@@ -21,8 +21,10 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    UPLOAD_DIR=/data/uploads
-RUN apk add --no-cache tini \
+    UPLOAD_DIR=/data/uploads \
+    CHROME_PATH=/usr/bin/chromium
+# Chromium prints quotations and invoices to PDF (exactly like the print page).
+RUN apk add --no-cache tini chromium font-noto font-noto-cjk \
  && addgroup -S app && adduser -S app -G app \
  && mkdir -p /data/uploads && chown -R app:app /data
 

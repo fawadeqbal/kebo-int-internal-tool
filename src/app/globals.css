@@ -205,6 +205,13 @@
   body {
     background: white;
   }
+  tr,
+  img {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
   @page {
     size: A4;
     margin: 14mm;

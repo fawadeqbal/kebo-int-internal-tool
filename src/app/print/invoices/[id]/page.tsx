@@ -19,7 +19,7 @@ export default async function PrintInvoice({ params }: { params: Promise<{ id: s
   return (
     <>
       <title>{`${inv.invoiceNo} — ${customerName(detail.customer)}`}</title>
-      <PrintToolbar backHref={`/invoices/${id}`} label={inv.invoiceNo} />
+      <PrintToolbar pdfHref={`/api/invoices/${id}/pdf`} backHref={`/invoices/${id}`} label={inv.invoiceNo} />
       <div className="shadow-xl print:shadow-none mx-auto max-w-[210mm]">
         <DocumentView
           kind="Invoice"

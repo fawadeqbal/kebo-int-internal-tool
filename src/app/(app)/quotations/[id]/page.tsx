@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { customerName } from "@/lib/utils/names";
-import { CopyPlus, Pencil, Printer, Receipt } from "lucide-react";
+import { CopyPlus, Pencil, FileDown, Printer, Receipt } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { isUuid } from "@/lib/utils/ids";
@@ -51,8 +51,11 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href={`/print/quotations/${id}`} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-              <Printer aria-hidden /> Print / PDF
+            <a href={`/api/quotations/${id}/pdf`} className={buttonClass("secondary", "sm")} download>
+              <FileDown aria-hidden /> Download PDF
+            </a>
+            <a href={`/print/quotations/${id}`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "sm")}>
+              <Printer aria-hidden /> Print
             </a>
             {manage && isEditable(q.status) && (
               <ButtonLink href={`/quotations/${id}/edit`} variant="secondary" size="sm">

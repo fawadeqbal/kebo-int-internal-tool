@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // Headless Chrome driver for PDF downloads: load it from node_modules, never bundle it.
+  serverExternalPackages: ["puppeteer-core"],
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },

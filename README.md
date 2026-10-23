@@ -15,8 +15,8 @@ Built with **Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM 
 | **Customers** | Name, company (optional), phone / WhatsApp, email · search · duplicate warning (same phone/email) · full history and account balance per customer |
 | **Queries / orders** | Only three things needed: customer, category, requirements · everything else optional · auto reference (`RFQ-2026-0001`) · the same 10 categories as the website · new customer can be added inside the query form · file attachments (drag & drop, with progress) |
 | **Workflow** | Pending → Processing → Completed / Not Completed (reason required) · reopen (managers) · assignment with history · internal notes · activity timeline · turnaround time |
-| **Quotations** | Line items, discount, tax %, auto totals · due/valid-until and submission dates · Draft → Sent → Accepted / Rejected / Expired · new versions (v1, v2…) without changing what the customer saw · print / save as PDF |
-| **Invoices** | Generated from an accepted quotation (values copied, editable before issuing) · sequential numbers (`INV-2026-0001`) never reused · locked once issued · payments (partial or full) · Overdue shown automatically · cancel with reason · print / save as PDF |
+| **Quotations** | Line items, discount, tax %, auto totals · due/valid-until and submission dates · Draft → Sent → Accepted / Rejected / Expired · new versions (v1, v2…) without changing what the customer saw · **Download PDF** (A4, page numbers) · print |
+| **Invoices** | Generated from an accepted quotation (values copied, editable before issuing) · sequential numbers (`INV-2026-0001`) never reused · locked once issued · payments (partial or full) · Overdue shown automatically · cancel with reason · **Download PDF** · print |
 | **Dashboard** | Pending / Processing / On hold / Overdue / Completed / Unassigned · money this month · queries per month chart · pipeline · my open work · needs attention · quotations awaiting reply · unpaid invoices · team workload |
 | **Reports** | Any date range and staff member · conversion · money · source and category breakdown · staff performance · CSV export · print to PDF |
 | **Reminders** | Background worker checks every hour: pending too long, processing too long, due soon / overdue, quotations expiring (auto-expired after due date), invoices due / overdue · in-app notifications · daily summary email to admins |
@@ -105,6 +105,8 @@ npm run db:seed -- --demo
 npm run dev                                       # http://localhost:3000
 npm run worker                                    # reminder job (optional)
 ```
+
+**PDF downloads** are printed by headless Chrome (`puppeteer-core`) from the same print page you see on screen, so the file matches it exactly. Locally an installed Chrome or Edge is used automatically; the Docker image ships Chromium. Set `CHROME_PATH` only if your browser is in an unusual place.
 
 Demo logins (after `--demo`): `admin@example.com` / value of `SEED_ADMIN_PASSWORD`; `ayesha@example.com` (manager), `bilal@example.com`, `sana@example.com`, `usman@example.com` (staff) — password `Demo@12345`.
 

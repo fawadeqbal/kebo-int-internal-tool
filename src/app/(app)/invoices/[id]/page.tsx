@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { customerName } from "@/lib/utils/names";
-import { Printer } from "lucide-react";
+import { FileDown, Printer } from "lucide-react";
 import { requirePagePermission } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { isUuid } from "@/lib/utils/ids";
@@ -57,9 +57,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               </Link>
             </p>
           </div>
-          <a href={`/print/invoices/${id}`} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-            <Printer aria-hidden /> Print / PDF
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <a href={`/print/invoices/${id}`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "sm")}>
+              <Printer aria-hidden /> Print
+            </a>
+            <a href={`/api/invoices/${id}/pdf`} className={buttonClass("primary", "sm")} download>
+              <FileDown aria-hidden /> Download PDF
+            </a>
+          </div>
         </div>
         {inv.status === "cancelled" && (
           <p className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm">

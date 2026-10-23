@@ -22,7 +22,7 @@ export default async function PrintQuotation({ params }: { params: Promise<{ id:
   return (
     <>
       <title>{`${q.refNo} — ${customerName(detail.customer)}`}</title>
-      <PrintToolbar backHref={`/quotations/${id}`} label={q.refNo} />
+      <PrintToolbar pdfHref={`/api/quotations/${id}/pdf`} backHref={`/quotations/${id}`} label={q.refNo} />
       <div className="shadow-xl print:shadow-none mx-auto max-w-[210mm]">
         <DocumentView
           kind="Quotation"
