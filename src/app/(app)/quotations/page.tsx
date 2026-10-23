@@ -1,54 +1,38 @@
 import Link from "next/link";
 import { FileText, SearchX } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { listQuotations, type QuotationFilters } from "@/modules/quotations/repository";
+import { listQuotations } from "@/modules/quotations/repository";
+import { parseQuotationParams, QUOTATION_SORTS, QUOTATION_STATUS_OPTIONS } from "@/lib/list-filters";
 import { listActiveUsers } from "@/modules/users/repository";
 import { getSettings } from "@/modules/settings/service";
 import { ActiveFilters, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { FilterDates, FilterSelect, FilterToolbar } from "@/components/ui/filters";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { QuotationStatusBadge } from "@/components/ui/badge";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
-import { QUOTATION_STATUS_LABEL } from "@/lib/labels";
 import { formatDate, todayISO } from "@/lib/utils/dates";
 import { formatMoney } from "@/lib/utils/money";
-import { isUuid } from "@/lib/utils/ids";
-import type { QuotationStatus } from "@/lib/db/schema";
 import { cn } from "@/lib/utils/cn";
 
 export const metadata = { title: "Quotations" };
 
-const SORTS = [
-  { value: "newest", label: "Newest first" },
-  { value: "expiry", label: "Valid-until date" },
-  { value: "value", label: "Highest value" },
-];
-const isDate = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+const SORTS = QUOTATION_SORTS;
 
 export default async function QuotationsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
   const sp = await searchParams;
-  const q = sp.q?.trim().slice(0, 100) || undefined;
-  const status = sp.status && (sp.status === "expiring" || sp.status in QUOTATION_STATUS_LABEL) ? (sp.status as QuotationStatus | "expiring") : undefined;
-  const preparedBy = isUuid(sp.by) ? sp.by : undefined;
-  const from = isDate(sp.from);
-  const to = isDate(sp.to);
-  const sort = SORTS.some((s) => s.value === sp.sort) && sp.sort !== "newest" ? (sp.sort as QuotationFilters["sort"]) : undefined;
-  const [data, settings, people] = await Promise.all([listQuotations(user, { q, status, preparedBy, from, to, sort, page: toPage(sp.page) }), getSettings(), listActiveUsers()]);
+  const people = await listActiveUsers();
+  const { filters, params, active } = parseQuotationParams(sp, people);
+  const { q, status, preparedBy, from, to, sort } = filters;
+  const [data, settings] = await Promise.all([listQuotations(user, { ...filters, page: toPage(sp.page) }), getSettings()]);
   const today = todayISO();
-  const params = { q, status, by: preparedBy, from, to, sort };
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/quotations", params, { page: undefined, ...patch });
-  const statusOptions = [{ value: "expiring", label: "Waiting for the customer" }, ...Object.entries(QUOTATION_STATUS_LABEL).map(([value, label]) => ({ value, label }))];
-  const active = [
-    status && { key: "status", label: "Status", value: statusOptions.find((o) => o.value === status)!.label },
-    preparedBy && { key: "by", label: "Prepared by", value: people.find((p) => p.id === preparedBy)?.name ?? "Someone" },
-    (from || to) && { key: "dates", label: "Created", value: `${from ? formatDate(from) : "…"} – ${to ? formatDate(to) : "…"}` },
-    sort && { key: "sort", label: "Sort", value: SORTS.find((s) => s.value === sort)!.label },
-  ].filter(Boolean) as { key: string; label: string; value: string }[];
+  const statusOptions = QUOTATION_STATUS_OPTIONS;
   const clearHref = buildHref("/quotations", { q }, {});
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Quotations" description="Offers sent to customers. Start a quotation from an inquiry." />
+      <PageHeader title="Quotations" description="Offers sent to customers. Start a quotation from an inquiry." actions={<ExportMenu pdfHref={buildHref("/api/export/quotations/pdf", params, {})} />} />
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         <FilterToolbar
           activeCount={active.length}
@@ -69,7 +53,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
           <FilterDates label="Created" from={from} to={to} />
           <FilterSelect name="sort" label="Sort" value={sort ?? "newest"} options={SORTS} keepDefault="newest" />
         </FilterToolbar>
-        <ActiveFilters clearHref={clearHref} items={active.map((a) => ({ ...a, removeHref: a.key === "dates" ? hrefFor({ from: undefined, to: undefined }) : hrefFor({ [a.key]: undefined }) }))} />
+        <ActiveFilters clearHref={clearHref} items={active.map((a) => ({ ...a, removeHref: hrefFor(Object.fromEntries(a.clear.map((k) => [k, undefined]))) }))} />
 
         {data.rows.length === 0 ? (
           <EmptyState

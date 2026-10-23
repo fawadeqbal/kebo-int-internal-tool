@@ -89,7 +89,18 @@ export function renderBaseUrl() {
  * Print one of the app's pages to an A4 PDF as the signed-in user.
  * `pagePath` must be an app path such as "/print/invoices/<id>".
  */
-export async function renderPdf({ pagePath, sessionCookie, footerLabel }: { pagePath: string; sessionCookie: { name: string; value: string }; footerLabel: string }): Promise<Uint8Array> {
+export async function renderPdf({
+  pagePath,
+  sessionCookie,
+  footerLabel,
+  landscape = false,
+}: {
+  pagePath: string;
+  sessionCookie: { name: string; value: string };
+  footerLabel: string;
+  /** Wide reports print on landscape A4. */
+  landscape?: boolean;
+}): Promise<Uint8Array> {
   if (!pagePath.startsWith("/print/")) throw new Error("Only print pages can be rendered");
   const base = renderBaseUrl();
   const origin = new URL(base).origin;
@@ -110,7 +121,7 @@ export async function renderPdf({ pagePath, sessionCookie, footerLabel }: { page
       await context.setCookie({ name: sessionCookie.name, value: sessionCookie.value, domain: new URL(base).hostname, path: "/", secure: false, httpOnly: true, sameSite: "Lax" });
 
       const response = await page.goto(`${base}${pagePath}`, { waitUntil: "networkidle0", timeout: RENDER_TIMEOUT_MS });
-      if (!response || !response.ok() || new URL(page.url()).pathname !== pagePath) {
+      if (!response || !response.ok() || new URL(page.url()).pathname !== pagePath.split("?")[0]) {
         throw new Error(`Could not open the document page (${response?.status() ?? "no response"})`);
       }
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -118,11 +129,14 @@ export async function renderPdf({ pagePath, sessionCookie, footerLabel }: { page
       const footer = footerLabel.replace(/[<>&"]/g, "");
       return await page.pdf({
         format: "A4",
+        landscape,
         printBackground: true,
-        preferCSSPageSize: true,
+        // Same margins as the print stylesheet, set here so landscape reports work too.
+        preferCSSPageSize: false,
+        margin: { top: "14mm", bottom: "14mm", left: landscape ? "12mm" : "14mm", right: landscape ? "12mm" : "14mm" },
         displayHeaderFooter: true,
         headerTemplate: "<span></span>",
-        footerTemplate: `<div style="width:100%;padding:0 14mm;font-family:Arial,sans-serif;font-size:7.5px;color:#8a8a8a;display:flex;justify-content:space-between"><span>${footer}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
+        footerTemplate: `<div style="width:100%;padding:0 ${landscape ? 12 : 14}mm;font-family:Arial,sans-serif;font-size:7.5px;color:#8a8a8a;display:flex;justify-content:space-between"><span>${footer}</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
         timeout: RENDER_TIMEOUT_MS,
       });
     } finally {

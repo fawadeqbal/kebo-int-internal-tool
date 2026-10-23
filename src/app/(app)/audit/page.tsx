@@ -5,17 +5,16 @@ import { listAudit } from "@/modules/audit/repository";
 import { listUsers } from "@/modules/users/repository";
 import { ActiveFilters, Avatar, EmptyState, PageHeader, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { FilterDates, FilterSelect, FilterToolbar } from "@/components/ui/filters";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { Badge } from "@/components/ui/badge";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
-import { formatDate, formatDateTime } from "@/lib/utils/dates";
-import { isUuid } from "@/lib/utils/ids";
+import { formatDateTime } from "@/lib/utils/dates";
+import { AUDIT_TYPES, auditTypeLabel, parseAuditParams } from "@/lib/list-filters";
 
 export const metadata = { title: "Audit log" };
 
-const ENTITY_TYPES = ["query", "customer", "quotation", "invoice", "payment", "attachment", "user", "settings"];
-const ENTITY_LABEL: Record<string, string> = { query: "Inquiry" };
-const label = (t: string) => ENTITY_LABEL[t] ?? t[0].toUpperCase() + t.slice(1);
-const isDate = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+const ENTITY_TYPES = AUDIT_TYPES;
+const label = auditTypeLabel;
 
 function Changes({ oldValues, newValues }: { oldValues: unknown; newValues: unknown }) {
   const n = (newValues ?? {}) as Record<string, unknown>;
@@ -37,22 +36,15 @@ function Changes({ oldValues, newValues }: { oldValues: unknown; newValues: unkn
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requirePagePermission("audit.view");
   const sp = await searchParams;
-  const type = ENTITY_TYPES.includes(sp.type ?? "") ? sp.type : undefined;
-  const who = isUuid(sp.who) ? sp.who : undefined;
-  const from = isDate(sp.from);
-  const to = isDate(sp.to);
-  const [data, people] = await Promise.all([listAudit({ page: toPage(sp.page), entityType: type, userId: who, from, to }), listUsers()]);
-  const params = { type, who, from, to };
+  const people = await listUsers();
+  const { filters, params, active } = parseAuditParams(sp, people);
+  const { entityType: type, userId: who, from, to } = filters;
+  const data = await listAudit({ ...filters, page: toPage(sp.page) });
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/audit", params, { page: undefined, ...patch });
-  const active = [
-    type && { key: "type", label: "Record", value: label(type) },
-    who && { key: "who", label: "Person", value: people.find((p) => p.id === who)?.name ?? "Someone" },
-    (from || to) && { key: "dates", label: "When", value: `${from ? formatDate(from) : "…"} – ${to ? formatDate(to) : "…"}` },
-  ].filter(Boolean) as { key: string; label: string; value: string }[];
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Audit log" description="Every important change: who did it, when, and what changed." />
+      <PageHeader title="Audit log" description="Every important change: who did it, when, and what changed." actions={<ExportMenu pdfHref={buildHref("/api/export/audit/pdf", params, {})} />} />
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         <FilterToolbar
           activeCount={active.length}
@@ -71,7 +63,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <FilterSelect name="who" label="Person" value={who} options={people.map((p) => ({ value: p.id, label: p.name }))} allLabel="Anyone" />
           <FilterDates label="When" from={from} to={to} />
         </FilterToolbar>
-        <ActiveFilters clearHref="/audit" items={active.map((a) => ({ ...a, removeHref: a.key === "dates" ? hrefFor({ from: undefined, to: undefined }) : hrefFor({ [a.key]: undefined }) }))} />
+        <ActiveFilters clearHref="/audit" items={active.map((a) => ({ ...a, removeHref: hrefFor(Object.fromEntries(a.clear.map((k) => [k, undefined]))) }))} />
         {data.rows.length === 0 ? (
           <EmptyState icon={active.length ? SearchX : ScrollText} title={active.length ? "Nothing matches these filters" : "No activity yet"} />
         ) : (

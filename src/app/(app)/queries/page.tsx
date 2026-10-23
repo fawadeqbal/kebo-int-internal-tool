@@ -1,28 +1,24 @@
 import Link from "next/link";
-import { ClipboardList, Download, Plus, SearchX, X } from "lucide-react";
+import { ClipboardList, Plus, SearchX, X } from "lucide-react";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { countByStatus, listQueries } from "@/modules/queries/repository";
 import { parseQueryFilters } from "@/modules/queries/filters";
+import { INQUIRY_SORTS, inquiryActiveFilters } from "@/lib/list-filters";
 import { listActiveUsers } from "@/modules/users/repository";
 import { getSettings } from "@/modules/settings/service";
 import { InboxList, InboxTable } from "@/modules/queries/components/inbox";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
 import { ActiveFilters, buttonClass, EmptyState, LinkTabs, PageHeader, SearchField } from "@/components/ui";
 import { FilterDates, FilterSelect, FilterToolbar } from "@/components/ui/filters";
-import { todayISO, formatDate } from "@/lib/utils/dates";
+import { todayISO } from "@/lib/utils/dates";
 import { PRIORITY_LABEL, QUERY_STATUS_LABEL, SOURCE_LABEL } from "@/lib/labels";
 import { cn } from "@/lib/utils/cn";
 
 export const metadata = { title: "Inquiries" };
 
-const SORTS = [
-  { value: "newest", label: "Newest first" },
-  { value: "oldest", label: "Oldest first" },
-  { value: "required", label: "Needed-by date" },
-  { value: "priority", label: "Priority" },
-  { value: "updated", label: "Recently updated" },
-];
+const SORTS = INQUIRY_SORTS;
 
 export default async function QueriesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
@@ -58,14 +54,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
   const sourceOptions = Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label }));
   const priorityOptions = Object.entries(PRIORITY_LABEL).map(([value, label]) => ({ value, label }));
 
-  const active = [
-    raw.assignee && { key: "assignee", label: "Handled by", value: personOptions.find((o) => o.value === raw.assignee)?.label ?? "Someone" },
-    raw.category && { key: "category", label: "Category", value: raw.category },
-    raw.source && { key: "source", label: "Via", value: SOURCE_LABEL[raw.source as keyof typeof SOURCE_LABEL] },
-    raw.priority && { key: "priority", label: "Priority", value: PRIORITY_LABEL[raw.priority as keyof typeof PRIORITY_LABEL] },
-    (raw.from || raw.to) && { key: "dates", label: "Received", value: `${raw.from ? formatDate(raw.from) : "…"} – ${raw.to ? formatDate(raw.to) : "…"}` },
-    raw.sort && raw.sort !== "newest" && { key: "sort", label: "Sort", value: SORTS.find((s) => s.value === raw.sort)?.label ?? raw.sort },
-  ].filter(Boolean) as { key: string; label: string; value: string }[];
+  const active = inquiryActiveFilters(raw, people, user.id);
 
   return (
     <div className="space-y-5">
@@ -83,9 +72,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
         }
         actions={
           <>
-            <a href={buildHref("/api/queries/export", raw, {})} className={buttonClass("secondary", "sm")} title="Download this list as a spreadsheet (CSV)">
-              <Download aria-hidden /> Export
-            </a>
+            <ExportMenu pdfHref={buildHref("/api/export/inquiries/pdf", { ...raw, status: statusParam }, {})} csvHref={buildHref("/api/queries/export", raw, {})} />
             {canCreate && (
               <Link href="/queries/new" className={cn(buttonClass("primary", "sm"), "hidden sm:inline-flex")}>
                 <Plus aria-hidden /> New inquiry
@@ -131,7 +118,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
         </FilterToolbar>
         <ActiveFilters
           clearHref={buildHref("/queries", { q: raw.q, status: statusParam }, {})}
-          items={active.map((a) => ({ label: a.label, value: a.value, removeHref: a.key === "dates" ? hrefFor({ from: undefined, to: undefined }) : hrefFor({ [a.key]: undefined }) }))}
+          items={active.map((a) => ({ label: a.label, value: a.value, removeHref: hrefFor(Object.fromEntries(a.clear.map((k) => [k, undefined]))) }))}
         />
 
         {data.rows.length === 0 ? (

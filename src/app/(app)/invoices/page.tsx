@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Receipt, SearchX } from "lucide-react";
 import { requirePagePermission } from "@/lib/auth/session";
-import { listInvoices, type InvoiceFilters } from "@/modules/invoices/repository";
+import { listInvoices } from "@/modules/invoices/repository";
+import { INVOICE_SORTS, INVOICE_STATUSES, parseInvoiceParams } from "@/lib/list-filters";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import { getSettings } from "@/modules/settings/service";
 import { ActiveFilters, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { FilterDates, FilterSelect, FilterToolbar } from "@/components/ui/filters";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { InvoiceStatusBadge } from "@/components/ui/badge";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
 import { formatDate, todayISO } from "@/lib/utils/dates";
@@ -14,43 +16,22 @@ import { cn } from "@/lib/utils/cn";
 
 export const metadata = { title: "Invoices" };
 
-const STATUSES: Record<NonNullable<InvoiceFilters["status"]>, string> = {
-  outstanding: "Outstanding (unpaid + partial)",
-  overdue: "Overdue",
-  unpaid: "Unpaid",
-  partially_paid: "Partially paid",
-  paid: "Paid",
-  cancelled: "Cancelled",
-};
-const SORTS = [
-  { value: "newest", label: "Newest first" },
-  { value: "due", label: "Payment due date" },
-  { value: "balance", label: "Largest balance" },
-];
-const isDate = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+const STATUSES = INVOICE_STATUSES;
+const SORTS = INVOICE_SORTS;
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requirePagePermission("invoices.manage");
   const sp = await searchParams;
-  const q = sp.q?.trim().slice(0, 100) || undefined;
-  const status = sp.status && sp.status in STATUSES ? (sp.status as InvoiceFilters["status"]) : undefined;
-  const from = isDate(sp.from);
-  const to = isDate(sp.to);
-  const sort = SORTS.some((s) => s.value === sp.sort) && sp.sort !== "newest" ? (sp.sort as InvoiceFilters["sort"]) : undefined;
-  const [data, settings] = await Promise.all([listInvoices(user, { q, status, from, to, sort, page: toPage(sp.page) }), getSettings()]);
+  const { filters, params, active } = parseInvoiceParams(sp);
+  const { q, status, from, to, sort } = filters;
+  const [data, settings] = await Promise.all([listInvoices(user, { ...filters, page: toPage(sp.page) }), getSettings()]);
   const today = todayISO();
-  const params = { q, status, from, to, sort };
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/invoices", params, { page: undefined, ...patch });
-  const active = [
-    status && { key: "status", label: "Status", value: STATUSES[status] },
-    (from || to) && { key: "dates", label: "Issued", value: `${from ? formatDate(from) : "…"} – ${to ? formatDate(to) : "…"}` },
-    sort && { key: "sort", label: "Sort", value: SORTS.find((s) => s.value === sort)!.label },
-  ].filter(Boolean) as { key: string; label: string; value: string }[];
   const clearHref = buildHref("/invoices", { q }, {});
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Invoices" description="Made from quotations the customer accepted." />
+      <PageHeader title="Invoices" description="Made from quotations the customer accepted." actions={<ExportMenu pdfHref={buildHref("/api/export/invoices/pdf", params, {})} />} />
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         <FilterToolbar
           activeCount={active.length}
@@ -70,7 +51,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           <FilterDates label="Issued" from={from} to={to} />
           <FilterSelect name="sort" label="Sort" value={sort ?? "newest"} options={SORTS} keepDefault="newest" />
         </FilterToolbar>
-        <ActiveFilters clearHref={clearHref} items={active.map((a) => ({ ...a, removeHref: a.key === "dates" ? hrefFor({ from: undefined, to: undefined }) : hrefFor({ [a.key]: undefined }) }))} />
+        <ActiveFilters clearHref={clearHref} items={active.map((a) => ({ ...a, removeHref: hrefFor(Object.fromEntries(a.clear.map((k) => [k, undefined]))) }))} />
 
         {data.rows.length === 0 ? (
           <EmptyState

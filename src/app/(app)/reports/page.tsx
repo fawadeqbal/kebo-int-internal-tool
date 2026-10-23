@@ -1,13 +1,12 @@
 import { AlertTriangle, Banknote, CheckCircle2, FileCheck2, FileText, Hourglass, Inbox, Receipt, Timer, Wallet, XCircle } from "lucide-react";
-import { Download } from "lucide-react";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { requirePagePermission } from "@/lib/auth/session";
 import { breakdown, finance, monthlyTrend, pipeline, rangeSummary, statusCounts, workload } from "@/modules/reports/repository";
 import { resolveRange } from "@/modules/reports/range";
 import { ReportFilters } from "./filters";
 import { listActiveUsers } from "@/modules/users/repository";
 import { getSettings } from "@/modules/settings/service";
-import { Avatar, buttonClass, Card, CardBody, CardHeader, PageHeader, Table, THead, Td, Th, Tr } from "@/components/ui";
-import { PrintButton } from "@/components/ui/client";
+import { Avatar, Card, CardBody, CardHeader, PageHeader, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { BarList, Metric, StatCard } from "@/components/stats";
 import { cn } from "@/lib/utils/cn";
 import { TrendChart } from "@/components/charts";
@@ -54,10 +53,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         }
         actions={
           <div className="no-print flex gap-2">
-            <a href={buildHref("/api/reports/export", params, {})} className={buttonClass("secondary", "sm")}>
-              <Download aria-hidden /> Export CSV
-            </a>
-            <PrintButton label="Print / PDF" size="sm" variant="secondary" />
+            <ExportMenu pdfHref={buildHref("/api/export/reports/pdf", params, {})} csvHref={buildHref("/api/reports/export", params, {})} />
           </div>
         }
       />

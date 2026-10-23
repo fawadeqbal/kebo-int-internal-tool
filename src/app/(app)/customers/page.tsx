@@ -1,37 +1,26 @@
 import Link from "next/link";
 import { Building2, ChevronRight, Plus, SearchX } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { listCustomers, type CustomerListFilters } from "@/modules/customers/repository";
+import { listCustomers } from "@/modules/customers/repository";
+import { CUSTOMER_SHOW, CUSTOMER_SORTS, parseCustomerParams } from "@/lib/list-filters";
 import { ActiveFilters, Avatar, ButtonLink, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { FilterSelect, FilterToolbar } from "@/components/ui/filters";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils/dates";
 
 export const metadata = { title: "Customers" };
 
-const SHOW = [
-  { value: "open", label: "With open inquiries" },
-  { value: "unpaid", label: "With unpaid invoices" },
-  { value: "none", label: "No inquiries yet" },
-];
-const SORTS = [
-  { value: "company", label: "Name (A–Z)" },
-  { value: "recent", label: "Latest inquiry" },
-];
+const SHOW = CUSTOMER_SHOW;
+const SORTS = CUSTOMER_SORTS;
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; sort?: string; has?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireUser();
   const sp = await searchParams;
-  const q = sp.q?.trim().slice(0, 100) || undefined;
-  const sort = sp.sort === "recent" ? "recent" : "company";
-  const has = SHOW.some((s) => s.value === sp.has) ? (sp.has as CustomerListFilters["has"]) : undefined;
-  const data = await listCustomers({ q, page: toPage(sp.page), sort, has });
-  const params = { q, has, sort: sort === "company" ? undefined : sort };
+  const { filters, params, active } = parseCustomerParams(sp);
+  const { q, sort, has } = filters;
+  const data = await listCustomers({ ...filters, page: toPage(sp.page) });
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/customers", params, { page: undefined, ...patch });
-  const active = [
-    has && { key: "has", label: "Show", value: SHOW.find((s) => s.value === has)!.label },
-    sort !== "company" && { key: "sort", label: "Sort", value: "Latest inquiry" },
-  ].filter(Boolean) as { key: string; label: string; value: string }[];
 
   return (
     <div className="space-y-5">
@@ -39,9 +28,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         title="Customers"
         description="Everyone who has sent an RFQ, by website, WhatsApp, WeChat, email or phone."
         actions={
-          <ButtonLink href="/customers/new" variant="primary" size="sm">
-            <Plus aria-hidden /> Add customer
-          </ButtonLink>
+          <>
+            <ExportMenu pdfHref={buildHref("/api/export/customers/pdf", params, {})} />
+            <ButtonLink href="/customers/new" variant="primary" size="sm">
+              <Plus aria-hidden /> Add customer
+            </ButtonLink>
+          </>
         }
       />
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
@@ -62,7 +54,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <FilterSelect name="has" label="Show" value={has} options={SHOW} allLabel="Everyone" />
           <FilterSelect name="sort" label="Sort" value={sort} options={SORTS} keepDefault="company" />
         </FilterToolbar>
-        <ActiveFilters clearHref={buildHref("/customers", { q }, {})} items={active.map((a) => ({ ...a, removeHref: hrefFor({ [a.key]: undefined }) }))} />
+        <ActiveFilters clearHref={buildHref("/customers", { q }, {})} items={active.map((a) => ({ ...a, removeHref: hrefFor(Object.fromEntries(a.clear.map((k) => [k, undefined]))) }))} />
 
         {data.rows.length === 0 ? (
           <EmptyState
