@@ -100,6 +100,10 @@ const listColumns = {
   customerPhone: customers.phone,
   assigneeId: assignee.id,
   assigneeName: assignee.name,
+  /** Deal progress, for the track on each row. */
+  quoted: sql<boolean>`exists (select 1 from quotations qt where qt.query_id = ${queries.id} and qt.deleted_at is null and qt.status <> 'draft')`,
+  accepted: sql<boolean>`exists (select 1 from quotations qt where qt.query_id = ${queries.id} and qt.deleted_at is null and qt.status = 'accepted')`,
+  invoiced: sql<boolean>`exists (select 1 from invoices iv where iv.query_id = ${queries.id} and iv.status <> 'cancelled')`,
 };
 
 export async function listQueries(user: SessionUser, f: QueryFilters) {

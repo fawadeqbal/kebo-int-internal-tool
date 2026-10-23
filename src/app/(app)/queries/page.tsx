@@ -1,215 +1,190 @@
 import Link from "next/link";
-import { Download } from "lucide-react";
+import { Download, Plus, Search, X } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { listQueries } from "@/modules/queries/repository";
 import { parseQueryFilters } from "@/modules/queries/filters";
-import { OPEN_STATUSES } from "@/modules/queries/workflow";
-import { listActiveUsers } from "@/modules/users/repository";
-import { Button, ButtonLink, buttonClass, Card, EmptyState, Input, PageHeader, Select, Table, Td, Th } from "@/components/ui";
-import { PriorityBadge, QueryStatusBadge } from "@/components/ui/badge";
+import { statusCounts } from "@/modules/reports/repository";
+import { InboxRow } from "@/modules/queries/components/inbox";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
-import { PRIORITY_LABEL, QUERY_STATUS_LABEL } from "@/lib/labels";
-import { formatDate, todayISO } from "@/lib/utils/dates";
+import { buttonClass } from "@/components/ui";
+import { todayISO } from "@/lib/utils/dates";
+import { QUERY_STATUS_LABEL } from "@/lib/labels";
 import { cn } from "@/lib/utils/cn";
 
 export const metadata = { title: "Queries" };
 
-const VIEWS = [
-  { key: "open", label: "Open", params: { status: "open" } },
-  { key: "website", label: "From website", params: { status: "open", source: "website" } },
-  { key: "mine", label: "Assigned to me", params: { status: "open", assignee: "me" } },
-  { key: "unassigned", label: "Unassigned", params: { status: "open", assignee: "unassigned" } },
-  { key: "overdue", label: "Overdue", params: { status: "overdue" } },
-  { key: "completed", label: "Completed", params: { status: "completed" } },
-  { key: "all", label: "All", params: {} },
-] as const;
+type Tab = { key: string; label: string; status?: string; count: number; alert?: boolean };
 
 export default async function QueriesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
   const sp = await searchParams;
-  const filters = parseQueryFilters(sp);
-  const [data, people] = await Promise.all([listQueries(user, { ...filters, page: toPage(sp.page) }), listActiveUsers()]);
+  const mine = sp.assignee === "me";
+  // The default view is the work still open: what people come here to act on.
+  const filters = parseQueryFilters({ ...sp, status: sp.status ?? "open" });
+  const status = sp.status === "all" ? "all" : filters.raw.status;
+  const [data, counts] = await Promise.all([listQueries(user, { ...filters, page: toPage(sp.page) }), statusCounts(user, mine ? user.id : undefined)]);
+
+  const tabs: Tab[] = [
+    { key: "open", label: "Open", status: "open", count: counts.pending + counts.processing },
+    { key: "overdue", label: "Overdue", status: "overdue", count: counts.overdue, alert: counts.overdue > 0 },
+    { key: "completed", label: "Completed", status: "completed", count: counts.completed },
+    { key: "not_completed", label: "Not completed", status: "not_completed", count: counts.not_completed },
+    { key: "all", label: "All", status: "all", count: counts.pending + counts.processing + counts.completed + counts.not_completed },
+  ];
+  const keep = { q: filters.q, assignee: mine ? "me" : undefined };
+  const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/queries", { ...keep, status: status === "open" ? undefined : status }, patch);
   const today = todayISO();
-  const activeView = VIEWS.find((v) => {
-    const p = v.params as Record<string, string>;
-    return (p.status ?? undefined) === filters.raw.status && (p.assignee ?? undefined) === filters.raw.assignee && (p.source ?? undefined) === filters.raw.source;
-  })?.key;
-  const hasExtraFilters = !!(filters.q || filters.priority || filters.from || filters.to || filters.customerId || ((filters.assignee || filters.source) && !activeView));
-  const exportHref = buildHref("/api/queries/export", filters.raw, {});
+  const now = new Date();
+  const needAction = counts.pending;
+  const canCreate = can(user.role, "queries.create");
 
   return (
-    <>
-      <PageHeader
-        title="Queries"
-        description="Customer queries and orders, from first contact to completion."
-        actions={
-          <>
-            <a href={exportHref} className={buttonClass("secondary")}>
-              <Download className="h-4 w-4" aria-hidden /> Export CSV
+    <div className="-mx-4 -mt-6 sm:-mx-6 lg:mx-auto lg:mt-0 lg:max-w-4xl">
+      {/* Title and the one filter that is about "me" */}
+      <div className="px-4 pt-5 sm:px-6 lg:px-0 lg:pt-0">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h1 className="text-[28px] font-semibold leading-tight tracking-tight">Queries</h1>
+            <p className="mt-0.5 text-sm text-muted">
+              {needAction > 0 ? (
+                <>
+                  <span className="font-medium text-amber-700">{needAction} waiting to be started</span>
+                  {counts.unassigned > 0 && `, ${counts.unassigned} without an owner`}
+                </>
+              ) : (
+                "Nothing waiting to be started"
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={buildHref("/api/queries/export", filters.raw, {})}
+              className="hidden h-10 items-center gap-2 rounded-lg px-3 text-sm text-muted hover:bg-black/5 hover:text-ink sm:inline-flex"
+              title="Download this list as a spreadsheet (CSV)"
+            >
+              <Download className="h-4 w-4" aria-hidden /> Export
             </a>
-            {can(user.role, "queries.create") && <ButtonLink href="/queries/new">New query</ButtonLink>}
-          </>
-        }
-      />
+            <Link
+              href={hrefFor({ assignee: mine ? undefined : "me", status: status === "open" ? undefined : status, page: undefined })}
+              aria-pressed={mine}
+              className={cn(
+                "inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-sm ring-1 ring-inset transition-colors",
+                mine ? "bg-brand-600 text-white ring-brand-600" : "bg-surface text-ink ring-line hover:bg-black/[0.03]",
+              )}
+            >
+              <span className={cn("grid h-4 w-4 place-items-center rounded-full border text-[10px]", mine ? "border-white bg-white text-brand-700" : "border-muted/60")} aria-hidden>
+                {mine ? "✓" : ""}
+              </span>
+              Mine
+            </Link>
+          </div>
+        </div>
 
-      <nav aria-label="Quick views" className="mb-4 flex flex-wrap gap-1.5">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.key}
-            href={buildHref("/queries", {}, v.params)}
-            aria-current={activeView === v.key ? "page" : undefined}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-sm transition-colors",
-              activeView === v.key ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface text-muted hover:text-ink",
+      </div>
+
+      {/* Search and status tabs stay pinned while scrolling on phones */}
+      <div className="sticky top-0 z-10 bg-canvas/95 px-4 pb-3 pt-4 backdrop-blur sm:px-6 lg:static lg:px-0 lg:backdrop-blur-none">
+        <form role="search" className="relative">
+          <label htmlFor="search" className="sr-only">
+            Search queries
+          </label>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
+          <input
+            id="search"
+            name="q"
+            type="search"
+            defaultValue={filters.q}
+            placeholder="Search buyer, company, machine or reference"
+            className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-10 text-[15px] shadow-xs placeholder:text-muted/80 focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-100"
+          />
+          {status !== "open" && <input type="hidden" name="status" value={status} />}
+          {mine && <input type="hidden" name="assignee" value="me" />}
+          {filters.q && (
+            <Link
+              href={hrefFor({ q: undefined })}
+              className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-ink"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </Link>
+          )}
+        </form>
+
+        <div className="mt-3">
+          <nav aria-label="Filter by status" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+            {tabs.map((t) => {
+              const active = status === t.status;
+              return (
+                <Link
+                  key={t.key}
+                  href={hrefFor({ status: t.status === "open" ? undefined : t.status, page: undefined })}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors",
+                    active ? "bg-ink text-white" : "bg-surface text-ink ring-1 ring-line ring-inset hover:bg-black/[0.03]",
+                  )}
+                >
+                  {t.label}
+                  <span
+                    className={cn(
+                      "tabular-nums text-xs",
+                      active ? "text-white/70" : t.alert ? "font-semibold text-red-700" : "text-muted",
+                    )}
+                  >
+                    {t.count}
+                  </span>
+                </Link>
+              );
+            })}
+            {status && !tabs.some((t) => t.status === status) && (
+              <Link
+                href={hrefFor({ status: undefined, page: undefined })}
+                aria-current="page"
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-ink px-3.5 text-sm text-white"
+                aria-label={`Showing ${QUERY_STATUS_LABEL[status as keyof typeof QUERY_STATUS_LABEL] ?? status}. Remove filter`}
+              >
+                {QUERY_STATUS_LABEL[status as keyof typeof QUERY_STATUS_LABEL] ?? status}
+                <X className="h-3.5 w-3.5 text-white/70" aria-hidden />
+              </Link>
             )}
-          >
-            {v.label}
-          </Link>
-        ))}
-      </nav>
+          </nav>
+        </div>
+      </div>
 
-      <Card>
-        <form className="grid gap-3 border-b border-line p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]" role="search">
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Search
-            <Input id="search" name="q" defaultValue={filters.q} placeholder="Ref no., title, company or contact" />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Status
-            <Select name="status" defaultValue={filters.raw.status ?? ""}>
-              <option value="">Any status</option>
-              <option value="open">Open (not closed)</option>
-              <option value="overdue">Overdue</option>
-              {Object.entries(QUERY_STATUS_LABEL).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Assigned to
-            <Select name="assignee" defaultValue={filters.raw.assignee ?? ""}>
-              <option value="">Anyone</option>
-              <option value="me">Me</option>
-              <option value="unassigned">Unassigned</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Priority
-            <Select name="priority" defaultValue={filters.raw.priority ?? ""}>
-              <option value="">Any priority</option>
-              {Object.entries(PRIORITY_LABEL).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <details className="group sm:col-span-2 lg:col-span-1 lg:row-start-2 lg:col-start-1 lg:col-end-6" open={!!(filters.from || filters.to || filters.sort)}>
-            <summary className="cursor-pointer text-sm text-muted hover:text-ink">More filters</summary>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
-                Created from
-                <Input type="date" name="from" defaultValue={filters.from} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
-                Created to
-                <Input type="date" name="to" defaultValue={filters.to} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
-                Sort by
-                <Select name="sort" defaultValue={filters.sort ?? "newest"}>
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                  <option value="required">Required-by date</option>
-                  <option value="priority">Priority</option>
-                  <option value="updated">Recently updated</option>
-                </Select>
-              </label>
-            </div>
-          </details>
-          {filters.customerId && <input type="hidden" name="customer" value={filters.customerId} />}
-          {filters.source && <input type="hidden" name="source" value={filters.source} />}
-          <div className="flex items-end gap-2 lg:row-start-1 lg:col-start-5">
-            <Button variant="secondary">Apply</Button>
-            {(hasExtraFilters || filters.raw.status) && (
-              <Link href="/queries" className="pb-2.5 text-sm text-muted hover:text-ink">
-                Reset
+      {/* The list */}
+      <section aria-label="Queries" className="border-y border-line bg-surface lg:mt-2 lg:rounded-2xl lg:border">
+        {data.rows.length === 0 ? (
+          <div className="px-6 py-16 text-center">
+            <p className="text-base font-semibold">
+              {filters.q ? `Nothing matches “${filters.q}”` : status === "overdue" ? "Nothing is overdue" : status === "open" ? "No open queries" : "No queries here yet"}
+            </p>
+            <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
+              {filters.q
+                ? "Try the buyer's name, the company or part of the machine name."
+                : status === "open"
+                  ? "Website inquiries appear here automatically. You can also add one from a call or WhatsApp."
+                  : "Try another tab."}
+            </p>
+            {canCreate && !filters.q && status === "open" && (
+              <Link href="/queries/new" className={buttonClass("primary", "md", "mt-5")}>
+                <Plus className="h-4 w-4" aria-hidden /> New query
               </Link>
             )}
           </div>
-        </form>
-
-        {data.rows.length === 0 ? (
-          <EmptyState
-            title="No queries found"
-            description={hasExtraFilters || filters.status ? "Try changing the filters." : "When a customer contacts you, record it here."}
-            action={can(user.role, "queries.create") && <ButtonLink href="/queries/new">New query</ButtonLink>}
-          />
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <Th>Reference</Th>
-                <Th>Query</Th>
-                <Th>Customer</Th>
-                <Th>Status</Th>
-                <Th>Priority</Th>
-                <Th>Assigned to</Th>
-                <Th>Required by</Th>
-                <Th>Received</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((r) => {
-                const overdue = !!r.requiredBy && r.requiredBy < today && OPEN_STATUSES.includes(r.status);
-                return (
-                  <tr key={r.id} className="group hover:bg-canvas/60">
-                    <Td className="whitespace-nowrap font-mono text-xs">
-                      <Link href={`/queries/${r.id}`} className="font-semibold text-brand-700 hover:underline">
-                        {r.refNo}
-                      </Link>
-                    </Td>
-                    <Td className="max-w-72">
-                      <Link href={`/queries/${r.id}`} className="font-medium text-ink hover:underline">
-                        {r.title}
-                      </Link>
-                      <p className="truncate text-xs text-muted">
-                        {r.source === "website" && <span className="mr-1.5 font-medium text-violet-700">Website ·</span>}
-                        {r.category}
-                      </p>
-                    </Td>
-                    <Td>
-                      <span className="block font-medium">{r.companyName}</span>
-                      {r.contactPerson !== r.companyName && <span className="text-xs text-muted">{r.contactPerson}</span>}
-                    </Td>
-                    <Td>
-                      <QueryStatusBadge status={r.status} />
-                    </Td>
-                    <Td>
-                      <PriorityBadge priority={r.priority} />
-                    </Td>
-                    <Td className={r.assigneeName ? "" : "text-muted italic"}>{r.assigneeName ?? "Unassigned"}</Td>
-                    <Td className={cn("whitespace-nowrap", overdue && "font-semibold text-red-700")}>
-                      {formatDate(r.requiredBy)}
-                      {overdue && <span className="block text-xs font-medium">Overdue</span>}
-                    </Td>
-                    <Td className="whitespace-nowrap text-muted">{formatDate(r.createdAt)}</Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
+          <ul className="divide-y divide-line">
+            {data.rows.map((r) => (
+              <InboxRow key={r.id} item={r} today={today} now={now} />
+            ))}
+          </ul>
         )}
-        <Pagination base="/queries" params={filters.raw} page={data.page} pageSize={data.pageSize} total={data.total} />
-      </Card>
-    </>
+        {data.total > data.pageSize && (
+          <div className="border-t border-line">
+            <Pagination base="/queries" params={{ ...keep, status: status === "open" ? undefined : status }} page={data.page} pageSize={data.pageSize} total={data.total} />
+          </div>
+        )}
+      </section>
+    </div>
   );
 }

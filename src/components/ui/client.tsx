@@ -70,7 +70,7 @@ export function Toast() {
     <div
       role="status"
       aria-live="polite"
-      className="no-print fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-lg bg-ink px-4 py-3 text-sm text-white shadow-lg"
+      className="no-print fixed inset-x-4 bottom-24 z-50 flex items-center gap-3 rounded-xl bg-ink px-4 py-3 text-sm text-white shadow-lg sm:inset-x-auto sm:right-5 lg:bottom-5"
     >
       <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
       {visible}

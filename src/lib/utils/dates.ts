@@ -49,3 +49,17 @@ export function formatDuration(ms: number | null | undefined): string {
 export function daysBetween(fromISO: string, toISO: string): number {
   return Math.round((Date.parse(`${toISO}T00:00:00Z`) - Date.parse(`${fromISO}T00:00:00Z`)) / 86400000);
 }
+
+/** Short relative time for lists: "just now", "25m", "3h", "Yesterday", "4d", or a date. */
+export function timeAgo(value: Date | string, now: Date = new Date()): string {
+  const d = new Date(value);
+  const mins = Math.floor((now.getTime() - d.getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: APP_TIME_ZONE }).format(d);
+}

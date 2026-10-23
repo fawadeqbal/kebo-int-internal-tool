@@ -67,7 +67,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen">
-      <Sidebar groups={groups} brand={brand} footer={footer} />
+      <Sidebar groups={groups} brand={brand} footer={footer} unread={unread} canCreate={can(user.role, "queries.create")} />
       <div className="lg:pl-64">
         <div className="no-print sticky top-0 z-20 hidden h-14 items-center justify-end gap-3 border-b border-line bg-canvas/85 px-8 backdrop-blur lg:flex">
           {can(user.role, "queries.create") && (
@@ -80,7 +80,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </Link>
           )}
         </div>
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main className="mx-auto max-w-7xl px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       </div>
       <Suspense>
         <Toast />
