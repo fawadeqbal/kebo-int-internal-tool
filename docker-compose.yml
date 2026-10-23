@@ -1,0 +1,106 @@
+# Production stack — everything runs on your own server.
+#   docker compose up -d --build
+#   docker compose run --rm app node dist/scripts/seed.js          # first admin
+#   docker compose run --rm app node dist/scripts/seed.js --demo   # + demo data (optional)
+
+name: qms
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://qms:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/qms
+  AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+  APP_URL: ${APP_URL:-https://localhost}
+  APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Karachi}
+  COOKIE_SECURE: ${COOKIE_SECURE:-true}
+  UPLOAD_DIR: /data/uploads
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+  SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qms
+      POSTGRES_USER: qms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${APP_TIME_ZONE:-Asia/Karachi}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qms -d qms"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: qms-app:latest
+    restart: unless-stopped
+    environment: *app-env
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "3000"
+
+  worker:
+    image: qms-app:latest
+    restart: unless-stopped
+    command: ["node", "dist/worker/index.js"]
+    environment:
+      <<: *app-env
+      REMINDER_INTERVAL_MINUTES: ${REMINDER_INTERVAL_MINUTES:-60}
+    healthcheck:
+      disable: true
+    depends_on:
+      app:
+        condition: service_healthy
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: qms
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: qms
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_HOUR: ${BACKUP_HOUR:-2}
+      TZ: ${APP_TIME_ZONE:-Asia/Karachi}
+    volumes:
+      - ./docker/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+      - uploads:/data/uploads:ro
+    entrypoint: ["sh", "/backup.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,150 @@
+# QMS — Query & Order Management System
+
+Internal web app to record customer queries/orders, track who is working on them and how long they take, send quotations, and generate invoices — with an admin dashboard and reports.
+
+Built with **Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM · Tailwind CSS**, and deployed with **Docker Compose on your own server**.
+
+---
+
+## What it does
+
+| Area | Features |
+|---|---|
+| **Customers** | Company name, contact person, contact number, email, address, NTN, notes · search · duplicate warning (same phone/email) · full history and account balance per customer |
+| **Queries / orders** | Auto reference (`QRY-2026-0001`) · specifications · quantity · priority · required-by date · source (phone, email, WhatsApp, walk-in…) · new customer can be added inside the query form · file attachments (drag & drop, with progress) |
+| **Workflow** | Pending → Processing → On Hold → Completed / Not Completed (reason required) · reopen (managers) · assignment and reassignment with history · internal notes · activity timeline · time spent in each status and turnaround time |
+| **Quotations** | Line items, discount, tax %, auto totals · due/valid-until and submission dates · Draft → Sent → Accepted / Rejected / Expired · new versions (v1, v2…) without changing what the customer saw · print / save as PDF |
+| **Invoices** | Generated from an accepted quotation (values copied, editable before issuing) · sequential numbers (`INV-2026-0001`) never reused · locked once issued · payments (partial or full) · Overdue shown automatically · cancel with reason · print / save as PDF |
+| **Dashboard** | Pending / Processing / On hold / Overdue / Completed / Unassigned · money this month · queries per month chart · pipeline · my open work · needs attention · quotations awaiting reply · unpaid invoices · team workload |
+| **Reports** | Any date range and staff member · conversion · money · source and category breakdown · staff performance · CSV export · print to PDF |
+| **Reminders** | Background worker checks every hour: pending too long, processing too long, due soon / overdue, quotations expiring (auto-expired after due date), invoices due / overdue · in-app notifications · optional email (SMTP) |
+| **Admin** | Users and roles · company profile, tax, defaults and reminder rules · full audit log (who changed what, old → new values) |
+
+### Roles
+
+| Role | Can |
+|---|---|
+| Super Admin | Everything, including users and settings |
+| Manager | All queries, assign work, reopen, quotations, invoices, payments, reports, audit log |
+| Staff | Create queries and customers, work on queries assigned to them, draft and send quotations |
+
+Permissions live in one file: `src/lib/auth/permissions.ts`.
+
+---
+
+## Run it on your server (Docker)
+
+Requirements: a Linux server with Docker and Docker Compose.
+
+```bash
+cp .env.example .env
+# Edit .env — at minimum set:
+#   POSTGRES_PASSWORD   (a strong password)
+#   AUTH_SECRET         (openssl rand -base64 48)
+#   DOMAIN              (e.g. qms.yourcompany.com — Caddy gets an HTTPS certificate automatically)
+#   APP_URL             (e.g. https://qms.yourcompany.com)
+#   SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD
+
+docker compose up -d --build
+
+# Create the first admin (run once)
+docker compose run --rm app node dist/scripts/seed.js
+
+# Optional: add demo data for a client demo / training
+docker compose run --rm app node dist/scripts/seed.js --demo
+```
+
+Open `https://<DOMAIN>` and sign in with the admin account.
+
+**LAN-only (no domain):** set `DOMAIN=:80` and `COOKIE_SECURE=false`, then open `http://<server-ip>`.
+
+### Containers
+
+| Container | Purpose |
+|---|---|
+| `proxy` | Caddy — HTTPS, compression, 30 MB upload limit |
+| `app` | Next.js app; runs database migrations on every start |
+| `worker` | Reminder job (every `REMINDER_INTERVAL_MINUTES`, default 60) |
+| `db` | PostgreSQL 16 (volume `pgdata`) |
+| `backup` | Nightly database dump + uploaded files into `./backups`, kept `BACKUP_RETENTION_DAYS` (default 14) |
+
+**Restore a backup**
+
+```bash
+gunzip -c backups/db-YYYY-MM-DD_HHMM.sql.gz | docker compose exec -T db psql -U qms -d qms
+docker compose run --rm -v "$PWD/backups:/backups" app sh -c "tar -xzf /backups/files-YYYY-MM-DD_HHMM.tar.gz -C /data"
+```
+
+**Update to a new version:** `git pull && docker compose up -d --build` (migrations run automatically).
+
+---
+
+## Develop locally
+
+```bash
+docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on localhost:5432
+cp .env.example .env                              # DATABASE_URL=postgres://qms:qms@localhost:5432/qms
+npm install
+npm run db:migrate
+npm run db:seed -- --demo
+npm run dev                                       # http://localhost:3000
+npm run worker                                    # reminder job (optional)
+```
+
+Demo logins (after `--demo`): `admin@example.com` / value of `SEED_ADMIN_PASSWORD`; `ayesha@example.com` (manager), `bilal@example.com`, `sana@example.com`, `usman@example.com` (staff) — password `Demo@12345`.
+
+| Command | |
+|---|---|
+| `npm run lint` · `npm run typecheck` · `npm test` | Quality checks (also run in CI) |
+| `npm run db:generate` | Create a migration after changing `src/lib/db/schema.ts` |
+| `npm run build` | Production build (app + worker + scripts) |
+
+---
+
+## Architecture
+
+A **modular monolith**: one deployable app, split into feature modules with clear layers.
+
+```
+src/
+  app/                  Routes only — pages read data and render; no business rules
+    (app)/…             Signed-in screens (dashboard, queries, customers, …)
+    print/…             Printable quotation & invoice
+    api/…               File upload/download, CSV export, customer search
+  modules/<feature>/
+    schema.ts           Input validation (Zod) — shared by forms and server
+    repository.ts       Database queries (the only place that reads tables)
+    service.ts          Business rules, permissions, transactions, audit
+    actions.ts          Server actions: auth → validate → service → revalidate
+    workflow.ts         Status lifecycles (single source of truth)
+    components.tsx      Feature UI
+  modules/events.ts     Domain events → notifications (add email/WhatsApp here)
+  lib/
+    db/                 Drizzle schema + connection pool
+    auth/               Sessions (signed cookie), passwords, RBAC
+    storage/            StorageProvider interface (local disk; swap for S3/MinIO)
+    email/              Mailer interface (console or SMTP)
+    utils/money.ts      All money maths in integer paisa — no rounding errors
+worker/                 Reminder worker entry point
+scripts/                migrate.ts, seed.ts
+drizzle/                SQL migrations
+tests/                  Unit tests for money, workflows and validation
+```
+
+**Principles applied:** separation of concerns (route → action → service → repository), single source of truth for statuses and totals, interfaces for storage/email/events (open for extension), database transactions for multi-step changes, row locking for payments, gap-free reference numbers, soft delete for business records, audit trail on every change, server-side permission checks on every action and API route, strict TypeScript.
+
+**Usability (HCI):** colour-coded status badges that always include text, plain business words, confirmation before destructive actions, inline validation with friendly messages, values kept after an error, live totals while typing prices, search-as-you-type customer picker, quick views and bookmarkable filters, keyboard shortcuts (`n` new query, `/` search, `Ctrl+Enter` post note), empty states that say what to do next, upload progress, responsive layout for phone and tablet, accessible labels and focus states.
+
+---
+
+## Where this differs from the scope document (v0.1)
+
+These were simplified to keep the first version small and easy to run; each sits behind an interface so it can be swapped later without touching business code.
+
+| Scope said | Built | Why / how to change |
+|---|---|---|
+| MinIO for files | Local disk in a Docker volume (`uploads`), behind `StorageProvider` | One container fewer; add an S3/MinIO provider in `src/lib/storage` |
+| Server-side PDF engine | Print-ready pages; "Print / Save as PDF" in the browser | No headless browser in the image; output is A4 and clean |
+| BullMQ + Redis worker | A simple scheduled worker (no Redis needed) | Enough for reminders; add a queue if heavier jobs come |
+| Prisma or Drizzle | Drizzle | Lighter, SQL-like, no engine binaries |
+| Auth.js | Signed session cookie (`jose`) + bcrypt, checked against the DB every request | Fewer moving parts for a credentials-only internal app |
