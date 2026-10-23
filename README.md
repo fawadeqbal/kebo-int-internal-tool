@@ -50,13 +50,13 @@ cp .env.example .env
 #   AUTH_SECRET         (openssl rand -base64 48)
 #   DOMAIN              (e.g. qms.yourcompany.com — Caddy gets an HTTPS certificate automatically)
 #   APP_URL             (e.g. https://qms.yourcompany.com)
-#   SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD
+#   SEED_ADMIN_* / SEED_MANAGER_* / SEED_STAFF_*   (email + password of the 3 starting accounts)
 #   NOTIFY_EMAILS       (admin emails to notify — can be changed later in Settings)
 #   SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD   (outgoing email, e.g. Gmail with an App password)
 
 docker compose up -d --build
 
-# Create the first admin (run once)
+# Create the starting accounts: Super Admin, Manager, Staff (run once)
 docker compose run --rm app node dist/scripts/seed.js
 
 # Optional: add demo data for a client demo / training
@@ -101,18 +101,27 @@ docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on localhost:5433,
 cp .env.example .env                              # DATABASE_URL=postgres://qms:qms@localhost:5433/qms
 npm install
 npm run db:migrate
-npm run db:seed -- --demo
+npm run db:seed -- --demo                         # or later: npm run db:reset -- --demo  (wipe and start again)
 npm run dev                                       # http://localhost:3000
 npm run worker                                    # reminder job (optional)
 ```
 
 **PDF downloads** are printed by headless Chrome (`puppeteer-core`) from the same print page you see on screen, so the file matches it exactly. Locally an installed Chrome or Edge is used automatically; the Docker image ships Chromium. Set `CHROME_PATH` only if your browser is in an unusual place.
 
-Demo logins (after `--demo`): `admin@example.com` / value of `SEED_ADMIN_PASSWORD`; `ayesha@example.com` (manager), `bilal@example.com`, `sana@example.com`, `usman@example.com` (staff) — password `Demo@12345`.
+### Roles and starting accounts
+
+| Role | For | Can use | Login (defaults, set in `.env`) |
+|---|---|---|---|
+| **Super Admin** | The developer | Everything: all work and sales, users, settings, audit log | `admin@example.com` / `Admin@12345` |
+| **Manager** | Kebo's manager | All inquiries, assigning work, quotations, invoices, payments, reports, exports, audit log | `manager@example.com` / `Manager@12345` |
+| **Staff** | Sales and sourcing team | Their own inquiries (assigned to or created by them), customers, quotations | `staff@example.com` / `Staff@12345` |
+
+`npm run db:reset` wipes the local database and seeds just these three accounts; `npm run db:reset -- --demo` adds sample customers, inquiries, quotations and invoices (and demo people `ayesha@` manager, `bilal@` / `sana@` / `usman@` staff, password `Demo@12345`). It only runs against a database on your own computer.
 
 | Command | |
 |---|---|
 | `npm run lint` · `npm run typecheck` · `npm test` | Quality checks (also run in CI) |
+| `npm run db:reset` | Wipe the local database and seed again (`-- --demo` for sample data) |
 | `npm run db:generate` | Create a migration after changing `src/lib/db/schema.ts` |
 | `npm run build` | Production build (app + worker + scripts) |
 

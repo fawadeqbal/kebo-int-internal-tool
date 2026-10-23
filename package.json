@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
+    "db:reset": "tsx --env-file=.env scripts/reset.ts && npm run db:migrate && npm run db:seed --",
     "worker": "tsx --env-file=.env worker/index.ts",
     "files:to-s3": "tsx --env-file=.env scripts/copy-files-to-s3.ts"
   },

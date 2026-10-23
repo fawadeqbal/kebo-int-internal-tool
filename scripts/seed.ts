@@ -1,6 +1,6 @@
 /**
  * Seeds the database.
- *   - Always: the first Super Admin (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD) and default settings.
+ *   - Always: default settings and three accounts (Super Admin, Manager, Staff; see ACCOUNTS).
  *   - With --demo (or SEED_DEMO=true): sample users, customers, queries, quotations,
  *     invoices and payments spread over the last 6 months, for demos and training.
  * Safe to run more than once: it skips anything that already exists.
@@ -52,20 +52,41 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 86400000);
 const addHours = (d: Date, h: number) => new Date(d.getTime() + h * 3600000);
 
-async function seedAdmin() {
-  const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@example.com").toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? "Admin@12345";
-  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
-  if (existing) {
-    console.log(`[seed] admin ${email} already exists`);
-    return existing.id;
+/**
+ * The three starting accounts. Each email / name / password comes from .env:
+ *   SEED_ADMIN_*   Super Admin: the developer, full access to everything
+ *   SEED_MANAGER_* Manager: runs work and sales (all inquiries, quotations, invoices, payments, reports)
+ *   SEED_STAFF_*   Staff: does the work and sales (own inquiries, customers, quotations)
+ * An account that already exists is left as it is (its password is not changed).
+ */
+const ACCOUNTS = [
+  { prefix: "SEED_ADMIN", role: "admin" as const, name: "Super Admin", email: "admin@example.com", password: "Admin@12345" },
+  { prefix: "SEED_MANAGER", role: "manager" as const, name: "Kebo Manager", email: "manager@example.com", password: "Manager@12345" },
+  { prefix: "SEED_STAFF", role: "staff" as const, name: "Kebo Staff", email: "staff@example.com", password: "Staff@12345" },
+];
+
+async function seedAccounts() {
+  const ids: Record<"admin" | "manager" | "staff", string> = { admin: "", manager: "", staff: "" };
+  for (const a of ACCOUNTS) {
+    const email = (process.env[`${a.prefix}_EMAIL`] || a.email).trim().toLowerCase();
+    const name = (process.env[`${a.prefix}_NAME`] || a.name).trim();
+    const given = process.env[`${a.prefix}_PASSWORD`];
+    if (!given && process.env.NODE_ENV === "production") {
+      console.log(`[seed] ${a.role.padEnd(7)} skipped: set ${a.prefix}_PASSWORD in .env to create this account on the server`);
+      continue;
+    }
+    const password = given || a.password;
+    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+    if (existing) {
+      console.log(`[seed] ${a.role.padEnd(7)} ${email} already exists (unchanged)`);
+      ids[a.role] = existing.id;
+      continue;
+    }
+    const [created] = await db.insert(users).values({ name, email, role: a.role, passwordHash: await bcrypt.hash(password, 12) }).returning({ id: users.id });
+    ids[a.role] = created.id;
+    console.log(`[seed] ${a.role.padEnd(7)} ${email} created`);
   }
-  const [created] = await db
-    .insert(users)
-    .values({ name: "System Admin", email, role: "admin", passwordHash: await bcrypt.hash(password, 12) })
-    .returning({ id: users.id });
-  console.log(`[seed] created admin ${email}`);
-  return created.id;
+  return ids;
 }
 
 async function seedSettings() {
@@ -107,7 +128,7 @@ const JOBS = [
   { category: "General Order Supply", title: "Spare motors and gearboxes", spec: "Assorted 3-phase motors 5.5–22 kW and matching gearboxes, list attached by email.", price: 9_800 },
 ] as const;
 
-async function seedDemo(adminId: string) {
+async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(queries);
   if (n > 0) {
     console.log("[seed] demo data skipped — queries already exist");
@@ -130,7 +151,8 @@ async function seedDemo(adminId: string) {
     staff[p.name] = row.id;
   }
   const manager = staff["Ayesha Khan"];
-  const workers = [staff["Bilal Ahmed"], staff["Sana Malik"], staff["Usman Tariq"]];
+  // The seeded Staff account gets real demo work too, so it can be tried straight away.
+  const workers = [staff["Bilal Ahmed"], staff["Sana Malik"], staff["Usman Tariq"], accounts.staff];
 
   const customerIds: string[] = [];
   for (const [contactPerson, companyName, phone, email, address] of COMPANIES) {
@@ -329,15 +351,14 @@ async function seedDemo(adminId: string) {
       await tx.insert(auditLogs).values({ userId: manager, action: "create", entityType: "query", entityId: q.id, summary: `Created query ${refNo} (demo data)`, createdAt: created });
     });
   }
-  void adminId;
   console.log(`[seed] demo data created: ${people.length} users, ${COMPANIES.length} customers, ${TOTAL} queries`);
   console.log(`[seed] demo users sign in with password: ${process.env.SEED_DEMO_PASSWORD ?? "Demo@12345"}`);
 }
 
 async function main() {
   await seedSettings();
-  const adminId = await seedAdmin();
-  if (process.argv.includes("--demo") || process.env.SEED_DEMO === "true") await seedDemo(adminId);
+  const accounts = await seedAccounts();
+  if (process.argv.includes("--demo") || process.env.SEED_DEMO === "true") await seedDemo(accounts);
   await pool.end();
 }
 
