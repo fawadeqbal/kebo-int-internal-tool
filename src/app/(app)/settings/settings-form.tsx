@@ -43,7 +43,7 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
               {(
                 [
                   ["notifyNewQuery", "A new RFQ arrives (website or entered by staff)"],
-                  ["notifyQuotation", "A buyer accepts or rejects a quotation"],
+                  ["notifyQuotation", "A customer accepts or rejects a quotation"],
                   ["notifyClosed", "An inquiry is completed or closed as not completed"],
                   ["notifyPayment", "A payment is recorded"],
                   ["notifyDailySummary", "Every morning: new RFQs, overdue inquiries and unpaid invoices"],

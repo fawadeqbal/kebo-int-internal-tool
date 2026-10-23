@@ -9,7 +9,7 @@ import { normalizePhone, type CustomerInput } from "./schema";
 
 export class DuplicateCustomerError extends DomainError {
   constructor(public readonly matches: { id: string; companyName: string | null; contactPerson: string; phone: string }[]) {
-    super("A buyer with the same phone number or email already exists.");
+    super("A customer with the same phone number or email already exists.");
   }
 }
 
@@ -42,7 +42,7 @@ export async function createCustomer(actor: SessionUser, input: CustomerInput, t
       action: "create",
       entityType: "customer",
       entityId: created.id,
-      summary: `Added buyer ${input.companyName || input.contactPerson}`,
+      summary: `Added customer ${input.companyName || input.contactPerson}`,
       newValues: toRow(input),
     });
     return created;
@@ -53,7 +53,7 @@ export async function createCustomer(actor: SessionUser, input: CustomerInput, t
 export async function updateCustomer(actor: SessionUser, id: string, input: CustomerInput) {
   assertCan(actor, "customers.manage");
   const existing = await findCustomer(id);
-  if (!existing) throw new NotFoundError("Buyer");
+  if (!existing) throw new NotFoundError("Customer");
   if (!input.allowDuplicate) {
     const matches = await findDuplicates(normalizePhone(input.phone), input.email, id);
     if (matches.length) throw new DuplicateCustomerError(matches);
@@ -63,18 +63,18 @@ export async function updateCustomer(actor: SessionUser, id: string, input: Cust
   await db.transaction(async (tx) => {
     await tx.update(customers).set(row).where(eq(customers.id, id));
     if (changes.changed)
-      await recordAudit(tx, { userId: actor.id, action: "update", entityType: "customer", entityId: id, summary: `Updated buyer ${input.companyName || input.contactPerson}`, ...changes });
+      await recordAudit(tx, { userId: actor.id, action: "update", entityType: "customer", entityId: id, summary: `Updated customer ${input.companyName || input.contactPerson}`, ...changes });
   });
 }
 
 export async function deleteCustomer(actor: SessionUser, id: string) {
   assertCan(actor, "customers.delete");
   const existing = await findCustomer(id);
-  if (!existing) throw new NotFoundError("Buyer");
+  if (!existing) throw new NotFoundError("Customer");
   if ((await customerQueryCount(id)) > 0)
-    throw new DomainError("This buyer has inquiries, so it cannot be removed. Their history must be kept.");
+    throw new DomainError("This customer has inquiries, so it cannot be removed. Their history must be kept.");
   await db.transaction(async (tx) => {
     await tx.update(customers).set({ deletedAt: new Date() }).where(eq(customers.id, id));
-    await recordAudit(tx, { userId: actor.id, action: "delete", entityType: "customer", entityId: id, summary: `Removed buyer ${existing.companyName || existing.contactPerson}` });
+    await recordAudit(tx, { userId: actor.id, action: "delete", entityType: "customer", entityId: id, summary: `Removed customer ${existing.companyName || existing.contactPerson}` });
   });
 }

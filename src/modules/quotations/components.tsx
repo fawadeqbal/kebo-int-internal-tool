@@ -48,13 +48,13 @@ export function QuotationForm({
           <Field label="Valid until" htmlFor="dueDate" required error={e.dueDate} hint="The price holds until this date">
             <Input id="dueDate" name="dueDate" type="date" defaultValue={v("dueDate")} aria-invalid={!!e.dueDate} />
           </Field>
-          <Field label="Sent to buyer on" htmlFor="submittedAt" error={e.submittedAt} hint="Filled in when you mark it as sent">
+          <Field label="Sent to customer on" htmlFor="submittedAt" error={e.submittedAt} hint="Filled in when you mark it as sent">
             <Input id="submittedAt" name="submittedAt" type="date" defaultValue={v("submittedAt")} />
           </Field>
           <Field label="Terms & conditions" htmlFor="terms" error={e.terms} className="sm:col-span-2">
             <Textarea id="terms" name="terms" rows={5} defaultValue={v("terms")} />
           </Field>
-          <Field label="Internal notes" htmlFor="notes" error={e.notes} hint="Not shown to the buyer" className="sm:col-span-2">
+          <Field label="Internal notes" htmlFor="notes" error={e.notes} hint="Not shown to the customer" className="sm:col-span-2">
             <Textarea id="notes" name="notes" rows={2} className="min-h-0" defaultValue={v("notes")} />
           </Field>
         </CardBody>

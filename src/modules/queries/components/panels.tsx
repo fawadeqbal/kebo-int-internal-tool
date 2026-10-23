@@ -143,7 +143,7 @@ export function CommentForm({ action }: { action: Action }) {
         id="body"
         name="body"
         rows={3}
-        placeholder="Add a note, e.g. asked 3 factories for prices, buyer sending drawings…"
+        placeholder="Add a note, e.g. asked 3 factories for prices, customer sending drawings…"
         aria-invalid={!!state.errors?.body}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ref.current?.requestSubmit();

@@ -20,7 +20,7 @@ import { formatDate } from "@/lib/utils/dates";
 import { formatCents, formatMoney, toCents } from "@/lib/utils/money";
 import { todayISO } from "@/lib/utils/dates";
 
-export const metadata = { title: "Buyer" };
+export const metadata = { title: "Customer" };
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -49,7 +49,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         title={customerName(customer)}
         description={customer.companyName ? `Contact: ${customer.contactPerson}` : undefined}
         backHref="/customers"
-        backLabel="Buyers"
+        backLabel="Customers"
         actions={
           <>
             {can(user.role, "customers.manage") && (
@@ -125,7 +125,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           {can(user.role, "customers.delete") && queryRows.length === 0 && (
             <form action={deleteCustomerAction.bind(null, id)}>
               <ConfirmSubmit variant="ghost" size="sm" className="text-red-700" message={`Remove ${customerName(customer)}?`}>
-                Remove buyer
+                Remove customer
               </ConfirmSubmit>
             </form>
           )}
@@ -134,7 +134,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <Card>
             <CardHeader title={`Inquiries (${queryRows.length})`} />
             {queryRows.length === 0 ? (
-              <EmptyState title="No inquiries from this buyer yet" action={can(user.role, "queries.create") && <ButtonLink href={`/queries/new?customer=${id}`}>New inquiry</ButtonLink>} />
+              <EmptyState title="No inquiries from this customer yet" action={can(user.role, "queries.create") && <ButtonLink href={`/queries/new?customer=${id}`}>New inquiry</ButtonLink>} />
             ) : (
               <Table>
                 <thead>

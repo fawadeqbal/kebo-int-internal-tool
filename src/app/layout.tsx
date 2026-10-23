@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "Kebo RFQ Desk", template: "%s · Kebo RFQ Desk" },
-  description: "Kebo's internal desk for buyer RFQs, quotations and invoices",
+  description: "Kebo's internal desk for customer RFQs, quotations and invoices",
   robots: { index: false, follow: false },
 };
 

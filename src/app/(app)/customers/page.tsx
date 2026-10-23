@@ -5,7 +5,7 @@ import { Button, ButtonLink, Card, EmptyState, Input, PageHeader, Select, Table,
 import { Pagination, toPage } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils/dates";
 
-export const metadata = { title: "Buyers" };
+export const metadata = { title: "Customers" };
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; sort?: string }> }) {
   await requireUser();
@@ -16,9 +16,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader
-        title="Buyers"
-        description="Every buyer who has sent an RFQ."
-        actions={<ButtonLink href="/customers/new">Add buyer</ButtonLink>}
+        title="Customers"
+        description="Every customer who has sent an RFQ."
+        actions={<ButtonLink href="/customers/new">Add customer</ButtonLink>}
       />
       <Card>
         <form className="flex flex-wrap items-end gap-3 border-b border-line p-4" role="search">
@@ -42,15 +42,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         </form>
         {data.rows.length === 0 ? (
           <EmptyState
-            title={q ? "No buyers match your search" : "No buyers yet"}
-            description={q ? "Try a different name or number." : "Buyers are added automatically from website RFQs, or when you enter an inquiry."}
-            action={!q && <ButtonLink href="/customers/new">Add buyer</ButtonLink>}
+            title={q ? "No customers match your search" : "No customers yet"}
+            description={q ? "Try a different name or number." : "Customers are added automatically from website RFQs, or when you enter an inquiry."}
+            action={!q && <ButtonLink href="/customers/new">Add customer</ButtonLink>}
           />
         ) : (
           <Table>
             <thead>
               <tr>
-                <Th>Buyer</Th>
+                <Th>Customer</Th>
                 <Th>Company</Th>
                 <Th>Phone / WhatsApp</Th>
                 <Th>Email</Th>

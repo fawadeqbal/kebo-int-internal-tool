@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const sp = Object.fromEntries(new URL(request.url).searchParams);
   const rows = await listQueriesForExport(user, parseQueryFilters(sp));
   const csv = toCsv(
-    ["RFQ no.", "Title", "Buyer", "Company", "Phone / WhatsApp", "Sourcing category", "Quantity", "Received via", "Priority", "Status", "Handled by", "Needed by", "Received", "Closed"],
+    ["RFQ no.", "Title", "Customer", "Company", "Phone / WhatsApp", "Sourcing category", "Quantity", "Received via", "Priority", "Status", "Handled by", "Needed by", "Received", "Closed"],
     rows.map((r) => [
       r.refNo,
       r.title,

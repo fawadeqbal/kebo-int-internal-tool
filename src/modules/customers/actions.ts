@@ -33,7 +33,7 @@ export async function createCustomerAction(_prev: ActionState, formData: FormDat
   if (dup) return dup;
   if (!result.ok) return result;
   revalidatePath("/customers");
-  redirect(`/customers/${id}?toast=Buyer+added`);
+  redirect(`/customers/${id}?toast=Customer+added`);
 }
 
 export async function updateCustomerAction(id: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -50,7 +50,7 @@ export async function updateCustomerAction(id: string, _prev: ActionState, formD
   if (dup) return dup;
   if (!result.ok) return result;
   revalidatePath(`/customers/${id}`);
-  redirect(`/customers/${id}?toast=Buyer+updated`);
+  redirect(`/customers/${id}?toast=Customer+updated`);
 }
 
 export async function deleteCustomerAction(id: string) {
@@ -61,5 +61,5 @@ export async function deleteCustomerAction(id: string) {
     redirect(`/customers/${id}?toast=${encodeURIComponent(toActionError(error).message ?? "Could not remove")}`);
   }
   revalidatePath("/customers");
-  redirect("/customers?toast=Buyer+removed");
+  redirect("/customers?toast=Customer+removed");
 }

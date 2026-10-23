@@ -132,7 +132,7 @@ export function Sidebar({
             </Link>
           </div>
         ) : (
-          tab("/customers", "Buyers", Building2)
+          tab("/customers", "Customers", Building2)
         )}
         {tab("/notifications", "Alerts", Bell, unread)}
         <button

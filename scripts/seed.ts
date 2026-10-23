@@ -177,14 +177,14 @@ async function seedDemo(adminId: string) {
       }
       if (outcome === "not_completed") {
         completedAt = addDays(startAt, 3 + rand() * 5);
-        reason = pick(["Buyer bought locally", "Buyer's budget not approved", "No factory can meet the spec"]);
+        reason = pick(["Customer bought locally", "Customer's budget not approved", "No factory can meet the spec"]);
         hist.push({ from: "processing", to: "not_completed", at: completedAt, reason });
         status = "not_completed";
       }
       if (["paid", "rejected"].includes(outcome)) {
         completedAt = addDays(startAt, 8 + rand() * 14);
         if (outcome === "rejected") {
-          reason = "Buyer rejected the price";
+          reason = "Customer rejected the price";
           hist.push({ from: "processing", to: "not_completed", at: completedAt, reason });
           status = "not_completed";
         } else {
@@ -223,10 +223,10 @@ async function seedDemo(adminId: string) {
           queryId: q.id,
           authorId: assignee ?? manager,
           body: pick([
-            "Called the buyer on WhatsApp to confirm voltage and output.",
-            "Buyer will send the layout drawing by email.",
+            "Called the customer on WhatsApp to confirm voltage and output.",
+            "Customer will send the layout drawing by email.",
             "Factory confirmed a lead time of about 10 weeks.",
-            "Buyer asked for a factory video of the machine running.",
+            "Customer asked for a factory video of the machine running.",
           ]),
           createdAt: addHours(created, 20),
         });

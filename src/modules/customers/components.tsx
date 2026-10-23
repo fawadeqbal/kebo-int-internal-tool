@@ -47,7 +47,7 @@ export function DuplicateWarning({ state }: { state: ActionState }) {
   if (!duplicates?.length) return null;
   return (
     <Alert tone="warning">
-      <p className="font-medium">This buyer may already exist:</p>
+      <p className="font-medium">This customer may already exist:</p>
       <ul className="mt-2 space-y-1">
         {duplicates.map((d) => (
           <li key={d.id}>
@@ -87,7 +87,7 @@ export function CustomerForm({
         <Textarea id="notes" name="notes" rows={3} defaultValue={(state.values?.notes as string) ?? initial?.notes ?? ""} />
       </Field>
       <div className="flex gap-3 border-t border-line pt-5">
-        <SubmitButton>{initial ? "Save changes" : "Add buyer"}</SubmitButton>
+        <SubmitButton>{initial ? "Save changes" : "Add customer"}</SubmitButton>
         <ButtonLink href={cancelHref} variant="secondary">
           Cancel
         </ButtonLink>

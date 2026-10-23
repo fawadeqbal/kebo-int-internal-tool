@@ -147,7 +147,7 @@ export function CustomerPicker({
               </p>
             </li>
           ))}
-          {!loading && results.length === 0 && <li className="px-3 py-2 text-sm text-muted">No matching buyer.</li>}
+          {!loading && results.length === 0 && <li className="px-3 py-2 text-sm text-muted">No matching customer.</li>}
           {onCreateNew && (
             <li className="border-t border-line">
               <button

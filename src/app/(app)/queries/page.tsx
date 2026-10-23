@@ -95,7 +95,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
             name="q"
             type="search"
             defaultValue={filters.q}
-            placeholder="Search buyer, company, product or RFQ no."
+            placeholder="Search customer, company, product or RFQ no."
             className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-10 text-[15px] shadow-xs placeholder:text-muted/80 focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-100"
           />
           {status !== "open" && <input type="hidden" name="status" value={status} />}
@@ -161,7 +161,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
             </p>
             <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
               {filters.q
-                ? "Try the buyer's name, company or part of the product name."
+                ? "Try the customer's name, company or part of the product name."
                 : status === "open"
                   ? "Website RFQs appear here by themselves. Add WhatsApp, WeChat or phone inquiries with the + button."
                   : "Try another tab."}

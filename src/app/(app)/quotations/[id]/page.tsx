@@ -61,7 +61,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             )}
             {manage && !isEditable(q.status) && (
               <form action={reviseQuotationAction.bind(null, id)}>
-                <ConfirmSubmit variant="secondary" message="Make a new draft version with the same lines? This one stays as the buyer saw it.">
+                <ConfirmSubmit variant="secondary" message="Make a new draft version with the same lines? This one stays as the customer saw it.">
                   <CopyPlus className="h-4 w-4" aria-hidden /> New version
                 </ConfirmSubmit>
               </form>
@@ -99,7 +99,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             <Card>
               <CardHeader
                 title="Next step"
-                description={q.status === "draft" ? "After you email or WhatsApp it to the buyer, mark it as sent." : "Record the buyer's answer."}
+                description={q.status === "draft" ? "After you email or WhatsApp it to the customer, mark it as sent." : "Record the customer's answer."}
               />
               <CardBody>
                 <QuotationStatusForm action={quotationStatusAction.bind(null, id)} transitions={QUOTATION_TRANSITIONS[q.status]} />
@@ -134,7 +134,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                   <dd>{formatDateTime(q.createdAt)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted">Sent to buyer</dt>
+                  <dt className="text-muted">Sent to customer</dt>
                   <dd>{formatDate(q.submittedAt)}</dd>
                 </div>
               </dl>

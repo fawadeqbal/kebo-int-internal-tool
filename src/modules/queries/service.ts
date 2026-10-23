@@ -68,7 +68,7 @@ export async function insertQueryRecord(tx: DbOrTx, actorId: string, values: New
 export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
   assertCan(actor, "queries.create");
   await assertAssignable(actor, input.assignedTo);
-  if (input.customerMode === "existing" && !(await findCustomer(input.customerId))) throw new DomainError("The selected buyer no longer exists.");
+  if (input.customerMode === "existing" && !(await findCustomer(input.customerId))) throw new DomainError("The selected customer no longer exists.");
 
   const created = await db.transaction(async (tx) => {
     const customerId =
@@ -114,7 +114,7 @@ export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
 export async function updateQuery(actor: SessionUser, id: string, input: UpdateQueryInput) {
   const existing = await getAccessibleQuery(actor, id);
   if (!canWorkOn(actor, existing)) throw new ForbiddenError("Only the assigned person or a manager can edit this inquiry.");
-  if (!(await findCustomer(input.customerId))) throw new DomainError("The selected buyer no longer exists.");
+  if (!(await findCustomer(input.customerId))) throw new DomainError("The selected customer no longer exists.");
   const row = {
     customerId: input.customerId,
     source: input.source,

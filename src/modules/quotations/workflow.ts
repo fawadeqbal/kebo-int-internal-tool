@@ -2,10 +2,10 @@ import type { QuotationStatus } from "@/lib/db/schema";
 
 /** Quotation lifecycle: draft → sent → accepted / rejected / expired. */
 export const QUOTATION_TRANSITIONS: Record<QuotationStatus, { to: QuotationStatus; label: string }[]> = {
-  draft: [{ to: "sent", label: "Mark as sent to buyer" }],
+  draft: [{ to: "sent", label: "Mark as sent to customer" }],
   sent: [
-    { to: "accepted", label: "Buyer accepted" },
-    { to: "rejected", label: "Buyer rejected" },
+    { to: "accepted", label: "Customer accepted" },
+    { to: "rejected", label: "Customer rejected" },
     { to: "expired", label: "Mark expired" },
   ],
   accepted: [],

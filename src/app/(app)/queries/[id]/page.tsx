@@ -179,7 +179,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
             {detail.quotations.length === 0 ? (
               <EmptyState
                 title="No quotation yet"
-                description="When the factory price is in, quote the buyer."
+                description="When the factory price is in, quote the customer."
                 action={
                   can(user.role, "quotations.manage") &&
                   query.status !== "not_completed" && <ButtonLink href={`/quotations/new?query=${id}`}>Create quotation</ButtonLink>

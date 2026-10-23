@@ -22,18 +22,18 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   const today = todayISO();
   return (
     <>
-      <PageHeader title="Quotations" description="Offers sent to buyers. Start a quotation from an inquiry." />
+      <PageHeader title="Quotations" description="Offers sent to customers. Start a quotation from an inquiry." />
       <Card>
         <form className="flex flex-wrap items-end gap-3 border-b border-line p-4" role="search">
           <label className="flex min-w-64 flex-1 flex-col gap-1.5 text-sm font-medium">
             Search
-            <Input id="search" name="q" defaultValue={q} placeholder="Quotation no., RFQ no., product or buyer" />
+            <Input id="search" name="q" defaultValue={q} placeholder="Quotation no., RFQ no., product or customer" />
           </label>
           <label className="flex flex-col gap-1.5 text-sm font-medium">
             Status
             <Select name="status" defaultValue={status ?? ""} className="w-52">
               <option value="">Any status</option>
-              <option value="expiring">Waiting for the buyer (soonest expiry first)</option>
+              <option value="expiring">Waiting for the customer (soonest expiry first)</option>
               {Object.entries(QUOTATION_STATUS_LABEL).map(([k, l]) => (
                 <option key={k} value={k}>
                   {l}
@@ -56,7 +56,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
               <tr>
                 <Th>Quotation</Th>
                 <Th>Inquiry</Th>
-                <Th>Buyer</Th>
+                <Th>Customer</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Total</Th>
                 <Th>Sent</Th>

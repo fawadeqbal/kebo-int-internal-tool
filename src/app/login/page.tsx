@@ -15,9 +15,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <span className="text-sm font-semibold tracking-wide">{settings.companyName}</span>
         </div>
         <div className="max-w-md">
-          <h1 className="text-4xl font-semibold leading-tight tracking-tight">Every buyer RFQ, from first message to final invoice.</h1>
+          <h1 className="text-4xl font-semibold leading-tight tracking-tight">Every customer RFQ, from first message to final invoice.</h1>
           <p className="mt-4 text-base text-white/70">
-            Website, WhatsApp, WeChat and email inquiries in one list. Source, quote, invoice and track payment without losing a single buyer.
+            Website, WhatsApp, WeChat and email inquiries in one list. Source, quote, invoice and track payment without losing a single customer.
           </p>
         </div>
         <ol className="grid grid-cols-4 gap-3 text-xs text-white/70">

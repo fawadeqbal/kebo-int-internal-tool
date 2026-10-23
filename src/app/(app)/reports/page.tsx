@@ -80,14 +80,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               items={[
                 { label: "Received", value: funnel.received },
                 { label: "Quoted", value: funnel.quoted, hint: pct(funnel.quoted, funnel.received) },
-                { label: "Buyer accepted", value: funnel.accepted, hint: pct(funnel.accepted, funnel.received) },
+                { label: "Customer accepted", value: funnel.accepted, hint: pct(funnel.accepted, funnel.received) },
                 { label: "Invoiced", value: funnel.invoiced, hint: pct(funnel.invoiced, funnel.received) },
               ]}
             />
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Money" description="All buyers in this period. Outstanding is as of today." />
+          <CardHeader title="Money" description="All customers in this period. Outstanding is as of today." />
           <CardBody>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               {[

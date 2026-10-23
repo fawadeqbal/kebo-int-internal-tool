@@ -11,7 +11,7 @@ const optional = (max: number) =>
 
 export const customerSchema = z.object({
   companyName: optional(200),
-  contactPerson: z.string().trim().min(2, "Enter the buyer's full name").max(120),
+  contactPerson: z.string().trim().min(2, "Enter the customer's full name").max(120),
   phone: z
     .string()
     .trim()

@@ -58,7 +58,7 @@ export function DocumentView({
 
       <section className="grid grid-cols-1 gap-6 py-6 sm:grid-cols-2">
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500">{kind === "Invoice" ? "Bill to" : "Buyer"}</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500">{kind === "Invoice" ? "Bill to" : "Customer"}</p>
           <p className="font-semibold">{customer.companyName || customer.contactPerson}</p>
           {customer.companyName && <p>Attn: {customer.contactPerson}</p>}
           {customer.address && <p className="text-stone-600">{customer.address}</p>}

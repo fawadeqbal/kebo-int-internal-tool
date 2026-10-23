@@ -94,7 +94,7 @@ export async function runReminders(now = new Date()) {
     } else {
       notify([q.createdBy], {
         type: "reminder.quotationDue",
-        title: `Quotation ${q.refNo} is valid until ${q.dueDate}. Follow up with the buyer`,
+        title: `Quotation ${q.refNo} is valid until ${q.dueDate}. Follow up with the customer`,
         link: `/quotations/${q.id}`,
         dedupeKey: `quote-due:${q.id}:${today}`,
       });

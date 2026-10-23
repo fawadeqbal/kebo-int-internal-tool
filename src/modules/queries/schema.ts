@@ -40,7 +40,7 @@ export const queryDetailsSchema = z.object({
   source: z.enum(querySourceEnum.enumValues, { message: "Choose how the inquiry came in" }).default("phone"),
   title: optionalText(200),
   category: z.string().trim().min(1, "Choose a sourcing category").max(120),
-  specifications: z.string().trim().min(5, "Write what the buyer needs").max(20000),
+  specifications: z.string().trim().min(5, "Write what the customer needs").max(20000),
   quantity: z.preprocess((v) => (v === "" || v === undefined ? 1 : v), z.coerce.number({ message: "Enter a quantity" }).int("Use a whole number").min(1, "At least 1").max(1_000_000)),
   priority: z.enum(priorityEnum.enumValues).default("normal"),
   requiredBy: optionalDate,
@@ -49,12 +49,12 @@ export const queryDetailsSchema = z.object({
 
 /** Create: either pick an existing customer or enter a new one in the same form. */
 export const createQuerySchema = z.discriminatedUnion("customerMode", [
-  queryDetailsSchema.extend({ customerMode: z.literal("existing"), customerId: z.uuid({ message: "Choose a buyer" }) }),
+  queryDetailsSchema.extend({ customerMode: z.literal("existing"), customerId: z.uuid({ message: "Choose a customer" }) }),
   queryDetailsSchema.extend({ customerMode: z.literal("new") }).extend(customerSchema.shape),
 ]);
 
 export const updateQuerySchema = queryDetailsSchema.omit({ assignedTo: true }).extend({
-  customerId: z.uuid({ message: "Choose a buyer" }),
+  customerId: z.uuid({ message: "Choose a customer" }),
 });
 
 export const statusChangeSchema = z

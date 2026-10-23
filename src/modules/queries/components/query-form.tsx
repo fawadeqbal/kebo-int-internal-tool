@@ -89,15 +89,15 @@ export function QueryForm({
 
       <Card>
         <CardHeader
-          title="Buyer"
-          description={mode === "create" ? "Search by name, company or phone, or add a new buyer." : undefined}
+          title="Customer"
+          description={mode === "create" ? "Search by name, company or phone, or add a new customer." : undefined}
           actions={
             mode === "create" && (
               <div role="radiogroup" aria-label="Customer type" className="flex rounded-lg border border-line p-0.5 text-sm">
                 {(["existing", "new"] as const).map((m) => (
                   <label key={m} className={`cursor-pointer rounded-md px-3 py-1 ${customerMode === m ? "bg-brand-600 text-white" : "text-muted hover:text-ink"}`}>
                     <input type="radio" name="customerMode" value={m} checked={customerMode === m} onChange={() => setCustomerMode(m)} className="sr-only" />
-                    {m === "existing" ? "Existing buyer" : "New buyer"}
+                    {m === "existing" ? "Existing customer" : "New customer"}
                   </label>
                 ))}
               </div>
@@ -107,7 +107,7 @@ export function QueryForm({
         <CardBody className="flex flex-col gap-4">
           {mode === "edit" && <input type="hidden" name="customerMode" value="existing" />}
           {customerMode === "existing" ? (
-            <Field label="Buyer" htmlFor="customer-search" required error={e.customerId}>
+            <Field label="Customer" htmlFor="customer-search" required error={e.customerId}>
               <CustomerPicker
                 name="customerId"
                 initial={initial?.customer}
@@ -132,7 +132,7 @@ export function QueryForm({
       </Card>
 
       <Card>
-        <CardHeader title="What does the buyer need?" />
+        <CardHeader title="What does the customer need?" />
         <CardBody className="grid gap-5 sm:grid-cols-2">
           <Field label="Sourcing category" htmlFor="category" required error={e.category}>
             <Select id="category" name="category" defaultValue={v("category", initial?.category ?? "")} aria-invalid={!!e.category}>
@@ -195,7 +195,7 @@ export function QueryForm({
                   ))}
                 </Select>
               </Field>
-              <Field label="Needed by" htmlFor="requiredBy" error={e.requiredBy} hint="When the buyer needs the quotation or delivery">
+              <Field label="Needed by" htmlFor="requiredBy" error={e.requiredBy} hint="When the customer needs the quotation or delivery">
                 <Input id="requiredBy" name="requiredBy" type="date" defaultValue={v("requiredBy", initial?.requiredBy)} />
               </Field>
             </div>

@@ -193,7 +193,7 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader title="Waiting for the buyer" description={`Sent, valid for ${settings.reminderDueSoonDays} more days or already expired`} actions={<Link href="/quotations?status=expiring" className="text-sm text-brand-700 hover:underline">View all</Link>} />
+          <CardHeader title="Waiting for the customer" description={`Sent, valid for ${settings.reminderDueSoonDays} more days or already expired`} actions={<Link href="/quotations?status=expiring" className="text-sm text-brand-700 hover:underline">View all</Link>} />
           {expiring.length === 0 ? (
             <CardBody>
               <p className="text-sm text-muted">No quotations about to expire.</p>

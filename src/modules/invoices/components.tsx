@@ -43,7 +43,7 @@ export function InvoiceForm({
           <Field label="Payment due" htmlFor="dueDate" required error={e.dueDate}>
             <Input id="dueDate" name="dueDate" type="date" defaultValue={v("dueDate")} />
           </Field>
-          <Field label="Note on invoice" htmlFor="notes" error={e.notes} hint="e.g. bank details for T/T, buyer PO number" className="sm:col-span-2">
+          <Field label="Note on invoice" htmlFor="notes" error={e.notes} hint="e.g. bank details for T/T, customer PO number" className="sm:col-span-2">
             <Textarea id="notes" name="notes" rows={2} className="min-h-0" defaultValue={v("notes")} />
           </Field>
         </CardBody>

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     ["Not completed", summary.notCompleted],
     ["Average turnaround", formatDuration(summary.avgTurnaroundMs)],
     ["Quoted", funnel.quoted],
-    ["Buyer accepted", funnel.accepted],
+    ["Customer accepted", funnel.accepted],
     ["Invoiced", funnel.invoiced],
     [],
     ["Money", ""],
