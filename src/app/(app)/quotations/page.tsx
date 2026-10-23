@@ -1,96 +1,153 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, SearchX } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { listQuotations } from "@/modules/quotations/repository";
+import { listQuotations, type QuotationFilters } from "@/modules/quotations/repository";
+import { listActiveUsers } from "@/modules/users/repository";
 import { getSettings } from "@/modules/settings/service";
-import { EmptyState, FilterBar, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
-import { AutoSelect } from "@/components/ui/client";
+import { ActiveFilters, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
+import { FilterDates, FilterSelect, FilterToolbar } from "@/components/ui/filters";
 import { QuotationStatusBadge } from "@/components/ui/badge";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
 import { QUOTATION_STATUS_LABEL } from "@/lib/labels";
 import { formatDate, todayISO } from "@/lib/utils/dates";
 import { formatMoney } from "@/lib/utils/money";
+import { isUuid } from "@/lib/utils/ids";
 import type { QuotationStatus } from "@/lib/db/schema";
 import { cn } from "@/lib/utils/cn";
 
 export const metadata = { title: "Quotations" };
 
-export default async function QuotationsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; page?: string }> }) {
+const SORTS = [
+  { value: "newest", label: "Newest first" },
+  { value: "expiry", label: "Valid-until date" },
+  { value: "value", label: "Highest value" },
+];
+const isDate = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+
+export default async function QuotationsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
   const sp = await searchParams;
   const q = sp.q?.trim().slice(0, 100) || undefined;
   const status = sp.status && (sp.status === "expiring" || sp.status in QUOTATION_STATUS_LABEL) ? (sp.status as QuotationStatus | "expiring") : undefined;
-  const [data, settings] = await Promise.all([listQuotations(user, { q, status, page: toPage(sp.page) }), getSettings()]);
+  const preparedBy = isUuid(sp.by) ? sp.by : undefined;
+  const from = isDate(sp.from);
+  const to = isDate(sp.to);
+  const sort = SORTS.some((s) => s.value === sp.sort) && sp.sort !== "newest" ? (sp.sort as QuotationFilters["sort"]) : undefined;
+  const [data, settings, people] = await Promise.all([listQuotations(user, { q, status, preparedBy, from, to, sort, page: toPage(sp.page) }), getSettings(), listActiveUsers()]);
   const today = todayISO();
+  const params = { q, status, by: preparedBy, from, to, sort };
+  const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/quotations", params, { page: undefined, ...patch });
+  const statusOptions = [{ value: "expiring", label: "Waiting for the customer" }, ...Object.entries(QUOTATION_STATUS_LABEL).map(([value, label]) => ({ value, label }))];
+  const active = [
+    status && { key: "status", label: "Status", value: statusOptions.find((o) => o.value === status)!.label },
+    preparedBy && { key: "by", label: "Prepared by", value: people.find((p) => p.id === preparedBy)?.name ?? "Someone" },
+    (from || to) && { key: "dates", label: "Created", value: `${from ? formatDate(from) : "…"} – ${to ? formatDate(to) : "…"}` },
+    sort && { key: "sort", label: "Sort", value: SORTS.find((s) => s.value === sort)!.label },
+  ].filter(Boolean) as { key: string; label: string; value: string }[];
+  const clearHref = buildHref("/quotations", { q }, {});
+
   return (
     <div className="space-y-5">
       <PageHeader title="Quotations" description="Offers sent to customers. Start a quotation from an inquiry." />
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-        <form role="search">
-          <FilterBar end={<span className="hidden text-xs text-muted tabular sm:inline">{data.total} quotations</span>}>
-            <SearchField defaultValue={q} placeholder="Quotation no., RFQ no., product or customer" clearHref={buildHref("/quotations", { status }, {})} label="Search quotations" />
-            <AutoSelect name="status" defaultValue={status ?? ""} className="w-56" aria-label="Status">
-              <option value="">Any status</option>
-              <option value="expiring">Waiting for the customer</option>
-              {Object.entries(QUOTATION_STATUS_LABEL).map(([k, l]) => (
-                <option key={k} value={k}>
-                  {l}
-                </option>
-              ))}
-            </AutoSelect>
-            {(q || status) && (
-              <Link href="/quotations" className="text-xs font-medium text-muted hover:text-text">
-                Reset
-              </Link>
-            )}
-          </FilterBar>
-        </form>
+        <FilterToolbar
+          activeCount={active.length}
+          search={<SearchField defaultValue={q} placeholder="Quotation no., RFQ no., product or customer" clearHref={hrefFor({ q: undefined })} label="Search quotations" />}
+          end={
+            <>
+              {active.length > 0 && (
+                <Link href={clearHref} className="font-medium text-muted hover:text-text">
+                  Reset
+                </Link>
+              )}
+              <span>{data.total} quotations</span>
+            </>
+          }
+        >
+          <FilterSelect name="status" label="Status" value={status} options={statusOptions} />
+          <FilterSelect name="by" label="Prepared by" value={preparedBy} options={people.map((p) => ({ value: p.id, label: p.id === user.id ? `${p.name} (me)` : p.name }))} allLabel="Anyone" />
+          <FilterDates label="Created" from={from} to={to} />
+          <FilterSelect name="sort" label="Sort" value={sort ?? "newest"} options={SORTS} keepDefault="newest" />
+        </FilterToolbar>
+        <ActiveFilters clearHref={clearHref} items={active.map((a) => ({ ...a, removeHref: a.key === "dates" ? hrefFor({ from: undefined, to: undefined }) : hrefFor({ [a.key]: undefined }) }))} />
+
         {data.rows.length === 0 ? (
-          <EmptyState icon={FileText} title="No quotations found" description="Open an inquiry and choose “Create quotation”." />
+          <EmptyState
+            icon={q || active.length ? SearchX : FileText}
+            title={q || active.length ? "No quotations match" : "No quotations yet"}
+            description={q || active.length ? "Try another word, or remove a filter." : "Open an inquiry and choose “Create quotation”."}
+          />
         ) : (
-          <Table>
-            <THead>
-              <tr>
-                <Th>Quotation</Th>
-                <Th>Inquiry</Th>
-                <Th className="hidden md:table-cell">Customer</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Total</Th>
-                <Th className="hidden lg:table-cell">Sent</Th>
-                <Th className="hidden sm:table-cell">Valid until</Th>
-              </tr>
-            </THead>
-            <tbody>
+          <>
+            <div className="hidden md:block">
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Quotation</Th>
+                    <Th>Inquiry</Th>
+                    <Th className="hidden lg:table-cell">Customer</Th>
+                    <Th>Status</Th>
+                    <Th className="text-right">Total</Th>
+                    <Th className="hidden xl:table-cell">Prepared by</Th>
+                    <Th>Valid until</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {data.rows.map((r) => {
+                    const late = r.status === "sent" && r.dueDate < today;
+                    return (
+                      <Tr key={r.id} className="group relative hover:bg-surface-2/70">
+                        <Td className="whitespace-nowrap">
+                          <Link href={`/quotations/${r.id}`} className="font-mono text-[13px] font-medium text-text group-hover:text-primary after:absolute after:inset-0 after:content-['']">
+                            {r.refNo}
+                          </Link>
+                          <span className="ml-1.5 text-xs text-muted">v{r.version}</span>
+                        </Td>
+                        <Td className="max-w-72 py-2">
+                          <p className="truncate text-text">{r.queryTitle}</p>
+                          <p className="font-mono text-[11px] text-muted">{r.queryRef}</p>
+                        </Td>
+                        <Td className="hidden max-w-48 truncate text-text-2 lg:table-cell">{r.companyName}</Td>
+                        <Td>
+                          <QuotationStatusBadge status={r.status} />
+                        </Td>
+                        <Td className="text-right font-medium whitespace-nowrap tabular">{formatMoney(r.total, settings.currency)}</Td>
+                        <Td className="hidden text-text-2 xl:table-cell">{r.preparedBy ?? "—"}</Td>
+                        <Td className={cn("whitespace-nowrap", late ? "font-medium text-bad" : "text-text-2")}>{formatDate(r.dueDate)}</Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
+            <ul className="divide-y divide-line md:hidden">
               {data.rows.map((r) => {
                 const late = r.status === "sent" && r.dueDate < today;
                 return (
-                  <Tr key={r.id} className="group hover:bg-surface-2/70">
-                    <Td className="whitespace-nowrap">
-                      <Link href={`/quotations/${r.id}`} className="font-mono text-[13px] font-medium text-text group-hover:text-primary hover:underline">
-                        {r.refNo}
-                      </Link>
-                      <span className="ml-1.5 text-xs text-muted">v{r.version}</span>
-                    </Td>
-                    <Td className="max-w-72 py-2">
-                      <p className="truncate text-text">{r.queryTitle}</p>
-                      <Link href={`/queries/${r.queryId}`} className="font-mono text-[11px] text-muted hover:text-primary hover:underline">
-                        {r.queryRef}
-                      </Link>
-                    </Td>
-                    <Td className="hidden text-text-2 md:table-cell">{r.companyName}</Td>
-                    <Td>
-                      <QuotationStatusBadge status={r.status} />
-                    </Td>
-                    <Td className="text-right font-medium whitespace-nowrap tabular">{formatMoney(r.total, settings.currency)}</Td>
-                    <Td className="hidden whitespace-nowrap text-muted lg:table-cell">{formatDate(r.submittedAt)}</Td>
-                    <Td className={cn("hidden whitespace-nowrap sm:table-cell", late ? "font-medium text-bad" : "text-text-2")}>{formatDate(r.dueDate)}</Td>
-                  </Tr>
+                  <li key={r.id}>
+                    <Link href={`/quotations/${r.id}`} className="block px-4 py-3 active:bg-surface-2">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-[13px] font-medium text-text">
+                          {r.refNo} <span className="font-sans text-xs font-normal text-muted">v{r.version}</span>
+                        </span>
+                        <span className="text-sm font-semibold text-text tabular">{formatMoney(r.total, settings.currency)}</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-sm text-text-2">{r.queryTitle}</p>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <QuotationStatusBadge status={r.status} />
+                          <span className="truncate text-xs text-muted">{r.companyName}</span>
+                        </span>
+                        <span className={cn("shrink-0 text-xs", late ? "font-medium text-bad" : "text-muted")}>until {formatDate(r.dueDate)}</span>
+                      </div>
+                    </Link>
+                  </li>
                 );
               })}
-            </tbody>
-          </Table>
+            </ul>
+          </>
         )}
-        <Pagination base="/quotations" params={{ q, status }} page={data.page} pageSize={data.pageSize} total={data.total} />
+        <Pagination base="/quotations" params={params} page={data.page} pageSize={data.pageSize} total={data.total} />
       </div>
     </div>
   );

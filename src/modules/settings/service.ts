@@ -23,6 +23,9 @@ export const settingsSchema = z.object({
   companyPhone: z.string().trim().max(60).default(""),
   companyEmail: z.union([z.literal(""), z.email("Enter a valid email")]).default(""),
   companyTaxNo: z.string().trim().max(60).default(""),
+  companyWebsite: z.string().trim().max(120).default(""),
+  /** Printed on invoices so the customer can pay by T/T. */
+  bankDetails: z.string().trim().max(1000).default(""),
   currency: z.string().trim().min(1).max(10).default("USD"),
   defaultTaxRate: z.coerce.number().min(0, "Tax cannot be negative").max(100, "Tax cannot exceed 100%"),
   quotationValidityDays: z.coerce.number().int().min(1).max(365),
@@ -65,6 +68,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   companyPhone: "+86 151 5475 4812",
   companyEmail: "info@keboint.com",
   companyTaxNo: "",
+  companyWebsite: "www.keboint.com",
+  bankDetails: "",
   currency: "USD",
   defaultTaxRate: 0,
   quotationValidityDays: 15,

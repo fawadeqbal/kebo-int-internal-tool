@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, inArray, lt, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { customers, invoiceItems, invoices, payments, queries, quotations, users } from "@/lib/db/schema";
 import { customerDisplayName } from "@/modules/customers/repository";
@@ -8,6 +8,9 @@ import { todayISO } from "@/lib/utils/dates";
 export interface InvoiceFilters {
   q?: string;
   status?: "unpaid" | "partially_paid" | "paid" | "cancelled" | "overdue" | "outstanding";
+  from?: string;
+  to?: string;
+  sort?: "newest" | "due" | "balance";
   page?: number;
   pageSize?: number;
 }
@@ -23,7 +26,15 @@ export async function listInvoices(_user: SessionUser, f: InvoiceFilters) {
   if (f.status === "overdue") conditions.push(inArray(invoices.status, ["unpaid", "partially_paid"]), lt(invoices.dueDate, todayISO()));
   else if (f.status === "outstanding") conditions.push(inArray(invoices.status, ["unpaid", "partially_paid"]));
   else if (f.status) conditions.push(eq(invoices.status, f.status));
+  if (f.from) conditions.push(gte(invoices.issueDate, f.from));
+  if (f.to) conditions.push(lte(invoices.issueDate, f.to));
   const where = and(...conditions);
+  const order =
+    f.sort === "balance"
+      ? [sql`(${invoices.total} - ${invoices.amountPaid}) desc`]
+      : f.sort === "due" || (!f.sort && (f.status === "overdue" || f.status === "outstanding"))
+        ? [asc(invoices.dueDate)]
+        : [desc(invoices.createdAt)];
   const [rows, [{ total }]] = await Promise.all([
     db
       .select({
@@ -43,7 +54,7 @@ export async function listInvoices(_user: SessionUser, f: InvoiceFilters) {
       .innerJoin(customers, eq(customers.id, invoices.customerId))
       .innerJoin(queries, eq(queries.id, invoices.queryId))
       .where(where)
-      .orderBy(f.status === "overdue" || f.status === "outstanding" ? asc(invoices.dueDate) : desc(invoices.createdAt))
+      .orderBy(...order)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db

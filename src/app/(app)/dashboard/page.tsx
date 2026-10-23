@@ -297,8 +297,8 @@ export default async function DashboardPage() {
                 <Th>Person</Th>
                 <Th className="text-right">Open</Th>
                 <Th className="text-right">Overdue</Th>
-                <Th className="text-right">Completed this month</Th>
-                <Th className="text-right">Avg. completion time</Th>
+                <Th className="hidden text-right sm:table-cell">Completed this month</Th>
+                <Th className="hidden text-right md:table-cell">Avg. completion time</Th>
               </tr>
             </THead>
             <tbody>
@@ -312,8 +312,8 @@ export default async function DashboardPage() {
                   </Td>
                   <Td className="text-right tabular">{p.open}</Td>
                   <Td className={cn("text-right tabular", p.overdue > 0 && "font-semibold text-bad")}>{p.overdue}</Td>
-                  <Td className="text-right tabular">{p.completed}</Td>
-                  <Td className="text-right text-text-2 tabular">{formatDuration(p.avgMs)}</Td>
+                  <Td className="hidden text-right tabular sm:table-cell">{p.completed}</Td>
+                  <Td className="hidden text-right text-text-2 tabular md:table-cell">{formatDuration(p.avgMs)}</Td>
                 </Tr>
               ))}
             </tbody>

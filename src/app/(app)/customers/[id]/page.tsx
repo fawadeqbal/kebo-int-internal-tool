@@ -143,8 +143,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     <Th>RFQ no.</Th>
                     <Th>Title</Th>
                     <Th>Status</Th>
-                    <Th>Handled by</Th>
-                    <Th>Received</Th>
+                    <Th className="hidden md:table-cell">Handled by</Th>
+                    <Th className="hidden sm:table-cell">Received</Th>
                   </tr>
                 </THead>
                 <tbody>
@@ -155,12 +155,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                           {q.refNo}
                         </Link>
                       </Td>
-                      <Td className="max-w-72 truncate">{q.title}</Td>
+                      <Td className="max-w-[10rem] truncate sm:max-w-72">{q.title}</Td>
                       <Td>
                         <QueryStatusBadge status={q.status} />
                       </Td>
-                      <Td className="text-muted">{q.assigneeName ?? "—"}</Td>
-                      <Td className="text-muted">{formatDate(q.createdAt)}</Td>
+                      <Td className="hidden text-muted md:table-cell">{q.assigneeName ?? "—"}</Td>
+                      <Td className="hidden whitespace-nowrap text-muted sm:table-cell">{formatDate(q.createdAt)}</Td>
                     </Tr>
                   ))}
                 </tbody>
@@ -176,7 +176,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     <Th>Invoice</Th>
                     <Th>Status</Th>
                     <Th className="text-right">Total</Th>
-                    <Th>Issued</Th>
+                    <Th className="hidden sm:table-cell">Issued</Th>
                     <Th>Due</Th>
                   </tr>
                 </THead>
@@ -191,9 +191,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                       <Td>
                         <InvoiceStatusBadge status={invoiceDisplayStatus(inv, today)} />
                       </Td>
-                      <Td className="text-right tabular">{formatMoney(inv.total, settings.currency)}</Td>
-                      <Td>{formatDate(inv.issueDate)}</Td>
-                      <Td>{formatDate(inv.dueDate)}</Td>
+                      <Td className="text-right whitespace-nowrap tabular">{formatMoney(inv.total, settings.currency)}</Td>
+                      <Td className="hidden whitespace-nowrap text-muted sm:table-cell">{formatDate(inv.issueDate)}</Td>
+                      <Td className="whitespace-nowrap text-text-2">{formatDate(inv.dueDate)}</Td>
                     </Tr>
                   ))}
                 </tbody>

@@ -33,6 +33,7 @@ export interface QueryFilters {
   customerId?: string;
   priority?: Priority;
   source?: QuerySource;
+  category?: string;
   from?: string;
   to?: string;
   sort?: "newest" | "oldest" | "required" | "priority" | "updated";
@@ -57,6 +58,7 @@ export function filterConditions(user: SessionUser, f: QueryFilters): SQL | unde
   if (f.customerId) conditions.push(eq(queries.customerId, f.customerId));
   if (f.priority) conditions.push(eq(queries.priority, f.priority));
   if (f.source) conditions.push(eq(queries.source, f.source));
+  if (f.category) conditions.push(eq(queries.category, f.category));
   if (f.from) conditions.push(gte(queries.createdAt, new Date(`${f.from}T00:00:00`)));
   if (f.to) conditions.push(lte(queries.createdAt, new Date(`${f.to}T23:59:59.999`)));
   return and(...conditions);
@@ -250,4 +252,17 @@ export async function listQueriesForCustomer(user: SessionUser, customerId: stri
     .leftJoin(assignee, eq(assignee.id, queries.assignedTo))
     .where(and(eq(queries.customerId, customerId), isNull(queries.deletedAt), accessCondition(user)))
     .orderBy(desc(queries.createdAt));
+}
+
+/** Counts per status tab for the current filters (search, category, person…), ignoring the status itself. */
+export async function countByStatus(user: SessionUser, f: QueryFilters) {
+  const where = filterConditions(user, { ...f, status: undefined });
+  const from = () => db.select({ n: count() }).from(queries).innerJoin(customers, eq(customers.id, queries.customerId));
+  const [rows, [{ n: overdue }], [{ n: unassigned }]] = await Promise.all([
+    db.select({ status: queries.status, n: count() }).from(queries).innerJoin(customers, eq(customers.id, queries.customerId)).where(where).groupBy(queries.status),
+    from().where(and(where, inArray(queries.status, OPEN_STATUSES), lt(queries.requiredBy, todayISO()))),
+    from().where(and(where, eq(queries.status, "pending"), isNull(queries.assignedTo))),
+  ]);
+  const by = Object.fromEntries(rows.map((r) => [r.status, r.n])) as Record<string, number>;
+  return { pending: by.pending ?? 0, processing: by.processing ?? 0, completed: by.completed ?? 0, not_completed: by.not_completed ?? 0, overdue, unassigned };
 }

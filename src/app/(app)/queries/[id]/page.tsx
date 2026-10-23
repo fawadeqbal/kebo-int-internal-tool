@@ -154,9 +154,55 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
         )}
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr] lg:items-start">
+        {/* What to do next: first on a phone, top right on a desktop */}
+        <aside aria-label="Status and assignment" className="flex flex-col gap-5 lg:col-start-2 lg:row-start-1">
+          <Card>
+            <CardHeader
+              title="Status"
+              description={
+                !workable
+                  ? "Only the person handling it or a manager can change this."
+                  : transitions.length === 0
+                    ? "Closed. A manager can reopen it."
+                    : "Move it to the next step."
+              }
+            />
+            <CardBody>
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted">
+                Now <QueryStatusBadge status={query.status} />
+              </div>
+              {workable && transitions.length > 0 && <StatusPanel action={changeStatusAction.bind(null, id)} transitions={transitions} />}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="Handled by" />
+            <CardBody className="flex flex-col gap-3">
+              {detail.assigneeName ? (
+                <p className="flex items-center gap-2 text-sm font-medium text-text">
+                  <Avatar name={detail.assigneeName} size={26} />
+                  {detail.assigneeName}
+                </p>
+              ) : (
+                <p>
+                  <Badge tone="warn">Not assigned yet</Badge>
+                </p>
+              )}
+              <AssignPanel
+                action={assignQueryAction.bind(null, id)}
+                people={people}
+                current={query.assignedTo}
+                canAssignOthers={can(user.role, "queries.assign")}
+                currentUserId={user.id}
+              />
+            </CardBody>
+          </Card>
+
+        </aside>
+
         {/* Main column */}
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <Card>
             <CardHeader title="Requirements" description={`${query.category ? `${query.category} · ` : ""}Quantity ${query.quantity}`} />
             <CardBody>
@@ -282,50 +328,8 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
           </Card>
         </div>
 
-        {/* Side column */}
-        <aside className="flex flex-col gap-5">
-          <Card>
-            <CardHeader
-              title="Status"
-              description={
-                !workable
-                  ? "Only the person handling it or a manager can change this."
-                  : transitions.length === 0
-                    ? "Closed. A manager can reopen it."
-                    : "Move it to the next step."
-              }
-            />
-            <CardBody>
-              <div className="mb-3 flex items-center gap-2 text-sm text-muted">
-                Now <QueryStatusBadge status={query.status} />
-              </div>
-              {workable && transitions.length > 0 && <StatusPanel action={changeStatusAction.bind(null, id)} transitions={transitions} />}
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader title="Handled by" />
-            <CardBody className="flex flex-col gap-3">
-              {detail.assigneeName ? (
-                <p className="flex items-center gap-2 text-sm font-medium text-text">
-                  <Avatar name={detail.assigneeName} size={26} />
-                  {detail.assigneeName}
-                </p>
-              ) : (
-                <p>
-                  <Badge tone="warn">Not assigned yet</Badge>
-                </p>
-              )}
-              <AssignPanel
-                action={assignQueryAction.bind(null, id)}
-                people={people}
-                current={query.assignedTo}
-                canAssignOthers={can(user.role, "queries.assign")}
-                currentUserId={user.id}
-              />
-            </CardBody>
-          </Card>
-
+        {/* Customer, timing and history */}
+        <aside aria-label="Details" className="flex flex-col gap-5 lg:col-start-2 lg:row-start-2">
           <Card>
             <CardHeader title="Customer" actions={<Link href={`/customers/${customer.id}`} className="text-xs font-medium text-primary hover:underline">View</Link>} />
             <CardBody className="space-y-3">

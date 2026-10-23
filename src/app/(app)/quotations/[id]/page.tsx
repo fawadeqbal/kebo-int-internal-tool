@@ -14,7 +14,7 @@ import { getSettings } from "@/modules/settings/service";
 import { ButtonLink, buttonClass, Card, CardBody, CardHeader } from "@/components/ui";
 import { InvoiceStatusBadge, QuotationStatusBadge } from "@/components/ui/badge";
 import { ConfirmSubmit } from "@/components/ui/client";
-import { DocumentView, docDate } from "@/components/documents/document-view";
+import { QuotationDocument } from "@/components/documents/documents";
 import { formatDate, formatDateTime, todayISO } from "@/lib/utils/dates";
 import { formatMoney } from "@/lib/utils/money";
 
@@ -51,11 +51,11 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href={`/api/quotations/${id}/pdf`} className={buttonClass("secondary", "sm")} download>
-              <FileDown aria-hidden /> Download PDF
-            </a>
             <a href={`/print/quotations/${id}`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "sm")}>
               <Printer aria-hidden /> Print
+            </a>
+            <a href={`/api/quotations/${id}/pdf`} className={buttonClass("secondary", "sm")} download>
+              <FileDown aria-hidden /> Download PDF
             </a>
             {manage && isEditable(q.status) && (
               <ButtonLink href={`/quotations/${id}/edit`} variant="secondary" size="sm">
@@ -78,26 +78,8 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
         </div>
       </header>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="overflow-hidden rounded-xl border border-line shadow-card">
-          <DocumentView
-            kind="Quotation"
-            number={q.refNo}
-            settings={settings}
-            customer={customer}
-            stamp={q.status === "draft" ? "Draft" : null}
-            meta={[
-              { label: "Date", value: docDate(q.submittedAt ?? q.createdAt.toISOString().slice(0, 10)) },
-              { label: "Valid until", value: docDate(q.dueDate) },
-              { label: "RFQ no.", value: query.refNo },
-              ...(q.version > 1 ? [{ label: "Revision", value: `v${q.version}` }] : []),
-            ]}
-            items={detail.items}
-            totals={q}
-            terms={q.terms}
-          />
-        </div>
-        <aside className="no-print flex flex-col gap-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:grid-rows-[auto_1fr] xl:items-start">
+        <aside aria-label="Next step" className="no-print flex flex-col gap-5 empty:hidden xl:col-start-2 xl:row-start-1">
           {manage && QUOTATION_TRANSITIONS[q.status].length > 0 && (
             <Card>
               <CardHeader
@@ -124,6 +106,11 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               </CardBody>
             </Card>
           )}
+        </aside>
+        <div className="overflow-hidden rounded-xl border border-line shadow-card xl:col-start-1 xl:row-span-2 xl:row-start-1">
+          <QuotationDocument detail={detail} settings={settings} />
+        </div>
+        <aside aria-label="Details" className="no-print flex flex-col gap-5 xl:col-start-2 xl:row-start-2">
           <Card>
             <CardHeader title="Details" />
             <CardBody>

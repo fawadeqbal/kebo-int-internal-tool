@@ -1,20 +1,38 @@
 import Link from "next/link";
-import { Building2, Plus, SearchX } from "lucide-react";
+import { Building2, ChevronRight, Plus, SearchX } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { listCustomers } from "@/modules/customers/repository";
-import { Avatar, ButtonLink, EmptyState, FilterBar, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
-import { AutoSelect } from "@/components/ui/client";
-import { Pagination, toPage } from "@/components/ui/pagination";
+import { listCustomers, type CustomerListFilters } from "@/modules/customers/repository";
+import { ActiveFilters, Avatar, ButtonLink, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
+import { FilterSelect, FilterToolbar } from "@/components/ui/filters";
+import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils/dates";
 
 export const metadata = { title: "Customers" };
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; sort?: string }> }) {
+const SHOW = [
+  { value: "open", label: "With open inquiries" },
+  { value: "unpaid", label: "With unpaid invoices" },
+  { value: "none", label: "No inquiries yet" },
+];
+const SORTS = [
+  { value: "company", label: "Name (A–Z)" },
+  { value: "recent", label: "Latest inquiry" },
+];
+
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; sort?: string; has?: string }> }) {
   await requireUser();
   const sp = await searchParams;
-  const q = sp.q?.trim() || undefined;
+  const q = sp.q?.trim().slice(0, 100) || undefined;
   const sort = sp.sort === "recent" ? "recent" : "company";
-  const data = await listCustomers({ q, page: toPage(sp.page), sort });
+  const has = SHOW.some((s) => s.value === sp.has) ? (sp.has as CustomerListFilters["has"]) : undefined;
+  const data = await listCustomers({ q, page: toPage(sp.page), sort, has });
+  const params = { q, has, sort: sort === "company" ? undefined : sort };
+  const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/customers", params, { page: undefined, ...patch });
+  const active = [
+    has && { key: "has", label: "Show", value: SHOW.find((s) => s.value === has)!.label },
+    sort !== "company" && { key: "sort", label: "Sort", value: "Latest inquiry" },
+  ].filter(Boolean) as { key: string; label: string; value: string }[];
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -27,22 +45,33 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
       />
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-        <form role="search">
-          <FilterBar end={<span className="hidden text-xs text-muted tabular sm:inline">{data.total} customers</span>}>
-            <SearchField defaultValue={q} placeholder="Name, company, phone or email" clearHref={sort === "recent" ? "/customers?sort=recent" : "/customers"} label="Search customers" />
-            <AutoSelect name="sort" defaultValue={sort} className="w-48" aria-label="Sort by">
-              <option value="company">Sort: Name (A–Z)</option>
-              <option value="recent">Sort: Most recent inquiry</option>
-            </AutoSelect>
-          </FilterBar>
-        </form>
+        <FilterToolbar
+          activeCount={active.length}
+          search={<SearchField defaultValue={q} placeholder="Name, company, phone or email" clearHref={hrefFor({ q: undefined })} label="Search customers" />}
+          end={
+            <>
+              {active.length > 0 && (
+                <Link href={buildHref("/customers", { q }, {})} className="font-medium text-muted hover:text-text">
+                  Reset
+                </Link>
+              )}
+              <span>{data.total} customers</span>
+            </>
+          }
+        >
+          <FilterSelect name="has" label="Show" value={has} options={SHOW} allLabel="Everyone" />
+          <FilterSelect name="sort" label="Sort" value={sort} options={SORTS} keepDefault="company" />
+        </FilterToolbar>
+        <ActiveFilters clearHref={buildHref("/customers", { q }, {})} items={active.map((a) => ({ ...a, removeHref: hrefFor({ [a.key]: undefined }) }))} />
+
         {data.rows.length === 0 ? (
           <EmptyState
-            icon={q ? SearchX : Building2}
-            title={q ? "No customers match your search" : "No customers yet"}
-            description={q ? "Try a different name or number." : "Customers are added automatically from website RFQs, or when you enter an inquiry."}
+            icon={q || has ? SearchX : Building2}
+            title={q || has ? "No customers match" : "No customers yet"}
+            description={q || has ? "Try a different name or number, or remove the filter." : "Customers are added automatically from website RFQs, or when you enter an inquiry."}
             action={
-              !q && (
+              !q &&
+              !has && (
                 <ButtonLink href="/customers/new" variant="primary" size="sm">
                   Add customer
                 </ButtonLink>
@@ -50,38 +79,61 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             }
           />
         ) : (
-          <Table>
-            <THead>
-              <tr>
-                <Th>Customer</Th>
-                <Th className="hidden md:table-cell">Phone / WhatsApp</Th>
-                <Th className="hidden lg:table-cell">Email</Th>
-                <Th className="text-right">Inquiries</Th>
-                <Th className="hidden sm:table-cell">Last inquiry</Th>
-              </tr>
-            </THead>
-            <tbody>
+          <>
+            <div className="hidden md:block">
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Customer</Th>
+                    <Th>Phone / WhatsApp</Th>
+                    <Th className="hidden lg:table-cell">Email</Th>
+                    <Th className="text-right">Inquiries</Th>
+                    <Th>Last inquiry</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {data.rows.map((c) => (
+                    <Tr key={c.id} className="group relative hover:bg-surface-2/70">
+                      <Td className="py-2">
+                        <Link href={`/customers/${c.id}`} className="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0 after:content-['']">
+                          <Avatar name={c.contactPerson} size={30} />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-text group-hover:text-primary">{c.contactPerson}</span>
+                            <span className="block truncate text-xs text-muted">{c.companyName ?? "No company"}</span>
+                          </span>
+                        </Link>
+                      </Td>
+                      <Td className="whitespace-nowrap text-text-2 tabular">{c.phone}</Td>
+                      <Td className="hidden text-text-2 lg:table-cell">{c.email ?? <span className="text-muted">—</span>}</Td>
+                      <Td className="text-right tabular">{c.queryCount}</Td>
+                      <Td className="whitespace-nowrap text-muted">{formatDate(c.lastQueryAt)}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+            <ul className="divide-y divide-line md:hidden">
               {data.rows.map((c) => (
-                <Tr key={c.id} className="group relative hover:bg-surface-2/70">
-                  <Td className="py-2">
-                    <Link href={`/customers/${c.id}`} className="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0 after:content-['']">
-                      <Avatar name={c.contactPerson} size={30} />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-text group-hover:text-primary">{c.contactPerson}</span>
-                        <span className="block truncate text-xs text-muted">{c.companyName ?? "No company"}</span>
-                      </span>
-                    </Link>
-                  </Td>
-                  <Td className="hidden whitespace-nowrap text-text-2 tabular md:table-cell">{c.phone}</Td>
-                  <Td className="hidden text-text-2 lg:table-cell">{c.email ?? <span className="text-muted">—</span>}</Td>
-                  <Td className="text-right tabular">{c.queryCount}</Td>
-                  <Td className="hidden whitespace-nowrap text-muted sm:table-cell">{formatDate(c.lastQueryAt)}</Td>
-                </Tr>
+                <li key={c.id}>
+                  <Link href={`/customers/${c.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-surface-2">
+                    <Avatar name={c.contactPerson} size={36} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-text">{c.contactPerson}</span>
+                      <span className="block truncate text-xs text-muted">{c.companyName ?? "No company"}</span>
+                      <span className="mt-0.5 block truncate text-xs text-text-2 tabular">{c.phone}</span>
+                    </span>
+                    <span className="shrink-0 text-right text-xs text-muted">
+                      <span className="block font-medium text-text tabular">{c.queryCount}</span>
+                      {c.queryCount === 1 ? "inquiry" : "inquiries"}
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-muted" aria-hidden />
+                  </Link>
+                </li>
               ))}
-            </tbody>
-          </Table>
+            </ul>
+          </>
         )}
-        <Pagination base="/customers" params={{ q, sort: sort === "company" ? undefined : sort }} page={data.page} pageSize={data.pageSize} total={data.total} />
+        <Pagination base="/customers" params={params} page={data.page} pageSize={data.pageSize} total={data.total} />
       </div>
     </div>
   );

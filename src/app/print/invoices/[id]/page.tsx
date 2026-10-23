@@ -4,7 +4,7 @@ import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { getInvoiceDetail } from "@/modules/invoices/repository";
 import { getSettings } from "@/modules/settings/service";
-import { DocumentView, docDate } from "@/components/documents/document-view";
+import { InvoiceDocument } from "@/components/documents/documents";
 import { PrintToolbar } from "../../toolbar";
 
 export const metadata = { title: "Invoice" };
@@ -21,23 +21,7 @@ export default async function PrintInvoice({ params }: { params: Promise<{ id: s
       <title>{`${inv.invoiceNo} — ${customerName(detail.customer)}`}</title>
       <PrintToolbar pdfHref={`/api/invoices/${id}/pdf`} backHref={`/invoices/${id}`} label={inv.invoiceNo} />
       <div className="shadow-xl print:shadow-none mx-auto max-w-[210mm]">
-        <DocumentView
-          kind="Invoice"
-          number={inv.invoiceNo}
-          settings={settings}
-          customer={detail.customer}
-          stamp={inv.status === "cancelled" ? "Cancelled" : inv.status === "paid" ? "Paid" : null}
-          meta={[
-            { label: "Invoice date", value: docDate(inv.issueDate) },
-            { label: "Payment due", value: docDate(inv.dueDate) },
-            { label: "Quotation", value: detail.quotation.refNo },
-            { label: "RFQ no.", value: detail.query.refNo },
-          ]}
-          items={detail.items}
-          totals={inv}
-          terms={inv.notes}
-          footer={settings.invoiceFooter}
-        />
+        <InvoiceDocument detail={detail} settings={settings} />
       </div>
     </>
   );

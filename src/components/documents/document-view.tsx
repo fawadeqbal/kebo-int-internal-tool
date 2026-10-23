@@ -1,6 +1,9 @@
+import type { ReactNode } from "react";
 import type { AppSettings } from "@/modules/settings/service";
 import { formatDate } from "@/lib/utils/dates";
-import { formatMoney } from "@/lib/utils/money";
+import { formatCents, formatMoney, toCents } from "@/lib/utils/money";
+import { amountInWords } from "@/lib/utils/words";
+import { cn } from "@/lib/utils/cn";
 
 interface DocLine {
   description: string;
@@ -9,139 +12,265 @@ interface DocLine {
   lineTotal: string;
 }
 
-/** Printable quotation / invoice layout, shared by the screen preview and the print page. */
-export function DocumentView({
-  kind,
-  number,
-  settings,
-  customer,
-  meta,
-  items,
-  totals,
-  terms,
-  footer,
-  stamp,
-}: {
+export interface DocumentProps {
   kind: "Quotation" | "Invoice";
   number: string;
   settings: AppSettings;
   customer: { companyName: string | null; contactPerson: string; phone: string; email: string | null; address: string | null; taxNo: string | null };
-  meta: { label: string; value: string }[];
+  /** Rows of the details box (date, validity, references…). */
+  meta: { label: string; value: ReactNode }[];
+  /** One line on what the document is for, e.g. the inquiry title. */
+  subject?: string | null;
   items: DocLine[];
   totals: { subtotal: string; discount: string; taxRate: string; taxAmount: string; total: string; amountPaid?: string };
   terms?: string | null;
+  /** Invoice only: how to pay. */
+  payment?: { bankDetails: string; dueDate: string; paidInFull: boolean };
   footer?: string | null;
-  stamp?: string | null;
-}) {
+  /** Draft / Paid / Cancelled marking. */
+  stamp?: { label: string; tone: "draft" | "paid" | "void" } | null;
+}
+
+const label = "text-[10px] font-semibold tracking-[0.12em] text-stone-500 uppercase";
+
+/**
+ * The printed quotation / invoice. One layout for the screen preview, the
+ * print page and the PDF download (the PDF is this page printed by Chrome).
+ * It reflows on a phone and is A4 when printed.
+ */
+export function DocumentView({ kind, number, settings, customer, meta, subject, items, totals, terms, payment, footer, stamp }: DocumentProps) {
   const c = settings.currency;
-  const hasDiscount = Number(totals.discount) > 0;
-  const balance = totals.amountPaid !== undefined ? Number(totals.total) - Number(totals.amountPaid) : null;
+  const discount = toCents(totals.discount);
+  const tax = toCents(totals.taxAmount);
+  const paid = totals.amountPaid !== undefined ? toCents(totals.amountPaid) : 0;
+  const balance = toCents(totals.total) - paid;
+  const title = kind === "Invoice" ? "Invoice" : "Quotation";
+  const contact = [settings.companyPhone, settings.companyEmail, settings.companyWebsite].filter(Boolean);
+
   return (
-    <article className="relative mx-auto w-full max-w-[210mm] bg-white p-8 text-[13px] leading-relaxed text-stone-900 sm:p-12 print:p-0">
-      {stamp && (
-        <div className="pointer-events-none absolute right-10 top-36 rotate-[-12deg] rounded-md border-4 border-current px-4 py-1 text-2xl font-bold uppercase tracking-widest text-red-600/40" aria-hidden>
-          {stamp}
+    <article className="relative mx-auto w-full max-w-[210mm] bg-white px-5 py-6 text-[12.5px] leading-relaxed text-stone-800 [print-color-adjust:exact] sm:px-12 sm:py-11 print:p-0">
+      {stamp && stamp.tone !== "paid" && (
+        <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+          <span className="-rotate-[28deg] text-[110px] font-bold tracking-[0.15em] text-stone-900/[0.04] uppercase select-none">{stamp.label}</span>
         </div>
       )}
-      <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-stone-900 pb-6">
-        <div>
-          <p className="text-lg font-bold tracking-tight">{settings.companyName}</p>
-          {settings.companyAddress && <p className="whitespace-pre-line text-stone-600">{settings.companyAddress}</p>}
-          <p className="text-stone-600">{[settings.companyPhone, settings.companyEmail].filter(Boolean).join(" · ")}</p>
-          {settings.companyTaxNo && <p className="text-stone-600">Tax no.: {settings.companyTaxNo}</p>}
+
+      {/* Letterhead */}
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-md bg-stone-900 text-white" aria-hidden>
+            <svg viewBox="0 0 32 32" className="size-5">
+              <path d="M8 10h16M8 16h11M8 22h7" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] leading-tight font-bold tracking-tight text-stone-900">{settings.companyName}</p>
+            {settings.companyAddress && <p className="mt-1 whitespace-pre-line text-stone-600">{settings.companyAddress}</p>}
+            {contact.length > 0 && <p className="text-stone-600">{contact.join("  ·  ")}</p>}
+            {settings.companyTaxNo && <p className="text-stone-600">Tax / Reg. no. {settings.companyTaxNo}</p>}
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-light uppercase tracking-[0.2em] text-stone-500">{kind}</p>
-          <p className="mt-1 font-mono text-base font-semibold">{number}</p>
+        <div className="sm:text-right">
+          <p className="text-[26px] leading-none font-light tracking-[0.22em] text-stone-900 uppercase">{title}</p>
+          <p className="mt-2 font-mono text-[13px] font-semibold text-stone-900">No. {number}</p>
+          {stamp && (
+            <p
+              className={cn(
+                "mt-2 inline-block rounded border px-2 py-0.5 text-[10px] font-bold tracking-[0.15em] uppercase",
+                stamp.tone === "paid" && "border-emerald-600 text-emerald-700",
+                stamp.tone === "draft" && "border-stone-400 text-stone-500",
+                stamp.tone === "void" && "border-red-600 text-red-600",
+              )}
+            >
+              {stamp.label}
+            </p>
+          )}
         </div>
       </header>
+      <div className="mt-6 h-[3px] bg-stone-900" />
 
-      <section className="grid grid-cols-1 gap-6 py-6 sm:grid-cols-2">
-        <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500">{kind === "Invoice" ? "Bill to" : "Customer"}</p>
-          <p className="font-semibold">{customer.companyName || customer.contactPerson}</p>
+      {/* Parties and details */}
+      <section className="mt-6 grid gap-4 sm:grid-cols-[1.15fr_1fr]">
+        <div className="rounded-md border border-stone-200 p-4">
+          <p className={label}>{kind === "Invoice" ? "Bill to" : "Prepared for"}</p>
+          <p className="mt-1.5 text-[13.5px] font-semibold text-stone-900">{customer.companyName || customer.contactPerson}</p>
           {customer.companyName && <p>Attn: {customer.contactPerson}</p>}
-          {customer.address && <p className="text-stone-600">{customer.address}</p>}
-          <p className="text-stone-600">{[customer.phone, customer.email].filter(Boolean).join(" · ")}</p>
-          {customer.taxNo && <p className="text-stone-600">Tax no.: {customer.taxNo}</p>}
+          {customer.address && <p className="whitespace-pre-line text-stone-600">{customer.address}</p>}
+          <p className="text-stone-600">{customer.phone}</p>
+          {customer.email && <p className="break-all text-stone-600">{customer.email}</p>}
+          {customer.taxNo && <p className="text-stone-600">Tax / Reg. no. {customer.taxNo}</p>}
         </div>
-        <dl className="grid grid-cols-[auto_1fr] content-start gap-x-6 gap-y-1 sm:justify-self-end">
-          {meta.map((m) => (
-            <div key={m.label} className="contents">
-              <dt className="text-stone-500">{m.label}</dt>
-              <dd className="text-right font-medium">{m.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <div className="rounded-md border border-stone-200 bg-stone-50 p-4">
+          <p className={label}>{title} details</p>
+          <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+            {meta.map((m) => (
+              <div key={m.label} className="contents">
+                <dt className="text-stone-500">{m.label}</dt>
+                <dd className="text-right font-medium text-stone-900">{m.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </section>
 
-      <table className="w-full border-collapse">
+      {subject && (
+        <p className="mt-5">
+          <span className="font-semibold text-stone-900">Subject:</span> {subject}
+        </p>
+      )}
+
+      {/* Line items: a table on paper and wide screens, stacked on a phone */}
+      <table className="mt-4 hidden w-full border-collapse sm:table">
         <thead>
-          <tr className="border-y border-stone-300 bg-stone-50 text-left text-[11px] uppercase tracking-wider text-stone-500">
-            <th className="w-8 py-2 pl-2">#</th>
-            <th className="py-2">Description</th>
-            <th className="w-16 py-2 text-right">Qty</th>
-            <th className="w-32 py-2 text-right">Unit price</th>
-            <th className="w-36 py-2 pr-2 text-right">Amount</th>
+          <tr className="bg-stone-900 text-left text-[10px] tracking-[0.1em] text-white uppercase">
+            <th className="w-10 py-2.5 pl-3 font-semibold">No.</th>
+            <th className="py-2.5 pr-3 font-semibold">Description</th>
+            <th className="w-16 py-2.5 pr-3 text-right font-semibold">Qty</th>
+            <th className="w-32 py-2.5 pr-3 text-right font-semibold">Unit price</th>
+            <th className="w-36 py-2.5 pr-3 text-right font-semibold">Amount ({c})</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((it, i) => (
-            <tr key={i} className="border-b border-stone-200 align-top">
-              <td className="py-2.5 pl-2 text-stone-500">{i + 1}</td>
-              <td className="whitespace-pre-wrap py-2.5 pr-4">{it.description}</td>
-              <td className="py-2.5 text-right tabular-nums">{Number(it.quantity)}</td>
-              <td className="py-2.5 text-right tabular-nums">{formatMoney(it.unitPrice, c)}</td>
-              <td className="py-2.5 pr-2 text-right tabular-nums">{formatMoney(it.lineTotal, c)}</td>
-            </tr>
-          ))}
+          {items.map((it, i) => {
+            const [name, ...rest] = it.description.split("\n");
+            return (
+              <tr key={i} className="border-b border-stone-200 align-top">
+                <td className="py-3 pl-3 text-stone-500 tabular-nums">{i + 1}</td>
+                <td className="py-3 pr-3">
+                  <p className="font-medium text-stone-900">{name}</p>
+                  {rest.length > 0 && <p className="mt-0.5 whitespace-pre-wrap text-stone-600">{rest.join("\n")}</p>}
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">{Number(it.quantity)}</td>
+                <td className="py-3 pr-3 text-right tabular-nums">{formatMoney(it.unitPrice, c)}</td>
+                <td className="py-3 pr-3 text-right font-medium text-stone-900 tabular-nums">{formatMoney(it.lineTotal, c)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      <ol className="mt-4 divide-y divide-stone-200 border-y border-stone-900 sm:hidden">
+        {items.map((it, i) => {
+          const [name, ...rest] = it.description.split("\n");
+          return (
+            <li key={i} className="py-3">
+              <div className="flex justify-between gap-3">
+                <p className="font-medium text-stone-900">
+                  <span className="mr-1.5 text-stone-400 tabular-nums">{i + 1}.</span>
+                  {name}
+                </p>
+                <p className="shrink-0 font-medium text-stone-900 tabular-nums">{formatMoney(it.lineTotal, c)}</p>
+              </div>
+              {rest.length > 0 && <p className="mt-0.5 whitespace-pre-wrap text-stone-600">{rest.join("\n")}</p>}
+              <p className="mt-1 text-stone-500 tabular-nums">
+                {Number(it.quantity)} × {formatMoney(it.unitPrice, c)}
+              </p>
+            </li>
+          );
+        })}
+      </ol>
 
-      <section className="mt-4 flex justify-end">
-        <dl className="w-full max-w-xs space-y-1.5">
-          <div className="flex justify-between">
+      {/* Amount in words + totals */}
+      <section className="mt-5 grid gap-5 sm:grid-cols-[1fr_17rem] sm:items-start">
+        <div className="order-2 sm:order-1">
+          <p className={label}>Amount in words</p>
+          <p className="mt-1 font-medium text-stone-900 italic">{amountInWords(toCents(totals.total), c)}</p>
+        </div>
+        <dl className="order-1 space-y-1.5 sm:order-2">
+          <div className="flex justify-between gap-4">
             <dt className="text-stone-500">Subtotal</dt>
             <dd className="tabular-nums">{formatMoney(totals.subtotal, c)}</dd>
           </div>
-          {hasDiscount && (
-            <div className="flex justify-between">
+          {discount > 0 && (
+            <div className="flex justify-between gap-4">
               <dt className="text-stone-500">Discount</dt>
               <dd className="tabular-nums">− {formatMoney(totals.discount, c)}</dd>
             </div>
           )}
-          <div className="flex justify-between">
-            <dt className="text-stone-500">Tax ({Number(totals.taxRate)}%)</dt>
-            <dd className="tabular-nums">{formatMoney(totals.taxAmount, c)}</dd>
+          {(tax > 0 || Number(totals.taxRate) > 0) && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-stone-500">Tax ({Number(totals.taxRate)}%)</dt>
+              <dd className="tabular-nums">{formatMoney(totals.taxAmount, c)}</dd>
+            </div>
+          )}
+          <div className="!mt-2.5 flex items-baseline justify-between gap-4 rounded-md bg-stone-900 px-3 py-2.5 text-white">
+            <dt className="text-[11px] font-semibold tracking-[0.12em] uppercase">Total {c}</dt>
+            <dd className="text-[15px] font-bold tabular-nums">{formatMoney(totals.total, c)}</dd>
           </div>
-          <div className="flex justify-between border-t-2 border-stone-900 pt-2 text-base font-bold">
-            <dt>Total</dt>
-            <dd className="tabular-nums">{formatMoney(totals.total, c)}</dd>
-          </div>
-          {balance !== null && Number(totals.amountPaid) > 0 && (
+          {kind === "Invoice" && paid > 0 && (
             <>
-              <div className="flex justify-between">
-                <dt className="text-stone-500">Paid</dt>
+              <div className="flex justify-between gap-4 px-3 pt-1">
+                <dt className="text-stone-500">Received</dt>
                 <dd className="tabular-nums">− {formatMoney(totals.amountPaid, c)}</dd>
               </div>
-              <div className="flex justify-between font-semibold">
+              <div className="flex justify-between gap-4 border-t border-stone-300 px-3 pt-1.5 font-semibold text-stone-900">
                 <dt>Balance due</dt>
-                <dd className="tabular-nums">{formatMoney(balance, c)}</dd>
+                <dd className="tabular-nums">{formatCents(balance, c)}</dd>
               </div>
             </>
           )}
         </dl>
       </section>
 
-      {terms && (
-        <section className="mt-10 border-t border-stone-200 pt-4">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500">Terms & conditions</p>
-          <p className="whitespace-pre-wrap text-stone-700">{terms}</p>
+      {/* Payment instructions (invoice) */}
+      {payment && (
+        <section className="mt-6 grid gap-4 rounded-md border border-stone-200 p-4 break-inside-avoid sm:grid-cols-[1fr_auto]">
+          <div>
+            <p className={label}>Payment by bank transfer (T/T)</p>
+            {payment.bankDetails ? (
+              <p className="mt-1.5 whitespace-pre-line text-stone-800">{payment.bankDetails}</p>
+            ) : (
+              <p className="mt-1.5 text-stone-500">Bank details will be sent separately.</p>
+            )}
+            <p className="mt-2 text-stone-600">
+              Please quote <span className="font-mono font-semibold text-stone-900">{number}</span> as the payment reference. Bank charges are borne by the remitter.
+            </p>
+          </div>
+          <div className="flex flex-col justify-between gap-6 sm:w-60 sm:border-l sm:border-stone-200 sm:pl-5">
+            <div>
+              <p className={label}>{payment.paidInFull ? "Status" : "Payment due"}</p>
+              <p className="mt-1.5 text-[14px] font-semibold text-stone-900">{payment.paidInFull ? "Paid in full" : formatDate(payment.dueDate)}</p>
+            </div>
+            <div>
+              <p className={label}>For and on behalf of</p>
+              <p className="mt-0.5 leading-snug font-medium text-stone-900">{settings.companyName}</p>
+              <div className="mt-8 border-t border-stone-400 pt-1.5 text-[11px] text-stone-500">Authorised signature</div>
+            </div>
+          </div>
         </section>
       )}
-      <footer className="mt-12 flex items-end justify-between gap-6 text-stone-500">
-        <p>{footer}</p>
-        <div className="w-48 border-t border-stone-400 pt-1 text-center text-[11px]">Authorised signature</div>
+
+      {/* Terms */}
+      {terms && (
+        <section className="mt-7">
+          <p className={label}>Terms & conditions</p>
+          <p className="mt-1.5 whitespace-pre-wrap text-stone-700">{terms}</p>
+        </section>
+      )}
+
+      {/* Signatures (an invoice signs inside the payment box) */}
+      {!payment && (
+        <section className={cn("mt-9 grid gap-8 break-inside-avoid", kind === "Quotation" && "sm:grid-cols-2")}>
+          {kind === "Quotation" && (
+            <div>
+              <p className={label}>Accepted by the customer</p>
+              <div className="mt-12 border-t border-stone-400 pt-1.5 text-[11px] text-stone-500">Name, signature, company stamp and date</div>
+            </div>
+          )}
+          <div className={cn(kind === "Invoice" && "sm:ml-auto sm:w-72")}>
+            <p className={label}>For and on behalf of</p>
+            <p className="mt-0.5 font-medium text-stone-900">{settings.companyName}</p>
+            <div className="mt-8 border-t border-stone-400 pt-1.5 text-[11px] text-stone-500">Authorised signature</div>
+          </div>
+        </section>
+      )}
+
+      <footer className="mt-8 border-t border-stone-200 pt-3 text-center text-[11px] text-stone-500">
+        {footer && <p className="font-medium text-stone-700">{footer}</p>}
+        <p>
+          {settings.companyName}
+          {settings.companyWebsite && `  ·  ${settings.companyWebsite}`}
+          {settings.companyEmail && `  ·  ${settings.companyEmail}`}
+        </p>
       </footer>
     </article>
   );

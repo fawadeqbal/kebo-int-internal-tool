@@ -10,6 +10,16 @@ export interface CustomerListFilters {
   page?: number;
   pageSize?: number;
   sort?: "company" | "recent";
+  /** open = has an open inquiry · unpaid = owes money · none = never sent an inquiry */
+  has?: "open" | "unpaid" | "none";
+}
+
+function hasCondition(has: CustomerListFilters["has"]): SQL | undefined {
+  if (has === "open")
+    return sql`exists (select 1 from ${queries} q where q.customer_id = ${customers.id} and q.deleted_at is null and q.status in ('pending','processing'))`;
+  if (has === "unpaid") return sql`exists (select 1 from ${invoices} i where i.customer_id = ${customers.id} and i.status in ('unpaid','partially_paid'))`;
+  if (has === "none") return sql`not exists (select 1 from ${queries} q where q.customer_id = ${customers.id} and q.deleted_at is null)`;
+  return undefined;
 }
 
 function searchCondition(q?: string): SQL | undefined {
@@ -24,8 +34,8 @@ function searchCondition(q?: string): SQL | undefined {
   );
 }
 
-export async function listCustomers({ q, page = 1, pageSize = 25, sort = "company" }: CustomerListFilters) {
-  const where = and(isNull(customers.deletedAt), searchCondition(q));
+export async function listCustomers({ q, page = 1, pageSize = 25, sort = "company", has }: CustomerListFilters) {
+  const where = and(isNull(customers.deletedAt), searchCondition(q), hasCondition(has));
   const stats = db
     .select({
       customerId: queries.customerId,

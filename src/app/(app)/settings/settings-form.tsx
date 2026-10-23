@@ -84,6 +84,7 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
           {text("companyTaxNo", "Tax / registration number")}
           {text("companyPhone", "Phone")}
           {text("companyEmail", "Email", { type: "email" })}
+          {text("companyWebsite", "Website", { hint: "e.g. www.keboint.com" })}
           <Field label="Address" htmlFor="companyAddress" error={e.companyAddress} className="sm:col-span-2">
             <Textarea id="companyAddress" name="companyAddress" rows={2} className="min-h-0" defaultValue={v("companyAddress")} />
           </Field>
@@ -107,10 +108,13 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Document text" />
+        <CardHeader title="Quotations & invoices" description="Printed on the documents you send to customers." />
         <CardBody className="grid gap-5">
           <Field label="Default quotation terms & conditions" htmlFor="defaultQuotationTerms" error={e.defaultQuotationTerms}>
             <Textarea id="defaultQuotationTerms" name="defaultQuotationTerms" rows={5} defaultValue={v("defaultQuotationTerms")} />
+          </Field>
+          <Field label="Bank details for T/T" htmlFor="bankDetails" optional error={e.bankDetails} hint="Printed on every invoice: beneficiary, bank name, account no., SWIFT code, bank address">
+            <Textarea id="bankDetails" name="bankDetails" rows={5} defaultValue={v("bankDetails")} placeholder={"Beneficiary: Shandong Kebo International Trade Co., Ltd.\nBank: …\nAccount no.: …\nSWIFT: …\nBank address: …"} />
           </Field>
           <Field label="Invoice footer" htmlFor="invoiceFooter" error={e.invoiceFooter}>
             <Input id="invoiceFooter" name="invoiceFooter" defaultValue={v("invoiceFooter")} />

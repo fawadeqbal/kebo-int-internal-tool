@@ -12,7 +12,7 @@ import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import { getSettings } from "@/modules/settings/service";
 import { buttonClass, Card, CardBody, CardHeader } from "@/components/ui";
 import { InvoiceStatusBadge } from "@/components/ui/badge";
-import { DocumentView, docDate } from "@/components/documents/document-view";
+import { InvoiceDocument } from "@/components/documents/documents";
 import { PAYMENT_METHOD_LABEL } from "@/lib/labels";
 import { formatDate, todayISO } from "@/lib/utils/dates";
 import { formatCents, formatMoney, toCents } from "@/lib/utils/money";
@@ -73,27 +73,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         )}
       </header>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="overflow-hidden rounded-xl border border-line shadow-card">
-          <DocumentView
-            kind="Invoice"
-            number={inv.invoiceNo}
-            settings={settings}
-            customer={customer}
-            stamp={inv.status === "cancelled" ? "Cancelled" : inv.status === "paid" ? "Paid" : null}
-            meta={[
-              { label: "Invoice date", value: docDate(inv.issueDate) },
-              { label: "Payment due", value: docDate(inv.dueDate) },
-              { label: "Quotation", value: quotation.refNo },
-              { label: "RFQ no.", value: query.refNo },
-            ]}
-            items={detail.items}
-            totals={inv}
-            terms={inv.notes}
-            footer={settings.invoiceFooter}
-          />
-        </div>
-        <aside className="no-print flex flex-col gap-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:grid-rows-[auto_1fr] xl:items-start">
+        <aside aria-label="Next step" className="no-print flex flex-col gap-5 empty:hidden xl:col-start-2 xl:row-start-1">
           <Card>
             <CardHeader title="Payment" description={inv.status === "paid" ? "Paid in full" : `Due ${formatDate(inv.dueDate)}`} />
             <CardBody className="flex flex-col gap-4">
@@ -118,6 +99,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               )}
             </CardBody>
           </Card>
+        </aside>
+        <div className="overflow-hidden rounded-xl border border-line shadow-card xl:col-start-1 xl:row-span-2 xl:row-start-1">
+          <InvoiceDocument detail={detail} settings={settings} />
+        </div>
+        <aside aria-label="Details" className="no-print flex flex-col gap-5 xl:col-start-2 xl:row-start-2">
           {detail.payments.length > 0 && (
             <Card>
               <CardHeader title="Payments received" />

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, isNull, lt, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { customers, invoices, queries, quotationItems, quotations, users, type QuotationStatus } from "@/lib/db/schema";
 import { customerDisplayName } from "@/modules/customers/repository";
@@ -9,6 +9,10 @@ import { todayISO } from "@/lib/utils/dates";
 export interface QuotationFilters {
   q?: string;
   status?: QuotationStatus | "expiring";
+  preparedBy?: string;
+  from?: string;
+  to?: string;
+  sort?: "newest" | "expiry" | "value";
   page?: number;
   pageSize?: number;
 }
@@ -23,7 +27,12 @@ export async function listQuotations(user: SessionUser, f: QuotationFilters) {
   }
   if (f.status === "expiring") conditions.push(eq(quotations.status, "sent"));
   else if (f.status) conditions.push(eq(quotations.status, f.status));
+  if (f.preparedBy) conditions.push(eq(quotations.createdBy, f.preparedBy));
+  if (f.from) conditions.push(gte(quotations.createdAt, new Date(`${f.from}T00:00:00`)));
+  if (f.to) conditions.push(lte(quotations.createdAt, new Date(`${f.to}T23:59:59.999`)));
   const where = and(...conditions);
+  const order =
+    f.sort === "value" ? [desc(quotations.total)] : f.sort === "expiry" || (!f.sort && f.status === "expiring") ? [asc(quotations.dueDate)] : [desc(quotations.createdAt)];
   const [rows, [{ total }]] = await Promise.all([
     db
       .select({
@@ -35,6 +44,7 @@ export async function listQuotations(user: SessionUser, f: QuotationFilters) {
         dueDate: quotations.dueDate,
         submittedAt: quotations.submittedAt,
         createdAt: quotations.createdAt,
+        preparedBy: sql<string | null>`(select u.name from users u where u.id = ${quotations.createdBy})`,
         queryId: queries.id,
         queryRef: queries.refNo,
         queryTitle: queries.title,
@@ -44,7 +54,7 @@ export async function listQuotations(user: SessionUser, f: QuotationFilters) {
       .innerJoin(queries, eq(queries.id, quotations.queryId))
       .innerJoin(customers, eq(customers.id, queries.customerId))
       .where(where)
-      .orderBy(f.status === "expiring" ? asc(quotations.dueDate) : desc(quotations.createdAt))
+      .orderBy(...order)
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db
