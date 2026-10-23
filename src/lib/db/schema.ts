@@ -19,12 +19,12 @@ import {
  * Enums — the single source of truth for every status in the system.
  * --------------------------------------------------------------------------*/
 export const roleEnum = pgEnum("role", ["admin", "manager", "staff"]);
-export const querySourceEnum = pgEnum("query_source", ["phone", "email", "whatsapp", "walk_in", "website", "other"]);
+export const querySourceEnum = pgEnum("query_source", ["phone", "email", "whatsapp", "walk_in", "website", "other", "wechat"]);
 export const priorityEnum = pgEnum("priority", ["low", "normal", "high", "urgent"]);
 export const queryStatusEnum = pgEnum("query_status", ["pending", "processing", "completed", "not_completed"]);
 export const quotationStatusEnum = pgEnum("quotation_status", ["draft", "sent", "accepted", "rejected", "expired"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", ["unpaid", "partially_paid", "paid", "cancelled"]);
-export const paymentMethodEnum = pgEnum("payment_method", ["cash", "bank_transfer", "cheque", "online", "other"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["cash", "bank_transfer", "cheque", "online", "other", "lc"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

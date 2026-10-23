@@ -46,8 +46,8 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               <QuotationStatusBadge status={q.status} />
             </div>
             <p className="mt-1 text-sm text-muted">
-              {customerName(customer)} · {formatMoney(q.total, settings.currency)} · due {formatDate(q.dueDate)}
-              {late && <span className="ml-2 font-semibold text-red-700">— past due, no reply yet</span>}
+              {customerName(customer)} · {formatMoney(q.total, settings.currency)} · valid until {formatDate(q.dueDate)}
+              {late && <span className="ml-2 font-semibold text-red-700">— expired, no reply yet</span>}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -61,7 +61,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             )}
             {manage && !isEditable(q.status) && (
               <form action={reviseQuotationAction.bind(null, id)}>
-                <ConfirmSubmit variant="secondary" message="Create a new draft version with the same lines? This version stays unchanged.">
+                <ConfirmSubmit variant="secondary" message="Make a new draft version with the same lines? This one stays as the buyer saw it.">
                   <CopyPlus className="h-4 w-4" aria-hidden /> New version
                 </ConfirmSubmit>
               </form>
@@ -86,7 +86,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             meta={[
               { label: "Date", value: docDate(q.submittedAt ?? q.createdAt.toISOString().slice(0, 10)) },
               { label: "Valid until", value: docDate(q.dueDate) },
-              { label: "Our reference", value: query.refNo },
+              { label: "RFQ no.", value: query.refNo },
               ...(q.version > 1 ? [{ label: "Revision", value: `v${q.version}` }] : []),
             ]}
             items={detail.items}
@@ -99,7 +99,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             <Card>
               <CardHeader
                 title="Next step"
-                description={q.status === "draft" ? "When you send this to the customer, mark it as sent." : "Record the customer's answer."}
+                description={q.status === "draft" ? "After you email or WhatsApp it to the buyer, mark it as sent." : "Record the buyer's answer."}
               />
               <CardBody>
                 <QuotationStatusForm action={quotationStatusAction.bind(null, id)} transitions={QUOTATION_TRANSITIONS[q.status]} />
@@ -134,7 +134,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                   <dd>{formatDateTime(q.createdAt)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted">Submitted</dt>
+                  <dt className="text-muted">Sent to buyer</dt>
                   <dd>{formatDate(q.submittedAt)}</dd>
                 </div>
               </dl>

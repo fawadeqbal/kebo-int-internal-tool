@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
   try {
     const { refNo } = await receiveWebsiteInquiry(parsed.data);
-    return reply(201, { ok: true, reference: refNo, message: `Thank you. Your inquiry ${refNo} has been received — our team will contact you shortly.` });
+    return reply(201, { ok: true, reference: refNo, message: `Thank you. We have your request (ref. ${refNo}). Our sourcing team will reply within one working day.` });
   } catch (error) {
     console.error("[inquiry] failed", error);
     return reply(500, { ok: false, message: "Sorry, something went wrong. Please email or WhatsApp us instead." });

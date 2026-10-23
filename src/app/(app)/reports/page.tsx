@@ -65,7 +65,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </Card>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatTile label="Queries received" value={summary.received} />
+        <StatTile label="Inquiries received" value={summary.received} />
         <StatTile label="Completed" value={summary.completed} tone="good" />
         <StatTile label="Not completed" value={summary.notCompleted} />
         <StatTile label="Avg. turnaround" value={formatDuration(summary.avgTurnaroundMs)} hint="Received → completed" />
@@ -74,20 +74,20 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Conversion" description="What happened to the queries received in this period" />
+          <CardHeader title="Conversion" description="What happened to the inquiries received in this period" />
           <CardBody>
             <BarList
               items={[
                 { label: "Received", value: funnel.received },
-                { label: "Quoted (sent to customer)", value: funnel.quoted, hint: pct(funnel.quoted, funnel.received) },
-                { label: "Quotation accepted", value: funnel.accepted, hint: pct(funnel.accepted, funnel.received) },
+                { label: "Quoted", value: funnel.quoted, hint: pct(funnel.quoted, funnel.received) },
+                { label: "Buyer accepted", value: funnel.accepted, hint: pct(funnel.accepted, funnel.received) },
                 { label: "Invoiced", value: funnel.invoiced, hint: pct(funnel.invoiced, funnel.received) },
               ]}
             />
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Money" description="All customers, for this period (outstanding is as of today)" />
+          <CardHeader title="Money" description="All buyers in this period. Outstanding is as of today." />
           <CardBody>
             <dl className="grid grid-cols-2 gap-4 text-sm">
               {[
@@ -109,7 +109,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </div>
 
       <Card className="mt-6">
-        <CardHeader title="Queries per month" description="Received vs completed, last 12 months" />
+        <CardHeader title="Inquiries per month" description="Received vs completed, last 12 months" />
         <CardBody>
           <TrendChart data={trend} />
         </CardBody>
@@ -117,13 +117,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Where queries come from" />
+          <CardHeader title="Where RFQs come from" />
           <CardBody>
             <BarList items={bySource.map((s) => ({ label: SOURCE_LABEL[s.key as QuerySource] ?? s.key, value: s.n }))} />
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="By product / category" />
+          <CardHeader title="By sourcing category" />
           <CardBody>
             <BarList items={byCategory.map((s) => ({ label: s.key, value: s.n }))} />
           </CardBody>
@@ -131,7 +131,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </div>
 
       <Card className="mt-6">
-        <CardHeader title="Staff performance" description="Open work now, and work closed in this period" />
+        <CardHeader title="Staff performance" description="Open now, and closed in this period" />
         <Table>
           <thead>
             <tr>

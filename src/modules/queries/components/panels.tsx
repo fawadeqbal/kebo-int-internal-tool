@@ -61,7 +61,7 @@ export function StatusPanel({
             label={needsReason ? "Reason (required)" : "Note (optional)"}
             htmlFor="reason"
             error={state.errors?.reason}
-            hint={needsReason ? "e.g. customer cancelled, price not accepted, not feasible" : "Visible in the activity history"}
+            hint={needsReason ? "e.g. bought elsewhere, price too high, factory can't supply" : "Shown in the activity history"}
           >
             <Textarea id="reason" name="reason" rows={2} className="min-h-0" autoFocus={needsReason} />
           </Field>
@@ -143,7 +143,7 @@ export function CommentForm({ action }: { action: Action }) {
         id="body"
         name="body"
         rows={3}
-        placeholder="Add an internal note — e.g. called the customer, waiting for drawings…"
+        placeholder="Add a note, e.g. asked 3 factories for prices, buyer sending drawings…"
         aria-invalid={!!state.errors?.body}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ref.current?.requestSubmit();

@@ -19,7 +19,7 @@ Nothing else on the website needs to change: the form keeps its look.
 
 2. Copy the ready-made script from **Settings → Website form** in the query system (it already contains the right server address) and paste it into the website just before `</body>`.
 
-   The script sends the form in the background and shows the visitor a "Thank you — your reference is QRY-2026-0042" message. It also adds a hidden anti-spam field.
+   The script sends the form in the background and shows the visitor a "Thank you — your reference is RFQ-2026-0042" message. It also adds a hidden anti-spam field.
 
 3. **Or, without JavaScript:** set the form tag to
 

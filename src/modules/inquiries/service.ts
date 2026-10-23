@@ -68,7 +68,7 @@ export async function receiveWebsiteInquiry(input: WebsiteInquiry) {
         action: "create",
         entityType: "customer",
         entityId: customerId,
-        summary: `Added customer ${input.company || input.fullName} from the website form`,
+        summary: `Added buyer ${input.company || input.fullName} from the website form`,
       });
     }
 

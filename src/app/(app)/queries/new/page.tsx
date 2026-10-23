@@ -9,7 +9,7 @@ import { listActiveUsers } from "@/modules/users/repository";
 import { PageHeader } from "@/components/ui";
 import { getSettings } from "@/modules/settings/service";
 
-export const metadata = { title: "New query" };
+export const metadata = { title: "New inquiry" };
 
 export default async function NewQueryPage({ searchParams }: { searchParams: Promise<{ customer?: string }> }) {
   const user = await requirePagePermission("queries.create");
@@ -17,7 +17,7 @@ export default async function NewQueryPage({ searchParams }: { searchParams: Pro
   const [people, preselected, settings] = await Promise.all([listActiveUsers(), isUuid(customer) ? findCustomer(customer) : null, getSettings()]);
   return (
     <>
-      <PageHeader title="New query" description="Three things are needed: the customer, a category and what they asked for." backHref="/queries" backLabel="Queries" />
+      <PageHeader title="New inquiry" description="Who asked, which category, and what they need. Everything else is optional." backHref="/queries" backLabel="Inquiries" />
       <div className="max-w-4xl">
         <QueryForm
           mode="create"

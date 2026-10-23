@@ -24,7 +24,7 @@ import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import type { QueryStatus } from "@/lib/db/schema";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  return { title: `Query ${(await params).id.slice(0, 8)}` };
+  return { title: `Inquiry ${(await params).id.slice(0, 8)}` };
 }
 
 function formatBytes(bytes: number) {
@@ -59,7 +59,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
         </>
       ) : (
         <>
-          <b>{h.userName}</b> created the query
+          <b>{h.userName}</b> created the inquiry
         </>
       ),
       detail: h.reason,
@@ -137,14 +137,14 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
         {/* Main column */}
         <div className="flex min-w-0 flex-col gap-6">
           <Card>
-            <CardHeader title="Specifications" description={`${query.category ? `${query.category} · ` : ""}Quantity ${query.quantity}`} />
+            <CardHeader title="Requirements" description={`${query.category ? `${query.category} · ` : ""}Quantity ${query.quantity}`} />
             <CardBody>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{query.specifications}</p>
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title={`Files (${detail.files.length})`} description="Drawings, spec sheets and photos for this query." />
+            <CardHeader title={`Files (${detail.files.length})`} description="Drawings, spec sheets, photos and factory quotes." />
             <CardBody className="flex flex-col gap-4">
               {detail.files.length > 0 && (
                 <ul className="divide-y divide-line rounded-lg border border-line">
@@ -179,7 +179,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
             {detail.quotations.length === 0 ? (
               <EmptyState
                 title="No quotation yet"
-                description="When pricing is ready, create a quotation with price, tax and due date."
+                description="When the factory price is in, quote the buyer."
                 action={
                   can(user.role, "quotations.manage") &&
                   query.status !== "not_completed" && <ButtonLink href={`/quotations/new?query=${id}`}>Create quotation</ButtonLink>
@@ -232,7 +232,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
           </Card>
 
           <Card>
-            <CardHeader title="Notes" description="Internal notes for the team. Customers never see these." />
+            <CardHeader title="Internal notes" description="Only the team sees these." />
             <CardBody className="flex flex-col gap-5">
               <CommentForm action={addCommentAction.bind(null, id)} />
               {detail.notes.length > 0 && (
@@ -267,10 +267,10 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
               title="Status"
               description={
                 !workable
-                  ? "Only the assigned person or a manager can change this."
+                  ? "Only the person handling it or a manager can change this."
                   : transitions.length === 0
-                    ? "This query is closed. A manager can reopen it if needed."
-                    : "Move the query forward."
+                    ? "Closed. A manager can reopen it."
+                    : "Move it to the next step."
               }
             />
             <CardBody>
@@ -282,9 +282,9 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
           </Card>
 
           <Card>
-            <CardHeader title="Assigned to" />
+            <CardHeader title="Handled by" />
             <CardBody className="flex flex-col gap-3">
-              <p className={query.assignedTo ? "text-sm font-medium" : "text-sm italic text-muted"}>{detail.assigneeName ?? "Nobody yet"}</p>
+              <p className={query.assignedTo ? "text-sm font-medium" : "text-sm italic text-muted"}>{detail.assigneeName ?? "Not assigned yet"}</p>
               <AssignPanel
                 action={assignQueryAction.bind(null, id)}
                 people={people}
@@ -312,11 +312,11 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
           </Card>
 
           <Card>
-            <CardHeader title="Timing" />
+            <CardHeader title="Time taken" />
             <CardBody>
               <dl className="flex flex-col gap-2.5 text-sm">
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted">Required by</dt>
+                  <dt className="text-muted">Needed by</dt>
                   <dd className={overdue ? "font-semibold text-red-700" : ""}>{formatDate(query.requiredBy)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
@@ -358,7 +358,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
           {can(user.role, "queries.delete") && detail.invoices.length === 0 && (
             <form action={deleteQueryAction.bind(null, id)} className="text-right">
               <ConfirmSubmit variant="ghost" size="sm" className="text-red-700" message={`Remove query ${query.refNo}? It will be hidden from all lists.`}>
-                Remove query
+                Remove inquiry
               </ConfirmSubmit>
             </form>
           )}

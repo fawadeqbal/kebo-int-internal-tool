@@ -15,13 +15,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <span className="text-sm font-semibold tracking-wide">{settings.companyName}</span>
         </div>
         <div className="max-w-md">
-          <h1 className="text-4xl font-semibold leading-tight tracking-tight">Every customer query, from first call to final invoice.</h1>
+          <h1 className="text-4xl font-semibold leading-tight tracking-tight">Every buyer RFQ, from first message to final invoice.</h1>
           <p className="mt-4 text-base text-white/70">
-            Record specifications and files, assign work, track progress, send quotations and issue invoices — all in one place.
+            Website, WhatsApp, WeChat and email inquiries in one list. Source, quote, invoice and track payment without losing a single buyer.
           </p>
         </div>
         <ol className="grid grid-cols-4 gap-3 text-xs text-white/70">
-          {["Query", "Processing", "Quotation", "Invoice"].map((step, i) => (
+          {["RFQ", "Sourcing", "Quotation", "Invoice"].map((step, i) => (
             <li key={step} className="border-t border-white/25 pt-3">
               <span className="block font-mono text-white/40">0{i + 1}</span>
               {step}
@@ -36,7 +36,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <span className="text-sm font-semibold">{settings.companyName}</span>
           </div>
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-          <p className="mt-1 text-sm text-muted">Use the account your administrator created for you.</p>
+          <p className="mt-1 text-sm text-muted">Use the account your admin set up for you.</p>
           <LoginForm next={next} />
         </div>
       </section>

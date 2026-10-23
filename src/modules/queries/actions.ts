@@ -35,7 +35,7 @@ export async function updateQueryAction(id: string, _prev: ActionState, formData
   });
   if (!result.ok) return result;
   revalidatePath(`/queries/${id}`);
-  redirect(`/queries/${id}?toast=Query+updated`);
+  redirect(`/queries/${id}?toast=Inquiry+updated`);
 }
 
 export async function changeStatusAction(id: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -88,5 +88,5 @@ export async function deleteQueryAction(id: string) {
     redirect(`/queries/${id}?toast=${encodeURIComponent(toActionError(error).message ?? "Could not remove")}`);
   }
   revalidatePath("/queries");
-  redirect("/queries?toast=Query+removed");
+  redirect("/queries?toast=Inquiry+removed");
 }

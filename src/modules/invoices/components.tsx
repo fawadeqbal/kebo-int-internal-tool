@@ -27,7 +27,7 @@ export function InvoiceForm({
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
       {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
-      <Alert tone="info">Values are copied from the accepted quotation. Check them now — once issued, an invoice cannot be edited (only cancelled and reissued).</Alert>
+      <Alert tone="info">Copied from the accepted quotation. Check it now: once issued, an invoice can only be cancelled, not edited.</Alert>
       <Card>
         <CardHeader title="Lines & totals" />
         <CardBody>
@@ -43,7 +43,7 @@ export function InvoiceForm({
           <Field label="Payment due" htmlFor="dueDate" required error={e.dueDate}>
             <Input id="dueDate" name="dueDate" type="date" defaultValue={v("dueDate")} />
           </Field>
-          <Field label="Note on invoice" htmlFor="notes" error={e.notes} hint="Optional, e.g. bank details or PO number" className="sm:col-span-2">
+          <Field label="Note on invoice" htmlFor="notes" error={e.notes} hint="e.g. bank details for T/T, buyer PO number" className="sm:col-span-2">
             <Textarea id="notes" name="notes" rows={2} className="min-h-0" defaultValue={v("notes")} />
           </Field>
         </CardBody>
@@ -85,7 +85,7 @@ export function PaymentForm({ action, balance, today }: { action: Action; balanc
           </Select>
         </Field>
       </div>
-      <Field label="Reference" htmlFor="reference" error={e.reference} hint="Cheque no., transaction ID…">
+      <Field label="Reference" htmlFor="reference" error={e.reference} hint="T/T reference, L/C number…">
         <Input id="reference" name="reference" />
       </Field>
       <div>

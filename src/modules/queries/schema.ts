@@ -37,10 +37,10 @@ export function titleFrom(requirements: string, category?: string | null): strin
 }
 
 export const queryDetailsSchema = z.object({
-  source: z.enum(querySourceEnum.enumValues, { message: "Choose how the query came in" }).default("phone"),
+  source: z.enum(querySourceEnum.enumValues, { message: "Choose how the inquiry came in" }).default("phone"),
   title: optionalText(200),
-  category: z.string().trim().min(1, "Choose a category").max(120),
-  specifications: z.string().trim().min(5, "Write what the customer needs").max(20000),
+  category: z.string().trim().min(1, "Choose a sourcing category").max(120),
+  specifications: z.string().trim().min(5, "Write what the buyer needs").max(20000),
   quantity: z.preprocess((v) => (v === "" || v === undefined ? 1 : v), z.coerce.number({ message: "Enter a quantity" }).int("Use a whole number").min(1, "At least 1").max(1_000_000)),
   priority: z.enum(priorityEnum.enumValues).default("normal"),
   requiredBy: optionalDate,
@@ -49,12 +49,12 @@ export const queryDetailsSchema = z.object({
 
 /** Create: either pick an existing customer or enter a new one in the same form. */
 export const createQuerySchema = z.discriminatedUnion("customerMode", [
-  queryDetailsSchema.extend({ customerMode: z.literal("existing"), customerId: z.uuid({ message: "Choose a customer" }) }),
+  queryDetailsSchema.extend({ customerMode: z.literal("existing"), customerId: z.uuid({ message: "Choose a buyer" }) }),
   queryDetailsSchema.extend({ customerMode: z.literal("new") }).extend(customerSchema.shape),
 ]);
 
 export const updateQuerySchema = queryDetailsSchema.omit({ assignedTo: true }).extend({
-  customerId: z.uuid({ message: "Choose a customer" }),
+  customerId: z.uuid({ message: "Choose a buyer" }),
 });
 
 export const statusChangeSchema = z
@@ -64,7 +64,7 @@ export const statusChangeSchema = z
   })
   .refine((v) => v.status !== "not_completed" || !!v.reason, {
     path: ["reason"],
-    message: "Explain why this query could not be completed",
+    message: "Say why there is no order, e.g. bought elsewhere",
   });
 
 export const assignSchema = z.object({ assignedTo: optionalUser });

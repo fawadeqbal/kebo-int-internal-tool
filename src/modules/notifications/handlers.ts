@@ -6,7 +6,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
   processing: "Processing",
   completed: "Completed",
-  not_completed: "Not Completed",
+  not_completed: "Not completed",
   draft: "Draft",
   sent: "Sent",
   accepted: "Accepted",
@@ -26,7 +26,7 @@ export const notificationHandlers: HandlerMap = {
         recipients.map((userId) => ({
           userId,
           type: "query.created",
-          title: `New query ${e.refNo}${e.source === "website" ? " from the website" : ""}`,
+          title: `New ${e.refNo}${e.source === "website" ? " from the website" : ""}`,
           body: e.title,
           link: `/queries/${e.queryId}`,
         })),
@@ -40,7 +40,7 @@ export const notificationHandlers: HandlerMap = {
         {
           userId: e.assignedTo,
           type: "query.assigned",
-          title: `New work assigned: ${e.refNo}`,
+          title: `${e.refNo} assigned to you`,
           body: e.title,
           link: `/queries/${e.queryId}`,
         },

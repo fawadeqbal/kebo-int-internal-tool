@@ -7,7 +7,7 @@ import { CustomerForm } from "@/modules/customers/components";
 import { findCustomer } from "@/modules/customers/repository";
 import { Card, CardBody, PageHeader } from "@/components/ui";
 
-export const metadata = { title: "Edit customer" };
+export const metadata = { title: "Edit buyer" };
 
 export default async function EditCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePagePermission("customers.manage");

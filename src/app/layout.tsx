@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "QMS — Query & Order Management", template: "%s · QMS" },
-  description: "Internal query, quotation and invoice tracking",
+  title: { default: "Kebo RFQ Desk", template: "%s · Kebo RFQ Desk" },
+  description: "Kebo's internal desk for buyer RFQs, quotations and invoices",
   robots: { index: false, follow: false },
 };
 

@@ -59,7 +59,7 @@ export function LineItemsEditor({
                     rows={1}
                     value={item.description}
                     onChange={(e) => update(i, { description: e.target.value })}
-                    placeholder="e.g. Rotary tablet press, 35 stations, GMP model"
+                    placeholder="e.g. Rotary tablet press, 35 stations, GMP, SS316"
                     className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-100"
                   />
                 </td>

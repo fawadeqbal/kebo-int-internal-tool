@@ -45,7 +45,7 @@ export async function getAccessibleQuotation(user: SessionUser, id: string) {
 export async function createQuotation(actor: SessionUser, queryId: string, input: QuotationInput) {
   assertCan(actor, "quotations.manage");
   const query = await getAccessibleQuery(actor, queryId);
-  if (query.status === "not_completed") throw new DomainError("This query is closed as not completed. Reopen it before quoting.");
+  if (query.status === "not_completed") throw new DomainError("This inquiry is closed as not completed. Reopen it before quoting.");
   const { t, columns, itemRows } = totalsFor(input.items, input.discount, input.taxRate);
   if (t.total <= 0) throw new DomainError("The quotation total must be more than zero.");
 

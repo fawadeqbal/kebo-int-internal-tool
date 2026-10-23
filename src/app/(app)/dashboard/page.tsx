@@ -57,7 +57,7 @@ export default async function DashboardPage() {
         </h1>
         <p className="mt-1 text-sm text-muted">
           {new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${today}T00:00:00Z`))}
-          {!isManager && " · showing work assigned to you or created by you"}
+          {!isManager && " · your inquiries only"}
         </p>
       </header>
 
@@ -66,13 +66,13 @@ export default async function DashboardPage() {
           label="Pending"
           value={counts.pending}
           href="/queries?status=pending"
-          hint={isManager && counts.unassigned > 0 ? `${counts.unassigned} not assigned yet` : "Not started yet"}
+          hint={isManager && counts.unassigned > 0 ? `${counts.unassigned} not assigned` : "Not started"}
           tone={isManager && counts.unassigned > 0 ? "alert" : "default"}
         />
-        <StatTile label="Processing" value={counts.processing} href="/queries?status=processing" hint="Being worked on" />
+        <StatTile label="Processing" value={counts.processing} href="/queries?status=processing" hint="Sourcing and quoting" />
         <StatTile label="Completed" value={month.completed} href="/queries?status=completed" tone="good" hint="This month" />
         <StatTile label="Not completed" value={month.notCompleted} href="/queries?status=not_completed" hint="This month" />
-        <StatTile label="Overdue" value={counts.overdue} href="/queries?status=overdue" tone={counts.overdue > 0 ? "alert" : "default"} hint="Past required-by date" />
+        <StatTile label="Overdue" value={counts.overdue} href="/queries?status=overdue" tone={counts.overdue > 0 ? "alert" : "default"} hint="Past the needed-by date" />
       </section>
 
       {fin && (
@@ -93,13 +93,13 @@ export default async function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader
-            title="New queries"
-            description="Received and not started yet — newest first"
+            title="New inquiries"
+            description="Not started yet, newest first"
             actions={<Link href="/queries?status=pending" className="text-sm text-brand-700 hover:underline">View all</Link>}
           />
           {fresh.rows.length === 0 ? (
             <CardBody>
-              <p className="text-sm text-muted">No new queries waiting.</p>
+              <p className="text-sm text-muted">No new inquiries waiting.</p>
             </CardBody>
           ) : (
             <ul className="divide-y divide-line">
@@ -113,7 +113,7 @@ export default async function DashboardPage() {
                       </span>
                     </span>
                     {q.source === "website" ? <Badge tone="violet">Website</Badge> : <span className="text-xs text-muted">{SOURCE_LABEL[q.source]}</span>}
-                    {!q.assigneeName && <span className="text-xs font-medium text-amber-700">Unassigned</span>}
+                    {!q.assigneeName && <span className="text-xs font-medium text-amber-700">Not assigned</span>}
                   </Link>
                 </li>
               ))}
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader title="My open work" description="Assigned to you, earliest deadline first" actions={<Link href="/queries?status=open&assignee=me" className="text-sm text-brand-700 hover:underline">View all</Link>} />
+          <CardHeader title="My open work" description="Assigned to you, earliest needed-by date first" actions={<Link href="/queries?status=open&assignee=me" className="text-sm text-brand-700 hover:underline">View all</Link>} />
           {mine.rows.length === 0 ? (
             <CardBody>
               <p className="text-sm text-muted">Nothing assigned to you right now.</p>
@@ -149,10 +149,10 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader title="Needs attention" description="Overdue work and queries waiting too long to start" />
+          <CardHeader title="Needs attention" description="Past the needed-by date, or waiting too long to start" />
           {overdue.length === 0 && stale.length === 0 ? (
             <CardBody>
-              <p className="text-sm text-muted">All clear — nothing overdue or waiting too long.</p>
+              <p className="text-sm text-muted">All clear. Nothing overdue or waiting too long.</p>
             </CardBody>
           ) : (
             <ul className="divide-y divide-line">
@@ -167,7 +167,7 @@ export default async function DashboardPage() {
                     </span>
                     <span className="text-right text-xs font-semibold text-red-700">
                       Overdue
-                      <span className="block font-normal">due {formatDate(q.requiredBy)}</span>
+                      <span className="block font-normal">needed by {formatDate(q.requiredBy)}</span>
                     </span>
                   </Link>
                 </li>
@@ -193,10 +193,10 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader title="Quotations awaiting reply" description={`Sent, due within ${settings.reminderDueSoonDays} days or already past due`} actions={<Link href="/quotations?status=expiring" className="text-sm text-brand-700 hover:underline">View all</Link>} />
+          <CardHeader title="Waiting for the buyer" description={`Sent, valid for ${settings.reminderDueSoonDays} more days or already expired`} actions={<Link href="/quotations?status=expiring" className="text-sm text-brand-700 hover:underline">View all</Link>} />
           {expiring.length === 0 ? (
             <CardBody>
-              <p className="text-sm text-muted">No quotations close to their due date.</p>
+              <p className="text-sm text-muted">No quotations about to expire.</p>
             </CardBody>
           ) : (
             <ul className="divide-y divide-line">
@@ -209,7 +209,7 @@ export default async function DashboardPage() {
                     </span>
                     <span className="text-right text-sm tabular-nums">
                       {formatMoney(q.total, settings.currency)}
-                      <span className={`block text-xs ${q.dueDate < today ? "font-semibold text-red-700" : "text-muted"}`}>due {formatDate(q.dueDate)}</span>
+                      <span className={`block text-xs ${q.dueDate < today ? "font-semibold text-red-700" : "text-muted"}`}>valid until {formatDate(q.dueDate)}</span>
                     </span>
                   </Link>
                 </li>
@@ -233,7 +233,7 @@ export default async function DashboardPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium">{inv.invoiceNo}</span>
                         <span className="text-xs text-muted">
-                          {inv.companyName} · due {formatDate(inv.dueDate)}
+                          {inv.companyName} · payment due {formatDate(inv.dueDate)}
                         </span>
                       </span>
                       <span className="text-sm font-medium tabular-nums">{formatCents(toCents(inv.total) - toCents(inv.amountPaid), settings.currency)}</span>
@@ -249,7 +249,7 @@ export default async function DashboardPage() {
 
       {isManager && team.length > 0 && (
         <Card className="mt-6">
-          <CardHeader title="Team workload" description="Open work per person, and what they closed this month" actions={<Link href="/reports" className="text-sm text-brand-700 hover:underline">Full report</Link>} />
+          <CardHeader title="Team workload" description="Open inquiries per person, and what they closed this month" actions={<Link href="/reports" className="text-sm text-brand-700 hover:underline">Full report</Link>} />
           <Table>
             <thead>
               <tr>

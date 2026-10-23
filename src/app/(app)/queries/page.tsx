@@ -12,7 +12,7 @@ import { todayISO } from "@/lib/utils/dates";
 import { QUERY_STATUS_LABEL } from "@/lib/labels";
 import { cn } from "@/lib/utils/cn";
 
-export const metadata = { title: "Queries" };
+export const metadata = { title: "Inquiries" };
 
 type Tab = { key: string; label: string; status?: string; count: number; alert?: boolean };
 
@@ -45,12 +45,12 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
       <div className="px-4 pt-5 sm:px-6 lg:px-0 lg:pt-0">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-[28px] font-semibold leading-tight tracking-tight">Queries</h1>
+            <h1 className="text-[28px] font-semibold leading-tight tracking-tight">Inquiries</h1>
             <p className="mt-0.5 text-sm text-muted">
               {needAction > 0 ? (
                 <>
                   <span className="font-medium text-amber-700">{needAction} waiting to be started</span>
-                  {counts.unassigned > 0 && `, ${counts.unassigned} without an owner`}
+                  {counts.unassigned > 0 && `, ${counts.unassigned} not assigned`}
                 </>
               ) : (
                 "Nothing waiting to be started"
@@ -87,7 +87,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
       <div className="sticky top-0 z-10 bg-canvas/95 px-4 pb-3 pt-4 backdrop-blur sm:px-6 lg:static lg:px-0 lg:backdrop-blur-none">
         <form role="search" className="relative">
           <label htmlFor="search" className="sr-only">
-            Search queries
+            Search inquiries
           </label>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
           <input
@@ -95,7 +95,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
             name="q"
             type="search"
             defaultValue={filters.q}
-            placeholder="Search buyer, company, machine or reference"
+            placeholder="Search buyer, company, product or RFQ no."
             className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-10 text-[15px] shadow-xs placeholder:text-muted/80 focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-100"
           />
           {status !== "open" && <input type="hidden" name="status" value={status} />}
@@ -157,18 +157,18 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
         {data.rows.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <p className="text-base font-semibold">
-              {filters.q ? `Nothing matches “${filters.q}”` : status === "overdue" ? "Nothing is overdue" : status === "open" ? "No open queries" : "No queries here yet"}
+              {filters.q ? `Nothing matches “${filters.q}”` : status === "overdue" ? "Nothing is overdue" : status === "open" ? "No open inquiries" : "No inquiries here yet"}
             </p>
             <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
               {filters.q
-                ? "Try the buyer's name, the company or part of the machine name."
+                ? "Try the buyer's name, company or part of the product name."
                 : status === "open"
-                  ? "Website inquiries appear here automatically. You can also add one from a call or WhatsApp."
+                  ? "Website RFQs appear here by themselves. Add WhatsApp, WeChat or phone inquiries with the + button."
                   : "Try another tab."}
             </p>
             {canCreate && !filters.q && status === "open" && (
               <Link href="/queries/new" className={buttonClass("primary", "md", "mt-5")}>
-                <Plus className="h-4 w-4" aria-hidden /> New query
+                <Plus className="h-4 w-4" aria-hidden /> New inquiry
               </Link>
             )}
           </div>

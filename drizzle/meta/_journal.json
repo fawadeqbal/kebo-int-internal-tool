@@ -15,6 +15,13 @@
       "when": 1792773627070,
       "tag": "0001_simplify",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792785750639,
+      "tag": "0002_kebo_channels",
+      "breakpoints": true
     }
   ]
 }

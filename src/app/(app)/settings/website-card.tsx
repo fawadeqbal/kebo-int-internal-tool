@@ -10,7 +10,7 @@ export function WebsiteFormCard({ appUrl }: { appUrl: string }) {
     <Card className="max-w-4xl">
       <CardHeader
         title="Website form (keboint.com)"
-        description="Inquiries sent from the website's RFQ form arrive here automatically as Pending queries, and the admin emails above are notified."
+        description="RFQs from the website form arrive here as Pending inquiries, and the emails above are notified."
       />
       <CardBody className="flex flex-col gap-5 text-sm">
         <ol className="list-decimal space-y-2 pl-5">

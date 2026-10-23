@@ -16,8 +16,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const work: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
-    { href: "/queries", label: "Queries", icon: "queries" },
-    { href: "/customers", label: "Customers", icon: "customers" },
+    { href: "/queries", label: "Inquiries", icon: "queries" },
+    { href: "/customers", label: "Buyers", icon: "customers" },
     { href: "/quotations", label: "Quotations", icon: "quotations" },
     ...(can(user.role, "invoices.manage") ? [{ href: "/invoices", label: "Invoices", icon: "invoices" } as NavItem] : []),
     ...(can(user.role, "reports.view") ? [{ href: "/reports", label: "Reports", icon: "reports" } as NavItem] : []),
@@ -74,9 +74,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link
               href="/queries/new"
               className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
-              title="New query (N)"
+              title="New inquiry (N)"
             >
-              <Plus className="h-4 w-4" aria-hidden /> New query
+              <Plus className="h-4 w-4" aria-hidden /> New inquiry
             </Link>
           )}
         </div>

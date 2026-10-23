@@ -9,7 +9,7 @@ import { canWorkOn } from "@/modules/queries/service";
 import { PageHeader } from "@/components/ui";
 import { getSettings } from "@/modules/settings/service";
 
-export const metadata = { title: "Edit query" };
+export const metadata = { title: "Edit inquiry" };
 
 export default async function EditQueryPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();

@@ -27,14 +27,14 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
     <form action={action} className="flex max-w-4xl flex-col gap-6" noValidate>
       {state.message && <Alert tone={state.ok ? "success" : "error"}>{state.message}</Alert>}
       <Card>
-        <CardHeader title="Email notifications" description="These admin emails are told about important events. Staff see notifications inside the app." />
+        <CardHeader title="Email notifications" description="Who at Kebo gets an email, and for what." />
         <CardBody className="grid gap-5">
           {!smtpConfigured && (
             <Alert tone="warning">
               Email sending is not set up on the server yet. Add <code>SMTP_HOST</code>, <code>SMTP_USER</code> and <code>SMTP_PASSWORD</code> to the server&apos;s <code>.env</code> file (a Gmail or company mailbox works), then restart.
             </Alert>
           )}
-          <Field label="Admin emails to notify" htmlFor="notifyEmails" error={e.notifyEmails} hint="Separate several emails with commas, e.g. info@keboint.com, tanveer@keboint.com">
+          <Field label="Admin emails to notify" htmlFor="notifyEmails" error={e.notifyEmails} hint="Separate with commas, e.g. info@keboint.com, shandongkeboint@gmail.com">
             <Textarea id="notifyEmails" name="notifyEmails" rows={2} className="min-h-0" defaultValue={v("notifyEmails")} />
           </Field>
           <fieldset>
@@ -42,11 +42,11 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {(
                 [
-                  ["notifyNewQuery", "A new query arrives (website or entered by staff)"],
-                  ["notifyQuotation", "A customer accepts or rejects a quotation"],
-                  ["notifyClosed", "A query is completed or closed as not completed"],
+                  ["notifyNewQuery", "A new RFQ arrives (website or entered by staff)"],
+                  ["notifyQuotation", "A buyer accepts or rejects a quotation"],
+                  ["notifyClosed", "An inquiry is completed or closed as not completed"],
                   ["notifyPayment", "A payment is recorded"],
-                  ["notifyDailySummary", "Every morning: summary of new, overdue and unpaid items"],
+                  ["notifyDailySummary", "Every morning: new RFQs, overdue inquiries and unpaid invoices"],
                 ] as const
               ).map(([key, label]) => (
                 <label key={key} className="flex items-start gap-2.5 rounded-lg border border-line px-3 py-2.5 text-sm hover:bg-canvas/60">
@@ -70,7 +70,7 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Product categories" description="Shown as choices when entering a query. Keep them the same as the website form." />
+        <CardHeader title="Sourcing categories" description="Keep these the same as the dropdown on keboint.com." />
         <CardBody>
           <Field label="One category per line" htmlFor="categories" error={e.categories}>
             <Textarea id="categories" name="categories" rows={6} defaultValue={v("categories")} />
@@ -90,20 +90,20 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Money & defaults" description="Used when creating new quotations and invoices. Existing documents keep their own values." />
+        <CardHeader title="Money & defaults" description="Defaults for new quotations and invoices." />
         <CardBody className="grid gap-5 sm:grid-cols-2">
           {text("currency", "Currency code", { required: true, hint: "e.g. USD" })}
-          {text("defaultTaxRate", "Default tax rate (%)", { type: "number", step: "0.01", hint: "0 for export quotations; can be changed on each quotation" })}
+          {text("defaultTaxRate", "Default tax rate (%)", { type: "number", step: "0.01", hint: "Usually 0 for export" })}
           {text("quotationValidityDays", "Quotation valid for (days)", { type: "number" })}
           {text("invoicePaymentDays", "Invoice payment due in (days)", { type: "number" })}
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Reminders" description="Checked every hour; the assigned person and managers see reminders in the app." />
+        <CardHeader title="Reminders" description="Checked every hour. Reminders go to the person handling it and to managers." />
         <CardBody className="grid gap-5 sm:grid-cols-3">
           {text("reminderPendingDays", "Pending longer than (days)", { type: "number" })}
           {text("reminderProcessingDays", "Processing longer than (days)", { type: "number" })}
-          {text("reminderDueSoonDays", "Warn before due dates (days)", { type: "number" })}
+          {text("reminderDueSoonDays", "Warn before deadlines (days)", { type: "number" })}
         </CardBody>
       </Card>
       <Card>

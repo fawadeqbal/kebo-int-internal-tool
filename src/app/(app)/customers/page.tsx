@@ -5,7 +5,7 @@ import { Button, ButtonLink, Card, EmptyState, Input, PageHeader, Select, Table,
 import { Pagination, toPage } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils/dates";
 
-export const metadata = { title: "Customers" };
+export const metadata = { title: "Buyers" };
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; sort?: string }> }) {
   await requireUser();
@@ -16,9 +16,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader
-        title="Customers"
-        description="Everyone who has sent us a query."
-        actions={<ButtonLink href="/customers/new">Add customer</ButtonLink>}
+        title="Buyers"
+        description="Every buyer who has sent an RFQ."
+        actions={<ButtonLink href="/customers/new">Add buyer</ButtonLink>}
       />
       <Card>
         <form className="flex flex-wrap items-end gap-3 border-b border-line p-4" role="search">
@@ -30,7 +30,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             Sort by
             <Select name="sort" defaultValue={sort} className="w-44">
               <option value="company">Name (A–Z)</option>
-              <option value="recent">Most recent query</option>
+              <option value="recent">Most recent inquiry</option>
             </Select>
           </label>
           <Button variant="secondary">Search</Button>
@@ -42,20 +42,20 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         </form>
         {data.rows.length === 0 ? (
           <EmptyState
-            title={q ? "No customers match your search" : "No customers yet"}
-            description={q ? "Try a different name or number." : "Add your first customer, or create one directly while entering a query."}
-            action={!q && <ButtonLink href="/customers/new">Add customer</ButtonLink>}
+            title={q ? "No buyers match your search" : "No buyers yet"}
+            description={q ? "Try a different name or number." : "Buyers are added automatically from website RFQs, or when you enter an inquiry."}
+            action={!q && <ButtonLink href="/customers/new">Add buyer</ButtonLink>}
           />
         ) : (
           <Table>
             <thead>
               <tr>
-                <Th>Customer</Th>
+                <Th>Buyer</Th>
                 <Th>Company</Th>
                 <Th>Phone / WhatsApp</Th>
                 <Th>Email</Th>
-                <Th className="text-right">Queries</Th>
-                <Th>Last query</Th>
+                <Th className="text-right">Inquiries</Th>
+                <Th>Last inquiry</Th>
               </tr>
             </thead>
             <tbody>

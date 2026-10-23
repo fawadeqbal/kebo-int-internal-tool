@@ -15,7 +15,7 @@ const STEPS = ["Received", "Quoted", "Accepted", "Invoiced"] as const;
 export function DealTrack({ status, quoted, accepted, invoiced }: { status: QueryStatus; quoted: boolean; accepted: boolean; invoiced: boolean }) {
   const reached = invoiced ? 3 : accepted ? 2 : quoted ? 1 : 0;
   const lost = status === "not_completed";
-  const label = lost ? "Closed without an order" : reached === 0 ? "Waiting for a quotation" : STEPS[reached];
+  const label = lost ? "Closed, no order" : reached === 0 ? "Waiting for a quotation" : STEPS[reached];
   return (
     <div className="flex items-center gap-3" aria-label={`Progress: ${label}`}>
       <ol className="flex items-center" aria-hidden>
@@ -117,7 +117,7 @@ export function InboxRow({ item, today, now }: { item: InboxItem; today: string;
             <span className={cn("rounded-md px-1.5 py-0.5 font-medium", STATUS_STYLE[item.status])}>{QUERY_STATUS_LABEL[item.status]}</span>
             {item.category && <span className="rounded-md bg-canvas px-1.5 py-0.5 text-muted">{item.category}</span>}
             {item.source === "website" && <span className="rounded-md bg-violet-50 px-1.5 py-0.5 font-medium text-violet-800">Website</span>}
-            {overdue && <span className="rounded-md bg-red-50 px-1.5 py-0.5 font-semibold text-red-700">Overdue, due {formatDate(item.requiredBy)}</span>}
+            {overdue && <span className="rounded-md bg-red-50 px-1.5 py-0.5 font-semibold text-red-700">Overdue, needed by {formatDate(item.requiredBy)}</span>}
           </div>
         </div>
 
@@ -133,7 +133,7 @@ export function InboxRow({ item, today, now }: { item: InboxItem; today: string;
                 <span className="hidden text-muted sm:inline">{item.assigneeName}</span>
               </>
             ) : (
-              <span className={needsOwner ? "font-medium text-amber-700" : "text-muted"}>{needsOwner ? "Needs an owner" : "Nobody"}</span>
+              <span className={needsOwner ? "font-medium text-amber-700" : "text-muted"}>{needsOwner ? "Not assigned" : "Nobody"}</span>
             )}
             <time dateTime={new Date(item.createdAt).toISOString()} className="hidden text-muted md:inline">
               {timeAgo(item.createdAt, now)}

@@ -80,7 +80,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               { label: "Invoice date", value: docDate(inv.issueDate) },
               { label: "Payment due", value: docDate(inv.dueDate) },
               { label: "Quotation", value: quotation.refNo },
-              { label: "Our reference", value: query.refNo },
+              { label: "RFQ no.", value: query.refNo },
             ]}
             items={detail.items}
             totals={inv}

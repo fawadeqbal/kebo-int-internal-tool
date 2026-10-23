@@ -31,7 +31,7 @@ export default async function PrintInvoice({ params }: { params: Promise<{ id: s
             { label: "Invoice date", value: docDate(inv.issueDate) },
             { label: "Payment due", value: docDate(inv.dueDate) },
             { label: "Quotation", value: detail.quotation.refNo },
-            { label: "Our reference", value: detail.query.refNo },
+            { label: "RFQ no.", value: detail.query.refNo },
           ]}
           items={detail.items}
           totals={inv}

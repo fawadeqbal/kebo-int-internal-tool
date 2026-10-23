@@ -37,20 +37,20 @@ export function emailNewQuery(queryId: string) {
     const { q, c } = row;
     const from = c.companyName ? `${c.contactPerson}, ${c.companyName}` : c.contactPerson;
     const mail = renderEmail({
-      heading: `New query ${q.refNo}${q.source === "website" ? " from the website" : ""}`,
+      heading: `New ${q.refNo}${q.source === "website" ? " from the website" : ""}`,
       rows: [
-        ["Customer", from],
-        ["Email", c.email],
+        ["Buyer", from],
+        ["Business email", c.email],
         ["Phone / WhatsApp", c.phone],
-        ["Category", q.category],
+        ["Sourcing category", q.category],
         ["Received via", SOURCE_LABEL[q.source]],
       ],
       body: q.specifications,
       link: `${appUrl()}/queries/${q.id}`,
-      linkLabel: "Open query",
+      linkLabel: "Open inquiry",
       footer: settings.companyName,
     });
-    return { subject: `New query ${q.refNo}: ${q.title}`, replyTo: c.email ?? undefined, ...mail };
+    return { subject: `New ${q.refNo}: ${q.title}`, replyTo: c.email ?? undefined, ...mail };
   });
 }
 
@@ -68,13 +68,13 @@ export function emailQueryClosed(queryId: string, actorId: string) {
     const mail = renderEmail({
       heading: `${q.refNo} is ${label}`,
       rows: [
-        ["Query", q.title],
-        ["Customer", c.companyName || c.contactPerson],
+        ["Inquiry", q.title],
+        ["Buyer", c.companyName || c.contactPerson],
         ["Closed by", actor?.name],
         ["Reason", q.statusReason],
       ],
       link: `${appUrl()}/queries/${q.id}`,
-      linkLabel: "Open query",
+      linkLabel: "Open inquiry",
       footer: settings.companyName,
     });
     return { subject: `${q.refNo} ${label}: ${q.title}`, ...mail };
@@ -93,10 +93,10 @@ export function emailQuotationDecision(quotationId: string) {
     const { qt, q, c } = row;
     const label = QUOTATION_STATUS_LABEL[qt.status];
     const mail = renderEmail({
-      heading: `Quotation ${qt.refNo} ${label.toLowerCase()} by the customer`,
+      heading: `Quotation ${qt.refNo} ${label.toLowerCase()} by the buyer`,
       rows: [
-        ["Customer", c.companyName || c.contactPerson],
-        ["Query", `${q.refNo}: ${q.title}`],
+        ["Buyer", c.companyName || c.contactPerson],
+        ["Inquiry", `${q.refNo}: ${q.title}`],
         ["Amount", formatMoney(qt.total, settings.currency)],
       ],
       link: `${appUrl()}/quotations/${qt.id}`,
@@ -119,7 +119,7 @@ export function emailPayment(invoiceId: string, amountText: string) {
     const mail = renderEmail({
       heading: `Payment received on ${inv.invoiceNo}`,
       rows: [
-        ["Customer", c.companyName || c.contactPerson],
+        ["Buyer", c.companyName || c.contactPerson],
         ["Amount", amountText],
         ["Invoice total", formatMoney(inv.total, settings.currency)],
         ["Paid so far", formatMoney(inv.amountPaid, settings.currency)],

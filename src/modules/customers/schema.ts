@@ -11,11 +11,11 @@ const optional = (max: number) =>
 
 export const customerSchema = z.object({
   companyName: optional(200),
-  contactPerson: z.string().trim().min(2, "Enter the customer's name").max(120),
+  contactPerson: z.string().trim().min(2, "Enter the buyer's full name").max(120),
   phone: z
     .string()
     .trim()
-    .min(7, "Enter a valid contact number")
+    .min(7, "Enter a phone / WhatsApp number with country code")
     .max(40)
     .regex(/^[+\d][\d\s\-()]{6,}$/, "Use digits, spaces, + - ( ) only"),
   email: z

@@ -120,19 +120,19 @@ export function Sidebar({
         className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
         {tab("/dashboard", "Home", LayoutDashboard)}
-        {tab("/queries", "Queries", ClipboardList)}
+        {tab("/queries", "Inquiries", ClipboardList)}
         {canCreate ? (
           <div className="flex flex-1 items-start justify-center">
             <Link
               href="/queries/new"
-              aria-label="New query"
+              aria-label="New inquiry"
               className="-mt-5 grid h-14 w-14 place-items-center rounded-full bg-brand-600 text-white shadow-[0_6px_16px_-4px_rgba(14,118,102,0.55)] ring-4 ring-canvas active:scale-95"
             >
               <Plus className="h-7 w-7" strokeWidth={2.25} />
             </Link>
           </div>
         ) : (
-          tab("/customers", "Customers", Building2)
+          tab("/customers", "Buyers", Building2)
         )}
         {tab("/notifications", "Alerts", Bell, unread)}
         <button

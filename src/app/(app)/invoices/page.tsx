@@ -29,12 +29,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const today = todayISO();
   return (
     <>
-      <PageHeader title="Invoices" description="Invoices are generated from accepted quotations." />
+      <PageHeader title="Invoices" description="Made from quotations the buyer accepted." />
       <Card>
         <form className="flex flex-wrap items-end gap-3 border-b border-line p-4" role="search">
           <label className="flex min-w-64 flex-1 flex-col gap-1.5 text-sm font-medium">
             Search
-            <Input id="search" name="q" defaultValue={q} placeholder="Invoice no., company, query ref or title" />
+            <Input id="search" name="q" defaultValue={q} placeholder="Invoice no., buyer, RFQ no. or product" />
           </label>
           <label className="flex flex-col gap-1.5 text-sm font-medium">
             Status
@@ -61,12 +61,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             <thead>
               <tr>
                 <Th>Invoice</Th>
-                <Th>Customer</Th>
+                <Th>Buyer</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Total</Th>
                 <Th className="text-right">Balance due</Th>
                 <Th>Issued</Th>
-                <Th>Due</Th>
+                <Th>Payment due</Th>
               </tr>
             </thead>
             <tbody>

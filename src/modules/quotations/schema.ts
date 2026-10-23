@@ -15,7 +15,7 @@ export const quotationSchema = z
     items: lineItemsField,
     discount: moneyField("discount").default(0),
     taxRate: taxRateField,
-    dueDate: isoDate("Choose the due / validity date"),
+    dueDate: isoDate("Choose the valid-until date"),
     submittedAt: z
       .string()
       .trim()

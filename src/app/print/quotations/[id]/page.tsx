@@ -33,7 +33,7 @@ export default async function PrintQuotation({ params }: { params: Promise<{ id:
           meta={[
             { label: "Date", value: docDate(q.submittedAt ?? q.createdAt.toISOString().slice(0, 10)) },
             { label: "Valid until", value: docDate(q.dueDate) },
-            { label: "Our reference", value: detail.query.refNo },
+            { label: "RFQ no.", value: detail.query.refNo },
             ...(q.version > 1 ? [{ label: "Revision", value: `v${q.version}` }] : []),
           ]}
           items={detail.items}

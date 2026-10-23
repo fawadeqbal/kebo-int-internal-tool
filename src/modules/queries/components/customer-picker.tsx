@@ -103,7 +103,7 @@ export function CustomerPicker({
         aria-autocomplete="list"
         aria-invalid={!!error}
         aria-activedescendant={open && results[active] ? `${listId}-${active}` : undefined}
-        placeholder="Type a name, company or phone number…"
+        placeholder="Name, company or phone…"
         className="pl-9"
         value={query}
         onChange={(e) => {
@@ -147,7 +147,7 @@ export function CustomerPicker({
               </p>
             </li>
           ))}
-          {!loading && results.length === 0 && <li className="px-3 py-2 text-sm text-muted">No matching customer.</li>}
+          {!loading && results.length === 0 && <li className="px-3 py-2 text-sm text-muted">No matching buyer.</li>}
           {onCreateNew && (
             <li className="border-t border-line">
               <button

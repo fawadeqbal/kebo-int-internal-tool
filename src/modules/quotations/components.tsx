@@ -31,7 +31,7 @@ export function QuotationForm({
     <form action={formAction} className="flex flex-col gap-6" noValidate>
       {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
       <Card>
-        <CardHeader title="Prices" description="Enter each item with quantity and unit price. Tax and total are calculated for you." />
+        <CardHeader title="Prices" description="One line per item. Add freight (CIF/DDP), inspection or spare parts as their own lines." />
         <CardBody>
           <LineItemsEditor
             initialItems={items}
@@ -45,16 +45,16 @@ export function QuotationForm({
       <Card>
         <CardHeader title="Dates & terms" />
         <CardBody className="grid gap-5 sm:grid-cols-2">
-          <Field label="Due / valid until" htmlFor="dueDate" required error={e.dueDate} hint="The price is valid until this date">
+          <Field label="Valid until" htmlFor="dueDate" required error={e.dueDate} hint="The price holds until this date">
             <Input id="dueDate" name="dueDate" type="date" defaultValue={v("dueDate")} aria-invalid={!!e.dueDate} />
           </Field>
-          <Field label="Submission date" htmlFor="submittedAt" error={e.submittedAt} hint="When it is (or will be) sent to the customer. Set automatically when marked as sent.">
+          <Field label="Sent to buyer on" htmlFor="submittedAt" error={e.submittedAt} hint="Filled in when you mark it as sent">
             <Input id="submittedAt" name="submittedAt" type="date" defaultValue={v("submittedAt")} />
           </Field>
           <Field label="Terms & conditions" htmlFor="terms" error={e.terms} className="sm:col-span-2">
             <Textarea id="terms" name="terms" rows={5} defaultValue={v("terms")} />
           </Field>
-          <Field label="Internal notes" htmlFor="notes" error={e.notes} hint="Not printed on the quotation" className="sm:col-span-2">
+          <Field label="Internal notes" htmlFor="notes" error={e.notes} hint="Not shown to the buyer" className="sm:col-span-2">
             <Textarea id="notes" name="notes" rows={2} className="min-h-0" defaultValue={v("notes")} />
           </Field>
         </CardBody>

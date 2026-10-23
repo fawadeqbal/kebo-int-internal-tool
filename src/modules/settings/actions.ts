@@ -50,7 +50,7 @@ export async function sendTestEmailAction(_prev: ActionState, formData: FormData
     footer: settings.companyName,
   });
   try {
-    await mailer.send({ to: parsed.data, subject: "Test email from the query system", ...mail });
+    await mailer.send({ to: parsed.data, subject: "Test email from Kebo RFQ Desk", ...mail });
     return { ok: true, message: `Sent to ${parsed.data.join(", ")}.` };
   } catch (error) {
     console.error(error);

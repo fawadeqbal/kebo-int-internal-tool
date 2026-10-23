@@ -11,19 +11,19 @@ export async function GET(request: Request) {
   const sp = Object.fromEntries(new URL(request.url).searchParams);
   const rows = await listQueriesForExport(user, parseQueryFilters(sp));
   const csv = toCsv(
-    ["Reference", "Title", "Company", "Contact person", "Contact number", "Category", "Quantity", "Source", "Priority", "Status", "Assigned to", "Required by", "Created", "Closed"],
+    ["RFQ no.", "Title", "Buyer", "Company", "Phone / WhatsApp", "Sourcing category", "Quantity", "Received via", "Priority", "Status", "Handled by", "Needed by", "Received", "Closed"],
     rows.map((r) => [
       r.refNo,
       r.title,
-      r.companyName,
       r.contactPerson,
+      r.companyName === r.contactPerson ? "" : r.companyName,
       r.customerPhone,
       r.category,
       r.quantity,
       SOURCE_LABEL[r.source],
       PRIORITY_LABEL[r.priority],
       QUERY_STATUS_LABEL[r.status],
-      r.assigneeName ?? "Unassigned",
+      r.assigneeName ?? "Not assigned",
       r.requiredBy,
       formatDateTime(r.createdAt),
       formatDateTime(r.completedAt),
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="queries-${todayISO()}.csv"`,
+      "Content-Disposition": `attachment; filename="inquiries-${todayISO()}.csv"`,
       "Cache-Control": "no-store",
     },
   });

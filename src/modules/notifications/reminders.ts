@@ -94,7 +94,7 @@ export async function runReminders(now = new Date()) {
     } else {
       notify([q.createdBy], {
         type: "reminder.quotationDue",
-        title: `Quotation ${q.refNo} is valid until ${q.dueDate} — follow up with the customer`,
+        title: `Quotation ${q.refNo} is valid until ${q.dueDate}. Follow up with the buyer`,
         link: `/quotations/${q.id}`,
         dedupeKey: `quote-due:${q.id}:${today}`,
       });
@@ -150,24 +150,24 @@ async function sendDailySummary(settings: AppSettings, now: Date): Promise<boole
   const lines = [
     `Pending: ${open.filter((q) => q.status === "pending").length}   Processing: ${open.filter((q) => q.status === "processing").length}   Overdue: ${overdue.length}`,
     "",
-    `New in the last 24 hours (${fresh.length}):`,
+    `New RFQs in the last 24 hours (${fresh.length}):`,
     ...(fresh.length ? fresh.map((q) => `• ${q.refNo} — ${q.customer}: ${q.title}`) : ["• none"]),
     "",
-    `Overdue queries (${overdue.length}):`,
+    `Overdue inquiries (${overdue.length}):`,
     ...(overdue.length ? overdue.slice(0, 20).map((q) => `• ${q.refNo} — ${q.customer}: ${q.title} (due ${q.requiredBy})`) : ["• none"]),
     "",
     `Overdue invoices (${unpaid.length}):`,
     ...(unpaid.length ? unpaid.map((i) => `• ${i.invoiceNo} — ${formatMoney((toCents(i.total) - toCents(i.paid)) / 100, settings.currency)} due ${i.dueDate}`) : ["• none"]),
   ];
   const mail = renderEmail({
-    heading: `Daily summary — ${today}`,
+    heading: `Kebo RFQ Desk, ${today}`,
     body: lines.join("\n"),
     link: `${(process.env.APP_URL ?? "").replace(/\/$/, "")}/dashboard`,
     linkLabel: "Open dashboard",
     footer: settings.companyName,
   });
   try {
-    await getMailer().send({ to: settings.notifyEmails, subject: `Daily summary: ${fresh.length} new, ${overdue.length} overdue`, ...mail });
+    await getMailer().send({ to: settings.notifyEmails, subject: `Daily summary: ${fresh.length} new RFQs, ${overdue.length} overdue`, ...mail });
   } catch (error) {
     console.error("[reminders] daily summary email failed", error);
     return false;

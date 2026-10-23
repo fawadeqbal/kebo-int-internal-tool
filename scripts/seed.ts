@@ -165,7 +165,7 @@ async function seedDemo(adminId: string) {
     else outcome = r < 0.1 ? "not_completed" : r < 0.22 ? "rejected" : r < 0.3 ? "sent" : r < 0.45 ? "invoiced" : r < 0.6 ? "partial" : "paid";
 
     await db.transaction(async (tx) => {
-      const refNo = await nextRef(tx, "QRY", created.getUTCFullYear());
+      const refNo = await nextRef(tx, "RFQ", created.getUTCFullYear());
       const hist: { from: schema.QueryStatus | null; to: schema.QueryStatus; at: Date; reason?: string }[] = [{ from: null, to: "pending", at: created }];
       const startAt = addHours(created, 6 + rand() * 40);
       let status: schema.QueryStatus = "pending";
@@ -177,14 +177,14 @@ async function seedDemo(adminId: string) {
       }
       if (outcome === "not_completed") {
         completedAt = addDays(startAt, 3 + rand() * 5);
-        reason = pick(["Customer bought locally", "Budget not approved by customer", "Specification not feasible"]);
+        reason = pick(["Buyer bought locally", "Buyer's budget not approved", "No factory can meet the spec"]);
         hist.push({ from: "processing", to: "not_completed", at: completedAt, reason });
         status = "not_completed";
       }
       if (["paid", "rejected"].includes(outcome)) {
         completedAt = addDays(startAt, 8 + rand() * 14);
         if (outcome === "rejected") {
-          reason = "Customer rejected the quotation (price)";
+          reason = "Buyer rejected the price";
           hist.push({ from: "processing", to: "not_completed", at: completedAt, reason });
           status = "not_completed";
         } else {
@@ -223,10 +223,10 @@ async function seedDemo(adminId: string) {
           queryId: q.id,
           authorId: assignee ?? manager,
           body: pick([
-            "Called the customer to confirm the voltage and output requirement.",
-            "Customer will share the layout drawing by email.",
-            "Checked with the supplier — lead time is about 10 weeks.",
-            "Customer asked for a demo video of the machine.",
+            "Called the buyer on WhatsApp to confirm voltage and output.",
+            "Buyer will send the layout drawing by email.",
+            "Factory confirmed a lead time of about 10 weeks.",
+            "Buyer asked for a factory video of the machine running.",
           ]),
           createdAt: addHours(created, 20),
         });

@@ -21,7 +21,7 @@ export async function getAccessibleQuery(user: SessionUser, id: string): Promise
     .from(queries)
     .where(and(eq(queries.id, id), isNull(queries.deletedAt), accessCondition(user)))
     .limit(1);
-  if (!row) throw new NotFoundError("Query");
+  if (!row) throw new NotFoundError("Inquiry");
   return row;
 }
 
@@ -48,7 +48,7 @@ type NewQueryRecord = Pick<
  * and by the website inquiry intake.
  */
 export async function insertQueryRecord(tx: DbOrTx, actorId: string, values: NewQueryRecord) {
-  const refNo = await nextReference(tx, "QRY");
+  const refNo = await nextReference(tx, "RFQ");
   const [query] = await tx
     .insert(queries)
     .values({ ...values, refNo, createdBy: actorId, status: "pending" })
@@ -60,7 +60,7 @@ export async function insertQueryRecord(tx: DbOrTx, actorId: string, values: New
     action: "create",
     entityType: "query",
     entityId: query.id,
-    summary: `Created query ${refNo}: ${query.title}`,
+    summary: `Created inquiry ${refNo}: ${query.title}`,
   });
   return query;
 }
@@ -68,7 +68,7 @@ export async function insertQueryRecord(tx: DbOrTx, actorId: string, values: New
 export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
   assertCan(actor, "queries.create");
   await assertAssignable(actor, input.assignedTo);
-  if (input.customerMode === "existing" && !(await findCustomer(input.customerId))) throw new DomainError("The selected customer no longer exists.");
+  if (input.customerMode === "existing" && !(await findCustomer(input.customerId))) throw new DomainError("The selected buyer no longer exists.");
 
   const created = await db.transaction(async (tx) => {
     const customerId =
@@ -113,8 +113,8 @@ export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
 
 export async function updateQuery(actor: SessionUser, id: string, input: UpdateQueryInput) {
   const existing = await getAccessibleQuery(actor, id);
-  if (!canWorkOn(actor, existing)) throw new ForbiddenError("Only the assigned person or a manager can edit this query.");
-  if (!(await findCustomer(input.customerId))) throw new DomainError("The selected customer no longer exists.");
+  if (!canWorkOn(actor, existing)) throw new ForbiddenError("Only the assigned person or a manager can edit this inquiry.");
+  if (!(await findCustomer(input.customerId))) throw new DomainError("The selected buyer no longer exists.");
   const row = {
     customerId: input.customerId,
     source: input.source,
@@ -129,7 +129,7 @@ export async function updateQuery(actor: SessionUser, id: string, input: UpdateQ
   if (!changes.changed) return;
   await db.transaction(async (tx) => {
     await tx.update(queries).set(row).where(eq(queries.id, id));
-    await recordAudit(tx, { userId: actor.id, action: "update", entityType: "query", entityId: id, summary: `Edited query ${existing.refNo}`, ...changes });
+    await recordAudit(tx, { userId: actor.id, action: "update", entityType: "query", entityId: id, summary: `Edited inquiry ${existing.refNo}`, ...changes });
   });
 }
 
@@ -137,8 +137,8 @@ export async function changeStatus(actor: SessionUser, id: string, to: QueryStat
   const existing = await getAccessibleQuery(actor, id);
   if (!canWorkOn(actor, existing)) throw new ForbiddenError("Only the assigned person or a manager can change the status.");
   if (!canTransition(existing.status, to))
-    throw new DomainError(`A query cannot move from ${QUERY_STATUS_LABEL[existing.status]} to ${QUERY_STATUS_LABEL[to]}.`);
-  if (isReopen(existing.status, to) && !can(actor.role, "queries.updateAny")) throw new ForbiddenError("Only a manager can reopen a closed query.");
+    throw new DomainError(`An inquiry cannot move from ${QUERY_STATUS_LABEL[existing.status]} to ${QUERY_STATUS_LABEL[to]}.`);
+  if (isReopen(existing.status, to) && !can(actor.role, "queries.updateAny")) throw new ForbiddenError("Only a manager can reopen a closed inquiry.");
   if (to === "not_completed" && !reason) throw new DomainError("Please give a reason.");
 
   const now = new Date();
@@ -234,11 +234,11 @@ export async function removeAttachment(actor: SessionUser, attachmentId: string)
 export async function deleteQuery(actor: SessionUser, id: string) {
   assertCan(actor, "queries.delete");
   const existing = await findQuery(id);
-  if (!existing) throw new NotFoundError("Query");
+  if (!existing) throw new NotFoundError("Inquiry");
   const [{ n }] = await db.select({ n: count() }).from(invoices).where(eq(invoices.queryId, id));
-  if (n > 0) throw new DomainError("This query has invoices, so it cannot be removed.");
+  if (n > 0) throw new DomainError("This inquiry has invoices, so it cannot be removed.");
   await db.transaction(async (tx) => {
     await tx.update(queries).set({ deletedAt: new Date() }).where(eq(queries.id, id));
-    await recordAudit(tx, { userId: actor.id, action: "delete", entityType: "query", entityId: id, summary: `Removed query ${existing.refNo}` });
+    await recordAudit(tx, { userId: actor.id, action: "delete", entityType: "query", entityId: id, summary: `Removed inquiry ${existing.refNo}` });
   });
 }

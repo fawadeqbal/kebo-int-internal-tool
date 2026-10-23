@@ -20,7 +20,7 @@ import { formatDate } from "@/lib/utils/dates";
 import { formatCents, formatMoney, toCents } from "@/lib/utils/money";
 import { todayISO } from "@/lib/utils/dates";
 
-export const metadata = { title: "Customer" };
+export const metadata = { title: "Buyer" };
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -49,7 +49,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         title={customerName(customer)}
         description={customer.companyName ? `Contact: ${customer.contactPerson}` : undefined}
         backHref="/customers"
-        backLabel="Customers"
+        backLabel="Buyers"
         actions={
           <>
             {can(user.role, "customers.manage") && (
@@ -59,7 +59,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             )}
             {can(user.role, "queries.create") && (
               <ButtonLink href={`/queries/new?customer=${id}`}>
-                <Plus className="h-4 w-4" aria-hidden /> New query
+                <Plus className="h-4 w-4" aria-hidden /> New inquiry
               </ButtonLink>
             )}
           </>
@@ -68,10 +68,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="flex flex-col gap-6">
           <Card>
-            <CardHeader title="Contact details" />
+            <CardHeader title="Contact" />
             <CardBody className="flex flex-col gap-3 text-sm">
               <p>
-                <span className="block text-xs font-medium uppercase tracking-wide text-muted">Contact person</span>
+                <span className="block text-xs font-medium uppercase tracking-wide text-muted">Full name</span>
                 {customer.contactPerson}
               </p>
               <a href={`tel:${customer.phone}`} className="inline-flex items-center gap-2 text-brand-700 hover:underline">
@@ -103,7 +103,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           </Card>
           {showMoney && (
             <Card>
-              <CardHeader title="Account" />
+              <CardHeader title="Account balance" />
               <CardBody>
                 <dl className="flex flex-col gap-2 text-sm">
                   <div className="flex justify-between">
@@ -125,24 +125,24 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           {can(user.role, "customers.delete") && queryRows.length === 0 && (
             <form action={deleteCustomerAction.bind(null, id)}>
               <ConfirmSubmit variant="ghost" size="sm" className="text-red-700" message={`Remove ${customerName(customer)}?`}>
-                Remove customer
+                Remove buyer
               </ConfirmSubmit>
             </form>
           )}
         </aside>
         <div className="flex min-w-0 flex-col gap-6">
           <Card>
-            <CardHeader title={`Queries (${queryRows.length})`} />
+            <CardHeader title={`Inquiries (${queryRows.length})`} />
             {queryRows.length === 0 ? (
-              <EmptyState title="No queries from this customer yet" action={can(user.role, "queries.create") && <ButtonLink href={`/queries/new?customer=${id}`}>New query</ButtonLink>} />
+              <EmptyState title="No inquiries from this buyer yet" action={can(user.role, "queries.create") && <ButtonLink href={`/queries/new?customer=${id}`}>New inquiry</ButtonLink>} />
             ) : (
               <Table>
                 <thead>
                   <tr>
-                    <Th>Reference</Th>
+                    <Th>RFQ no.</Th>
                     <Th>Title</Th>
                     <Th>Status</Th>
-                    <Th>Assigned to</Th>
+                    <Th>Handled by</Th>
                     <Th>Received</Th>
                   </tr>
                 </thead>

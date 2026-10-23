@@ -25,12 +25,14 @@ export const INVOICE_STATUS_LABEL: Record<InvoiceDisplayStatus, string> = {
   overdue: "Overdue",
 };
 
+/** Order = how often Kebo receives RFQs through each channel. */
 export const SOURCE_LABEL: Record<QuerySource, string> = {
-  phone: "Phone call",
-  email: "Email",
+  website: "Website form",
   whatsapp: "WhatsApp",
-  walk_in: "Walk-in / visit",
-  website: "Website",
+  wechat: "WeChat",
+  email: "Email",
+  phone: "Phone",
+  walk_in: "Visit / trade fair",
   other: "Other",
 };
 
@@ -42,10 +44,11 @@ export const PRIORITY_LABEL: Record<Priority, string> = {
 };
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  bank_transfer: "Bank transfer (T/T)",
+  lc: "Letter of credit (L/C)",
   cash: "Cash",
-  bank_transfer: "Bank transfer",
   cheque: "Cheque",
-  online: "Online",
+  online: "Online payment",
   other: "Other",
 };
 

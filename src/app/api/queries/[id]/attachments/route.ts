@@ -11,16 +11,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
   const { id } = await params;
-  if (!isUuid(id)) return NextResponse.json({ error: "Query not found." }, { status: 404 });
+  if (!isUuid(id)) return NextResponse.json({ error: "Inquiry not found." }, { status: 404 });
 
   let query;
   try {
     query = await getAccessibleQuery(user, id);
   } catch {
-    return NextResponse.json({ error: "Query not found." }, { status: 404 });
+    return NextResponse.json({ error: "Inquiry not found." }, { status: 404 });
   }
   if (!canWorkOn(user, query) && !can(user.role, "queries.create"))
-    return NextResponse.json({ error: "You cannot add files to this query." }, { status: 403 });
+    return NextResponse.json({ error: "You cannot add files to this inquiry." }, { status: 403 });
 
   const form = await request.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
