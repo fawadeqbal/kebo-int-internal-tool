@@ -91,8 +91,8 @@ docker compose run --rm -v "$PWD/backups:/backups" app sh -c "tar -xzf /backups/
 ## Develop locally
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on localhost:5432
-cp .env.example .env                              # DATABASE_URL=postgres://qms:qms@localhost:5432/qms
+docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on localhost:5433
+cp .env.example .env                              # DATABASE_URL=postgres://qms:qms@localhost:5433/qms
 npm install
 npm run db:migrate
 npm run db:seed -- --demo

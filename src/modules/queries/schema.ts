@@ -29,7 +29,7 @@ const optionalUser = z
 
 /** A short title from the first line of the requirements, when none is typed. */
 export function titleFrom(requirements: string, category?: string | null): string {
-  const first = requirements.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
+  const first = (requirements.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "").replace(/[.\s]+$/, "");
   if (!first) return category ? `${category} inquiry` : "Inquiry";
   if (first.length <= 90) return first;
   const cut = first.slice(0, 90);

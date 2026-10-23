@@ -1,4 +1,5 @@
 # Development: only the database runs in Docker; the app runs with `npm run dev`.
+# Connect with DATABASE_URL=postgres://qms:qms@localhost:5433/qms
 #   docker compose -f docker-compose.dev.yml up -d
 name: qms-dev
 services:
@@ -9,7 +10,8 @@ services:
       POSTGRES_USER: qms
       POSTGRES_PASSWORD: qms
     ports:
-      - "5432:5432"
+      # 5433 on your PC, so it never clashes with another PostgreSQL already using 5432
+      - "5433:5432"
     volumes:
       - pgdata-dev:/var/lib/postgresql/data
 volumes:
