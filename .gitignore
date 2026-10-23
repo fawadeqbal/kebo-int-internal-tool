@@ -6,3 +6,8 @@ dist
 /storage/
 *.tsbuildinfo
 next-env.d.ts
+
+# local secrets and notes
+.env.*
+!.env.example
+server-check.txt
