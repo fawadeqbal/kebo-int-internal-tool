@@ -40,6 +40,9 @@ Permissions live in one file: `src/lib/auth/permissions.ts`.
 
 ## Run it on your server (Docker)
 
+> **Shared server (145.241.156.60, existing Caddy):** follow [`deploy/README.md`](deploy/README.md): one command, `bash deploy/push.sh`.
+> The steps below are for a server of its own, where this app's Caddy may use ports 80/443 (`docker compose --profile standalone up -d`).
+
 Requirements: a Linux server with Docker and Docker Compose.
 
 ```bash
@@ -54,7 +57,7 @@ cp .env.example .env
 #   NOTIFY_EMAILS       (admin emails to notify — can be changed later in Settings)
 #   SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD   (outgoing email, e.g. Gmail with an App password)
 
-docker compose up -d --build
+docker compose --profile standalone up -d --build
 
 # Create the starting accounts: Super Admin, Manager, Staff (run once)
 docker compose run --rm app node dist/scripts/seed.js
@@ -74,7 +77,7 @@ Open `https://<DOMAIN>` and sign in with the admin account. Then:
 
 | Container | Purpose |
 |---|---|
-| `proxy` | Caddy — HTTPS, compression, 30 MB upload limit |
+| `proxy` | Caddy (only with `--profile standalone`): HTTPS, compression, 30 MB upload limit |
 | `app` | Next.js app; runs database migrations on every start |
 | `worker` | Reminder job (every `REMINDER_INTERVAL_MINUTES`, default 60) |
 | `db` | PostgreSQL 16 (volume `pgdata`) |

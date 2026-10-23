@@ -1,0 +1,12 @@
+# Kebo RFQ Desk (appended by /opt/kebo-rfq/deploy/install.sh)
+__DOMAIN__ {
+	encode zstd gzip
+	request_body {
+		max_size 30MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	reverse_proxy kebo-rfq-app:3000
+}

@@ -1,9 +1,22 @@
-# Production stack — everything runs on your own server.
+# Production stack. Made to share a server with other apps:
+#   - every container, volume, network and image is prefixed "kebo-rfq" (COMPOSE_PROJECT_NAME)
+#   - nothing listens on 80/443; the app is published on 127.0.0.1:${APP_PORT} only,
+#     for the server's existing reverse proxy (Caddy / nginx) to forward to
+#   - the database and file storage are not reachable from outside Docker
+#   - memory and log sizes are capped so the other apps are not starved
+#
 #   docker compose up -d --build
-#   docker compose run --rm app node dist/scripts/seed.js          # first admin
-#   docker compose run --rm app node dist/scripts/seed.js --demo   # + demo data (optional)
+#   docker compose run --rm app node dist/scripts/seed.js          # starting accounts
+#   docker compose --profile standalone up -d                      # only on a server WITHOUT its own proxy
+# See deploy/README.md.
 
-name: qms
+name: ${COMPOSE_PROJECT_NAME:-kebo-rfq}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 x-app-env: &app-env
   DATABASE_URL: postgres://qms:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/qms
@@ -53,10 +66,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    mem_limit: ${DB_MEMORY:-512m}
+    logging: *logging
 
   app:
     build: .
-    image: qms-app:latest
+    image: kebo-rfq-app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment: *app-env
     depends_on:
@@ -64,8 +79,11 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-    expose:
-      - "3000"
+    # Host-only: reachable by the reverse proxy on this server, not from the internet directly.
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3410}:3000"
+    mem_limit: ${APP_MEMORY:-1536m}
+    logging: *logging
 
   # S3-compatible file storage for drawings, spec sheets and photos.
   # The official MinIO community image stopped being published in Oct 2025;
@@ -83,9 +101,11 @@ services:
       - files:/data
     expose:
       - "9000"
+    mem_limit: ${MINIO_MEMORY:-512m}
+    logging: *logging
 
   worker:
-    image: qms-app:latest
+    image: kebo-rfq-app:${APP_VERSION:-latest}
     restart: unless-stopped
     command: ["node", "dist/worker/index.js"]
     environment:
@@ -96,10 +116,16 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    mem_limit: ${WORKER_MEMORY:-384m}
+    logging: *logging
 
+  # Only for a server that has no reverse proxy of its own:
+  #   docker compose --profile standalone up -d
   proxy:
     image: caddy:2-alpine
+    profiles: ["standalone"]
     restart: unless-stopped
+    logging: *logging
     ports:
       - "80:80"
       - "443:443"
@@ -131,6 +157,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    mem_limit: 256m
+    logging: *logging
 
 volumes:
   pgdata:
