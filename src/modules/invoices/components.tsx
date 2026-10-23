@@ -25,7 +25,7 @@ export function InvoiceForm({
   const v = (key: keyof typeof initial) => (state.values?.[key] as string | undefined) ?? (initial[key] as string);
   const items = state.values?.items ? (JSON.parse(state.values.items as string) as EditableLine[]) : initial.items;
   return (
-    <form action={formAction} className="flex flex-col gap-6" noValidate>
+    <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
       <Alert tone="info">Copied from the accepted quotation. Check it now: once issued, an invoice can only be cancelled, not edited.</Alert>
       <Card>
@@ -43,12 +43,12 @@ export function InvoiceForm({
           <Field label="Payment due" htmlFor="dueDate" required error={e.dueDate}>
             <Input id="dueDate" name="dueDate" type="date" defaultValue={v("dueDate")} />
           </Field>
-          <Field label="Note on invoice" htmlFor="notes" error={e.notes} hint="e.g. bank details for T/T, customer PO number" className="sm:col-span-2">
+          <Field label="Note on invoice" htmlFor="notes" optional error={e.notes} hint="e.g. bank details for T/T, customer PO number" className="sm:col-span-2">
             <Textarea id="notes" name="notes" rows={2} className="min-h-0" defaultValue={v("notes")} />
           </Field>
         </CardBody>
       </Card>
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-2">
         <SubmitButton pendingText="Issuing…">Issue invoice</SubmitButton>
         <ButtonLink href={cancelHref} variant="secondary">
           Cancel
@@ -85,7 +85,7 @@ export function PaymentForm({ action, balance, today }: { action: Action; balanc
           </Select>
         </Field>
       </div>
-      <Field label="Reference" htmlFor="reference" error={e.reference} hint="T/T reference, L/C number…">
+      <Field label="Reference" htmlFor="reference" optional error={e.reference} hint="T/T reference, L/C number…">
         <Input id="reference" name="reference" />
       </Field>
       <div>
@@ -102,12 +102,12 @@ export function CancelInvoiceForm({ action }: { action: Action }) {
   const [open, setOpen] = useState(false);
   if (!open)
     return (
-      <Button type="button" variant="ghost" size="sm" className="text-red-700" onClick={() => setOpen(true)}>
+      <Button type="button" variant="danger-ghost" size="sm" onClick={() => setOpen(true)}>
         Cancel invoice…
       </Button>
     );
   return (
-    <form action={formAction} className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3">
+    <form action={formAction} className="flex flex-col gap-3 rounded-lg border border-bad/30 bg-bad-soft/50 p-3">
       {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
       <Field label="Reason for cancelling" htmlFor="reason" required error={state.errors?.reason}>
         <Textarea id="reason" name="reason" rows={2} className="min-h-0" autoFocus />

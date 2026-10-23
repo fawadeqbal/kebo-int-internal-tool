@@ -84,7 +84,7 @@ export function QueryForm({
   const tooLarge = files.some((f) => f.size > maxUploadMb * 1024 * 1024);
 
   return (
-    <form action={formAction} className="flex flex-col gap-6" noValidate>
+    <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.message && !state.ok && !state.meta?.duplicates && <Alert tone="error">{state.message}</Alert>}
 
       <Card>
@@ -93,9 +93,9 @@ export function QueryForm({
           description={mode === "create" ? "Search by name, company or phone, or add a new customer." : undefined}
           actions={
             mode === "create" && (
-              <div role="radiogroup" aria-label="Customer type" className="flex rounded-lg border border-line p-0.5 text-sm">
+              <div role="radiogroup" aria-label="Customer type" className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5">
                 {(["existing", "new"] as const).map((m) => (
-                  <label key={m} className={`cursor-pointer rounded-md px-3 py-1 ${customerMode === m ? "bg-brand-600 text-white" : "text-muted hover:text-ink"}`}>
+                  <label key={m} className={`inline-flex h-7 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring ${customerMode === m ? "bg-surface text-text shadow-card" : "text-muted hover:text-text"}`}>
                     <input type="radio" name="customerMode" value={m} checked={customerMode === m} onChange={() => setCustomerMode(m)} className="sr-only" />
                     {m === "existing" ? "Existing customer" : "New customer"}
                   </label>
@@ -178,9 +178,9 @@ export function QueryForm({
             </Field>
           )}
           <details className="group sm:col-span-2" open={mode === "edit" || !!(e.title || e.quantity || e.requiredBy)}>
-            <summary className="cursor-pointer select-none text-sm font-medium text-brand-700 hover:underline">More details (optional)</summary>
+            <summary className="cursor-pointer text-sm font-medium text-primary select-none hover:underline">More details (optional)</summary>
             <div className="mt-4 grid gap-5 sm:grid-cols-2">
-              <Field label="Short title" htmlFor="title" error={e.title} hint="Leave empty to use the first line of the requirements" className="sm:col-span-2">
+              <Field label="Short title" htmlFor="title" optional error={e.title} hint="Leave empty to use the first line of the requirements" className="sm:col-span-2">
                 <Input id="title" name="title" defaultValue={v("title", initial?.title)} maxLength={200} />
               </Field>
               <Field label="Quantity" htmlFor="quantity" error={e.quantity}>
@@ -195,7 +195,7 @@ export function QueryForm({
                   ))}
                 </Select>
               </Field>
-              <Field label="Needed by" htmlFor="requiredBy" error={e.requiredBy} hint="When the customer needs the quotation or delivery">
+              <Field label="Needed by" htmlFor="requiredBy" optional error={e.requiredBy} hint="When the customer needs the quotation or delivery">
                 <Input id="requiredBy" name="requiredBy" type="date" defaultValue={v("requiredBy", initial?.requiredBy)} />
               </Field>
             </div>
@@ -205,14 +205,14 @@ export function QueryForm({
 
       {mode === "create" && (
         <Card>
-          <CardHeader title="Files (optional)" description="Drawings, spec sheets, photos, factory quotes" />
+          <CardHeader title="Files" description="Optional. Drawings, spec sheets, photos, factory quotes" />
           <CardBody>
             <FilePicker files={files} onChange={setFiles} maxMb={maxUploadMb} />
           </CardBody>
         </Card>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <SubmitButton disabled={tooLarge || !!createdId} pendingText={mode === "create" ? "Creating…" : "Saving…"}>
           {mode === "create" ? "Create inquiry" : "Save changes"}
         </SubmitButton>

@@ -8,7 +8,7 @@ import { SubmitButton } from "@/components/ui/client";
 export function LoginForm({ next }: { next?: string }) {
   const [state, action] = useActionState(loginAction, {});
   return (
-    <form action={action} className="mt-8 flex flex-col gap-5" noValidate>
+    <form action={action} className="mt-5 flex flex-col gap-4" noValidate>
       {state.message && <Alert tone="error">{state.message}</Alert>}
       <input type="hidden" name="next" value={next ?? ""} />
       <Field label="Email" htmlFor="email" error={state.errors?.email}>
@@ -35,7 +35,7 @@ export function LoginForm({ next }: { next?: string }) {
           aria-describedby={state.errors?.password ? "password-error" : undefined}
         />
       </Field>
-      <SubmitButton pendingText="Signing in…" className="w-full">
+      <SubmitButton pendingText="Signing in…" size="lg" className="w-full">
         Sign in
       </SubmitButton>
     </form>

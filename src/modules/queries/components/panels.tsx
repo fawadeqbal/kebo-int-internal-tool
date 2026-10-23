@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Alert, Button, Field, Select, Textarea } from "@/components/ui";
+import { Alert, Button, buttonClass, Field, Select, Textarea } from "@/components/ui";
 import { ConfirmSubmit, SubmitButton } from "@/components/ui/client";
 import type { ActionState } from "@/lib/utils/result";
 import type { QueryStatus } from "@/lib/db/schema";
@@ -40,14 +40,9 @@ export function StatusPanel({
             onClick={() => setChoice(choice === t.to ? null : t.to)}
             aria-pressed={choice === t.to}
             className={cn(
-              "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
-              choice === t.to
-                ? "border-brand-600 bg-brand-600 text-white"
-                : t.to === "not_completed"
-                  ? "border-line text-red-700 hover:border-red-300 hover:bg-red-50"
-                  : t.to === "completed"
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                    : "border-line bg-surface hover:bg-canvas",
+              buttonClass(choice === t.to ? "primary" : t.to === "not_completed" ? "danger-ghost" : "secondary", "sm"),
+              t.to === "not_completed" && choice !== t.to && "border border-line",
+              t.to === "completed" && choice !== t.to && "border-ok/30 text-ok",
             )}
           >
             {t.label}
@@ -55,10 +50,11 @@ export function StatusPanel({
         ))}
       </div>
       {choice && (
-        <div className="flex flex-col gap-3 rounded-lg border border-line bg-canvas/50 p-3">
+        <div className="flex animate-in flex-col gap-3 rounded-lg border border-line bg-surface-2/60 p-3">
           <input type="hidden" name="status" value={choice} />
           <Field
-            label={needsReason ? "Reason (required)" : "Note (optional)"}
+            label={needsReason ? "Reason" : "Note"}
+            optional={!needsReason}
             htmlFor="reason"
             error={state.errors?.reason}
             hint={needsReason ? "e.g. bought elsewhere, price too high, factory can't supply" : "Shown in the activity history"}
@@ -112,7 +108,7 @@ export function AssignPanel({
         Assign to
       </label>
       <div className="flex gap-2">
-        <Select id="assignedTo" name="assignedTo" defaultValue={current ?? ""} className="h-9" key={current ?? "none"}>
+        <Select id="assignedTo" name="assignedTo" defaultValue={current ?? ""} className="flex-1" key={current ?? "none"}>
           <option value="">Unassigned</option>
           {people.map((p) => (
             <option key={p.id} value={p.id}>
@@ -149,7 +145,7 @@ export function CommentForm({ action }: { action: Action }) {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ref.current?.requestSubmit();
         }}
       />
-      {state.errors?.body && <p className="text-xs font-medium text-red-600">{state.errors.body[0]}</p>}
+      {state.errors?.body && <p className="text-xs text-bad">{state.errors.body[0]}</p>}
       {state.message && !state.ok && !state.errors && <Alert tone="error">{state.message}</Alert>}
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted">Ctrl + Enter to post</span>
@@ -165,10 +161,10 @@ export function RemoveFileButton({ action, fileName }: { action: () => Promise<A
   const [state, formAction] = useActionState(action, {});
   return (
     <form action={formAction} className="inline">
-      <ConfirmSubmit size="sm" variant="ghost" message={`Remove ${fileName}?`} pendingText="…" aria-label={`Remove ${fileName}`}>
+      <ConfirmSubmit size="xs" variant="danger-ghost" message={`Remove ${fileName}?`} pendingText="…" aria-label={`Remove ${fileName}`}>
         Remove
       </ConfirmSubmit>
-      {state.message && !state.ok && <span className="ml-2 text-xs text-red-600">{state.message}</span>}
+      {state.message && !state.ok && <span className="ml-2 text-xs text-bad">{state.message}</span>}
     </form>
   );
 }

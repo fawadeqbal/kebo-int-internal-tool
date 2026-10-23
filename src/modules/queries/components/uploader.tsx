@@ -57,13 +57,15 @@ export function FilePicker({ files, onChange, maxMb }: { files: File[]; onChange
         }}
         className={cn(
           "flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors",
-          dragging ? "border-brand-500 bg-brand-50" : "border-line bg-canvas/40",
+          dragging ? "border-primary bg-primary-soft" : "border-line-strong bg-surface-2/50 hover:bg-surface-2",
         )}
       >
-        <UploadCloud className="h-6 w-6 text-muted" aria-hidden />
-        <p className="text-sm">
+        <span className="flex size-9 items-center justify-center rounded-full bg-surface text-muted shadow-card">
+          <UploadCloud className="size-4" aria-hidden />
+        </span>
+        <p className="text-sm text-text-2">
           Drag files here or{" "}
-          <button type="button" className="font-medium text-brand-700 hover:underline" onClick={() => inputRef.current?.click()}>
+          <button type="button" className="font-medium text-primary hover:underline" onClick={() => inputRef.current?.click()}>
             browse
           </button>
         </p>
@@ -71,16 +73,16 @@ export function FilePicker({ files, onChange, maxMb }: { files: File[]; onChange
         <input ref={inputRef} type="file" multiple className="sr-only" onChange={(e) => add(e.target.files)} tabIndex={-1} />
       </div>
       {files.length > 0 && (
-        <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
+        <ul className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line">
           {files.map((f, i) => (
             <li key={`${f.name}-${i}`} className="flex items-center gap-3 px-3 py-2 text-sm">
               <Paperclip className="h-4 w-4 shrink-0 text-muted" aria-hidden />
               <span className="min-w-0 flex-1 truncate">{f.name}</span>
-              <span className={cn("text-xs", f.size > maxMb * 1024 * 1024 ? "font-semibold text-red-700" : "text-muted")}>
+              <span className={cn("text-xs", f.size > maxMb * 1024 * 1024 ? "font-semibold text-bad" : "text-muted")}>
                 {formatBytes(f.size)}
                 {f.size > maxMb * 1024 * 1024 && " — too large"}
               </span>
-              <button type="button" onClick={() => onChange(files.filter((_, j) => j !== i))} aria-label={`Remove ${f.name}`} className="rounded p-1 text-muted hover:bg-canvas hover:text-ink">
+              <button type="button" onClick={() => onChange(files.filter((_, j) => j !== i))} aria-label={`Remove ${f.name}`} className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text">
                 <X className="h-4 w-4" />
               </button>
             </li>
@@ -108,6 +110,7 @@ export function AttachmentUploader({ queryId, maxMb }: { queryId: string; maxMb:
           <Button
             type="button"
             size="sm"
+            variant="primary"
             disabled={progress !== null || tooLarge}
             onClick={async () => {
               setError(null);
@@ -126,8 +129,8 @@ export function AttachmentUploader({ queryId, maxMb }: { queryId: string; maxMb:
             {progress !== null ? `Uploading… ${progress}%` : `Upload ${files.length} file${files.length > 1 ? "s" : ""}`}
           </Button>
           {progress !== null && (
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-canvas" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-              <div className="h-full bg-brand-500 transition-all" style={{ width: `${progress}%` }} />
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full bg-primary-solid transition-all" style={{ width: `${progress}%` }} />
             </div>
           )}
         </div>

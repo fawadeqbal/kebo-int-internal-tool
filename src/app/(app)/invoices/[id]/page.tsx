@@ -32,15 +32,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const open = inv.status === "unpaid" || inv.status === "partially_paid";
 
   return (
-    <>
-      <header className="no-print mb-6">
-        <Link href="/invoices" className="mb-2 inline-flex text-sm text-muted hover:text-ink">
+    <div>
+      <header className="no-print mb-5">
+        <Link href="/invoices" className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-text">
           ← Invoices
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{inv.invoiceNo}</h1>
+              <h1 className="font-mono text-xl font-semibold tracking-tight text-text">{inv.invoiceNo}</h1>
               <InvoiceStatusBadge status={display} />
             </div>
             <p className="mt-1 text-sm text-muted">
@@ -57,19 +57,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               </Link>
             </p>
           </div>
-          <a href={`/print/invoices/${id}`} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
-            <Printer className="h-4 w-4" aria-hidden /> Print / PDF
+          <a href={`/print/invoices/${id}`} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+            <Printer aria-hidden /> Print / PDF
           </a>
         </div>
         {inv.status === "cancelled" && (
-          <p className="mt-3 rounded-lg border border-line bg-surface px-4 py-2 text-sm">
+          <p className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm">
             <span className="font-medium">Cancelled:</span> {inv.cancelReason}
           </p>
         )}
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="overflow-hidden rounded-xl border border-line shadow-xs">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="overflow-hidden rounded-xl border border-line shadow-card">
           <DocumentView
             kind="Invoice"
             number={inv.invoiceNo}
@@ -88,22 +88,22 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             footer={settings.invoiceFooter}
           />
         </div>
-        <aside className="no-print flex flex-col gap-6">
+        <aside className="no-print flex flex-col gap-5">
           <Card>
-            <CardHeader title="Payment" />
+            <CardHeader title="Payment" description={inv.status === "paid" ? "Paid in full" : `Due ${formatDate(inv.dueDate)}`} />
             <CardBody className="flex flex-col gap-4">
-              <dl className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between">
+              <dl className="flex flex-col divide-y divide-line text-sm">
+                <div className="flex justify-between py-2 first:pt-0">
                   <dt className="text-muted">Total</dt>
-                  <dd className="tabular-nums">{formatMoney(inv.total, settings.currency)}</dd>
+                  <dd className="text-text tabular">{formatMoney(inv.total, settings.currency)}</dd>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between py-2 first:pt-0">
                   <dt className="text-muted">Received</dt>
-                  <dd className="tabular-nums">{formatMoney(inv.amountPaid, settings.currency)}</dd>
+                  <dd className="text-text tabular">{formatMoney(inv.amountPaid, settings.currency)}</dd>
                 </div>
-                <div className="flex justify-between border-t border-line pt-2 font-semibold">
+                <div className="flex justify-between pt-2 font-medium text-text">
                   <dt>Balance due</dt>
-                  <dd className={display === "overdue" ? "tabular-nums text-red-700" : "tabular-nums"}>
+                  <dd className={display === "overdue" ? "tabular text-bad" : "tabular"}>
                     {inv.status === "cancelled" ? "—" : formatCents(balance, settings.currency)}
                   </dd>
                 </div>
@@ -117,11 +117,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <Card>
               <CardHeader title="Payments received" />
               <CardBody>
-                <ul className="flex flex-col gap-3 text-sm">
+                <ul className="flex flex-col divide-y divide-line text-sm">
                   {detail.payments.map((p) => (
-                    <li key={p.id} className="flex justify-between gap-3">
+                    <li key={p.id} className="flex justify-between gap-3 py-2 first:pt-0 last:pb-0">
                       <span>
-                        <span className="block font-medium tabular-nums">{formatMoney(p.amount, settings.currency)}</span>
+                        <span className="block font-medium text-text tabular">{formatMoney(p.amount, settings.currency)}</span>
                         <span className="text-xs text-muted">
                           {PAYMENT_METHOD_LABEL[p.method]}
                           {p.reference ? ` · ${p.reference}` : ""} · by {p.recordedBy}
@@ -141,6 +141,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           )}
         </aside>
       </div>
-    </>
+    </div>
   );
 }

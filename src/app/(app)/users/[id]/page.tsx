@@ -19,11 +19,22 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
     <>
       <PageHeader
         title={user.name}
-        description={user.isActive ? <Badge tone="green">Active</Badge> : <Badge tone="slate">Deactivated</Badge>}
+        description={
+          <span className="flex items-center gap-2">
+            {user.email}
+            {user.isActive ? (
+              <Badge tone="ok" dot>
+                Active
+              </Badge>
+            ) : (
+              <Badge dot>Deactivated</Badge>
+            )}
+          </span>
+        }
         backHref="/users"
         backLabel="Users"
       />
-      <div className="flex max-w-3xl flex-col gap-6">
+      <div className="flex max-w-3xl flex-col gap-5">
         <Card>
           <CardHeader title="Profile & role" />
           <CardBody>
@@ -46,6 +57,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
               <form action={toggleUserActiveAction.bind(null, user.id, !user.isActive)}>
                 <ConfirmSubmit
                   variant={user.isActive ? "danger" : "secondary"}
+                  size="sm"
                   message={user.isActive ? `Deactivate ${user.name}?` : `Reactivate ${user.name}?`}
                 >
                   {user.isActive ? "Deactivate" : "Reactivate"}

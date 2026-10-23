@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" description="Notifications, categories, company details and defaults." />
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         <SettingsForm settings={settings} smtpConfigured={!!process.env.SMTP_HOST} />
         <WebsiteFormCard appUrl={process.env.APP_URL ?? "https://your-server"} />
       </div>

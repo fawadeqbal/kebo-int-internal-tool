@@ -13,7 +13,7 @@ export function WebsiteFormCard({ appUrl }: { appUrl: string }) {
         description="RFQs from the website form arrive here as Pending inquiries, and the emails above are notified."
       />
       <CardBody className="flex flex-col gap-5 text-sm">
-        <ol className="list-decimal space-y-2 pl-5">
+        <ol className="list-decimal space-y-3 pl-5 text-text-2 marker:text-muted">
           <li>
             Make sure each field in the website form has these <code>name</code> values (other common names also work):
             <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 sm:max-w-md">
@@ -28,7 +28,7 @@ export function WebsiteFormCard({ appUrl }: { appUrl: string }) {
           <li>
             Paste this script into the website, just before <code>&lt;/body&gt;</code>:
             <div className="relative mt-2">
-              <pre className="max-h-72 overflow-auto rounded-lg bg-ink p-4 text-xs leading-relaxed text-white/90">{snippet}</pre>
+              <pre className="max-h-72 overflow-auto rounded-lg border border-line bg-surface-2 p-3 pr-20 font-mono text-[11px] leading-relaxed text-text-2">{snippet}</pre>
               <div className="absolute right-2 top-2">
                 <CopyButton text={snippet} />
               </div>

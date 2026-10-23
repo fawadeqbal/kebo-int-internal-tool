@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, controlClass, Field, Input } from "@/components/ui";
 import { calculateTotals, formatCents } from "@/lib/utils/money";
+import { cn } from "@/lib/utils/cn";
 
 export interface EditableLine {
   description: string;
@@ -37,7 +38,7 @@ export function LineItemsEditor({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted">
+            <tr className="text-left text-xs font-medium text-muted">
               <th className="w-8 pb-2">#</th>
               <th className="pb-2">Description</th>
               <th className="w-24 pb-2">Qty</th>
@@ -60,7 +61,7 @@ export function LineItemsEditor({
                     value={item.description}
                     onChange={(e) => update(i, { description: e.target.value })}
                     placeholder="e.g. Rotary tablet press, 35 stations, GMP, SS316"
-                    className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-100"
+                    className={cn(controlClass, "resize-y py-2")}
                   />
                 </td>
                 <td className="py-1.5 pr-2">
@@ -75,13 +76,13 @@ export function LineItemsEditor({
                   </label>
                   <Input id={`price-${i}`} type="number" min="0" step="0.01" inputMode="decimal" value={item.unitPrice} onChange={(e) => update(i, { unitPrice: e.target.value })} placeholder="0.00" />
                 </td>
-                <td className="py-1.5 pt-4 text-right tabular-nums">{formatCents(totals.lines[i]?.lineTotal ?? 0, currency)}</td>
+                <td className="py-1.5 pt-4 text-right tabular">{formatCents(totals.lines[i]?.lineTotal ?? 0, currency)}</td>
                 <td className="py-1.5 pl-1 pt-2.5">
                   <button
                     type="button"
                     onClick={() => setItems((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev))}
                     disabled={items.length === 1}
-                    className="rounded-md p-1.5 text-muted hover:bg-red-50 hover:text-red-700 disabled:opacity-30"
+                    className="rounded-md p-1.5 text-muted hover:bg-bad-soft hover:text-bad disabled:opacity-30"
                     aria-label={`Remove line ${i + 1}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -92,17 +93,17 @@ export function LineItemsEditor({
           </tbody>
         </table>
       </div>
-      {errors?.items && <p className="text-xs font-medium text-red-600">{errors.items[0]}</p>}
+      {errors?.items && <p className="text-xs text-bad">{errors.items[0]}</p>}
       <div>
         <Button type="button" variant="secondary" size="sm" onClick={() => setItems((prev) => [...prev, { description: "", quantity: "1", unitPrice: "" }])}>
-          <Plus className="h-4 w-4" aria-hidden /> Add line
+          <Plus aria-hidden /> Add line
         </Button>
       </div>
 
-      <div className="ml-auto grid w-full max-w-sm gap-3 rounded-lg border border-line bg-canvas/50 p-4">
+      <div className="ml-auto grid w-full max-w-sm gap-3 rounded-xl border border-line bg-surface-2/60 p-4">
         <div className="flex justify-between text-sm">
           <span className="text-muted">Subtotal</span>
-          <span className="tabular-nums">{formatCents(totals.subtotal, currency)}</span>
+          <span className="tabular">{formatCents(totals.subtotal, currency)}</span>
         </div>
         <Field label="Discount (amount)" htmlFor="discount" error={errors?.discount}>
           <Input id="discount" name="discount" type="number" min="0" step="0.01" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} />
@@ -112,11 +113,11 @@ export function LineItemsEditor({
         </Field>
         <div className="flex justify-between text-sm">
           <span className="text-muted">Tax</span>
-          <span className="tabular-nums">{formatCents(totals.taxAmount, currency)}</span>
+          <span className="tabular">{formatCents(totals.taxAmount, currency)}</span>
         </div>
-        <div className="flex justify-between border-t border-line pt-3 text-base font-semibold">
+        <div className="flex justify-between border-t border-line pt-3 text-base font-semibold text-text">
           <span>Total</span>
-          <span className="tabular-nums">{formatCents(totals.total, currency)}</span>
+          <span className="tabular">{formatCents(totals.total, currency)}</span>
         </div>
       </div>
     </div>

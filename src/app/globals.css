@@ -1,50 +1,206 @@
 @import "tailwindcss";
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
 
-@theme {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+/*
+ * Design tokens (same system as the Vibe admin panel).
+ * Components use the semantic names (bg-surface, text-muted, border-line…),
+ * never raw colours, so theming and dark mode live in this one file.
+ * To re-brand, change the --primary* values only.
+ */
 
-  /* Brand accent: deep teal — calm, industrial, readable */
-  --color-brand-50: #effaf8;
-  --color-brand-100: #d7f1ec;
-  --color-brand-200: #b0e2d9;
-  --color-brand-500: #14907d;
-  --color-brand-600: #0e7666;
-  --color-brand-700: #0d5f53;
-  --color-brand-800: #0e4c44;
-  --color-brand-900: #0d3f39;
+@custom-variant dark (&:where(.dark, .dark *));
 
-  /* Surfaces */
-  --color-canvas: #f2f4f3;
-  --color-surface: #ffffff;
-  --color-line: #e3e5e1;
-  --color-ink: #17201d;
-  --color-muted: #5b6561;
+:root {
+  --bg: #f7f7f9;
+  --surface: #ffffff;
+  --surface-2: #f2f2f5;
+  --surface-3: #e9e9ee;
+  --line: #e4e4ea;
+  --line-strong: #d3d3dc;
+  --text: #16151c;
+  --text-2: #4a4857;
+  --muted: #74727f;
+
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-soft: #f1ebfe;
+  --primary-fg: #ffffff;
+  /* Filled buttons keep white text readable in both themes (≥ 4.5:1). */
+  --primary-solid: #7c3aed;
+  --primary-solid-hover: #6d28d9;
+  --bad-solid: #dc2626;
+
+  --trust: #0f766e;
+  --trust-soft: #e6f7f5;
+  --money: #a16207;
+  --money-soft: #fdf4e3;
+  --ok: #15803d;
+  --ok-soft: #e8f6ec;
+  --warn: #b45309;
+  --warn-soft: #fef3e2;
+  --bad: #dc2626;
+  --bad-soft: #fdecec;
+  --info: #2563eb;
+  --info-soft: #eaf1fe;
+
+  --ring: color-mix(in oklab, var(--primary) 45%, transparent);
+  --shadow: 0 1px 2px rgb(16 15 25 / 0.05), 0 1px 1px rgb(16 15 25 / 0.03);
+  --shadow-lg: 0 12px 32px -8px rgb(16 15 25 / 0.18), 0 2px 6px rgb(16 15 25 / 0.06);
+
+  /* Validated categorical chart colours (light): CVD ΔE ≥ 9.7, contrast ≥ 3:1. */
+  --chart-1: #7c3aed;
+  --chart-2: #0d9488;
+  --chart-3: #d97706;
+  --chart-4: #db2777;
+  --chart-5: #2563eb;
+}
+
+.dark {
+  --bg: #0b0a10;
+  --surface: #131219;
+  --surface-2: #1a1922;
+  --surface-3: #23222d;
+  --line: #262531;
+  --line-strong: #34333f;
+  --text: #f1f0f5;
+  --text-2: #b9b7c6;
+  --muted: #8a889a;
+
+  --primary: #8b5cf6;
+  --primary-hover: #9d74f8;
+  --primary-soft: #221a38;
+  --primary-fg: #ffffff;
+  --primary-solid: #7c3aed;
+  --primary-solid-hover: #8b5cf6;
+  --bad-solid: #dc2626;
+
+  --trust: #5eead4;
+  --trust-soft: #11292a;
+  --money: #f5c451;
+  --money-soft: #2a2213;
+  --ok: #4ade80;
+  --ok-soft: #12261a;
+  --warn: #fbbf24;
+  --warn-soft: #2a2110;
+  --bad: #f87171;
+  --bad-soft: #2c1517;
+  --info: #60a5fa;
+  --info-soft: #111f33;
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+
+  --chart-1: #8b5cf6;
+  --chart-2: #14a394;
+  --chart-3: #c07f12;
+  --chart-4: #e0478f;
+  --chart-5: #3b82f6;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-solid: var(--primary-solid);
+  --color-primary-solid-hover: var(--primary-solid-hover);
+  --color-bad-solid: var(--bad-solid);
+  --color-trust: var(--trust);
+  --color-trust-soft: var(--trust-soft);
+  --color-money: var(--money);
+  --color-money-soft: var(--money-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
+
+  --animate-in: fade-in 140ms ease-out;
+  --animate-slide-in: slide-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.99);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
 }
 
 @layer base {
   html {
-    -webkit-font-smoothing: antialiased;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
   }
   body {
-    @apply bg-canvas text-ink;
-    font-feature-settings: "tnum" 1;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
   }
-  :focus-visible {
-    outline: 2px solid var(--color-brand-500);
-    outline-offset: 2px;
+  :not(pre) > code {
+    border-radius: 0.25rem;
+    background: var(--surface-2);
+    padding: 0.05rem 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--text);
   }
   ::selection {
-    background: var(--color-brand-100);
+    background: color-mix(in oklab, var(--primary) 30%, transparent);
   }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 @media print {
   .no-print {
     display: none !important;
+  }
+  html,
+  html.dark {
+    color-scheme: light;
   }
   body {
     background: white;
@@ -59,7 +215,7 @@
   *,
   *::before,
   *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
   }
 }

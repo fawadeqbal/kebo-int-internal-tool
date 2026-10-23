@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { customerName } from "@/lib/utils/names";
-import { Mail, MapPin, Phone, Pencil, Plus } from "lucide-react";
+import { ClipboardList, Mail, MessageCircle, Phone, Pencil, Plus, Trash2 } from "lucide-react";
 import { and, desc, eq } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
@@ -13,7 +13,7 @@ import { deleteCustomerAction } from "@/modules/customers/actions";
 import { listQueriesForCustomer } from "@/modules/queries/repository";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import { getSettings } from "@/modules/settings/service";
-import { ButtonLink, Card, CardBody, CardHeader, EmptyState, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Avatar, buttonClass, ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, PageHeader, Table, Td, Th, THead, Tr } from "@/components/ui";
 import { InvoiceStatusBadge, QueryStatusBadge } from "@/components/ui/badge";
 import { ConfirmSubmit } from "@/components/ui/client";
 import { formatDate } from "@/lib/utils/dates";
@@ -44,7 +44,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const outstanding = toCents(money.invoiced) - toCents(money.paid);
 
   return (
-    <>
+    <div className="space-y-5">
       <PageHeader
         title={customerName(customer)}
         description={customer.companyName ? `Contact: ${customer.contactPerson}` : undefined}
@@ -53,52 +53,53 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         actions={
           <>
             {can(user.role, "customers.manage") && (
-              <ButtonLink href={`/customers/${id}/edit`} variant="secondary">
-                <Pencil className="h-4 w-4" aria-hidden /> Edit
+              <ButtonLink href={`/customers/${id}/edit`} variant="secondary" size="sm">
+                <Pencil aria-hidden /> Edit
               </ButtonLink>
             )}
             {can(user.role, "queries.create") && (
-              <ButtonLink href={`/queries/new?customer=${id}`}>
-                <Plus className="h-4 w-4" aria-hidden /> New inquiry
+              <ButtonLink href={`/queries/new?customer=${id}`} variant="primary" size="sm">
+                <Plus aria-hidden /> New inquiry
               </ButtonLink>
             )}
           </>
         }
       />
-      <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-6">
+      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="flex flex-col gap-5">
           <Card>
             <CardHeader title="Contact" />
-            <CardBody className="flex flex-col gap-3 text-sm">
-              <p>
-                <span className="block text-xs font-medium uppercase tracking-wide text-muted">Full name</span>
-                {customer.contactPerson}
-              </p>
-              <a href={`tel:${customer.phone}`} className="inline-flex items-center gap-2 text-brand-700 hover:underline">
-                <Phone className="h-4 w-4" aria-hidden /> {customer.phone}
-              </a>
-              {customer.email && (
-                <a href={`mailto:${customer.email}`} className="inline-flex items-center gap-2 break-all text-brand-700 hover:underline">
-                  <Mail className="h-4 w-4 shrink-0" aria-hidden /> {customer.email}
+            <CardBody className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Avatar name={customer.contactPerson} size={40} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-text">{customer.contactPerson}</p>
+                  <p className="truncate text-xs text-muted">{customer.companyName ?? "No company"}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <a href={`tel:${customer.phone}`} className={buttonClass("secondary", "xs")}>
+                  <Phone aria-hidden /> Call
                 </a>
-              )}
-              {customer.address && (
-                <p className="inline-flex gap-2">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden /> {customer.address}
-                </p>
-              )}
-              {customer.taxNo && (
-                <p>
-                  <span className="block text-xs font-medium uppercase tracking-wide text-muted">Tax / registration no.</span>
-                  {customer.taxNo}
-                </p>
-              )}
-              {customer.notes && (
-                <p className="whitespace-pre-wrap rounded-lg bg-canvas p-3 text-muted">
-                  <span className="mb-1 block text-xs font-medium uppercase tracking-wide">Notes</span>
-                  {customer.notes}
-                </p>
-              )}
+                <a href={`https://wa.me/${customer.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer" className={buttonClass("secondary", "xs")}>
+                  <MessageCircle aria-hidden /> WhatsApp
+                </a>
+                {customer.email && (
+                  <a href={`mailto:${customer.email}`} className={buttonClass("secondary", "xs")}>
+                    <Mail aria-hidden /> Email
+                  </a>
+                )}
+              </div>
+              <DetailList
+                columns={1}
+                items={[
+                  { label: "Phone / WhatsApp", value: <span className="tabular">{customer.phone}</span> },
+                  { label: "Email", value: customer.email, hidden: !customer.email },
+                  { label: "Address / country", value: customer.address, hidden: !customer.address },
+                  { label: "Registration / tax no.", value: customer.taxNo, hidden: !customer.taxNo },
+                  { label: "Notes", value: <span className="whitespace-pre-wrap">{customer.notes}</span>, hidden: !customer.notes },
+                ]}
+              />
             </CardBody>
           </Card>
           {showMoney && (
@@ -108,15 +109,15 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 <dl className="flex flex-col gap-2 text-sm">
                   <div className="flex justify-between">
                     <dt className="text-muted">Invoiced</dt>
-                    <dd className="tabular-nums">{formatMoney(money.invoiced, settings.currency)}</dd>
+                    <dd className="text-text tabular">{formatMoney(money.invoiced, settings.currency)}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-muted">Received</dt>
-                    <dd className="tabular-nums">{formatMoney(money.paid, settings.currency)}</dd>
+                    <dd className="text-text tabular">{formatMoney(money.paid, settings.currency)}</dd>
                   </div>
-                  <div className="flex justify-between border-t border-line pt-2 font-semibold">
+                  <div className="flex justify-between border-t border-line pt-2 font-medium text-text">
                     <dt>Outstanding</dt>
-                    <dd className={outstanding > 0 ? "tabular-nums text-amber-700" : "tabular-nums"}>{formatCents(outstanding, settings.currency)}</dd>
+                    <dd className={outstanding > 0 ? "tabular text-warn" : "tabular"}>{formatCents(outstanding, settings.currency)}</dd>
                   </div>
                 </dl>
               </CardBody>
@@ -124,20 +125,20 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           )}
           {can(user.role, "customers.delete") && queryRows.length === 0 && (
             <form action={deleteCustomerAction.bind(null, id)}>
-              <ConfirmSubmit variant="ghost" size="sm" className="text-red-700" message={`Remove ${customerName(customer)}?`}>
-                Remove customer
+              <ConfirmSubmit variant="danger-ghost" size="sm" message={`Remove ${customerName(customer)}?`}>
+                <Trash2 aria-hidden /> Remove customer
               </ConfirmSubmit>
             </form>
           )}
         </aside>
-        <div className="flex min-w-0 flex-col gap-6">
-          <Card>
-            <CardHeader title={`Inquiries (${queryRows.length})`} />
+        <div className="flex min-w-0 flex-col gap-5">
+          <Card className="overflow-hidden">
+            <CardHeader title="Inquiries" description={`${queryRows.length} from this customer`} />
             {queryRows.length === 0 ? (
-              <EmptyState title="No inquiries from this customer yet" action={can(user.role, "queries.create") && <ButtonLink href={`/queries/new?customer=${id}`}>New inquiry</ButtonLink>} />
+              <EmptyState icon={ClipboardList} title="No inquiries from this customer yet" action={can(user.role, "queries.create") && <ButtonLink href={`/queries/new?customer=${id}`} variant="primary" size="sm">New inquiry</ButtonLink>} />
             ) : (
               <Table>
-                <thead>
+                <THead>
                   <tr>
                     <Th>RFQ no.</Th>
                     <Th>Title</Th>
@@ -145,32 +146,32 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     <Th>Handled by</Th>
                     <Th>Received</Th>
                   </tr>
-                </thead>
+                </THead>
                 <tbody>
                   {queryRows.map((q) => (
-                    <tr key={q.id}>
-                      <Td className="font-mono text-xs">
-                        <Link href={`/queries/${q.id}`} className="font-semibold text-brand-700 hover:underline">
+                    <Tr key={q.id} className="hover:bg-surface-2/70">
+                      <Td className="whitespace-nowrap">
+                        <Link href={`/queries/${q.id}`} className="font-mono text-[13px] font-medium text-text hover:text-primary hover:underline">
                           {q.refNo}
                         </Link>
                       </Td>
-                      <Td>{q.title}</Td>
+                      <Td className="max-w-72 truncate">{q.title}</Td>
                       <Td>
                         <QueryStatusBadge status={q.status} />
                       </Td>
                       <Td className="text-muted">{q.assigneeName ?? "—"}</Td>
                       <Td className="text-muted">{formatDate(q.createdAt)}</Td>
-                    </tr>
+                    </Tr>
                   ))}
                 </tbody>
               </Table>
             )}
           </Card>
           {showMoney && invoiceRows.length > 0 && (
-            <Card>
-              <CardHeader title={`Invoices (${invoiceRows.length})`} />
+            <Card className="overflow-hidden">
+              <CardHeader title="Invoices" description={`${invoiceRows.length} issued`} />
               <Table>
-                <thead>
+                <THead>
                   <tr>
                     <Th>Invoice</Th>
                     <Th>Status</Th>
@@ -178,22 +179,22 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     <Th>Issued</Th>
                     <Th>Due</Th>
                   </tr>
-                </thead>
+                </THead>
                 <tbody>
                   {invoiceRows.map((inv) => (
-                    <tr key={inv.id}>
+                    <Tr key={inv.id} className="hover:bg-surface-2/70">
                       <Td>
-                        <Link href={`/invoices/${inv.id}`} className="font-medium text-brand-700 hover:underline">
+                        <Link href={`/invoices/${inv.id}`} className="font-mono text-[13px] font-medium text-text hover:text-primary hover:underline">
                           {inv.invoiceNo}
                         </Link>
                       </Td>
                       <Td>
                         <InvoiceStatusBadge status={invoiceDisplayStatus(inv, today)} />
                       </Td>
-                      <Td className="text-right tabular-nums">{formatMoney(inv.total, settings.currency)}</Td>
+                      <Td className="text-right tabular">{formatMoney(inv.total, settings.currency)}</Td>
                       <Td>{formatDate(inv.issueDate)}</Td>
                       <Td>{formatDate(inv.dueDate)}</Td>
-                    </tr>
+                    </Tr>
                   ))}
                 </tbody>
               </Table>
@@ -201,6 +202,6 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }

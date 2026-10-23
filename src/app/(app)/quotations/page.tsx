@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { FileText } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { listQuotations } from "@/modules/quotations/repository";
 import { getSettings } from "@/modules/settings/service";
-import { Button, Card, EmptyState, Input, PageHeader, Select, Table, Td, Th } from "@/components/ui";
+import { EmptyState, FilterBar, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
+import { AutoSelect } from "@/components/ui/client";
 import { QuotationStatusBadge } from "@/components/ui/badge";
-import { Pagination, toPage } from "@/components/ui/pagination";
+import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
 import { QUOTATION_STATUS_LABEL } from "@/lib/labels";
 import { formatDate, todayISO } from "@/lib/utils/dates";
 import { formatMoney } from "@/lib/utils/money";
@@ -21,80 +23,75 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   const [data, settings] = await Promise.all([listQuotations(user, { q, status, page: toPage(sp.page) }), getSettings()]);
   const today = todayISO();
   return (
-    <>
+    <div className="space-y-5">
       <PageHeader title="Quotations" description="Offers sent to customers. Start a quotation from an inquiry." />
-      <Card>
-        <form className="flex flex-wrap items-end gap-3 border-b border-line p-4" role="search">
-          <label className="flex min-w-64 flex-1 flex-col gap-1.5 text-sm font-medium">
-            Search
-            <Input id="search" name="q" defaultValue={q} placeholder="Quotation no., RFQ no., product or customer" />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Status
-            <Select name="status" defaultValue={status ?? ""} className="w-52">
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+        <form role="search">
+          <FilterBar end={<span className="hidden text-xs text-muted tabular sm:inline">{data.total} quotations</span>}>
+            <SearchField defaultValue={q} placeholder="Quotation no., RFQ no., product or customer" clearHref={buildHref("/quotations", { status }, {})} label="Search quotations" />
+            <AutoSelect name="status" defaultValue={status ?? ""} className="w-56" aria-label="Status">
               <option value="">Any status</option>
-              <option value="expiring">Waiting for the customer (soonest expiry first)</option>
+              <option value="expiring">Waiting for the customer</option>
               {Object.entries(QUOTATION_STATUS_LABEL).map(([k, l]) => (
                 <option key={k} value={k}>
                   {l}
                 </option>
               ))}
-            </Select>
-          </label>
-          <Button variant="secondary">Apply</Button>
-          {(q || status) && (
-            <Link href="/quotations" className="pb-2.5 text-sm text-muted hover:text-ink">
-              Reset
-            </Link>
-          )}
+            </AutoSelect>
+            {(q || status) && (
+              <Link href="/quotations" className="text-xs font-medium text-muted hover:text-text">
+                Reset
+              </Link>
+            )}
+          </FilterBar>
         </form>
         {data.rows.length === 0 ? (
-          <EmptyState title="No quotations found" description="Open an inquiry and choose “Create quotation”." />
+          <EmptyState icon={FileText} title="No quotations found" description="Open an inquiry and choose “Create quotation”." />
         ) : (
           <Table>
-            <thead>
+            <THead>
               <tr>
                 <Th>Quotation</Th>
                 <Th>Inquiry</Th>
-                <Th>Customer</Th>
+                <Th className="hidden md:table-cell">Customer</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Total</Th>
-                <Th>Sent</Th>
-                <Th>Valid until</Th>
+                <Th className="hidden lg:table-cell">Sent</Th>
+                <Th className="hidden sm:table-cell">Valid until</Th>
               </tr>
-            </thead>
+            </THead>
             <tbody>
               {data.rows.map((r) => {
                 const late = r.status === "sent" && r.dueDate < today;
                 return (
-                  <tr key={r.id} className="hover:bg-canvas/60">
+                  <Tr key={r.id} className="group hover:bg-surface-2/70">
                     <Td className="whitespace-nowrap">
-                      <Link href={`/quotations/${r.id}`} className="font-medium text-brand-700 hover:underline">
+                      <Link href={`/quotations/${r.id}`} className="font-mono text-[13px] font-medium text-text group-hover:text-primary hover:underline">
                         {r.refNo}
                       </Link>
                       <span className="ml-1.5 text-xs text-muted">v{r.version}</span>
                     </Td>
-                    <Td className="max-w-64">
-                      <Link href={`/queries/${r.queryId}`} className="font-mono text-xs text-muted hover:underline">
+                    <Td className="max-w-72 py-2">
+                      <p className="truncate text-text">{r.queryTitle}</p>
+                      <Link href={`/queries/${r.queryId}`} className="font-mono text-[11px] text-muted hover:text-primary hover:underline">
                         {r.queryRef}
                       </Link>
-                      <p className="truncate">{r.queryTitle}</p>
                     </Td>
-                    <Td>{r.companyName}</Td>
+                    <Td className="hidden text-text-2 md:table-cell">{r.companyName}</Td>
                     <Td>
                       <QuotationStatusBadge status={r.status} />
                     </Td>
-                    <Td className="text-right tabular-nums">{formatMoney(r.total, settings.currency)}</Td>
-                    <Td className="text-muted">{formatDate(r.submittedAt)}</Td>
-                    <Td className={cn("whitespace-nowrap", late && "font-semibold text-red-700")}>{formatDate(r.dueDate)}</Td>
-                  </tr>
+                    <Td className="text-right font-medium whitespace-nowrap tabular">{formatMoney(r.total, settings.currency)}</Td>
+                    <Td className="hidden whitespace-nowrap text-muted lg:table-cell">{formatDate(r.submittedAt)}</Td>
+                    <Td className={cn("hidden whitespace-nowrap sm:table-cell", late ? "font-medium text-bad" : "text-text-2")}>{formatDate(r.dueDate)}</Td>
+                  </Tr>
                 );
               })}
             </tbody>
           </Table>
         )}
         <Pagination base="/quotations" params={{ q, status }} page={data.page} pageSize={data.pageSize} total={data.total} />
-      </Card>
-    </>
+      </div>
+    </div>
   );
 }

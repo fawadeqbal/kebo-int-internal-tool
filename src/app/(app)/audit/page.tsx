@@ -1,12 +1,17 @@
+import { ScrollText } from "lucide-react";
 import { requirePagePermission } from "@/lib/auth/session";
 import { listAudit } from "@/modules/audit/repository";
-import { Card, EmptyState, PageHeader, Select, Table, Td, Th, Button } from "@/components/ui";
+import { Avatar, EmptyState, FilterBar, PageHeader, Table, THead, Td, Th, Tr } from "@/components/ui";
+import { AutoSelect } from "@/components/ui/client";
+import { Badge } from "@/components/ui/badge";
 import { Pagination, toPage } from "@/components/ui/pagination";
 import { formatDateTime } from "@/lib/utils/dates";
 
 export const metadata = { title: "Audit log" };
 
 const ENTITY_TYPES = ["query", "customer", "quotation", "invoice", "payment", "attachment", "user", "settings"];
+const ENTITY_LABEL: Record<string, string> = { query: "Inquiry" };
+const label = (t: string) => ENTITY_LABEL[t] ?? t[0].toUpperCase() + t.slice(1);
 
 function Changes({ oldValues, newValues }: { oldValues: unknown; newValues: unknown }) {
   const n = (newValues ?? {}) as Record<string, unknown>;
@@ -17,7 +22,7 @@ function Changes({ oldValues, newValues }: { oldValues: unknown; newValues: unkn
     <ul className="mt-1 space-y-0.5 text-xs text-muted">
       {keys.slice(0, 6).map((k) => (
         <li key={k}>
-          <span className="font-medium text-ink/80">{k}</span>: {k in o ? <s className="mr-1">{String(o[k] ?? "—").slice(0, 60)}</s> : null}
+          <span className="font-mono text-[11px] text-text-2">{k}</span>: {k in o ? <s className="mr-1">{String(o[k] ?? "—").slice(0, 60)}</s> : null}
           {String(n[k] ?? "—").slice(0, 80)}
         </li>
       ))}
@@ -32,52 +37,57 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const type = ENTITY_TYPES.includes(sp.type ?? "") ? sp.type : undefined;
   const data = await listAudit({ page, entityType: type });
   return (
-    <>
+    <div className="space-y-5">
       <PageHeader title="Audit log" description="Every important change: who did it, when, and what changed." />
-      <Card>
-        <form className="flex flex-wrap items-end gap-3 border-b border-line p-4">
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Record type
-            <Select name="type" defaultValue={type ?? ""} className="w-48">
-              <option value="">All</option>
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+        <form>
+          <FilterBar end={<span className="text-xs text-muted tabular">{data.total} entries</span>}>
+            <AutoSelect name="type" defaultValue={type ?? ""} className="w-48" aria-label="Record type">
+              <option value="">All records</option>
               {ENTITY_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {t[0].toUpperCase() + t.slice(1)}
+                  {label(t)}
                 </option>
               ))}
-            </Select>
-          </label>
-          <Button variant="secondary">Filter</Button>
+            </AutoSelect>
+          </FilterBar>
         </form>
         {data.rows.length === 0 ? (
-          <EmptyState title="No activity yet" />
+          <EmptyState icon={ScrollText} title="No activity yet" />
         ) : (
           <Table>
-            <thead>
+            <THead>
               <tr>
                 <Th className="w-44">When</Th>
-                <Th className="w-40">Who</Th>
-                <Th className="w-32">Record</Th>
+                <Th className="w-44">Who</Th>
+                <Th className="w-28">Record</Th>
                 <Th>What happened</Th>
               </tr>
-            </thead>
+            </THead>
             <tbody>
               {data.rows.map((r) => (
-                <tr key={r.id}>
-                  <Td className="text-muted">{formatDateTime(r.createdAt)}</Td>
-                  <Td>{r.userName ?? "System"}</Td>
-                  <Td className="capitalize text-muted">{r.entityType}</Td>
-                  <Td>
+                <Tr key={r.id}>
+                  <Td className="py-2.5 align-top whitespace-nowrap text-muted">{formatDateTime(r.createdAt)}</Td>
+                  <Td className="py-2.5 align-top">
+                    <span className="flex items-center gap-2">
+                      <Avatar name={r.userName ?? "System"} size={22} />
+                      <span className="truncate">{r.userName ?? "System"}</span>
+                    </span>
+                  </Td>
+                  <Td className="py-2.5 align-top">
+                    <Badge tone="outline">{label(r.entityType)}</Badge>
+                  </Td>
+                  <Td className="py-2.5 align-top">
                     {r.summary ?? r.action}
                     <Changes oldValues={r.oldValues} newValues={r.newValues} />
                   </Td>
-                </tr>
+                </Tr>
               ))}
             </tbody>
           </Table>
         )}
         <Pagination base="/audit" params={{ type }} page={data.page} pageSize={data.pageSize} total={data.total} />
-      </Card>
-    </>
+      </div>
+    </div>
   );
 }

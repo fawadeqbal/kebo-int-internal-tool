@@ -1,8 +1,11 @@
 "use client";
 
 import { useRef } from "react";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, controlClass, Select } from "@/components/ui";
 import { PRESETS } from "@/modules/reports/range";
+import { cn } from "@/lib/utils/cn";
+
+const label = "flex flex-col gap-1 text-xs font-medium text-muted";
 
 /** Picking a date switches the period to "Custom"; picking a preset applies straight away. */
 export function ReportFilters({
@@ -21,10 +24,10 @@ export function ReportFilters({
   const form = useRef<HTMLFormElement>(null);
   const presetRef = useRef<HTMLSelectElement>(null);
   return (
-    <form ref={form} className="flex flex-wrap items-end gap-3 p-4">
-      <label className="flex flex-col gap-1.5 text-sm font-medium">
+    <form ref={form} className="flex flex-wrap items-end gap-2 px-3 py-2.5">
+      <label className={label}>
         Period
-        <Select ref={presetRef} name="range" defaultValue={preset} className="w-44" onChange={(e) => e.target.value !== "custom" && form.current?.requestSubmit()}>
+        <Select ref={presetRef} name="range" defaultValue={preset} compact className="w-44" onChange={(e) => e.target.value !== "custom" && form.current?.requestSubmit()}>
           {Object.entries(PRESETS).map(([k, l]) => (
             <option key={k} value={k}>
               {l}
@@ -32,17 +35,17 @@ export function ReportFilters({
           ))}
         </Select>
       </label>
-      <label className="flex flex-col gap-1.5 text-sm font-medium">
+      <label className={label}>
         From
-        <Input type="date" name="from" defaultValue={from} className="w-40" onChange={() => presetRef.current && (presetRef.current.value = "custom")} />
+        <input type="date" name="from" defaultValue={from} className={cn(controlClass, "h-8 w-38")} onChange={() => presetRef.current && (presetRef.current.value = "custom")} />
       </label>
-      <label className="flex flex-col gap-1.5 text-sm font-medium">
+      <label className={label}>
         To
-        <Input type="date" name="to" defaultValue={to} className="w-40" onChange={() => presetRef.current && (presetRef.current.value = "custom")} />
+        <input type="date" name="to" defaultValue={to} className={cn(controlClass, "h-8 w-38")} onChange={() => presetRef.current && (presetRef.current.value = "custom")} />
       </label>
-      <label className="flex flex-col gap-1.5 text-sm font-medium">
+      <label className={label}>
         Staff
-        <Select name="staff" defaultValue={staffId ?? ""} className="w-48" onChange={() => form.current?.requestSubmit()}>
+        <Select name="staff" defaultValue={staffId ?? ""} compact className="w-48" onChange={() => form.current?.requestSubmit()}>
           <option value="">Everyone</option>
           {people.map((p) => (
             <option key={p.id} value={p.id}>
@@ -51,7 +54,9 @@ export function ReportFilters({
           ))}
         </Select>
       </label>
-      <Button variant="secondary">Apply</Button>
+      <Button type="submit" variant="secondary" size="sm">
+        Apply
+      </Button>
     </form>
   );
 }

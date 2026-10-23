@@ -52,34 +52,34 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   other: "Other",
 };
 
-export type Tone = "amber" | "blue" | "slate" | "green" | "red" | "violet" | "teal";
+export type Tone = "neutral" | "primary" | "trust" | "money" | "ok" | "warn" | "bad" | "info" | "outline";
 
 export const QUERY_STATUS_TONE: Record<QueryStatus, Tone> = {
-  pending: "amber",
-  processing: "blue",
-  completed: "green",
-  not_completed: "red",
+  pending: "warn",
+  processing: "info",
+  completed: "ok",
+  not_completed: "neutral",
 };
 
 export const QUOTATION_STATUS_TONE: Record<QuotationStatus, Tone> = {
-  draft: "slate",
-  sent: "blue",
-  accepted: "green",
-  rejected: "red",
-  expired: "amber",
+  draft: "neutral",
+  sent: "info",
+  accepted: "ok",
+  rejected: "bad",
+  expired: "warn",
 };
 
 export const INVOICE_STATUS_TONE: Record<InvoiceDisplayStatus, Tone> = {
-  unpaid: "amber",
-  partially_paid: "blue",
-  paid: "green",
-  cancelled: "slate",
-  overdue: "red",
+  unpaid: "warn",
+  partially_paid: "info",
+  paid: "ok",
+  cancelled: "neutral",
+  overdue: "bad",
 };
 
 export const PRIORITY_TONE: Record<Priority, Tone> = {
-  low: "slate",
-  normal: "teal",
-  high: "amber",
-  urgent: "red",
+  low: "outline",
+  normal: "neutral",
+  high: "warn",
+  urgent: "bad",
 };

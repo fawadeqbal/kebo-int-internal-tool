@@ -34,49 +34,49 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   return (
     <>
-      <header className="no-print mb-6">
-        <Link href={`/queries/${query.id}`} className="mb-2 inline-flex text-sm text-muted hover:text-ink">
+      <header className="no-print mb-5">
+        <Link href={`/queries/${query.id}`} className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-text">
           ← {query.refNo}: {query.title}
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{q.refNo}</h1>
-              <span className="text-sm text-muted">version {q.version}</span>
+              <h1 className="font-mono text-xl font-semibold tracking-tight text-text">{q.refNo}</h1>
+              <span className="text-xs text-muted">v{q.version}</span>
               <QuotationStatusBadge status={q.status} />
             </div>
             <p className="mt-1 text-sm text-muted">
               {customerName(customer)} · {formatMoney(q.total, settings.currency)} · valid until {formatDate(q.dueDate)}
-              {late && <span className="ml-2 font-semibold text-red-700">— expired, no reply yet</span>}
+              {late && <span className="ml-2 font-medium text-bad">· expired, no reply yet</span>}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href={`/print/quotations/${id}`} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
-              <Printer className="h-4 w-4" aria-hidden /> Print / PDF
+            <a href={`/print/quotations/${id}`} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+              <Printer aria-hidden /> Print / PDF
             </a>
             {manage && isEditable(q.status) && (
-              <ButtonLink href={`/quotations/${id}/edit`} variant="secondary">
-                <Pencil className="h-4 w-4" aria-hidden /> Edit
+              <ButtonLink href={`/quotations/${id}/edit`} variant="secondary" size="sm">
+                <Pencil aria-hidden /> Edit
               </ButtonLink>
             )}
             {manage && !isEditable(q.status) && (
               <form action={reviseQuotationAction.bind(null, id)}>
-                <ConfirmSubmit variant="secondary" message="Make a new draft version with the same lines? This one stays as the customer saw it.">
-                  <CopyPlus className="h-4 w-4" aria-hidden /> New version
+                <ConfirmSubmit variant="secondary" size="sm" message="Make a new draft version with the same lines? This one stays as the customer saw it.">
+                  <CopyPlus aria-hidden /> New version
                 </ConfirmSubmit>
               </form>
             )}
             {q.status === "accepted" && !activeInvoice && can(user.role, "invoices.manage") && (
-              <ButtonLink href={`/invoices/new?quotation=${id}`}>
-                <Receipt className="h-4 w-4" aria-hidden /> Generate invoice
+              <ButtonLink href={`/invoices/new?quotation=${id}`} variant="primary" size="sm">
+                <Receipt aria-hidden /> Generate invoice
               </ButtonLink>
             )}
           </div>
         </div>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="overflow-hidden rounded-xl border border-line shadow-xs">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="overflow-hidden rounded-xl border border-line shadow-card">
           <DocumentView
             kind="Quotation"
             number={q.refNo}
@@ -94,7 +94,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             terms={q.terms}
           />
         </div>
-        <aside className="no-print flex flex-col gap-6">
+        <aside className="no-print flex flex-col gap-5">
           {manage && QUOTATION_TRANSITIONS[q.status].length > 0 && (
             <Card>
               <CardHeader
@@ -112,7 +112,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               <CardBody className="flex flex-col gap-2 text-sm">
                 {detail.invoices.map((inv) => (
                   <div key={inv.id} className="flex items-center justify-between gap-2">
-                    <Link href={`/invoices/${inv.id}`} className="font-medium text-brand-700 hover:underline">
+                    <Link href={`/invoices/${inv.id}`} className="font-mono text-[13px] font-medium text-text hover:text-primary hover:underline">
                       {inv.invoiceNo}
                     </Link>
                     <InvoiceStatusBadge status={invoiceDisplayStatus(inv, today)} />
@@ -124,21 +124,21 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
           <Card>
             <CardHeader title="Details" />
             <CardBody>
-              <dl className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between gap-3">
+              <dl className="flex flex-col divide-y divide-line text-sm">
+                <div className="flex justify-between gap-3 py-2 first:pt-0 last:pb-0">
                   <dt className="text-muted">Prepared by</dt>
-                  <dd>{detail.creatorName}</dd>
+                  <dd className="text-text">{detail.creatorName}</dd>
                 </div>
-                <div className="flex justify-between gap-3">
+                <div className="flex justify-between gap-3 py-2 first:pt-0 last:pb-0">
                   <dt className="text-muted">Created</dt>
-                  <dd>{formatDateTime(q.createdAt)}</dd>
+                  <dd className="text-text">{formatDateTime(q.createdAt)}</dd>
                 </div>
-                <div className="flex justify-between gap-3">
+                <div className="flex justify-between gap-3 py-2 first:pt-0 last:pb-0">
                   <dt className="text-muted">Sent to customer</dt>
-                  <dd>{formatDate(q.submittedAt)}</dd>
+                  <dd className="text-text">{formatDate(q.submittedAt)}</dd>
                 </div>
               </dl>
-              {q.notes && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-canvas p-3 text-sm text-muted">{q.notes}</p>}
+              {q.notes && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-sm whitespace-pre-wrap text-text-2">{q.notes}</p>}
             </CardBody>
           </Card>
           {detail.versions.length > 1 && (
@@ -146,9 +146,9 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               <CardHeader title="All versions" />
               <CardBody className="flex flex-col gap-2 text-sm">
                 {detail.versions.map((v) => (
-                  <Link key={v.id} href={`/quotations/${v.id}`} aria-current={v.id === id ? "page" : undefined} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-canvas aria-[current=page]:bg-brand-50">
+                  <Link key={v.id} href={`/quotations/${v.id}`} aria-current={v.id === id ? "page" : undefined} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-surface-2 aria-[current=page]:bg-primary-soft">
                     <span>
-                      v{v.version} · <span className="tabular-nums">{formatMoney(v.total, settings.currency)}</span>
+                      v{v.version} · <span className="tabular">{formatMoney(v.total, settings.currency)}</span>
                     </span>
                     <QuotationStatusBadge status={v.status} />
                   </Link>
@@ -158,7 +158,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
           )}
           {manage && q.status === "draft" && (
             <form action={deleteQuotationAction.bind(null, id)} className="text-right">
-              <ConfirmSubmit variant="ghost" size="sm" className="text-red-700" message="Delete this draft quotation?">
+              <ConfirmSubmit variant="danger-ghost" size="sm" message="Delete this draft quotation?">
                 Delete draft
               </ConfirmSubmit>
             </form>

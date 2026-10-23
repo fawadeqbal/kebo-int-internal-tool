@@ -11,7 +11,7 @@ export default async function AccountPage() {
   return (
     <>
       <PageHeader title="My account" />
-      <div className="flex max-w-3xl flex-col gap-6">
+      <div className="flex max-w-3xl flex-col gap-5">
         <Card>
           <CardHeader title="Profile" description="Ask an administrator to change your name, email or role." />
           <CardBody>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Copy } from "lucide-react";
+import { buttonClass } from "@/components/ui";
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -12,8 +14,9 @@ export function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="rounded-md bg-white/15 px-2.5 py-1 text-xs font-medium text-white hover:bg-white/25"
+      className={buttonClass("secondary", "xs")}
     >
+      {copied ? <Check aria-hidden className="text-ok" /> : <Copy aria-hidden />}
       {copied ? "Copied" : "Copy"}
     </button>
   );

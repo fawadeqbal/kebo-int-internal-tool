@@ -28,7 +28,7 @@ export function QuotationForm({
   const v = (key: keyof typeof initial) => (state.values?.[key] as string | undefined) ?? (initial[key] as string);
   const items = state.values?.items ? (JSON.parse(state.values.items as string) as EditableLine[]) : initial.items;
   return (
-    <form action={formAction} className="flex flex-col gap-6" noValidate>
+    <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
       <Card>
         <CardHeader title="Prices" description="One line per item. Add freight (CIF/DDP), inspection or spare parts as their own lines." />
@@ -48,18 +48,18 @@ export function QuotationForm({
           <Field label="Valid until" htmlFor="dueDate" required error={e.dueDate} hint="The price holds until this date">
             <Input id="dueDate" name="dueDate" type="date" defaultValue={v("dueDate")} aria-invalid={!!e.dueDate} />
           </Field>
-          <Field label="Sent to customer on" htmlFor="submittedAt" error={e.submittedAt} hint="Filled in when you mark it as sent">
+          <Field label="Sent to customer on" htmlFor="submittedAt" optional error={e.submittedAt} hint="Filled in when you mark it as sent">
             <Input id="submittedAt" name="submittedAt" type="date" defaultValue={v("submittedAt")} />
           </Field>
-          <Field label="Terms & conditions" htmlFor="terms" error={e.terms} className="sm:col-span-2">
+          <Field label="Terms & conditions" htmlFor="terms" optional error={e.terms} className="sm:col-span-2">
             <Textarea id="terms" name="terms" rows={5} defaultValue={v("terms")} />
           </Field>
-          <Field label="Internal notes" htmlFor="notes" error={e.notes} hint="Not shown to the customer" className="sm:col-span-2">
+          <Field label="Internal notes" htmlFor="notes" optional error={e.notes} hint="Not shown to the customer" className="sm:col-span-2">
             <Textarea id="notes" name="notes" rows={2} className="min-h-0" defaultValue={v("notes")} />
           </Field>
         </CardBody>
       </Card>
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-2">
         <SubmitButton>{submitLabel}</SubmitButton>
         <ButtonLink href={cancelHref} variant="secondary">
           Cancel
@@ -87,8 +87,8 @@ export function QuotationStatusForm({
             name="status"
             value={t.to}
             size="sm"
-            variant={t.to === "accepted" ? "primary" : "secondary"}
-            className={cn(t.to === "rejected" && "text-red-700")}
+            variant={t.to === "accepted" ? "primary" : t.to === "rejected" ? "danger-ghost" : "secondary"}
+            className={cn(t.to === "rejected" && "border border-line")}
             pendingText={t.label}
           >
             {t.label}

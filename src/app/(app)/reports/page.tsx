@@ -1,3 +1,4 @@
+import { AlertTriangle, Banknote, CheckCircle2, FileCheck2, FileText, Hourglass, Inbox, Receipt, Timer, Wallet, XCircle } from "lucide-react";
 import { Download } from "lucide-react";
 import { requirePagePermission } from "@/lib/auth/session";
 import { breakdown, finance, monthlyTrend, pipeline, rangeSummary, statusCounts, workload } from "@/modules/reports/repository";
@@ -5,9 +6,10 @@ import { resolveRange } from "@/modules/reports/range";
 import { ReportFilters } from "./filters";
 import { listActiveUsers } from "@/modules/users/repository";
 import { getSettings } from "@/modules/settings/service";
-import { buttonClass, Card, CardBody, CardHeader, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Avatar, buttonClass, Card, CardBody, CardHeader, PageHeader, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { PrintButton } from "@/components/ui/client";
-import { BarList, StatTile } from "@/components/stats";
+import { BarList, Metric, StatCard } from "@/components/stats";
+import { cn } from "@/lib/utils/cn";
 import { TrendChart } from "@/components/charts";
 import { buildHref } from "@/components/ui/pagination";
 import { SOURCE_LABEL } from "@/lib/labels";
@@ -41,7 +43,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const params = { range: range.preset, from: range.preset === "custom" ? range.from : undefined, to: range.preset === "custom" ? range.to : undefined, staff: staffId };
 
   return (
-    <>
+    <div className="space-y-5">
       <PageHeader
         title="Reports"
         description={
@@ -52,27 +54,34 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         }
         actions={
           <div className="no-print flex gap-2">
-            <a href={buildHref("/api/reports/export", params, {})} className={buttonClass("secondary")}>
-              <Download className="h-4 w-4" aria-hidden /> Export CSV
+            <a href={buildHref("/api/reports/export", params, {})} className={buttonClass("secondary", "sm")}>
+              <Download aria-hidden /> Export CSV
             </a>
-            <PrintButton label="Print / PDF" />
+            <PrintButton label="Print / PDF" size="sm" variant="secondary" />
           </div>
         }
       />
 
-      <Card className="no-print mb-6">
+      <Card className="no-print">
         <ReportFilters key={`${range.preset}${range.from}${range.to}${staffId}`} preset={range.preset} from={range.from} to={range.to} staffId={staffId} people={people} />
       </Card>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatTile label="Inquiries received" value={summary.received} />
-        <StatTile label="Completed" value={summary.completed} tone="good" />
-        <StatTile label="Not completed" value={summary.notCompleted} />
-        <StatTile label="Avg. turnaround" value={formatDuration(summary.avgTurnaroundMs)} hint="Received → completed" />
-        <StatTile label="Open right now" value={counts.pending + counts.processing} hint={`${counts.overdue} overdue`} tone={counts.overdue ? "alert" : "default"} />
+      <section aria-label="Summary" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Inquiries received" icon={Inbox} tone="primary" value={summary.received} />
+        <StatCard label="Completed" icon={CheckCircle2} tone="ok" value={summary.completed} hint={pct(summary.completed, summary.received) + " of received"} />
+        <StatCard label="Not completed" icon={XCircle} value={summary.notCompleted} hint="Closed without an order" />
+        <StatCard label="Avg. turnaround" icon={Timer} tone="info" value={formatDuration(summary.avgTurnaroundMs)} hint="Received → completed" />
+        <StatCard
+          label="Open right now"
+          icon={counts.overdue ? AlertTriangle : Hourglass}
+          tone={counts.overdue ? "bad" : "neutral"}
+          emphasis={counts.overdue > 0}
+          value={counts.pending + counts.processing}
+          hint={`${counts.overdue} overdue`}
+        />
       </section>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader title="Conversion" description="What happened to the inquiries received in this period" />
           <CardBody>
@@ -88,34 +97,30 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </Card>
         <Card>
           <CardHeader title="Money" description="All customers in this period. Outstanding is as of today." />
-          <CardBody>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              {[
-                ["Quotations sent", money.quotedSent],
-                ["Quotations accepted", money.quotedAccepted],
-                ["Invoiced", money.invoiced],
-                ["Payments received", money.received],
-                ["Outstanding", money.outstanding],
-                ["Overdue", money.overdue],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted">{label}</dt>
-                  <dd className={`mt-1 text-lg font-semibold tabular-nums ${label === "Overdue" && toCents(value) > 0 ? "text-red-700" : ""}`}>{formatMoney(value, settings.currency)}</dd>
-                </div>
-              ))}
-            </dl>
+          <CardBody className="divide-y divide-line py-1">
+            <Metric icon={FileText} label="Quotations sent" value={formatMoney(money.quotedSent, settings.currency)} />
+            <Metric icon={FileCheck2} label="Quotations accepted" value={formatMoney(money.quotedAccepted, settings.currency)} />
+            <Metric icon={Receipt} label="Invoiced" value={formatMoney(money.invoiced, settings.currency)} />
+            <Metric icon={Banknote} label="Payments received" value={formatMoney(money.received, settings.currency)} />
+            <Metric
+              icon={Wallet}
+              label="Outstanding"
+              value={formatMoney(money.outstanding, settings.currency)}
+              sub={toCents(money.overdue) > 0 ? `${formatMoney(money.overdue, settings.currency)} overdue` : "Nothing overdue"}
+              warn={toCents(money.overdue) > 0}
+            />
           </CardBody>
         </Card>
       </div>
 
-      <Card className="mt-6">
+      <Card>
         <CardHeader title="Inquiries per month" description="Received vs completed, last 12 months" />
         <CardBody>
           <TrendChart data={trend} />
         </CardBody>
       </Card>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader title="Where RFQs come from" />
           <CardBody>
@@ -130,10 +135,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </Card>
       </div>
 
-      <Card className="mt-6">
+      <Card className="overflow-hidden">
         <CardHeader title="Staff performance" description="Open now, and closed in this period" />
         <Table>
-          <thead>
+          <THead>
             <tr>
               <Th>Person</Th>
               <Th className="text-right">Open</Th>
@@ -142,21 +147,26 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <Th className="text-right">Not completed</Th>
               <Th className="text-right">Avg. completion time</Th>
             </tr>
-          </thead>
+          </THead>
           <tbody>
             {team.map((p) => (
-              <tr key={p.id} className={p.id === staffId ? "bg-brand-50/50" : undefined}>
-                <Td className="font-medium">{p.name}</Td>
-                <Td className="text-right tabular-nums">{p.open}</Td>
-                <Td className={`text-right tabular-nums ${p.overdue ? "font-semibold text-red-700" : ""}`}>{p.overdue}</Td>
-                <Td className="text-right tabular-nums">{p.completed}</Td>
-                <Td className="text-right tabular-nums">{p.notCompleted}</Td>
-                <Td className="text-right tabular-nums">{formatDuration(p.avgMs)}</Td>
-              </tr>
+              <Tr key={p.id} className={p.id === staffId ? "bg-primary-soft/50" : undefined}>
+                <Td>
+                  <span className="flex items-center gap-2 font-medium">
+                    <Avatar name={p.name} size={24} />
+                    {p.name}
+                  </span>
+                </Td>
+                <Td className="text-right tabular">{p.open}</Td>
+                <Td className={cn("text-right tabular", p.overdue > 0 && "font-semibold text-bad")}>{p.overdue}</Td>
+                <Td className="text-right tabular">{p.completed}</Td>
+                <Td className="text-right tabular">{p.notCompleted}</Td>
+                <Td className="text-right text-text-2 tabular">{formatDuration(p.avgMs)}</Td>
+              </Tr>
             ))}
           </tbody>
         </Table>
       </Card>
-    </>
+    </div>
   );
 }

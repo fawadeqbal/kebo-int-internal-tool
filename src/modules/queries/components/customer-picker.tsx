@@ -64,12 +64,14 @@ export function CustomerPicker({
 
   if (selected) {
     return (
-      <div className={cn("flex items-center justify-between gap-3 rounded-lg border bg-brand-50/50 px-3 py-2.5", error ? "border-red-500" : "border-brand-200")}>
+      <div className={cn("flex items-center justify-between gap-3 rounded-lg border bg-primary-soft px-3 py-2.5", error ? "border-bad" : "border-primary/30")}>
         <input type="hidden" name={name} value={selected.id} />
         <div className="flex min-w-0 items-center gap-3">
-          <Building2 className="h-4 w-4 shrink-0 text-brand-700" aria-hidden />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface text-primary shadow-card">
+            <Building2 className="size-4" aria-hidden />
+          </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{selected.companyName || selected.contactPerson}</p>
+            <p className="truncate text-sm font-medium text-text">{selected.companyName || selected.contactPerson}</p>
             <p className="truncate text-xs text-muted">
               {selected.contactPerson} · {selected.phone}
               {selected.email ? ` · ${selected.email}` : ""}
@@ -78,7 +80,7 @@ export function CustomerPicker({
         </div>
         <button
           type="button"
-          className="text-sm font-medium text-brand-700 hover:underline"
+          className="text-sm font-medium text-primary hover:underline"
           onClick={() => {
             setSelected(null);
             setTimeout(() => inputRef.current?.focus(), 0);
@@ -93,7 +95,7 @@ export function CustomerPicker({
   return (
     <div className="relative">
       <input type="hidden" name={name} value="" />
-      <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted" aria-hidden />
+      <Search className="pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-muted" aria-hidden />
       <Input
         ref={inputRef}
         id="customer-search"
@@ -127,7 +129,7 @@ export function CustomerPicker({
         }}
       />
       {open && (
-        <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
+        <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full animate-in overflow-auto rounded-xl border border-line bg-surface p-1 shadow-pop">
           {results.map((c, i) => (
             <li
               key={c.id}
@@ -139,9 +141,9 @@ export function CustomerPicker({
                 choose(c);
               }}
               onMouseEnter={() => setActive(i)}
-              className={cn("cursor-pointer px-3 py-2", i === active && "bg-brand-50")}
+              className={cn("cursor-pointer rounded-lg px-2.5 py-2", i === active && "bg-surface-2")}
             >
-              <p className="text-sm font-medium">{c.companyName || c.contactPerson}</p>
+              <p className="text-sm font-medium text-text">{c.companyName || c.contactPerson}</p>
               <p className="text-xs text-muted">
                 {c.contactPerson} · {c.phone}
               </p>
@@ -149,14 +151,14 @@ export function CustomerPicker({
           ))}
           {!loading && results.length === 0 && <li className="px-3 py-2 text-sm text-muted">No matching customer.</li>}
           {onCreateNew && (
-            <li className="border-t border-line">
+            <li className="mt-1 border-t border-line pt-1">
               <button
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onCreateNew(query);
                 }}
-                className="w-full px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
+                className="w-full rounded-lg px-2.5 py-2 text-left text-sm font-medium text-primary hover:bg-primary-soft"
               >
                 + Add a new customer{query ? ` “${query}”` : ""}
               </button>

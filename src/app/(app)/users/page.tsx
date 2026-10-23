@@ -1,48 +1,71 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { requirePagePermission } from "@/lib/auth/session";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { listUsers } from "@/modules/users/repository";
-import { ButtonLink, Card, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Avatar, ButtonLink, Card, PageHeader, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils/dates";
 
 export const metadata: Metadata = { title: "Users" };
 
+const ROLE_TONE = { admin: "primary", manager: "info", staff: "neutral" } as const;
+
 export default async function UsersPage() {
   await requirePagePermission("users.manage");
   const users = await listUsers();
   return (
-    <>
-      <PageHeader title="Users" description="People who can sign in and what they are allowed to do." actions={<ButtonLink href="/users/new">Add user</ButtonLink>} />
-      <Card>
+    <div className="space-y-5">
+      <PageHeader
+        title="Users"
+        description="People who can sign in and what they are allowed to do."
+        actions={
+          <ButtonLink href="/users/new" variant="primary" size="sm">
+            <Plus aria-hidden /> Add user
+          </ButtonLink>
+        }
+      />
+      <Card className="overflow-hidden">
         <Table>
-          <thead>
+          <THead>
             <tr>
               <Th>Name</Th>
-              <Th>Email</Th>
               <Th>Role</Th>
               <Th>Status</Th>
-              <Th>Last sign-in</Th>
+              <Th className="hidden md:table-cell">Last sign-in</Th>
             </tr>
-          </thead>
+          </THead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className="hover:bg-canvas/60">
-                <Td>
-                  <Link href={`/users/${u.id}`} className="font-medium text-brand-700 hover:underline">
-                    {u.name}
+              <Tr key={u.id} className="group relative hover:bg-surface-2/70">
+                <Td className="py-2">
+                  <Link href={`/users/${u.id}`} className="flex min-w-0 items-center gap-2.5 after:absolute after:inset-0 after:content-['']">
+                    <Avatar name={u.name} size={30} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-text group-hover:text-primary">{u.name}</span>
+                      <span className="block truncate text-xs text-muted">{u.email}</span>
+                    </span>
                   </Link>
                 </Td>
-                <Td className="text-muted">{u.email}</Td>
-                <Td>{ROLE_LABELS[u.role]}</Td>
-                <Td>{u.isActive ? <Badge tone="green">Active</Badge> : <Badge tone="slate">Deactivated</Badge>}</Td>
-                <Td className="text-muted">{formatDateTime(u.lastLoginAt)}</Td>
-              </tr>
+                <Td>
+                  <Badge tone={ROLE_TONE[u.role]}>{ROLE_LABELS[u.role]}</Badge>
+                </Td>
+                <Td>
+                  {u.isActive ? (
+                    <Badge tone="ok" dot>
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge dot>Deactivated</Badge>
+                  )}
+                </Td>
+                <Td className="hidden whitespace-nowrap text-muted md:table-cell">{formatDateTime(u.lastLoginAt)}</Td>
+              </Tr>
             ))}
           </tbody>
         </Table>
       </Card>
-    </>
+    </div>
   );
 }

@@ -11,7 +11,7 @@ export function KeyboardShortcuts({ canCreate }: { canCreate: boolean }) {
       const target = e.target as HTMLElement;
       if (e.metaKey || e.ctrlKey || e.altKey || target.closest("input, textarea, select, [contenteditable=true]")) return;
       if (e.key === "/") {
-        const search = document.getElementById("search") as HTMLInputElement | null;
+        const search = (document.getElementById("search") ?? document.getElementById("global-search")) as HTMLInputElement | null;
         if (search) {
           e.preventDefault();
           search.focus();

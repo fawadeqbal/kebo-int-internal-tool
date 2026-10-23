@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
+import { buttonClass } from "./index";
 
 export function buildHref(base: string, params: Record<string, string | undefined>, patch: Record<string, string | undefined>) {
   const next = new URLSearchParams();
@@ -29,17 +30,14 @@ export function Pagination({
       href={buildHref(base, params, { page: p > 1 ? String(p) : undefined })}
       aria-disabled={disabled}
       tabIndex={disabled ? -1 : undefined}
-      className={cn(
-        "rounded-lg border border-line bg-surface px-3 py-1.5 text-sm shadow-xs hover:bg-canvas",
-        disabled && "pointer-events-none opacity-45",
-      )}
+      className={cn(buttonClass("secondary", "sm"), disabled && "pointer-events-none opacity-50")}
     >
       {label}
     </Link>
   );
   return (
-    <nav aria-label="Pagination" className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted">
-      <span>
+    <nav aria-label="Pagination" className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-xs text-muted">
+      <span className="tabular">
         {from}–{to} of {total}
       </span>
       <span className="flex gap-2">

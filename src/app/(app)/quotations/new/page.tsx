@@ -24,7 +24,7 @@ export default async function NewQuotationPage({ searchParams }: { searchParams:
         title="New quotation"
         description={
           <>
-            For <span className="font-medium text-ink">{customerName(customer)}</span> · {query.refNo}: {query.title}
+            For <span className="font-medium text-text">{customerName(customer)}</span> · {query.refNo}: {query.title}
             {detail.quotations.length > 0 && ` · this will be version ${detail.quotations.length + 1}`}
           </>
         }

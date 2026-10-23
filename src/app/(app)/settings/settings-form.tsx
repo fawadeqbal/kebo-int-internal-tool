@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Alert, Card, CardBody, CardHeader, Field, Input, Textarea } from "@/components/ui";
+import { Alert, buttonClass, Card, CardBody, CardHeader, Field, Input, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/client";
 import { saveSettingsAction, sendTestEmailAction } from "@/modules/settings/actions";
 import type { AppSettings } from "@/modules/settings/service";
@@ -24,7 +24,7 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
   );
 
   return (
-    <form action={action} className="flex max-w-4xl flex-col gap-6" noValidate>
+    <form action={action} className="flex max-w-4xl flex-col gap-5" noValidate>
       {state.message && <Alert tone={state.ok ? "success" : "error"}>{state.message}</Alert>}
       <Card>
         <CardHeader title="Email notifications" description="Who at Kebo gets an email, and for what." />
@@ -38,7 +38,7 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
             <Textarea id="notifyEmails" name="notifyEmails" rows={2} className="min-h-0" defaultValue={v("notifyEmails")} />
           </Field>
           <fieldset>
-            <legend className="text-sm font-medium">Send an email when…</legend>
+            <legend className="text-sm font-medium text-text">Send an email when…</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {(
                 [
@@ -49,8 +49,8 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
                   ["notifyDailySummary", "Every morning: new RFQs, overdue inquiries and unpaid invoices"],
                 ] as const
               ).map(([key, label]) => (
-                <label key={key} className="flex items-start gap-2.5 rounded-lg border border-line px-3 py-2.5 text-sm hover:bg-canvas/60">
-                  <input type="checkbox" name={key} defaultChecked={checked(key)} className="mt-0.5 h-4 w-4 accent-brand-600" />
+                <label key={key} className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line px-3 py-2.5 text-sm text-text-2 transition-colors hover:border-line-strong hover:bg-surface-2 has-[:checked]:border-primary/40 has-[:checked]:bg-primary-soft/40 has-[:checked]:text-text">
+                  <input type="checkbox" name={key} defaultChecked={checked(key)} className="mt-0.5 size-4 accent-[var(--primary-solid)]" />
                   {label}
                 </label>
               ))}
@@ -61,11 +61,11 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
               type="submit"
               formAction={testAction}
               disabled={testing}
-              className="inline-flex h-8 items-center rounded-lg border border-line bg-surface px-3 text-sm font-medium shadow-sm hover:bg-canvas disabled:opacity-55"
+              className={buttonClass("secondary", "sm")}
             >
               {testing ? "Sending…" : "Send a test email"}
             </button>
-            {testState.message && <span className={`text-sm ${testState.ok ? "text-emerald-700" : "text-red-700"}`}>{testState.message}</span>}
+            {testState.message && <span className={`text-xs ${testState.ok ? "text-ok" : "text-bad"}`}>{testState.message}</span>}
           </div>
         </CardBody>
       </Card>
@@ -117,7 +117,7 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
           </Field>
         </CardBody>
       </Card>
-      <div>
+      <div className="sticky bottom-20 z-10 flex justify-end rounded-xl border border-line bg-surface/90 p-3 shadow-pop backdrop-blur lg:bottom-4">
         <SubmitButton>Save settings</SubmitButton>
       </div>
     </form>

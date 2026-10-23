@@ -13,54 +13,46 @@ import {
 } from "@/lib/labels";
 import type { Priority, QueryStatus, QuotationStatus } from "@/lib/db/schema";
 
-const TONES: Record<Tone, string> = {
-  amber: "bg-amber-50 text-amber-800 ring-amber-200",
-  blue: "bg-sky-50 text-sky-800 ring-sky-200",
-  slate: "bg-stone-100 text-stone-700 ring-stone-200",
-  green: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  red: "bg-red-50 text-red-800 ring-red-200",
-  violet: "bg-violet-50 text-violet-800 ring-violet-200",
-  teal: "bg-brand-50 text-brand-800 ring-brand-200",
-};
+export type { Tone };
 
-const DOTS: Record<Tone, string> = {
-  amber: "bg-amber-500",
-  blue: "bg-sky-500",
-  slate: "bg-stone-400",
-  green: "bg-emerald-500",
-  red: "bg-red-500",
-  violet: "bg-violet-500",
-  teal: "bg-brand-500",
+const TONES: Record<Tone, string> = {
+  neutral: "bg-surface-3 text-text-2",
+  primary: "bg-primary-soft text-primary",
+  trust: "bg-trust-soft text-trust",
+  money: "bg-money-soft text-money",
+  ok: "bg-ok-soft text-ok",
+  warn: "bg-warn-soft text-warn",
+  bad: "bg-bad-soft text-bad",
+  info: "bg-info-soft text-info",
+  outline: "border border-line text-text-2",
 };
 
 /** Colour is never the only signal: every badge carries its text label. */
-export function Badge({ tone, children, className }: { tone: Tone; children: React.ReactNode; className?: string }) {
+export function Badge({ tone = "neutral", dot, children, className }: { tone?: Tone; dot?: boolean; children: React.ReactNode; className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset whitespace-nowrap",
-        TONES[tone],
-        className,
-      )}
-    >
-      <span className={cn("h-1.5 w-1.5 rounded-full", DOTS[tone])} aria-hidden />
+    <span className={cn("inline-flex h-5.5 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs font-medium whitespace-nowrap [&_svg]:size-3", TONES[tone], className)}>
+      {dot && <span className="size-1.5 rounded-full bg-current" aria-hidden />}
       {children}
     </span>
   );
 }
 
 export const QueryStatusBadge = ({ status }: { status: QueryStatus }) => (
-  <Badge tone={QUERY_STATUS_TONE[status]}>{QUERY_STATUS_LABEL[status]}</Badge>
+  <Badge tone={QUERY_STATUS_TONE[status]} dot>
+    {QUERY_STATUS_LABEL[status]}
+  </Badge>
 );
 
 export const QuotationStatusBadge = ({ status }: { status: QuotationStatus }) => (
-  <Badge tone={QUOTATION_STATUS_TONE[status]}>{QUOTATION_STATUS_LABEL[status]}</Badge>
+  <Badge tone={QUOTATION_STATUS_TONE[status]} dot>
+    {QUOTATION_STATUS_LABEL[status]}
+  </Badge>
 );
 
 export const InvoiceStatusBadge = ({ status }: { status: InvoiceDisplayStatus }) => (
-  <Badge tone={INVOICE_STATUS_TONE[status]}>{INVOICE_STATUS_LABEL[status]}</Badge>
+  <Badge tone={INVOICE_STATUS_TONE[status]} dot>
+    {INVOICE_STATUS_LABEL[status]}
+  </Badge>
 );
 
-export const PriorityBadge = ({ priority }: { priority: Priority }) => (
-  <Badge tone={PRIORITY_TONE[priority]}>{PRIORITY_LABEL[priority]}</Badge>
-);
+export const PriorityBadge = ({ priority }: { priority: Priority }) => <Badge tone={PRIORITY_TONE[priority]}>{PRIORITY_LABEL[priority]}</Badge>;

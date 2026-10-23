@@ -9,22 +9,24 @@ export default async function InquiryReceived({ searchParams }: { searchParams: 
   const settings = await getSettings();
   const backUrl = back && /^https?:\/\/[^/]+$/.test(back) ? back : null;
   return (
-    <main className="grid min-h-screen place-items-center p-6">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-8 text-center shadow-sm">
+    <main className="grid min-h-dvh place-items-center p-6">
+      <div className="w-full max-w-md rounded-xl border border-line bg-surface p-8 text-center shadow-card">
         {error ? (
           <>
-            <h1 className="text-xl font-semibold">Your RFQ was not sent</h1>
+            <h1 className="text-lg font-semibold text-text">Your RFQ was not sent</h1>
             <p className="mt-2 text-sm text-muted">{error.slice(0, 200)}</p>
           </>
         ) : (
           <>
-            <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-700" aria-hidden>
-              ✓
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-ok-soft text-ok" aria-hidden>
+              <svg viewBox="0 0 16 16" className="size-5" fill="none">
+                <path d="m4 8.5 2.5 2.5L12 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
-            <h1 className="text-xl font-semibold">Thank you, we have your RFQ</h1>
+            <h1 className="text-lg font-semibold text-text">Thank you, we have your RFQ</h1>
             {ref && (
               <p className="mt-2 text-sm text-muted">
-                Your reference number is <span className="font-mono font-semibold text-ink">{ref.slice(0, 30)}</span>
+                Your reference number is <span className="font-mono font-semibold text-text">{ref.slice(0, 30)}</span>
               </p>
             )}
             <p className="mt-2 text-sm text-muted">Our sourcing team will reply within one working day.</p>
@@ -36,7 +38,7 @@ export default async function InquiryReceived({ searchParams }: { searchParams: 
           {settings.companyPhone && ` · ${settings.companyPhone}`}
         </p>
         {backUrl && (
-          <a href={backUrl} className="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">
+          <a href={backUrl} className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
             ← Back to the website
           </a>
         )}

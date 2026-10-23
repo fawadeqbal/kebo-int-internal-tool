@@ -45,7 +45,7 @@ export function UserForm({
           </Field>
         )}
       </div>
-      <div className="flex gap-3 border-t border-line pt-5">
+      <div className="flex gap-2 border-t border-line pt-4">
         <SubmitButton>{initial ? "Save changes" : "Create user"}</SubmitButton>
         <ButtonLink href="/users" variant="secondary">
           Cancel

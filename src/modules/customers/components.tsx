@@ -19,21 +19,21 @@ export function CustomerFields({ state, initial, prefix = "", compact = false }:
       <Field label="Full name" htmlFor={id("contactPerson")} required error={e.contactPerson}>
         <Input id={id("contactPerson")} name="contactPerson" defaultValue={v("contactPerson")} aria-invalid={!!e.contactPerson} autoComplete="name" />
       </Field>
-      <Field label="Company" htmlFor={id("companyName")} error={e.companyName} hint="Optional">
+      <Field label="Company" htmlFor={id("companyName")} optional error={e.companyName}>
         <Input id={id("companyName")} name="companyName" defaultValue={v("companyName")} aria-invalid={!!e.companyName} autoComplete="organization" />
       </Field>
       <Field label="Phone / WhatsApp" htmlFor={id("phone")} required error={e.phone} hint="With country code, e.g. +971 50 123 4567">
         <Input id={id("phone")} name="phone" type="tel" defaultValue={v("phone")} aria-invalid={!!e.phone} autoComplete="tel" />
       </Field>
-      <Field label="Business email" htmlFor={id("email")} error={e.email}>
+      <Field label="Business email" htmlFor={id("email")} optional error={e.email}>
         <Input id={id("email")} name="email" type="email" defaultValue={v("email")} aria-invalid={!!e.email} autoComplete="email" />
       </Field>
       {!compact && (
         <>
-          <Field label="Address / country" htmlFor={id("address")} error={e.address}>
+          <Field label="Address / country" htmlFor={id("address")} optional error={e.address}>
             <Input id={id("address")} name="address" defaultValue={v("address")} autoComplete="street-address" />
           </Field>
-          <Field label="Company registration / tax no." htmlFor={id("taxNo")} error={e.taxNo}>
+          <Field label="Company registration / tax no." htmlFor={id("taxNo")} optional error={e.taxNo}>
             <Input id={id("taxNo")} name="taxNo" defaultValue={v("taxNo")} />
           </Field>
         </>
@@ -59,7 +59,7 @@ export function DuplicateWarning({ state }: { state: ActionState }) {
         ))}
       </ul>
       <label className="mt-3 flex items-center gap-2">
-        <input type="checkbox" name="allowDuplicate" value="on" className="h-4 w-4 accent-brand-600" />
+        <input type="checkbox" name="allowDuplicate" value="on" className="size-4 accent-[var(--primary-solid)]" />
         It&apos;s a different customer — save anyway
       </label>
     </Alert>
@@ -83,10 +83,10 @@ export function CustomerForm({
       {state.message && !duplicates && <Alert tone="error">{state.message}</Alert>}
       <DuplicateWarning state={state} />
       <CustomerFields state={state} initial={initial} />
-      <Field label="Notes" htmlFor="notes" error={e.notes} hint="Only the team sees this, e.g. preferred trade terms, destination port">
+      <Field label="Notes" htmlFor="notes" optional error={e.notes} hint="Only the team sees this, e.g. preferred trade terms, destination port">
         <Textarea id="notes" name="notes" rows={3} defaultValue={(state.values?.notes as string) ?? initial?.notes ?? ""} />
       </Field>
-      <div className="flex gap-3 border-t border-line pt-5">
+      <div className="flex gap-2 border-t border-line pt-4">
         <SubmitButton>{initial ? "Save changes" : "Add customer"}</SubmitButton>
         <ButtonLink href={cancelHref} variant="secondary">
           Cancel
