@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, ilike, isNull, lt, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { customers, invoices, queries, quotationItems, quotations, users, type QuotationStatus } from "@/lib/db/schema";
+import { customerDisplayName } from "@/modules/customers/repository";
 import type { SessionUser } from "@/lib/auth/session";
 import { accessCondition } from "@/modules/queries/repository";
 import { todayISO } from "@/lib/utils/dates";
@@ -37,7 +38,7 @@ export async function listQuotations(user: SessionUser, f: QuotationFilters) {
         queryId: queries.id,
         queryRef: queries.refNo,
         queryTitle: queries.title,
-        companyName: customers.companyName,
+        companyName: customerDisplayName,
       })
       .from(quotations)
       .innerJoin(queries, eq(queries.id, quotations.queryId))

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
+import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { getQuotationDetail } from "@/modules/quotations/repository";
 import { getSettings } from "@/modules/settings/service";
@@ -20,7 +21,7 @@ export default async function PrintQuotation({ params }: { params: Promise<{ id:
   const q = detail.quotation;
   return (
     <>
-      <title>{`${q.refNo} — ${detail.customer.companyName}`}</title>
+      <title>{`${q.refNo} — ${customerName(detail.customer)}`}</title>
       <PrintToolbar backHref={`/quotations/${id}`} label={q.refNo} />
       <div className="shadow-xl print:shadow-none mx-auto max-w-[210mm]">
         <DocumentView

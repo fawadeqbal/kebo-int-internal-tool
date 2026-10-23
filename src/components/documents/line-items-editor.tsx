@@ -107,7 +107,7 @@ export function LineItemsEditor({
         <Field label="Discount (amount)" htmlFor="discount" error={errors?.discount}>
           <Input id="discount" name="discount" type="number" min="0" step="0.01" inputMode="decimal" value={discount} onChange={(e) => setDiscount(e.target.value)} />
         </Field>
-        <Field label="Tax rate (%)" htmlFor="taxRate" error={errors?.taxRate} hint="e.g. 18 for 18% GST">
+        <Field label="Tax rate (%)" htmlFor="taxRate" error={errors?.taxRate} hint="0 if no tax applies">
           <Input id="taxRate" name="taxRate" type="number" min="0" max="100" step="0.01" inputMode="decimal" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
         </Field>
         <div className="flex justify-between text-sm">

@@ -17,6 +17,7 @@ export const metadata = { title: "Queries" };
 
 const VIEWS = [
   { key: "open", label: "Open", params: { status: "open" } },
+  { key: "website", label: "From website", params: { status: "open", source: "website" } },
   { key: "mine", label: "Assigned to me", params: { status: "open", assignee: "me" } },
   { key: "unassigned", label: "Unassigned", params: { status: "open", assignee: "unassigned" } },
   { key: "overdue", label: "Overdue", params: { status: "overdue" } },
@@ -32,9 +33,9 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
   const today = todayISO();
   const activeView = VIEWS.find((v) => {
     const p = v.params as Record<string, string>;
-    return (p.status ?? undefined) === filters.raw.status && (p.assignee ?? undefined) === filters.raw.assignee;
+    return (p.status ?? undefined) === filters.raw.status && (p.assignee ?? undefined) === filters.raw.assignee && (p.source ?? undefined) === filters.raw.source;
   })?.key;
-  const hasExtraFilters = !!(filters.q || filters.priority || filters.from || filters.to || filters.customerId || (filters.assignee && !activeView));
+  const hasExtraFilters = !!(filters.q || filters.priority || filters.from || filters.to || filters.customerId || ((filters.assignee || filters.source) && !activeView));
   const exportHref = buildHref("/api/queries/export", filters.raw, {});
 
   return (
@@ -135,6 +136,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
             </div>
           </details>
           {filters.customerId && <input type="hidden" name="customer" value={filters.customerId} />}
+          {filters.source && <input type="hidden" name="source" value={filters.source} />}
           <div className="flex items-end gap-2 lg:row-start-1 lg:col-start-5">
             <Button variant="secondary">Apply</Button>
             {(hasExtraFilters || filters.raw.status) && (
@@ -179,11 +181,14 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
                       <Link href={`/queries/${r.id}`} className="font-medium text-ink hover:underline">
                         {r.title}
                       </Link>
-                      {r.category && <p className="truncate text-xs text-muted">{r.category}</p>}
+                      <p className="truncate text-xs text-muted">
+                        {r.source === "website" && <span className="mr-1.5 font-medium text-violet-700">Website ·</span>}
+                        {r.category}
+                      </p>
                     </Td>
                     <Td>
                       <span className="block font-medium">{r.companyName}</span>
-                      <span className="text-xs text-muted">{r.contactPerson}</span>
+                      {r.contactPerson !== r.companyName && <span className="text-xs text-muted">{r.contactPerson}</span>}
                     </Td>
                     <Td>
                       <QueryStatusBadge status={r.status} />

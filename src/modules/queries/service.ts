@@ -1,5 +1,5 @@
 import { and, count, eq, isNull } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { db, type DbOrTx } from "@/lib/db";
 import { attachments, comments, invoices, queries, queryAssignments, queryStatusHistory, users, type Query, type QueryStatus } from "@/lib/db/schema";
 import { can } from "@/lib/auth/permissions";
 import { assertCan, type SessionUser } from "@/lib/auth/session";
@@ -11,7 +11,7 @@ import { findCustomer } from "@/modules/customers/repository";
 import { publish } from "@/modules/events";
 import { QUERY_STATUS_LABEL } from "@/lib/labels";
 import { accessCondition, findQuery } from "./repository";
-import type { CreateQueryInput, UpdateQueryInput } from "./schema";
+import { titleFrom, type CreateQueryInput, type UpdateQueryInput } from "./schema";
 import { canTransition, isReopen } from "./workflow";
 
 /** Load a query the user is allowed to see, or fail. */
@@ -35,6 +35,34 @@ async function assertAssignable(actor: SessionUser, assignedTo: string | null | 
   if (!can(actor.role, "queries.assign") && assignedTo !== actor.id) throw new ForbiddenError("You can only assign work to yourself.");
   const [user] = await db.select({ isActive: users.isActive }).from(users).where(eq(users.id, assignedTo)).limit(1);
   if (!user?.isActive) throw new DomainError("The selected person is not an active user.");
+}
+
+type NewQueryRecord = Pick<
+  typeof queries.$inferInsert,
+  "customerId" | "source" | "title" | "category" | "specifications" | "quantity" | "priority" | "requiredBy" | "assignedTo"
+>;
+
+/**
+ * The one place a query row is created: reference number, Pending status,
+ * first history entry, assignment record and audit entry. Used by the staff form
+ * and by the website inquiry intake.
+ */
+export async function insertQueryRecord(tx: DbOrTx, actorId: string, values: NewQueryRecord) {
+  const refNo = await nextReference(tx, "QRY");
+  const [query] = await tx
+    .insert(queries)
+    .values({ ...values, refNo, createdBy: actorId, status: "pending" })
+    .returning();
+  await tx.insert(queryStatusHistory).values({ queryId: query.id, fromStatus: null, toStatus: "pending", changedBy: actorId });
+  if (query.assignedTo) await tx.insert(queryAssignments).values({ queryId: query.id, assignedTo: query.assignedTo, assignedBy: actorId });
+  await recordAudit(tx, {
+    userId: actorId,
+    action: "create",
+    entityType: "query",
+    entityId: query.id,
+    summary: `Created query ${refNo}: ${query.title}`,
+  });
+  return query;
 }
 
 export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
@@ -63,37 +91,21 @@ export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
             )
           ).id;
 
-    const refNo = await nextReference(tx, "QRY");
-    const [query] = await tx
-      .insert(queries)
-      .values({
-        refNo,
-        customerId,
-        source: input.source,
-        title: input.title,
-        category: input.category ?? null,
-        specifications: input.specifications,
-        quantity: input.quantity,
-        priority: input.priority,
-        requiredBy: input.requiredBy ?? null,
-        assignedTo: input.assignedTo ?? null,
-        createdBy: actor.id,
-        status: "pending",
-      })
-      .returning();
-    await tx.insert(queryStatusHistory).values({ queryId: query.id, fromStatus: null, toStatus: "pending", changedBy: actor.id });
-    if (query.assignedTo) await tx.insert(queryAssignments).values({ queryId: query.id, assignedTo: query.assignedTo, assignedBy: actor.id });
-    await recordAudit(tx, {
-      userId: actor.id,
-      action: "create",
-      entityType: "query",
-      entityId: query.id,
-      summary: `Created query ${refNo}: ${input.title}`,
+    const query = await insertQueryRecord(tx, actor.id, {
+      customerId,
+      source: input.source,
+      title: input.title || titleFrom(input.specifications, input.category),
+      category: input.category,
+      specifications: input.specifications,
+      quantity: input.quantity,
+      priority: input.priority,
+      requiredBy: input.requiredBy ?? null,
+      assignedTo: input.assignedTo ?? null,
     });
     return query;
   });
 
-  await publish({ type: "query.created", queryId: created.id, refNo: created.refNo, title: created.title, actorId: actor.id });
+  await publish({ type: "query.created", queryId: created.id, refNo: created.refNo, title: created.title, actorId: actor.id, source: created.source });
   if (created.assignedTo)
     await publish({ type: "query.assigned", queryId: created.id, refNo: created.refNo, title: created.title, assignedTo: created.assignedTo, actorId: actor.id });
   return created;
@@ -106,8 +118,8 @@ export async function updateQuery(actor: SessionUser, id: string, input: UpdateQ
   const row = {
     customerId: input.customerId,
     source: input.source,
-    title: input.title,
-    category: input.category ?? null,
+    title: input.title || titleFrom(input.specifications, input.category),
+    category: input.category,
     specifications: input.specifications,
     quantity: input.quantity,
     priority: input.priority,

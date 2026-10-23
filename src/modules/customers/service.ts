@@ -8,14 +8,14 @@ import { customerQueryCount, findCustomer, findDuplicates } from "./repository";
 import { normalizePhone, type CustomerInput } from "./schema";
 
 export class DuplicateCustomerError extends DomainError {
-  constructor(public readonly matches: { id: string; companyName: string; contactPerson: string; phone: string }[]) {
+  constructor(public readonly matches: { id: string; companyName: string | null; contactPerson: string; phone: string }[]) {
     super("A customer with the same phone number or email already exists.");
   }
 }
 
 function toRow(input: CustomerInput) {
   return {
-    companyName: input.companyName,
+    companyName: input.companyName ?? null,
     contactPerson: input.contactPerson,
     phone: input.phone,
     email: input.email ?? null,
@@ -42,7 +42,7 @@ export async function createCustomer(actor: SessionUser, input: CustomerInput, t
       action: "create",
       entityType: "customer",
       entityId: created.id,
-      summary: `Added customer ${input.companyName}`,
+      summary: `Added customer ${input.companyName || input.contactPerson}`,
       newValues: toRow(input),
     });
     return created;
@@ -63,7 +63,7 @@ export async function updateCustomer(actor: SessionUser, id: string, input: Cust
   await db.transaction(async (tx) => {
     await tx.update(customers).set(row).where(eq(customers.id, id));
     if (changes.changed)
-      await recordAudit(tx, { userId: actor.id, action: "update", entityType: "customer", entityId: id, summary: `Updated customer ${input.companyName}`, ...changes });
+      await recordAudit(tx, { userId: actor.id, action: "update", entityType: "customer", entityId: id, summary: `Updated customer ${input.companyName || input.contactPerson}`, ...changes });
   });
 }
 
@@ -75,6 +75,6 @@ export async function deleteCustomer(actor: SessionUser, id: string) {
     throw new DomainError("This customer has queries, so it cannot be removed. Their history must be kept.");
   await db.transaction(async (tx) => {
     await tx.update(customers).set({ deletedAt: new Date() }).where(eq(customers.id, id));
-    await recordAudit(tx, { userId: actor.id, action: "delete", entityType: "customer", entityId: id, summary: `Removed customer ${existing.companyName}` });
+    await recordAudit(tx, { userId: actor.id, action: "delete", entityType: "customer", entityId: id, summary: `Removed customer ${existing.companyName || existing.contactPerson}` });
   });
 }

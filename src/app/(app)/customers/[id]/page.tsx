@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { customerName } from "@/lib/utils/names";
 import { Mail, MapPin, Phone, Pencil, Plus } from "lucide-react";
 import { and, desc, eq } from "drizzle-orm";
 import { requireUser } from "@/lib/auth/session";
@@ -45,8 +46,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader
-        title={customer.companyName}
-        description={`Contact person: ${customer.contactPerson}`}
+        title={customerName(customer)}
+        description={customer.companyName ? `Contact: ${customer.contactPerson}` : undefined}
         backHref="/customers"
         backLabel="Customers"
         actions={
@@ -88,7 +89,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               )}
               {customer.taxNo && (
                 <p>
-                  <span className="block text-xs font-medium uppercase tracking-wide text-muted">NTN / Tax no.</span>
+                  <span className="block text-xs font-medium uppercase tracking-wide text-muted">Tax / registration no.</span>
                   {customer.taxNo}
                 </p>
               )}
@@ -123,7 +124,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           )}
           {can(user.role, "customers.delete") && queryRows.length === 0 && (
             <form action={deleteCustomerAction.bind(null, id)}>
-              <ConfirmSubmit variant="ghost" size="sm" className="text-red-700" message={`Remove ${customer.companyName}?`}>
+              <ConfirmSubmit variant="ghost" size="sm" className="text-red-700" message={`Remove ${customerName(customer)}?`}>
                 Remove customer
               </ConfirmSubmit>
             </form>

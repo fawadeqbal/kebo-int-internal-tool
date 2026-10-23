@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils/cn";
 
 export interface CustomerOption {
   id: string;
-  companyName: string;
+  companyName: string | null;
   contactPerson: string;
   phone: string;
   email?: string | null;
@@ -69,7 +69,7 @@ export function CustomerPicker({
         <div className="flex min-w-0 items-center gap-3">
           <Building2 className="h-4 w-4 shrink-0 text-brand-700" aria-hidden />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{selected.companyName}</p>
+            <p className="truncate text-sm font-semibold">{selected.companyName || selected.contactPerson}</p>
             <p className="truncate text-xs text-muted">
               {selected.contactPerson} · {selected.phone}
               {selected.email ? ` · ${selected.email}` : ""}
@@ -103,7 +103,7 @@ export function CustomerPicker({
         aria-autocomplete="list"
         aria-invalid={!!error}
         aria-activedescendant={open && results[active] ? `${listId}-${active}` : undefined}
-        placeholder="Search by company, contact person or phone…"
+        placeholder="Type a name, company or phone number…"
         className="pl-9"
         value={query}
         onChange={(e) => {
@@ -141,7 +141,7 @@ export function CustomerPicker({
               onMouseEnter={() => setActive(i)}
               className={cn("cursor-pointer px-3 py-2", i === active && "bg-brand-50")}
             >
-              <p className="text-sm font-medium">{c.companyName}</p>
+              <p className="text-sm font-medium">{c.companyName || c.contactPerson}</p>
               <p className="text-xs text-muted">
                 {c.contactPerson} · {c.phone}
               </p>

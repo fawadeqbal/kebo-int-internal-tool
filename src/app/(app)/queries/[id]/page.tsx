@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { customerName } from "@/lib/utils/names";
 import { Download, Eye, FileText, Mail, Paperclip, Phone, Pencil } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
@@ -109,7 +110,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
             </div>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">{query.title}</h1>
             <p className="mt-1 text-sm text-muted">
-              {customer.companyName} · received {formatDateTime(query.createdAt)} via {SOURCE_LABEL[query.source].toLowerCase()}
+              {customerName(customer)} · received {formatDateTime(query.createdAt)} via {SOURCE_LABEL[query.source].toLowerCase()}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -297,7 +298,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
           <Card>
             <CardHeader title="Customer" actions={<Link href={`/customers/${customer.id}`} className="text-sm text-brand-700 hover:underline">View</Link>} />
             <CardBody className="flex flex-col gap-2 text-sm">
-              <p className="font-semibold">{customer.companyName}</p>
+              <p className="font-semibold">{customerName(customer)}</p>
               <p>{customer.contactPerson}</p>
               <a href={`tel:${customer.phone}`} className="inline-flex items-center gap-2 text-brand-700 hover:underline">
                 <Phone className="h-4 w-4" aria-hidden /> {customer.phone}

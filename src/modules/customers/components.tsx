@@ -7,33 +7,37 @@ import { SubmitButton } from "@/components/ui/client";
 import type { ActionState } from "@/lib/utils/result";
 
 type Values = Partial<Record<"companyName" | "contactPerson" | "phone" | "email" | "address" | "taxNo" | "notes", string | null>>;
-type Duplicate = { id: string; companyName: string; contactPerson: string; phone: string };
+type Duplicate = { id: string; companyName: string | null; contactPerson: string; phone: string };
 
 /** The customer fields, reused by the customer form and the "new customer" part of the query form. */
-export function CustomerFields({ state, initial, prefix = "" }: { state: ActionState; initial?: Values; prefix?: string }) {
+export function CustomerFields({ state, initial, prefix = "", compact = false }: { state: ActionState; initial?: Values; prefix?: string; compact?: boolean }) {
   const e = state.errors ?? {};
   const v = (key: keyof Values) => (state.values?.[key] as string | undefined) ?? initial?.[key] ?? "";
   const id = (key: string) => `${prefix}${key}`;
   return (
     <div className="grid gap-5 sm:grid-cols-2">
-      <Field label="Company name" htmlFor={id("companyName")} required error={e.companyName}>
-        <Input id={id("companyName")} name="companyName" defaultValue={v("companyName")} aria-invalid={!!e.companyName} autoComplete="organization" />
-      </Field>
-      <Field label="Contact person" htmlFor={id("contactPerson")} required error={e.contactPerson} hint="The person we deal with at this company">
+      <Field label="Customer name" htmlFor={id("contactPerson")} required error={e.contactPerson} hint="The person who contacted us">
         <Input id={id("contactPerson")} name="contactPerson" defaultValue={v("contactPerson")} aria-invalid={!!e.contactPerson} autoComplete="name" />
       </Field>
-      <Field label="Contact number" htmlFor={id("phone")} required error={e.phone} hint="e.g. 0300 1234567">
+      <Field label="Company" htmlFor={id("companyName")} error={e.companyName} hint="Optional">
+        <Input id={id("companyName")} name="companyName" defaultValue={v("companyName")} aria-invalid={!!e.companyName} autoComplete="organization" />
+      </Field>
+      <Field label="Phone / WhatsApp" htmlFor={id("phone")} required error={e.phone} hint="With country code, e.g. +92 300 1234567">
         <Input id={id("phone")} name="phone" type="tel" defaultValue={v("phone")} aria-invalid={!!e.phone} autoComplete="tel" />
       </Field>
       <Field label="Email" htmlFor={id("email")} error={e.email}>
         <Input id={id("email")} name="email" type="email" defaultValue={v("email")} aria-invalid={!!e.email} autoComplete="email" />
       </Field>
-      <Field label="Address" htmlFor={id("address")} error={e.address}>
-        <Input id={id("address")} name="address" defaultValue={v("address")} autoComplete="street-address" />
-      </Field>
-      <Field label="NTN / Tax number" htmlFor={id("taxNo")} error={e.taxNo}>
-        <Input id={id("taxNo")} name="taxNo" defaultValue={v("taxNo")} />
-      </Field>
+      {!compact && (
+        <>
+          <Field label="Address" htmlFor={id("address")} error={e.address}>
+            <Input id={id("address")} name="address" defaultValue={v("address")} autoComplete="street-address" />
+          </Field>
+          <Field label="Tax / registration number" htmlFor={id("taxNo")} error={e.taxNo}>
+            <Input id={id("taxNo")} name="taxNo" defaultValue={v("taxNo")} />
+          </Field>
+        </>
+      )}
     </div>
   );
 }
@@ -48,7 +52,7 @@ export function DuplicateWarning({ state }: { state: ActionState }) {
         {duplicates.map((d) => (
           <li key={d.id}>
             <Link href={`/customers/${d.id}`} target="_blank" className="font-medium underline">
-              {d.companyName}
+              {d.companyName || d.contactPerson}
             </Link>{" "}
             — {d.contactPerson}, {d.phone}
           </li>

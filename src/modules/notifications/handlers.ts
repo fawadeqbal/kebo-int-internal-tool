@@ -5,7 +5,6 @@ import { insertNotifications, managerIds } from "./repository";
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
   processing: "Processing",
-  on_hold: "On Hold",
   completed: "Completed",
   not_completed: "Not Completed",
   draft: "Draft",
@@ -19,6 +18,21 @@ const others = (ids: (string | null | undefined)[], actorId: string) =>
   [...new Set(ids.filter((id): id is string => !!id && id !== actorId))];
 
 export const notificationHandlers: HandlerMap = {
+  "query.created": [
+    async (e) => {
+      const recipients = others(await managerIds(), e.actorId);
+      await insertNotifications(
+        db,
+        recipients.map((userId) => ({
+          userId,
+          type: "query.created",
+          title: `New query ${e.refNo}${e.source === "website" ? " from the website" : ""}`,
+          body: e.title,
+          link: `/queries/${e.queryId}`,
+        })),
+      );
+    },
+  ],
   "query.assigned": [
     async (e) => {
       if (!e.assignedTo || e.assignedTo === e.actorId) return;

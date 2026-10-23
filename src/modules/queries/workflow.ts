@@ -7,23 +7,17 @@ import type { QueryStatus } from "@/lib/db/schema";
 export const TRANSITIONS: Record<QueryStatus, { to: QueryStatus; label: string; reopen?: boolean }[]> = {
   pending: [
     { to: "processing", label: "Start processing" },
-    { to: "on_hold", label: "Put on hold" },
     { to: "not_completed", label: "Close as not completed" },
   ],
   processing: [
     { to: "completed", label: "Mark completed" },
-    { to: "on_hold", label: "Put on hold" },
-    { to: "not_completed", label: "Close as not completed" },
-  ],
-  on_hold: [
-    { to: "processing", label: "Resume processing" },
     { to: "not_completed", label: "Close as not completed" },
   ],
   completed: [{ to: "processing", label: "Reopen", reopen: true }],
   not_completed: [{ to: "pending", label: "Reopen", reopen: true }],
 };
 
-export const OPEN_STATUSES: QueryStatus[] = ["pending", "processing", "on_hold"];
+export const OPEN_STATUSES: QueryStatus[] = ["pending", "processing"];
 export const CLOSED_STATUSES: QueryStatus[] = ["completed", "not_completed"];
 
 export function canTransition(from: QueryStatus, to: QueryStatus): boolean {

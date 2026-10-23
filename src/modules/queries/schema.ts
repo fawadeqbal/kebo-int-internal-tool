@@ -27,13 +27,22 @@ const optionalUser = z
   .nullable()
   .optional();
 
+/** A short title from the first line of the requirements, when none is typed. */
+export function titleFrom(requirements: string, category?: string | null): string {
+  const first = requirements.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
+  if (!first) return category ? `${category} inquiry` : "Inquiry";
+  if (first.length <= 90) return first;
+  const cut = first.slice(0, 90);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), 60))}…`;
+}
+
 export const queryDetailsSchema = z.object({
-  source: z.enum(querySourceEnum.enumValues, { message: "Choose how the query came in" }),
-  title: z.string().trim().min(3, "Give the query a short title").max(200),
-  category: optionalText(120),
-  specifications: z.string().trim().min(5, "Describe what the customer needs").max(20000),
-  quantity: z.coerce.number({ message: "Enter a quantity" }).int("Use a whole number").min(1, "At least 1").max(1_000_000),
-  priority: z.enum(priorityEnum.enumValues),
+  source: z.enum(querySourceEnum.enumValues, { message: "Choose how the query came in" }).default("phone"),
+  title: optionalText(200),
+  category: z.string().trim().min(1, "Choose a category").max(120),
+  specifications: z.string().trim().min(5, "Write what the customer needs").max(20000),
+  quantity: z.preprocess((v) => (v === "" || v === undefined ? 1 : v), z.coerce.number({ message: "Enter a quantity" }).int("Use a whole number").min(1, "At least 1").max(1_000_000)),
+  priority: z.enum(priorityEnum.enumValues).default("normal"),
   requiredBy: optionalDate,
   assignedTo: optionalUser,
 });

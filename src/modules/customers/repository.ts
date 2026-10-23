@@ -2,6 +2,9 @@ import { and, asc, count, desc, eq, ilike, isNull, max, or, sql, type SQL } from
 import { db, type DbOrTx } from "@/lib/db";
 import { customers, invoices, queries } from "@/lib/db/schema";
 
+/** Company name, or the contact person's name when there is no company. */
+export const customerDisplayName = sql<string>`coalesce(${customers.companyName}, ${customers.contactPerson})`;
+
 export interface CustomerListFilters {
   q?: string;
   page?: number;
@@ -48,7 +51,7 @@ export async function listCustomers({ q, page = 1, pageSize = 25, sort = "compan
       .from(customers)
       .leftJoin(stats, eq(stats.customerId, customers.id))
       .where(where)
-      .orderBy(sort === "recent" ? sql`${stats.lastQueryAt} desc nulls last` : asc(customers.companyName))
+      .orderBy(sort === "recent" ? sql`${stats.lastQueryAt} desc nulls last` : asc(sql`lower(${customers.contactPerson})`))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ total: count() }).from(customers).where(where),
@@ -67,7 +70,7 @@ export async function searchCustomers(q: string, limit = 8) {
     })
     .from(customers)
     .where(and(isNull(customers.deletedAt), searchCondition(q)))
-    .orderBy(asc(customers.companyName))
+    .orderBy(asc(sql`lower(coalesce(${customers.companyName}, ${customers.contactPerson}))`))
     .limit(limit);
 }
 

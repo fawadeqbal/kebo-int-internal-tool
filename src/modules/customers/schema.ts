@@ -10,8 +10,8 @@ const optional = (max: number) =>
     .optional();
 
 export const customerSchema = z.object({
-  companyName: z.string().trim().min(2, "Enter the company name").max(200),
-  contactPerson: z.string().trim().min(2, "Enter the contact person's name").max(120),
+  companyName: optional(200),
+  contactPerson: z.string().trim().min(2, "Enter the customer's name").max(120),
   phone: z
     .string()
     .trim()

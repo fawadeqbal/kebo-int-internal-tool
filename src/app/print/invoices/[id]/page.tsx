@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/session";
+import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { getInvoiceDetail } from "@/modules/invoices/repository";
 import { getSettings } from "@/modules/settings/service";
@@ -17,7 +18,7 @@ export default async function PrintInvoice({ params }: { params: Promise<{ id: s
   const inv = detail.invoice;
   return (
     <>
-      <title>{`${inv.invoiceNo} — ${detail.customer.companyName}`}</title>
+      <title>{`${inv.invoiceNo} — ${customerName(detail.customer)}`}</title>
       <PrintToolbar backHref={`/invoices/${id}`} label={inv.invoiceNo} />
       <div className="shadow-xl print:shadow-none mx-auto max-w-[210mm]">
         <DocumentView

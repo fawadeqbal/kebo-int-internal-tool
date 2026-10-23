@@ -32,6 +32,7 @@ export function QueryForm({
   currentUserId,
   cancelHref,
   maxUploadMb,
+  categories,
 }: {
   action: Action;
   mode: "create" | "edit";
@@ -41,6 +42,7 @@ export function QueryForm({
   currentUserId?: string;
   cancelHref: string;
   maxUploadMb: number;
+  categories: string[];
 }) {
   const router = useRouter();
   const [state, formAction] = useActionState(action, {});
@@ -88,7 +90,7 @@ export function QueryForm({
       <Card>
         <CardHeader
           title="Customer"
-          description={mode === "create" ? "Who is this query from? Search existing customers or add a new one." : undefined}
+          description={mode === "create" ? "Search by name, company or phone — or add a new customer." : undefined}
           actions={
             mode === "create" && (
               <div role="radiogroup" aria-label="Customer type" className="flex rounded-lg border border-line p-0.5 text-sm">
@@ -123,19 +125,28 @@ export function QueryForm({
           ) : (
             <>
               <DuplicateWarning state={state} />
-              <CustomerFields state={state} initial={{ companyName: prefillCompany }} prefix="c-" />
+              <CustomerFields state={state} initial={{ contactPerson: prefillCompany }} prefix="c-" compact />
             </>
           )}
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader title="Query details" description="What does the customer need?" />
+        <CardHeader title="What does the customer need?" />
         <CardBody className="grid gap-5 sm:grid-cols-2">
-          <Field label="Title" htmlFor="title" required error={e.title} hint="Short summary, e.g. “Tablet press machine, 35 stations”" className="sm:col-span-2">
-            <Input id="title" name="title" defaultValue={v("title", initial?.title)} aria-invalid={!!e.title} maxLength={200} />
+          <Field label="Category" htmlFor="category" required error={e.category}>
+            <Select id="category" name="category" defaultValue={v("category", initial?.category ?? "")} aria-invalid={!!e.category}>
+              <option value="" disabled>
+                Choose a category…
+              </option>
+              {[...categories, ...(initial?.category && !categories.includes(initial.category) ? [initial.category] : [])].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
           </Field>
-          <Field label="Received via" htmlFor="source" required error={e.source}>
+          <Field label="Received via" htmlFor="source" error={e.source}>
             <Select id="source" name="source" defaultValue={v("source", initial?.source ?? "phone")}>
               {Object.entries(SOURCE_LABEL).map(([k, label]) => (
                 <option key={k} value={k}>
@@ -144,31 +155,20 @@ export function QueryForm({
               ))}
             </Select>
           </Field>
-          <Field label="Product / category" htmlFor="category" error={e.category} hint="Optional">
-            <Input id="category" name="category" defaultValue={v("category", initial?.category)} list="category-suggestions" />
-          </Field>
-          <Field label="Specifications" htmlFor="specifications" required error={e.specifications} hint="Everything the customer told you: model, capacity, materials, standards, delivery…" className="sm:col-span-2">
-            <Textarea id="specifications" name="specifications" rows={7} defaultValue={v("specifications", initial?.specifications)} aria-invalid={!!e.specifications} />
-          </Field>
-          <Field label="Quantity" htmlFor="quantity" required error={e.quantity}>
-            <Input id="quantity" name="quantity" type="number" min={1} step={1} inputMode="numeric" defaultValue={v("quantity", initial?.quantity ?? 1)} aria-invalid={!!e.quantity} />
-          </Field>
-          <Field label="Priority" htmlFor="priority" required error={e.priority}>
-            <Select id="priority" name="priority" defaultValue={v("priority", initial?.priority ?? "normal")}>
-              {Object.entries(PRIORITY_LABEL).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Required by" htmlFor="requiredBy" error={e.requiredBy} hint="When the customer needs an answer or delivery">
-            <Input id="requiredBy" name="requiredBy" type="date" defaultValue={v("requiredBy", initial?.requiredBy)} />
+          <Field
+            label="Requirements"
+            htmlFor="specifications"
+            required
+            error={e.specifications}
+            hint="Everything the customer asked for: machine, model, capacity, quantity, delivery…"
+            className="sm:col-span-2"
+          >
+            <Textarea id="specifications" name="specifications" rows={6} defaultValue={v("specifications", initial?.specifications)} aria-invalid={!!e.specifications} />
           </Field>
           {mode === "create" && people && (
-            <Field label="Assign to" htmlFor="assignedTo" error={e.assignedTo} hint={canAssignOthers ? "Who will work on this?" : "You can pick it up yourself, or leave it for a manager to assign"}>
+            <Field label="Assign to" htmlFor="assignedTo" error={e.assignedTo} hint={canAssignOthers ? "Who will handle it? You can also do this later." : "Pick it up yourself, or leave it for a manager"}>
               <Select id="assignedTo" name="assignedTo" defaultValue={v("assignedTo", "")}>
-                <option value="">Leave unassigned</option>
+                <option value="">Decide later</option>
                 {(canAssignOthers ? people : people.filter((p) => p.id === currentUserId)).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.id === currentUserId ? `${p.name} (me)` : p.name}
@@ -177,17 +177,35 @@ export function QueryForm({
               </Select>
             </Field>
           )}
-          <datalist id="category-suggestions">
-            {["Tablet press", "Capsule filling", "Blister packing", "Mixer / granulator", "Coating machine", "Spare parts", "Service / maintenance"].map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
+          <details className="group sm:col-span-2" open={mode === "edit" || !!(e.title || e.quantity || e.requiredBy)}>
+            <summary className="cursor-pointer select-none text-sm font-medium text-brand-700 hover:underline">More details (optional)</summary>
+            <div className="mt-4 grid gap-5 sm:grid-cols-2">
+              <Field label="Short title" htmlFor="title" error={e.title} hint="Left empty, the first line of the requirements is used" className="sm:col-span-2">
+                <Input id="title" name="title" defaultValue={v("title", initial?.title)} maxLength={200} />
+              </Field>
+              <Field label="Quantity" htmlFor="quantity" error={e.quantity}>
+                <Input id="quantity" name="quantity" type="number" min={1} step={1} inputMode="numeric" defaultValue={v("quantity", initial?.quantity ?? 1)} />
+              </Field>
+              <Field label="Priority" htmlFor="priority" error={e.priority}>
+                <Select id="priority" name="priority" defaultValue={v("priority", initial?.priority ?? "normal")}>
+                  {Object.entries(PRIORITY_LABEL).map(([k, label]) => (
+                    <option key={k} value={k}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Required by" htmlFor="requiredBy" error={e.requiredBy} hint="When the customer needs an answer or delivery">
+                <Input id="requiredBy" name="requiredBy" type="date" defaultValue={v("requiredBy", initial?.requiredBy)} />
+              </Field>
+            </div>
+          </details>
         </CardBody>
       </Card>
 
       {mode === "create" && (
         <Card>
-          <CardHeader title="Files" description="Drawings, specification sheets, photos — optional. You can also add files later." />
+          <CardHeader title="Files (optional)" description="Drawings, specification sheets, photos. You can also add them later." />
           <CardBody>
             <FilePicker files={files} onChange={setFiles} maxMb={maxUploadMb} />
           </CardBody>

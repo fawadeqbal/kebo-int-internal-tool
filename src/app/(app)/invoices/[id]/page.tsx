@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { customerName } from "@/lib/utils/names";
 import { Printer } from "lucide-react";
 import { requirePagePermission } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
@@ -44,7 +45,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             </div>
             <p className="mt-1 text-sm text-muted">
               <Link href={`/customers/${customer.id}`} className="hover:underline">
-                {customer.companyName}
+                {customerName(customer)}
               </Link>{" "}
               · from{" "}
               <Link href={`/quotations/${quotation.id}`} className="hover:underline">

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/session";
+import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { updateCustomerAction } from "@/modules/customers/actions";
 import { CustomerForm } from "@/modules/customers/components";
@@ -15,7 +16,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
   if (!customer) notFound();
   return (
     <>
-      <PageHeader title={`Edit ${customer.companyName}`} backHref={`/customers/${id}`} backLabel={customer.companyName} />
+      <PageHeader title={`Edit ${customerName(customer)}`} backHref={`/customers/${id}`} backLabel={customerName(customer)} />
       <Card className="max-w-3xl">
         <CardBody>
           <CustomerForm action={updateCustomerAction.bind(null, id)} initial={customer} cancelHref={`/customers/${id}`} />

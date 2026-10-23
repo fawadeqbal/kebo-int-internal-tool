@@ -8,7 +8,7 @@ describe("query status lifecycle", () => {
     expect(canTransition("pending", "processing")).toBe(true);
     expect(canTransition("processing", "completed")).toBe(true);
     expect(canTransition("pending", "completed")).toBe(false);
-    expect(canTransition("on_hold", "completed")).toBe(false);
+    expect(canTransition("completed", "not_completed")).toBe(false);
   });
 
   it("treats moving out of a closed status as a reopen", () => {
@@ -23,15 +23,15 @@ describe("query status lifecycle", () => {
       [
         { toStatus: "pending", changedAt: t0 },
         { toStatus: "processing", changedAt: h(5) },
-        { toStatus: "on_hold", changedAt: h(10) },
-        { toStatus: "processing", changedAt: h(12) },
+        { toStatus: "completed", changedAt: h(12) },
+        { toStatus: "processing", changedAt: h(14) },
         { toStatus: "completed", changedAt: h(20) },
       ],
       h(30),
     );
     expect(totals.pending).toBe(5 * 3600000);
-    expect(totals.processing).toBe(13 * 3600000);
-    expect(totals.on_hold).toBe(2 * 3600000);
+    expect(totals.processing).toBe(13 * 3600000); // 7h + 6h after reopening
+    expect(totals.completed).toBe(2 * 3600000 + 10 * 3600000);
     expect(turnaroundMs(t0, h(20))).toBe(20 * 3600000);
   });
 });

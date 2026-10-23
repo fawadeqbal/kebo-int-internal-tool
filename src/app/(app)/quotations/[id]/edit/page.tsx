@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/session";
+import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { getQuotationDetail } from "@/modules/quotations/repository";
 import { updateQuotationAction } from "@/modules/quotations/actions";
@@ -22,7 +23,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
     <>
       <PageHeader
         title={`Edit ${q.refNo} (v${q.version})`}
-        description={`${detail.customer.companyName} · ${detail.query.refNo}: ${detail.query.title}`}
+        description={`${customerName(detail.customer)} · ${detail.query.refNo}: ${detail.query.title}`}
         backHref={`/quotations/${id}`}
         backLabel={q.refNo}
       />

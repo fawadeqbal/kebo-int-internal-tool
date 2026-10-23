@@ -1,6 +1,6 @@
 # QMS — Query & Order Management System
 
-Internal web app to record customer queries/orders, track who is working on them and how long they take, send quotations, and generate invoices — with an admin dashboard and reports.
+Internal web app for **Shandong Kebo International Trade Co., Ltd.** (keboint.com) to receive customer queries — from the website RFQ form, WhatsApp, email or phone — track who is working on them and how long they take, send quotations, and generate invoices. Admins are emailed about everything important.
 
 Built with **Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM · Tailwind CSS**, and deployed with **Docker Compose on your own server**.
 
@@ -10,14 +10,16 @@ Built with **Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM 
 
 | Area | Features |
 |---|---|
-| **Customers** | Company name, contact person, contact number, email, address, NTN, notes · search · duplicate warning (same phone/email) · full history and account balance per customer |
-| **Queries / orders** | Auto reference (`QRY-2026-0001`) · specifications · quantity · priority · required-by date · source (phone, email, WhatsApp, walk-in…) · new customer can be added inside the query form · file attachments (drag & drop, with progress) |
-| **Workflow** | Pending → Processing → On Hold → Completed / Not Completed (reason required) · reopen (managers) · assignment and reassignment with history · internal notes · activity timeline · time spent in each status and turnaround time |
+| **Website inquiries** | The keboint.com RFQ form sends straight into the system: customer added or matched by email/phone, Pending query created, admins emailed. Spam protection built in. See `docs/website-form.md` |
+| **Admin emails** | One list of admin emails (Settings) · tick what to be told about: new query, quotation accepted/rejected, query closed, payment, and a morning summary · "Send a test email" button |
+| **Customers** | Name, company (optional), phone / WhatsApp, email · search · duplicate warning (same phone/email) · full history and account balance per customer |
+| **Queries / orders** | Only three things needed: customer, category, requirements · everything else optional · auto reference (`QRY-2026-0001`) · the same 10 categories as the website · new customer can be added inside the query form · file attachments (drag & drop, with progress) |
+| **Workflow** | Pending → Processing → Completed / Not Completed (reason required) · reopen (managers) · assignment with history · internal notes · activity timeline · turnaround time |
 | **Quotations** | Line items, discount, tax %, auto totals · due/valid-until and submission dates · Draft → Sent → Accepted / Rejected / Expired · new versions (v1, v2…) without changing what the customer saw · print / save as PDF |
 | **Invoices** | Generated from an accepted quotation (values copied, editable before issuing) · sequential numbers (`INV-2026-0001`) never reused · locked once issued · payments (partial or full) · Overdue shown automatically · cancel with reason · print / save as PDF |
 | **Dashboard** | Pending / Processing / On hold / Overdue / Completed / Unassigned · money this month · queries per month chart · pipeline · my open work · needs attention · quotations awaiting reply · unpaid invoices · team workload |
 | **Reports** | Any date range and staff member · conversion · money · source and category breakdown · staff performance · CSV export · print to PDF |
-| **Reminders** | Background worker checks every hour: pending too long, processing too long, due soon / overdue, quotations expiring (auto-expired after due date), invoices due / overdue · in-app notifications · optional email (SMTP) |
+| **Reminders** | Background worker checks every hour: pending too long, processing too long, due soon / overdue, quotations expiring (auto-expired after due date), invoices due / overdue · in-app notifications · daily summary email to admins |
 | **Admin** | Users and roles · company profile, tax, defaults and reminder rules · full audit log (who changed what, old → new values) |
 
 ### Roles
@@ -27,6 +29,8 @@ Built with **Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM 
 | Super Admin | Everything, including users and settings |
 | Manager | All queries, assign work, reopen, quotations, invoices, payments, reports, audit log |
 | Staff | Create queries and customers, work on queries assigned to them, draft and send quotations |
+
+Website inquiries are recorded under a built-in, sign-in-disabled "Website form" account.
 
 Permissions live in one file: `src/lib/auth/permissions.ts`.
 
@@ -44,6 +48,8 @@ cp .env.example .env
 #   DOMAIN              (e.g. qms.yourcompany.com — Caddy gets an HTTPS certificate automatically)
 #   APP_URL             (e.g. https://qms.yourcompany.com)
 #   SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD
+#   NOTIFY_EMAILS       (admin emails to notify — can be changed later in Settings)
+#   SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD   (outgoing email, e.g. Gmail with an App password)
 
 docker compose up -d --build
 
@@ -54,7 +60,10 @@ docker compose run --rm app node dist/scripts/seed.js
 docker compose run --rm app node dist/scripts/seed.js --demo
 ```
 
-Open `https://<DOMAIN>` and sign in with the admin account.
+Open `https://<DOMAIN>` and sign in with the admin account. Then:
+
+1. **Settings → Email notifications:** check the admin emails and press **Send a test email**.
+2. **Settings → Website form:** give the script there to the website designer (details in `docs/website-form.md`).
 
 **LAN-only (no domain):** set `DOMAIN=:80` and `COOKIE_SECURE=false`, then open `http://<server-ip>`.
 

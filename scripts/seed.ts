@@ -69,33 +69,42 @@ async function seedAdmin() {
 }
 
 async function seedSettings() {
-  await db.insert(settings).values({ key: "app", value: DEFAULT_SETTINGS }).onConflictDoNothing();
+  // NOTIFY_EMAILS (comma separated) pre-fills Settings → Email notifications on first setup.
+  const notifyEmails = (process.env.NOTIFY_EMAILS ?? "")
+    .split(/[\s,;]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+  await db.insert(settings).values({ key: "app", value: { ...DEFAULT_SETTINGS, notifyEmails } }).onConflictDoNothing();
 }
 
+/** Fictional overseas buyers: [contact person, company (optional), phone, email, address]. */
 const COMPANIES = [
-  ["Medipak Pharma (Pvt) Ltd", "Imran Qureshi", "0300 5123456", "imran@medipak.example", "Plot 14, Sundar Industrial Estate, Lahore"],
-  ["Crescent Life Sciences", "Dr. Hina Farooq", "0321 4455667", "hina.farooq@crescentls.example", "I-9/2 Industrial Area, Islamabad"],
-  ["Indus Biotech Labs", "Kamran Siddiqui", "0333 2211009", "kamran@indusbio.example", "Korangi Industrial Area, Karachi"],
-  ["Karakoram Healthcare", "Faisal Mehmood", "0345 9988776", "procurement@karakoramhc.example", "Hattar Industrial Estate, Haripur"],
-  ["Ravi Generics", "Nadia Aslam", "0301 7766554", "nadia@ravigenerics.example", "Multan Road, Lahore"],
-  ["Zamzam Nutraceuticals", "Adeel Raza", "0312 3344556", "adeel.raza@zamzamnutra.example", "SITE Area, Karachi"],
-  ["Margalla Pharmaceuticals", "Saima Javed", "0336 1212121", "saima@margallapharma.example", "Rawat Industrial Zone, Rawalpindi"],
-  ["Hilal Herbal Labs", "Tariq Hussain", "0302 5656565", null, "Small Industrial Estate, Peshawar"],
-  ["Noor Veterinary Products", "Rabia Noor", "0322 8080808", "rabia@noorvet.example", "Sargodha Road, Faisalabad"],
-  ["Sindh Medical Supplies", "Asad Memon", "0300 2929292", "asad@sindhmed.example", "Hyderabad Bypass, Hyderabad"],
+  ["Imran Qureshi", "Medipak Pharma (Pvt) Ltd", "+92 300 5123456", "imran@medipak.example", "Sundar Industrial Estate, Lahore, Pakistan"],
+  ["Dr. Hina Farooq", "Crescent Life Sciences", "+92 321 4455667", "hina@crescentls.example", "I-9 Industrial Area, Islamabad, Pakistan"],
+  ["Chinedu Okafor", "Lagos Health Industries Ltd", "+234 803 555 0142", "chinedu@lagoshealth.example", "Ikeja, Lagos, Nigeria"],
+  ["Amina Mwangi", "Nairobi Juice Co.", "+254 722 555 019", "amina@nairobijuice.example", "Industrial Area, Nairobi, Kenya"],
+  ["Khalid Al-Harbi", "Gulf Cosmetics Factory", "+966 55 555 0187", "khalid@gulfcosmetics.example", "Second Industrial City, Riyadh, Saudi Arabia"],
+  ["Rashed Hossain", "Dhaka Textiles Ltd", "+880 1711 555 210", "rashed@dhakatex.example", "Gazipur, Dhaka, Bangladesh"],
+  ["Omar Farid", null, "+20 100 555 0193", "omar.farid@mail.example", "Cairo, Egypt"],
+  ["Dilshod Karimov", "Tashkent MedLab", "+998 90 555 0136", "dilshod@tashkentmedlab.example", "Tashkent, Uzbekistan"],
+  ["Fatima Zahra Benali", "Atlas Food Processing", "+212 661 555 024", "fz.benali@atlasfood.example", "Casablanca, Morocco"],
+  ["Ahmed Raza", null, "+971 50 555 0178", "ahmed.raza@mail.example", "Sharjah, UAE"],
 ] as const;
 
+/** Sample requests in the same categories as the website form; prices in USD. */
 const JOBS = [
-  { category: "Tablet press", title: "Rotary tablet press, 35 stations", spec: "D-tooling, 35 stations, output up to 250,000 tablets/hour. GMP model with SS316 contact parts, force feeder and PLC/HMI. Needs IQ/OQ documents.", price: 6_800_000 },
-  { category: "Tablet press", title: "Single-punch tablet press for R&D", spec: "Lab-scale single punch press for formulation trials. 10 mm round tooling set required. Bench-top, 220V.", price: 650_000 },
-  { category: "Capsule filling", title: "Automatic capsule filling machine", spec: "Size 0–4 change parts, 25,000 capsules/hour, with dust extraction and empty-capsule rejection.", price: 5_400_000 },
-  { category: "Blister packing", title: "Alu-PVC blister packing machine", spec: "Flat-plate type, 40 cycles/min, 2 blisters per cycle, with batch coding and missing-tablet detection.", price: 7_900_000 },
-  { category: "Mixer / granulator", title: "Rapid mixer granulator, 150 L", spec: "150 L working capacity, SS316, impeller + chopper, jacketed bowl, CIP nozzles, flameproof motor.", price: 3_200_000 },
-  { category: "Coating machine", title: "Auto coater, 48 inch", spec: "Perforated pan coater, 150 kg batch, spray guns x3, HMI recipe control, dust collector.", price: 8_600_000 },
-  { category: "Spare parts", title: "Punches and dies set (B tooling)", spec: "B-type punches and dies, 12 mm round, bevel edge, set of 27 stations. Chrome plated.", price: 420_000 },
-  { category: "Service / maintenance", title: "Annual maintenance contract — tablet presses", spec: "Preventive maintenance for 3 tablet presses, 4 visits/year, includes calibration certificates.", price: 900_000 },
-  { category: "Spare parts", title: "Blister forming and sealing rollers", spec: "Replacement forming plate and sealing roller for existing blister machine model BP-260.", price: 380_000 },
-  { category: "Mixer / granulator", title: "Octagonal blender, 500 L", spec: "500 L octagonal blender with charging/discharging butterfly valves, safety railing, timer.", price: 2_100_000 },
+  { category: "Pharmaceutical Machinery", title: "Rotary tablet press, 35 stations", spec: "D-tooling, 35 stations, up to 250,000 tablets/hour. GMP model, SS316 contact parts, force feeder, PLC/HMI. Need IQ/OQ documents.", price: 68_000 },
+  { category: "Pharmaceutical Machinery", title: "Automatic capsule filling machine", spec: "Size 0–4 change parts, 25,000 capsules/hour, dust extraction and empty-capsule rejection.", price: 54_000 },
+  { category: "Pharmaceutical Machinery", title: "Alu-PVC blister packing machine", spec: "Flat-plate type, 40 cycles/min, batch coding and missing-tablet detection.", price: 79_000 },
+  { category: "Medical Devices & Equipment", title: "Hospital bed set, 50 units", spec: "Electric 3-function ICU beds with side rails and mattresses. CE certified. Delivery to port in 60 days.", price: 1_150 },
+  { category: "Laboratory Equipment", title: "HPLC system for QC lab", spec: "Quaternary pump, UV detector, autosampler, software and installation. 220V 50Hz.", price: 32_000 },
+  { category: "Food Processing Machinery", title: "Fruit juice processing line, 2 t/h", spec: "Washing, crushing, pulping, pasteurising and hot filling for mango and orange juice. 2 tons per hour.", price: 145_000 },
+  { category: "Beverage Machinery", title: "Water bottling line, 6,000 bph", spec: "Rinsing, filling, capping 3-in-1 machine for 500 ml PET bottles, with labeller and shrink wrapper.", price: 88_000 },
+  { category: "Cosmetics Manufacturing Machinery", title: "Vacuum emulsifying mixer, 200 L", spec: "Homogenizer for creams and lotions, hydraulic lift, SS316L, with oil and water phase tanks.", price: 26_500 },
+  { category: "Utility & HVAC Systems", title: "Clean room HVAC for 400 m² pharma area", spec: "AHUs, HEPA filters, ducting and BMS for Grade C/D rooms. Need layout drawing and quote.", price: 210_000 },
+  { category: "Textile Machinery", title: "Air-jet looms, 24 units", spec: "190 cm reed width, 1,000 rpm, dobby shedding. Installation and training included.", price: 23_500 },
+  { category: "Solar System Solutions", title: "500 kW rooftop solar system", spec: "Mono PERC panels, string inverters, mounting structure and monitoring for a factory roof.", price: 265_000 },
+  { category: "General Order Supply", title: "Spare motors and gearboxes", spec: "Assorted 3-phase motors 5.5–22 kW and matching gearboxes, list attached by email.", price: 9_800 },
 ] as const;
 
 async function seedDemo(adminId: string) {
@@ -124,7 +133,7 @@ async function seedDemo(adminId: string) {
   const workers = [staff["Bilal Ahmed"], staff["Sana Malik"], staff["Usman Tariq"]];
 
   const customerIds: string[] = [];
-  for (const [companyName, contactPerson, phone, email, address] of COMPANIES) {
+  for (const [contactPerson, companyName, phone, email, address] of COMPANIES) {
     const [row] = await db
       .insert(customers)
       .values({ companyName, contactPerson, phone, email, address, createdBy: manager, createdAt: addDays(new Date(), -200) })
@@ -133,7 +142,7 @@ async function seedDemo(adminId: string) {
   }
 
   const now = new Date();
-  const sources = ["phone", "email", "whatsapp", "walk_in", "email", "phone"] as const;
+  const sources = ["website", "website", "whatsapp", "email", "website", "phone"] as const;
   const priorities = ["normal", "normal", "high", "low", "urgent", "normal"] as const;
   const TOTAL = 34;
 
@@ -145,14 +154,14 @@ async function seedDemo(adminId: string) {
     const job = pick(JOBS);
     const customerId = pick(customerIds);
     const assignee = rand() < 0.88 ? pick(workers) : null;
-    const quantity = job.category === "Spare parts" ? 1 + Math.floor(rand() * 3) : 1;
+    const quantity = job.title.startsWith("Hospital bed") ? 50 : job.title.startsWith("Air-jet") ? 24 : 1;
     const requiredBy = iso(addDays(created, 10 + Math.floor(rand() * 30)));
 
     // Decide where this query ended up.
-    let outcome: "pending" | "processing" | "on_hold" | "quoted_draft" | "sent" | "rejected" | "accepted" | "invoiced" | "paid" | "partial" | "not_completed";
+    let outcome: "pending" | "processing" | "quoted_draft" | "sent" | "rejected" | "accepted" | "invoiced" | "paid" | "partial" | "not_completed";
     const r = rand();
     if (age < 3) outcome = r < 0.65 ? "pending" : "processing";
-    else if (age < 20) outcome = r < 0.15 ? "pending" : r < 0.4 ? "processing" : r < 0.5 ? "on_hold" : r < 0.65 ? "quoted_draft" : r < 0.9 ? "sent" : "accepted";
+    else if (age < 20) outcome = r < 0.15 ? "pending" : r < 0.5 ? "processing" : r < 0.65 ? "quoted_draft" : r < 0.9 ? "sent" : "accepted";
     else outcome = r < 0.1 ? "not_completed" : r < 0.22 ? "rejected" : r < 0.3 ? "sent" : r < 0.45 ? "invoiced" : r < 0.6 ? "partial" : "paid";
 
     await db.transaction(async (tx) => {
@@ -165,10 +174,6 @@ async function seedDemo(adminId: string) {
       if (outcome !== "pending") {
         hist.push({ from: "pending", to: "processing", at: startAt });
         status = "processing";
-      }
-      if (outcome === "on_hold") {
-        hist.push({ from: "processing", to: "on_hold", at: addHours(startAt, 30), reason: "Waiting for drawings from the customer" });
-        status = "on_hold";
       }
       if (outcome === "not_completed") {
         completedAt = addDays(startAt, 3 + rand() * 5);
@@ -229,12 +234,12 @@ async function seedDemo(adminId: string) {
       // Quotations
       if (["quoted_draft", "sent", "rejected", "accepted", "invoiced", "paid", "partial"].includes(outcome)) {
         const quotedAt = addDays(startAt, 2 + rand() * 4);
-        const unit = Math.round((job.price * (0.9 + rand() * 0.25)) / 1000) * 1000;
+        const unit = Math.round((job.price * (0.9 + rand() * 0.25)) / 50) * 50;
         const lines = [{ description: `${job.title}\n${job.spec}`, quantity, unitPrice: unit }];
-        if (job.category !== "Spare parts" && job.category !== "Service / maintenance")
-          lines.push({ description: "Installation, commissioning and operator training", quantity: 1, unitPrice: Math.round(unit * 0.04 / 1000) * 1000 });
-        const discount = rand() < 0.3 ? Math.round(unit * 0.02 / 1000) * 1000 : 0;
-        const t = calculateTotals(lines, discount, 18);
+        if (job.category !== "General Order Supply")
+          lines.push({ description: "Sea freight CIF destination port, incl. export documents", quantity: 1, unitPrice: Math.round((unit * quantity * 0.06) / 50) * 50 });
+        const discount = rand() < 0.3 ? Math.round((unit * quantity * 0.02) / 50) * 50 : 0;
+        const t = calculateTotals(lines, discount, 0);
         const qStatus: schema.QuotationStatus =
           outcome === "quoted_draft" ? "draft" : outcome === "sent" ? "sent" : outcome === "rejected" ? "rejected" : "accepted";
         const submittedAt = qStatus === "draft" ? null : iso(addDays(quotedAt, 1));
@@ -248,7 +253,7 @@ async function seedDemo(adminId: string) {
             version: 1,
             subtotal: fromCents(t.subtotal),
             discount: fromCents(t.discount),
-            taxRate: "18",
+            taxRate: "0",
             taxAmount: fromCents(t.taxAmount),
             total: fromCents(t.total),
             dueDate,
@@ -289,7 +294,7 @@ async function seedDemo(adminId: string) {
               dueDate: invDue,
               subtotal: fromCents(t.subtotal),
               discount: fromCents(t.discount),
-              taxRate: "18",
+              taxRate: "0",
               taxAmount: fromCents(t.taxAmount),
               total: fromCents(t.total),
               amountPaid: fromCents(paid),

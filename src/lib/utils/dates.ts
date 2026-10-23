@@ -1,5 +1,5 @@
 /** Today's date as YYYY-MM-DD in the business time zone. */
-export const APP_TIME_ZONE = process.env.APP_TIME_ZONE ?? "Asia/Karachi";
+export const APP_TIME_ZONE = process.env.APP_TIME_ZONE ?? "Asia/Shanghai";
 
 export function todayISO(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIME_ZONE }).format(new Date());

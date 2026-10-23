@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, ne, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { customers, invoices, payments, queries, quotations, users } from "@/lib/db/schema";
+import { customerDisplayName } from "@/modules/customers/repository";
 import type { SessionUser } from "@/lib/auth/session";
 import { accessCondition } from "@/modules/queries/repository";
 import { OPEN_STATUSES } from "@/modules/queries/workflow";
@@ -11,7 +12,7 @@ export interface Range {
   to: string; // YYYY-MM-DD inclusive
 }
 
-const tzName = process.env.APP_TIME_ZONE ?? "Asia/Karachi";
+const tzName = process.env.APP_TIME_ZONE ?? "Asia/Shanghai";
 if (!/^[A-Za-z0-9_\/+-]+$/.test(tzName)) throw new Error("APP_TIME_ZONE is not a valid time zone name");
 /** Inlined (validated) so identical expressions in SELECT and GROUP BY match exactly. */
 const tz = sql.raw(`'${tzName}'`);
@@ -33,12 +34,11 @@ export async function statusCounts(user: SessionUser, staffId?: string) {
   const [{ unassigned }] = await db
     .select({ unassigned: count() })
     .from(queries)
-    .where(and(scope(user, staffId), inArray(queries.status, OPEN_STATUSES), isNull(queries.assignedTo)));
+    .where(and(scope(user, staffId), eq(queries.status, "pending"), isNull(queries.assignedTo)));
   const byStatus = Object.fromEntries(rows.map((r) => [r.status, r.n])) as Record<string, number>;
   return {
     pending: byStatus.pending ?? 0,
     processing: byStatus.processing ?? 0,
-    on_hold: byStatus.on_hold ?? 0,
     completed: byStatus.completed ?? 0,
     not_completed: byStatus.not_completed ?? 0,
     overdue,
@@ -69,8 +69,8 @@ export async function workload(r: Range) {
       id: users.id,
       name: users.name,
       role: users.role,
-      open: sql<number>`count(${queries.id}) filter (where ${queries.status} in ('pending','processing','on_hold'))`.mapWith(Number),
-      overdue: sql<number>`count(${queries.id}) filter (where ${queries.status} in ('pending','processing','on_hold') and ${queries.requiredBy} < ${todayISO()})`.mapWith(Number),
+      open: sql<number>`count(${queries.id}) filter (where ${queries.status} in ('pending','processing'))`.mapWith(Number),
+      overdue: sql<number>`count(${queries.id}) filter (where ${queries.status} in ('pending','processing') and ${queries.requiredBy} < ${todayISO()})`.mapWith(Number),
       completed: sql<number>`count(${queries.id}) filter (where ${queries.status} = 'completed' and (${queries.completedAt} at time zone ${tz})::date between ${r.from} and ${r.to})`.mapWith(Number),
       notCompleted: sql<number>`count(${queries.id}) filter (where ${queries.status} = 'not_completed' and (${queries.completedAt} at time zone ${tz})::date between ${r.from} and ${r.to})`.mapWith(Number),
       avgMs: sql<number | null>`avg(extract(epoch from (${queries.completedAt} - ${queries.createdAt})) * 1000) filter (where ${queries.status} = 'completed' and (${queries.completedAt} at time zone ${tz})::date between ${r.from} and ${r.to})`.mapWith(
@@ -81,7 +81,7 @@ export async function workload(r: Range) {
     .leftJoin(queries, and(eq(queries.assignedTo, users.id), isNull(queries.deletedAt)))
     .where(eq(users.isActive, true))
     .groupBy(users.id, users.name, users.role)
-    .orderBy(desc(sql`count(${queries.id}) filter (where ${queries.status} in ('pending','processing','on_hold'))`), asc(users.name));
+    .orderBy(desc(sql`count(${queries.id}) filter (where ${queries.status} in ('pending','processing'))`), asc(users.name));
   return rows;
 }
 
@@ -183,7 +183,7 @@ export async function overdueQueries(user: SessionUser, limit = 6) {
       title: queries.title,
       requiredBy: queries.requiredBy,
       status: queries.status,
-      companyName: customers.companyName,
+      companyName: customerDisplayName,
       assigneeName: users.name,
     })
     .from(queries)
@@ -197,7 +197,7 @@ export async function overdueQueries(user: SessionUser, limit = 6) {
 export async function staleQueries(user: SessionUser, pendingDays: number, limit = 6) {
   const cutoff = new Date(Date.now() - pendingDays * 86400000);
   return db
-    .select({ id: queries.id, refNo: queries.refNo, title: queries.title, createdAt: queries.createdAt, companyName: customers.companyName, assigneeName: users.name })
+    .select({ id: queries.id, refNo: queries.refNo, title: queries.title, createdAt: queries.createdAt, companyName: customerDisplayName, assigneeName: users.name })
     .from(queries)
     .innerJoin(customers, eq(customers.id, queries.customerId))
     .leftJoin(users, eq(users.id, queries.assignedTo))
@@ -208,7 +208,7 @@ export async function staleQueries(user: SessionUser, pendingDays: number, limit
 
 export async function expiringQuotations(user: SessionUser, withinDays: number, limit = 6) {
   return db
-    .select({ id: quotations.id, refNo: quotations.refNo, dueDate: quotations.dueDate, total: quotations.total, companyName: customers.companyName })
+    .select({ id: quotations.id, refNo: quotations.refNo, dueDate: quotations.dueDate, total: quotations.total, companyName: customerDisplayName })
     .from(quotations)
     .innerJoin(queries, eq(queries.id, quotations.queryId))
     .innerJoin(customers, eq(customers.id, queries.customerId))
@@ -226,7 +226,7 @@ export async function unpaidInvoices(limit = 6) {
       total: invoices.total,
       amountPaid: invoices.amountPaid,
       status: invoices.status,
-      companyName: customers.companyName,
+      companyName: customerDisplayName,
     })
     .from(invoices)
     .innerJoin(customers, eq(customers.id, invoices.customerId))

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { customerName } from "@/lib/utils/names";
 import { CopyPlus, Pencil, Printer, Receipt } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
@@ -45,7 +46,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               <QuotationStatusBadge status={q.status} />
             </div>
             <p className="mt-1 text-sm text-muted">
-              {customer.companyName} · {formatMoney(q.total, settings.currency)} · due {formatDate(q.dueDate)}
+              {customerName(customer)} · {formatMoney(q.total, settings.currency)} · due {formatDate(q.dueDate)}
               {late && <span className="ml-2 font-semibold text-red-700">— past due, no reply yet</span>}
             </p>
           </div>

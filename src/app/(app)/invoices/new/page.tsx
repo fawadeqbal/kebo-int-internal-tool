@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/session";
+import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { addDaysISO, todayISO } from "@/lib/utils/dates";
 import { getQuotationDetail } from "@/modules/quotations/repository";
@@ -23,7 +24,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
     <>
       <PageHeader
         title="Generate invoice"
-        description={`From ${q.refNo} (v${q.version}) · ${detail.customer.companyName} · ${detail.query.refNo}`}
+        description={`From ${q.refNo} (v${q.version}) · ${customerName(detail.customer)} · ${detail.query.refNo}`}
         backHref={`/quotations/${q.id}`}
         backLabel={q.refNo}
       />

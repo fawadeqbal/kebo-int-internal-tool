@@ -69,7 +69,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <StatTile label="Completed" value={summary.completed} tone="good" />
         <StatTile label="Not completed" value={summary.notCompleted} />
         <StatTile label="Avg. turnaround" value={formatDuration(summary.avgTurnaroundMs)} hint="Received → completed" />
-        <StatTile label="Open right now" value={counts.pending + counts.processing + counts.on_hold} hint={`${counts.overdue} overdue`} tone={counts.overdue ? "alert" : "default"} />
+        <StatTile label="Open right now" value={counts.pending + counts.processing} hint={`${counts.overdue} overdue`} tone={counts.overdue ? "alert" : "default"} />
       </section>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

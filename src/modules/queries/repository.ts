@@ -11,9 +11,11 @@ import {
   quotations,
   users,
   type Priority,
+  type QuerySource,
   type QueryStatus,
 } from "@/lib/db/schema";
 import { can } from "@/lib/auth/permissions";
+import { customerDisplayName } from "@/modules/customers/repository";
 import type { SessionUser } from "@/lib/auth/session";
 import { todayISO } from "@/lib/utils/dates";
 import { OPEN_STATUSES } from "./workflow";
@@ -30,6 +32,7 @@ export interface QueryFilters {
   assignee?: string; // user id | "me" | "unassigned"
   customerId?: string;
   priority?: Priority;
+  source?: QuerySource;
   from?: string;
   to?: string;
   sort?: "newest" | "oldest" | "required" | "priority" | "updated";
@@ -53,6 +56,7 @@ export function filterConditions(user: SessionUser, f: QueryFilters): SQL | unde
   else if (f.assignee) conditions.push(eq(queries.assignedTo, f.assignee));
   if (f.customerId) conditions.push(eq(queries.customerId, f.customerId));
   if (f.priority) conditions.push(eq(queries.priority, f.priority));
+  if (f.source) conditions.push(eq(queries.source, f.source));
   if (f.from) conditions.push(gte(queries.createdAt, new Date(`${f.from}T00:00:00`)));
   if (f.to) conditions.push(lte(queries.createdAt, new Date(`${f.to}T23:59:59.999`)));
   return and(...conditions);
@@ -91,7 +95,7 @@ const listColumns = {
   updatedAt: queries.updatedAt,
   completedAt: queries.completedAt,
   customerId: customers.id,
-  companyName: customers.companyName,
+  companyName: customerDisplayName,
   contactPerson: customers.contactPerson,
   customerPhone: customers.phone,
   assigneeId: assignee.id,

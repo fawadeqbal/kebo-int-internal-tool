@@ -17,19 +17,19 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader
         title="Customers"
-        description="Companies and contact people who send us queries."
+        description="Everyone who has sent us a query."
         actions={<ButtonLink href="/customers/new">Add customer</ButtonLink>}
       />
       <Card>
         <form className="flex flex-wrap items-end gap-3 border-b border-line p-4" role="search">
           <label className="flex min-w-64 flex-1 flex-col gap-1.5 text-sm font-medium">
             Search
-            <Input id="search" name="q" defaultValue={q} placeholder="Company, contact person, phone or email" />
+            <Input id="search" name="q" defaultValue={q} placeholder="Name, company, phone or email" />
           </label>
           <label className="flex flex-col gap-1.5 text-sm font-medium">
             Sort by
             <Select name="sort" defaultValue={sort} className="w-44">
-              <option value="company">Company name</option>
+              <option value="company">Name (A–Z)</option>
               <option value="recent">Most recent query</option>
             </Select>
           </label>
@@ -50,9 +50,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <Table>
             <thead>
               <tr>
+                <Th>Customer</Th>
                 <Th>Company</Th>
-                <Th>Contact person</Th>
-                <Th>Contact number</Th>
+                <Th>Phone / WhatsApp</Th>
                 <Th>Email</Th>
                 <Th className="text-right">Queries</Th>
                 <Th>Last query</Th>
@@ -63,10 +63,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <tr key={c.id} className="hover:bg-canvas/60">
                   <Td>
                     <Link href={`/customers/${c.id}`} className="font-medium text-brand-700 hover:underline">
-                      {c.companyName}
+                      {c.contactPerson}
                     </Link>
                   </Td>
-                  <Td>{c.contactPerson}</Td>
+                  <Td className={c.companyName ? "" : "text-muted"}>{c.companyName ?? "—"}</Td>
                   <Td className="whitespace-nowrap tabular-nums">{c.phone}</Td>
                   <Td className="text-muted">{c.email ?? "—"}</Td>
                   <Td className="text-right tabular-nums">{c.queryCount}</Td>

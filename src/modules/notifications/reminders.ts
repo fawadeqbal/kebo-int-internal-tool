@@ -1,9 +1,10 @@
 import { and, eq, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { invoices, queries, quotations, users } from "@/lib/db/schema";
+import { customers, invoices, queries, quotations, settings as settingsTable } from "@/lib/db/schema";
 import { addDaysISO, todayISO } from "@/lib/utils/dates";
-import { getMailer } from "@/lib/email";
-import { loadSettings } from "@/modules/settings/service";
+import { getMailer, renderEmail } from "@/lib/email";
+import { formatMoney, toCents } from "@/lib/utils/money";
+import { loadSettings, type AppSettings } from "@/modules/settings/service";
 import { recordAudit } from "@/modules/audit/service";
 import { insertNotifications, managerIds, type NewNotification } from "./repository";
 
@@ -61,7 +62,7 @@ export async function runReminders(now = new Date()) {
   const due = await db
     .select({ id: queries.id, refNo: queries.refNo, title: queries.title, assignedTo: queries.assignedTo, requiredBy: queries.requiredBy })
     .from(queries)
-    .where(and(isNull(queries.deletedAt), inArray(queries.status, ["pending", "processing", "on_hold"]), lte(queries.requiredBy, soon)));
+    .where(and(isNull(queries.deletedAt), inArray(queries.status, ["pending", "processing"]), lte(queries.requiredBy, soon)));
   for (const q of due) {
     const overdue = q.requiredBy! < today;
     notify(overdue ? [q.assignedTo, ...managers] : [q.assignedTo], {
@@ -116,25 +117,64 @@ export async function runReminders(now = new Date()) {
   }
 
   const created = await insertNotifications(db, out);
+  const summarySent = await sendDailySummary(settings, now);
+  return { checked: out.length, created, summarySent };
+}
 
-  // Optional email copy of each new reminder (only when SMTP is configured).
-  if (created > 0 && process.env.SMTP_HOST) {
-    const recipients = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.isActive, true));
-    const mailer = getMailer();
-    const appUrl = process.env.APP_URL ?? "";
-    const byUser = new Map<string, NewNotification[]>();
-    for (const n of out) byUser.set(n.userId, [...(byUser.get(n.userId) ?? []), n]);
-    for (const [userId, list] of byUser) {
-      const email = recipients.find((r) => r.id === userId)?.email;
-      if (!email) continue;
-      await mailer
-        .send({
-          to: email,
-          subject: `${list.length} reminder${list.length > 1 ? "s" : ""} from ${settings.companyName}`,
-          text: list.map((n) => `• ${n.title}${n.link ? `\n  ${appUrl}${n.link}` : ""}`).join("\n\n"),
-        })
-        .catch((e) => console.error("[reminders] email failed", e));
-    }
+const SUMMARY_KEY = "daily-summary-sent";
+const SUMMARY_HOUR = Number(process.env.DAILY_SUMMARY_HOUR ?? 8);
+
+/** One email per day to the admin list: what is new, overdue and unpaid. */
+async function sendDailySummary(settings: AppSettings, now: Date): Promise<boolean> {
+  if (!settings.notifyDailySummary || settings.notifyEmails.length === 0) return false;
+  const tz = process.env.APP_TIME_ZONE ?? "Asia/Shanghai";
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: tz }).format(now));
+  if (hour < SUMMARY_HOUR) return false;
+  const today = todayISO();
+  const [last] = await db.select().from(settingsTable).where(eq(settingsTable.key, SUMMARY_KEY));
+  if (last?.value === today) return false;
+
+  const open = await db
+    .select({ id: queries.id, refNo: queries.refNo, title: queries.title, status: queries.status, requiredBy: queries.requiredBy, createdAt: queries.createdAt, customer: sql<string>`coalesce(${customers.companyName}, ${customers.contactPerson})` })
+    .from(queries)
+    .innerJoin(customers, eq(customers.id, queries.customerId))
+    .where(and(isNull(queries.deletedAt), inArray(queries.status, ["pending", "processing"])));
+  const since = new Date(now.getTime() - 86400000);
+  const fresh = open.filter((q) => q.createdAt > since);
+  const overdue = open.filter((q) => q.requiredBy && q.requiredBy < today);
+  const unpaid = await db
+    .select({ invoiceNo: invoices.invoiceNo, dueDate: invoices.dueDate, total: invoices.total, paid: invoices.amountPaid })
+    .from(invoices)
+    .where(and(inArray(invoices.status, ["unpaid", "partially_paid"]), lt(invoices.dueDate, today)));
+
+  const lines = [
+    `Pending: ${open.filter((q) => q.status === "pending").length}   Processing: ${open.filter((q) => q.status === "processing").length}   Overdue: ${overdue.length}`,
+    "",
+    `New in the last 24 hours (${fresh.length}):`,
+    ...(fresh.length ? fresh.map((q) => `• ${q.refNo} — ${q.customer}: ${q.title}`) : ["• none"]),
+    "",
+    `Overdue queries (${overdue.length}):`,
+    ...(overdue.length ? overdue.slice(0, 20).map((q) => `• ${q.refNo} — ${q.customer}: ${q.title} (due ${q.requiredBy})`) : ["• none"]),
+    "",
+    `Overdue invoices (${unpaid.length}):`,
+    ...(unpaid.length ? unpaid.map((i) => `• ${i.invoiceNo} — ${formatMoney((toCents(i.total) - toCents(i.paid)) / 100, settings.currency)} due ${i.dueDate}`) : ["• none"]),
+  ];
+  const mail = renderEmail({
+    heading: `Daily summary — ${today}`,
+    body: lines.join("\n"),
+    link: `${(process.env.APP_URL ?? "").replace(/\/$/, "")}/dashboard`,
+    linkLabel: "Open dashboard",
+    footer: settings.companyName,
+  });
+  try {
+    await getMailer().send({ to: settings.notifyEmails, subject: `Daily summary: ${fresh.length} new, ${overdue.length} overdue`, ...mail });
+  } catch (error) {
+    console.error("[reminders] daily summary email failed", error);
+    return false;
   }
-  return { checked: out.length, created };
+  await db
+    .insert(settingsTable)
+    .values({ key: SUMMARY_KEY, value: today })
+    .onConflictDoUpdate({ target: settingsTable.key, set: { value: today, updatedAt: new Date() } });
+  return true;
 }

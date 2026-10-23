@@ -25,7 +25,7 @@ export function DocumentView({
   kind: "Quotation" | "Invoice";
   number: string;
   settings: AppSettings;
-  customer: { companyName: string; contactPerson: string; phone: string; email: string | null; address: string | null; taxNo: string | null };
+  customer: { companyName: string | null; contactPerson: string; phone: string; email: string | null; address: string | null; taxNo: string | null };
   meta: { label: string; value: string }[];
   items: DocLine[];
   totals: { subtotal: string; discount: string; taxRate: string; taxAmount: string; total: string; amountPaid?: string };
@@ -48,7 +48,7 @@ export function DocumentView({
           <p className="text-lg font-bold tracking-tight">{settings.companyName}</p>
           {settings.companyAddress && <p className="whitespace-pre-line text-stone-600">{settings.companyAddress}</p>}
           <p className="text-stone-600">{[settings.companyPhone, settings.companyEmail].filter(Boolean).join(" · ")}</p>
-          {settings.companyTaxNo && <p className="text-stone-600">NTN: {settings.companyTaxNo}</p>}
+          {settings.companyTaxNo && <p className="text-stone-600">Tax no.: {settings.companyTaxNo}</p>}
         </div>
         <div className="text-right">
           <p className="text-2xl font-light uppercase tracking-[0.2em] text-stone-500">{kind}</p>
@@ -59,11 +59,11 @@ export function DocumentView({
       <section className="grid grid-cols-1 gap-6 py-6 sm:grid-cols-2">
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500">{kind === "Invoice" ? "Bill to" : "Prepared for"}</p>
-          <p className="font-semibold">{customer.companyName}</p>
-          <p>Attn: {customer.contactPerson}</p>
+          <p className="font-semibold">{customer.companyName || customer.contactPerson}</p>
+          {customer.companyName && <p>Attn: {customer.contactPerson}</p>}
           {customer.address && <p className="text-stone-600">{customer.address}</p>}
           <p className="text-stone-600">{[customer.phone, customer.email].filter(Boolean).join(" · ")}</p>
-          {customer.taxNo && <p className="text-stone-600">NTN: {customer.taxNo}</p>}
+          {customer.taxNo && <p className="text-stone-600">Tax no.: {customer.taxNo}</p>}
         </div>
         <dl className="grid grid-cols-[auto_1fr] content-start gap-x-6 gap-y-1 sm:justify-self-end">
           {meta.map((m) => (

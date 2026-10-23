@@ -21,13 +21,7 @@ import {
 export const roleEnum = pgEnum("role", ["admin", "manager", "staff"]);
 export const querySourceEnum = pgEnum("query_source", ["phone", "email", "whatsapp", "walk_in", "website", "other"]);
 export const priorityEnum = pgEnum("priority", ["low", "normal", "high", "urgent"]);
-export const queryStatusEnum = pgEnum("query_status", [
-  "pending",
-  "processing",
-  "on_hold",
-  "completed",
-  "not_completed",
-]);
+export const queryStatusEnum = pgEnum("query_status", ["pending", "processing", "completed", "not_completed"]);
 export const quotationStatusEnum = pgEnum("quotation_status", ["draft", "sent", "accepted", "rejected", "expired"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", ["unpaid", "partially_paid", "paid", "cancelled"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "bank_transfer", "cheque", "online", "other"]);
@@ -64,7 +58,8 @@ export const customers = pgTable(
   "customers",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    companyName: varchar("company_name", { length: 200 }).notNull(),
+    /** Optional — website inquiries may come from individuals. */
+    companyName: varchar("company_name", { length: 200 }),
     contactPerson: varchar("contact_person", { length: 120 }).notNull(),
     email: varchar("email", { length: 254 }),
     phone: varchar("phone", { length: 40 }).notNull(),

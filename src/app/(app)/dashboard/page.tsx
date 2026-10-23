@@ -4,9 +4,7 @@ import { can } from "@/lib/auth/permissions";
 import {
   expiringQuotations,
   finance,
-  monthlyTrend,
   overdueQueries,
-  pipeline,
   rangeSummary,
   staleQueries,
   statusCounts,
@@ -18,16 +16,13 @@ import { getSettings } from "@/modules/settings/service";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import { Card, CardBody, CardHeader, Table, Td, Th } from "@/components/ui";
 import { InvoiceStatusBadge, PriorityBadge, QueryStatusBadge } from "@/components/ui/badge";
-import { BarList, StatTile } from "@/components/stats";
-import { TrendChart } from "@/components/charts";
-import { formatDate, formatDuration, todayISO } from "@/lib/utils/dates";
+import { StatTile } from "@/components/stats";
+import { Badge } from "@/components/ui/badge";
+import { SOURCE_LABEL } from "@/lib/labels";
+import { formatDate, formatDateTime, formatDuration, todayISO } from "@/lib/utils/dates";
 import { formatCents, formatMoney, toCents } from "@/lib/utils/money";
 
 export const metadata = { title: "Dashboard" };
-
-function pct(part: number, whole: number) {
-  return whole > 0 ? `${Math.round((part / whole) * 100)}%` : "—";
-}
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -37,11 +32,10 @@ export default async function DashboardPage() {
   const isManager = can(user.role, "reports.view");
   const money = can(user.role, "invoices.manage");
 
-  const [counts, month, trend, funnel, overdue, stale, expiring, mine] = await Promise.all([
+  const [counts, month, fresh, overdue, stale, expiring, mine] = await Promise.all([
     statusCounts(user),
     rangeSummary(user, monthRange),
-    monthlyTrend(user, 12),
-    pipeline(user, monthRange),
+    listQueries(user, { status: "pending", sort: "newest", pageSize: 6 }),
     overdueQueries(user),
     staleQueries(user, settings.reminderPendingDays),
     expiringQuotations(user, settings.reminderDueSoonDays),
@@ -52,7 +46,7 @@ export default async function DashboardPage() {
     money ? unpaidInvoices() : [],
     isManager ? workload(monthRange) : [],
   ]);
-  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: process.env.APP_TIME_ZONE ?? "Asia/Karachi" }).format(new Date()));
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: process.env.APP_TIME_ZONE ?? "Asia/Shanghai" }).format(new Date()));
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
@@ -67,19 +61,18 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      <section aria-label="Work status" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <StatTile label="Pending" value={counts.pending} href="/queries?status=pending" hint="Not started yet" />
-        <StatTile label="Processing" value={counts.processing} href="/queries?status=processing" hint="Being worked on" />
-        <StatTile label="On hold" value={counts.on_hold} href="/queries?status=on_hold" hint="Waiting on something" />
-        <StatTile label="Overdue" value={counts.overdue} href="/queries?status=overdue" tone={counts.overdue > 0 ? "alert" : "default"} hint="Past required-by date" />
-        <StatTile label="Completed" value={month.completed} href="/queries?status=completed" tone="good" hint="This month" />
+      <section aria-label="Work status" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <StatTile
-          label={isManager ? "Unassigned" : "Not completed"}
-          value={isManager ? counts.unassigned : month.notCompleted}
-          href={isManager ? "/queries?status=open&assignee=unassigned" : "/queries?status=not_completed"}
+          label="Pending"
+          value={counts.pending}
+          href="/queries?status=pending"
+          hint={isManager && counts.unassigned > 0 ? `${counts.unassigned} not assigned yet` : "Not started yet"}
           tone={isManager && counts.unassigned > 0 ? "alert" : "default"}
-          hint={isManager ? "Needs an owner" : "Closed this month"}
         />
+        <StatTile label="Processing" value={counts.processing} href="/queries?status=processing" hint="Being worked on" />
+        <StatTile label="Completed" value={month.completed} href="/queries?status=completed" tone="good" hint="This month" />
+        <StatTile label="Not completed" value={month.notCompleted} href="/queries?status=not_completed" hint="This month" />
+        <StatTile label="Overdue" value={counts.overdue} href="/queries?status=overdue" tone={counts.overdue > 0 ? "alert" : "default"} hint="Past required-by date" />
       </section>
 
       {fin && (
@@ -97,32 +90,37 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Card>
-          <CardHeader title="Queries per month" description="Received vs completed, last 12 months" />
-          <CardBody>
-            <TrendChart data={trend} />
-          </CardBody>
-        </Card>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader
-            title="This month's pipeline"
-            description={`Of ${funnel.received} queries received${month.avgTurnaroundMs ? ` · avg. turnaround ${formatDuration(month.avgTurnaroundMs)}` : ""}`}
+            title="New queries"
+            description="Received and not started yet — newest first"
+            actions={<Link href="/queries?status=pending" className="text-sm text-brand-700 hover:underline">View all</Link>}
           />
-          <CardBody>
-            <BarList
-              items={[
-                { label: "Received", value: funnel.received },
-                { label: "Quoted", value: funnel.quoted, hint: pct(funnel.quoted, funnel.received) },
-                { label: "Accepted", value: funnel.accepted, hint: pct(funnel.accepted, funnel.received) },
-                { label: "Invoiced", value: funnel.invoiced, hint: pct(funnel.invoiced, funnel.received) },
-              ]}
-            />
-          </CardBody>
+          {fresh.rows.length === 0 ? (
+            <CardBody>
+              <p className="text-sm text-muted">No new queries waiting.</p>
+            </CardBody>
+          ) : (
+            <ul className="divide-y divide-line">
+              {fresh.rows.map((q) => (
+                <li key={q.id}>
+                  <Link href={`/queries/${q.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-canvas/60">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{q.title}</span>
+                      <span className="text-xs text-muted">
+                        {q.refNo} · {q.companyName} · {formatDateTime(q.createdAt)}
+                      </span>
+                    </span>
+                    {q.source === "website" ? <Badge tone="violet">Website</Badge> : <span className="text-xs text-muted">{SOURCE_LABEL[q.source]}</span>}
+                    {!q.assigneeName && <span className="text-xs font-medium text-amber-700">Unassigned</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
-      </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="My open work" description="Assigned to you, earliest deadline first" actions={<Link href="/queries?status=open&assignee=me" className="text-sm text-brand-700 hover:underline">View all</Link>} />
           {mine.rows.length === 0 ? (

@@ -1,4 +1,4 @@
-import { priorityEnum, queryStatusEnum, type Priority, type QueryStatus } from "@/lib/db/schema";
+import { priorityEnum, querySourceEnum, queryStatusEnum, type Priority, type QuerySource, type QueryStatus } from "@/lib/db/schema";
 import { isUuid } from "@/lib/utils/ids";
 import type { QueryFilters } from "./repository";
 
@@ -13,6 +13,7 @@ export function parseQueryFilters(sp: Params): QueryFilters & { raw: Record<stri
   const priority = one(sp.priority);
   const sort = one(sp.sort);
   const customer = one(sp.customer);
+  const source = one(sp.source);
   const filters: QueryFilters = {
     q: one(sp.q)?.slice(0, 100),
     status:
@@ -22,6 +23,7 @@ export function parseQueryFilters(sp: Params): QueryFilters & { raw: Record<stri
     assignee: assignee === "me" || assignee === "unassigned" || isUuid(assignee) ? assignee : undefined,
     priority: (priorityEnum.enumValues as string[]).includes(priority ?? "") ? (priority as Priority) : undefined,
     customerId: isUuid(customer) ? customer : undefined,
+    source: (querySourceEnum.enumValues as string[]).includes(source ?? "") ? (source as QuerySource) : undefined,
     from: isDate(one(sp.from)) ? one(sp.from) : undefined,
     to: isDate(one(sp.to)) ? one(sp.to) : undefined,
     sort: ["newest", "oldest", "required", "priority", "updated"].includes(sort ?? "") ? (sort as QueryFilters["sort"]) : undefined,
@@ -34,6 +36,7 @@ export function parseQueryFilters(sp: Params): QueryFilters & { raw: Record<stri
       assignee: filters.assignee,
       priority: filters.priority,
       customer: filters.customerId,
+      source: filters.source,
       from: filters.from,
       to: filters.to,
       sort: filters.sort,

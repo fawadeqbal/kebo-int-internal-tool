@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { customerSchema, normalizePhone } from "@/modules/customers/schema";
-import { createQuerySchema, statusChangeSchema } from "@/modules/queries/schema";
+import { createQuerySchema, statusChangeSchema, titleFrom } from "@/modules/queries/schema";
+import { normalizeFields, websiteInquirySchema } from "@/modules/inquiries/schema";
 import { quotationSchema } from "@/modules/quotations/schema";
 import { toCsv } from "@/lib/utils/csv";
 
@@ -24,7 +25,7 @@ describe("validation", () => {
       phone: "0333 4567890",
       email: "",
       source: "phone",
-      title: "Capsule filler",
+      category: "Pharmaceutical Machinery",
       specifications: "30,000 capsules/hour",
       quantity: "2",
       priority: "high",
@@ -48,5 +49,43 @@ describe("validation", () => {
 
   it("protects CSV exports against spreadsheet formula injection", () => {
     expect(toCsv(["a"], [["=HYPERLINK(1)"]])).toContain(`"'=HYPERLINK(1)"`);
+  });
+
+  it("needs only customer, category and requirements for a query", () => {
+    const r = createQuerySchema.safeParse({ customerMode: "existing", customerId: "3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90", category: "Textile Machinery", specifications: "24 air-jet looms" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.quantity).toBe(1);
+      expect(r.data.priority).toBe("normal");
+    }
+  });
+
+  it("makes a short title from the requirements", () => {
+    expect(titleFrom("Water bottling line, 6,000 bph\nwith labeller", "Beverage Machinery")).toBe("Water bottling line, 6,000 bph");
+    expect(titleFrom("x".repeat(200)).length).toBeLessThanOrEqual(91);
+  });
+});
+
+describe("website inquiries", () => {
+  it("understands the website form's field names", () => {
+    const fields = normalizeFields({
+      "Full Name": "Chinedu Okafor",
+      business_email: "Chinedu@LagosHealth.example",
+      "Phone / WhatsApp": "+234 803 555 0142",
+      company_name: "",
+      sourcing_category: "Medical Devices & Equipment",
+      message: "50 ICU beds, CE certified",
+      website: "",
+    });
+    const parsed = websiteInquirySchema.parse(fields);
+    expect(parsed.fullName).toBe("Chinedu Okafor");
+    expect(parsed.email).toBe("chinedu@lagoshealth.example");
+    expect(parsed.company).toBeNull();
+    expect(parsed.category).toBe("Medical Devices & Equipment");
+    expect(fields.honeypot).toBe("");
+  });
+
+  it("rejects an inquiry without contact details", () => {
+    expect(websiteInquirySchema.safeParse(normalizeFields({ name: "A", requirements: "hello there" })).success).toBe(false);
   });
 });

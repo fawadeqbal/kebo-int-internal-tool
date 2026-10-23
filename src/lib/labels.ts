@@ -4,7 +4,6 @@ import type { InvoiceStatus, PaymentMethod, Priority, QuerySource, QueryStatus, 
 export const QUERY_STATUS_LABEL: Record<QueryStatus, string> = {
   pending: "Pending",
   processing: "Processing",
-  on_hold: "On Hold",
   completed: "Completed",
   not_completed: "Not Completed",
 };
@@ -55,7 +54,6 @@ export type Tone = "amber" | "blue" | "slate" | "green" | "red" | "violet" | "te
 export const QUERY_STATUS_TONE: Record<QueryStatus, Tone> = {
   pending: "amber",
   processing: "blue",
-  on_hold: "slate",
   completed: "green",
   not_completed: "red",
 };

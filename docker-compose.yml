@@ -9,7 +9,7 @@ x-app-env: &app-env
   DATABASE_URL: postgres://qms:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/qms
   AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
   APP_URL: ${APP_URL:-https://localhost}
-  APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Karachi}
+  APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Shanghai}
   COOKIE_SECURE: ${COOKIE_SECURE:-true}
   UPLOAD_DIR: /data/uploads
   MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
@@ -18,6 +18,9 @@ x-app-env: &app-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMTP_FROM: ${SMTP_FROM:-}
+  PUBLIC_FORM_ORIGINS: ${PUBLIC_FORM_ORIGINS:-https://keboint.com,https://www.keboint.com}
+  NOTIFY_EMAILS: ${NOTIFY_EMAILS:-}
+  DAILY_SUMMARY_HOUR: ${DAILY_SUMMARY_HOUR:-8}
   SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
   SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
 
@@ -29,7 +32,7 @@ services:
       POSTGRES_DB: qms
       POSTGRES_USER: qms
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      TZ: ${APP_TIME_ZONE:-Asia/Karachi}
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -89,7 +92,7 @@ services:
       PGDATABASE: qms
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       BACKUP_HOUR: ${BACKUP_HOUR:-2}
-      TZ: ${APP_TIME_ZONE:-Asia/Karachi}
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
     volumes:
       - ./docker/backup.sh:/backup.sh:ro
       - ./backups:/backups

@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, ilike, inArray, lt, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { customers, invoiceItems, invoices, payments, queries, quotations, users } from "@/lib/db/schema";
+import { customerDisplayName } from "@/modules/customers/repository";
 import type { SessionUser } from "@/lib/auth/session";
 import { todayISO } from "@/lib/utils/dates";
 
@@ -33,7 +34,7 @@ export async function listInvoices(_user: SessionUser, f: InvoiceFilters) {
         amountPaid: invoices.amountPaid,
         issueDate: invoices.issueDate,
         dueDate: invoices.dueDate,
-        companyName: customers.companyName,
+        companyName: customerDisplayName,
         customerId: customers.id,
         queryRef: queries.refNo,
         queryId: queries.id,

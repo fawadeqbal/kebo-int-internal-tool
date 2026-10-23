@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/session";
+import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { addDaysISO, todayISO } from "@/lib/utils/dates";
 import { getQueryDetail } from "@/modules/queries/repository";
@@ -23,7 +24,7 @@ export default async function NewQuotationPage({ searchParams }: { searchParams:
         title="New quotation"
         description={
           <>
-            For <span className="font-medium text-ink">{customer.companyName}</span> · {query.refNo}: {query.title}
+            For <span className="font-medium text-ink">{customerName(customer)}</span> · {query.refNo}: {query.title}
             {detail.quotations.length > 0 && ` · this will be version ${detail.quotations.length + 1}`}
           </>
         }
