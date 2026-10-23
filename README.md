@@ -30,6 +30,8 @@ Built with **Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM 
 | Manager | All queries, assign work, reopen, quotations, invoices, payments, reports, audit log |
 | Staff | Create queries and customers, work on queries assigned to them, draft and send quotations |
 
+**File storage:** uploads go to MinIO by default (`STORAGE_DRIVER=s3`). The same settings work for AWS S3, Cloudflare R2 or any S3-compatible store: change `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY`. Files are never public; every download goes through the app's permission check.
+
 Website inquiries are recorded under a built-in, sign-in-disabled "Website form" account.
 
 Permissions live in one file: `src/lib/auth/permissions.ts`.
@@ -44,6 +46,7 @@ Requirements: a Linux server with Docker and Docker Compose.
 cp .env.example .env
 # Edit .env — at minimum set:
 #   POSTGRES_PASSWORD   (a strong password)
+#   MINIO_ROOT_PASSWORD (another strong password, for file storage)
 #   AUTH_SECRET         (openssl rand -base64 48)
 #   DOMAIN              (e.g. qms.yourcompany.com — Caddy gets an HTTPS certificate automatically)
 #   APP_URL             (e.g. https://qms.yourcompany.com)
@@ -75,13 +78,16 @@ Open `https://<DOMAIN>` and sign in with the admin account. Then:
 | `app` | Next.js app; runs database migrations on every start |
 | `worker` | Reminder job (every `REMINDER_INTERVAL_MINUTES`, default 60) |
 | `db` | PostgreSQL 16 (volume `pgdata`) |
-| `backup` | Nightly database dump + uploaded files into `./backups`, kept `BACKUP_RETENTION_DAYS` (default 14) |
+| `minio` | S3-compatible file storage for drawings, spec sheets and photos (volume `files`, private bucket `kebo-files`). Uses Chainguard's free MinIO image, because MinIO stopped publishing its community image in Oct 2025 |
+| `backup` | Nightly database dump + the file store into `./backups`, kept `BACKUP_RETENTION_DAYS` (default 14) |
 
 **Restore a backup**
 
 ```bash
 gunzip -c backups/db-YYYY-MM-DD_HHMM.sql.gz | docker compose exec -T db psql -U qms -d qms
-docker compose run --rm -v "$PWD/backups:/backups" app sh -c "tar -xzf /backups/files-YYYY-MM-DD_HHMM.tar.gz -C /data"
+docker compose stop minio
+docker run --rm -v qms_files:/data/files -v "$PWD/backups:/backups" alpine sh -c "rm -rf /data/files/* && tar -xzf /backups/files-YYYY-MM-DD_HHMM.tar.gz -C /data"
+docker compose start minio
 ```
 
 **Update to a new version:** `git pull && docker compose up -d --build` (migrations run automatically).
@@ -91,7 +97,7 @@ docker compose run --rm -v "$PWD/backups:/backups" app sh -c "tar -xzf /backups/
 ## Develop locally
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on localhost:5433
+docker compose -f docker-compose.dev.yml up -d   # PostgreSQL on localhost:5433, MinIO on localhost:9000
 cp .env.example .env                              # DATABASE_URL=postgres://qms:qms@localhost:5433/qms
 npm install
 npm run db:migrate
@@ -131,7 +137,7 @@ src/
   lib/
     db/                 Drizzle schema + connection pool
     auth/               Sessions (signed cookie), passwords, RBAC
-    storage/            StorageProvider interface (local disk; swap for S3/MinIO)
+    storage/            StorageProvider interface: S3/MinIO (default) or local disk
     email/              Mailer interface (console or SMTP)
     utils/money.ts      All money maths in integer paisa — no rounding errors
 worker/                 Reminder worker entry point
@@ -152,7 +158,6 @@ These were simplified to keep the first version small and easy to run; each sits
 
 | Scope said | Built | Why / how to change |
 |---|---|---|
-| MinIO for files | Local disk in a Docker volume (`uploads`), behind `StorageProvider` | One container fewer; add an S3/MinIO provider in `src/lib/storage` |
 | Server-side PDF engine | Print-ready pages; "Print / Save as PDF" in the browser | No headless browser in the image; output is A4 and clean |
 | BullMQ + Redis worker | A simple scheduled worker (no Redis needed) | Enough for reminders; add a queue if heavier jobs come |
 | Prisma or Drizzle | Drizzle | Lighter, SQL-like, no engine binaries |

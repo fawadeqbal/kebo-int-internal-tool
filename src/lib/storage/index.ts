@@ -1,48 +1,41 @@
-import { createReadStream } from "node:fs";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { Readable } from "node:stream";
+import { LocalDiskStorage } from "./local";
+import { S3Storage } from "./s3";
 
 /**
- * Storage interface. Business code only depends on this, so the local-disk
- * implementation can be swapped for S3/MinIO later without other changes.
+ * Storage interface. Business code only depends on this, so where files live
+ * (MinIO, AWS S3, local disk) is a configuration choice, not a code change.
  */
 export interface StorageProvider {
   put(key: string, data: Buffer, contentType: string): Promise<void>;
   getStream(key: string): Promise<ReadableStream<Uint8Array>>;
   delete(key: string): Promise<void>;
+  /** Throws if the store cannot be reached (used by the health check). */
+  check(): Promise<void>;
 }
 
-class LocalDiskStorage implements StorageProvider {
-  constructor(private readonly root: string) {}
-
-  private resolve(key: string): string {
-    const full = path.resolve(this.root, key);
-    if (!full.startsWith(path.resolve(this.root) + path.sep)) throw new Error("Invalid storage key");
-    return full;
-  }
-
-  async put(key: string, data: Buffer) {
-    const full = this.resolve(key);
-    await mkdir(path.dirname(full), { recursive: true });
-    await writeFile(full, data);
-  }
-
-  async getStream(key: string) {
-    const full = this.resolve(key);
-    await stat(full);
-    return Readable.toWeb(createReadStream(full)) as ReadableStream<Uint8Array>;
-  }
-
-  async delete(key: string) {
-    await rm(this.resolve(key), { force: true });
-  }
-}
+const required = (name: string) => {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be set when STORAGE_DRIVER=s3`);
+  return value;
+};
 
 let instance: StorageProvider | null = null;
 
+/** STORAGE_DRIVER=s3 (MinIO / S3, the default in Docker) or local (a folder on disk). */
 export function getStorage(): StorageProvider {
-  if (!instance) instance = new LocalDiskStorage(process.env.UPLOAD_DIR ?? "./storage/uploads");
+  if (instance) return instance;
+  const driver = (process.env.STORAGE_DRIVER ?? (process.env.S3_BUCKET ? "s3" : "local")).toLowerCase();
+  instance =
+    driver === "s3"
+      ? new S3Storage({
+          endpoint: process.env.S3_ENDPOINT,
+          region: process.env.S3_REGION ?? "us-east-1",
+          bucket: required("S3_BUCKET"),
+          accessKeyId: required("S3_ACCESS_KEY"),
+          secretAccessKey: required("S3_SECRET_KEY"),
+          forcePathStyle: (process.env.S3_FORCE_PATH_STYLE ?? "true") === "true",
+        })
+      : new LocalDiskStorage(process.env.UPLOAD_DIR ?? "./storage/uploads");
   return instance;
 }
 

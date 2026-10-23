@@ -11,8 +11,14 @@ x-app-env: &app-env
   APP_URL: ${APP_URL:-https://localhost}
   APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Shanghai}
   COOKIE_SECURE: ${COOKIE_SECURE:-true}
-  UPLOAD_DIR: /data/uploads
   MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+  STORAGE_DRIVER: s3
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_BUCKET: ${S3_BUCKET:-kebo-files}
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER:-kebo}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+  S3_FORCE_PATH_STYLE: "true"
   SMTP_HOST: ${SMTP_HOST:-}
   SMTP_PORT: ${SMTP_PORT:-587}
   SMTP_USER: ${SMTP_USER:-}
@@ -46,13 +52,30 @@ services:
     image: qms-app:latest
     restart: unless-stopped
     environment: *app-env
-    volumes:
-      - uploads:/data/uploads
     depends_on:
       db:
         condition: service_healthy
+      minio:
+        condition: service_started
     expose:
       - "3000"
+
+  # S3-compatible file storage for drawings, spec sheets and photos.
+  # The official MinIO community image stopped being published in Oct 2025;
+  # Chainguard's free image is built from MinIO's source and rebuilt daily.
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    # root inside the container so it can always write to the new volume; MinIO is not exposed outside Docker
+    user: "0:0"
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-kebo}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - files:/data
+    expose:
+      - "9000"
 
   worker:
     image: qms-app:latest
@@ -96,7 +119,7 @@ services:
     volumes:
       - ./docker/backup.sh:/backup.sh:ro
       - ./backups:/backups
-      - uploads:/data/uploads:ro
+      - files:/data/files:ro
     entrypoint: ["sh", "/backup.sh"]
     depends_on:
       db:
@@ -104,6 +127,6 @@ services:
 
 volumes:
   pgdata:
-  uploads:
+  files:
   caddy_data:
   caddy_config:
