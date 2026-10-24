@@ -50,12 +50,12 @@ if [ ! -f .env ]; then
   FIRST_RUN=1
   say "first install: creating .env with fresh secrets"
   ask() { local var="$1" prompt="$2" def="$3" val; if [ -t 0 ]; then read -rp "$prompt [$def]: " val; fi; printf -v "$var" '%s' "${val:-$def}"; }
-  ask ADMIN_EMAIL "Super Admin email (your login)" "${ADMIN_EMAIL:-admin@fawadiqbal.dev}"
-  ask MANAGER_EMAIL "Manager email" "${MANAGER_EMAIL:-manager@keboint.com}"
-  ask STAFF_EMAIL "Staff email" "${STAFF_EMAIL:-staff@keboint.com}"
+  ask ADMIN_EMAIL "Fawad Iqbal (Super Admin) email" "${ADMIN_EMAIL:-admin@fawadiqbal.dev}"
+  ask MANAGER_EMAIL "Faizur Rehman (Manager) email" "${MANAGER_EMAIL:-faizur@keboint.com}"
+  ask MANAGER2_EMAIL "Tanveer ul Haq (Manager) email" "${MANAGER2_EMAIL:-tanveer@keboint.com}"
   ask NOTIFY "Emails told about new RFQs (comma separated)" "${NOTIFY:-info@keboint.com, shandongkeboint@gmail.com}"
   pw() { printf 'Kb%s7' "$(openssl rand -hex 7)"; }
-  ADMIN_PW=$(pw); MANAGER_PW=$(pw); STAFF_PW=$(pw)
+  ADMIN_PW=$(pw); MANAGER_PW=$(pw); MANAGER2_PW=$(pw)
   umask 077
   cat > .env <<ENV
 # Kebo RFQ Desk on $(hostname) — created $(date -u +%F) by deploy/install.sh. Keep this file private.
@@ -85,7 +85,7 @@ SMTP_PASSWORD=
 SMTP_FROM=
 
 # Security (see deploy/README.md → Security settings)
-TWO_STEP_REQUIRED_ROLES=admin,manager
+TWO_STEP_REQUIRED_ROLES=
 TURNSTILE_SECRET_KEY=
 BACKUP_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
 OFFSITE_S3_ENDPOINT=
@@ -95,15 +95,15 @@ OFFSITE_S3_ACCESS_KEY=
 OFFSITE_S3_SECRET_KEY=
 
 # Starting accounts (only used when an account does not exist yet)
-SEED_ADMIN_NAME="Super Admin"
+SEED_ADMIN_NAME="Fawad Iqbal"
 SEED_ADMIN_EMAIL=$ADMIN_EMAIL
 SEED_ADMIN_PASSWORD=$ADMIN_PW
-SEED_MANAGER_NAME="Kebo Manager"
+SEED_MANAGER_NAME="Faizur Rehman"
 SEED_MANAGER_EMAIL=$MANAGER_EMAIL
 SEED_MANAGER_PASSWORD=$MANAGER_PW
-SEED_STAFF_NAME="Kebo Staff"
-SEED_STAFF_EMAIL=$STAFF_EMAIL
-SEED_STAFF_PASSWORD=$STAFF_PW
+SEED_MANAGER2_NAME="Tanveer ul Haq"
+SEED_MANAGER2_EMAIL=$MANAGER2_EMAIL
+SEED_MANAGER2_PASSWORD=$MANAGER2_PW
 ENV
   umask 022
 fi
@@ -156,9 +156,9 @@ if [ "$FIRST_RUN" = 1 ]; then
   cat <<INFO
 
   Logins (also stored in /opt/kebo-rfq/.env — change the passwords after signing in):
-    Super Admin  $ADMIN_EMAIL   $ADMIN_PW
-    Manager      $MANAGER_EMAIL   $MANAGER_PW
-    Staff        $STAFF_EMAIL   $STAFF_PW
+    Fawad Iqbal     Super Admin  $ADMIN_EMAIL   $ADMIN_PW
+    Faizur Rehman   Manager      $MANAGER_EMAIL   $MANAGER_PW
+    Tanveer ul Haq  Manager      $MANAGER2_EMAIL   $MANAGER2_PW
 
 INFO
 fi

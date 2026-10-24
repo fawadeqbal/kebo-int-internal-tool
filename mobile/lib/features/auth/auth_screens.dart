@@ -234,7 +234,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
 
 final _setupProvider = FutureProvider.autoDispose<Json>((ref) => ref.read(apiProvider).get('/api/v1/me/two-step/setup'));
 
-/// Two-step setup: required for Super Admin and Manager, optional for Staff (from Account).
+/// Two-step setup: shown only when the server makes it compulsory for a role (off by default).
 class TwoStepSetupScreen extends ConsumerStatefulWidget {
   const TwoStepSetupScreen({super.key, this.fromAccount = false});
   final bool fromAccount;

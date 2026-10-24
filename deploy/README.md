@@ -33,7 +33,7 @@ Kebo RFQ Desk fits in without touching them:
    - appends one site block for `rfq.fawadiqbal.dev` to `/opt/global-proxy/Caddyfile`
      (backup first, `caddy validate`, old file put back if invalid), then reloads Caddy.
      The other sites keep running during the reload.
-3. It prints the three logins once at the end. Sign in at https://rfq.fawadiqbal.dev and change the passwords.
+3. It prints the three logins (Fawad Iqbal, Faizur Rehman, Tanveer ul Haq) once at the end. Sign in at https://rfq.fawadiqbal.dev and change the passwords.
 
 ## Updates
 
@@ -41,8 +41,10 @@ Commit, then `bash deploy/push.sh` again. `.env`, the database, files and backup
 
 ## Security settings
 
-**Two-step sign-in** is required for the Super Admin and Manager (`TWO_STEP_REQUIRED_ROLES`, default `admin,manager`).
-At their next sign-in each is asked to scan a QR code with an authenticator app and save 10 recovery codes.
+**Two-step sign-in** is off by default: nobody is asked for it, and anyone can turn it on for
+themselves under My account. To make it compulsory, set `TWO_STEP_REQUIRED_ROLES=admin,manager` in `.env`
+and run `docker compose up -d`; at their next sign-in each is then asked to scan a QR code with an
+authenticator app and save 10 recovery codes.
 Lost phone: the Super Admin resets it for others under Users. For the Super Admin's own account, on the server:
 
 ```bash

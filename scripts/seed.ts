@@ -55,15 +55,20 @@ const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 8640000
 const addHours = (d: Date, h: number) => new Date(d.getTime() + h * 3600000);
 
 /**
- * The three starting accounts. Each email / name / password comes from .env:
- *   SEED_ADMIN_*   Super Admin: the developer, full access to everything
- *   SEED_MANAGER_* Manager: runs work and sales (all inquiries, quotations, invoices, payments, reports)
- *   SEED_STAFF_*   Staff: does the work and sales (own inquiries, customers, quotations)
- * An account that already exists is left as it is (its password is not changed).
+ * The starting accounts. Each email / name / password comes from .env:
+ *   SEED_ADMIN_*    Super Admin: full access to everything
+ *   SEED_MANAGER_*  Manager: runs work and sales (all inquiries, quotations, invoices, payments, reports)
+ *   SEED_MANAGER2_* a second Manager
+ *   SEED_STAFF_*    Staff: does the work and sales (own inquiries, customers, quotations)
+ * On the server an account is only created when its email and password are set
+ * (Staff are usually added later in Users). The defaults below are for a
+ * computer used for development only. An account that already exists is left
+ * as it is (its password is not changed).
  */
 const ACCOUNTS = [
-  { prefix: "SEED_ADMIN", role: "admin" as const, name: "Super Admin", email: "admin@example.com", password: "Admin@12345" },
-  { prefix: "SEED_MANAGER", role: "manager" as const, name: "Kebo Manager", email: "manager@example.com", password: "Manager@12345" },
+  { prefix: "SEED_ADMIN", role: "admin" as const, name: "Fawad Iqbal", email: "admin@example.com", password: "Admin@12345" },
+  { prefix: "SEED_MANAGER", role: "manager" as const, name: "Faizur Rehman", email: "manager@example.com", password: "Manager@12345" },
+  { prefix: "SEED_MANAGER2", role: "manager" as const, name: "Tanveer ul Haq", email: "manager2@example.com", password: "Manager@12345" },
   { prefix: "SEED_STAFF", role: "staff" as const, name: "Kebo Staff", email: "staff@example.com", password: "Staff@12345" },
 ];
 
@@ -77,7 +82,8 @@ async function seedAccounts() {
     const email = (process.env[`${a.prefix}_EMAIL`] || a.email).trim().toLowerCase();
     const name = (process.env[`${a.prefix}_NAME`] || a.name).trim();
     const given = process.env[`${a.prefix}_PASSWORD`];
-    if (!given && process.env.NODE_ENV === "production") {
+    if (PRODUCTION && !process.env[`${a.prefix}_EMAIL`] && !given) continue; // not configured on this server
+    if (!given && PRODUCTION) {
       console.log(`[seed] ${a.role.padEnd(7)} skipped: set ${a.prefix}_PASSWORD in .env to create this account on the server`);
       continue;
     }
@@ -89,11 +95,11 @@ async function seedAccounts() {
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (existing) {
       console.log(`[seed] ${a.role.padEnd(7)} ${email} already exists (unchanged)`);
-      ids[a.role] = existing.id;
+      ids[a.role] ||= existing.id;
       continue;
     }
     const [created] = await db.insert(users).values({ name, email, role: a.role, passwordHash: await bcrypt.hash(password, 12) }).returning({ id: users.id });
-    ids[a.role] = created.id;
+    ids[a.role] ||= created.id;
     console.log(`[seed] ${a.role.padEnd(7)} ${email} created`);
   }
   return ids;

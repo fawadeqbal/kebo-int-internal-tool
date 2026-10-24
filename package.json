@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && npm run build:scripts",
-    "build:scripts": "esbuild scripts/migrate.ts scripts/seed.ts scripts/reset-two-step.ts scripts/decrypt-backup.ts worker/index.ts --bundle --platform=node --target=node22 --outdir=dist --external:pg-native --log-level=warning",
+    "build:scripts": "esbuild scripts/migrate.ts scripts/seed.ts scripts/reset.ts scripts/reset-two-step.ts scripts/decrypt-backup.ts worker/index.ts --bundle --platform=node --target=node22 --outdir=dist --external:pg-native --log-level=warning",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

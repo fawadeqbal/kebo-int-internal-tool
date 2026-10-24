@@ -57,12 +57,12 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 /**
- * Roles that must use two-step sign-in (authenticator app). Default: Super
- * Admin and Manager. TWO_STEP_REQUIRED_ROLES="admin,manager,staff" adds Staff;
- * an empty value makes it optional for everyone (local testing only).
+ * Roles that must use two-step sign-in (authenticator app). Default: none, so
+ * nobody is ever sent to the set-up screen; anyone can still turn it on for
+ * themselves in My account. TWO_STEP_REQUIRED_ROLES="admin,manager" makes it
+ * compulsory for those roles.
  */
 export function twoStepRequired(role: Role): boolean {
-  const configured = process.env.TWO_STEP_REQUIRED_ROLES;
-  const roles = configured === undefined ? ["admin", "manager"] : configured.split(",").map((r) => r.trim());
+  const roles = (process.env.TWO_STEP_REQUIRED_ROLES ?? "").split(",").map((r) => r.trim()).filter(Boolean);
   return roles.includes(role);
 }
