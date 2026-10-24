@@ -34,6 +34,8 @@ export const GET = handle(async () => {
       invoicePaymentDays: settings.invoicePaymentDays,
       quotationTerms: settings.defaultQuotationTerms,
     },
+    // Costing (only for people who see factory prices).
+    costing: can(user.role, "sourcing.manage") ? { exchangeRates: settings.exchangeRates, defaultMarginPercent: settings.defaultMarginPercent } : null,
     categories: { configured: settings.categories, all: categories },
     people: can(user.role, "queries.assign") || can(user.role, "queries.viewAll") ? people : people.filter((p) => p.id === user.id),
     labels: {

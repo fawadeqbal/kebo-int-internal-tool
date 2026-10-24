@@ -16,6 +16,8 @@ export const PERMISSIONS = [
   "customers.delete",
   "customers.export",
   "quotations.manage",
+  /** Factories, their offers and our costs and margins (never shown to customers). */
+  "sourcing.manage",
   "invoices.manage",
   "payments.record",
   "users.manage",
@@ -39,11 +41,13 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "customers.delete",
     "customers.export",
     "quotations.manage",
+    "sourcing.manage",
     "invoices.manage",
     "payments.record",
     "audit.view",
   ],
-  staff: ["dashboard.view", "queries.create", "customers.manage", "quotations.manage"],
+  // Staff do the sourcing, so they record factory offers and see costs on their own inquiries.
+  staff: ["dashboard.view", "queries.create", "customers.manage", "quotations.manage", "sourcing.manage"],
 };
 
 export function can(role: Role, permission: Permission): boolean {

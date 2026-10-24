@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  Factory,
   Bell,
   BarChart3,
   Building2,
@@ -44,6 +45,7 @@ const ICONS = {
   dashboard: LayoutDashboard,
   queries: ClipboardList,
   customers: Building2,
+  factories: Factory,
   quotations: FileText,
   invoices: Receipt,
   reports: BarChart3,

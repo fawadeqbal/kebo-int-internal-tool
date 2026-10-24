@@ -16,8 +16,11 @@ export function QuotationForm({
   currency,
   cancelHref,
   submitLabel,
+  costing = false,
 }: {
   action: Action;
+  /** Show our cost and margin per line (people who may see factory prices). */
+  costing?: boolean;
   initial: { items: EditableLine[]; discount: string; taxRate: string; dueDate: string; submittedAt: string; terms: string; notes: string };
   currency: string;
   cancelHref: string;
@@ -40,6 +43,7 @@ export function QuotationForm({
             currency={currency}
             errors={e}
             sourceLabel="Requested by the customer"
+            costing={costing}
           />
         </CardBody>
       </Card>

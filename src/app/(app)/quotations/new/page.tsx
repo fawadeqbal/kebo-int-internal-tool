@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/session";
+import { can } from "@/lib/auth/permissions";
 import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { NotFoundError } from "@/lib/utils/result";
@@ -35,6 +36,7 @@ export default async function NewQuotationPage({ searchParams }: { searchParams:
           action={createQuotationAction.bind(null, query.id)}
           currency={draft.currency}
           cancelHref={`/queries/${query.id}`}
+          costing={can(user.role, "sourcing.manage")}
           submitLabel="Save as draft"
           initial={draft.initial}
         />

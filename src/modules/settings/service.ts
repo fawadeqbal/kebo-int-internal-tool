@@ -17,6 +17,30 @@ const emailList = z.preprocess(
   z.array(z.email({ message: "One of the notification emails is not valid" })).max(20),
 );
 
+/** "CNY = 7.10" lines → { CNY: 7.1 }: how much of each currency one unit of the main currency buys. */
+const rateLines = z
+  .union([z.string(), z.record(z.string(), z.number())])
+  .transform((v, ctx) => {
+    if (typeof v !== "string") return v;
+    const out: Record<string, number> = {};
+    for (const line of v.split(/\r?\n|,/).map((l) => l.trim()).filter(Boolean)) {
+      const m = line.match(/^([A-Za-z]{3})\s*[=:]\s*([0-9]+(?:\.[0-9]+)?)$/);
+      if (!m) {
+        ctx.addIssue({ code: "custom", message: `Write each rate as CNY = 7.10, one per line ("${line}")` });
+        return z.NEVER;
+      }
+      out[m[1].toUpperCase()] = Number(m[2]);
+    }
+    return out;
+  })
+  .pipe(z.record(z.string(), z.number().positive("Rates must be more than 0")));
+
+/** The rates as the settings form shows them. */
+export const ratesText = (r: Record<string, number>) =>
+  Object.entries(r)
+    .map(([c, n]) => `${c} = ${n}`)
+    .join("\n");
+
 export const settingsSchema = z.object({
   companyName: z.string().trim().min(1, "Company name is required").max(200),
   companyAddress: z.string().trim().max(500).default(""),
@@ -27,6 +51,10 @@ export const settingsSchema = z.object({
   /** Printed on invoices so the customer can pay by T/T. */
   bankDetails: z.string().trim().max(1000).default(""),
   currency: z.string().trim().min(1).max(10).default("USD"),
+  /** Factory prices in other currencies are converted with these (1 main-currency unit = N of that currency). */
+  exchangeRates: rateLines.default({ CNY: 7.1 }),
+  /** Margin new quotation lines start with when priced from a factory offer (% of the selling price). */
+  defaultMarginPercent: z.coerce.number().min(0, "Margin cannot be negative").max(95, "Margin must be under 95%").default(15),
   defaultTaxRate: z.coerce.number().min(0, "Tax cannot be negative").max(100, "Tax cannot exceed 100%"),
   quotationValidityDays: z.coerce.number().int().min(1).max(365),
   invoicePaymentDays: z.coerce.number().int().min(0).max(365),
@@ -71,6 +99,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   companyWebsite: "www.keboint.com",
   bankDetails: "",
   currency: "USD",
+  exchangeRates: { CNY: 7.1 },
+  defaultMarginPercent: 15,
   defaultTaxRate: 0,
   quotationValidityDays: 15,
   invoicePaymentDays: 30,

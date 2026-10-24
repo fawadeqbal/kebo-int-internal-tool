@@ -292,7 +292,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static const _text = [
     'companyName', 'companyAddress', 'companyPhone', 'companyEmail', 'companyWebsite', 'companyTaxNo', 'bankDetails', 'currency', 'defaultTaxRate',
     'quotationValidityDays', 'invoicePaymentDays', 'reminderPendingDays', 'reminderProcessingDays', 'reminderDueSoonDays', 'defaultQuotationTerms', 'invoiceFooter',
+    'defaultMarginPercent',
   ];
+
+  /// { CNY: 7.1 } → "CNY = 7.1" lines, as they are typed.
+  static String _ratesText(Json raw) => raw.m('exchangeRates').entries.map((e) => '${e.key} = ${e.value}').join('\n');
   static const _switches = {
     'notifyNewQuery': 'New inquiries',
     'notifyClosed': 'Inquiries closed',
@@ -300,7 +304,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     'notifyPayment': 'Payments received',
     'notifyDailySummary': 'Daily summary',
   };
-  final _c = {for (final k in [..._text, 'categories', 'notifyEmails']) k: TextEditingController()};
+  final _c = {for (final k in [..._text, 'categories', 'notifyEmails', 'exchangeRates']) k: TextEditingController()};
   final _on = <String, bool>{};
   bool _loaded = false;
   Object? _loadError;
@@ -322,6 +326,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       _c['categories']!.text = _raw.ls('categories').join('\n');
       _c['notifyEmails']!.text = _raw.ls('notifyEmails').join(', ');
+      _c['exchangeRates']!.text = _ratesText(_raw);
       for (final k in _switches.keys) {
         _on[k] = _raw.b(k);
       }
@@ -336,6 +341,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         for (final k in _text) k: _c[k]!.text,
         'categories': _c['categories']!.text.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
         'notifyEmails': _c['notifyEmails']!.text.split(RegExp(r'[\s,;]+')).where((s) => s.isNotEmpty).toList(),
+        'exchangeRates': _c['exchangeRates']!.text,
         for (final k in _switches.keys) k: _on[k] ?? false,
       };
 
@@ -348,6 +354,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     _c['categories']!.text = _raw.ls('categories').join('\n');
     _c['notifyEmails']!.text = _raw.ls('notifyEmails').join(', ');
+    _c['exchangeRates']!.text = _ratesText(_raw);
     for (final k in _switches.keys) {
       _on[k] = _raw.b(k);
     }
@@ -356,11 +363,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _saveSection() async {
     setState(() => _error = null);
     try {
-      final body = _body;
-      await ref.mutate(() => ref.read(apiProvider).put('/api/v1/settings', body));
+      final res = await ref.mutate(() => ref.read(apiProvider).put('/api/v1/settings', _body));
       ref.invalidate(metaProvider);
       setState(() {
-        _raw = body;
+        _raw = res.m('settings');
+        _reset();
         _editing = null;
       });
       if (mounted) toast(context, 'Settings saved.');
@@ -449,6 +456,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ('Tax rate', '${v('defaultTaxRate')}%'),
             ('Quotation valid', '${v('quotationValidityDays')} days'),
             ('Payment due', '${v('invoicePaymentDays')} days'),
+            ('Exchange rates', _raw.m('exchangeRates').isEmpty ? 'Not set' : _raw.m('exchangeRates').entries.map((r) => '1 ${v('currency')} = ${r.value} ${r.key}').join('\n')),
+            ('Default margin', '${v('defaultMarginPercent')}% of the selling price'),
             ('Quotation terms', v('defaultQuotationTerms')),
             ('Invoice footer', v('invoiceFooter')),
           ]),
@@ -463,6 +472,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               gap12,
               Expanded(child: field('invoicePaymentDays', 'Payment due (days)', optional: false, kb: TextInputType.number)),
             ]),
+            field('exchangeRates', 'Exchange rates', optional: false, lines: 3, helper: 'For factory prices: how much one ${v('currency')} buys, one per line, e.g. CNY = 7.10'),
+            field('defaultMarginPercent', 'Default margin (%)', optional: false, kb: numKb, helper: 'Of the selling price, when pricing from factory offers'),
             field('defaultQuotationTerms', 'Default quotation terms', lines: 6),
             field('invoiceFooter', 'Invoice footer', lines: 2),
           ]),

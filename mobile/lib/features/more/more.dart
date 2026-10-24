@@ -50,6 +50,7 @@ class MoreScreen extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           child: CardList(children: [
             item(Icons.notifications_none_rounded, 'Notifications', '/notifications'),
+            if (s.can('sourcing.manage')) item(Icons.factory_outlined, 'Factories', '/factories', sub: 'Who you buy from, their offers and VAT'),
             if (s.can('invoices.manage')) item(Icons.receipt_long_outlined, 'Invoices', '/invoices', sub: 'Payments, balances and packing lists'),
             if (s.can('reports.view')) item(Icons.insights_rounded, 'Reports', '/reports', sub: 'Conversion, money, team, trends'),
           ]),

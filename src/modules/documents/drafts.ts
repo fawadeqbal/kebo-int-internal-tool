@@ -7,6 +7,9 @@ import { getQuotationDetail } from "@/modules/quotations/repository";
 import { getInvoiceDetail } from "@/modules/invoices/repository";
 import { getPackingListDetail } from "@/modules/packing/repository";
 import { getSettings } from "@/modules/settings/service";
+import { sourcingForQuery } from "@/modules/sourcing/repository";
+import { marginPercent, priceForMargin } from "@/lib/costing";
+import { can } from "@/lib/auth/permissions";
 
 /**
  * The starting values of every document form, in one place for the web pages
@@ -14,6 +17,16 @@ import { getSettings } from "@/modules/settings/service";
  * the customer's requested items (or the latest version), an invoice from the
  * accepted quotation, a packing list from the invoice. Nothing is retyped.
  */
+
+/** A line without our internal cost (for people who may not see costs). */
+export function withoutCost(l: EditableLine): EditableLine {
+  const out = { ...l };
+  delete out.unitCost;
+  delete out.costSourceId;
+  delete out.fxRate;
+  delete out.costNote;
+  return out;
+}
 
 export interface PackingEditableLine {
   sourceId: string;
@@ -43,11 +56,46 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
     // A new version starts from the latest one.
     const prev = await getQuotationDetail(user, latest.id);
     items = (prev?.items ?? []).map((i) => toEditableLine(i, { sourceId: i.queryItemId }));
+    // If another factory line was chosen since, the new version is costed from it (keeping the line's margin).
+    if (can(user.role, "sourcing.manage")) {
+      const sourcing = await sourcingForQuery(queryId, settings.currency, settings.currency, settings.exchangeRates);
+      items = items.map((l) => {
+        const chosen = sourcing.items.find((x) => x.id === l.sourceId)?.chosen;
+        if (!chosen || chosen.unitCost === null || chosen.id === l.costSourceId) return l;
+        const margin = l.unitCost && l.unitPrice ? (marginPercent(Number(l.unitPrice), Number(l.unitCost)) ?? settings.defaultMarginPercent) : settings.defaultMarginPercent;
+        return {
+          ...l,
+          unitCost: String(chosen.unitCost),
+          costSourceId: chosen.id,
+          fxRate: String(chosen.fxRate),
+          unitPrice: String(priceForMargin(chosen.unitCost, Math.min(Math.max(margin, 0), 90))),
+          costNote: `Now from ${chosen.supplierName} · ${chosen.offerCurrency} ${chosen.unitPriceWithVat.toLocaleString("en", { minimumFractionDigits: 2 })} incl. VAT`,
+        };
+      });
+    }
+    if (!can(user.role, "sourcing.manage")) items = items.map(withoutCost);
     discount = String(Number(prev?.quotation.discount ?? 0));
     terms = prev?.quotation.terms ?? terms;
   } else {
-    // Version 1 starts from what the customer asked for; only the prices are missing.
-    items = detail.items.map((i) => toEditableLine(i, { asSource: true, withPrice: false }));
+    // Version 1 starts from what the customer asked for. Items with a factory
+    // offer are priced from it: our cost (VAT included, converted) plus the
+    // default margin. The chosen offer is used, or the cheapest one.
+    const sourcing = can(user.role, "sourcing.manage") ? await sourcingForQuery(queryId, settings.currency, settings.currency, settings.exchangeRates) : null;
+    items = detail.items.map((i) => {
+      const line = toEditableLine(i, { asSource: true, withPrice: false });
+      const option = sourcing?.items.find((x) => x.id === i.id);
+      const from = option?.chosen ?? option?.cheapest ?? null;
+      if (!from || from.unitCost === null) return line;
+      return {
+        ...line,
+        model: line.model || from.model || "",
+        unitCost: String(from.unitCost),
+        costSourceId: from.id,
+        fxRate: String(from.fxRate),
+        unitPrice: String(priceForMargin(from.unitCost, settings.defaultMarginPercent)),
+        costNote: `${from.supplierName} · ${from.offerCurrency} ${from.unitPriceWithVat.toLocaleString("en", { minimumFractionDigits: 2 })} incl. VAT`,
+      };
+    });
   }
   return {
     query: detail.query,
@@ -95,7 +143,7 @@ export async function invoiceDraft(user: SessionUser, quotationId: string) {
     detail,
     currency: q.currency,
     initial: {
-      items: detail.items.map((i) => toEditableLine(i, { asSource: true })),
+      items: detail.items.map((i) => withoutCost(toEditableLine(i, { asSource: true }))),
       discount: String(Number(q.discount)),
       taxRate: String(Number(q.taxRate)),
       issueDate: today,

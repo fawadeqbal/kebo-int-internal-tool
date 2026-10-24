@@ -16,7 +16,9 @@ import { InvoiceStatusBadge, QuotationStatusBadge } from "@/components/ui/badge"
 import { ConfirmSubmit } from "@/components/ui/client";
 import { QuotationDocument } from "@/components/documents/documents";
 import { formatDate, formatDateTime, todayISO } from "@/lib/utils/dates";
-import { formatMoney } from "@/lib/utils/money";
+import { formatCents, formatMoney, toCents } from "@/lib/utils/money";
+import { costSummary } from "@/lib/costing";
+import { can } from "@/lib/auth/permissions";
 
 export const metadata = { title: "Quotation" };
 
@@ -29,6 +31,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
   const { quotation: q, query, customer } = detail;
   const able = quotationAbilities(user, detail);
   const changes = quotationChanges(detail);
+  const costing = costSummary(detail.items.map((i) => ({ quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost })));
   const today = todayISO();
   const late = q.status === "sent" && q.dueDate < today;
 
@@ -97,6 +100,32 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
               />
               <CardBody>
                 <QuotationStatusForm action={quotationStatusAction.bind(null, id)} transitions={able.transitions} />
+              </CardBody>
+            </Card>
+          )}
+          {can(user.role, "sourcing.manage") && costing.costCents > 0 && (
+            <Card>
+              <CardHeader title="Costing" description="Internal, not on the PDF" />
+              <CardBody>
+                <dl className="flex flex-col divide-y divide-line text-sm">
+                  <div className="flex justify-between gap-3 py-2 first:pt-0">
+                    <dt className="text-muted">Our cost (incl. VAT)</dt>
+                    <dd className="tabular">{formatCents(costing.costCents, q.currency)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2">
+                    <dt className="text-muted">Sold for (before discount)</dt>
+                    <dd className="tabular">{formatCents(costing.salesCents, q.currency)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 py-2 last:pb-0">
+                    <dt className="font-medium text-text">Profit</dt>
+                    <dd className={costing.profitCents - toCents(q.discount) < 0 ? "font-semibold text-bad tabular" : "font-semibold text-ok tabular"}>
+                      {formatCents(costing.profitCents - toCents(q.discount), q.currency)}
+                      {costing.salesCents > 0 && ` · ${Math.round(((costing.profitCents - toCents(q.discount)) / costing.salesCents) * 1000) / 10}%`}
+                    </dd>
+                  </div>
+                </dl>
+                {costing.uncosted > 0 && <p className="mt-2 text-xs text-muted">{costing.uncosted} line(s) without a cost (e.g. freight) are not counted.</p>}
+                {toCents(q.discount) > 0 && <p className="mt-1 text-xs text-muted">The discount is taken off the profit.</p>}
               </CardBody>
             </Card>
           )}

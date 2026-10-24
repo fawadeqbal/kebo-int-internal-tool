@@ -23,6 +23,7 @@ import 'features/more/reports.dart';
 import 'features/packing/packing.dart';
 import 'features/quotations/quotations.dart';
 import 'features/shell/shell.dart';
+import 'features/sourcing/sourcing.dart';
 import 'theme/theme.dart';
 
 class KeboApp extends ConsumerStatefulWidget {
@@ -135,6 +136,14 @@ class _KeboAppState extends ConsumerState<KeboApp> {
         GoRoute(path: '/inquiries/new', builder: (_, s) => InquiryFormScreen(customerId: s.uri.queryParameters['customer'])),
         GoRoute(path: '/inquiries/:id', builder: (_, s) => InquiryDetailScreen(id: s.pathParameters['id']!)),
         GoRoute(path: '/inquiries/:id/edit', builder: (_, s) => InquiryFormScreen(editId: s.pathParameters['id'])),
+        GoRoute(path: '/inquiries/:id/sourcing', builder: (_, s) => SourcingScreen(queryId: s.pathParameters['id']!)),
+        GoRoute(path: '/inquiries/:id/offers/new', builder: (_, s) => OfferFormScreen(queryId: s.pathParameters['id'])),
+        GoRoute(path: '/offers/:id/edit', builder: (_, s) => OfferFormScreen(editId: s.pathParameters['id'])),
+        // Factories
+        GoRoute(path: '/factories', builder: (_, _) => const FactoriesScreen()),
+        GoRoute(path: '/factories/new', builder: (_, _) => const FactoryFormScreen()),
+        GoRoute(path: '/factories/:id', builder: (_, s) => FactoryDetailScreen(id: s.pathParameters['id']!)),
+        GoRoute(path: '/factories/:id/edit', builder: (_, s) => FactoryFormScreen(editId: s.pathParameters['id'])),
         // Customers
         GoRoute(path: '/customers/new', builder: (_, _) => const CustomerFormScreen()),
         GoRoute(path: '/customers/:id', builder: (_, s) => CustomerDetailScreen(id: s.pathParameters['id']!)),

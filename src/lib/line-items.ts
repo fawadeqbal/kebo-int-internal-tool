@@ -44,10 +44,19 @@ export const baseLineSchema = z.object({
   unit,
 });
 
-/** A priced line (quotation, invoice). */
+const optionalNumber = (max: number) =>
+  z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().min(0).max(max).nullable()).optional();
+
+/** A priced line (quotation, invoice). Quotation lines may carry our internal cost (never printed). */
 export const lineItemSchema = baseLineSchema.extend({
   hsCode: optionalText(20),
   unitPrice: z.coerce.number({ message: "Enter a price" }).min(0, "Price cannot be negative").max(1_000_000_000_000),
+  /** What one unit costs us, VAT included, in the document's currency. */
+  unitCost: optionalNumber(1_000_000_000_000),
+  /** The factory offer line the cost came from. */
+  costSourceId: optionalId,
+  /** Factory currency units per document currency unit, when the cost was converted. */
+  fxRate: optionalNumber(1_000_000),
 });
 
 /** A requested item on an inquiry: no price yet. */
@@ -108,13 +117,30 @@ export interface EditableLine {
   quantity: string;
   unit: string;
   unitPrice: string;
+  /** Internal costing (quotations only). */
+  unitCost?: string;
+  costSourceId?: string;
+  fxRate?: string;
+  /** Who it is from, shown next to the cost: "Jinan Pharma Machinery · CNY 410,000". */
+  costNote?: string;
 }
 
 export const emptyLine = (): EditableLine => ({ description: "", model: "", hsCode: "", quantity: "1", unit: "pcs", unitPrice: "" });
 
 /** A stored line (any document) → editor line. `sourceId` = the stored line's own id, to carry it to the next step. */
 export function toEditableLine(
-  row: { id?: string; description: string; model?: string | null; hsCode?: string | null; quantity: string | number; unit?: string | null; unitPrice?: string | number | null },
+  row: {
+    id?: string;
+    description: string;
+    model?: string | null;
+    hsCode?: string | null;
+    quantity: string | number;
+    unit?: string | null;
+    unitPrice?: string | number | null;
+    unitCost?: string | number | null;
+    supplierQuoteItemId?: string | null;
+    fxRate?: string | number | null;
+  },
   opts: { asSource?: boolean; keepId?: boolean; sourceId?: string | null; withPrice?: boolean } = {},
 ): EditableLine {
   return {
@@ -126,5 +152,8 @@ export function toEditableLine(
     quantity: String(Number(row.quantity)),
     unit: row.unit || "pcs",
     unitPrice: opts.withPrice === false || row.unitPrice === undefined || row.unitPrice === null ? "" : String(Number(row.unitPrice)),
+    ...(row.unitCost !== undefined && row.unitCost !== null ? { unitCost: String(Number(row.unitCost)) } : {}),
+    ...(row.supplierQuoteItemId ? { costSourceId: row.supplierQuoteItemId } : {}),
+    ...(row.fxRate !== undefined && row.fxRate !== null ? { fxRate: String(Number(row.fxRate)) } : {}),
   };
 }

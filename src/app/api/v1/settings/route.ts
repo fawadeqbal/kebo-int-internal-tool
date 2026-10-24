@@ -10,15 +10,18 @@ export const GET = handle(async () => {
   return json({ settings: await loadSettings() });
 });
 
-/** The whole settings object (categories and notifyEmails as arrays, the notify* switches as booleans). */
+/** The settings object; missing fields keep their saved values (categories and notifyEmails as arrays, the notify* switches as booleans). */
 export const PUT = handle(async (request: Request) => {
   const actor = await apiUser("settings.manage");
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body || typeof body !== "object") throw new ApiError(400, "Send a JSON object.");
+  // Fields the app does not send (e.g. an older app without exchange rates) keep their saved value.
+  const current = await loadSettings();
+  const merged: Record<string, unknown> = { ...current, ...body };
   const asForm = {
-    ...body,
-    categories: Array.isArray(body.categories) ? body.categories.join("\n") : body.categories,
-    notifyEmails: Array.isArray(body.notifyEmails) ? body.notifyEmails.join(",") : body.notifyEmails,
+    ...merged,
+    categories: Array.isArray(merged.categories) ? merged.categories.join("\n") : merged.categories,
+    notifyEmails: Array.isArray(merged.notifyEmails) ? merged.notifyEmails.join(",") : merged.notifyEmails,
   };
   const data = parse(settingsSchema, asForm);
   await db.transaction(async (tx) => {

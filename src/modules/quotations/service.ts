@@ -1,6 +1,6 @@
 import { and, eq, isNull, max, ne } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
-import { invoices, queries, queryItems, quotationItems, quotations, type QuotationStatus } from "@/lib/db/schema";
+import { invoices, queries, queryItems, quotationItems, quotations, supplierQuoteItems, supplierQuotes, type QuotationStatus } from "@/lib/db/schema";
 import { assertCan, type SessionUser } from "@/lib/auth/session";
 import { nextReference } from "@/lib/counters";
 import { calculateTotals, fromCents } from "@/lib/utils/money";
@@ -29,6 +29,9 @@ function totalsFor(items: LineItem[], discount: number, taxRate: number) {
     },
     itemRows: items.map((item, i) => ({
       queryItemId: item.sourceId ?? null,
+      supplierQuoteItemId: item.costSourceId ?? null,
+      unitCost: item.unitCost === null || item.unitCost === undefined ? null : String(item.unitCost),
+      fxRate: item.fxRate === null || item.fxRate === undefined ? null : String(item.fxRate),
       description: item.description,
       model: item.model ?? null,
       hsCode: item.hsCode ?? null,
@@ -41,10 +44,23 @@ function totalsFor(items: LineItem[], discount: number, taxRate: number) {
   };
 }
 
-/** Keep only links to this inquiry's own requested items. */
-async function ownItemLinks<T extends { queryItemId: string | null }>(tx: DbOrTx, queryId: string, rows: T[]): Promise<T[]> {
+/** Keep only links to this inquiry's own requested items and factory offer lines. */
+async function ownItemLinks<T extends { queryItemId: string | null; supplierQuoteItemId: string | null }>(tx: DbOrTx, queryId: string, rows: T[]): Promise<T[]> {
   const own = new Set((await tx.select({ id: queryItems.id }).from(queryItems).where(eq(queryItems.queryId, queryId))).map((r) => r.id));
-  return rows.map((r) => (r.queryItemId && !own.has(r.queryItemId) ? { ...r, queryItemId: null } : r));
+  const offerLines = new Set(
+    (
+      await tx
+        .select({ id: supplierQuoteItems.id })
+        .from(supplierQuoteItems)
+        .innerJoin(supplierQuotes, eq(supplierQuotes.id, supplierQuoteItems.supplierQuoteId))
+        .where(eq(supplierQuotes.queryId, queryId))
+    ).map((r) => r.id),
+  );
+  return rows.map((r) => ({
+    ...r,
+    queryItemId: r.queryItemId && own.has(r.queryItemId) ? r.queryItemId : null,
+    supplierQuoteItemId: r.supplierQuoteItemId && offerLines.has(r.supplierQuoteItemId) ? r.supplierQuoteItemId : null,
+  }));
 }
 
 /** The newest version number of an inquiry's quotations. Older versions are superseded. */
@@ -192,6 +208,9 @@ export async function reviseQuotation(actor: SessionUser, id: string) {
       quantity: Number(i.quantity),
       unit: i.unit,
       unitPrice: Number(i.unitPrice),
+      unitCost: i.unitCost === null ? null : Number(i.unitCost),
+      costSourceId: i.supplierQuoteItemId,
+      fxRate: i.fxRate === null ? null : Number(i.fxRate),
     })),
     discount: Number(existing.discount),
     taxRate: Number(existing.taxRate),

@@ -14,7 +14,7 @@ const SECTIONS: Record<Section, Key[]> = {
   email: ["notifyEmails", "notifyNewQuery", "notifyQuotation", "notifyClosed", "notifyPayment", "notifyDailySummary"],
   categories: ["categories"],
   company: ["companyName", "companyTaxNo", "companyPhone", "companyEmail", "companyWebsite", "companyAddress"],
-  money: ["currency", "defaultTaxRate", "quotationValidityDays", "invoicePaymentDays"],
+  money: ["currency", "defaultTaxRate", "quotationValidityDays", "invoicePaymentDays", "exchangeRates", "defaultMarginPercent"],
   reminders: ["reminderPendingDays", "reminderProcessingDays", "reminderDueSoonDays"],
   documents: ["defaultQuotationTerms", "bankDetails", "invoiceFooter"],
 };
@@ -27,8 +27,22 @@ const NOTIFY: [Key, string][] = [
   ["notifyDailySummary", "Every morning: new RFQs, overdue inquiries and unpaid invoices"],
 ];
 
+/** { CNY: 7.1 } → "CNY = 7.1" lines (the form the rates are typed in). */
+const ratesText = (r: Record<string, number>) =>
+  Object.entries(r)
+    .map(([c, v]) => `${c} = ${v}`)
+    .join("\n");
+
 const asText = (key: Key, value: AppSettings[Key]) =>
-  Array.isArray(value) ? value.join(key === "notifyEmails" ? ", " : "\n") : typeof value === "boolean" ? (value ? "on" : "") : String(value ?? "");
+  Array.isArray(value)
+    ? value.join(key === "notifyEmails" ? ", " : "\n")
+    : typeof value === "boolean"
+      ? value
+        ? "on"
+        : ""
+      : value && typeof value === "object"
+        ? ratesText(value as Record<string, number>)
+        : String(value ?? "");
 
 /** The saved values of every other section, so saving one section keeps the rest as they are. */
 function KeepOthers({ settings, except }: { settings: AppSettings; except: Key[] }) {
@@ -237,6 +251,8 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
             ["Default tax rate", `${settings.defaultTaxRate}%`],
             ["Quotation valid for", `${settings.quotationValidityDays} days`],
             ["Invoice payment due in", `${settings.invoicePaymentDays} days`],
+            ["Exchange rates (for factory prices)", Object.entries(settings.exchangeRates).map(([c, r]) => `1 ${settings.currency} = ${r} ${c}`).join("\n")],
+            ["Default margin", `${settings.defaultMarginPercent}% of the selling price`],
           ]}
         />,
         <>
@@ -244,6 +260,10 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
           {text("defaultTaxRate", "Default tax rate (%)", { type: "number", step: "0.01", hint: "Usually 0 for export" })}
           {text("quotationValidityDays", "Quotation valid for (days)", { type: "number" })}
           {text("invoicePaymentDays", "Invoice payment due in (days)", { type: "number" })}
+          <Field label="Exchange rates" htmlFor="exchangeRates" error={e.exchangeRates} hint={`How much of each currency one ${settings.currency} buys, one per line, e.g. CNY = 7.10`}>
+            <Textarea id="exchangeRates" name="exchangeRates" rows={3} className="min-h-0 font-mono" defaultValue={v("exchangeRates")} />
+          </Field>
+          {text("defaultMarginPercent", "Default margin (%)", { type: "number", step: "0.1", hint: "Of the selling price. Used when a quotation is priced from factory offers" })}
         </>,
         "grid gap-5 sm:grid-cols-2",
       )}

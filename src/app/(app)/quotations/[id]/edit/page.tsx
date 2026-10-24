@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/session";
+import { can } from "@/lib/auth/permissions";
 import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { getQuotationDetail } from "@/modules/quotations/repository";
@@ -31,6 +32,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
           action={updateQuotationAction.bind(null, id)}
           currency={q.currency}
           cancelHref={`/quotations/${id}`}
+          costing={can(user.role, "sourcing.manage")}
           submitLabel="Save changes"
           initial={quotationEditValues(detail)}
         />

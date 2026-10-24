@@ -18,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/notifications", label: "Notifications", icon: "notifications", badge: unread },
   ];
   const money: NavItem[] = [
+    ...(can(user.role, "sourcing.manage") ? [{ href: "/factories", label: "Factories", icon: "factories" } as NavItem] : []),
     { href: "/quotations", label: "Quotations", icon: "quotations" },
     ...(can(user.role, "invoices.manage") ? [{ href: "/invoices", label: "Invoices", icon: "invoices" } as NavItem] : []),
     ...(can(user.role, "reports.view") ? [{ href: "/reports", label: "Reports", icon: "reports" } as NavItem] : []),

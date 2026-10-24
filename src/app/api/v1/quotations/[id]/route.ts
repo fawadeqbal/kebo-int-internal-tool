@@ -15,8 +15,11 @@ export const GET = handle(async (_request: Request, { params }: Ctx) => {
   const detail = await getQuotationDetail(user, id);
   if (!detail) throw new ApiError(404, "Quotation not found");
   const abilities = quotationAbilities(user, detail);
+  // Our costs are internal: only people who do the sourcing get them.
+  const costs = can(user.role, "sourcing.manage");
   return json({
     ...detail,
+    items: costs ? detail.items : detail.items.map((i) => ({ ...i, unitCost: null, fxRate: null, supplierQuoteItemId: null })),
     invoices: can(user.role, "invoices.manage") ? detail.invoices : [],
     changes: quotationChanges(detail),
     pdf: `/api/quotations/${id}/pdf`,

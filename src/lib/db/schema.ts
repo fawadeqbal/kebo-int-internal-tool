@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   date,
   foreignKey,
@@ -190,8 +191,81 @@ export const queryItems = pgTable(
       .notNull()
       .references(() => queries.id, { onDelete: "cascade" }),
     ...lineColumns(),
+    /** The factory offer line chosen for this item (its cost goes into the quotation). */
+    chosenOfferItemId: uuid("chosen_offer_item_id").references((): AnyPgColumn => supplierQuoteItems.id, { onDelete: "set null" }),
   },
   (t) => [index("query_items_query_idx").on(t.queryId)],
+);
+
+/* ----------------------------------------------------------------------------
+ * Sourcing: factories and what each one offered for an inquiry (internal only)
+ * --------------------------------------------------------------------------*/
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 200 }).notNull(),
+    contactPerson: varchar("contact_person", { length: 120 }),
+    phone: varchar("phone", { length: 40 }),
+    wechat: varchar("wechat", { length: 80 }),
+    email: varchar("email", { length: 254 }),
+    address: text("address"),
+    /** What they usually charge, to start new offer lines with (each line keeps its own). */
+    defaultVatRate: numeric("default_vat_rate", { precision: 5, scale: 2 }).notNull().default("13"),
+    bankDetails: text("bank_details"),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("suppliers_name_idx").on(t.name)],
+);
+
+export const supplierQuotes = pgTable(
+  "supplier_quotes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    queryId: uuid("query_id")
+      .notNull()
+      .references(() => queries.id),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id),
+    /** The factory's own quotation number, if any. */
+    reference: varchar("reference", { length: 80 }),
+    quotedOn: date("quoted_on", { mode: "string" }).notNull(),
+    validUntil: date("valid_until", { mode: "string" }),
+    currency: varchar("currency", { length: 3 }).notNull().default("CNY"),
+    /** Whether the prices typed in already include VAT (each line has its own rate). */
+    pricesIncludeVat: boolean("prices_include_vat").notNull().default(true),
+    /** EXW, FOB Qingdao, delivered to port… */
+    priceBasis: varchar("price_basis", { length: 60 }),
+    leadTime: varchar("lead_time", { length: 120 }),
+    paymentTerms: text("payment_terms"),
+    notes: text("notes"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("supplier_quotes_query_idx").on(t.queryId), index("supplier_quotes_supplier_idx").on(t.supplierId)],
+);
+
+export const supplierQuoteItems = pgTable(
+  "supplier_quote_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    supplierQuoteId: uuid("supplier_quote_id")
+      .notNull()
+      .references(() => supplierQuotes.id, { onDelete: "cascade" }),
+    /** The customer's item this offer line is for (empty for extras the factory added). */
+    queryItemId: uuid("query_item_id").references(() => queryItems.id, { onDelete: "set null" }),
+    ...lineColumns(),
+    unitPrice: money("unit_price"),
+    vatRate: numeric("vat_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  },
+  (t) => [index("supplier_quote_items_quote_idx").on(t.supplierQuoteId)],
 );
 
 export const queryStatusHistory = pgTable(
@@ -317,6 +391,11 @@ export const quotationItems = pgTable(
     hsCode: varchar("hs_code", { length: 20 }),
     unitPrice: money("unit_price"),
     lineTotal: money("line_total"),
+    /** Internal costing, never printed: the factory line it was priced from and what one unit costs us (incl. VAT, in the quotation's currency). */
+    supplierQuoteItemId: uuid("supplier_quote_item_id").references(() => supplierQuoteItems.id, { onDelete: "set null" }),
+    unitCost: numeric("unit_cost", { precision: 14, scale: 2 }),
+    /** Units of the factory's currency per 1 unit of the quotation's currency, when it was priced. */
+    fxRate: numeric("fx_rate", { precision: 14, scale: 6 }),
   },
   (t) => [index("quotation_items_quotation_idx").on(t.quotationId)],
 );
@@ -608,6 +687,9 @@ export type QueryStatus = (typeof queryStatusEnum.enumValues)[number];
 export type QuerySource = (typeof querySourceEnum.enumValues)[number];
 export type Priority = (typeof priorityEnum.enumValues)[number];
 export type QueryItem = typeof queryItems.$inferSelect;
+export type Supplier = typeof suppliers.$inferSelect;
+export type SupplierQuote = typeof supplierQuotes.$inferSelect;
+export type SupplierQuoteItem = typeof supplierQuoteItems.$inferSelect;
 export type Quotation = typeof quotations.$inferSelect;
 export type QuotationStatus = (typeof quotationStatusEnum.enumValues)[number];
 export type Invoice = typeof invoices.$inferSelect;

@@ -12,6 +12,7 @@ import '../../core/session.dart';
 import '../../theme/colors.dart';
 import '../../ui/docs.dart';
 import '../../ui/kit.dart';
+import '../sourcing/sourcing.dart';
 
 class InquiryDetailScreen extends ConsumerWidget {
   const InquiryDetailScreen({super.key, required this.id});
@@ -93,6 +94,7 @@ class _Detail extends ConsumerWidget {
                 ('Created by', d.s('creatorName', '—')),
               ]),
             ),
+            FactoryOffersCard(queryId: id),
             _Documents(id: id, d: d, currency: cur),
             _Files(id: id, d: d),
             _Notes(id: id, d: d),

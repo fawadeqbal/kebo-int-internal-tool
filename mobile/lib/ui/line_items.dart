@@ -11,18 +11,53 @@ const kUnits = ['pcs', 'set', 'unit', 'lot', 'kg', 'ton', 'm', 'm²', 'm³', 'L'
 /// name, then details), brand/model, HS code, quantity, unit and (when priced)
 /// unit price. [sourceId] is the line it came from on the step before.
 class EditLine {
-  EditLine({this.id, this.sourceId, String description = '', String model = '', String hsCode = '', String quantity = '1', String unit = 'pcs', String unitPrice = ''})
-      : description = TextEditingController(text: description),
+  EditLine({
+    this.id,
+    this.sourceId,
+    String description = '',
+    String model = '',
+    String hsCode = '',
+    String quantity = '1',
+    String unit = 'pcs',
+    String unitPrice = '',
+    String unitCost = '',
+    this.costSourceId,
+    this.fxRate,
+    this.costNote,
+  })  : description = TextEditingController(text: description),
         model = TextEditingController(text: model),
         hsCode = TextEditingController(text: hsCode),
         quantity = TextEditingController(text: quantity),
         unit = TextEditingController(text: unit),
         unitPrice = TextEditingController(text: unitPrice),
-        showCodes = model.isNotEmpty || hsCode.isNotEmpty;
+        unitCost = TextEditingController(text: unitCost),
+        margin = TextEditingController(text: _marginText(unitPrice, unitCost)),
+        showCodes = model.isNotEmpty || hsCode.isNotEmpty,
+        showCost = unitCost.isNotEmpty;
   final String? id;
   final String? sourceId;
   final TextEditingController description, model, hsCode, quantity, unit, unitPrice;
+  /// Internal (never printed): what one unit costs us incl. VAT, the factory line it came from, and the rate used.
+  final TextEditingController unitCost, margin;
+  String? costSourceId;
+  String? fxRate;
+  String? costNote;
   bool showCodes;
+  bool showCost;
+
+  /// Margin on the selling price, one decimal, half away from zero (same as the server).
+  static String _marginText(String price, String cost) {
+    final p = num.tryParse(price), c = num.tryParse(cost);
+    if (p == null || c == null || p <= 0 || c <= 0) return '';
+    final m = (p - c) / p * 100;
+    final r = (m.abs() * 10).round() / 10 * m.sign;
+    return r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(1);
+  }
+
+  /// The price that gives [marginPercent] on [cost]: cost / (1 − m%), to the cent.
+  static String priceFor(num cost, num marginPercent) => ((cost / (1 - marginPercent / 100) * 100).round() / 100).toStringAsFixed(2);
+
+  void refreshMargin() => margin.text = _marginText(unitPrice.text, unitCost.text);
 
   factory EditLine.fromJson(Json j) => EditLine(
         id: j.s('id').isEmpty ? null : j.s('id'),
@@ -33,6 +68,10 @@ class EditLine {
         quantity: f.qty(j['quantity'] ?? '1').replaceAll(',', ''),
         unit: j.s('unit').isEmpty ? 'pcs' : j.s('unit'),
         unitPrice: j.s('unitPrice').isEmpty ? '' : (num.tryParse(j.s('unitPrice'))?.toString() ?? j.s('unitPrice')),
+        unitCost: j.s('unitCost').isEmpty ? '' : (num.tryParse(j.s('unitCost'))?.toString() ?? j.s('unitCost')),
+        costSourceId: j.sn('costSourceId') ?? j.sn('supplierQuoteItemId'),
+        fxRate: j.sn('fxRate'),
+        costNote: j.sn('costNote'),
       );
 
   /// A stored requested item → an editable one (keeps its id so quotations stay linked).
@@ -47,10 +86,15 @@ class EditLine {
         'quantity': quantity.text.trim(),
         'unit': unit.text.trim(),
         if (priced) 'unitPrice': unitPrice.text.trim(),
+        if (priced && unitCost.text.trim().isNotEmpty) ...{
+          'unitCost': unitCost.text.trim(),
+          'costSourceId': ?costSourceId,
+          'fxRate': ?fxRate,
+        },
       };
   bool get isEmpty => description.text.trim().isEmpty && unitPrice.text.trim().isEmpty;
   void dispose() {
-    for (final c in [description, model, hsCode, quantity, unit, unitPrice]) {
+    for (final c in [description, model, hsCode, quantity, unit, unitPrice, unitCost, margin]) {
       c.dispose();
     }
   }
@@ -68,6 +112,7 @@ class LineItemsEditor extends StatefulWidget {
     this.error,
     this.priced = true,
     this.sourceLabel,
+    this.costing = false,
     this.hint = 'e.g. Rotary tablet press, 35 stations, GMP, SS316',
   });
   final List<EditLine> lines;
@@ -78,6 +123,8 @@ class LineItemsEditor extends StatefulWidget {
   final bool priced;
   /// Shown on lines that came from the step before, e.g. "Requested by the customer".
   final String? sourceLabel;
+  /// Show our cost and margin per line (internal; never printed).
+  final bool costing;
   final String hint;
   @override
   State<LineItemsEditor> createState() => _LineItemsEditorState();
@@ -119,6 +166,7 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
             _row(context, 'Tax', f.cents(t.tax, cur)),
             Divider(height: 20, color: context.c.lineStrong),
             _row(context, 'Total', f.cents(t.total, cur), strong: true),
+            if (widget.costing) _costSummary(context, t.discount),
           ]),
         ),
       ],
@@ -176,13 +224,99 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
               child: TextField(
                 controller: l.unitPrice,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                onChanged: _changed,
+                onChanged: (_) => setState(l.refreshMargin),
                 decoration: InputDecoration(labelText: 'Unit price (${widget.currency})', hintText: '0.00'),
               ),
             ),
           ],
         ]),
+        if (priced && widget.costing) _costRow(context, l),
         gap8,
+      ]),
+    );
+  }
+
+  Widget _costRow(BuildContext context, EditLine l) {
+    if (!l.showCost) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+          onPressed: () => setState(() => l.showCost = true),
+          child: const Text('+ Our cost', style: TextStyle(fontSize: 12.5)),
+        ),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(top: 8, right: 6),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+      decoration: BoxDecoration(color: context.c.surface2, borderRadius: BorderRadius.circular(10)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (l.costNote != null) Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(l.costNote!, style: context.t.bodySmall)),
+        Row(children: [
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: l.unitCost,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) => setState(l.refreshMargin),
+              decoration: InputDecoration(labelText: 'Our cost (${widget.currency})', isDense: true),
+            ),
+          ),
+          gap8,
+          Expanded(
+            flex: 2,
+            child: TextField(
+              controller: l.margin,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+              onChanged: (v) {
+                final m = num.tryParse(v), c = num.tryParse(l.unitCost.text);
+                if (m != null && m < 95 && c != null && c > 0) setState(() => l.unitPrice.text = EditLine.priceFor(c, m));
+              },
+              decoration: const InputDecoration(labelText: 'Margin', suffixText: '%', isDense: true),
+            ),
+          ),
+        ]),
+        gap4,
+        Text('Internal, not printed', style: context.t.bodySmall!.copyWith(fontSize: 11)),
+      ]),
+    );
+  }
+
+  /// Cost, profit and margin over the lines that have a cost (freight and other uncosted lines left out).
+  Widget _costSummary(BuildContext context, int discountCents) {
+    var cost = 0, sales = 0, uncosted = 0;
+    for (final l in widget.lines) {
+      if (l.description.text.trim().isEmpty) continue;
+      final q = num.tryParse(l.quantity.text) ?? 0;
+      final c = num.tryParse(l.unitCost.text);
+      if (c == null || l.unitCost.text.trim().isEmpty) {
+        uncosted++;
+        continue;
+      }
+      cost += (f.toCents(c) * q).round();
+      sales += (f.toCents(num.tryParse(l.unitPrice.text) ?? 0) * q).round();
+    }
+    if (cost == 0) return const SizedBox.shrink();
+    final profit = sales - cost;
+    final pct = sales > 0 ? ((profit / sales * 1000).round() / 10) : 0;
+    final bad = profit - discountCents < 0;
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: context.c.lineStrong)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Internal, not printed', style: context.t.labelMedium),
+        gap4,
+        _row(context, 'Our cost (incl. VAT)', f.cents(cost, widget.currency)),
+        Row(children: [
+          Expanded(child: Text('Profit before discount', style: context.t.bodyMedium!.copyWith(color: context.c.muted))),
+          gap8,
+          Text('${f.cents(profit, widget.currency)} · $pct%', style: context.t.bodyMedium!.copyWith(fontWeight: FontWeight.w600, color: profit < 0 ? context.c.bad : context.c.ok)),
+        ]),
+        if (discountCents > 0)
+          Text('After the discount: ${f.cents(profit - discountCents, widget.currency)} profit', style: context.t.bodySmall!.copyWith(color: bad ? context.c.bad : null)),
+        if (uncosted > 0) Text('$uncosted line(s) without a cost (e.g. freight) are left out.', style: context.t.bodySmall),
       ]),
     );
   }

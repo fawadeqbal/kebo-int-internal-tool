@@ -192,6 +192,7 @@ class QuotationDetailScreen extends ConsumerWidget {
               ]),
             ),
             SectionCard(title: d.m('query').s('title'), subtitle: 'Lines', child: LinesView(items: d.l('items'), totals: q, currency: cur)),
+            CostingCard(items: d.l('items'), discount: q['discount'], currency: cur),
             if (d.m('previous').isNotEmpty)
               SectionCard(
                 title: 'Changes from v${d.m('previous').i('version')}',
@@ -372,6 +373,7 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
             taxRate: _tax,
             currency: _currency,
             sourceLabel: 'Requested by the customer',
+            costing: ref.read(sessionProvider).can('sourcing.manage'),
             error: e?.field('items') ?? e?.field('discount') ?? e?.field('taxRate'),
           ),
         ),
@@ -419,5 +421,42 @@ class RevisionChanges extends StatelessWidget {
           ]),
         ),
     ]);
+  }
+}
+
+/// Internal: what the lines cost us and the profit (from each line's cost). Nothing when no line has a cost.
+class CostingCard extends StatelessWidget {
+  const CostingCard({super.key, required this.items, required this.discount, required this.currency});
+  final List<Json> items;
+  final Object? discount;
+  final String currency;
+  @override
+  Widget build(BuildContext context) {
+    var cost = 0, sales = 0, uncosted = 0;
+    for (final it in items) {
+      final q = num.tryParse(it.s('quantity')) ?? 0;
+      if (it['unitCost'] == null) {
+        uncosted++;
+        continue;
+      }
+      cost += (f.toCents(it['unitCost']) * q).round();
+      sales += (f.toCents(it['unitPrice']) * q).round();
+    }
+    if (cost == 0) return const SizedBox.shrink();
+    final profit = sales - cost - f.toCents(discount);
+    final pct = sales > 0 ? (profit / sales * 1000).round() / 10 : 0;
+    return SectionCard(
+      title: 'Costing',
+      subtitle: 'Internal, not on the PDF',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        KeyValues([
+          ('Our cost (incl. VAT)', Text(f.cents(cost, currency), textAlign: TextAlign.right)),
+          ('Sold for (before discount)', Text(f.cents(sales, currency), textAlign: TextAlign.right)),
+          ('Profit', Text('${f.cents(profit, currency)} · $pct%', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w600, color: profit < 0 ? context.c.bad : context.c.ok))),
+        ]),
+        if (uncosted > 0) Padding(padding: const EdgeInsets.only(top: 6), child: Text('$uncosted line(s) without a cost (e.g. freight) are not counted.', style: context.t.bodySmall)),
+        if (f.toCents(discount) > 0) Text('The discount is taken off the profit.', style: context.t.bodySmall),
+      ]),
+    );
   }
 }
