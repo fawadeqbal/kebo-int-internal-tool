@@ -12,6 +12,7 @@ import { Pool } from "pg";
 import * as schema from "../src/lib/db/schema";
 import { calculateTotals, fromCents } from "../src/lib/utils/money";
 import { DEFAULT_SETTINGS } from "../src/modules/settings/service";
+import { companySnapshot, customerSnapshot } from "../src/modules/documents/snapshots";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool, { schema });
@@ -21,6 +22,7 @@ const {
   queries,
   queryStatusHistory,
   queryAssignments,
+  queryItems,
   comments,
   quotations,
   quotationItems,
@@ -172,6 +174,7 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
 
   const customerIds: string[] = [];
   const customerCity = new Map<string, string>();
+  const customerParty = new Map<string, ReturnType<typeof customerSnapshot>>();
   for (const [contactPerson, companyName, phone, email, address] of COMPANIES) {
     const [row] = await db
       .insert(customers)
@@ -179,7 +182,10 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
       .returning({ id: customers.id });
     customerIds.push(row.id);
     customerCity.set(row.id, address);
+    customerParty.set(row.id, customerSnapshot({ companyName, contactPerson, phone, email, address, taxNo: null }));
   }
+  const company = companySnapshot(DEFAULT_SETTINGS);
+  const currency = DEFAULT_SETTINGS.currency;
 
   const now = new Date();
   const sources = ["website", "website", "whatsapp", "email", "website", "phone"] as const;
@@ -195,6 +201,7 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
     const customerId = pick(customerIds);
     const assignee = rand() < 0.88 ? pick(workers) : null;
     const quantity = job.title.startsWith("Hospital bed") ? 50 : job.title.startsWith("Air-jet") ? 24 : 1;
+    const unit = quantity > 1 ? "pcs" : "set";
     const requiredBy = iso(addDays(created, 10 + Math.floor(rand() * 30)));
 
     // Decide where this query ended up.
@@ -241,8 +248,7 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
           source: pick(sources),
           title: job.title,
           category: job.category,
-          specifications: job.spec,
-          quantity,
+          specifications: rand() < 0.5 ? `Deliver to ${customerCity.get(customerId) ?? "the customer"}. ${pick(["Needs CE certificate.", "Sea freight, CIF.", "Wants delivery within 60 days.", "Will pay by L/C."])}` : null,
           priority: pick(priorities),
           requiredBy,
           status,
@@ -254,6 +260,11 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
           updatedAt: completedAt ?? startAt,
         })
         .returning({ id: queries.id });
+      // What the customer asked for (the quotation answers it line by line).
+      const [item] = await tx
+        .insert(queryItems)
+        .values({ queryId: q.id, description: `${job.title}\n${job.spec}`, quantity: String(quantity), unit, sortOrder: 0 })
+        .returning({ id: queryItems.id });
 
       for (const h of hist)
         await tx.insert(queryStatusHistory).values({ queryId: q.id, fromStatus: h.from, toStatus: h.to, reason: h.reason ?? null, changedBy: assignee ?? manager, changedAt: h.at });
@@ -274,11 +285,20 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
       // Quotations
       if (["quoted_draft", "sent", "rejected", "accepted", "invoiced", "paid", "partial"].includes(outcome)) {
         const quotedAt = addDays(startAt, 2 + rand() * 4);
-        const unit = Math.round((job.price * (0.9 + rand() * 0.25)) / 50) * 50;
-        const lines = [{ description: `${job.title}\n${job.spec}`, quantity, unitPrice: unit }];
+        const price = Math.round((job.price * (0.9 + rand() * 0.25)) / 50) * 50;
+        const lines: { description: string; quantity: number; unit: string; unitPrice: number; queryItemId: string | null; hsCode: string | null }[] = [
+          { description: `${job.title}\n${job.spec}`, quantity, unit, unitPrice: price, queryItemId: item.id, hsCode: "8479.89" },
+        ];
         if (job.category !== "General Order Supply")
-          lines.push({ description: "Sea freight CIF destination port, incl. export documents", quantity: 1, unitPrice: Math.round((unit * quantity * 0.06) / 50) * 50 });
-        const discount = rand() < 0.3 ? Math.round((unit * quantity * 0.02) / 50) * 50 : 0;
+          lines.push({
+            description: "Sea freight CIF destination port, incl. export documents",
+            quantity: 1,
+            unit: "lot",
+            unitPrice: Math.round((price * quantity * 0.06) / 50) * 50,
+            queryItemId: null,
+            hsCode: null,
+          });
+        const discount = rand() < 0.3 ? Math.round((price * quantity * 0.02) / 50) * 50 : 0;
         const t = calculateTotals(lines, discount, 0);
         const qStatus: schema.QuotationStatus =
           outcome === "quoted_draft" ? "draft" : outcome === "sent" ? "sent" : outcome === "rejected" ? "rejected" : "accepted";
@@ -291,6 +311,7 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
             refNo: quoteRef,
             queryId: q.id,
             version: 1,
+            currency,
             subtotal: fromCents(t.subtotal),
             discount: fromCents(t.discount),
             taxRate: "0",
@@ -300,21 +321,28 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
             submittedAt,
             status: qStatus,
             terms: DEFAULT_SETTINGS.defaultQuotationTerms,
+            ...(qStatus === "draft" ? {} : { customerSnapshot: customerParty.get(customerId), companySnapshot: company }),
             createdBy: assignee ?? manager,
             createdAt: quotedAt,
             updatedAt: quotedAt,
           })
           .returning({ id: quotations.id });
-        await tx.insert(quotationItems).values(
-          lines.map((l, idx) => ({
-            quotationId: quote.id,
-            description: l.description,
-            quantity: String(l.quantity),
-            unitPrice: String(l.unitPrice),
-            lineTotal: fromCents(t.lines[idx].lineTotal),
-            sortOrder: idx,
-          })),
-        );
+        const quoteLines = await tx
+          .insert(quotationItems)
+          .values(
+            lines.map((l, idx) => ({
+              quotationId: quote.id,
+              queryItemId: l.queryItemId,
+              description: l.description,
+              hsCode: l.hsCode,
+              quantity: String(l.quantity),
+              unit: l.unit,
+              unitPrice: String(l.unitPrice),
+              lineTotal: fromCents(t.lines[idx].lineTotal),
+              sortOrder: idx,
+            })),
+          )
+          .returning({ id: quotationItems.id });
 
         // Invoices + payments
         if (["invoiced", "paid", "partial"].includes(outcome)) {
@@ -332,6 +360,9 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
               customerId,
               issueDate,
               dueDate: invDue,
+              currency,
+              customerSnapshot: customerParty.get(customerId),
+              companySnapshot: company,
               subtotal: fromCents(t.subtotal),
               discount: fromCents(t.discount),
               taxRate: "0",
@@ -343,16 +374,22 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
               createdAt: new Date(`${issueDate}T10:00:00Z`),
             })
             .returning({ id: invoices.id });
-          await tx.insert(invoiceItems).values(
-            lines.map((l, idx) => ({
-              invoiceId: inv.id,
-              description: l.description,
-              quantity: String(l.quantity),
-              unitPrice: String(l.unitPrice),
-              lineTotal: fromCents(t.lines[idx].lineTotal),
-              sortOrder: idx,
-            })),
-          );
+          const invLines = await tx
+            .insert(invoiceItems)
+            .values(
+              lines.map((l, idx) => ({
+                invoiceId: inv.id,
+                quotationItemId: quoteLines[idx].id,
+                description: l.description,
+                hsCode: l.hsCode,
+                quantity: String(l.quantity),
+                unit: l.unit,
+                unitPrice: String(l.unitPrice),
+                lineTotal: fromCents(t.lines[idx].lineTotal),
+                sortOrder: idx,
+              })),
+            )
+            .returning({ id: invoiceItems.id });
           // Paid (or half-paid) orders have been packed and shipped.
           if (paid > 0) {
             const packOn = addDays(new Date(`${issueDate}T00:00:00Z`), 3 + rand() * 10);
@@ -379,6 +416,8 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
                 containerNo: `1 × ${net > 6000 ? "40HQ" : "20GP"} ${pick(["MSKU", "CSNU", "TGHU", "CMAU"])}${Math.floor(1000000 + rand() * 8999999)}`,
                 sealNo: `SL${Math.floor(100000 + rand() * 899999)}`,
                 marks: `KEBO / ${refNo}\nC/NO. 1–${cases}\nMADE IN CHINA`,
+                customerSnapshot: customerParty.get(customerId),
+                companySnapshot: company,
                 createdBy: manager,
                 createdAt: new Date(`${packDate}T09:00:00Z`),
               })
@@ -386,9 +425,11 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
             await tx.insert(packingListItems).values([
               {
                 packingListId: pl.id,
-                description: job.title,
+                invoiceItemId: invLines[0].id,
+                description: lines[0].description,
+                hsCode: lines[0].hsCode,
                 quantity: String(quantity),
-                unit: quantity > 1 ? "units" : "set",
+                unit,
                 packages: cases,
                 packageType: job.category === "Medical Devices & Equipment" ? "Carton" : "Wooden case",
                 netWeight: String(net),

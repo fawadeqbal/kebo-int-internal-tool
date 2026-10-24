@@ -10,6 +10,7 @@ import '../../core/refresh.dart';
 import '../../core/session.dart';
 import '../../theme/colors.dart';
 import '../../ui/kit.dart';
+import '../../ui/line_items.dart';
 import '../customers/customers.dart';
 
 /// New inquiry (existing or new customer) or edit. Same fields and rules as the web form.
@@ -38,9 +39,11 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
   String _category = '';
   final _customCategory = TextEditingController();
   String _source = 'whatsapp';
+  /// What the customer needs, item by item (the quotation starts from these).
+  final _items = <EditLine>[];
+  /// Anything else: destination port, delivery time, standards…
   final _specs = TextEditingController();
   final _title = TextEditingController();
-  final _quantity = TextEditingController(text: '1');
   String _priority = 'normal';
   String _requiredBy = '';
   String _assignee = '';
@@ -65,13 +68,14 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
         _source = q.s('source');
         _specs.text = q.s('specifications');
         _title.text = q.s('title');
-        _quantity.text = '${q.i('quantity', 1)}';
+        _items.addAll(d.l('items').map(EditLine.fromItem));
         _priority = q.s('priority', 'normal');
         _requiredBy = q.s('requiredBy');
       } else if (widget.customerId != null) {
         final c = await api.get('/api/v1/customers/${widget.customerId}');
         _customer = c.m('customer');
       }
+      if (_items.isEmpty) _items.add(EditLine(unit: 'pcs'));
       final session = ref.read(sessionProvider);
       if (!_edit && !session.can('queries.assign')) _assignee = session.userId;
       final meta = await ref.read(metaProvider.future);
@@ -88,8 +92,11 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
 
   @override
   void dispose() {
-    for (final c in [_contact, _company, _phone, _email, _customCategory, _specs, _title, _quantity]) {
+    for (final c in [_contact, _company, _phone, _email, _customCategory, _specs, _title]) {
       c.dispose();
+    }
+    for (final l in _items) {
+      l.dispose();
     }
     super.dispose();
   }
@@ -102,9 +109,9 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
     final details = {
       'category': _categoryValue,
       'source': _source,
+      'items': [for (final l in _items.where((l) => !l.isEmpty)) l.toJson(priced: false)],
       'specifications': _specs.text,
       'title': _title.text,
-      'quantity': _quantity.text,
       'priority': _priority,
       'requiredBy': _requiredBy,
     };
@@ -251,7 +258,14 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
                 items: [for (final s in sourceLabel.entries) (s.key, s.value)],
                 onChanged: (v) => setState(() => _source = v ?? 'whatsapp'),
               ),
-              Field(label: 'Requirements', controller: _specs, maxLines: 8, minLines: 4, helper: 'Machine or product, model, capacity, quantity, destination port, delivery time', error: e?.field('specifications')),
+              const FieldLabel('Items'),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('One per machine or product: name on the first line, then capacity, size, voltage…', style: context.t.bodySmall),
+              ),
+              LineItemsEditor(lines: _items, priced: false, error: e?.field('items'), hint: 'e.g. Capsule filling machine\n25,000 capsules/hour, size 0–4'),
+              gap16,
+              Field(label: 'Other details', controller: _specs, optional: true, maxLines: 5, minLines: 2, helper: 'Destination port, delivery time, standards, payment terms…', error: e?.field('specifications')),
               if (!_edit)
                 SelectField<String>(
                   label: 'Handled by',
@@ -270,19 +284,13 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
             title: 'More details',
             subtitle: 'Optional',
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Field(label: 'Short title', controller: _title, optional: true, helper: 'Leave empty to use the first line of the requirements', error: e?.field('title')),
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: Field(label: 'Quantity', controller: _quantity, keyboard: TextInputType.number, error: e?.field('quantity'))),
-                gap12,
-                Expanded(
-                  child: SelectField<String>(
-                    label: 'Priority',
-                    value: _priority,
-                    items: [for (final p in priorityLabel.entries) (p.key, p.value)],
-                    onChanged: (v) => setState(() => _priority = v ?? 'normal'),
-                  ),
-                ),
-              ]),
+              Field(label: 'Short title', controller: _title, optional: true, helper: 'Leave empty to name it after the items', error: e?.field('title')),
+              SelectField<String>(
+                label: 'Priority',
+                value: _priority,
+                items: [for (final p in priorityLabel.entries) (p.key, p.value)],
+                onChanged: (v) => setState(() => _priority = v ?? 'normal'),
+              ),
               DateField(label: 'Needed by', optional: true, clearable: true, value: _requiredBy, error: e?.field('requiredBy'), onChanged: (v) => setState(() => _requiredBy = v)),
             ]),
           ),

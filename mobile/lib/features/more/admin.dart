@@ -135,6 +135,8 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
   final _password = TextEditingController();
   String _role = 'staff';
   bool _filled = false;
+  bool _editProfile = false;
+  bool _editPassword = false;
   ApiException? _error;
 
   @override
@@ -166,47 +168,76 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
             gap16,
             SectionCard(
               title: 'Profile & role',
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Field(label: 'Full name', controller: _name, error: e?.field('name')),
-                Field(label: 'Email', controller: _email, keyboard: TextInputType.emailAddress, error: e?.field('email')),
-                SelectField<String>(label: 'Role', value: _role, helper: _roleHelp(_role), items: [for (final r in roleLabel.entries) (r.key, r.value)], onChanged: (v) => setState(() => _role = v ?? _role)),
-                BusyButton(
-                  label: 'Save',
-                  style: BusyStyle.outlined,
-                  onPressed: () async {
-                    setState(() => _error = null);
-                    try {
-                      await ref.mutate(() => api.patch('/api/v1/users/${widget.id}', {'name': _name.text, 'email': _email.text, 'role': _role}));
-                      if (context.mounted) toast(context, 'User updated');
-                    } on ApiException catch (err) {
-                      setState(() => _error = err);
-                      if (err.fieldErrors.isEmpty) rethrow;
-                    }
-                  },
-                ),
-              ]),
+              trailing: _editProfile ? null : TextButton.icon(onPressed: () => setState(() => _editProfile = true), icon: const Icon(Icons.edit_outlined, size: 16), label: const Text('Edit')),
+              child: !_editProfile
+                  ? kv([('Name', u.s('name')), ('Email', u.s('email')), ('Role', roleLabel[u.s('role')] ?? u.s('role'))])
+                  : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Field(label: 'Full name', controller: _name, error: e?.field('name')),
+                      Field(label: 'Email', controller: _email, keyboard: TextInputType.emailAddress, error: e?.field('email')),
+                      SelectField<String>(label: 'Role', value: _role, helper: _roleHelp(_role), items: [for (final r in roleLabel.entries) (r.key, r.value)], onChanged: (v) => setState(() => _role = v ?? _role)),
+                      Row(children: [
+                        Expanded(
+                          child: BusyButton(
+                            label: 'Save',
+                            onPressed: () async {
+                              setState(() => _error = null);
+                              try {
+                                await ref.mutate(() => api.patch('/api/v1/users/${widget.id}', {'name': _name.text, 'email': _email.text, 'role': _role}));
+                                setState(() => _editProfile = false);
+                                if (context.mounted) toast(context, 'User updated');
+                              } on ApiException catch (err) {
+                                setState(() => _error = err);
+                                if (err.fieldErrors.isEmpty) rethrow;
+                              }
+                            },
+                          ),
+                        ),
+                        gap8,
+                        TextButton(
+                          onPressed: () => setState(() {
+                            _name.text = u.s('name');
+                            _email.text = u.s('email');
+                            _role = u.s('role');
+                            _error = null;
+                            _editProfile = false;
+                          }),
+                          child: const Text('Cancel'),
+                        ),
+                      ]),
+                    ]),
             ),
             SectionCard(
-              title: 'Reset password',
-              subtitle: 'Set a new temporary password and share it with the user. They are signed out everywhere.',
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Field(label: 'New password', controller: _password, error: e?.field('password'), helper: 'At least 8 characters, with a letter and a number'),
-                BusyButton(
-                  label: 'Set new password',
-                  style: BusyStyle.outlined,
-                  onPressed: () async {
-                    setState(() => _error = null);
-                    try {
-                      final res = await ref.mutate(() => api.post('/api/v1/users/${widget.id}/password', {'password': _password.text}));
-                      _password.clear();
-                      if (context.mounted) toast(context, res.s('message', 'Password updated'));
-                    } on ApiException catch (err) {
-                      setState(() => _error = err);
-                      if (err.fieldErrors.isEmpty) rethrow;
-                    }
-                  },
-                ),
-              ]),
+              title: 'Password',
+              subtitle: 'For a person who forgot theirs: set a temporary one and share it. They are signed out everywhere.',
+              child: !_editPassword
+                  ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton(onPressed: () => setState(() => _editPassword = true), child: const Text('Set a temporary password')),
+                    )
+                  : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Field(label: 'New password', controller: _password, error: e?.field('password'), helper: 'At least 8 characters, with a letter and a number'),
+                      Row(children: [
+                        Expanded(
+                          child: BusyButton(
+                            label: 'Set new password',
+                            onPressed: () async {
+                              setState(() => _error = null);
+                              try {
+                                final res = await ref.mutate(() => api.post('/api/v1/users/${widget.id}/password', {'password': _password.text}));
+                                _password.clear();
+                                setState(() => _editPassword = false);
+                                if (context.mounted) toast(context, res.s('message', 'Password updated'));
+                              } on ApiException catch (err) {
+                                setState(() => _error = err);
+                                if (err.fieldErrors.isEmpty) rethrow;
+                              }
+                            },
+                          ),
+                        ),
+                        gap8,
+                        TextButton(onPressed: () => setState(() => _editPassword = false), child: const Text('Cancel')),
+                      ]),
+                    ]),
             ),
             if (!self) ...[
               SectionCard(
@@ -308,6 +339,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         for (final k in _switches.keys) k: _on[k] ?? false,
       };
 
+  /// The section being edited (one at a time); the rest are read-only.
+  String? _editing;
+
+  void _reset() {
+    for (final k in _text) {
+      _c[k]!.text = _raw.s(k);
+    }
+    _c['categories']!.text = _raw.ls('categories').join('\n');
+    _c['notifyEmails']!.text = _raw.ls('notifyEmails').join(', ');
+    for (final k in _switches.keys) {
+      _on[k] = _raw.b(k);
+    }
+  }
+
+  Future<void> _saveSection() async {
+    setState(() => _error = null);
+    try {
+      final body = _body;
+      await ref.mutate(() => ref.read(apiProvider).put('/api/v1/settings', body));
+      ref.invalidate(metaProvider);
+      setState(() {
+        _raw = body;
+        _editing = null;
+      });
+      if (mounted) toast(context, 'Settings saved.');
+    } on ApiException catch (err) {
+      setState(() => _error = err);
+      if (err.fieldErrors.isEmpty) rethrow;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadError != null) return Scaffold(appBar: AppBar(title: const Text('Settings')), body: ErrorState(_loadError!, onRetry: _load));
@@ -316,14 +378,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     Field field(String key, String label, {bool optional = true, int lines = 1, TextInputType? kb, String? helper}) =>
         Field(label: label, controller: _c[key]!, optional: optional, maxLines: lines, keyboard: kb, helper: helper, error: e?.field(key));
     const numKb = TextInputType.numberWithOptions(decimal: true);
+    String v(String k) => _raw.s(k).isEmpty ? 'Not set' : _raw.s(k);
+
+    Widget section(String id, String title, {String? subtitle, required Widget read, required Widget edit}) {
+      final open = _editing == id;
+      return SectionCard(
+        title: title,
+        subtitle: subtitle,
+        trailing: open
+            ? null
+            : TextButton.icon(
+                onPressed: _editing != null ? null : () => setState(() => _editing = id),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Edit'),
+              ),
+        child: open
+            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (e != null && e.fieldErrors.isNotEmpty) const Notice('Please fix the highlighted fields.', tone: Tone.bad),
+                edit,
+                gap8,
+                Row(children: [
+                  Expanded(child: BusyButton(label: 'Save', onPressed: _saveSection)),
+                  gap8,
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _reset();
+                      _error = null;
+                      _editing = null;
+                    }),
+                    child: const Text('Cancel'),
+                  ),
+                ]),
+              ])
+            : read,
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(padding: pagePadding, children: [
-        if (e != null && e.fieldErrors.isNotEmpty) const Notice('Please fix the highlighted fields.', tone: Tone.bad),
-        SectionCard(
-          title: 'Company',
+        section(
+          'company',
+          'Company',
           subtitle: 'Printed on quotations, invoices and packing lists',
-          child: Column(children: [
+          read: kv([
+            ('Company name', v('companyName')),
+            ('Address', v('companyAddress')),
+            ('Phone', v('companyPhone')),
+            ('Email', v('companyEmail')),
+            ('Website', v('companyWebsite')),
+            ('Tax / Reg. no.', v('companyTaxNo')),
+            ('Bank details', v('bankDetails')),
+          ]),
+          edit: Column(children: [
             field('companyName', 'Company name', optional: false),
             field('companyAddress', 'Address', lines: 3),
             field('companyPhone', 'Phone', kb: TextInputType.phone),
@@ -333,9 +440,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             field('bankDetails', 'Bank details for T/T', lines: 5, helper: 'Printed on quotations and invoices'),
           ]),
         ),
-        SectionCard(
-          title: 'Defaults',
-          child: Column(children: [
+        section(
+          'defaults',
+          'Defaults',
+          subtitle: 'For new quotations and invoices. Sent documents keep their own currency.',
+          read: kv([
+            ('Currency', v('currency')),
+            ('Tax rate', '${v('defaultTaxRate')}%'),
+            ('Quotation valid', '${v('quotationValidityDays')} days'),
+            ('Payment due', '${v('invoicePaymentDays')} days'),
+            ('Quotation terms', v('defaultQuotationTerms')),
+            ('Invoice footer', v('invoiceFooter')),
+          ]),
+          edit: Column(children: [
             Row(children: [
               Expanded(child: field('currency', 'Currency', optional: false)),
               gap12,
@@ -350,50 +467,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             field('invoiceFooter', 'Invoice footer', lines: 2),
           ]),
         ),
-        SectionCard(
-          title: 'Reminders',
+        section(
+          'reminders',
+          'Reminders',
           subtitle: 'When the system reminds people about waiting work',
-          child: Column(children: [
+          read: kv([
+            ('Pending for', '${v('reminderPendingDays')} days'),
+            ('Processing for', '${v('reminderProcessingDays')} days'),
+            ('Warn before deadlines', '${v('reminderDueSoonDays')} days'),
+          ]),
+          edit: Column(children: [
             field('reminderPendingDays', 'Pending for (days)', optional: false, kb: TextInputType.number),
             field('reminderProcessingDays', 'Processing for (days)', optional: false, kb: TextInputType.number),
             field('reminderDueSoonDays', 'Due within (days)', optional: false, kb: TextInputType.number),
           ]),
         ),
-        SectionCard(
-          title: 'Sourcing categories',
+        section(
+          'categories',
+          'Sourcing categories',
           subtitle: 'Keep these the same as the dropdown on keboint.com',
-          child: field('categories', 'One category per line', optional: false, lines: 10),
+          read: Wrap(spacing: 6, runSpacing: 6, children: [for (final c in _raw.ls('categories')) ToneBadge(c, tone: Tone.outline)]),
+          edit: field('categories', 'One category per line', optional: false, lines: 10),
         ),
-        SectionCard(
-          title: 'Email notifications',
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            field('notifyEmails', 'Admin emails', lines: 2, kb: TextInputType.emailAddress, helper: 'Separate with commas'),
+        section(
+          'email',
+          'Email notifications',
+          read: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            kv([('Admin emails', _raw.ls('notifyEmails').isEmpty ? 'Not set' : _raw.ls('notifyEmails').join(', '))]),
+            gap8,
             for (final s in _switches.entries)
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(s.value, style: context.t.bodyMedium), value: _on[s.key] ?? false, onChanged: (v) => setState(() => _on[s.key] = v)),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(children: [
+                  Icon(_raw.b(s.key) ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded, size: 18, color: _raw.b(s.key) ? context.c.ok : context.c.muted),
+                  gap8,
+                  Expanded(child: Text(s.value, style: context.t.bodyMedium!.copyWith(color: _raw.b(s.key) ? null : context.c.muted))),
+                ]),
+              ),
             gap8,
             BusyButton(
               label: 'Send a test email',
               style: BusyStyle.outlined,
               onPressed: () async {
-                final res = await ref.read(apiProvider).post('/api/v1/settings/test-email', {'notifyEmails': _body['notifyEmails']});
+                final res = await ref.read(apiProvider).post('/api/v1/settings/test-email', {'notifyEmails': _raw.ls('notifyEmails')});
                 if (context.mounted) toast(context, res.s('message', 'Sent'));
               },
             ),
           ]),
-        ),
-        BusyButton(
-          label: 'Save settings',
-          onPressed: () async {
-            setState(() => _error = null);
-            try {
-              await ref.mutate(() => ref.read(apiProvider).put('/api/v1/settings', _body));
-              ref.invalidate(metaProvider);
-              if (context.mounted) toast(context, 'Settings saved.');
-            } on ApiException catch (err) {
-              setState(() => _error = err);
-              if (err.fieldErrors.isEmpty) rethrow;
-            }
-          },
+          edit: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            field('notifyEmails', 'Admin emails', lines: 2, kb: TextInputType.emailAddress, helper: 'Separate with commas'),
+            for (final s in _switches.entries)
+              SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(s.value, style: context.t.bodyMedium), value: _on[s.key] ?? false, onChanged: (v) => setState(() => _on[s.key] = v)),
+          ]),
         ),
       ]),
     );

@@ -6,6 +6,7 @@ import { updateQueryAction } from "@/modules/queries/actions";
 import { QueryForm } from "@/modules/queries/components/query-form";
 import { getQueryDetail } from "@/modules/queries/repository";
 import { canWorkOn } from "@/modules/queries/service";
+import { toEditableLine } from "@/lib/line-items";
 import { PageHeader } from "@/components/ui";
 import { getSettings } from "@/modules/settings/service";
 import { listCategoriesInUse, mergeCategories } from "@/modules/queries/repository";
@@ -36,8 +37,8 @@ export default async function EditQueryPage({ params }: { params: Promise<{ id: 
             source: query.source,
             title: query.title,
             category: query.category,
+            items: detail.items.map((i) => toEditableLine(i, { keepId: true, withPrice: false })),
             specifications: query.specifications,
-            quantity: query.quantity,
             priority: query.priority,
             requiredBy: query.requiredBy,
           }}

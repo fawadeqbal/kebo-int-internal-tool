@@ -25,7 +25,8 @@ export const GET = handle(async (_request: Request, { params }: { params: Promis
     can: {
       recordPayment: open && can(user.role, "payments.record"),
       cancel: open && toCents(inv.amountPaid) === 0,
-      packingList: inv.status !== "cancelled",
+      // One packing list per invoice: make it once, then open it.
+      packingList: inv.status !== "cancelled" && !detail.packingList,
     },
   });
 });

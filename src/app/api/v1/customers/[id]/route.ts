@@ -23,7 +23,7 @@ export const GET = handle(async (_request: Request, { params }: Ctx) => {
     money ? customerFinancials(id) : null,
     money
       ? db
-          .select({ id: invoices.id, invoiceNo: invoices.invoiceNo, status: invoices.status, total: invoices.total, amountPaid: invoices.amountPaid, dueDate: invoices.dueDate, issueDate: invoices.issueDate })
+          .select({ id: invoices.id, invoiceNo: invoices.invoiceNo, currency: invoices.currency, status: invoices.status, total: invoices.total, amountPaid: invoices.amountPaid, dueDate: invoices.dueDate, issueDate: invoices.issueDate })
           .from(invoices)
           .where(and(eq(invoices.customerId, id)))
           .orderBy(desc(invoices.issueDate))

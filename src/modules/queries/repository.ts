@@ -7,7 +7,9 @@ import {
   invoices,
   queries,
   queryAssignments,
+  queryItems,
   queryStatusHistory,
+  quotationItems,
   quotations,
   users,
   type Priority,
@@ -46,7 +48,14 @@ export function filterConditions(user: SessionUser, f: QueryFilters): SQL | unde
   if (f.q) {
     const term = `%${f.q.trim()}%`;
     conditions.push(
-      or(ilike(queries.refNo, term), ilike(queries.title, term), ilike(customers.companyName, term), ilike(customers.contactPerson, term), ilike(queries.category, term)),
+      or(
+        ilike(queries.refNo, term),
+        ilike(queries.title, term),
+        ilike(customers.companyName, term),
+        ilike(customers.contactPerson, term),
+        ilike(queries.category, term),
+        sql`exists (select 1 from query_items qi where qi.query_id = ${queries.id} and (qi.description ilike ${term} or qi.model ilike ${term}))`,
+      ),
     );
   }
   if (f.status === "open") conditions.push(inArray(queries.status, OPEN_STATUSES));
@@ -91,7 +100,7 @@ const listColumns = {
   status: queries.status,
   priority: queries.priority,
   source: queries.source,
-  quantity: queries.quantity,
+  itemCount: sql<number>`(select count(*)::int from query_items qi where qi.query_id = ${queries.id})`,
   requiredBy: queries.requiredBy,
   createdAt: queries.createdAt,
   updatedAt: queries.updatedAt,
@@ -161,7 +170,27 @@ export async function getQueryDetail(user: SessionUser, id: string) {
     .limit(1);
   if (!row) return null;
 
-  const [files, notes, history, assignments, quotes, invs] = await Promise.all([
+  const [items, latestLines, files, notes, history, assignments, quotes, invs] = await Promise.all([
+    db.select().from(queryItems).where(eq(queryItems.queryId, id)).orderBy(asc(queryItems.sortOrder)),
+    // Lines of the newest quotation version that answer a requested item.
+    db
+      .select({
+        queryItemId: quotationItems.queryItemId,
+        quantity: quotationItems.quantity,
+        unit: quotationItems.unit,
+        unitPrice: quotationItems.unitPrice,
+        version: quotations.version,
+      })
+      .from(quotationItems)
+      .innerJoin(quotations, eq(quotations.id, quotationItems.quotationId))
+      .where(
+        and(
+          eq(quotations.queryId, id),
+          isNull(quotations.deletedAt),
+          sql`${quotations.version} = (select max(q2.version) from quotations q2 where q2.query_id = ${id} and q2.deleted_at is null)`,
+          sql`${quotationItems.queryItemId} is not null`,
+        ),
+      ),
     db
       .select({
         id: attachments.id,
@@ -235,7 +264,14 @@ export async function getQueryDetail(user: SessionUser, id: string) {
       .orderBy(desc(invoices.createdAt)),
   ]);
 
-  return { ...row, files, notes, history, assignments, quotations: quotes, invoices: invs };
+  const requestedItems = items.map((it) => {
+    const lines = latestLines.filter((l) => l.queryItemId === it.id);
+    return {
+      ...it,
+      quoted: lines.length ? { version: lines[0].version, unitPrice: lines[0].unitPrice, quantity: lines[0].quantity, unit: lines[0].unit } : null,
+    };
+  });
+  return { ...row, items: requestedItems, files, notes, history, assignments, quotations: quotes, invoices: invs };
 }
 
 export async function listQueriesForCustomer(user: SessionUser, customerId: string) {

@@ -4,7 +4,6 @@ import { requirePagePermission } from "@/lib/auth/session";
 import { listInvoices } from "@/modules/invoices/repository";
 import { INVOICE_SORTS, INVOICE_STATUSES, parseInvoiceParams } from "@/lib/list-filters";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
-import { getSettings } from "@/modules/settings/service";
 import { ActiveFilters, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { FilterDates, FilterSelect, FilterToolbar } from "@/components/ui/filters";
 import { ExportMenu } from "@/components/ui/export-menu";
@@ -24,7 +23,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const { filters, params, active } = parseInvoiceParams(sp);
   const { q, status, from, to, sort } = filters;
-  const [data, settings] = await Promise.all([listInvoices(user, { ...filters, page: toPage(sp.page) }), getSettings()]);
+  const data = await listInvoices(user, { ...filters, page: toPage(sp.page) });
   const today = todayISO();
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/invoices", params, { page: undefined, ...patch });
   const clearHref = buildHref("/invoices", { q }, {});
@@ -90,8 +89,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                         <Td>
                           <InvoiceStatusBadge status={display} />
                         </Td>
-                        <Td className="hidden text-right whitespace-nowrap text-text-2 tabular lg:table-cell">{formatMoney(r.total, settings.currency)}</Td>
-                        <Td className="text-right font-medium whitespace-nowrap tabular">{balance > 0 ? formatCents(balance, settings.currency) : <span className="text-muted">—</span>}</Td>
+                        <Td className="hidden text-right whitespace-nowrap text-text-2 tabular lg:table-cell">{formatMoney(r.total, r.currency)}</Td>
+                        <Td className="text-right font-medium whitespace-nowrap tabular">{balance > 0 ? formatCents(balance, r.currency) : <span className="text-muted">—</span>}</Td>
                         <Td className="hidden whitespace-nowrap text-muted lg:table-cell">{formatDate(r.issueDate)}</Td>
                         <Td className={cn("whitespace-nowrap", display === "overdue" ? "font-medium text-bad" : "text-text-2")}>{formatDate(r.dueDate)}</Td>
                       </Tr>
@@ -109,13 +108,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                     <Link href={`/invoices/${r.id}`} className="block px-4 py-3 active:bg-surface-2">
                       <div className="flex items-baseline justify-between gap-3">
                         <span className="font-mono text-[13px] font-medium text-text">{r.invoiceNo}</span>
-                        <span className="text-sm font-semibold text-text tabular">{formatMoney(r.total, settings.currency)}</span>
+                        <span className="text-sm font-semibold text-text tabular">{formatMoney(r.total, r.currency)}</span>
                       </div>
                       <p className="mt-0.5 truncate text-sm text-text-2">{r.companyName}</p>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <InvoiceStatusBadge status={display} />
                         <span className={cn("text-xs", display === "overdue" ? "font-medium text-bad" : "text-muted")}>
-                          {balance > 0 ? `${formatCents(balance, settings.currency)} due ${formatDate(r.dueDate)}` : `Due ${formatDate(r.dueDate)}`}
+                          {balance > 0 ? `${formatCents(balance, r.currency)} due ${formatDate(r.dueDate)}` : `Due ${formatDate(r.dueDate)}`}
                         </span>
                       </div>
                     </Link>

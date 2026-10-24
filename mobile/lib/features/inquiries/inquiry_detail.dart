@@ -83,20 +83,14 @@ class _Detail extends ConsumerWidget {
             if (q.s('status') == 'not_completed' && q.sn('statusReason') != null) Notice('Closed: ${q.s('statusReason')}', tone: Tone.neutral),
             if (transitions.isNotEmpty || can.b('assign')) _Actions(id: id, d: d),
             _CustomerCard(c: d.m('customer')),
+            _NeedsCard(id: id, d: d, currency: cur),
             SectionCard(
               title: 'Request',
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                kv([
-                  ('Category', q.s('category', '—')),
-                  ('Quantity', '${q.i('quantity')}'),
-                  ('Needed by', f.date(q.sn('requiredBy'))),
-                  ('Handled by', d.s('assigneeName', 'Not assigned')),
-                  ('Created by', d.s('creatorName', '—')),
-                ]),
-                gap12,
-                Overline('Requirements', padding: EdgeInsets.zero),
-                gap4,
-                SelectableText(q.s('specifications'), style: context.t.bodyMedium!.copyWith(color: context.c.text2)),
+              child: kv([
+                ('Category', q.s('category', '—')),
+                ('Needed by', f.date(q.sn('requiredBy'))),
+                ('Handled by', d.s('assigneeName', 'Not assigned')),
+                ('Created by', d.s('creatorName', '—')),
               ]),
             ),
             _Documents(id: id, d: d, currency: cur),
@@ -111,6 +105,58 @@ class _Detail extends ConsumerWidget {
 }
 
 /* ---------------------------------------------------------------- Status & assignment */
+
+/// What the customer asked for, item by item, with the price each got in the latest quotation.
+class _NeedsCard extends StatelessWidget {
+  const _NeedsCard({required this.id, required this.d, required this.currency});
+  final String id;
+  final Json d;
+  final String currency;
+  @override
+  Widget build(BuildContext context) {
+    final q = d.m('query');
+    final items = d.l('items');
+    final quoted = d.l('quotations').isNotEmpty;
+    return SectionCard(
+      title: 'What the customer needs',
+      subtitle: '${items.length} ${items.length == 1 ? 'item' : 'items'}',
+      trailing: d.m('can').b('edit') ? TextButton(onPressed: () => context.push('/inquiries/$id/edit'), child: const Text('Edit')) : null,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) Divider(height: 20, color: context.c.line),
+          Builder(builder: (context) {
+            final it = items[i];
+            final lines = it.s('description').split('\n');
+            final details = lines.skip(1).join('\n').trim();
+            final price = it.m('quoted');
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(child: Text(lines.first, style: context.t.titleSmall)),
+                gap8,
+                Text('${f.qty(it['quantity'])} ${it.s('unit')}', style: context.t.bodyMedium!.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+              ]),
+              if (it.s('model').isNotEmpty) Text('Model ${it.s('model')}', style: context.t.bodySmall),
+              if (details.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(details, style: context.t.bodySmall!.copyWith(color: context.c.text2))),
+              if (quoted)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: price.isNotEmpty
+                      ? Text('Quoted ${f.money(price['unitPrice'], currency)} / ${price.s('unit')} in v${price.i('version')}', style: context.t.bodySmall)
+                      : const ToneBadge('Not in the latest quotation', tone: Tone.warn),
+                ),
+            ]);
+          }),
+        ],
+        if (q.s('specifications').isNotEmpty) ...[
+          Divider(height: 24, color: context.c.line),
+          Overline('Other details', padding: EdgeInsets.zero),
+          gap4,
+          SelectableText(q.s('specifications'), style: context.t.bodyMedium!.copyWith(color: context.c.text2)),
+        ],
+      ]),
+    );
+  }
+}
 
 class _Actions extends ConsumerWidget {
   const _Actions({required this.id, required this.d});
@@ -260,7 +306,9 @@ class _Documents extends StatelessWidget {
     final quotes = d.l('quotations');
     final invoices = d.l('invoices');
     final packing = d.l('packingLists');
-    final accepted = quotes.where((x) => x.s('status') == 'accepted').firstOrNull;
+    // Only the newest version is live (the list is newest first).
+    final accepted = quotes.isNotEmpty && quotes.first.s('status') == 'accepted' ? quotes.first : null;
+    final latestVersion = quotes.isEmpty ? 0 : quotes.first.i('version');
     final liveInvoice = invoices.where((i) => i.s('status') != 'cancelled').firstOrNull;
     final today = f.today();
 
@@ -283,7 +331,7 @@ class _Documents extends StatelessWidget {
               _DocRow(
                 number: x.s('refNo'),
                 label: 'v${x.i('version')}',
-                badge: quotationStatusBadge(x.s('status')),
+                badge: x.i('version') < latestVersion ? const ToneBadge('Superseded', tone: Tone.outline) : quotationStatusBadge(x.s('status')),
                 right: f.money(x['total'], currency),
                 sub: 'Valid until ${f.date(x.s('dueDate'))}',
                 onTap: () => context.push('/quotations/${x.s('id')}'),
@@ -327,9 +375,9 @@ class _Documents extends StatelessWidget {
                       ? 'When the goods are packed: cases, weights and volume for the shipment.'
                       : 'Available once the invoice is issued.',
           action: can.b('invoice') && liveInvoice != null
-              ? (packing.isEmpty
-                  ? FilledButton.icon(onPressed: () => context.push('/packing-lists/new?invoice=${liveInvoice.s('id')}'), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Create packing list'))
-                  : OutlinedButton.icon(onPressed: () => context.push('/packing-lists/new?invoice=${liveInvoice.s('id')}'), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Another packing list')))
+              ? (packing.any((p) => p.s('invoiceId') == liveInvoice.s('id'))
+                  ? null
+                  : FilledButton.icon(onPressed: () => context.push('/packing-lists/new?invoice=${liveInvoice.s('id')}'), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('Create packing list')))
               : null,
           rows: [
             for (final p in packing)

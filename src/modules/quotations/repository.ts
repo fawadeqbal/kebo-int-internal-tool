@@ -38,6 +38,7 @@ export async function listQuotations(user: SessionUser, f: QuotationFilters) {
       .select({
         id: quotations.id,
         refNo: quotations.refNo,
+        currency: quotations.currency,
         version: quotations.version,
         status: quotations.status,
         total: quotations.total,
@@ -90,7 +91,22 @@ export async function getQuotationDetail(user: SessionUser, id: string) {
       .where(and(eq(quotations.queryId, row.query.id), isNull(quotations.deletedAt)))
       .orderBy(desc(quotations.version)),
   ]);
-  return { ...row, items, invoices: invoiceRows, versions };
+  // Versions are numbered per inquiry: the newest is the live one, older ones are superseded.
+  const latest = versions[0]?.version ?? row.quotation.version;
+  const previous = versions.find((v) => v.version < row.quotation.version);
+  const previousItems = previous
+    ? await db.select().from(quotationItems).where(eq(quotationItems.quotationId, previous.id)).orderBy(asc(quotationItems.sortOrder))
+    : [];
+  return {
+    ...row,
+    items,
+    invoices: invoiceRows,
+    versions,
+    latestVersion: latest,
+    superseded: row.quotation.version < latest,
+    newer: versions.find((v) => v.version === latest && v.version !== row.quotation.version) ?? null,
+    previous: previous ? { ...previous, items: previousItems } : null,
+  };
 }
 
 export async function sentPastDue() {

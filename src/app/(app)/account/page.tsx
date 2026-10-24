@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth/session";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { changeOwnPasswordAction } from "@/modules/users/actions";
-import { PasswordForm } from "@/modules/users/components";
+import { PasswordCard } from "@/modules/users/components";
 import { ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils/dates";
 import { twoStepStatus } from "@/modules/users/two-step";
@@ -68,9 +68,9 @@ export default async function AccountPage() {
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Change password" />
+          <CardHeader title="Password" />
           <CardBody>
-            <PasswordForm action={changeOwnPasswordAction} own />
+            <PasswordCard action={changeOwnPasswordAction} own title="Change my password" />
           </CardBody>
         </Card>
       </div>

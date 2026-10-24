@@ -1,6 +1,6 @@
 import { and, eq, isNull, max, ne } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { invoices, quotationItems, quotations, type QuotationStatus } from "@/lib/db/schema";
+import { db, type DbOrTx } from "@/lib/db";
+import { invoices, queries, queryItems, quotationItems, quotations, type QuotationStatus } from "@/lib/db/schema";
 import { assertCan, type SessionUser } from "@/lib/auth/session";
 import { nextReference } from "@/lib/counters";
 import { calculateTotals, fromCents } from "@/lib/utils/money";
@@ -11,6 +11,8 @@ import type { LineItem } from "@/lib/line-items";
 import { recordAudit } from "@/modules/audit/service";
 import { publish } from "@/modules/events";
 import { getAccessibleQuery } from "@/modules/queries/service";
+import { getSettings } from "@/modules/settings/service";
+import { companySnapshot, customerSnapshotFor } from "@/modules/documents/snapshots";
 import type { QuotationInput } from "./schema";
 import { canMoveQuotation, isEditable } from "./workflow";
 
@@ -26,13 +28,33 @@ function totalsFor(items: LineItem[], discount: number, taxRate: number) {
       total: fromCents(t.total),
     },
     itemRows: items.map((item, i) => ({
+      queryItemId: item.sourceId ?? null,
       description: item.description,
+      model: item.model ?? null,
+      hsCode: item.hsCode ?? null,
       quantity: String(item.quantity),
+      unit: item.unit,
       unitPrice: String(item.unitPrice),
       lineTotal: fromCents(t.lines[i].lineTotal),
       sortOrder: i,
     })),
   };
+}
+
+/** Keep only links to this inquiry's own requested items. */
+async function ownItemLinks<T extends { queryItemId: string | null }>(tx: DbOrTx, queryId: string, rows: T[]): Promise<T[]> {
+  const own = new Set((await tx.select({ id: queryItems.id }).from(queryItems).where(eq(queryItems.queryId, queryId))).map((r) => r.id));
+  return rows.map((r) => (r.queryItemId && !own.has(r.queryItemId) ? { ...r, queryItemId: null } : r));
+}
+
+/** The newest version number of an inquiry's quotations. Older versions are superseded. */
+export async function latestVersion(queryId: string, tx: DbOrTx = db): Promise<number> {
+  const [{ v }] = await tx.select({ v: max(quotations.version) }).from(quotations).where(and(eq(quotations.queryId, queryId), isNull(quotations.deletedAt)));
+  return v ?? 0;
+}
+
+async function assertLatest(q: { queryId: string; version: number }, what: string) {
+  if (q.version < (await latestVersion(q.queryId))) throw new DomainError(`A newer version of this quotation exists, so this one cannot be ${what}. Open the latest version.`);
 }
 
 export async function getAccessibleQuotation(user: SessionUser, id: string) {
@@ -48,6 +70,7 @@ export async function createQuotation(actor: SessionUser, queryId: string, input
   if (query.status === "not_completed") throw new DomainError("This inquiry is closed as not completed. Reopen it before quoting.");
   const { t, columns, itemRows } = totalsFor(input.items, input.discount, input.taxRate);
   if (t.total <= 0) throw new DomainError("The quotation total must be more than zero.");
+  const currency = (await getSettings()).currency;
 
   return db.transaction(async (tx) => {
     const [{ v }] = await tx.select({ v: max(quotations.version) }).from(quotations).where(eq(quotations.queryId, queryId));
@@ -59,6 +82,7 @@ export async function createQuotation(actor: SessionUser, queryId: string, input
         refNo,
         queryId,
         version,
+        currency,
         ...columns,
         dueDate: input.dueDate,
         submittedAt: input.submittedAt ?? null,
@@ -68,7 +92,7 @@ export async function createQuotation(actor: SessionUser, queryId: string, input
         status: "draft",
       })
       .returning({ id: quotations.id, refNo: quotations.refNo });
-    await tx.insert(quotationItems).values(itemRows.map((r) => ({ ...r, quotationId: created.id })));
+    await tx.insert(quotationItems).values((await ownItemLinks(tx, queryId, itemRows)).map((r) => ({ ...r, quotationId: created.id })));
     await recordAudit(tx, {
       userId: actor.id,
       action: "create",
@@ -85,6 +109,7 @@ export async function updateQuotation(actor: SessionUser, id: string, input: Quo
   assertCan(actor, "quotations.manage");
   const existing = await getAccessibleQuotation(actor, id);
   if (!isEditable(existing.status)) throw new DomainError("Only draft quotations can be edited. Create a new version instead.");
+  await assertLatest(existing, "edited");
   const { t, columns, itemRows } = totalsFor(input.items, input.discount, input.taxRate);
   if (t.total <= 0) throw new DomainError("The quotation total must be more than zero.");
   await db.transaction(async (tx) => {
@@ -93,7 +118,7 @@ export async function updateQuotation(actor: SessionUser, id: string, input: Quo
       .set({ ...columns, dueDate: input.dueDate, submittedAt: input.submittedAt ?? null, terms: input.terms ?? null, notes: input.notes ?? null })
       .where(eq(quotations.id, id));
     await tx.delete(quotationItems).where(eq(quotationItems.quotationId, id));
-    await tx.insert(quotationItems).values(itemRows.map((r) => ({ ...r, quotationId: id })));
+    await tx.insert(quotationItems).values((await ownItemLinks(tx, existing.queryId, itemRows)).map((r) => ({ ...r, quotationId: id })));
     await recordAudit(tx, {
       userId: actor.id,
       action: "update",
@@ -111,11 +136,19 @@ export async function changeQuotationStatus(actor: SessionUser, id: string, to: 
   const existing = await getAccessibleQuotation(actor, id);
   if (!canMoveQuotation(existing.status, to))
     throw new DomainError(`A ${QUOTATION_STATUS_LABEL[existing.status].toLowerCase()} quotation cannot be marked ${QUOTATION_STATUS_LABEL[to].toLowerCase()}.`);
+  await assertLatest(existing, `marked ${QUOTATION_STATUS_LABEL[to].toLowerCase()}`);
+  const settings = to === "sent" ? await getSettings() : null;
   await db.transaction(async (tx) => {
-    await tx
-      .update(quotations)
-      .set({ status: to, ...(to === "sent" ? { submittedAt: submittedAt || existing.submittedAt || todayISO() } : {}) })
-      .where(eq(quotations.id, id));
+    // Sending freezes who it was for and who sent it (and in which currency), as on the PDF.
+    const frozen =
+      to === "sent"
+        ? {
+            submittedAt: submittedAt || existing.submittedAt || todayISO(),
+            customerSnapshot: await customerSnapshotFor(tx, (await tx.select({ c: queries.customerId }).from(queries).where(eq(queries.id, existing.queryId)))[0].c),
+            companySnapshot: companySnapshot(settings!),
+          }
+        : {};
+    await tx.update(quotations).set({ status: to, ...frozen }).where(eq(quotations.id, id));
     await recordAudit(tx, {
       userId: actor.id,
       action: "status_change",
@@ -141,9 +174,25 @@ export async function changeQuotationStatus(actor: SessionUser, id: string, to: 
 export async function reviseQuotation(actor: SessionUser, id: string) {
   assertCan(actor, "quotations.manage");
   const existing = await getAccessibleQuotation(actor, id);
-  const items = await db.select().from(quotationItems).where(eq(quotationItems.quotationId, id));
+  await assertLatest(existing, "revised");
+  if (existing.status === "draft") throw new DomainError("This version is still a draft: edit it instead of making a new version.");
+  const [invoiced] = await db
+    .select({ invoiceNo: invoices.invoiceNo })
+    .from(invoices)
+    .where(and(eq(invoices.quotationId, id), ne(invoices.status, "cancelled")))
+    .limit(1);
+  if (invoiced) throw new DomainError(`This quotation is already invoiced (${invoiced.invoiceNo}). Cancel the invoice first to change the prices.`);
+  const items = await db.select().from(quotationItems).where(eq(quotationItems.quotationId, id)).orderBy(quotationItems.sortOrder);
   return createQuotation(actor, existing.queryId, {
-    items: items.map((i) => ({ description: i.description, quantity: Number(i.quantity), unitPrice: Number(i.unitPrice) })),
+    items: items.map((i) => ({
+      sourceId: i.queryItemId,
+      description: i.description,
+      model: i.model,
+      hsCode: i.hsCode,
+      quantity: Number(i.quantity),
+      unit: i.unit,
+      unitPrice: Number(i.unitPrice),
+    })),
     discount: Number(existing.discount),
     taxRate: Number(existing.taxRate),
     dueDate: existing.dueDate < todayISO() ? todayISO() : existing.dueDate,

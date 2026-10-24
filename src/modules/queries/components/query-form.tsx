@@ -7,6 +7,8 @@ import { SubmitButton } from "@/components/ui/client";
 import { PRIORITY_LABEL, SOURCE_LABEL } from "@/lib/labels";
 import type { ActionState } from "@/lib/utils/result";
 import { CustomerFields, DuplicateWarning } from "@/modules/customers/components";
+import { LineItemsEditor } from "@/components/documents/line-items-editor";
+import type { EditableLine } from "@/lib/line-items";
 import { CustomerPicker, type CustomerOption } from "./customer-picker";
 import { FilePicker, uploadFiles } from "./uploader";
 
@@ -17,8 +19,8 @@ export interface QueryFormInitial {
   source?: string;
   title?: string;
   category?: string | null;
-  specifications?: string;
-  quantity?: number;
+  items?: EditableLine[];
+  specifications?: string | null;
   priority?: string;
   requiredBy?: string | null;
 }
@@ -147,15 +149,27 @@ export function QueryForm({
               ))}
             </Select>
           </Field>
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <p className="text-sm font-medium text-text">
+              Items <span className="text-bad">*</span>
+            </p>
+            <p className="-mt-1 text-xs text-muted">One line per machine or product: name on the first line, then capacity, voltage, size… The quotation starts from these.</p>
+            <LineItemsEditor
+              priced={false}
+              initialItems={state.values?.items ? (JSON.parse(state.values.items as string) as EditableLine[]) : (initial?.items ?? [])}
+              errors={e}
+              placeholder={"e.g. Capsule filling machine\n25,000 capsules/hour, size 0–4"}
+            />
+          </div>
           <Field
-            label="Requirements"
+            label="Other details"
             htmlFor="specifications"
-            required
+            optional
             error={e.specifications}
-            hint="Machine or product, model, capacity, quantity, destination port, delivery time"
+            hint="Destination port, delivery time, standards, payment terms…"
             className="sm:col-span-2"
           >
-            <Textarea id="specifications" name="specifications" rows={6} defaultValue={v("specifications", initial?.specifications)} aria-invalid={!!e.specifications} />
+            <Textarea id="specifications" name="specifications" rows={2} className="min-h-0" defaultValue={v("specifications", initial?.specifications)} />
           </Field>
           {mode === "create" && people && (
             <Field label="Handled by" htmlFor="assignedTo" error={e.assignedTo} hint={canAssignOthers ? "Who will source and quote this" : "Take it yourself, or leave it for a manager"}>
@@ -169,14 +183,11 @@ export function QueryForm({
               </Select>
             </Field>
           )}
-          <details className="group sm:col-span-2" open={mode === "edit" || !!(e.title || e.quantity || e.requiredBy)}>
+          <details className="group sm:col-span-2" open={mode === "edit" || !!(e.title || e.requiredBy)}>
             <summary className="cursor-pointer text-sm font-medium text-primary select-none hover:underline">More details (optional)</summary>
             <div className="mt-4 grid gap-5 sm:grid-cols-2">
-              <Field label="Short title" htmlFor="title" optional error={e.title} hint="Leave empty to use the first line of the requirements" className="sm:col-span-2">
+              <Field label="Short title" htmlFor="title" optional error={e.title} hint="Leave empty to name it after the items" className="sm:col-span-2">
                 <Input id="title" name="title" defaultValue={v("title", initial?.title)} maxLength={200} />
-              </Field>
-              <Field label="Quantity" htmlFor="quantity" error={e.quantity}>
-                <Input id="quantity" name="quantity" type="number" min={1} step={1} inputMode="numeric" defaultValue={v("quantity", initial?.quantity ?? 1)} />
               </Field>
               <Field label="Priority" htmlFor="priority" error={e.priority}>
                 <Select id="priority" name="priority" defaultValue={v("priority", initial?.priority ?? "normal")}>

@@ -68,7 +68,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
             title: r.s('companyName'),
             subtitle: Text('${r.s('invoiceNo')} · ${r.s('queryRef')}\nIssued ${f.date(r.s('issueDate'))} · due ${f.date(r.s('dueDate'))}'),
             trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(f.cents(r.s('status') == 'cancelled' ? f.toCents(r['total']) : balance, cur),
+              Text(f.cents(r.s('status') == 'cancelled' ? f.toCents(r['total']) : balance, r.s('currency', cur)),
                   style: context.t.bodyMedium!.copyWith(fontWeight: FontWeight.w600, color: status == 'overdue' ? context.c.bad : null)),
               const SizedBox(height: 3),
               invoiceStatusBadge(status),
@@ -90,12 +90,12 @@ class InvoiceDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(getProvider('/api/v1/invoices/$id'));
-    final cur = ref.watch(metaProvider).value?.s('currency') ?? 'USD';
     return data.when(
       loading: () => Scaffold(appBar: AppBar(), body: const LoadingView()),
       error: (e, _) => Scaffold(appBar: AppBar(), body: ErrorState(e, onRetry: () => ref.invalidate(getProvider('/api/v1/invoices/$id')))),
       data: (d) {
         final inv = d.m('invoice');
+        final cur = inv.s('currency', 'USD');
         final can = d.m('can');
         final status = d.s('displayStatus');
         return Scaffold(
@@ -157,13 +157,13 @@ class InvoiceDetailScreen extends ConsumerWidget {
             ),
             SectionCard(title: d.m('query').s('title'), subtitle: 'Lines', child: LinesView(items: d.l('items'), totals: inv, currency: cur)),
             if (inv.sn('notes') != null) SectionCard(title: 'Note on invoice', child: Text(inv.s('notes'), style: context.t.bodyMedium!.copyWith(color: context.c.text2))),
-            if (can.b('packingList'))
+            if (inv.s('status') != 'cancelled')
               SectionCard(
-                title: 'Packing lists',
+                title: 'Packing list',
                 padding: EdgeInsets.zero,
-                trailing: TextButton(onPressed: () => context.push('/packing-lists/new?invoice=$id'), child: const Text('New')),
+                trailing: can.b('packingList') ? TextButton(onPressed: () => context.push('/packing-lists/new?invoice=$id'), child: const Text('Create')) : null,
                 child: d.l('packingLists').isEmpty
-                    ? Padding(padding: const EdgeInsets.all(16), child: Text('None yet. Make one when the goods are packed.', style: context.t.bodySmall))
+                    ? Padding(padding: const EdgeInsets.all(16), child: Text('Not made yet. Create it when the goods are packed: the lines come from this invoice.', style: context.t.bodySmall))
                     : CardList(children: [
                         for (final p in d.l('packingLists'))
                           RowTile(

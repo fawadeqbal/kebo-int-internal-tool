@@ -31,7 +31,7 @@ export function QuotationForm({
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
       <Card>
-        <CardHeader title="Prices" description="One line per item. Add freight (CIF/DDP), inspection or spare parts as their own lines." />
+        <CardHeader title="Prices" description="The customer's items are filled in: add the prices. Freight (CIF/DDP), inspection or spare parts go on their own lines." />
         <CardBody>
           <LineItemsEditor
             initialItems={items}
@@ -39,6 +39,7 @@ export function QuotationForm({
             initialTaxRate={(state.values?.taxRate as string) ?? initial.taxRate}
             currency={currency}
             errors={e}
+            sourceLabel="Requested by the customer"
           />
         </CardBody>
       </Card>

@@ -310,10 +310,12 @@ class LoadingView extends StatelessWidget {
 }
 
 class Notice extends StatelessWidget {
-  const Notice(this.text, {super.key, this.tone = Tone.info, this.icon});
+  const Notice(this.text, {super.key, this.tone = Tone.info, this.icon, this.action});
   final String text;
   final Tone tone;
   final IconData? icon;
+  /// e.g. a TextButton under the text ("Open v2").
+  final Widget? action;
   @override
   Widget build(BuildContext context) {
     final (bg, fg) = context.c.tone(tone);
@@ -326,7 +328,12 @@ class Notice extends StatelessWidget {
         children: [
           Icon(icon ?? (tone == Tone.bad ? Icons.error_outline_rounded : tone == Tone.warn ? Icons.warning_amber_rounded : Icons.info_outline_rounded), size: 18, color: fg),
           gap8,
-          Expanded(child: Text(text, style: context.t.bodyMedium!.copyWith(color: context.c.text))),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(text, style: context.t.bodyMedium!.copyWith(color: context.c.text)),
+              ?action,
+            ]),
+          ),
         ],
       ),
     );

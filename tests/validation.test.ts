@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { customerSchema, normalizePhone } from "@/modules/customers/schema";
-import { createQuerySchema, statusChangeSchema, titleFrom } from "@/modules/queries/schema";
+import { createQuerySchema, statusChangeSchema, titleFrom, titleFromItems } from "@/modules/queries/schema";
 import { normalizeFields, websiteInquirySchema } from "@/modules/inquiries/schema";
 import { quotationSchema } from "@/modules/quotations/schema";
 import { toCsv } from "@/lib/utils/csv";
@@ -26,8 +26,8 @@ describe("validation", () => {
       email: "",
       source: "phone",
       category: "Pharmaceutical Machinery",
-      specifications: "30,000 capsules/hour",
-      quantity: "2",
+      items: JSON.stringify([{ description: "Capsule filling machine\n30,000 capsules/hour", quantity: "2", unit: "set" }]),
+      specifications: "",
       priority: "high",
       requiredBy: "",
       assignedTo: "",
@@ -51,13 +51,23 @@ describe("validation", () => {
     expect(toCsv(["a"], [["=HYPERLINK(1)"]])).toContain(`"'=HYPERLINK(1)"`);
   });
 
-  it("needs only customer, category and requirements for a query", () => {
-    const r = createQuerySchema.safeParse({ customerMode: "existing", customerId: "3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90", category: "Textile Machinery", specifications: "24 air-jet looms" });
+  it("needs only customer, category and at least one requested item for a query", () => {
+    const base = { customerMode: "existing", customerId: "3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90", category: "Textile Machinery" };
+    expect(createQuerySchema.safeParse({ ...base, items: "[]" }).success).toBe(false);
+    const r = createQuerySchema.safeParse({ ...base, items: JSON.stringify([{ description: "Air-jet loom, 190 cm", quantity: "24", unit: "" }]) });
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.data.quantity).toBe(1);
+      expect(r.data.items[0]).toMatchObject({ quantity: 24, unit: "pcs" });
+      expect(r.data.specifications ?? null).toBeNull();
       expect(r.data.priority).toBe("normal");
     }
+  });
+
+  it("names an inquiry after its items", () => {
+    expect(titleFromItems([{ description: "Rotary tablet press\n35 stations" }, { description: "Capsule filler" }, { description: "Tooling" }])).toBe(
+      "Rotary tablet press + 2 more",
+    );
+    expect(titleFromItems([], "Solar")).toBe("Solar inquiry");
   });
 
   it("makes a short title from the requirements", () => {

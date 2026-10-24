@@ -77,7 +77,8 @@ export function DocumentsCard({
 }) {
   const { query } = detail;
   const quotes = detail.quotations;
-  const accepted = quotes.find((q) => q.status === "accepted");
+  // Only the newest version is live: an older accepted version was replaced by a revision.
+  const accepted = quotes[0]?.status === "accepted" ? quotes[0] : undefined;
   const invoices = canInvoice ? detail.invoices : [];
   const liveInvoice = detail.invoices.find((i) => i.status !== "cancelled");
   const closedLost = query.status === "not_completed";
@@ -94,10 +95,11 @@ export function DocumentsCard({
         <Plus aria-hidden /> Generate invoice
       </ButtonLink>
     ) : null;
+  // One packing list per invoice: offered once, then it is opened from the list below.
   const packingAction =
-    canInvoice && liveInvoice ? (
-      <ButtonLink href={`/packing-lists/new?invoice=${liveInvoice.id}`} variant={packingLists.length ? "secondary" : "primary"} size="sm">
-        <Plus aria-hidden /> {packingLists.length ? "Another packing list" : "Create packing list"}
+    canInvoice && liveInvoice && !packingLists.some((p) => p.invoiceId === liveInvoice.id) ? (
+      <ButtonLink href={`/packing-lists/new?invoice=${liveInvoice.id}`} variant="primary" size="sm">
+        <Plus aria-hidden /> Create packing list
       </ButtonLink>
     ) : null;
 

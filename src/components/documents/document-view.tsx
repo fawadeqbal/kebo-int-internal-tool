@@ -7,15 +7,27 @@ import { cn } from "@/lib/utils/cn";
 
 interface DocLine {
   description: string;
+  model?: string | null;
+  hsCode?: string | null;
   quantity: string;
+  unit?: string | null;
   unitPrice: string;
   lineTotal: string;
 }
 
+/** "Model X · HS 8479.89" under the item name. */
+export function lineCodes(it: { model?: string | null; hsCode?: string | null }) {
+  return [it.model && `Model ${it.model}`, it.hsCode && `HS ${it.hsCode}`].filter(Boolean).join(" · ");
+}
+
+const qtyUnit = (it: DocLine) => `${Number(it.quantity)}${it.unit ? ` ${it.unit}` : ""}`;
+
 export interface DocumentProps {
   kind: "Quotation" | "Invoice";
   number: string;
+  /** Our letterhead and bank details (frozen on sent/issued documents). */
   settings: AppSettings;
+  currency: string;
   customer: { companyName: string | null; contactPerson: string; phone: string; email: string | null; address: string | null; taxNo: string | null };
   /** Rows of the details box (date, validity, references…). */
   meta: { label: string; value: ReactNode }[];
@@ -40,8 +52,8 @@ const label = "text-[10px] font-semibold tracking-[0.12em] text-stone-500 upperc
  * print page and the PDF download (the PDF is this page printed by Chrome).
  * It reflows on a phone and is A4 when printed.
  */
-export function DocumentView({ kind, number, settings, customer, meta, subject, items, totals, terms, payment, bankDetails, footer, stamp }: DocumentProps) {
-  const c = settings.currency;
+export function DocumentView({ kind, number, settings, currency, customer, meta, subject, items, totals, terms, payment, bankDetails, footer, stamp }: DocumentProps) {
+  const c = currency;
   const discount = toCents(totals.discount);
   const tax = toCents(totals.taxAmount);
   const paid = totals.amountPaid !== undefined ? toCents(totals.amountPaid) : 0;
@@ -72,7 +84,7 @@ export function DocumentView({ kind, number, settings, customer, meta, subject, 
           <tr className="bg-stone-900 text-left text-[10px] tracking-[0.1em] text-white uppercase">
             <th className="w-10 py-2.5 pl-3 font-semibold">No.</th>
             <th className="py-2.5 pr-3 font-semibold">Description</th>
-            <th className="w-16 py-2.5 pr-3 text-right font-semibold">Qty</th>
+            <th className="w-20 py-2.5 pr-3 text-right font-semibold">Qty</th>
             <th className="w-32 py-2.5 pr-3 text-right font-semibold">Unit price</th>
             <th className="w-36 py-2.5 pr-3 text-right font-semibold">Amount ({c})</th>
           </tr>
@@ -85,9 +97,10 @@ export function DocumentView({ kind, number, settings, customer, meta, subject, 
                 <td className="py-3 pl-3 text-stone-500 tabular-nums">{i + 1}</td>
                 <td className="py-3 pr-3">
                   <p className="font-medium text-stone-900">{name}</p>
+                  {lineCodes(it) && <p className="mt-0.5 text-[11px] text-stone-500">{lineCodes(it)}</p>}
                   {rest.length > 0 && <p className="mt-0.5 whitespace-pre-wrap text-stone-600">{rest.join("\n")}</p>}
                 </td>
-                <td className="py-3 pr-3 text-right tabular-nums">{Number(it.quantity)}</td>
+                <td className="py-3 pr-3 text-right whitespace-nowrap tabular-nums">{qtyUnit(it)}</td>
                 <td className="py-3 pr-3 text-right tabular-nums">{formatMoney(it.unitPrice, c)}</td>
                 <td className="py-3 pr-3 text-right font-medium text-stone-900 tabular-nums">{formatMoney(it.lineTotal, c)}</td>
               </tr>
@@ -107,9 +120,10 @@ export function DocumentView({ kind, number, settings, customer, meta, subject, 
                 </p>
                 <p className="shrink-0 font-medium text-stone-900 tabular-nums">{formatMoney(it.lineTotal, c)}</p>
               </div>
+              {lineCodes(it) && <p className="mt-0.5 text-[11px] text-stone-500">{lineCodes(it)}</p>}
               {rest.length > 0 && <p className="mt-0.5 whitespace-pre-wrap text-stone-600">{rest.join("\n")}</p>}
               <p className="mt-1 text-stone-500 tabular-nums">
-                {Number(it.quantity)} × {formatMoney(it.unitPrice, c)}
+                {qtyUnit(it)} × {formatMoney(it.unitPrice, c)}
               </p>
             </li>
           );

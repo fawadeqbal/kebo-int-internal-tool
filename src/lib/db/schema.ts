@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -10,6 +11,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -36,6 +38,39 @@ const timestamps = {
 
 /** Money columns: exact decimals, never floating point. */
 const money = (name: string) => numeric(name, { precision: 14, scale: 2 }).notNull().default("0");
+
+/**
+ * What every line has, on every document (requested item, quotation, invoice,
+ * packing list): the item, its brand/model, how many and in which unit. The
+ * description's first line is the item name; further lines are its details.
+ */
+const lineColumns = () => ({
+  description: text("description").notNull(),
+  model: varchar("model", { length: 120 }),
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  unit: varchar("unit", { length: 20 }).notNull().default("pcs"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** Who the document was for and who issued it, frozen when it is sent/issued (so old PDFs never change). */
+export interface CustomerSnapshot {
+  companyName: string | null;
+  contactPerson: string;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  taxNo: string | null;
+}
+export interface CompanySnapshot {
+  companyName: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+  companyWebsite: string;
+  companyTaxNo: string;
+  bankDetails: string;
+  invoiceFooter: string;
+}
 
 /* ----------------------------------------------------------------------------
  * Users
@@ -122,8 +157,8 @@ export const queries = pgTable(
     source: querySourceEnum("source").notNull().default("phone"),
     title: varchar("title", { length: 200 }).notNull(),
     category: varchar("category", { length: 120 }),
-    specifications: text("specifications").notNull(),
-    quantity: integer("quantity").notNull().default(1),
+    /** Anything else the customer said: destination port, delivery time, standards… (the items are in query_items). */
+    specifications: text("specifications"),
     priority: priorityEnum("priority").notNull().default("normal"),
     requiredBy: date("required_by", { mode: "string" }),
     status: queryStatusEnum("status").notNull().default("pending"),
@@ -141,7 +176,22 @@ export const queries = pgTable(
     index("queries_assigned_idx").on(t.assignedTo),
     index("queries_customer_idx").on(t.customerId),
     index("queries_created_idx").on(t.createdAt),
+    // Lets invoices/packing lists prove they belong to this inquiry's customer.
+    unique("queries_id_customer_uq").on(t.id, t.customerId),
   ],
+);
+
+/** What the customer asked for, item by item. Quotation lines answer these. */
+export const queryItems = pgTable(
+  "query_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    queryId: uuid("query_id")
+      .notNull()
+      .references(() => queries.id, { onDelete: "cascade" }),
+    ...lineColumns(),
+  },
+  (t) => [index("query_items_query_idx").on(t.queryId)],
 );
 
 export const queryStatusHistory = pgTable(
@@ -226,6 +276,7 @@ export const quotations = pgTable(
       .notNull()
       .references(() => queries.id),
     version: integer("version").notNull().default(1),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     subtotal: money("subtotal"),
     discount: money("discount"),
     taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
@@ -236,6 +287,9 @@ export const quotations = pgTable(
     status: quotationStatusEnum("status").notNull().default("draft"),
     terms: text("terms"),
     notes: text("notes"),
+    /** Set when marked sent. */
+    customerSnapshot: jsonb("customer_snapshot").$type<CustomerSnapshot>(),
+    companySnapshot: jsonb("company_snapshot").$type<CompanySnapshot>(),
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id),
@@ -244,22 +298,28 @@ export const quotations = pgTable(
   },
   (t) => [
     index("quotations_query_idx").on(t.queryId),
+    unique("quotations_id_query_uq").on(t.id, t.queryId),
     index("quotations_status_idx").on(t.status),
     uniqueIndex("quotations_query_version_uq").on(t.queryId, t.version),
   ],
 );
 
-export const quotationItems = pgTable("quotation_items", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  quotationId: uuid("quotation_id")
-    .notNull()
-    .references(() => quotations.id, { onDelete: "cascade" }),
-  description: text("description").notNull(),
-  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
-  unitPrice: money("unit_price"),
-  lineTotal: money("line_total"),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
+export const quotationItems = pgTable(
+  "quotation_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    quotationId: uuid("quotation_id")
+      .notNull()
+      .references(() => quotations.id, { onDelete: "cascade" }),
+    /** The requested item this line answers (empty for extras such as freight). */
+    queryItemId: uuid("query_item_id").references(() => queryItems.id, { onDelete: "set null" }),
+    ...lineColumns(),
+    hsCode: varchar("hs_code", { length: 20 }),
+    unitPrice: money("unit_price"),
+    lineTotal: money("line_total"),
+  },
+  (t) => [index("quotation_items_quotation_idx").on(t.quotationId)],
+);
 
 /* ----------------------------------------------------------------------------
  * Invoices & payments
@@ -280,6 +340,7 @@ export const invoices = pgTable(
       .references(() => customers.id),
     issueDate: date("issue_date", { mode: "string" }).notNull(),
     dueDate: date("due_date", { mode: "string" }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
     subtotal: money("subtotal"),
     discount: money("discount"),
     taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
@@ -289,6 +350,8 @@ export const invoices = pgTable(
     status: invoiceStatusEnum("status").notNull().default("unpaid"),
     cancelReason: text("cancel_reason"),
     notes: text("notes"),
+    customerSnapshot: jsonb("customer_snapshot").$type<CustomerSnapshot>(),
+    companySnapshot: jsonb("company_snapshot").$type<CompanySnapshot>(),
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id),
@@ -296,22 +359,31 @@ export const invoices = pgTable(
   },
   (t) => [
     index("invoices_status_idx").on(t.status),
+    unique("invoices_id_query_customer_uq").on(t.id, t.queryId, t.customerId),
+    // The inquiry and customer are kept for fast lists/reports, and the database guarantees they match.
+    foreignKey({ name: "invoices_quotation_query_fk", columns: [t.quotationId, t.queryId], foreignColumns: [quotations.id, quotations.queryId] }).onUpdate("cascade"),
+    foreignKey({ name: "invoices_query_customer_fk", columns: [t.queryId, t.customerId], foreignColumns: [queries.id, queries.customerId] }).onUpdate("cascade"),
     index("invoices_customer_idx").on(t.customerId),
     index("invoices_due_idx").on(t.dueDate),
   ],
 );
 
-export const invoiceItems = pgTable("invoice_items", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  invoiceId: uuid("invoice_id")
-    .notNull()
-    .references(() => invoices.id, { onDelete: "cascade" }),
-  description: text("description").notNull(),
-  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
-  unitPrice: money("unit_price"),
-  lineTotal: money("line_total"),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
+export const invoiceItems = pgTable(
+  "invoice_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    /** The accepted quotation line this was invoiced from. */
+    quotationItemId: uuid("quotation_item_id").references(() => quotationItems.id, { onDelete: "set null" }),
+    ...lineColumns(),
+    hsCode: varchar("hs_code", { length: 20 }),
+    unitPrice: money("unit_price"),
+    lineTotal: money("line_total"),
+  },
+  (t) => [index("invoice_items_invoice_idx").on(t.invoiceId)],
+);
 
 export const payments = pgTable(
   "payments",
@@ -360,13 +432,20 @@ export const packingLists = pgTable(
     sealNo: varchar("seal_no", { length: 120 }),
     marks: text("marks"),
     notes: text("notes"),
+    customerSnapshot: jsonb("customer_snapshot").$type<CustomerSnapshot>(),
+    companySnapshot: jsonb("company_snapshot").$type<CompanySnapshot>(),
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("packing_lists_invoice_idx").on(t.invoiceId), index("packing_lists_query_idx").on(t.queryId)],
+  (t) => [
+    // One shipment per invoice.
+    uniqueIndex("packing_lists_invoice_uq").on(t.invoiceId).where(sql`${t.deletedAt} is null`),
+    index("packing_lists_query_idx").on(t.queryId),
+    foreignKey({ name: "packing_lists_invoice_party_fk", columns: [t.invoiceId, t.queryId, t.customerId], foreignColumns: [invoices.id, invoices.queryId, invoices.customerId] }).onUpdate("cascade"),
+  ],
 );
 
 export const packingListItems = pgTable("packing_list_items", {
@@ -374,9 +453,10 @@ export const packingListItems = pgTable("packing_list_items", {
   packingListId: uuid("packing_list_id")
     .notNull()
     .references(() => packingLists.id, { onDelete: "cascade" }),
-  description: text("description").notNull(),
-  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
-  unit: varchar("unit", { length: 20 }).notNull().default("pcs"),
+  /** The invoice line being shipped (description, model, quantity and unit come from it). */
+  invoiceItemId: uuid("invoice_item_id").references(() => invoiceItems.id, { onDelete: "set null" }),
+  ...lineColumns(),
+  hsCode: varchar("hs_code", { length: 20 }),
   /** Number of packages (cartons, cases, pallets) for this line. */
   packages: integer("packages").notNull().default(1),
   packageType: varchar("package_type", { length: 40 }).notNull().default("Wooden case"),
@@ -384,7 +464,6 @@ export const packingListItems = pgTable("packing_list_items", {
   grossWeight: numeric("gross_weight", { precision: 12, scale: 2 }).notNull().default("0"),
   /** Volume of this line's packages, cubic metres. */
   cbm: numeric("cbm", { precision: 12, scale: 3 }).notNull().default("0"),
-  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 /* ----------------------------------------------------------------------------
@@ -470,9 +549,14 @@ export const queriesRelations = relations(queries, ({ one, many }) => ({
   assignee: one(users, { fields: [queries.assignedTo], references: [users.id], relationName: "assignee" }),
   creator: one(users, { fields: [queries.createdBy], references: [users.id], relationName: "creator" }),
   quotations: many(quotations),
+  items: many(queryItems),
   attachments: many(attachments),
   comments: many(comments),
   statusHistory: many(queryStatusHistory),
+}));
+
+export const queryItemsRelations = relations(queryItems, ({ one }) => ({
+  query: one(queries, { fields: [queryItems.queryId], references: [queries.id] }),
 }));
 
 export const quotationsRelations = relations(quotations, ({ one, many }) => ({
@@ -523,6 +607,7 @@ export type Query = typeof queries.$inferSelect;
 export type QueryStatus = (typeof queryStatusEnum.enumValues)[number];
 export type QuerySource = (typeof querySourceEnum.enumValues)[number];
 export type Priority = (typeof priorityEnum.enumValues)[number];
+export type QueryItem = typeof queryItems.$inferSelect;
 export type Quotation = typeof quotations.$inferSelect;
 export type QuotationStatus = (typeof quotationStatusEnum.enumValues)[number];
 export type Invoice = typeof invoices.$inferSelect;

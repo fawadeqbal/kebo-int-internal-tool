@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth/session";
 import { listQuotations } from "@/modules/quotations/repository";
 import { parseQuotationParams, QUOTATION_SORTS, QUOTATION_STATUS_OPTIONS } from "@/lib/list-filters";
 import { listActiveUsers } from "@/modules/users/repository";
-import { getSettings } from "@/modules/settings/service";
 import { ActiveFilters, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { FilterDates, FilterSelect, FilterToolbar } from "@/components/ui/filters";
 import { ExportMenu } from "@/components/ui/export-menu";
@@ -24,7 +23,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
   const people = await listActiveUsers();
   const { filters, params, active } = parseQuotationParams(sp, people);
   const { q, status, preparedBy, from, to, sort } = filters;
-  const [data, settings] = await Promise.all([listQuotations(user, { ...filters, page: toPage(sp.page) }), getSettings()]);
+  const data = await listQuotations(user, { ...filters, page: toPage(sp.page) });
   const today = todayISO();
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/quotations", params, { page: undefined, ...patch });
   const statusOptions = QUOTATION_STATUS_OPTIONS;
@@ -95,7 +94,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
                         <Td>
                           <QuotationStatusBadge status={r.status} />
                         </Td>
-                        <Td className="text-right font-medium whitespace-nowrap tabular">{formatMoney(r.total, settings.currency)}</Td>
+                        <Td className="text-right font-medium whitespace-nowrap tabular">{formatMoney(r.total, r.currency)}</Td>
                         <Td className="hidden text-text-2 xl:table-cell">{r.preparedBy ?? "—"}</Td>
                         <Td className={cn("whitespace-nowrap", late ? "font-medium text-bad" : "text-text-2")}>{formatDate(r.dueDate)}</Td>
                       </Tr>
@@ -114,7 +113,7 @@ export default async function QuotationsPage({ searchParams }: { searchParams: P
                         <span className="font-mono text-[13px] font-medium text-text">
                           {r.refNo} <span className="font-sans text-xs font-normal text-muted">v{r.version}</span>
                         </span>
-                        <span className="text-sm font-semibold text-text tabular">{formatMoney(r.total, settings.currency)}</span>
+                        <span className="text-sm font-semibold text-text tabular">{formatMoney(r.total, r.currency)}</span>
                       </div>
                       <p className="mt-0.5 truncate text-sm text-text-2">{r.queryTitle}</p>
                       <div className="mt-2 flex items-center justify-between gap-2">

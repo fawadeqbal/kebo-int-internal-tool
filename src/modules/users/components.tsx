@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
-import { Alert, ButtonLink, Field, Input, Select } from "@/components/ui";
+import { useActionState, useState } from "react";
+import { Alert, Button, ButtonLink, DetailList, Field, Input, Select } from "@/components/ui";
+import { EditableCard } from "@/components/ui/editable-card";
 import { SubmitButton } from "@/components/ui/client";
 import type { ActionState } from "@/lib/utils/result";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
@@ -12,12 +13,19 @@ export function UserForm({
   action,
   initial,
   withPassword,
+  onDone,
 }: {
   action: Action;
   initial?: { name: string; email: string; role: string };
   withPassword?: boolean;
+  /** In a read-then-edit card: close after saving, and Cancel closes. */
+  onDone?: () => void;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction] = useActionState(async (prev: ActionState, fd: FormData) => {
+    const r = await action(prev, fd);
+    if (r.ok) onDone?.();
+    return r;
+  }, {});
   const v = (key: string, fallback = "") => (state.values?.[key] as string | undefined) ?? fallback;
   const e = state.errors ?? {};
   return (
@@ -47,15 +55,21 @@ export function UserForm({
       </div>
       <div className="flex gap-2 border-t border-line pt-4">
         <SubmitButton>{initial ? "Save changes" : "Create user"}</SubmitButton>
-        <ButtonLink href="/users" variant="secondary">
-          Cancel
-        </ButtonLink>
+        {onDone ? (
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+        ) : (
+          <ButtonLink href="/users" variant="secondary">
+            Cancel
+          </ButtonLink>
+        )}
       </div>
     </form>
   );
 }
 
-export function PasswordForm({ action, own }: { action: Action; own?: boolean }) {
+export function PasswordForm({ action, own, onCancel }: { action: Action; own?: boolean; onCancel?: () => void }) {
   const [state, formAction] = useActionState(action, {});
   const e = state.errors ?? {};
   return (
@@ -74,9 +88,40 @@ export function PasswordForm({ action, own }: { action: Action; own?: boolean })
           <Input id="confirm" name="confirm" type="password" autoComplete="new-password" />
         </Field>
       )}
-      <div>
+      <div className="flex gap-2">
         <SubmitButton variant="secondary">{own ? "Change password" : "Set new password"}</SubmitButton>
+        {onCancel && (
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            {state.ok ? "Close" : "Cancel"}
+          </Button>
+        )}
       </div>
     </form>
+  );
+}
+
+/** A person's profile: shown first, "Edit" opens the form in place. */
+export function UserProfileCard({ action, user, roleLabel }: { action: Action; user: { name: string; email: string; role: string }; roleLabel: string }) {
+  return (
+    <EditableCard
+      title="Profile & role"
+      read={<DetailList items={[{ label: "Name", value: user.name }, { label: "Email", value: user.email }, { label: "Role", value: roleLabel }]} />}
+      edit={(done) => <UserForm action={action} initial={user} onDone={done} />}
+    />
+  );
+}
+
+/** Password: a button first, the form only when asked for. */
+export function PasswordCard({ action, own, title, description }: { action: Action; own?: boolean; title: string; description?: string }) {
+  const [open, setOpen] = useState(false);
+  return open ? (
+    <PasswordForm action={action} own={own} onCancel={() => setOpen(false)} />
+  ) : (
+    <div className="flex flex-col items-start gap-2">
+      {description && <p className="text-sm text-muted">{description}</p>}
+      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        {title}
+      </Button>
+    </div>
   );
 }

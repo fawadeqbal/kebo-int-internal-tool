@@ -3,7 +3,6 @@
  * cubic centimetres (0.001 m³ = 1,000 cm³), as integers, so totals never drift.
  */
 export interface PackingLineInput {
-  quantity: string | number;
   packages: string | number;
   netWeight: string | number;
   grossWeight: string | number;
@@ -33,4 +32,5 @@ export const formatKg = (kg: number) => `${kg.toLocaleString("en", { minimumFrac
 export const formatCbm = (m3: number) => `${m3.toLocaleString("en", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} m³`;
 
 export const PACKAGE_TYPES = ["Wooden case", "Carton", "Pallet", "Crate", "Bundle", "Drum", "Bag", "Roll", "Unpacked"] as const;
-export const UNITS = ["pcs", "sets", "units", "kg", "m", "rolls", "boxes", "lots"] as const;
+/** Units: one list for every document. */
+export { UNITS } from "./line-items";

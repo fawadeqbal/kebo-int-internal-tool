@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { priorityEnum, querySourceEnum, queryStatusEnum } from "@/lib/db/schema";
+import { itemsSummary, requestedItemsField, type RequestedItem } from "@/lib/line-items";
 import { customerSchema } from "@/modules/customers/schema";
 
 const optionalText = (max: number) =>
@@ -27,7 +28,12 @@ const optionalUser = z
   .nullable()
   .optional();
 
-/** A short title from the first line of the requirements, when none is typed. */
+/** A short title from the requested items ("Tablet press + 2 more"), when none is typed. */
+export function titleFromItems(items: Pick<RequestedItem, "description">[], category?: string | null): string {
+  return itemsSummary(items) || (category ? `${category} inquiry` : "Inquiry");
+}
+
+/** A short title from the first line of free text (the website form). */
 export function titleFrom(requirements: string, category?: string | null): string {
   const first = (requirements.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "").replace(/[.\s]+$/, "");
   if (!first) return category ? `${category} inquiry` : "Inquiry";
@@ -40,8 +46,10 @@ export const queryDetailsSchema = z.object({
   source: z.enum(querySourceEnum.enumValues, { message: "Choose how the inquiry came in" }).default("phone"),
   title: optionalText(200),
   category: z.string().trim().min(1, "Choose a sourcing category, or type your own").max(120).transform((v) => v.replace(/\s+/g, " ")),
-  specifications: z.string().trim().min(5, "Write what the customer needs").max(20000),
-  quantity: z.preprocess((v) => (v === "" || v === undefined ? 1 : v), z.coerce.number({ message: "Enter a quantity" }).int("Use a whole number").min(1, "At least 1").max(1_000_000)),
+  /** What the customer needs, item by item. */
+  items: requestedItemsField,
+  /** Anything else: destination port, delivery time, standards, payment… */
+  specifications: optionalText(20000),
   priority: z.enum(priorityEnum.enumValues).default("normal"),
   requiredBy: optionalDate,
   assignedTo: optionalUser,

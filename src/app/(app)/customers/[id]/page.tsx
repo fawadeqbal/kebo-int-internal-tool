@@ -33,7 +33,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     customerFinancials(id),
     showMoney
       ? db
-          .select({ id: invoices.id, invoiceNo: invoices.invoiceNo, status: invoices.status, total: invoices.total, dueDate: invoices.dueDate, issueDate: invoices.issueDate })
+          .select({ id: invoices.id, invoiceNo: invoices.invoiceNo, currency: invoices.currency, status: invoices.status, total: invoices.total, dueDate: invoices.dueDate, issueDate: invoices.issueDate })
           .from(invoices)
           .where(and(eq(invoices.customerId, id)))
           .orderBy(desc(invoices.issueDate))
@@ -191,7 +191,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                       <Td>
                         <InvoiceStatusBadge status={invoiceDisplayStatus(inv, today)} />
                       </Td>
-                      <Td className="text-right whitespace-nowrap tabular">{formatMoney(inv.total, settings.currency)}</Td>
+                      <Td className="text-right whitespace-nowrap tabular">{formatMoney(inv.total, inv.currency)}</Td>
                       <Td className="hidden whitespace-nowrap text-muted sm:table-cell">{formatDate(inv.issueDate)}</Td>
                       <Td className="whitespace-nowrap text-text-2">{formatDate(inv.dueDate)}</Td>
                     </Tr>

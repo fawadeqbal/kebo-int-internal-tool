@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 import { customerName } from "@/lib/utils/names";
 import { CopyPlus, Pencil, FileDown, Printer, Receipt } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { can } from "@/lib/auth/permissions";
 import { isUuid } from "@/lib/utils/ids";
 import { getQuotationDetail } from "@/modules/quotations/repository";
 import { deleteQuotationAction, quotationStatusAction, reviseQuotationAction } from "@/modules/quotations/actions";
 import { QuotationStatusForm } from "@/modules/quotations/components";
-import { isEditable, QUOTATION_TRANSITIONS } from "@/modules/quotations/workflow";
+import { quotationAbilities, quotationChanges } from "@/modules/documents/abilities";
+import { RevisionChanges } from "@/modules/quotations/revision-changes";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import { getSettings } from "@/modules/settings/service";
 import { ButtonLink, buttonClass, Card, CardBody, CardHeader } from "@/components/ui";
@@ -27,8 +27,8 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
   if (!detail) notFound();
   const settings = await getSettings();
   const { quotation: q, query, customer } = detail;
-  const manage = can(user.role, "quotations.manage");
-  const activeInvoice = detail.invoices.find((i) => i.status !== "cancelled");
+  const able = quotationAbilities(user, detail);
+  const changes = quotationChanges(detail);
   const today = todayISO();
   const late = q.status === "sent" && q.dueDate < today;
 
@@ -43,10 +43,10 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             <div className="flex items-center gap-2">
               <h1 className="font-mono text-xl font-semibold tracking-tight text-text">{q.refNo}</h1>
               <span className="text-xs text-muted">v{q.version}</span>
-              <QuotationStatusBadge status={q.status} />
+              {detail.superseded ? <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-medium text-muted">Superseded</span> : <QuotationStatusBadge status={q.status} />}
             </div>
             <p className="mt-1 text-sm text-muted">
-              {customerName(customer)} · {formatMoney(q.total, settings.currency)} · valid until {formatDate(q.dueDate)}
+              {customerName(customer)} · {formatMoney(q.total, q.currency)} · valid until {formatDate(q.dueDate)}
               {late && <span className="ml-2 font-medium text-bad">· expired, no reply yet</span>}
             </p>
           </div>
@@ -57,37 +57,54 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             <a href={`/api/quotations/${id}/pdf`} className={buttonClass("secondary", "sm")} download>
               <FileDown aria-hidden /> Download PDF
             </a>
-            {manage && isEditable(q.status) && (
+            {able.edit && (
               <ButtonLink href={`/quotations/${id}/edit`} variant="secondary" size="sm">
                 <Pencil aria-hidden /> Edit
               </ButtonLink>
             )}
-            {manage && !isEditable(q.status) && (
+            {able.revise && (
               <form action={reviseQuotationAction.bind(null, id)}>
                 <ConfirmSubmit variant="secondary" size="sm" message="Make a new draft version with the same lines? This one stays as the customer saw it.">
                   <CopyPlus aria-hidden /> New version
                 </ConfirmSubmit>
               </form>
             )}
-            {q.status === "accepted" && !activeInvoice && can(user.role, "invoices.manage") && (
+            {able.invoice && (
               <ButtonLink href={`/invoices/new?quotation=${id}`} variant="primary" size="sm">
                 <Receipt aria-hidden /> Generate invoice
               </ButtonLink>
             )}
           </div>
         </div>
+        {detail.newer && (
+          <p className="mt-4 rounded-lg border border-line bg-surface-2 px-4 py-3 text-sm text-text-2">
+            This is version {q.version}. It was replaced by{" "}
+            <Link href={`/quotations/${detail.newer.id}`} className="font-medium text-primary hover:underline">
+              version {detail.newer.version} ({detail.newer.refNo})
+            </Link>
+            , which is the one to send, accept or invoice.
+          </p>
+        )}
       </header>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:grid-rows-[auto_1fr] xl:items-start">
         <aside aria-label="Next step" className="no-print flex flex-col gap-5 empty:hidden xl:col-start-2 xl:row-start-1">
-          {manage && QUOTATION_TRANSITIONS[q.status].length > 0 && (
+          {able.transitions.length > 0 && (
             <Card>
               <CardHeader
                 title="Next step"
                 description={q.status === "draft" ? "After you email or WhatsApp it to the customer, mark it as sent." : "Record the customer's answer."}
               />
               <CardBody>
-                <QuotationStatusForm action={quotationStatusAction.bind(null, id)} transitions={QUOTATION_TRANSITIONS[q.status]} />
+                <QuotationStatusForm action={quotationStatusAction.bind(null, id)} transitions={able.transitions} />
+              </CardBody>
+            </Card>
+          )}
+          {detail.previous && (
+            <Card>
+              <CardHeader title={`Changes from v${detail.previous.version}`} description={`Total ${formatMoney(detail.previous.total, q.currency)} → ${formatMoney(q.total, q.currency)}`} />
+              <CardBody>
+                <RevisionChanges changes={changes} currency={q.currency} />
               </CardBody>
             </Card>
           )}
@@ -138,15 +155,15 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                 {detail.versions.map((v) => (
                   <Link key={v.id} href={`/quotations/${v.id}`} aria-current={v.id === id ? "page" : undefined} className="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-surface-2 aria-[current=page]:bg-primary-soft">
                     <span>
-                      v{v.version} · <span className="tabular">{formatMoney(v.total, settings.currency)}</span>
+                      v{v.version} · <span className="tabular">{formatMoney(v.total, q.currency)}</span>
                     </span>
-                    <QuotationStatusBadge status={v.status} />
+                    {v.version < detail.latestVersion ? <span className="text-xs text-muted">Superseded</span> : <QuotationStatusBadge status={v.status} />}
                   </Link>
                 ))}
               </CardBody>
             </Card>
           )}
-          {manage && q.status === "draft" && (
+          {able.delete && (
             <form action={deleteQuotationAction.bind(null, id)} className="text-right">
               <ConfirmSubmit variant="danger-ghost" size="sm" message="Delete this draft quotation?">
                 Delete draft

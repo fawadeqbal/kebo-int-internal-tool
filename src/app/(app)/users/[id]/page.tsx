@@ -3,7 +3,8 @@ import { requirePagePermission } from "@/lib/auth/session";
 import { resetPasswordAction, toggleUserActiveAction, updateUserAction } from "@/modules/users/actions";
 import { findUserById } from "@/modules/users/repository";
 import { isUuid } from "@/lib/utils/ids";
-import { PasswordForm, UserForm } from "@/modules/users/components";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { PasswordCard, UserProfileCard } from "@/modules/users/components";
 import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/ui/client";
 import { Badge } from "@/components/ui/badge";
@@ -37,16 +38,11 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
         backLabel="Users"
       />
       <div className="flex max-w-3xl flex-col gap-5">
+        <UserProfileCard action={updateUserAction.bind(null, user.id)} user={user} roleLabel={ROLE_LABELS[user.role]} />
         <Card>
-          <CardHeader title="Profile & role" />
+          <CardHeader title="Password" />
           <CardBody>
-            <UserForm action={updateUserAction.bind(null, user.id)} initial={user} />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader title="Reset password" description="Set a new temporary password and share it with the user." />
-          <CardBody>
-            <PasswordForm action={resetPasswordAction.bind(null, user.id)} />
+            <PasswordCard action={resetPasswordAction.bind(null, user.id)} title="Set a temporary password" description="For a person who forgot theirs: set one and share it with them." />
           </CardBody>
         </Card>
         {actor.id !== user.id && (

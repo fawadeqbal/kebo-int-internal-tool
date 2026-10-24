@@ -1,6 +1,6 @@
-import { and, asc, count, desc, eq, gte, ilike, inArray, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { customers, invoiceItems, invoices, payments, queries, quotations, users } from "@/lib/db/schema";
+import { customers, invoiceItems, invoices, packingLists, payments, queries, quotations, users } from "@/lib/db/schema";
 import { customerDisplayName } from "@/modules/customers/repository";
 import type { SessionUser } from "@/lib/auth/session";
 import { todayISO } from "@/lib/utils/dates";
@@ -40,6 +40,7 @@ export async function listInvoices(_user: SessionUser, f: InvoiceFilters) {
       .select({
         id: invoices.id,
         invoiceNo: invoices.invoiceNo,
+        currency: invoices.currency,
         status: invoices.status,
         total: invoices.total,
         amountPaid: invoices.amountPaid,
@@ -78,7 +79,7 @@ export async function getInvoiceDetail(id: string) {
     .where(eq(invoices.id, id))
     .limit(1);
   if (!row) return null;
-  const [items, paymentRows] = await Promise.all([
+  const [items, paymentRows, [packingList]] = await Promise.all([
     db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id)).orderBy(asc(invoiceItems.sortOrder)),
     db
       .select({
@@ -94,6 +95,11 @@ export async function getInvoiceDetail(id: string) {
       .innerJoin(users, eq(users.id, payments.recordedBy))
       .where(eq(payments.invoiceId, id))
       .orderBy(desc(payments.paidAt)),
+    db
+      .select({ id: packingLists.id, plNo: packingLists.plNo, packDate: packingLists.packDate })
+      .from(packingLists)
+      .where(and(eq(packingLists.invoiceId, id), isNull(packingLists.deletedAt)))
+      .limit(1),
   ]);
-  return { ...row, items, payments: paymentRows };
+  return { ...row, items, payments: paymentRows, packingList: packingList ?? null };
 }

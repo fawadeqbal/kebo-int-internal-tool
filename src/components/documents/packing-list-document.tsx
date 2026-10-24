@@ -3,7 +3,8 @@ import type { getPackingListDetail } from "@/modules/packing/repository";
 import { formatCbm, formatKg, packingTotals } from "@/lib/packing";
 import { numberToWords } from "@/lib/utils/words";
 import { cn } from "@/lib/utils/cn";
-import { DetailsBox, docDate, docLabel as label, Letterhead, PartyBox } from "./document-view";
+import { partiesFor } from "@/modules/documents/snapshots";
+import { DetailsBox, docDate, docLabel as label, Letterhead, lineCodes, PartyBox } from "./document-view";
 
 type PackingListDetail = NonNullable<Awaited<ReturnType<typeof getPackingListDetail>>>;
 
@@ -15,8 +16,9 @@ const m3 = (v: string) => Number(v).toLocaleString("en", { minimumFractionDigits
  * The packing list as it travels with the goods (screen, print and PDF).
  * Same letterhead and boxes as the quotation and invoice; no prices.
  */
-export function PackingListDocument({ detail, settings }: { detail: PackingListDetail; settings: AppSettings }) {
+export function PackingListDocument({ detail, settings: live }: { detail: PackingListDetail; settings: AppSettings }) {
   const pl = detail.packingList;
+  const { customer, company: settings } = partiesFor(pl, detail.customer, live);
   const t = packingTotals(detail.items);
   const shipper = {
     companyName: null,
@@ -42,7 +44,7 @@ export function PackingListDocument({ detail, settings }: { detail: PackingListD
 
       <section className="mt-5 grid gap-3 sm:grid-cols-2">
         <PartyBox title="Shipper / exporter" customer={shipper} />
-        <PartyBox title="Consignee" customer={detail.customer} />
+        <PartyBox title="Consignee" customer={customer} />
       </section>
 
       <section className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -90,6 +92,7 @@ export function PackingListDocument({ detail, settings }: { detail: PackingListD
                 <td className="py-2.5 pl-3 text-stone-500 tabular-nums">{i + 1}</td>
                 <td className="py-2.5 pr-3">
                   <p className="font-medium text-stone-900">{name}</p>
+                  {lineCodes(it) && <p className="mt-0.5 text-[11px] text-stone-500">{lineCodes(it)}</p>}
                   {rest.length > 0 && <p className="mt-0.5 whitespace-pre-wrap text-stone-600">{rest.join("\n")}</p>}
                 </td>
                 <td className="py-2.5 pr-3 text-right whitespace-nowrap tabular-nums">
@@ -133,6 +136,7 @@ export function PackingListDocument({ detail, settings }: { detail: PackingListD
                 <span className="mr-1.5 text-stone-400 tabular-nums">{i + 1}.</span>
                 {name}
               </p>
+              {lineCodes(it) && <p className="mt-0.5 text-[11px] text-stone-500">{lineCodes(it)}</p>}
               {rest.length > 0 && <p className="mt-0.5 whitespace-pre-wrap text-stone-600">{rest.join("\n")}</p>}
               <p className="mt-1 text-stone-600 tabular-nums">
                 {qty(it.quantity)} {it.unit}

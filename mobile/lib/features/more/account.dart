@@ -22,6 +22,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   final _new = TextEditingController();
   final _confirm = TextEditingController();
   ApiException? _error;
+  bool _changing = false;
 
   @override
   void initState() {
@@ -77,9 +78,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
               : FilledButton(onPressed: () => context.push('/account/two-step'), child: const Text('Set up two-step sign-in')),
         ),
         SectionCard(
-          title: 'Change password',
-          subtitle: 'Your other devices are signed out; this one stays signed in.',
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          title: 'Password',
+          subtitle: 'Changing it signs out your other devices; this one stays signed in.',
+          child: !_changing
+              ? Align(alignment: Alignment.centerLeft, child: OutlinedButton(onPressed: () => setState(() => _changing = true), child: const Text('Change my password')))
+              : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (e != null && e.fieldErrors.isEmpty) Notice(e.message, tone: Tone.bad),
             Field(label: 'Current password', controller: _current, obscure: true, autofill: const [AutofillHints.password], error: e?.field('currentPassword')),
             Field(label: 'New password', controller: _new, obscure: true, autofill: const [AutofillHints.newPassword], helper: 'At least 8 characters, with a letter and a number', error: e?.field('password')),
@@ -94,11 +97,22 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   for (final c in [_current, _new, _confirm]) {
                     c.clear();
                   }
+                  setState(() => _changing = false);
                   if (context.mounted) toast(context, res.s('message', 'Password changed'));
                 } on ApiException catch (err) {
                   setState(() => _error = err);
                 }
               },
+            ),
+            TextButton(
+              onPressed: () => setState(() {
+                for (final c in [_current, _new, _confirm]) {
+                  c.clear();
+                }
+                _error = null;
+                _changing = false;
+              }),
+              child: const Text('Cancel'),
             ),
           ]),
         ),

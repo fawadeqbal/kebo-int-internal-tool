@@ -77,17 +77,24 @@ export async function receiveWebsiteInquiry(input: WebsiteInquiry) {
       });
     }
 
-    return insertQueryRecord(tx, actorId, {
-      customerId,
-      source: "website",
-      title: titleFrom(input.requirements, category),
-      category,
-      specifications: `${input.requirements}${contactNote}${input.page ? `\n\n— Sent from ${input.page}` : ""}`,
-      quantity: 1,
-      priority: "normal",
-      requiredBy: null,
-      assignedTo: null,
-    });
+    const title = titleFrom(input.requirements, category);
+    // The website sends one free-text message: it becomes one requested item to
+    // split up later, and the full message is kept as the inquiry's notes.
+    return insertQueryRecord(
+      tx,
+      actorId,
+      {
+        customerId,
+        source: "website",
+        title,
+        category,
+        specifications: `${input.requirements}${contactNote}${input.page ? `\n\n— Sent from ${input.page}` : ""}`,
+        priority: "normal",
+        requiredBy: null,
+        assignedTo: null,
+      },
+      [{ description: title, quantity: 1, unit: "pcs", model: null }],
+    );
   });
 
   await publish({ type: "query.created", queryId: query.id, refNo: query.refNo, title: query.title, actorId, source: "website" });

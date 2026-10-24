@@ -173,7 +173,7 @@ class CustomerDetailScreen extends ConsumerWidget {
                       mono: true,
                       title: i.s('invoiceNo'),
                       subtitle: Text('Issued ${f.date(i.s('issueDate'))} · due ${f.date(i.s('dueDate'))}'),
-                      trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [MoneyText(i['total'], cur), invoiceStatusBadge(invoiceDisplayStatus(i, f.today()))]),
+                      trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [MoneyText(i['total'], i.s('currency', cur)), invoiceStatusBadge(invoiceDisplayStatus(i, f.today()))]),
                       onTap: () => context.push('/invoices/${i.s('id')}'),
                     ),
                 ]),

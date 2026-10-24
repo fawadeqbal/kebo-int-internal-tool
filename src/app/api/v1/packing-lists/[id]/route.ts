@@ -1,6 +1,7 @@
 import { ApiError, apiUser, formBody, handle, idParam, json, parse } from "@/lib/api/http";
 import { packingTotals } from "@/lib/packing";
 import { getPackingListDetail } from "@/modules/packing/repository";
+import { packingEditValues } from "@/modules/documents/drafts";
 import { packingListSchema } from "@/modules/packing/schema";
 import { deletePackingList, updatePackingList } from "@/modules/packing/service";
 
@@ -13,7 +14,9 @@ export const GET = handle(async (_request: Request, { params }: Ctx) => {
   const id = await idParam(params);
   const detail = await getPackingListDetail(id);
   if (!detail) throw new ApiError(404, "Packing list not found");
-  return json({ ...detail, totals: packingTotals(detail.items), pdf: `/api/packing-lists/${id}/pdf` });
+  // `initial` = the edit form's values (every invoice line with how it is packed).
+  const { initial } = await packingEditValues(id);
+  return json({ ...detail, totals: packingTotals(detail.items), initial, pdf: `/api/packing-lists/${id}/pdf` });
 });
 
 export const PATCH = handle(async (request: Request, { params }: Ctx) => {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Alert, Button, buttonClass, Field, Select, Textarea } from "@/components/ui";
+import { Alert, Avatar, Button, buttonClass, Field, Select, Textarea } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmSubmit, SubmitButton } from "@/components/ui/client";
 import type { ActionState } from "@/lib/utils/result";
 import type { QueryStatus } from "@/lib/db/schema";
@@ -75,52 +76,94 @@ export function StatusPanel({
   );
 }
 
+/**
+ * Who handles the inquiry: shown as a name, with "Change" to pick someone else
+ * (managers) or "Assign to me" (staff, when nobody has it yet).
+ */
 export function AssignPanel({
   action,
   people,
   current,
+  currentName,
   canAssignOthers,
   currentUserId,
 }: {
   action: Action;
   people: { id: string; name: string }[];
   current: string | null;
+  currentName: string | null;
   canAssignOthers: boolean;
   currentUserId: string;
 }) {
   const [state, formAction] = useActionState(action, {});
+  const [editing, setEditing] = useState(false);
+  const shown = (
+    <div className="flex items-center justify-between gap-3">
+      {currentName ? (
+        <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-text">
+          <Avatar name={currentName} size={26} />
+          <span className="truncate">{currentName}</span>
+        </p>
+      ) : (
+        <Badge tone="warn">Not assigned yet</Badge>
+      )}
+      {canAssignOthers && !editing && (
+        <Button type="button" variant="secondary" size="xs" onClick={() => setEditing(true)}>
+          {current ? "Change" : "Assign"}
+        </Button>
+      )}
+    </div>
+  );
   if (!canAssignOthers) {
-    if (current) return null;
     return (
-      <form action={formAction} className="flex flex-col gap-2">
-        {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
-        <input type="hidden" name="assignedTo" value={currentUserId} />
-        <SubmitButton size="sm" variant="secondary">
-          Assign to me
-        </SubmitButton>
-      </form>
+      <div className="flex flex-col gap-3">
+        {shown}
+        {!current && (
+          <form action={formAction} className="flex flex-col gap-2">
+            {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
+            <input type="hidden" name="assignedTo" value={currentUserId} />
+            <SubmitButton size="sm" variant="secondary">
+              Assign to me
+            </SubmitButton>
+          </form>
+        )}
+      </div>
     );
   }
   return (
-    <form action={formAction} className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {state.message && <Alert tone={state.ok ? "success" : "error"}>{state.message}</Alert>}
-      <label htmlFor="assignedTo" className="sr-only">
-        Assign to
-      </label>
-      <div className="flex gap-2">
-        <Select id="assignedTo" name="assignedTo" defaultValue={current ?? ""} className="flex-1" key={current ?? "none"}>
-          <option value="">Unassigned</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.id === currentUserId ? `${p.name} (me)` : p.name}
-            </option>
-          ))}
-        </Select>
-        <SubmitButton size="sm" variant="secondary" pendingText="…">
-          Save
-        </SubmitButton>
-      </div>
-    </form>
+      {shown}
+      {editing && (
+        <form
+          action={async (fd) => {
+            await formAction(fd);
+            setEditing(false);
+          }}
+          className="flex flex-col gap-2"
+        >
+          <label htmlFor="assignedTo" className="sr-only">
+            Assign to
+          </label>
+          <Select id="assignedTo" name="assignedTo" defaultValue={current ?? ""} key={current ?? "none"} autoFocus>
+            <option value="">Nobody yet</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id === currentUserId ? `${p.name} (me)` : p.name}
+              </option>
+            ))}
+          </Select>
+          <div className="flex gap-2">
+            <SubmitButton size="sm" pendingText="Saving…">
+              Save
+            </SubmitButton>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 

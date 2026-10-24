@@ -47,7 +47,7 @@ export async function reviseQuotationAction(id: string) {
   } catch (error) {
     redirect(`/quotations/${id}?toast=${encodeURIComponent(toActionError(error).message ?? "Could not create version")}`);
   }
-  redirect(`/quotations/${newId}/edit?toast=New+version+created+—+adjust+and+save`);
+  redirect(`/quotations/${newId}/edit?toast=${encodeURIComponent("New version created: adjust the prices and save")}`);
 }
 
 export async function deleteQuotationAction(id: string) {

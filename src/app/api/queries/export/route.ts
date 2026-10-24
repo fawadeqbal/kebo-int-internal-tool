@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const rows = await listQueriesForExport(user, parseQueryFilters(sp));
   await recordAudit(db, { userId: user.id, action: "export", entityType: "export", summary: `Downloaded the Inquiries CSV (${rows.length} rows)` });
   const csv = toCsv(
-    ["RFQ no.", "Title", "Customer", "Company", "Phone / WhatsApp", "Sourcing category", "Quantity", "Received via", "Priority", "Status", "Handled by", "Needed by", "Received", "Closed"],
+    ["RFQ no.", "Title", "Customer", "Company", "Phone / WhatsApp", "Sourcing category", "Items", "Received via", "Priority", "Status", "Handled by", "Needed by", "Received", "Closed"],
     rows.map((r) => [
       r.refNo,
       r.title,
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       r.companyName === r.contactPerson ? "" : r.companyName,
       r.customerPhone,
       r.category,
-      r.quantity,
+      r.itemCount,
       SOURCE_LABEL[r.source],
       PRIORITY_LABEL[r.priority],
       QUERY_STATUS_LABEL[r.status],

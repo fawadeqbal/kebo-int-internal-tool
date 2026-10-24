@@ -6,7 +6,7 @@ import { getQuotationDetail } from "@/modules/quotations/repository";
 import { updateQuotationAction } from "@/modules/quotations/actions";
 import { QuotationForm } from "@/modules/quotations/components";
 import { isEditable } from "@/modules/quotations/workflow";
-import { getSettings } from "@/modules/settings/service";
+import { quotationEditValues } from "@/modules/documents/drafts";
 import { PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Edit quotation" };
@@ -16,8 +16,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const detail = isUuid(id) ? await getQuotationDetail(user, id) : null;
   if (!detail) notFound();
-  if (!isEditable(detail.quotation.status)) redirect(`/quotations/${id}`);
-  const settings = await getSettings();
+  if (!isEditable(detail.quotation.status) || detail.superseded) redirect(`/quotations/${id}`);
   const q = detail.quotation;
   return (
     <>
@@ -30,18 +29,10 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
       <div className="max-w-5xl">
         <QuotationForm
           action={updateQuotationAction.bind(null, id)}
-          currency={settings.currency}
+          currency={q.currency}
           cancelHref={`/quotations/${id}`}
           submitLabel="Save changes"
-          initial={{
-            items: detail.items.map((i) => ({ description: i.description, quantity: String(Number(i.quantity)), unitPrice: String(Number(i.unitPrice)) })),
-            discount: String(Number(q.discount)),
-            taxRate: String(Number(q.taxRate)),
-            dueDate: q.dueDate,
-            submittedAt: q.submittedAt ?? "",
-            terms: q.terms ?? "",
-            notes: q.notes ?? "",
-          }}
+          initial={quotationEditValues(detail)}
         />
       </div>
     </>

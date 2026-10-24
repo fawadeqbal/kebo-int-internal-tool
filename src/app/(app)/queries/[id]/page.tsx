@@ -24,6 +24,8 @@ import { getSettings } from "@/modules/settings/service";
 import { listPackingListsForQuery } from "@/modules/packing/repository";
 import { DocumentsCard } from "@/modules/queries/components/documents";
 import type { QueryStatus } from "@/lib/db/schema";
+import { splitDescription } from "@/lib/line-items";
+import { formatMoney } from "@/lib/utils/money";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   return { title: `Inquiry ${(await params).id.slice(0, 8)}` };
@@ -178,21 +180,12 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
 
           <Card>
             <CardHeader title="Handled by" />
-            <CardBody className="flex flex-col gap-3">
-              {detail.assigneeName ? (
-                <p className="flex items-center gap-2 text-sm font-medium text-text">
-                  <Avatar name={detail.assigneeName} size={26} />
-                  {detail.assigneeName}
-                </p>
-              ) : (
-                <p>
-                  <Badge tone="warn">Not assigned yet</Badge>
-                </p>
-              )}
+            <CardBody>
               <AssignPanel
                 action={assignQueryAction.bind(null, id)}
                 people={people}
                 current={query.assignedTo}
+                currentName={detail.assigneeName}
                 canAssignOthers={can(user.role, "queries.assign")}
                 currentUserId={user.id}
               />
@@ -204,9 +197,55 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
         {/* Main column */}
         <div className="flex min-w-0 flex-col gap-5 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <Card>
-            <CardHeader title="Requirements" description={`${query.category ? `${query.category} · ` : ""}Quantity ${query.quantity}`} />
-            <CardBody>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-text">{query.specifications}</p>
+            <CardHeader
+              title="What the customer needs"
+              description={[query.category, `${detail.items.length} ${detail.items.length === 1 ? "item" : "items"}`].filter(Boolean).join(" · ")}
+              actions={
+                workable && (
+                  <Link href={`/queries/${id}/edit`} className="text-xs font-medium text-primary hover:underline">
+                    Edit
+                  </Link>
+                )
+              }
+            />
+            <CardBody className="flex flex-col gap-4 p-0">
+              <ol className="divide-y divide-line">
+                {detail.items.map((it, n) => {
+                  const { name, details } = splitDescription(it.description);
+                  return (
+                    <li key={it.id} className="flex gap-3 px-5 py-3.5">
+                      <span className="pt-0.5 text-xs text-muted tabular">{n + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                          <p className="font-medium text-text">{name}</p>
+                          <p className="text-sm whitespace-nowrap text-text tabular">
+                            {Number(it.quantity)} {it.unit}
+                          </p>
+                        </div>
+                        {it.model && <p className="text-xs text-muted">Model {it.model}</p>}
+                        {details && <p className="mt-0.5 text-sm whitespace-pre-wrap text-text-2">{details}</p>}
+                        {detail.quotations.length > 0 && (
+                          <p className="mt-1.5 text-xs">
+                            {it.quoted ? (
+                              <span className="text-muted">
+                                Quoted <span className="font-medium text-text tabular">{formatMoney(it.quoted.unitPrice, settings.currency)}</span> / {it.quoted.unit} in v{it.quoted.version}
+                              </span>
+                            ) : (
+                              <Badge tone="warn">Not in the latest quotation</Badge>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+              {query.specifications && (
+                <div className="border-t border-line px-5 pt-3.5 pb-4">
+                  <p className="text-xs font-medium text-muted">Other details</p>
+                  <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap text-text">{query.specifications}</p>
+                </div>
+              )}
             </CardBody>
           </Card>
 

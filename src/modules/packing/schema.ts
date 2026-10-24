@@ -13,11 +13,13 @@ const optionalText = (max: number) =>
 const decimal = (label: string, max: number) =>
   z.preprocess((v) => (v === "" || v === null || v === undefined ? 0 : v), z.coerce.number({ message: `Enter the ${label}` }).min(0, `${label[0].toUpperCase()}${label.slice(1)} cannot be negative`).max(max));
 
+/**
+ * A packed invoice line. The item, model, quantity and unit come from the
+ * invoice line (`sourceId`); the packing list adds only how it is packed.
+ */
 export const packingLineSchema = z
   .object({
-    description: z.string().trim().min(1, "Each line needs a description").max(2000),
-    quantity: z.coerce.number({ message: "Enter a quantity" }).positive("Quantity must be more than 0").max(1_000_000),
-    unit: z.string().trim().min(1).max(20).default("pcs"),
+    sourceId: z.uuid({ message: "This line is not on the invoice" }),
     packages: z.preprocess((v) => (v === "" ? 0 : v), z.coerce.number().int("Packages must be a whole number").min(0).max(100_000)),
     packageType: z.string().trim().min(1).max(40).default("Wooden case"),
     netWeight: decimal("net weight", 10_000_000),
@@ -37,7 +39,7 @@ export const packingLinesField = z
       return z.NEVER;
     }
   })
-  .pipe(z.array(packingLineSchema).min(1, "Add at least one line").max(200, "Too many lines"));
+  .pipe(z.array(packingLineSchema).min(1, "Tick at least one line that is shipped").max(200, "Too many lines"));
 
 export const packingListSchema = z.object({
   items: packingLinesField,

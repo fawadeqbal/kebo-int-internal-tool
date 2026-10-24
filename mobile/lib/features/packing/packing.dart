@@ -94,23 +94,29 @@ class PackingDetailScreen extends ConsumerWidget {
 
 /* ---------------------------------------------------------------- Form */
 
+/// An invoice line as shipped: what it is comes from the invoice (shown, not
+/// typed); this only says how it is packed, and whether it ships at all.
 class _Line {
   _Line(Json j)
-      : description = TextEditingController(text: j.s('description')),
-        quantity = TextEditingController(text: _n(j.s('quantity', '1'))),
-        unit = TextEditingController(text: j.s('unit', 'pcs')),
+      : sourceId = j.s('sourceId'),
+        description = j.s('description'),
+        model = j.s('model'),
+        hsCode = j.s('hsCode'),
+        quantity = j['quantity'],
+        unit = j.s('unit', 'pcs'),
+        include = j['include'] != false,
         packages = TextEditingController(text: j.s('packages', '1')),
         packageType = TextEditingController(text: j.s('packageType', 'Wooden case')),
         net = TextEditingController(text: _opt(j.s('netWeight'))),
         gross = TextEditingController(text: _opt(j.s('grossWeight'))),
         cbm = TextEditingController(text: _opt(j.s('cbm')));
-  final TextEditingController description, quantity, unit, packages, packageType, net, gross, cbm;
-  static String _n(String v) => (num.tryParse(v) ?? 1).toString().replaceAll(RegExp(r'\.0$'), '');
+  final String sourceId, description, model, hsCode, unit;
+  final Object? quantity;
+  bool include;
+  final TextEditingController packages, packageType, net, gross, cbm;
   static String _opt(String v) => (num.tryParse(v) ?? 0) == 0 ? '' : (num.tryParse(v)!).toString().replaceAll(RegExp(r'\.0$'), '');
   Map<String, String> toJson() => {
-        'description': description.text.trim(),
-        'quantity': quantity.text.trim(),
-        'unit': unit.text.trim(),
+        'sourceId': sourceId,
         'packages': packages.text.trim(),
         'packageType': packageType.text.trim(),
         'netWeight': net.text.trim(),
@@ -150,7 +156,7 @@ class _PackingFormScreenState extends ConsumerState<PackingFormScreen> {
       if (widget.editId != null) {
         final d = await api.get('/api/v1/packing-lists/${widget.editId}');
         final pl = d.m('packingList');
-        init = {...pl, 'items': d.l('items')};
+        init = d.m('initial');
         _subtitle = '${pl.s('plNo')} · for ${d.m('invoice').s('invoiceNo')} · ${f.customerName(d.m('customer'))}';
       } else {
         final d = await api.get('/api/v1/packing-lists/new', query: {'invoice': widget.invoiceId});
@@ -159,7 +165,6 @@ class _PackingFormScreenState extends ConsumerState<PackingFormScreen> {
       }
       _types = (await ref.read(metaProvider.future)).m('packing').ls('packageTypes');
       _lines.addAll(init.l('items').map(_Line.new));
-      if (_lines.isEmpty) _lines.add(_Line(const {}));
       _packDate = init.s('packDate', f.today());
       for (final e in _f.entries) {
         e.value.text = init.s(e.key);
@@ -173,7 +178,7 @@ class _PackingFormScreenState extends ConsumerState<PackingFormScreen> {
   ({int packages, double net, double gross, double cbm}) get _totals {
     var p = 0;
     var n = 0, g = 0, c = 0;
-    for (final l in _lines) {
+    for (final l in _lines.where((l) => l.include)) {
       p += int.tryParse(l.packages.text) ?? 0;
       n += ((double.tryParse(l.net.text) ?? 0) * 1000).round();
       g += ((double.tryParse(l.gross.text) ?? 0) * 1000).round();
@@ -185,7 +190,7 @@ class _PackingFormScreenState extends ConsumerState<PackingFormScreen> {
   Future<void> _save() async {
     setState(() => _error = null);
     final body = {
-      'items': [for (final l in _lines) if (l.description.text.trim().isNotEmpty) l.toJson()],
+      'items': [for (final l in _lines.where((l) => l.include)) l.toJson()],
       'packDate': _packDate,
       for (final e in _f.entries) e.key: e.value.text,
     };
@@ -228,67 +233,67 @@ class _PackingFormScreenState extends ConsumerState<PackingFormScreen> {
         if (e != null) Notice(e.field('items') ?? (e.fieldErrors.isNotEmpty ? 'Please fix the highlighted fields.' : e.message), tone: Tone.bad),
         SectionCard(
           title: 'Goods & packing',
-          subtitle: 'Copied from the invoice. Remove lines that are not shipped (freight, installation). Weights and volume are per line.',
+          subtitle: 'The goods come from the invoice. Say how each is packed; switch off what is not shipped (freight, installation). Weights and volume are per line.',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            for (var i = 0; i < _lines.length; i++)
+            for (final l in _lines)
               Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(12, 8, 6, 10),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: context.c.line)),
+                decoration: BoxDecoration(color: l.include ? null : context.c.surface2, borderRadius: BorderRadius.circular(12), border: Border.all(color: context.c.line)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Row(children: [
-                    Text('Line ${i + 1}', style: context.t.labelMedium),
-                    const Spacer(),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: _lines.length == 1 ? null : () => setState(() => _lines.removeAt(i)),
-                      icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                    ),
-                  ]),
-                  TextField(controller: _lines[i].description, maxLines: 4, minLines: 1, decoration: const InputDecoration(hintText: 'e.g. Rotary tablet press ZP-35, with spare punches')),
-                  gap8,
-                  Row(children: [
-                    Expanded(child: TextField(controller: _lines[i].quantity, keyboardType: numKb, decoration: dec('Qty'))),
-                    gap8,
-                    Expanded(child: TextField(controller: _lines[i].unit, decoration: dec('Unit'))),
-                    gap8,
-                    Expanded(child: TextField(controller: _lines[i].packages, keyboardType: TextInputType.number, onChanged: (_) => setState(() {}), decoration: dec('Packages'))),
-                  ]),
-                  gap8,
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(text: _lines[i].packageType.text),
-                    optionsBuilder: (v) => _types.where((o) => o.toLowerCase().contains(v.text.toLowerCase())),
-                    onSelected: (v) => _lines[i].packageType.text = v,
-                    fieldViewBuilder: (ctx, ctrl, focus, _) => TextField(controller: ctrl, focusNode: focus, onChanged: (v) => _lines[i].packageType.text = v, decoration: dec('Packed in', hint: 'Wooden case, carton, pallet…')),
-                  ),
-                  gap8,
-                  Row(children: [
-                    Expanded(child: TextField(controller: _lines[i].net, keyboardType: numKb, onChanged: (_) => setState(() {}), decoration: dec('Net kg'))),
-                    gap8,
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
-                      child: TextField(
-                        controller: _lines[i].gross,
-                        keyboardType: numKb,
-                        onChanged: (_) => setState(() {}),
-                        decoration: dec('Gross kg').copyWith(
-                          errorText: (double.tryParse(_lines[i].gross.text) ?? 0) > 0 && (double.tryParse(_lines[i].gross.text) ?? 0) < (double.tryParse(_lines[i].net.text) ?? 0) ? 'Below net' : null,
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(l.description.split('\n').first, style: context.t.titleSmall!.copyWith(color: l.include ? null : context.c.muted)),
+                        Text(
+                          [
+                            '${f.qty(l.quantity)} ${l.unit}',
+                            if (l.model.isNotEmpty) 'Model ${l.model}',
+                            if (l.hsCode.isNotEmpty) 'HS ${l.hsCode}',
+                            if (!l.include) 'not shipped',
+                          ].join(' · '),
+                          style: context.t.bodySmall,
+                        ),
+                      ]),
+                    ),
+                    Switch(value: l.include, onChanged: (v) => setState(() => l.include = v)),
+                  ]),
+                  if (l.include) ...[
+                    gap8,
+                    Row(children: [
+                      Expanded(child: TextField(controller: l.packages, keyboardType: TextInputType.number, onChanged: (_) => setState(() {}), decoration: dec('Packages'))),
+                      gap8,
+                      Expanded(
+                        flex: 2,
+                        child: Autocomplete<String>(
+                          initialValue: TextEditingValue(text: l.packageType.text),
+                          optionsBuilder: (v) => _types.where((o) => o.toLowerCase().contains(v.text.toLowerCase())),
+                          onSelected: (v) => l.packageType.text = v,
+                          fieldViewBuilder: (ctx, ctrl, focus, _) => TextField(controller: ctrl, focusNode: focus, onChanged: (v) => l.packageType.text = v, decoration: dec('Packed in', hint: 'Wooden case, carton…')),
                         ),
                       ),
-                    ),
+                    ]),
                     gap8,
-                    Expanded(child: TextField(controller: _lines[i].cbm, keyboardType: numKb, onChanged: (_) => setState(() {}), decoration: dec('CBM m³'))),
-                  ]),
+                    Row(children: [
+                      Expanded(child: TextField(controller: l.net, keyboardType: numKb, onChanged: (_) => setState(() {}), decoration: dec('Net kg'))),
+                      gap8,
+                      Expanded(
+                        child: TextField(
+                          controller: l.gross,
+                          keyboardType: numKb,
+                          onChanged: (_) => setState(() {}),
+                          decoration: dec('Gross kg').copyWith(
+                            errorText: (double.tryParse(l.gross.text) ?? 0) > 0 && (double.tryParse(l.gross.text) ?? 0) < (double.tryParse(l.net.text) ?? 0) ? 'Below net' : null,
+                          ),
+                        ),
+                      ),
+                      gap8,
+                      Expanded(child: TextField(controller: l.cbm, keyboardType: numKb, onChanged: (_) => setState(() {}), decoration: dec('CBM m³'))),
+                    ]),
+                  ],
                 ]),
               ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => setState(() => _lines.add(_Line({'packageType': _lines.isEmpty ? 'Wooden case' : _lines.last.packageType.text}))),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add line'),
-              ),
-            ),
-            gap12,
+            gap4,
             FigureBand([('Packages', '${t.packages}'), ('Volume', f.cbm(t.cbm)), ('Net', f.kg(t.net)), ('Gross', f.kg(t.gross))], dark: false),
           ]),
         ),

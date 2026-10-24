@@ -67,7 +67,7 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen> {
             title: r.s('companyName'),
             subtitle: Text('${r.s('refNo')} v${r.i('version')} · ${r.s('queryTitle')}\nValid until ${f.date(r.s('dueDate'))}${r.sn('preparedBy') != null ? ' · ${r.s('preparedBy')}' : ''}', maxLines: 3),
             trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              MoneyText(r['total'], cur),
+              MoneyText(r['total'], r.s('currency', cur)),
               const SizedBox(height: 3),
               late ? const ToneBadge('Expired, no reply', tone: Tone.warn) : quotationStatusBadge(r.s('status')),
             ]),
@@ -88,14 +88,15 @@ class QuotationDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(getProvider('/api/v1/quotations/$id'));
-    final meta = ref.watch(metaProvider).value ?? {};
-    final cur = meta.s('currency', 'USD');
     return data.when(
       loading: () => Scaffold(appBar: AppBar(), body: const LoadingView()),
       error: (e, _) => Scaffold(appBar: AppBar(), body: ErrorState(e, onRetry: () => ref.invalidate(getProvider('/api/v1/quotations/$id')))),
       data: (d) {
         final q = d.m('quotation');
+        final cur = q.s('currency', 'USD');
         final can = d.m('can');
+        final newer = d.m('newer');
+        final superseded = d.b('superseded');
         final number = q.i('version') > 1 ? '${q.s('refNo')}-R${q.i('version') - 1}' : q.s('refNo');
         final late = q.s('status') == 'sent' && q.s('dueDate').compareTo(f.today()) < 0;
         final api = ref.read(apiProvider);
@@ -132,12 +133,24 @@ class QuotationDetailScreen extends ConsumerWidget {
             ],
           ),
           body: ListView(padding: pagePadding, children: [
-            Wrap(spacing: 6, children: [quotationStatusBadge(q.s('status')), ToneBadge('v${q.i('version')}', tone: Tone.outline), if (late) const ToneBadge('Expired, no reply yet', tone: Tone.warn)]),
+            Wrap(spacing: 6, children: [
+              if (superseded) const ToneBadge('Superseded', tone: Tone.outline) else quotationStatusBadge(q.s('status')),
+              ToneBadge('v${q.i('version')}', tone: Tone.outline),
+              if (late && !superseded) const ToneBadge('Expired, no reply yet', tone: Tone.warn),
+            ]),
             gap8,
             Text(f.money(q['total'], cur), style: context.t.headlineSmall),
             gap4,
             Text('${f.customerName(d.m('customer'))} · valid until ${f.date(q.s('dueDate'))}', style: context.t.bodySmall),
             gap16,
+            if (superseded && newer.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Notice(
+                  'Replaced by version ${newer.i('version')}. That one is sent, accepted and invoiced.',
+                  action: TextButton(onPressed: () => context.pushReplacement('/quotations/${newer.s('id')}'), child: Text('Open v${newer.i('version')}')),
+                ),
+              ),
             if (can.l('transitions').isNotEmpty || can.b('invoice'))
               SectionCard(
                 title: 'Next step',
@@ -179,6 +192,12 @@ class QuotationDetailScreen extends ConsumerWidget {
               ]),
             ),
             SectionCard(title: d.m('query').s('title'), subtitle: 'Lines', child: LinesView(items: d.l('items'), totals: q, currency: cur)),
+            if (d.m('previous').isNotEmpty)
+              SectionCard(
+                title: 'Changes from v${d.m('previous').i('version')}',
+                subtitle: 'Total ${f.money(d.m('previous')['total'], cur)} → ${f.money(q['total'], cur)}',
+                child: RevisionChanges(changes: d.l('changes'), currency: cur),
+              ),
             if (q.sn('terms') != null) SectionCard(title: 'Terms & conditions', child: Text(q.s('terms'), style: context.t.bodyMedium!.copyWith(color: context.c.text2))),
             if (q.sn('notes') != null) SectionCard(title: 'Internal notes', child: Text(q.s('notes'), style: context.t.bodyMedium!.copyWith(color: context.c.text2))),
             if (d.l('versions').length > 1)
@@ -190,7 +209,11 @@ class QuotationDetailScreen extends ConsumerWidget {
                     RowTile(
                       title: '${v.s('refNo')} v${v.i('version')}',
                       mono: true,
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [MoneyText(v['total'], cur), gap8, quotationStatusBadge(v.s('status'))]),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        MoneyText(v['total'], cur),
+                        gap8,
+                        if (v.i('version') < d.i('latestVersion')) Text('Superseded', style: context.t.bodySmall) else quotationStatusBadge(v.s('status')),
+                      ]),
                       onTap: v.s('id') == id ? null : () => context.pushReplacement('/quotations/${v.s('id')}'),
                     ),
                 ]),
@@ -264,9 +287,10 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
       if (widget.editId != null) {
         final d = await api.get('/api/v1/quotations/${widget.editId}');
         final q = d.m('quotation');
-        _locked = q.s('status') != 'draft';
+        _locked = q.s('status') != 'draft' || d.b('superseded');
+        _currency = q.s('currency', 'USD');
         init = {
-          'items': d.l('items'),
+          'items': [for (final it in d.l('items')) {...it, 'sourceId': it.s('queryItemId')}],
           'discount': (num.tryParse(q.s('discount')) ?? 0).toString(),
           'taxRate': (num.tryParse(q.s('taxRate')) ?? 0).toString(),
           'dueDate': q.s('dueDate'),
@@ -281,7 +305,6 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
         _subtitle = 'For ${f.customerName(d.m('customer'))} · ${d.m('query').s('refNo')}${d.i('version') > 1 ? ' · version ${d.i('version')}' : ''}';
         _currency = d.s('currency', 'USD');
       }
-      _currency = (await ref.read(metaProvider.future)).s('currency', _currency);
       _lines.addAll(init.l('items').map(EditLine.fromJson));
       if (_lines.isEmpty) _lines.add(EditLine());
       _discount.text = init.s('discount', '0');
@@ -343,7 +366,14 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
         if (e != null && e.fieldErrors.isNotEmpty) const Notice('Please fix the highlighted fields.', tone: Tone.bad),
         SectionCard(
           title: 'Lines & totals',
-          child: LineItemsEditor(lines: _lines, discount: _discount, taxRate: _tax, currency: _currency, error: e?.field('items') ?? e?.field('discount') ?? e?.field('taxRate')),
+          child: LineItemsEditor(
+            lines: _lines,
+            discount: _discount,
+            taxRate: _tax,
+            currency: _currency,
+            sourceLabel: 'Requested by the customer',
+            error: e?.field('items') ?? e?.field('discount') ?? e?.field('taxRate'),
+          ),
         ),
         SectionCard(
           title: 'Validity & terms',
@@ -356,5 +386,38 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
         BusyButton(label: widget.editId == null ? 'Save as draft' : 'Save quotation', onPressed: _locked ? null : _save),
       ]),
     );
+  }
+}
+
+
+/// What changed from the previous version: "Price 68,000 → 65,500", "Added: …".
+class RevisionChanges extends StatelessWidget {
+  const RevisionChanges({super.key, required this.changes, required this.currency});
+  final List<Json> changes;
+  final String currency;
+  @override
+  Widget build(BuildContext context) {
+    if (changes.isEmpty) return Text('Same lines and prices; only the dates or terms may differ.', style: context.t.bodySmall);
+    String qty(Object? v) => f.qty(v);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final c in changes)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${c.s('kind') == 'added' ? 'Added: ' : c.s('kind') == 'removed' ? 'Removed: ' : ''}${c.s('name')}', style: context.t.titleSmall),
+            if (c.s('kind') == 'added') Text('${qty(c['quantity'])} ${c.s('unit')} × ${f.money(c['unitPrice'], currency)}', style: context.t.bodySmall),
+            if (c.s('kind') == 'changed')
+              Text(
+                [
+                  if (c['unitPrice'] is List) 'Price ${f.money((c['unitPrice'] as List)[0], currency)} → ${f.money((c['unitPrice'] as List)[1], currency)}',
+                  if (c['quantity'] is List) 'Qty ${qty((c['quantity'] as List)[0])} → ${qty((c['quantity'] as List)[1])}',
+                  if (c['unit'] is List) 'Unit ${(c['unit'] as List)[0]} → ${(c['unit'] as List)[1]}',
+                  if (c['details'] == true) 'Description updated',
+                ].join(' · '),
+                style: context.t.bodySmall,
+              ),
+          ]),
+        ),
+    ]);
   }
 }

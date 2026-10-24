@@ -1,6 +1,7 @@
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, asc, count, eq, isNull, ne, notInArray } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
-import { attachments, comments, invoices, queries, queryAssignments, queryStatusHistory, users, type Query, type QueryStatus } from "@/lib/db/schema";
+import { attachments, comments, invoices, queries, queryAssignments, queryItems, queryStatusHistory, quotations, users, type Query, type QueryStatus } from "@/lib/db/schema";
+import type { RequestedItem } from "@/lib/line-items";
 import { can } from "@/lib/auth/permissions";
 import { assertCan, type SessionUser } from "@/lib/auth/session";
 import { nextReference } from "@/lib/counters";
@@ -12,7 +13,7 @@ import { publish } from "@/modules/events";
 import { QUERY_STATUS_LABEL } from "@/lib/labels";
 import { accessCondition, findQuery, listCategoriesInUse } from "./repository";
 import { getSettings } from "@/modules/settings/service";
-import { titleFrom, type CreateQueryInput, type UpdateQueryInput } from "./schema";
+import { titleFromItems, type CreateQueryInput, type UpdateQueryInput } from "./schema";
 import { canTransition, isReopen } from "./workflow";
 
 /** Use the existing spelling when a typed category matches one already known (any letter case). */
@@ -48,20 +49,44 @@ async function assertAssignable(actor: SessionUser, assignedTo: string | null | 
 
 type NewQueryRecord = Pick<
   typeof queries.$inferInsert,
-  "customerId" | "source" | "title" | "category" | "specifications" | "quantity" | "priority" | "requiredBy" | "assignedTo"
+  "customerId" | "source" | "title" | "category" | "specifications" | "priority" | "requiredBy" | "assignedTo"
 >;
+
+/**
+ * Save an inquiry's requested items, keeping each existing item's id (quotation
+ * lines point at them), adding new ones and removing the ones taken out.
+ */
+export async function writeRequestedItems(tx: DbOrTx, queryId: string, items: RequestedItem[]) {
+  const existing = await tx.select({ id: queryItems.id }).from(queryItems).where(eq(queryItems.queryId, queryId));
+  const known = new Set(existing.map((r) => r.id));
+  const keep = items.map((i) => i.id).filter((id): id is string => !!id && known.has(id));
+  await tx.delete(queryItems).where(keep.length ? and(eq(queryItems.queryId, queryId), notInArray(queryItems.id, keep)) : eq(queryItems.queryId, queryId));
+  for (const [i, item] of items.entries()) {
+    const row = { description: item.description, model: item.model ?? null, quantity: String(item.quantity), unit: item.unit, sortOrder: i };
+    if (item.id && known.has(item.id)) await tx.update(queryItems).set(row).where(eq(queryItems.id, item.id));
+    else await tx.insert(queryItems).values({ ...row, queryId });
+  }
+}
+
+export async function listRequestedItems(queryId: string) {
+  return db.select().from(queryItems).where(eq(queryItems.queryId, queryId)).orderBy(asc(queryItems.sortOrder));
+}
+
+/** Items text for the audit log and notifications. */
+const itemsText = (items: RequestedItem[]) => items.map((i) => `${Number(i.quantity)} ${i.unit} ${i.description.split("\n")[0]}`).join("; ");
 
 /**
  * The one place a query row is created: reference number, Pending status,
  * first history entry, assignment record and audit entry. Used by the staff form
  * and by the website inquiry intake.
  */
-export async function insertQueryRecord(tx: DbOrTx, actorId: string, values: NewQueryRecord) {
+export async function insertQueryRecord(tx: DbOrTx, actorId: string, values: NewQueryRecord, items: RequestedItem[]) {
   const refNo = await nextReference(tx, "RFQ");
   const [query] = await tx
     .insert(queries)
     .values({ ...values, refNo, createdBy: actorId, status: "pending" })
     .returning();
+  await writeRequestedItems(tx, query.id, items);
   await tx.insert(queryStatusHistory).values({ queryId: query.id, fromStatus: null, toStatus: "pending", changedBy: actorId });
   if (query.assignedTo) await tx.insert(queryAssignments).values({ queryId: query.id, assignedTo: query.assignedTo, assignedBy: actorId });
   await recordAudit(tx, {
@@ -101,17 +126,21 @@ export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
             )
           ).id;
 
-    const query = await insertQueryRecord(tx, actor.id, {
-      customerId,
-      source: input.source,
-      title: input.title || titleFrom(input.specifications, category),
-      category,
-      specifications: input.specifications,
-      quantity: input.quantity,
-      priority: input.priority,
-      requiredBy: input.requiredBy ?? null,
-      assignedTo: input.assignedTo ?? null,
-    });
+    const query = await insertQueryRecord(
+      tx,
+      actor.id,
+      {
+        customerId,
+        source: input.source,
+        title: input.title || titleFromItems(input.items, category),
+        category,
+        specifications: input.specifications ?? null,
+        priority: input.priority,
+        requiredBy: input.requiredBy ?? null,
+        assignedTo: input.assignedTo ?? null,
+      },
+      input.items,
+    );
     return query;
   });
 
@@ -125,21 +154,33 @@ export async function updateQuery(actor: SessionUser, id: string, input: UpdateQ
   const existing = await getAccessibleQuery(actor, id);
   if (!canWorkOn(actor, existing)) throw new ForbiddenError("Only the assigned person or a manager can edit this inquiry.");
   if (!(await findCustomer(input.customerId))) throw new DomainError("The selected customer no longer exists.");
+  if (input.customerId !== existing.customerId) {
+    // Sent quotations and invoices were addressed to this customer: they cannot move to another one.
+    const [sent] = await db
+      .select({ id: quotations.id })
+      .from(quotations)
+      .where(and(eq(quotations.queryId, id), isNull(quotations.deletedAt), ne(quotations.status, "draft")))
+      .limit(1);
+    if (sent) throw new DomainError("A quotation was already sent to this customer, so the inquiry cannot move to another customer.");
+  }
   const category = await canonicalCategory(input.category);
   const row = {
     customerId: input.customerId,
     source: input.source,
-    title: input.title || titleFrom(input.specifications, category),
+    title: input.title || titleFromItems(input.items, category),
     category,
-    specifications: input.specifications,
-    quantity: input.quantity,
+    specifications: input.specifications ?? null,
     priority: input.priority,
     requiredBy: input.requiredBy ?? null,
   };
-  const changes = diff(existing, row);
+  const before = await listRequestedItems(id);
+  const oldItems = itemsText(before.map((b) => ({ ...b, quantity: Number(b.quantity) })));
+  const newItems = itemsText(input.items);
+  const changes = diff({ ...existing, items: oldItems }, { ...row, items: newItems });
   if (!changes.changed) return;
   await db.transaction(async (tx) => {
     await tx.update(queries).set(row).where(eq(queries.id, id));
+    await writeRequestedItems(tx, id, input.items);
     await recordAudit(tx, { userId: actor.id, action: "update", entityType: "query", entityId: id, summary: `Edited inquiry ${existing.refNo}`, ...changes });
   });
 }

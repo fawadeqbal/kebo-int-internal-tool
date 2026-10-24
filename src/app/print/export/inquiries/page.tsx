@@ -61,7 +61,7 @@ export default async function InquiriesExport({ searchParams }: { searchParams: 
           <span key="ref" className="font-mono text-[10px] whitespace-nowrap text-stone-900">{r.refNo}</span>,
           <span key="d" className="whitespace-nowrap">{formatDate(r.createdAt)}</span>,
           <Cell key="c" main={r.contactPerson} sub={r.companyName !== r.contactPerson ? r.companyName : r.customerPhone} />,
-          <Cell key="t" main={r.title} sub={[r.category, r.quantity > 1 ? `Qty ${r.quantity}` : null].filter(Boolean).join(" · ")} />,
+          <Cell key="t" main={r.title} sub={[r.category, r.itemCount > 1 ? `${r.itemCount} items` : null].filter(Boolean).join(" · ")} />,
           SOURCE_LABEL[r.source],
           PRIORITY_LABEL[r.priority],
           <span key="s" className={r.status === "completed" ? "font-medium text-emerald-700" : r.status === "pending" ? "font-medium text-amber-700" : undefined}>

@@ -84,21 +84,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               <dl className="flex flex-col divide-y divide-line text-sm">
                 <div className="flex justify-between py-2 first:pt-0">
                   <dt className="text-muted">Total</dt>
-                  <dd className="text-text tabular">{formatMoney(inv.total, settings.currency)}</dd>
+                  <dd className="text-text tabular">{formatMoney(inv.total, inv.currency)}</dd>
                 </div>
                 <div className="flex justify-between py-2 first:pt-0">
                   <dt className="text-muted">Received</dt>
-                  <dd className="text-text tabular">{formatMoney(inv.amountPaid, settings.currency)}</dd>
+                  <dd className="text-text tabular">{formatMoney(inv.amountPaid, inv.currency)}</dd>
                 </div>
                 <div className="flex justify-between pt-2 font-medium text-text">
                   <dt>Balance due</dt>
                   <dd className={display === "overdue" ? "tabular text-bad" : "tabular"}>
-                    {inv.status === "cancelled" ? "—" : formatCents(balance, settings.currency)}
+                    {inv.status === "cancelled" ? "—" : formatCents(balance, inv.currency)}
                   </dd>
                 </div>
               </dl>
               {open && can(user.role, "payments.record") && (
-                <PaymentForm action={recordPaymentAction.bind(null, id)} balance={formatCents(balance, settings.currency)} today={today} />
+                <PaymentForm action={recordPaymentAction.bind(null, id)} balance={formatCents(balance, inv.currency)} today={today} />
               )}
             </CardBody>
           </Card>
@@ -110,16 +110,18 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           {inv.status !== "cancelled" && (
             <Card>
               <CardHeader
-                title="Packing lists"
+                title="Packing list"
                 actions={
-                  <ButtonLink href={`/packing-lists/new?invoice=${id}`} variant="secondary" size="sm">
-                    New
-                  </ButtonLink>
+                  packing.length === 0 && (
+                    <ButtonLink href={`/packing-lists/new?invoice=${id}`} variant="secondary" size="sm">
+                      Create
+                    </ButtonLink>
+                  )
                 }
               />
               <CardBody>
                 {packing.length === 0 ? (
-                  <p className="text-sm text-muted">None yet. Make one when the goods are packed.</p>
+                  <p className="text-sm text-muted">Not made yet. Create it when the goods are packed: the lines come from this invoice.</p>
                 ) : (
                   <ul className="flex flex-col divide-y divide-line text-sm">
                     {packing.map((p) => (
@@ -146,7 +148,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   {detail.payments.map((p) => (
                     <li key={p.id} className="flex justify-between gap-3 py-2 first:pt-0 last:pb-0">
                       <span>
-                        <span className="block font-medium text-text tabular">{formatMoney(p.amount, settings.currency)}</span>
+                        <span className="block font-medium text-text tabular">{formatMoney(p.amount, inv.currency)}</span>
                         <span className="text-xs text-muted">
                           {PAYMENT_METHOD_LABEL[p.method]}
                           {p.reference ? ` · ${p.reference}` : ""} · by {p.recordedBy}

@@ -3,7 +3,7 @@ import { ApiError, apiUser, formBody, handle, idParam, json, parse } from "@/lib
 import { getQuotationDetail } from "@/modules/quotations/repository";
 import { quotationSchema } from "@/modules/quotations/schema";
 import { deleteDraftQuotation, updateQuotation } from "@/modules/quotations/service";
-import { isEditable, QUOTATION_TRANSITIONS } from "@/modules/quotations/workflow";
+import { quotationAbilities, quotationChanges } from "@/modules/documents/abilities";
 
 export const runtime = "nodejs";
 
@@ -14,20 +14,13 @@ export const GET = handle(async (_request: Request, { params }: Ctx) => {
   const id = await idParam(params);
   const detail = await getQuotationDetail(user, id);
   if (!detail) throw new ApiError(404, "Quotation not found");
-  const manage = can(user.role, "quotations.manage");
-  const q = detail.quotation;
-  const activeInvoice = detail.invoices.find((i) => i.status !== "cancelled");
+  const abilities = quotationAbilities(user, detail);
   return json({
     ...detail,
     invoices: can(user.role, "invoices.manage") ? detail.invoices : [],
+    changes: quotationChanges(detail),
     pdf: `/api/quotations/${id}/pdf`,
-    can: {
-      edit: manage && isEditable(q.status),
-      revise: manage && !isEditable(q.status),
-      delete: manage && q.status === "draft",
-      transitions: manage ? QUOTATION_TRANSITIONS[q.status] : [],
-      invoice: q.status === "accepted" && !activeInvoice && can(user.role, "invoices.manage"),
-    },
+    can: { ...abilities, activeInvoice: undefined },
   });
 });
 
