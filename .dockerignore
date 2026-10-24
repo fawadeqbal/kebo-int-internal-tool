@@ -8,3 +8,7 @@ storage
 .git
 tests
 *.log
+# Server-only folders next to the code (backups are readable by the backup service only)
+backups
+# The phone app is built separately (Flutter), not part of the server image
+mobile
