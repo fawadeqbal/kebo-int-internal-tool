@@ -17,7 +17,7 @@ export const GET = handle(async (request: Request) => {
   return json(await listQuotations(user, { ...filters, page: page(sp.page), pageSize: 25 }));
 });
 
-/** { queryId, items: [{description, quantity, unitPrice}], discount, taxRate, dueDate, submittedAt?, terms?, notes? } → draft */
+/** { queryId, items: [{description, quantity, unitPrice}], discount, dueDate, submittedAt?, terms?, notes? } → draft. VAT comes from Settings (none for a VAT-exempt customer); a taxRate sent is ignored. */
 export const POST = handle(async (request: Request) => {
   const user = await apiUser("quotations.manage");
   const body = await formBody(request);

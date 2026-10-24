@@ -64,6 +64,8 @@ export interface CustomerSnapshot {
 }
 export interface CompanySnapshot {
   companyName: string;
+  companyNameLocal?: string;
+  companyEmail2?: string;
   companyAddress: string;
   companyPhone: string;
   companyEmail: string;
@@ -132,6 +134,8 @@ export const customers = pgTable(
     phone: varchar("phone", { length: 40 }).notNull(),
     address: text("address"),
     taxNo: varchar("tax_no", { length: 60 }),
+    /** Export customers etc.: their quotations and invoices carry no VAT. */
+    vatExempt: boolean("vat_exempt").notNull().default(false),
     notes: text("notes"),
     createdBy: uuid("created_by").references(() => users.id),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -354,6 +358,8 @@ export const quotations = pgTable(
     subtotal: money("subtotal"),
     discount: money("discount"),
     taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    /** VAT as set when the document was made: true = the prices already include it (Total incl. VAT), false = added on top. */
+    pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
     taxAmount: money("tax_amount"),
     total: money("total"),
     dueDate: date("due_date", { mode: "string" }).notNull(),
@@ -423,6 +429,8 @@ export const invoices = pgTable(
     subtotal: money("subtotal"),
     discount: money("discount"),
     taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+    /** VAT as set when the document was made: true = the prices already include it (Total incl. VAT), false = added on top. */
+    pricesIncludeVat: boolean("prices_include_vat").notNull().default(false),
     taxAmount: money("tax_amount"),
     total: money("total"),
     amountPaid: money("amount_paid"),

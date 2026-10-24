@@ -39,7 +39,7 @@ export function PackingListDocument({ detail, settings: live }: { detail: Packin
   const types = [...new Set(detail.items.filter((i) => i.packages > 0).map((i) => i.packageType.toLowerCase()))];
 
   return (
-    <article className="relative mx-auto w-full max-w-[210mm] bg-white px-5 py-6 text-[12.5px] leading-relaxed text-stone-800 [print-color-adjust:exact] sm:px-12 sm:py-11 print:p-0">
+    <article className="relative mx-auto w-full max-w-[210mm] bg-white font-doc px-5 py-6 text-[12.5px] leading-relaxed text-stone-800 [print-color-adjust:exact] sm:px-12 sm:py-11 print:p-0">
       <Letterhead settings={settings} title="Packing list" number={pl.plNo} />
 
       <section className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -74,7 +74,7 @@ export function PackingListDocument({ detail, settings: live }: { detail: Packin
       {/* Lines: a table on paper and wide screens, stacked on a phone */}
       <table className="mt-3 hidden w-full border-collapse sm:table">
         <thead>
-          <tr className="bg-stone-900 text-left text-[10px] tracking-[0.1em] text-white uppercase">
+          <tr className="bg-kebo text-left text-[10px] tracking-[0.1em] text-white uppercase">
             <th className="w-9 py-2.5 pl-3 font-semibold">No.</th>
             <th className="py-2.5 pr-3 font-semibold">Description of goods</th>
             <th className="w-20 py-2.5 pr-3 text-right font-semibold">Qty</th>
@@ -88,7 +88,7 @@ export function PackingListDocument({ detail, settings: live }: { detail: Packin
           {detail.items.map((it, i) => {
             const [name, ...rest] = it.description.split("\n");
             return (
-              <tr key={it.id} className="border-b border-stone-200 align-top">
+              <tr key={it.id} className="border-b border-kebo-line align-top">
                 <td className="py-2.5 pl-3 text-stone-500 tabular-nums">{i + 1}</td>
                 <td className="py-2.5 pr-3">
                   <p className="font-medium text-stone-900">{name}</p>
@@ -116,7 +116,7 @@ export function PackingListDocument({ detail, settings: live }: { detail: Packin
           })}
         </tbody>
         <tfoot className="[display:table-row-group]">
-          <tr className="border-t-2 border-stone-900 font-semibold text-stone-900">
+          <tr className="border-t-2 border-kebo font-semibold text-stone-900">
             <td />
             <td className="py-2.5 pr-3 text-[11px] tracking-[0.12em] uppercase">Total</td>
             <td />
@@ -127,7 +127,7 @@ export function PackingListDocument({ detail, settings: live }: { detail: Packin
           </tr>
         </tfoot>
       </table>
-      <ol className="mt-4 divide-y divide-stone-200 border-y border-stone-900 sm:hidden">
+      <ol className="mt-4 divide-y divide-kebo-line border-y-2 border-kebo sm:hidden">
         {detail.items.map((it, i) => {
           const [name, ...rest] = it.description.split("\n");
           return (
@@ -151,14 +151,14 @@ export function PackingListDocument({ detail, settings: live }: { detail: Packin
       </ol>
 
       {/* Totals band */}
-      <section className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-md bg-stone-900 text-white sm:grid-cols-4">
+      <section className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-md bg-kebo-deep text-white sm:grid-cols-4">
         {[
           { k: "Total packages", v: String(t.packages) },
           { k: "Net weight", v: formatKg(t.netKg) },
           { k: "Gross weight", v: formatKg(t.grossKg) },
           { k: "Volume", v: formatCbm(t.cbm) },
         ].map((x) => (
-          <div key={x.k} className="bg-stone-900 px-3 py-2.5">
+          <div key={x.k} className="bg-kebo-deep px-3 py-2.5">
             <p className="text-[10px] font-semibold tracking-[0.12em] text-stone-300 uppercase">{x.k}</p>
             <p className="text-[14px] font-bold tabular-nums">{x.v}</p>
           </div>
@@ -176,13 +176,13 @@ export function PackingListDocument({ detail, settings: live }: { detail: Packin
           {(pl.marks || pl.notes) && (
             <div className={cn("grid gap-4", pl.marks && pl.notes && "sm:grid-cols-2")}>
               {pl.marks && (
-                <div className="rounded-md border border-stone-200 p-3.5">
+                <div className="rounded-md border border-kebo-line p-3.5">
                   <p className={label}>Shipping marks & numbers</p>
                   <p className="mt-1 font-mono text-[12px] whitespace-pre-wrap text-stone-900">{pl.marks}</p>
                 </div>
               )}
               {pl.notes && (
-                <div className="rounded-md border border-stone-200 p-3.5">
+                <div className="rounded-md border border-kebo-line p-3.5">
                   <p className={label}>Remarks</p>
                   <p className="mt-1 whitespace-pre-wrap text-stone-700">{pl.notes}</p>
                 </div>

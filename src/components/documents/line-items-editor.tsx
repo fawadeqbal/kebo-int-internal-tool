@@ -19,7 +19,7 @@ export type { EditableLine };
 export function LineItemsEditor({
   initialItems,
   initialDiscount = "0",
-  initialTaxRate = "0",
+  vat = { rate: 0, included: false },
   currency = "USD",
   errors,
   priced = true,
@@ -30,7 +30,8 @@ export function LineItemsEditor({
 }: {
   initialItems: EditableLine[];
   initialDiscount?: string;
-  initialTaxRate?: string;
+  /** The VAT from Settings (never typed here): rate, whether prices include it, and whether the customer is exempt. */
+  vat?: { rate: number; included: boolean; exempt?: boolean };
   currency?: string;
   errors?: Record<string, string[] | undefined>;
   /** false = requested items: no prices or totals. */
@@ -46,7 +47,6 @@ export function LineItemsEditor({
     initialItems.length ? initialItems : [emptyLine()],
   );
   const [discount, setDiscount] = useState(initialDiscount);
-  const [taxRate, setTaxRate] = useState(initialTaxRate);
   const [marginText, setMarginText] = useState<Record<number, string>>({});
   const [costOpen, setCostOpen] = useState<Set<number>>(
     () => new Set(initialItems.flatMap((l, i) => (l.unitCost ? [i] : []))),
@@ -56,8 +56,9 @@ export function LineItemsEditor({
       new Set(initialItems.flatMap((l, i) => (l.model || l.hsCode ? [i] : []))),
   );
   const totals = useMemo(
-    () => calculateTotals(priced ? items : [], discount, taxRate),
-    [items, discount, taxRate, priced],
+    () =>
+      calculateTotals(priced ? items : [], discount, vat.rate, vat.included),
+    [items, discount, vat.rate, vat.included, priced],
   );
   const update = (i: number, patch: Partial<EditableLine>) =>
     setItems((prev) =>
@@ -74,16 +75,17 @@ export function LineItemsEditor({
                 unitPrice: i.unitPrice,
                 unitCost: i.unitCost ?? null,
               })),
+            vat,
           )
         : null,
-    [items, costing],
+    [items, costing, vat],
   );
   const setMargin = (i: number, text: string) => {
     setMarginText((m) => ({ ...m, [i]: text }));
     const cost = Number(items[i].unitCost);
     const m = Number(text);
     if (text !== "" && Number.isFinite(m) && m < 95 && cost > 0)
-      update(i, { unitPrice: String(priceForMargin(cost, m)) });
+      update(i, { unitPrice: String(priceForMargin(cost, m, vat)) });
   };
   const remove = (i: number) => {
     setItems((prev) =>
@@ -273,6 +275,7 @@ export function LineItemsEditor({
                             marginPercent(
                               Number(item.unitPrice),
                               Number(item.unitCost),
+                              vat,
                             ) ?? "",
                           )
                         : "")
@@ -339,36 +342,40 @@ export function LineItemsEditor({
               onChange={(e) => setDiscount(e.target.value)}
             />
           </Field>
-          <Field
-            label="Tax rate (%)"
-            htmlFor="taxRate"
-            error={errors?.taxRate}
-            hint="0 if no tax applies"
-          >
-            <Input
-              id="taxRate"
-              name="taxRate"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              inputMode="decimal"
-              value={taxRate}
-              onChange={(e) => setTaxRate(e.target.value)}
-            />
-          </Field>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted">Tax</span>
-            <span className="tabular">
-              {formatCents(totals.taxAmount, currency)}
-            </span>
-          </div>
+          {!vat.included && (vat.rate > 0 || vat.exempt) && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">
+                {vat.exempt ? "VAT (customer exempt)" : `VAT ${vat.rate}%`}
+              </span>
+              <span className="tabular">
+                {formatCents(totals.taxAmount, currency)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between border-t border-line pt-3 text-base font-semibold text-text">
-            <span>Total</span>
+            <span>
+              {vat.included && vat.rate > 0 ? "Total incl. VAT" : "Total"}
+            </span>
             <span className="tabular">
               {formatCents(totals.total, currency)}
             </span>
           </div>
+          {vat.included && (
+            <div className="-mt-2 flex justify-between text-xs text-muted">
+              <span>
+                {vat.exempt
+                  ? "No VAT (customer exempt)"
+                  : `of which VAT ${vat.rate}%`}
+              </span>
+              <span className="tabular">
+                {formatCents(totals.taxAmount, currency)}
+              </span>
+            </div>
+          )}
+          <p className="text-xs text-muted">
+            VAT is set by the super admin in Settings
+            {vat.exempt ? "; this customer is VAT exempt" : ""}.
+          </p>
           {summary && summary.costCents > 0 && (
             <div className="grid gap-1 rounded-lg border border-dashed border-line-strong p-3 text-xs">
               <p className="font-medium text-text-2">Internal, not printed</p>

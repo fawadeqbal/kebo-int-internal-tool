@@ -39,6 +39,7 @@ export default async function NewQuotationPage({ searchParams }: { searchParams:
           costing={can(user.role, "sourcing.manage")}
           submitLabel="Save as draft"
           initial={draft.initial}
+          vat={draft.vat}
         />
       </div>
     </>

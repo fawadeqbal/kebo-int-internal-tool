@@ -29,7 +29,9 @@ export const GET = handle(async () => {
     },
     currency: settings.currency,
     defaults: {
-      taxRate: settings.defaultTaxRate,
+      taxRate: settings.vatRate,
+      vatRate: settings.vatRate,
+      pricesIncludeVat: settings.pricesIncludeVat,
       quotationValidityDays: settings.quotationValidityDays,
       invoicePaymentDays: settings.invoicePaymentDays,
       quotationTerms: settings.defaultQuotationTerms,

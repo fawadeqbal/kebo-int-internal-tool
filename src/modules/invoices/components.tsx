@@ -1,39 +1,37 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, ButtonLink, Card, CardBody, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/client";
-import { LineItemsEditor, type EditableLine } from "@/components/documents/line-items-editor";
 import { PAYMENT_METHOD_LABEL } from "@/lib/labels";
 import type { ActionState } from "@/lib/utils/result";
 
 type Action = (prev: ActionState, formData: FormData) => Promise<ActionState>;
 
+/**
+ * Issuing an invoice asks only for what belongs to it: the dates and a note.
+ * The lines, prices, discount and VAT are the accepted quotation's (`lines`,
+ * shown read-only), so the invoice always matches what the customer accepted.
+ */
 export function InvoiceForm({
   action,
   initial,
-  currency,
+  lines,
   cancelHref,
 }: {
   action: Action;
-  initial: { items: EditableLine[]; discount: string; taxRate: string; issueDate: string; dueDate: string; notes: string };
-  currency: string;
+  initial: { issueDate: string; dueDate: string; notes: string };
+  /** The accepted quotation's lines and totals, read-only. */
+  lines: ReactNode;
   cancelHref: string;
 }) {
   const [state, formAction] = useActionState(action, {});
   const e = state.errors ?? {};
-  const v = (key: keyof typeof initial) => (state.values?.[key] as string | undefined) ?? (initial[key] as string);
-  const items = state.values?.items ? (JSON.parse(state.values.items as string) as EditableLine[]) : initial.items;
+  const v = (key: keyof typeof initial) => (state.values?.[key] as string | undefined) ?? initial[key];
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
-      <Alert tone="info">Copied from the accepted quotation. Check it now: once issued, an invoice can only be cancelled, not edited.</Alert>
-      <Card>
-        <CardHeader title="Lines & totals" />
-        <CardBody>
-          <LineItemsEditor initialItems={items} initialDiscount={v("discount")} initialTaxRate={v("taxRate")} currency={currency} errors={e} />
-        </CardBody>
-      </Card>
+      {lines}
       <Card>
         <CardHeader title="Dates" />
         <CardBody className="grid gap-5 sm:grid-cols-2">

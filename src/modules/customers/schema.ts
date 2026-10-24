@@ -29,6 +29,11 @@ export const customerSchema = z.object({
     .optional(),
   address: optional(500),
   taxNo: optional(60),
+  /** Their documents carry no VAT (e.g. export). Left out = unchanged. Only managers and the super admin can set it. */
+  vatExempt: z.preprocess((v) => {
+    const last = Array.isArray(v) ? v.at(-1) : v;
+    return last === undefined || last === null ? undefined : last === "on" || last === true || last === "true";
+  }, z.boolean().optional()),
   notes: optional(2000),
   allowDuplicate: z.string().optional(),
 });

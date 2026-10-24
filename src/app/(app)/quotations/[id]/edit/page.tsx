@@ -8,6 +8,7 @@ import { updateQuotationAction } from "@/modules/quotations/actions";
 import { QuotationForm } from "@/modules/quotations/components";
 import { isEditable } from "@/modules/quotations/workflow";
 import { quotationEditValues } from "@/modules/documents/drafts";
+import { vatForCustomer } from "@/modules/documents/vat";
 import { PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Edit quotation" };
@@ -35,6 +36,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
           costing={can(user.role, "sourcing.manage")}
           submitLabel="Save changes"
           initial={quotationEditValues(detail)}
+          vat={await vatForCustomer(detail.query.customerId)}
         />
       </div>
     </>

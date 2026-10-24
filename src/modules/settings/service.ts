@@ -43,9 +43,13 @@ export const ratesText = (r: Record<string, number>) =>
 
 export const settingsSchema = z.object({
   companyName: z.string().trim().min(1, "Company name is required").max(200),
+  /** The Chinese name, printed above the English one as on the business card. */
+  companyNameLocal: z.string().trim().max(120).default(""),
   companyAddress: z.string().trim().max(500).default(""),
   companyPhone: z.string().trim().max(60).default(""),
   companyEmail: z.union([z.literal(""), z.email("Enter a valid email")]).default(""),
+  /** A second email printed beside the first. */
+  companyEmail2: z.union([z.literal(""), z.email("Enter a valid email")]).default(""),
   companyTaxNo: z.string().trim().max(60).default(""),
   companyWebsite: z.string().trim().max(120).default(""),
   /** Printed on invoices so the customer can pay by T/T. */
@@ -55,7 +59,10 @@ export const settingsSchema = z.object({
   exchangeRates: rateLines.default({ CNY: 7.1 }),
   /** Margin new quotation lines start with when priced from a factory offer (% of the selling price). */
   defaultMarginPercent: z.coerce.number().min(0, "Margin cannot be negative").max(95, "Margin must be under 95%").default(15),
-  defaultTaxRate: z.coerce.number().min(0, "Tax cannot be negative").max(100, "Tax cannot exceed 100%"),
+  /** The one VAT on quotations and invoices (set by the super admin). Customers marked VAT exempt get none. */
+  vatRate: z.coerce.number({ message: "Enter the VAT rate" }).min(0, "VAT cannot be negative").max(100, "VAT cannot exceed 100%").default(0),
+  /** true: our prices already include VAT (documents show "of which VAT"); false: VAT is added on top. */
+  pricesIncludeVat: checkbox.default(false),
   quotationValidityDays: z.coerce.number().int().min(1).max(365),
   invoicePaymentDays: z.coerce.number().int().min(0).max(365),
   reminderPendingDays: z.coerce.number().int().min(1).max(90),
@@ -92,16 +99,19 @@ export const DEFAULT_CATEGORIES = [
 
 export const DEFAULT_SETTINGS: AppSettings = {
   companyName: "Shandong Kebo International Trade Co., Ltd.",
+  companyNameLocal: "山东科波国际贸易有限公司",
   companyAddress: "No. 5, Jielu Road, High-tech Zone, Jining, Shandong, China",
   companyPhone: "+86 151 5475 4812",
   companyEmail: "info@keboint.com",
+  companyEmail2: "shandongkeboint@gmail.com",
   companyTaxNo: "",
   companyWebsite: "www.keboint.com",
   bankDetails: "",
   currency: "USD",
   exchangeRates: { CNY: 7.1 },
   defaultMarginPercent: 15,
-  defaultTaxRate: 0,
+  vatRate: 0,
+  pricesIncludeVat: false,
   quotationValidityDays: 15,
   invoicePaymentDays: 30,
   reminderPendingDays: 1,
@@ -123,8 +133,10 @@ const SETTINGS_KEY = "app";
 
 export async function loadSettings(tx: DbOrTx = db): Promise<AppSettings> {
   const rows = await tx.select().from(settings);
-  const stored = rows.find((r) => r.key === SETTINGS_KEY)?.value as Partial<AppSettings> | undefined;
-  return { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+  const stored = rows.find((r) => r.key === SETTINGS_KEY)?.value as (Partial<AppSettings> & { defaultTaxRate?: number }) | undefined;
+  const { defaultTaxRate, ...rest } = stored ?? {};
+  // Settings saved before there was one VAT kept it as "default tax rate".
+  return { ...DEFAULT_SETTINGS, ...(defaultTaxRate !== undefined && rest.vatRate === undefined ? { vatRate: Number(defaultTaxRate) } : {}), ...rest };
 }
 
 /**

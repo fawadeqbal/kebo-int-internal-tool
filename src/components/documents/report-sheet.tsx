@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { AppSettings } from "@/modules/settings/service";
 import { cn } from "@/lib/utils/cn";
+import { KeboLogo } from "./document-view";
 
 /**
  * A printed report (list exports and the Reports page). Built for paper:
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils/cn";
  * and the page footer carries "Page x of y".
  */
 
-export const reportLabel = "text-[9px] font-semibold tracking-[0.14em] text-stone-500 uppercase";
+export const reportLabel = "text-[9px] font-semibold tracking-[0.14em] text-kebo uppercase";
 
 export function ReportSheet({
   settings,
@@ -43,7 +44,7 @@ export function ReportSheet({
   return (
     <article
       className={cn(
-        "mx-auto w-full bg-white p-8 text-[11px] leading-normal text-stone-800 [print-color-adjust:exact] print:p-0",
+        "mx-auto w-full bg-white p-8 font-doc text-[11px] leading-normal text-stone-800 [print-color-adjust:exact] print:p-0",
         landscape ? "max-w-[297mm]" : "max-w-[210mm]",
       )}
     >
@@ -51,23 +52,21 @@ export function ReportSheet({
       {landscape && <style>{"@page { size: A4 landscape; margin: 14mm 12mm; }"}</style>}
       <header className="flex items-start justify-between gap-6">
         <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded bg-stone-900 text-white" aria-hidden>
-            <svg viewBox="0 0 32 32" className="size-4">
-              <path d="M8 10h16M8 16h11M8 22h7" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" />
-            </svg>
-          </span>
+          <KeboLogo className="size-[44px]" />
           <div>
-            <p className="text-[13px] leading-tight font-bold text-stone-900">{settings.companyName}</p>
+            {settings.companyNameLocal && <p className="font-doc-display text-[12px] leading-tight font-bold text-kebo">{settings.companyNameLocal}</p>}
+            <p className="font-doc-display text-[13px] leading-tight font-bold text-kebo-ink">{settings.companyName}</p>
             <p className="text-stone-500">{[settings.companyAddress.split("\n")[0], settings.companyPhone, settings.companyEmail].filter(Boolean).join("  ·  ")}</p>
           </div>
         </div>
         <div className="shrink-0 text-right whitespace-nowrap">
           <p className={reportLabel}>{kind}</p>
-          <p className="text-[20px] leading-tight font-semibold tracking-tight text-stone-900">{title}</p>
+          <p className="font-doc-display text-[20px] leading-tight font-bold tracking-tight text-kebo">{title}</p>
           {period && <p className="mt-0.5 font-medium text-stone-700">{period}</p>}
         </div>
       </header>
-      <div className="mt-4 h-[2px] bg-stone-900" />
+      <div className="mt-4 h-[3px] rounded-full bg-gradient-to-r from-kebo-deep via-kebo to-kebo-2" />
+      <div className="mt-[2px] h-[2px] bg-kebo-gold" />
 
       <dl className={cn("mt-3 grid gap-x-6 gap-y-1.5 border-b border-stone-200 pb-3", landscape ? "grid-cols-[auto_auto_auto_1fr]" : "grid-cols-[auto_auto_1fr]")}>
         <div>
@@ -126,7 +125,7 @@ export function ReportTable({ columns, rows, footer, empty = "Nothing to show." 
   return (
     <table className="w-full border-collapse">
       <thead>
-        <tr className="bg-stone-900 text-white">
+        <tr className="bg-kebo text-white">
           {columns.map((c) => (
             <th key={c.header} className={cn("px-2 py-1.5 text-[8.5px] font-semibold tracking-[0.08em] uppercase first:pl-2.5 last:pr-2.5", align(c.align), c.className)}>
               {c.header}
@@ -143,7 +142,7 @@ export function ReportTable({ columns, rows, footer, empty = "Nothing to show." 
           </tr>
         ) : (
           rows.map((cells, i) => (
-            <tr key={i} className="border-b border-stone-200 align-top even:bg-stone-50">
+            <tr key={i} className="border-b border-kebo-line align-top even:bg-kebo-paper">
               {cells.map((cell, j) => (
                 <td key={j} className={cn("px-2 py-1 first:pl-2.5 last:pr-2.5", align(columns[j]?.align), columns[j]?.align === "right" && "tabular-nums whitespace-nowrap", columns[j]?.className)}>
                   {cell}
@@ -194,7 +193,7 @@ export function Cell({ main, sub, mono }: { main: ReactNode; sub?: ReactNode; mo
 export function Bar({ value, max, className }: { value: number; max: number; className?: string }) {
   return (
     <span className="block h-1.5 w-full rounded-full bg-stone-200">
-      <span className={cn("block h-1.5 rounded-full bg-stone-800", className)} style={{ width: `${max > 0 ? Math.max(value > 0 ? 3 : 0, (value / max) * 100) : 0}%` }} />
+      <span className={cn("block h-1.5 rounded-full bg-kebo", className)} style={{ width: `${max > 0 ? Math.max(value > 0 ? 3 : 0, (value / max) * 100) : 0}%` }} />
     </span>
   );
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isoDate, lineItemsField, moneyField, taxRateField } from "@/lib/line-items";
+import { isoDate, lineItemsField, moneyField } from "@/lib/line-items";
 
 const optionalText = (max: number) =>
   z
@@ -14,7 +14,6 @@ export const quotationSchema = z
   .object({
     items: lineItemsField,
     discount: moneyField("discount").default(0),
-    taxRate: taxRateField,
     dueDate: isoDate("Choose the valid-until date"),
     submittedAt: z
       .string()

@@ -64,6 +64,13 @@ describe("profit", () => {
     expect(totals(ls).documents).toBe(2);
   });
 
+  it("takes our VAT out when the prices include it", () => {
+    const t = totals(costLines([line({ lineTotalCents: 113_000, docSubtotalCents: 113_000, docVatRate: 13, docPricesIncludeVat: true, unitCost: 850 })]));
+    expect(t.revenueCents).toBe(100_000);
+    expect(t.profitCents).toBe(15_000);
+    expect(t.marginPercent).toBe(15);
+  });
+
   it("handles nothing costed", () => {
     const t = totals(costLines([line({ lineTotalCents: 5000, docSubtotalCents: 5000 })]));
     expect(t.marginPercent).toBeNull();

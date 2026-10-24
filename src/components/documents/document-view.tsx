@@ -34,7 +34,7 @@ export interface DocumentProps {
   /** One line on what the document is for, e.g. the inquiry title. */
   subject?: string | null;
   items: DocLine[];
-  totals: { subtotal: string; discount: string; taxRate: string; taxAmount: string; total: string; amountPaid?: string };
+  totals: { subtotal: string; discount: string; taxRate: string; taxAmount: string; total: string; amountPaid?: string; pricesIncludeVat?: boolean };
   terms?: string | null;
   /** Invoice only: how to pay. */
   payment?: { bankDetails: string; dueDate: string; paidInFull: boolean };
@@ -45,7 +45,7 @@ export interface DocumentProps {
   stamp?: { label: string; tone: "draft" | "paid" | "void" } | null;
 }
 
-const label = "text-[10px] font-semibold tracking-[0.12em] text-stone-500 uppercase";
+const label = "text-[10px] font-semibold tracking-[0.12em] text-kebo uppercase";
 
 /**
  * The printed quotation / invoice. One layout for the screen preview, the
@@ -61,7 +61,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
   const title = kind === "Invoice" ? "Invoice" : "Quotation";
 
   return (
-    <article className="relative mx-auto w-full max-w-[210mm] bg-white px-5 py-6 text-[12.5px] leading-relaxed text-stone-800 [print-color-adjust:exact] sm:px-12 sm:py-11 print:p-0">
+    <article className="relative mx-auto w-full max-w-[210mm] bg-white font-doc px-5 py-6 text-[12.5px] leading-relaxed text-stone-800 [print-color-adjust:exact] sm:px-12 sm:py-11 print:p-0">
       <Watermark stamp={stamp} />
 
       <Letterhead settings={settings} title={title} number={number} stamp={stamp} />
@@ -81,7 +81,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
       {/* Line items: a table on paper and wide screens, stacked on a phone */}
       <table className="mt-4 hidden w-full border-collapse sm:table">
         <thead>
-          <tr className="bg-stone-900 text-left text-[10px] tracking-[0.1em] text-white uppercase">
+          <tr className="bg-kebo text-left text-[10px] tracking-[0.1em] text-white uppercase">
             <th className="w-10 py-2.5 pl-3 font-semibold">No.</th>
             <th className="py-2.5 pr-3 font-semibold">Description</th>
             <th className="w-20 py-2.5 pr-3 text-right font-semibold">Qty</th>
@@ -93,7 +93,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
           {items.map((it, i) => {
             const [name, ...rest] = it.description.split("\n");
             return (
-              <tr key={i} className="border-b border-stone-200 align-top">
+              <tr key={i} className="border-b border-kebo-line align-top">
                 <td className="py-3 pl-3 text-stone-500 tabular-nums">{i + 1}</td>
                 <td className="py-3 pr-3">
                   <p className="font-medium text-stone-900">{name}</p>
@@ -108,7 +108,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
           })}
         </tbody>
       </table>
-      <ol className="mt-4 divide-y divide-stone-200 border-y border-stone-900 sm:hidden">
+      <ol className="mt-4 divide-y divide-kebo-line border-y-2 border-kebo sm:hidden">
         {items.map((it, i) => {
           const [name, ...rest] = it.description.split("\n");
           return (
@@ -147,16 +147,25 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
               <dd className="tabular-nums">− {formatMoney(totals.discount, c)}</dd>
             </div>
           )}
-          {(tax > 0 || Number(totals.taxRate) > 0) && (
+          {!totals.pricesIncludeVat && (tax > 0 || Number(totals.taxRate) > 0) && (
             <div className="flex justify-between gap-4">
-              <dt className="text-stone-500">Tax ({Number(totals.taxRate)}%)</dt>
+              <dt className="text-stone-500">VAT ({Number(totals.taxRate)}%)</dt>
               <dd className="tabular-nums">{formatMoney(totals.taxAmount, c)}</dd>
             </div>
           )}
-          <div className="!mt-2.5 flex items-baseline justify-between gap-4 rounded-md bg-stone-900 px-3 py-2.5 text-white">
-            <dt className="text-[11px] font-semibold tracking-[0.12em] uppercase">Total {c}</dt>
+          <div className="!mt-2.5 flex items-baseline justify-between gap-4 rounded-md bg-kebo-deep px-3 py-2.5 text-white">
+            <dt className="text-[11px] font-semibold tracking-[0.12em] uppercase">
+              Total {c}
+              {totals.pricesIncludeVat && Number(totals.taxRate) > 0 && <span className="font-normal normal-case"> incl. VAT</span>}
+            </dt>
             <dd className="text-[15px] font-bold tabular-nums">{formatMoney(totals.total, c)}</dd>
           </div>
+          {totals.pricesIncludeVat && (tax > 0 || Number(totals.taxRate) > 0) && (
+            <div className="flex justify-between gap-4 px-3 text-[11px] text-stone-500">
+              <dt>of which VAT ({Number(totals.taxRate)}%)</dt>
+              <dd className="tabular-nums">{formatMoney(totals.taxAmount, c)}</dd>
+            </div>
+          )}
           {kind === "Invoice" && paid > 0 && (
             <>
               <div className="flex justify-between gap-4 px-3 pt-1">
@@ -174,7 +183,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
 
       {/* Payment instructions (invoice) */}
       {payment && (
-        <section className="mt-6 grid gap-4 rounded-md border border-stone-200 p-4 break-inside-avoid sm:grid-cols-[1fr_auto]">
+        <section className="mt-6 grid gap-4 rounded-md border border-kebo-line p-4 break-inside-avoid sm:grid-cols-[1fr_auto]">
           <div>
             <p className={label}>Payment by bank transfer (T/T)</p>
             {payment.bankDetails ? (
@@ -186,7 +195,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
               Please quote <span className="font-mono font-semibold text-stone-900">{number}</span> as the payment reference. Bank charges are borne by the remitter.
             </p>
           </div>
-          <div className="flex flex-col justify-between gap-6 sm:w-60 sm:border-l sm:border-stone-200 sm:pl-5">
+          <div className="flex flex-col justify-between gap-6 sm:w-60 sm:border-l sm:border-kebo-line sm:pl-5">
             <div>
               <p className={label}>{payment.paidInFull ? "Status" : "Payment due"}</p>
               <p className="mt-1.5 text-[14px] font-semibold text-stone-900">{payment.paidInFull ? "Paid in full" : formatDate(payment.dueDate)}</p>
@@ -204,7 +213,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
       {(terms || (!payment && bankDetails)) && (
         <section className={cn("mt-6 grid gap-5 break-inside-avoid", !payment && bankDetails && terms && "sm:grid-cols-2")}>
           {!payment && bankDetails && (
-            <div className="rounded-md border border-stone-200 p-3.5">
+            <div className="rounded-md border border-kebo-line p-3.5">
               <p className={label}>Bank details for payment (T/T)</p>
               <p className="mt-1 whitespace-pre-line text-stone-800">{bankDetails}</p>
               <p className="mt-1.5 text-stone-600">
@@ -238,7 +247,7 @@ export function DocumentView({ kind, number, settings, currency, customer, meta,
         </section>
       )}
 
-      {footer && <footer className="mt-6 border-t border-stone-200 pt-3 text-center text-[11px] font-medium text-stone-700">{footer}</footer>}
+      {footer && <footer className="mt-6 border-t border-kebo-line pt-3 text-center text-[11px] font-medium text-stone-700">{footer}</footer>}
     </article>
   );
 }
@@ -257,28 +266,46 @@ export function Watermark({ stamp }: { stamp: Stamp }) {
   );
 }
 
-/** Company letterhead with the document title and number (shared by every printed document). */
+/** The KEBO logo, served by the app (so PDFs never depend on the website). */
+export function KeboLogo({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element -- printed by Chrome; a plain image is the most reliable there
+  return <img src="/brand/kebo-logo.png" alt="KEBO International" width={360} height={360} className={cn("shrink-0 object-contain", className)} />;
+}
+
+/**
+ * Company letterhead with the document title and number (shared by every
+ * printed document), in the brand of keboint.com: the KEBO logo, the Chinese
+ * and English names as on the business card, the contacts, and the blue rule
+ * with the gold line under it.
+ */
 export function Letterhead({ settings, title, number, stamp }: { settings: AppSettings; title: string; number: string; stamp?: Stamp }) {
-  const contact = [settings.companyPhone, settings.companyEmail, settings.companyWebsite].filter(Boolean);
+  const emails = [settings.companyEmail, settings.companyEmail2].filter(Boolean);
+  const row = (k: string, v: ReactNode) => (
+    <p className="flex gap-1.5">
+      <span className="w-[88px] shrink-0 text-kebo">{k}</span>
+      <span className="min-w-0 text-stone-700">{v}</span>
+    </p>
+  );
   return (
     <>
       <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-md bg-stone-900 text-white" aria-hidden>
-            <svg viewBox="0 0 32 32" className="size-5">
-              <path d="M8 10h16M8 16h11M8 22h7" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" />
-            </svg>
-          </span>
+        <div className="flex items-start gap-3.5">
+          <KeboLogo className="size-[68px]" />
           <div className="min-w-0">
-            <p className="text-[15px] leading-tight font-bold tracking-tight text-stone-900">{settings.companyName}</p>
-            {settings.companyAddress && <p className="mt-1 whitespace-pre-line text-stone-600">{settings.companyAddress}</p>}
-            {contact.length > 0 && <p className="text-stone-600">{contact.join("  ·  ")}</p>}
-            {settings.companyTaxNo && <p className="text-stone-600">Tax / Reg. no. {settings.companyTaxNo}</p>}
+            {settings.companyNameLocal && <p className="font-doc-display text-[16px] leading-tight font-bold tracking-wide text-kebo">{settings.companyNameLocal}</p>}
+            <p className="font-doc-display text-[14px] leading-tight font-bold text-kebo-ink">{settings.companyName}</p>
+            <div className="mt-1.5 space-y-px text-[10.5px] leading-snug">
+              {settings.companyAddress && row("Address", <span className="whitespace-pre-line">{settings.companyAddress}</span>)}
+              {settings.companyPhone && row("Tel / WhatsApp", settings.companyPhone)}
+              {emails.length > 0 && row("Email", emails.join("  ·  "))}
+              {settings.companyWebsite && row("Website", settings.companyWebsite)}
+              {settings.companyTaxNo && row("Tax / Reg. no.", settings.companyTaxNo)}
+            </div>
           </div>
         </div>
         <div className="sm:text-right">
-          <p className="text-[26px] leading-none font-light tracking-[0.22em] text-stone-900 uppercase">{title}</p>
-          <p className="mt-2 font-mono text-[13px] font-semibold text-stone-900">No. {number}</p>
+          <p className="font-doc-display text-[26px] leading-none font-extrabold tracking-[0.14em] text-kebo uppercase">{title}</p>
+          <p className="mt-2 font-mono text-[13px] font-semibold text-kebo-ink">No. {number}</p>
           {stamp && (
             <p
               className={cn(
@@ -293,7 +320,8 @@ export function Letterhead({ settings, title, number, stamp }: { settings: AppSe
           )}
         </div>
       </header>
-      <div className="mt-6 h-[3px] bg-stone-900" />
+      <div className="mt-5 h-[4px] rounded-full bg-gradient-to-r from-kebo-deep via-kebo to-kebo-2" />
+      <div className="mt-[2px] h-[2px] bg-kebo-gold" />
     </>
   );
 }
@@ -303,7 +331,7 @@ type Party = { companyName: string | null; contactPerson: string; phone: string;
 /** A customer (or consignee) box. */
 export function PartyBox({ title, customer }: { title: string; customer: Party }) {
   return (
-    <div className="rounded-md border border-stone-200 p-4">
+    <div className="rounded-md border border-kebo-line p-4">
       <p className={label}>{title}</p>
       <p className="mt-1.5 text-[13.5px] font-semibold text-stone-900">{customer.companyName || customer.contactPerson}</p>
       {customer.companyName && <p>Attn: {customer.contactPerson}</p>}
@@ -318,7 +346,7 @@ export function PartyBox({ title, customer }: { title: string; customer: Party }
 /** The grey label/value box (dates, references, shipment details). */
 export function DetailsBox({ title, rows }: { title: string; rows: { label: string; value: ReactNode }[] }) {
   return (
-    <div className="rounded-md border border-stone-200 bg-stone-50 p-4">
+    <div className="rounded-md border border-kebo-line bg-kebo-paper p-4">
       <p className={label}>{title}</p>
       <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {rows.map((m) => (

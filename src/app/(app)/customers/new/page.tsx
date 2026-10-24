@@ -6,13 +6,13 @@ import { Card, CardBody, PageHeader } from "@/components/ui";
 export const metadata = { title: "Add customer" };
 
 export default async function NewCustomerPage() {
-  await requirePagePermission("customers.manage");
+  const user = await requirePagePermission("customers.manage");
   return (
     <>
       <PageHeader title="Add customer" backHref="/customers" backLabel="Customers" />
       <Card className="max-w-3xl">
         <CardBody>
-          <CustomerForm action={createCustomerAction} cancelHref="/customers" />
+          <CustomerForm action={createCustomerAction} cancelHref="/customers" canSetVat={user.role !== "staff"} />
         </CardBody>
       </Card>
     </>

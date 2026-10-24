@@ -71,6 +71,13 @@
       "when": 1792865566277,
       "tag": "0009_sourcing",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792872181577,
+      "tag": "0010_vat",
+      "breakpoints": true
     }
   ]
 }

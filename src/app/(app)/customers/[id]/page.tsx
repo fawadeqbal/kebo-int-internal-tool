@@ -97,6 +97,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   { label: "Email", value: customer.email, hidden: !customer.email },
                   { label: "Address / country", value: customer.address, hidden: !customer.address },
                   { label: "Registration / tax no.", value: customer.taxNo, hidden: !customer.taxNo },
+                  { label: "VAT", value: "Exempt: their documents carry no VAT", hidden: !customer.vatExempt },
                   { label: "Notes", value: <span className="whitespace-pre-wrap">{customer.notes}</span>, hidden: !customer.notes },
                 ]}
               />

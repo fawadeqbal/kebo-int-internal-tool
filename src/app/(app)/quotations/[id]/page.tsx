@@ -31,7 +31,12 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
   const { quotation: q, query, customer } = detail;
   const able = quotationAbilities(user, detail);
   const changes = quotationChanges(detail);
-  const costing = costSummary(detail.items.map((i) => ({ quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost })));
+  const costing = costSummary(
+    detail.items.map((i) => ({ quantity: i.quantity, unitPrice: i.unitPrice, unitCost: i.unitCost })),
+    { rate: Number(detail.quotation.taxRate), included: detail.quotation.pricesIncludeVat },
+  );
+  // The discount without our VAT when prices include it (profit is always without our VAT).
+  const discountNet = Math.round(toCents(detail.quotation.discount) / (detail.quotation.pricesIncludeVat ? 1 + Number(detail.quotation.taxRate) / 100 : 1));
   const today = todayISO();
   const late = q.status === "sent" && q.dueDate < today;
 
@@ -113,14 +118,14 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
                     <dd className="tabular">{formatCents(costing.costCents, q.currency)}</dd>
                   </div>
                   <div className="flex justify-between gap-3 py-2">
-                    <dt className="text-muted">Sold for (before discount)</dt>
+                    <dt className="text-muted">Sold for (before discount{detail.quotation.pricesIncludeVat ? ", without VAT" : ""})</dt>
                     <dd className="tabular">{formatCents(costing.salesCents, q.currency)}</dd>
                   </div>
                   <div className="flex justify-between gap-3 py-2 last:pb-0">
                     <dt className="font-medium text-text">Profit</dt>
-                    <dd className={costing.profitCents - toCents(q.discount) < 0 ? "font-semibold text-bad tabular" : "font-semibold text-ok tabular"}>
-                      {formatCents(costing.profitCents - toCents(q.discount), q.currency)}
-                      {costing.salesCents > 0 && ` · ${Math.round(((costing.profitCents - toCents(q.discount)) / costing.salesCents) * 1000) / 10}%`}
+                    <dd className={costing.profitCents - discountNet < 0 ? "font-semibold text-bad tabular" : "font-semibold text-ok tabular"}>
+                      {formatCents(costing.profitCents - discountNet, q.currency)}
+                      {costing.salesCents > 0 && ` · ${Math.round(((costing.profitCents - discountNet) / costing.salesCents) * 1000) / 10}%`}
                     </dd>
                   </div>
                 </dl>

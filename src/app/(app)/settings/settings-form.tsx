@@ -8,13 +8,14 @@ import { saveSettingsAction, sendTestEmailAction } from "@/modules/settings/acti
 import type { AppSettings } from "@/modules/settings/service";
 
 type Key = keyof AppSettings;
-type Section = "email" | "categories" | "company" | "money" | "reminders" | "documents";
+type Section = "email" | "categories" | "company" | "vat" | "money" | "reminders" | "documents";
 
 const SECTIONS: Record<Section, Key[]> = {
   email: ["notifyEmails", "notifyNewQuery", "notifyQuotation", "notifyClosed", "notifyPayment", "notifyDailySummary"],
   categories: ["categories"],
-  company: ["companyName", "companyTaxNo", "companyPhone", "companyEmail", "companyWebsite", "companyAddress"],
-  money: ["currency", "defaultTaxRate", "quotationValidityDays", "invoicePaymentDays", "exchangeRates", "defaultMarginPercent"],
+  company: ["companyName", "companyNameLocal", "companyTaxNo", "companyPhone", "companyEmail", "companyEmail2", "companyWebsite", "companyAddress"],
+  vat: ["vatRate", "pricesIncludeVat"],
+  money: ["currency", "quotationValidityDays", "invoicePaymentDays", "exchangeRates", "defaultMarginPercent"],
   reminders: ["reminderPendingDays", "reminderProcessingDays", "reminderDueSoonDays"],
   documents: ["defaultQuotationTerms", "bankDetails", "invoiceFooter"],
 };
@@ -217,26 +218,71 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
       {section(
         "company",
         "Company profile",
-        "Printed on quotations, invoices and packing lists.",
+        "Printed on quotations, invoices and packing lists, with the KEBO logo.",
         <ReadRows
           rows={[
             ["Company name", settings.companyName],
+            ["Chinese name", settings.companyNameLocal],
             ["Tax / registration no.", settings.companyTaxNo],
             ["Phone", settings.companyPhone],
-            ["Email", settings.companyEmail],
+            ["Email", [settings.companyEmail, settings.companyEmail2].filter(Boolean).join("\n")],
             ["Website", settings.companyWebsite],
             ["Address", settings.companyAddress],
           ]}
         />,
         <>
           {text("companyName", "Company name", { required: true })}
+          {text("companyNameLocal", "Chinese name", { hint: "Printed above the English name, e.g. 山东科波国际贸易有限公司" })}
           {text("companyTaxNo", "Tax / registration number")}
           {text("companyPhone", "Phone")}
           {text("companyEmail", "Email", { type: "email" })}
+          {text("companyEmail2", "Second email", { type: "email", hint: "Optional, printed beside the first" })}
           {text("companyWebsite", "Website", { hint: "e.g. www.keboint.com" })}
           <Field label="Address" htmlFor="companyAddress" error={e.companyAddress} className="sm:col-span-2">
             <Textarea id="companyAddress" name="companyAddress" rows={2} className="min-h-0" defaultValue={v("companyAddress")} />
           </Field>
+        </>,
+        "grid gap-5 sm:grid-cols-2",
+      )}
+
+      {section(
+        "vat",
+        "VAT",
+        "The one tax on every quotation and invoice. Customers marked VAT exempt get none. Documents already sent keep the VAT they were sent with.",
+        <ReadRows
+          rows={[
+            ["VAT rate", `${settings.vatRate}%`],
+            ["Our prices", settings.pricesIncludeVat ? "Include VAT (documents show the VAT inside the total)" : "Exclude VAT (VAT is added on top)"],
+          ]}
+        />,
+        <>
+          {text("vatRate", "VAT rate (%)", { type: "number", step: "0.01", hint: "0 if you charge no VAT" })}
+          <fieldset>
+            <legend className="text-sm font-medium text-text">Our prices</legend>
+            <div className="mt-2 grid gap-2">
+              {[
+                [false, "Exclude VAT", "Subtotal, then VAT is added on top"],
+                [true, "Include VAT", "The price is the total; the VAT inside it is shown"],
+              ].map(([value, label, hint]) => (
+                <label
+                  key={String(value)}
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line px-3 py-2.5 text-sm text-text-2 transition-colors hover:border-line-strong hover:bg-surface-2 has-[:checked]:border-primary/40 has-[:checked]:bg-primary-soft/40 has-[:checked]:text-text"
+                >
+                  <input
+                    type="radio"
+                    name="pricesIncludeVat"
+                    value={value ? "on" : "off"}
+                    defaultChecked={(state.values && !state.ok ? state.values.pricesIncludeVat === "on" : settings.pricesIncludeVat) === value}
+                    className="mt-0.5 size-4 accent-[var(--primary-solid)]"
+                  />
+                  <span>
+                    <span className="block font-medium text-text">{label as string}</span>
+                    <span className="block text-xs text-muted">{hint as string}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </>,
         "grid gap-5 sm:grid-cols-2",
       )}
@@ -248,7 +294,6 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
         <ReadRows
           rows={[
             ["Currency", settings.currency],
-            ["Default tax rate", `${settings.defaultTaxRate}%`],
             ["Quotation valid for", `${settings.quotationValidityDays} days`],
             ["Invoice payment due in", `${settings.invoicePaymentDays} days`],
             ["Exchange rates (for factory prices)", Object.entries(settings.exchangeRates).map(([c, r]) => `1 ${settings.currency} = ${r} ${c}`).join("\n")],
@@ -257,7 +302,6 @@ export function SettingsForm({ settings, smtpConfigured }: { settings: AppSettin
         />,
         <>
           {text("currency", "Currency code", { required: true, hint: "e.g. USD" })}
-          {text("defaultTaxRate", "Default tax rate (%)", { type: "number", step: "0.01", hint: "Usually 0 for export" })}
           {text("quotationValidityDays", "Quotation valid for (days)", { type: "number" })}
           {text("invoicePaymentDays", "Invoice payment due in (days)", { type: "number" })}
           <Field label="Exchange rates" htmlFor="exchangeRates" error={e.exchangeRates} hint={`How much of each currency one ${settings.currency} buys, one per line, e.g. CNY = 7.10`}>

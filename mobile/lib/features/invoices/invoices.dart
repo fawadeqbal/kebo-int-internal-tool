@@ -247,9 +247,8 @@ class InvoiceFormScreen extends ConsumerStatefulWidget {
 }
 
 class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
-  final _lines = <EditLine>[];
-  final _discount = TextEditingController();
-  final _tax = TextEditingController();
+  List<Json> _items = [];
+  Json _totals = {};
   final _notes = TextEditingController();
   String _issueDate = '';
   String _dueDate = '';
@@ -269,9 +268,8 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     try {
       final d = await ref.read(apiProvider).get('/api/v1/invoices/new', query: {'quotation': widget.quotationId});
       final init = d.m('initial');
-      _lines.addAll(init.l('items').map(EditLine.fromJson));
-      _discount.text = init.s('discount', '0');
-      _tax.text = init.s('taxRate', '0');
+      _items = d.l('items');
+      _totals = d.m('totals');
       _issueDate = init.s('issueDate');
       _dueDate = init.s('dueDate');
       _currency = d.s('currency', 'USD');
@@ -287,9 +285,6 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     try {
       final res = await ref.mutate(() => ref.read(apiProvider).post('/api/v1/invoices', {
             'quotationId': widget.quotationId,
-            'items': [for (final l in _lines) if (!l.isEmpty) l.toJson()],
-            'discount': _discount.text,
-            'taxRate': _tax.text,
             'issueDate': _issueDate,
             'dueDate': _dueDate,
             'notes': _notes.text,
@@ -315,9 +310,12 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       body: ListView(padding: pagePadding, children: [
         Text(_subtitle, style: context.t.bodySmall),
         gap12,
-        const Notice('Copied from the accepted quotation. Check it now: once issued, an invoice can only be cancelled, not edited.'),
         if (e != null && e.fieldErrors.isNotEmpty) const Notice('Please fix the highlighted fields.', tone: Tone.bad),
-        SectionCard(title: 'Lines & totals', child: LineItemsEditor(lines: _lines, discount: _discount, taxRate: _tax, currency: _currency, error: e?.field('items'))),
+        SectionCard(
+          title: 'What is invoiced',
+          subtitle: 'Exactly the accepted quotation. To change anything, make a new quotation version and have it accepted.',
+          child: LinesView(items: _items, totals: _totals, currency: _currency),
+        ),
         SectionCard(
           title: 'Dates',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

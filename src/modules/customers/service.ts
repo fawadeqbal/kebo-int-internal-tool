@@ -25,6 +25,9 @@ function toRow(input: CustomerInput) {
   };
 }
 
+/** VAT exemption decides the tax on their documents, so only managers and the super admin change it. */
+const vatRow = (actor: SessionUser, input: CustomerInput) => (input.vatExempt !== undefined && actor.role !== "staff" ? { vatExempt: input.vatExempt } : {});
+
 /** Creates a customer. Can run inside a larger transaction (e.g. new query + new customer). */
 export async function createCustomer(actor: SessionUser, input: CustomerInput, tx?: DbOrTx) {
   assertCan(actor, "customers.manage");
@@ -35,7 +38,7 @@ export async function createCustomer(actor: SessionUser, input: CustomerInput, t
   const run = async (t: DbOrTx) => {
     const [created] = await t
       .insert(customers)
-      .values({ ...toRow(input), createdBy: actor.id })
+      .values({ ...toRow(input), ...vatRow(actor, input), createdBy: actor.id })
       .returning({ id: customers.id });
     await recordAudit(t, {
       userId: actor.id,
@@ -58,7 +61,7 @@ export async function updateCustomer(actor: SessionUser, id: string, input: Cust
     const matches = await findDuplicates(normalizePhone(input.phone), input.email, id);
     if (matches.length) throw new DuplicateCustomerError(matches);
   }
-  const row = toRow(input);
+  const row = { ...toRow(input), ...vatRow(actor, input) };
   const changes = diff(existing, row);
   await db.transaction(async (tx) => {
     await tx.update(customers).set(row).where(eq(customers.id, id));

@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+/* keboint.com's fonts, stored with the app for the printed documents (SIL Open Font License). */
+@font-face {
+  font-family: "Kebo Inter";
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Kebo Jakarta";
+  src: url("/fonts/plus-jakarta-sans-latin.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+/* Brand of keboint.com, used on quotations, invoices, packing lists and reports (always on white paper). */
+@theme {
+  --color-kebo: #0b5ed7;
+  --color-kebo-2: #1e88e5;
+  --color-kebo-deep: #063c8c;
+  --color-kebo-gold: #b08d3c;
+  --color-kebo-light: #eaf4ff;
+  --color-kebo-line: #dce8f5;
+  --color-kebo-paper: #f8fafc;
+  --color-kebo-ink: #1a1a1a;
+  --font-doc: "Kebo Inter", "Noto Sans CJK SC", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  --font-doc-display: "Kebo Jakarta", "Kebo Inter", "Noto Sans CJK SC", "Noto Sans SC", ui-sans-serif, sans-serif;
+}
+
 /*
  * Design tokens (same system as the Vibe admin panel).
  * Components use the semantic names (bg-surface, text-muted, border-line…),

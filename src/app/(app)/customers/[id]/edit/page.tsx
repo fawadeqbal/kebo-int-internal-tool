@@ -19,7 +19,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
       <PageHeader title={`Edit ${customerName(customer)}`} backHref={`/customers/${id}`} backLabel={customerName(customer)} />
       <Card className="max-w-3xl">
         <CardBody>
-          <CustomerForm action={updateCustomerAction.bind(null, id)} initial={customer} cancelHref={`/customers/${id}`} />
+          <CustomerForm action={updateCustomerAction.bind(null, id)} initial={customer} cancelHref={`/customers/${id}`} canSetVat={user.role !== "staff"} />
         </CardBody>
       </Card>
     </>

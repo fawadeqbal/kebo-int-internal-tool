@@ -16,6 +16,8 @@ export const GET = handle(async (request: Request) => {
     requestedItems: d.requestedItems,
     version: d.version,
     currency: d.currency,
+    /** The VAT this quotation will carry: { rate, included, exempt } (from Settings; not typed on the quotation). */
+    vat: d.vat,
     initial: d.initial,
   });
 });

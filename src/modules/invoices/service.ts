@@ -1,9 +1,9 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { invoiceItems, invoices, payments, queries, quotationItems } from "@/lib/db/schema";
 import { assertCan, type SessionUser } from "@/lib/auth/session";
 import { nextReference } from "@/lib/counters";
-import { calculateTotals, formatCents, fromCents, toCents } from "@/lib/utils/money";
+import { formatCents, fromCents, toCents } from "@/lib/utils/money";
 import { DomainError, NotFoundError } from "@/lib/utils/result";
 import { recordAudit } from "@/modules/audit/service";
 import { publish } from "@/modules/events";
@@ -13,7 +13,11 @@ import { companySnapshot, customerSnapshotFor } from "@/modules/documents/snapsh
 import type { InvoiceInput, PaymentInput } from "./schema";
 import { paymentStatus } from "./status";
 
-/** Generate an invoice from an accepted quotation. Once issued, the invoice is locked. */
+/**
+ * Generate an invoice from an accepted quotation: the same lines, prices,
+ * discount and VAT, so it always matches what the customer accepted. Only the
+ * dates and a note are the invoice's own. Once issued, the invoice is locked.
+ */
 export async function createInvoice(actor: SessionUser, quotationId: string, input: InvoiceInput) {
   assertCan(actor, "invoices.manage");
   const quotation = await getAccessibleQuotation(actor, quotationId);
@@ -26,11 +30,9 @@ export async function createInvoice(actor: SessionUser, quotationId: string, inp
     .limit(1);
   if (existing) throw new DomainError(`This quotation already has invoice ${existing.invoiceNo}.`);
 
-  const t = calculateTotals(input.items, input.discount, input.taxRate);
-  if (t.total <= 0) throw new DomainError("The invoice total must be more than zero.");
+  if (toCents(quotation.total) <= 0) throw new DomainError("The invoice total must be more than zero.");
   const [query] = await db.select({ customerId: queries.customerId, refNo: queries.refNo }).from(queries).where(eq(queries.id, quotation.queryId));
-  // Lines keep a link to the quotation line they were invoiced from (only this quotation's).
-  const own = new Set((await db.select({ id: quotationItems.id }).from(quotationItems).where(eq(quotationItems.quotationId, quotationId))).map((r) => r.id));
+  const lines = await db.select().from(quotationItems).where(eq(quotationItems.quotationId, quotationId)).orderBy(asc(quotationItems.sortOrder));
   const settings = await getSettings();
 
   const created = await db.transaction(async (tx) => {
@@ -45,11 +47,12 @@ export async function createInvoice(actor: SessionUser, quotationId: string, inp
         issueDate: input.issueDate,
         dueDate: input.dueDate,
         currency: quotation.currency,
-        subtotal: fromCents(t.subtotal),
-        discount: fromCents(t.discount),
-        taxRate: String(t.taxRate),
-        taxAmount: fromCents(t.taxAmount),
-        total: fromCents(t.total),
+        subtotal: quotation.subtotal,
+        discount: quotation.discount,
+        taxRate: quotation.taxRate,
+        pricesIncludeVat: quotation.pricesIncludeVat,
+        taxAmount: quotation.taxAmount,
+        total: quotation.total,
         amountPaid: "0",
         status: "unpaid",
         notes: input.notes ?? null,
@@ -59,16 +62,16 @@ export async function createInvoice(actor: SessionUser, quotationId: string, inp
       })
       .returning({ id: invoices.id, invoiceNo: invoices.invoiceNo });
     await tx.insert(invoiceItems).values(
-      input.items.map((item, i) => ({
+      lines.map((item, i) => ({
         invoiceId: inv.id,
-        quotationItemId: item.sourceId && own.has(item.sourceId) ? item.sourceId : null,
+        quotationItemId: item.id,
         description: item.description,
-        model: item.model ?? null,
-        hsCode: item.hsCode ?? null,
-        quantity: String(item.quantity),
+        model: item.model,
+        hsCode: item.hsCode,
+        quantity: item.quantity,
         unit: item.unit,
-        unitPrice: String(item.unitPrice),
-        lineTotal: fromCents(t.lines[i].lineTotal),
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
         sortOrder: i,
       })),
     );
@@ -77,7 +80,7 @@ export async function createInvoice(actor: SessionUser, quotationId: string, inp
       action: "create",
       entityType: "invoice",
       entityId: inv.id,
-      summary: `Issued invoice ${invoiceNo} for ${query.refNo} — total ${fromCents(t.total)}`,
+      summary: `Issued invoice ${invoiceNo} for ${query.refNo} from ${quotation.refNo} v${quotation.version} — total ${quotation.total}`,
     });
     return inv;
   });

@@ -39,17 +39,27 @@ export function fxRate(from: string, to: string, main: string, rates: Rates): nu
 /** A factory amount in the quotation's currency, given `rate` = factory units per quotation unit. */
 export const convert = (amount: number, rate: number) => round2(amount / rate);
 
-/** Margin as a share of the selling price, in %: (price − cost) / price. */
-export function marginPercent(unitPrice: number, unitCost: number): number | null {
+/** Our VAT on the selling price: when prices include it, margins are worked on the price without it. */
+export interface SalesVat {
+  rate: number;
+  included: boolean;
+}
+
+const net = (price: number, vat?: SalesVat) => (vat?.included && vat.rate > 0 ? price / (1 + vat.rate / 100) : price);
+
+/** Margin as a share of the selling price (without our VAT), in %: (price − cost) / price. */
+export function marginPercent(unitPriceInput: number, unitCost: number, vat?: SalesVat): number | null {
+  const unitPrice = net(unitPriceInput, vat);
   if (!(unitPrice > 0)) return null;
   const m = ((unitPrice - unitCost) / unitPrice) * 1000;
   return (Math.sign(m) * Math.round(Math.abs(m))) / 10; // half away from zero: −6.25 → −6.3
 }
 
-/** The selling price that gives `margin` % on top of `unitCost`. */
-export function priceForMargin(unitCost: number, margin: number): number {
+/** The selling price that gives `margin` % on top of `unitCost` (with our VAT added in when prices include it). */
+export function priceForMargin(unitCost: number, margin: number, vat?: SalesVat): number {
   if (margin >= 100) throw new Error("Margin must be under 100%");
-  return round2(unitCost / (1 - margin / 100));
+  const price = unitCost / (1 - margin / 100);
+  return round2(vat?.included && vat.rate > 0 ? price * (1 + vat.rate / 100) : price);
 }
 
 export interface CostedLine {
@@ -59,13 +69,13 @@ export interface CostedLine {
 }
 
 /** Totals for the internal costing box: cost, sales, profit and margin of the lines that have a cost. */
-export function costSummary(lines: CostedLine[]) {
+export function costSummary(lines: CostedLine[], vat?: SalesVat) {
   let cost = 0;
   let sales = 0;
   let uncosted = 0;
   for (const l of lines) {
     const q = Number(l.quantity) || 0;
-    const p = Math.round((Number(l.unitPrice) || 0) * 100);
+    const p = Math.round(net(Number(l.unitPrice) || 0, vat) * 100);
     if (l.unitCost === null || l.unitCost === undefined || l.unitCost === "") {
       uncosted += 1;
       continue;

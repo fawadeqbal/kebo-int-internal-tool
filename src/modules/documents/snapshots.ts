@@ -22,6 +22,8 @@ export async function customerSnapshotFor(tx: DbOrTx, customerId: string): Promi
 export function companySnapshot(s: AppSettings): CompanySnapshot {
   return {
     companyName: s.companyName,
+    companyNameLocal: s.companyNameLocal,
+    companyEmail2: s.companyEmail2,
     companyAddress: s.companyAddress,
     companyPhone: s.companyPhone,
     companyEmail: s.companyEmail,

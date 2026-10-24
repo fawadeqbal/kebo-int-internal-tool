@@ -290,7 +290,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static const _text = [
-    'companyName', 'companyAddress', 'companyPhone', 'companyEmail', 'companyWebsite', 'companyTaxNo', 'bankDetails', 'currency', 'defaultTaxRate',
+    'companyName', 'companyNameLocal', 'companyEmail2', 'companyAddress', 'companyPhone', 'companyEmail', 'companyWebsite', 'companyTaxNo', 'bankDetails', 'currency', 'vatRate',
     'quotationValidityDays', 'invoicePaymentDays', 'reminderPendingDays', 'reminderProcessingDays', 'reminderDueSoonDays', 'defaultQuotationTerms', 'invoiceFooter',
     'defaultMarginPercent',
   ];
@@ -327,6 +327,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _c['categories']!.text = _raw.ls('categories').join('\n');
       _c['notifyEmails']!.text = _raw.ls('notifyEmails').join(', ');
       _c['exchangeRates']!.text = _ratesText(_raw);
+      _vatIncluded = _raw.b('pricesIncludeVat');
       for (final k in _switches.keys) {
         _on[k] = _raw.b(k);
       }
@@ -343,7 +344,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'notifyEmails': _c['notifyEmails']!.text.split(RegExp(r'[\s,;]+')).where((s) => s.isNotEmpty).toList(),
         'exchangeRates': _c['exchangeRates']!.text,
         for (final k in _switches.keys) k: _on[k] ?? false,
+        'pricesIncludeVat': _vatIncluded,
       };
+
+  bool _vatIncluded = false;
 
   /// The section being edited (one at a time); the rest are read-only.
   String? _editing;
@@ -355,6 +359,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _c['categories']!.text = _raw.ls('categories').join('\n');
     _c['notifyEmails']!.text = _raw.ls('notifyEmails').join(', ');
     _c['exchangeRates']!.text = _ratesText(_raw);
+    _vatIncluded = _raw.b('pricesIncludeVat');
     for (final k in _switches.keys) {
       _on[k] = _raw.b(k);
     }
@@ -430,21 +435,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           subtitle: 'Printed on quotations, invoices and packing lists',
           read: kv([
             ('Company name', v('companyName')),
+            ('Chinese name', v('companyNameLocal')),
             ('Address', v('companyAddress')),
             ('Phone', v('companyPhone')),
-            ('Email', v('companyEmail')),
+            ('Email', [_raw.s('companyEmail'), _raw.s('companyEmail2')].where((e) => e.isNotEmpty).join('\n').ifEmptyNotSet),
             ('Website', v('companyWebsite')),
             ('Tax / Reg. no.', v('companyTaxNo')),
             ('Bank details', v('bankDetails')),
           ]),
           edit: Column(children: [
             field('companyName', 'Company name', optional: false),
+            field('companyNameLocal', 'Chinese name', helper: 'Printed above the English name'),
             field('companyAddress', 'Address', lines: 3),
             field('companyPhone', 'Phone', kb: TextInputType.phone),
             field('companyEmail', 'Email', kb: TextInputType.emailAddress),
+            field('companyEmail2', 'Second email', kb: TextInputType.emailAddress),
             field('companyWebsite', 'Website', kb: TextInputType.url),
             field('companyTaxNo', 'Tax / Reg. no.'),
             field('bankDetails', 'Bank details for T/T', lines: 5, helper: 'Printed on quotations and invoices'),
+          ]),
+        ),
+        section(
+          'vat',
+          'VAT',
+          subtitle: 'The one tax on every quotation and invoice. VAT-exempt customers get none; sent documents keep theirs.',
+          read: kv([
+            ('VAT rate', '${v('vatRate')}%'),
+            ('Our prices', _raw.b('pricesIncludeVat') ? 'Include VAT' : 'Exclude VAT (added on top)'),
+          ]),
+          edit: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            field('vatRate', 'VAT rate (%)', optional: false, kb: numKb, helper: '0 if you charge no VAT'),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Our prices include VAT'),
+              subtitle: Text(_vatIncluded ? 'The price is the total; the VAT inside it is shown' : 'VAT is added on top of the prices'),
+              value: _vatIncluded,
+              onChanged: (v) => setState(() => _vatIncluded = v),
+            ),
           ]),
         ),
         section(
@@ -453,7 +480,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           subtitle: 'For new quotations and invoices. Sent documents keep their own currency.',
           read: kv([
             ('Currency', v('currency')),
-            ('Tax rate', '${v('defaultTaxRate')}%'),
             ('Quotation valid', '${v('quotationValidityDays')} days'),
             ('Payment due', '${v('invoicePaymentDays')} days'),
             ('Exchange rates', _raw.m('exchangeRates').isEmpty ? 'Not set' : _raw.m('exchangeRates').entries.map((r) => '1 ${v('currency')} = ${r.value} ${r.key}').join('\n')),
@@ -462,11 +488,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ('Invoice footer', v('invoiceFooter')),
           ]),
           edit: Column(children: [
-            Row(children: [
-              Expanded(child: field('currency', 'Currency', optional: false)),
-              gap12,
-              Expanded(child: field('defaultTaxRate', 'Tax rate (%)', optional: false, kb: numKb)),
-            ]),
+            field('currency', 'Currency', optional: false),
             Row(children: [
               Expanded(child: field('quotationValidityDays', 'Quotation valid (days)', optional: false, kb: TextInputType.number)),
               gap12,
@@ -596,4 +618,8 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
       ),
     );
   }
+}
+
+extension on String {
+  String get ifEmptyNotSet => isEmpty ? 'Not set' : this;
 }

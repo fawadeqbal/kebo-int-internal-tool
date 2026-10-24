@@ -147,6 +147,7 @@ class CustomerDetailScreen extends ConsumerWidget {
                 ('Email', c.s('email', '—')),
                 ('Address', c.s('address', '—')),
                 ('Tax / Reg. no.', c.s('taxNo', '—')),
+                if (c.b('vatExempt')) ('VAT', 'Exempt'),
                 ('Customer since', f.date(c.s('createdAt'))),
               ]),
             ),
@@ -198,6 +199,7 @@ class CustomerFormScreen extends ConsumerStatefulWidget {
 class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
   final _f = {for (final k in ['contactPerson', 'companyName', 'phone', 'email', 'address', 'taxNo', 'notes']) k: TextEditingController()};
   bool _loaded = false;
+  bool _vatExempt = false;
   ApiException? _error;
 
   @override
@@ -211,6 +213,7 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
         for (final e in _f.entries) {
           e.value.text = c.s(e.key);
         }
+        _vatExempt = c.b('vatExempt');
         if (mounted) setState(() => _loaded = true);
       });
     }
@@ -227,7 +230,8 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
   Future<void> _save({bool allowDuplicate = false}) async {
     setState(() => _error = null);
     final api = ref.read(apiProvider);
-    final body = {for (final e in _f.entries) e.key: e.value.text, if (allowDuplicate) 'allowDuplicate': 'on'};
+    final manager = ref.read(sessionProvider).isManager;
+    final body = {for (final e in _f.entries) e.key: e.value.text, if (manager) 'vatExempt': _vatExempt, if (allowDuplicate) 'allowDuplicate': 'on'};
     try {
       if (widget.editId != null) {
         await ref.mutate(() => api.patch('/api/v1/customers/${widget.editId}', body));
@@ -275,6 +279,14 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
                   Field(label: 'Address', controller: _f['address']!, optional: true, maxLines: 3, error: e?.field('address')),
                   Field(label: 'Tax / Reg. no.', controller: _f['taxNo']!, optional: true, error: e?.field('taxNo')),
                   Field(label: 'Notes', controller: _f['notes']!, optional: true, maxLines: 4, error: e?.field('notes')),
+                  if (ref.watch(sessionProvider).isManager)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('VAT exempt'),
+                      subtitle: const Text('Their quotations and invoices carry no VAT, e.g. export customers'),
+                      value: _vatExempt,
+                      onChanged: (v) => setState(() => _vatExempt = v),
+                    ),
                 ]),
               ),
               BusyButton(label: widget.editId == null ? 'Add customer' : 'Save customer', onPressed: _save),

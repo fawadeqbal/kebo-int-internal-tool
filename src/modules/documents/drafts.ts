@@ -6,6 +6,7 @@ import { getQueryDetail } from "@/modules/queries/repository";
 import { getQuotationDetail } from "@/modules/quotations/repository";
 import { getInvoiceDetail } from "@/modules/invoices/repository";
 import { getPackingListDetail } from "@/modules/packing/repository";
+import { vatForCustomer } from "./vat";
 import { getSettings } from "@/modules/settings/service";
 import { sourcingForQuery } from "@/modules/sourcing/repository";
 import { marginPercent, priceForMargin } from "@/lib/costing";
@@ -48,6 +49,7 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
   const detail = await getQueryDetail(user, queryId);
   if (!detail) throw new NotFoundError("Inquiry");
   const settings = await getSettings();
+  const vat = await vatForCustomer(detail.query.customerId);
   const latest = detail.quotations[0];
   let items: EditableLine[];
   let discount = "0";
@@ -62,13 +64,14 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
       items = items.map((l) => {
         const chosen = sourcing.items.find((x) => x.id === l.sourceId)?.chosen;
         if (!chosen || chosen.unitCost === null || chosen.id === l.costSourceId) return l;
-        const margin = l.unitCost && l.unitPrice ? (marginPercent(Number(l.unitPrice), Number(l.unitCost)) ?? settings.defaultMarginPercent) : settings.defaultMarginPercent;
+        const prevVat = prev ? { rate: Number(prev.quotation.taxRate), included: prev.quotation.pricesIncludeVat } : undefined;
+        const margin = l.unitCost && l.unitPrice ? (marginPercent(Number(l.unitPrice), Number(l.unitCost), prevVat) ?? settings.defaultMarginPercent) : settings.defaultMarginPercent;
         return {
           ...l,
           unitCost: String(chosen.unitCost),
           costSourceId: chosen.id,
           fxRate: String(chosen.fxRate),
-          unitPrice: String(priceForMargin(chosen.unitCost, Math.min(Math.max(margin, 0), 90))),
+          unitPrice: String(priceForMargin(chosen.unitCost, Math.min(Math.max(margin, 0), 90), vat)),
           costNote: `Now from ${chosen.supplierName} · ${chosen.offerCurrency} ${chosen.unitPriceWithVat.toLocaleString("en", { minimumFractionDigits: 2 })} incl. VAT`,
         };
       });
@@ -92,7 +95,7 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
         unitCost: String(from.unitCost),
         costSourceId: from.id,
         fxRate: String(from.fxRate),
-        unitPrice: String(priceForMargin(from.unitCost, settings.defaultMarginPercent)),
+        unitPrice: String(priceForMargin(from.unitCost, settings.defaultMarginPercent, vat)),
         costNote: `${from.supplierName} · ${from.offerCurrency} ${from.unitPriceWithVat.toLocaleString("en", { minimumFractionDigits: 2 })} incl. VAT`,
       };
     });
@@ -103,10 +106,11 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
     requestedItems: detail.items,
     version: (latest?.version ?? 0) + 1,
     currency: settings.currency,
+    /** The VAT this quotation will carry (from Settings, none for a VAT-exempt customer). */
+    vat,
     initial: {
       items,
       discount,
-      taxRate: String(settings.defaultTaxRate),
       dueDate: addDaysISO(todayISO(), settings.quotationValidityDays),
       submittedAt: "",
       terms,
@@ -120,7 +124,6 @@ export function quotationEditValues(detail: NonNullable<Awaited<ReturnType<typeo
   return {
     items: detail.items.map((i) => toEditableLine(i, { sourceId: i.queryItemId })),
     discount: String(Number(q.discount)),
-    taxRate: String(Number(q.taxRate)),
     dueDate: q.dueDate,
     submittedAt: q.submittedAt ?? "",
     terms: q.terms ?? "",
@@ -144,8 +147,6 @@ export async function invoiceDraft(user: SessionUser, quotationId: string) {
     currency: q.currency,
     initial: {
       items: detail.items.map((i) => withoutCost(toEditableLine(i, { asSource: true }))),
-      discount: String(Number(q.discount)),
-      taxRate: String(Number(q.taxRate)),
       issueDate: today,
       dueDate: addDaysISO(today, settings.invoicePaymentDays),
       notes: "",

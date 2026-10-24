@@ -17,11 +17,14 @@ export function QuotationForm({
   cancelHref,
   submitLabel,
   costing = false,
+  vat,
 }: {
   action: Action;
   /** Show our cost and margin per line (people who may see factory prices). */
   costing?: boolean;
-  initial: { items: EditableLine[]; discount: string; taxRate: string; dueDate: string; submittedAt: string; terms: string; notes: string };
+  initial: { items: EditableLine[]; discount: string; dueDate: string; submittedAt: string; terms: string; notes: string };
+  /** The VAT this quotation carries (from Settings). */
+  vat: { rate: number; included: boolean; exempt: boolean };
   currency: string;
   cancelHref: string;
   submitLabel: string;
@@ -39,7 +42,7 @@ export function QuotationForm({
           <LineItemsEditor
             initialItems={items}
             initialDiscount={(state.values?.discount as string) ?? initial.discount}
-            initialTaxRate={(state.values?.taxRate as string) ?? initial.taxRate}
+            vat={vat}
             currency={currency}
             errors={e}
             sourceLabel="Requested by the customer"

@@ -21,6 +21,8 @@ function toLine(r: Row): ProfitLine {
     lineTotalCents: cents(r.line_total),
     docSubtotalCents: cents(r.subtotal),
     docDiscountCents: cents(r.discount),
+    docVatRate: Number(r.tax_rate ?? 0),
+    docPricesIncludeVat: r.prices_include_vat === true,
     unitCost: r.unit_cost === null || r.unit_cost === undefined ? null : Number(r.unit_cost),
   };
 }
@@ -30,7 +32,7 @@ const staffFilter = (staffId?: string): SQL => (staffId ? sql`and q.assigned_to 
 /** Invoiced lines (not cancelled) issued between from and to, in `currency`. */
 async function invoiceLines(from: string, to: string, currency: string, staffId?: string) {
   const res = await db.execute(sql`
-    select i.id as doc_id, i.invoice_no as doc_no, i.issue_date::text as date, i.subtotal, i.discount,
+    select i.id as doc_id, i.invoice_no as doc_no, i.issue_date::text as date, i.subtotal, i.discount, i.tax_rate, i.prices_include_vat,
            ii.quantity, ii.line_total, qi.unit_cost,
            coalesce(nullif(c.company_name, ''), c.contact_person) as customer,
            coalesce(nullif(q.category, ''), 'Uncategorised') as category,
@@ -59,7 +61,7 @@ async function quotationLines(kind: "accepted" | "waiting", r: Range, currency: 
       : sql`qt.status = 'sent' and qt.version = (select max(v.version) from quotations v where v.query_id = qt.query_id and v.deleted_at is null)`;
   const res = await db.execute(sql`
     select qt.id as doc_id, qt.ref_no || ' v' || qt.version as doc_no, coalesce(qt.submitted_at, qt.created_at::date)::text as date,
-           qt.subtotal, qt.discount, qi.quantity, qi.line_total, qi.unit_cost,
+           qt.subtotal, qt.discount, qt.tax_rate, qt.prices_include_vat, qi.quantity, qi.line_total, qi.unit_cost,
            coalesce(nullif(c.company_name, ''), c.contact_person) as customer,
            coalesce(nullif(q.category, ''), 'Uncategorised') as category,
            coalesce(u.name, 'Not assigned') as person,

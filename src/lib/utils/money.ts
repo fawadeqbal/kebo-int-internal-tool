@@ -24,14 +24,21 @@ export interface Totals {
   lines: { lineTotal: Cents }[];
   subtotal: Cents;
   discount: Cents;
+  /** Subtotal less discount (incl. VAT when the prices include it). */
   taxable: Cents;
   taxRate: number;
+  /** The VAT: added on top, or the part of the total that is VAT when prices include it. */
   taxAmount: Cents;
   total: Cents;
+  pricesIncludeVat: boolean;
 }
 
-/** Single place where quotation and invoice totals are calculated. */
-export function calculateTotals(items: LineInput[], discountInput: string | number, taxRateInput: string | number): Totals {
+/**
+ * Single place where quotation and invoice totals are calculated.
+ * VAT exclusive (default): total = subtotal − discount + VAT.
+ * VAT inclusive: total = subtotal − discount, and taxAmount is the VAT inside it.
+ */
+export function calculateTotals(items: LineInput[], discountInput: string | number, taxRateInput: string | number, pricesIncludeVat = false): Totals {
   const lines = items.map((item) => {
     const qty = Number(item.quantity) || 0;
     return { lineTotal: Math.round(qty * toCents(item.unitPrice)) };
@@ -40,8 +47,17 @@ export function calculateTotals(items: LineInput[], discountInput: string | numb
   const discount = Math.min(Math.max(toCents(discountInput), 0), subtotal);
   const taxable = subtotal - discount;
   const taxRate = Math.max(Number(taxRateInput) || 0, 0);
+  if (pricesIncludeVat) {
+    const taxAmount = Math.round((taxable * taxRate) / (100 + taxRate));
+    return { lines, subtotal, discount, taxable, taxRate, taxAmount, total: taxable, pricesIncludeVat };
+  }
   const taxAmount = Math.round((taxable * taxRate) / 100);
-  return { lines, subtotal, discount, taxable, taxRate, taxAmount, total: taxable + taxAmount };
+  return { lines, subtotal, discount, taxable, taxRate, taxAmount, total: taxable + taxAmount, pricesIncludeVat };
+}
+
+/** An amount without its VAT (unchanged when VAT is added on top). */
+export function withoutVat(amount: number, taxRate: number, pricesIncludeVat: boolean): number {
+  return pricesIncludeVat && taxRate > 0 ? amount / (1 + taxRate / 100) : amount;
 }
 
 /** Format a decimal amount (as stored in the DB) for display. */

@@ -192,7 +192,7 @@ class QuotationDetailScreen extends ConsumerWidget {
               ]),
             ),
             SectionCard(title: d.m('query').s('title'), subtitle: 'Lines', child: LinesView(items: d.l('items'), totals: q, currency: cur)),
-            CostingCard(items: d.l('items'), discount: q['discount'], currency: cur),
+            CostingCard(items: d.l('items'), discount: q['discount'], currency: cur, vat: f.Vat(rate: num.tryParse(q.s('taxRate')) ?? 0, included: q['pricesIncludeVat'] == true)),
             if (d.m('previous').isNotEmpty)
               SectionCard(
                 title: 'Changes from v${d.m('previous').i('version')}',
@@ -255,7 +255,7 @@ class QuotationFormScreen extends ConsumerStatefulWidget {
 class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
   final _lines = <EditLine>[];
   final _discount = TextEditingController(text: '0');
-  final _tax = TextEditingController(text: '0');
+  f.Vat _vat = const f.Vat();
   final _terms = TextEditingController();
   final _notes = TextEditingController();
   String _dueDate = '';
@@ -290,10 +290,10 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
         final q = d.m('quotation');
         _locked = q.s('status') != 'draft' || d.b('superseded');
         _currency = q.s('currency', 'USD');
+        _vat = f.Vat.fromJson(d.m('vat'));
         init = {
           'items': [for (final it in d.l('items')) {...it, 'sourceId': it.s('queryItemId')}],
           'discount': (num.tryParse(q.s('discount')) ?? 0).toString(),
-          'taxRate': (num.tryParse(q.s('taxRate')) ?? 0).toString(),
           'dueDate': q.s('dueDate'),
           'submittedAt': q.s('submittedAt'),
           'terms': q.s('terms'),
@@ -305,11 +305,11 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
         init = d.m('initial');
         _subtitle = 'For ${f.customerName(d.m('customer'))} · ${d.m('query').s('refNo')}${d.i('version') > 1 ? ' · version ${d.i('version')}' : ''}';
         _currency = d.s('currency', 'USD');
+        _vat = f.Vat.fromJson(d.m('vat'));
       }
       _lines.addAll(init.l('items').map(EditLine.fromJson));
       if (_lines.isEmpty) _lines.add(EditLine());
       _discount.text = init.s('discount', '0');
-      _tax.text = init.s('taxRate', '0');
       _dueDate = init.s('dueDate');
       _submittedAt = init.s('submittedAt');
       _terms.text = init.s('terms');
@@ -325,7 +325,6 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
     final body = {
       'items': [for (final l in _lines) if (!l.isEmpty) l.toJson()],
       'discount': _discount.text,
-      'taxRate': _tax.text,
       'dueDate': _dueDate,
       'submittedAt': _submittedAt,
       'terms': _terms.text,
@@ -370,7 +369,7 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
           child: LineItemsEditor(
             lines: _lines,
             discount: _discount,
-            taxRate: _tax,
+            vat: _vat,
             currency: _currency,
             sourceLabel: 'Requested by the customer',
             costing: ref.read(sessionProvider).can('sourcing.manage'),
@@ -426,10 +425,12 @@ class RevisionChanges extends StatelessWidget {
 
 /// Internal: what the lines cost us and the profit (from each line's cost). Nothing when no line has a cost.
 class CostingCard extends StatelessWidget {
-  const CostingCard({super.key, required this.items, required this.discount, required this.currency});
+  const CostingCard({super.key, required this.items, required this.discount, required this.currency, this.vat = const f.Vat()});
   final List<Json> items;
   final Object? discount;
   final String currency;
+  /// The quotation's VAT: when prices include it, profit is worked without it.
+  final f.Vat vat;
   @override
   Widget build(BuildContext context) {
     var cost = 0, sales = 0, uncosted = 0;
@@ -440,10 +441,10 @@ class CostingCard extends StatelessWidget {
         continue;
       }
       cost += (f.toCents(it['unitCost']) * q).round();
-      sales += (f.toCents(it['unitPrice']) * q).round();
+      sales += (f.toCents(vat.net(num.tryParse(it.s('unitPrice')) ?? 0)) * q).round();
     }
     if (cost == 0) return const SizedBox.shrink();
-    final profit = sales - cost - f.toCents(discount);
+    final profit = sales - cost - (f.toCents(vat.net(num.tryParse('$discount') ?? 0)));
     final pct = sales > 0 ? (profit / sales * 1000).round() / 10 : 0;
     return SectionCard(
       title: 'Costing',

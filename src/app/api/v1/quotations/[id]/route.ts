@@ -5,6 +5,8 @@ import { quotationSchema } from "@/modules/quotations/schema";
 import { deleteDraftQuotation, updateQuotation } from "@/modules/quotations/service";
 import { quotationAbilities, quotationChanges } from "@/modules/documents/abilities";
 
+import { vatForCustomer } from "@/modules/documents/vat";
+
 export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -23,6 +25,8 @@ export const GET = handle(async (_request: Request, { params }: Ctx) => {
     invoices: can(user.role, "invoices.manage") ? detail.invoices : [],
     changes: quotationChanges(detail),
     pdf: `/api/quotations/${id}/pdf`,
+    // The VAT a draft gets when it is saved or sent (sent ones keep their own).
+    vat: detail.quotation.status === "draft" ? await vatForCustomer(detail.query.customerId) : { rate: Number(detail.quotation.taxRate), included: detail.quotation.pricesIncludeVat, exempt: false },
     can: { ...abilities, activeInvoice: undefined },
   });
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { paymentMethodEnum } from "@/lib/db/schema";
-import { isoDate, lineItemsField, moneyField, taxRateField } from "@/lib/line-items";
+import { isoDate } from "@/lib/line-items";
 
 const optionalText = (max: number) =>
   z
@@ -11,11 +11,9 @@ const optionalText = (max: number) =>
     .nullable()
     .optional();
 
+/** Only what belongs to the invoice: the lines, prices, discount and VAT are the accepted quotation's. */
 export const invoiceSchema = z
   .object({
-    items: lineItemsField,
-    discount: moneyField("discount").default(0),
-    taxRate: taxRateField,
     issueDate: isoDate("Choose the invoice date"),
     dueDate: isoDate("Choose the payment due date"),
     notes: optionalText(2000),

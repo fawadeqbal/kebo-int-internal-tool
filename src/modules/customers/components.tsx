@@ -6,13 +6,28 @@ import { Alert, ButtonLink, Field, Input, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/client";
 import type { ActionState } from "@/lib/utils/result";
 
-type Values = Partial<Record<"companyName" | "contactPerson" | "phone" | "email" | "address" | "taxNo" | "notes", string | null>>;
+type Values = Partial<Record<"companyName" | "contactPerson" | "phone" | "email" | "address" | "taxNo" | "notes", string | null>> & { vatExempt?: boolean };
 type Duplicate = { id: string; companyName: string | null; contactPerson: string; phone: string };
 
 /** The customer fields, reused by the customer form and the "new customer" part of the query form. */
-export function CustomerFields({ state, initial, prefix = "", compact = false }: { state: ActionState; initial?: Values; prefix?: string; compact?: boolean }) {
+export function CustomerFields({
+  state,
+  initial,
+  prefix = "",
+  compact = false,
+  canSetVat = false,
+}: {
+  state: ActionState;
+  initial?: Values;
+  prefix?: string;
+  compact?: boolean;
+  /** Managers and the super admin can mark a customer VAT exempt. */
+  canSetVat?: boolean;
+}) {
   const e = state.errors ?? {};
-  const v = (key: keyof Values) => (state.values?.[key] as string | undefined) ?? initial?.[key] ?? "";
+  const v = (key: Exclude<keyof Values, "vatExempt">) => (state.values?.[key] as string | undefined) ?? initial?.[key] ?? "";
+  const sentExempt = state.values?.vatExempt;
+  const exempt = sentExempt !== undefined ? (Array.isArray(sentExempt) ? sentExempt.at(-1) : sentExempt) === "on" : (initial?.vatExempt ?? false);
   const id = (key: string) => `${prefix}${key}`;
   return (
     <div className="grid gap-5 sm:grid-cols-2">
@@ -36,6 +51,16 @@ export function CustomerFields({ state, initial, prefix = "", compact = false }:
           <Field label="Company registration / tax no." htmlFor={id("taxNo")} optional error={e.taxNo}>
             <Input id={id("taxNo")} name="taxNo" defaultValue={v("taxNo")} />
           </Field>
+          {canSetVat && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line px-3 py-2.5 text-sm text-text-2 hover:bg-surface-2 has-[:checked]:border-primary/40 has-[:checked]:bg-primary-soft/40 has-[:checked]:text-text sm:col-span-2">
+              <input type="hidden" name="vatExempt" value="off" />
+              <input type="checkbox" name="vatExempt" defaultChecked={exempt} className="mt-0.5 size-4 accent-[var(--primary-solid)]" />
+              <span>
+                <span className="block font-medium text-text">VAT exempt</span>
+                <span className="block text-xs text-muted">Their quotations and invoices carry no VAT, e.g. export customers.</span>
+              </span>
+            </label>
+          )}
         </>
       )}
     </div>
@@ -70,10 +95,12 @@ export function CustomerForm({
   action,
   initial,
   cancelHref,
+  canSetVat = false,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   initial?: Values;
   cancelHref: string;
+  canSetVat?: boolean;
 }) {
   const [state, formAction] = useActionState(action, {});
   const e = state.errors ?? {};
@@ -82,7 +109,7 @@ export function CustomerForm({
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.message && !duplicates && <Alert tone="error">{state.message}</Alert>}
       <DuplicateWarning state={state} />
-      <CustomerFields state={state} initial={initial} />
+      <CustomerFields state={state} initial={initial} canSetVat={canSetVat} />
       <Field label="Notes" htmlFor="notes" optional error={e.notes} hint="Only the team sees this, e.g. preferred trade terms, destination port">
         <Textarea id="notes" name="notes" rows={3} defaultValue={(state.values?.notes as string) ?? initial?.notes ?? ""} />
       </Field>

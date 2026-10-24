@@ -31,7 +31,7 @@ class EditLine {
         unit = TextEditingController(text: unit),
         unitPrice = TextEditingController(text: unitPrice),
         unitCost = TextEditingController(text: unitCost),
-        margin = TextEditingController(text: _marginText(unitPrice, unitCost)),
+        margin = TextEditingController(),
         showCodes = model.isNotEmpty || hsCode.isNotEmpty,
         showCost = unitCost.isNotEmpty;
   final String? id;
@@ -45,19 +45,20 @@ class EditLine {
   bool showCodes;
   bool showCost;
 
-  /// Margin on the selling price, one decimal, half away from zero (same as the server).
-  static String _marginText(String price, String cost) {
-    final p = num.tryParse(price), c = num.tryParse(cost);
+  /// Margin on the selling price (without our VAT), one decimal, half away from zero (same as the server).
+  static String _marginText(String priceText, String cost, f.Vat vat) {
+    final price = num.tryParse(priceText);
+    final p = price == null ? null : vat.net(price), c = num.tryParse(cost);
     if (p == null || c == null || p <= 0 || c <= 0) return '';
     final m = (p - c) / p * 100;
     final r = (m.abs() * 10).round() / 10 * m.sign;
     return r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(1);
   }
 
-  /// The price that gives [marginPercent] on [cost]: cost / (1 − m%), to the cent.
-  static String priceFor(num cost, num marginPercent) => ((cost / (1 - marginPercent / 100) * 100).round() / 100).toStringAsFixed(2);
+  /// The price that gives [marginPercent] on [cost]: cost / (1 − m%) (plus our VAT when prices include it), to the cent.
+  static String priceFor(num cost, num marginPercent, [f.Vat vat = const f.Vat()]) => ((vat.gross(cost / (1 - marginPercent / 100)) * 100).round() / 100).toStringAsFixed(2);
 
-  void refreshMargin() => margin.text = _marginText(unitPrice.text, unitCost.text);
+  void refreshMargin([f.Vat vat = const f.Vat()]) => margin.text = _marginText(unitPrice.text, unitCost.text, vat);
 
   factory EditLine.fromJson(Json j) => EditLine(
         id: j.s('id').isEmpty ? null : j.s('id'),
@@ -107,7 +108,7 @@ class LineItemsEditor extends StatefulWidget {
     super.key,
     required this.lines,
     this.discount,
-    this.taxRate,
+    this.vat = const f.Vat(),
     this.currency = 'USD',
     this.error,
     this.priced = true,
@@ -117,7 +118,8 @@ class LineItemsEditor extends StatefulWidget {
   });
   final List<EditLine> lines;
   final TextEditingController? discount;
-  final TextEditingController? taxRate;
+  /// The VAT from Settings; never typed on a document.
+  final f.Vat vat;
   final String currency;
   final String? error;
   final bool priced;
@@ -134,10 +136,19 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
   void _changed(_) => setState(() {});
 
   @override
+  void initState() {
+    super.initState();
+    for (final l in widget.lines) {
+      l.refreshMargin(widget.vat);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cur = widget.currency;
     final priced = widget.priced;
-    final t = f.lineTotals([for (final l in widget.lines) (quantity: l.quantity.text, unitPrice: priced ? l.unitPrice.text : '0')], widget.discount?.text ?? '0', widget.taxRate?.text ?? '0');
+    final vat = widget.vat;
+    final t = f.lineTotals([for (final l in widget.lines) (quantity: l.quantity.text, unitPrice: priced ? l.unitPrice.text : '0')], widget.discount?.text ?? '0', '${vat.rate}', included: vat.included);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       for (var i = 0; i < widget.lines.length; i++) _line(context, i, t.lines[i]),
       if (widget.error != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(widget.error!, style: TextStyle(color: context.c.bad, fontSize: 12.5))),
@@ -157,15 +168,14 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
           child: Column(children: [
             _row(context, 'Subtotal', f.cents(t.subtotal, cur)),
             gap8,
-            Row(children: [
-              Expanded(child: TextField(controller: widget.discount, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: _changed, decoration: const InputDecoration(labelText: 'Discount (amount)'))),
-              gap8,
-              Expanded(child: TextField(controller: widget.taxRate, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: _changed, decoration: const InputDecoration(labelText: 'Tax rate (%)'))),
-            ]),
+            TextField(controller: widget.discount, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: _changed, decoration: const InputDecoration(labelText: 'Discount (amount)')),
             gap8,
-            _row(context, 'Tax', f.cents(t.tax, cur)),
+            if (!vat.included && (vat.rate > 0 || vat.exempt)) _row(context, vat.exempt ? 'VAT (customer exempt)' : 'VAT ${vat.rate}%', f.cents(t.tax, cur)),
             Divider(height: 20, color: context.c.lineStrong),
-            _row(context, 'Total', f.cents(t.total, cur), strong: true),
+            _row(context, vat.included && vat.rate > 0 ? 'Total incl. VAT' : 'Total', f.cents(t.total, cur), strong: true),
+            if (vat.included) _row(context, vat.exempt ? 'No VAT (customer exempt)' : 'of which VAT ${vat.rate}%', f.cents(t.tax, cur)),
+            gap4,
+            Align(alignment: Alignment.centerLeft, child: Text('VAT is set by the super admin in Settings${vat.exempt ? '; this customer is VAT exempt' : ''}.', style: context.t.bodySmall)),
             if (widget.costing) _costSummary(context, t.discount),
           ]),
         ),
@@ -224,7 +234,7 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
               child: TextField(
                 controller: l.unitPrice,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                onChanged: (_) => setState(l.refreshMargin),
+                onChanged: (_) => setState(() => l.refreshMargin(widget.vat)),
                 decoration: InputDecoration(labelText: 'Unit price (${widget.currency})', hintText: '0.00'),
               ),
             ),
@@ -259,7 +269,7 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
             child: TextField(
               controller: l.unitCost,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              onChanged: (_) => setState(l.refreshMargin),
+              onChanged: (_) => setState(() => l.refreshMargin(widget.vat)),
               decoration: InputDecoration(labelText: 'Our cost (${widget.currency})', isDense: true),
             ),
           ),
@@ -271,7 +281,7 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
               onChanged: (v) {
                 final m = num.tryParse(v), c = num.tryParse(l.unitCost.text);
-                if (m != null && m < 95 && c != null && c > 0) setState(() => l.unitPrice.text = EditLine.priceFor(c, m));
+                if (m != null && m < 95 && c != null && c > 0) setState(() => l.unitPrice.text = EditLine.priceFor(c, m, widget.vat));
               },
               decoration: const InputDecoration(labelText: 'Margin', suffixText: '%', isDense: true),
             ),
@@ -295,7 +305,7 @@ class _LineItemsEditorState extends State<LineItemsEditor> {
         continue;
       }
       cost += (f.toCents(c) * q).round();
-      sales += (f.toCents(num.tryParse(l.unitPrice.text) ?? 0) * q).round();
+      sales += (f.toCents(widget.vat.net(num.tryParse(l.unitPrice.text) ?? 0)) * q).round();
     }
     if (cost == 0) return const SizedBox.shrink();
     final profit = sales - cost;
@@ -363,6 +373,8 @@ class LinesView extends StatelessWidget {
     final discount = f.toCents(totals['discount']);
     final tax = f.toCents(totals['taxAmount']);
     final paid = totals['amountPaid'] == null ? 0 : f.toCents(totals['amountPaid']);
+    final included = totals['pricesIncludeVat'] == true;
+    final rate = num.tryParse(totals.s('taxRate')) ?? 0;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       for (var i = 0; i < items.length; i++) ...[
         if (i > 0) Divider(height: 20, color: context.c.line),
@@ -385,17 +397,18 @@ class LinesView extends StatelessWidget {
       Divider(height: 24, color: context.c.lineStrong),
       _total(context, 'Subtotal', f.money(totals['subtotal'], currency)),
       if (discount > 0) _total(context, 'Discount', '− ${f.money(totals['discount'], currency)}'),
-      if (tax > 0 || (num.tryParse(totals.s('taxRate')) ?? 0) > 0) _total(context, 'Tax (${num.tryParse(totals.s('taxRate')) ?? 0}%)', f.money(totals['taxAmount'], currency)),
+      if (!included && (tax > 0 || rate > 0)) _total(context, 'VAT ($rate%)', f.money(totals['taxAmount'], currency)),
       gap8,
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(color: context.c.text, borderRadius: BorderRadius.circular(10)),
         child: Row(children: [
-          Text('TOTAL $currency', style: TextStyle(fontFamily: 'Geist', fontSize: 12, letterSpacing: 1.2, fontWeight: FontWeight.w600, color: context.c.bg)),
+          Text('TOTAL $currency${included && rate > 0 ? ' INCL. VAT' : ''}', style: TextStyle(fontFamily: 'Geist', fontSize: 12, letterSpacing: 1.2, fontWeight: FontWeight.w600, color: context.c.bg)),
           const Spacer(),
           Text(f.money(totals['total'], currency), style: TextStyle(fontFamily: 'Geist', fontSize: 16, fontWeight: FontWeight.w700, color: context.c.bg, fontFeatures: const [FontFeature.tabularFigures()])),
         ]),
       ),
+      if (included && (tax > 0 || rate > 0)) Padding(padding: const EdgeInsets.only(top: 4), child: _total(context, 'of which VAT ($rate%)', f.money(totals['taxAmount'], currency))),
       if (paid > 0) ...[
         gap8,
         _total(context, 'Received', '− ${f.money(totals['amountPaid'], currency)}'),

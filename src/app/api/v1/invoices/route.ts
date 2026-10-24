@@ -16,7 +16,7 @@ export const GET = handle(async (request: Request) => {
   return json(await listInvoices(user, { ...filters, page: page(sp.page), pageSize: 25 }));
 });
 
-/** { quotationId, items, discount, taxRate, issueDate, dueDate, notes? } — from an accepted quotation. */
+/** { quotationId, issueDate, dueDate, notes? } — the lines, prices, discount and VAT are the accepted quotation's (anything else sent is ignored). */
 export const POST = handle(async (request: Request) => {
   const user = await apiUser("invoices.manage");
   const body = await formBody(request);

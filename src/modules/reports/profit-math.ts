@@ -7,7 +7,8 @@
  * rounding). A line with a recorded cost (from a factory offer, or typed in)
  * counts towards profit; a line without one (freight, inspection, an item
  * priced by hand) is revenue with an unknown cost and is reported apart, so it
- * never inflates the profit.
+ * never inflates the profit. When a document's prices include VAT, the VAT is
+ * taken out first: revenue is always without our VAT.
  */
 
 export interface ProfitLine {
@@ -24,6 +25,9 @@ export interface ProfitLine {
   lineTotalCents: number;
   docSubtotalCents: number;
   docDiscountCents: number;
+  /** The document's VAT; when its prices include VAT, that VAT is taken out of the revenue. */
+  docVatRate?: number;
+  docPricesIncludeVat?: boolean;
   /** One unit's cost incl. VAT, in the document currency; null = no cost recorded. */
   unitCost: number | null;
 }
@@ -68,7 +72,9 @@ export function costLines(lines: ProfitLine[]): CostedLine[] {
     docLines.forEach((l, i) => {
       const share = subtotal > 0 && discount > 0 ? (i === docLines.length - 1 ? discount - given : Math.round((l.lineTotalCents * discount) / subtotal)) : 0;
       given += share;
-      const netCents = l.lineTotalCents - share;
+      const afterDiscount = l.lineTotalCents - share;
+      const vat = l.docPricesIncludeVat ? (l.docVatRate ?? 0) : 0;
+      const netCents = vat > 0 ? Math.round(afterDiscount / (1 + vat / 100)) : afterDiscount;
       const costCents = l.unitCost === null ? null : Math.round(Math.round(l.unitCost * 100) * l.quantity);
       out.push({ ...l, netCents, costCents, profitCents: costCents === null ? null : netCents - costCents });
     });
