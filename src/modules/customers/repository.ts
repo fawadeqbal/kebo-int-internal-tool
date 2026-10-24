@@ -14,11 +14,12 @@ export interface CustomerListFilters {
   has?: "open" | "unpaid" | "none";
 }
 
+/** Outer column written in full: the count query selects from one table, where Drizzle would render a bare "id". */
 function hasCondition(has: CustomerListFilters["has"]): SQL | undefined {
   if (has === "open")
-    return sql`exists (select 1 from ${queries} q where q.customer_id = ${customers.id} and q.deleted_at is null and q.status in ('pending','processing'))`;
-  if (has === "unpaid") return sql`exists (select 1 from ${invoices} i where i.customer_id = ${customers.id} and i.status in ('unpaid','partially_paid'))`;
-  if (has === "none") return sql`not exists (select 1 from ${queries} q where q.customer_id = ${customers.id} and q.deleted_at is null)`;
+    return sql`exists (select 1 from ${queries} q where q.customer_id = "customers"."id" and q.deleted_at is null and q.status in ('pending','processing'))`;
+  if (has === "unpaid") return sql`exists (select 1 from ${invoices} i where i.customer_id = "customers"."id" and i.status in ('unpaid','partially_paid'))`;
+  if (has === "none") return sql`not exists (select 1 from ${queries} q where q.customer_id = "customers"."id" and q.deleted_at is null)`;
   return undefined;
 }
 

@@ -87,13 +87,15 @@ export async function workload(r: Range) {
 
 /** Conversion: queries → quoted → accepted → invoiced (for queries received in the range). */
 export async function pipeline(user: SessionUser, r: Range, staffId?: string) {
+  // The outer column is written out in full: in a one-table query Drizzle renders ${queries.id} as a bare "id",
+  // which inside the sub-query would mean the quotation's own id (the counts were always 0).
   const base = and(scope(user, staffId), inRange(queries.createdAt, r));
   const [row] = await db
     .select({
       received: sql<number>`count(distinct ${queries.id})`.mapWith(Number),
-      quoted: sql<number>`count(distinct ${queries.id}) filter (where exists (select 1 from quotations q where q.query_id = ${queries.id} and q.deleted_at is null and q.status <> 'draft'))`.mapWith(Number),
-      accepted: sql<number>`count(distinct ${queries.id}) filter (where exists (select 1 from quotations q where q.query_id = ${queries.id} and q.deleted_at is null and q.status = 'accepted'))`.mapWith(Number),
-      invoiced: sql<number>`count(distinct ${queries.id}) filter (where exists (select 1 from invoices i where i.query_id = ${queries.id} and i.status <> 'cancelled'))`.mapWith(Number),
+      quoted: sql<number>`count(distinct ${queries.id}) filter (where exists (select 1 from quotations q where q.query_id = "queries"."id" and q.deleted_at is null and q.status <> 'draft'))`.mapWith(Number),
+      accepted: sql<number>`count(distinct ${queries.id}) filter (where exists (select 1 from quotations q where q.query_id = "queries"."id" and q.deleted_at is null and q.status = 'accepted'))`.mapWith(Number),
+      invoiced: sql<number>`count(distinct ${queries.id}) filter (where exists (select 1 from invoices i where i.query_id = "queries"."id" and i.status <> 'cancelled'))`.mapWith(Number),
     })
     .from(queries)
     .where(base);
