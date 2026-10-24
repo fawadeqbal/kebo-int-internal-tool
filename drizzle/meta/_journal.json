@@ -29,6 +29,13 @@
       "when": 1792800092764,
       "tag": "0003_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792836001749,
+      "tag": "0004_packing_lists",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,8 @@ export interface DocumentProps {
   terms?: string | null;
   /** Invoice only: how to pay. */
   payment?: { bankDetails: string; dueDate: string; paidInFull: boolean };
+  /** Quotation only: bank details for the advance payment. */
+  bankDetails?: string;
   footer?: string | null;
   /** Draft / Paid / Cancelled marking. */
   stamp?: { label: string; tone: "draft" | "paid" | "void" } | null;
@@ -38,79 +40,24 @@ const label = "text-[10px] font-semibold tracking-[0.12em] text-stone-500 upperc
  * print page and the PDF download (the PDF is this page printed by Chrome).
  * It reflows on a phone and is A4 when printed.
  */
-export function DocumentView({ kind, number, settings, customer, meta, subject, items, totals, terms, payment, footer, stamp }: DocumentProps) {
+export function DocumentView({ kind, number, settings, customer, meta, subject, items, totals, terms, payment, bankDetails, footer, stamp }: DocumentProps) {
   const c = settings.currency;
   const discount = toCents(totals.discount);
   const tax = toCents(totals.taxAmount);
   const paid = totals.amountPaid !== undefined ? toCents(totals.amountPaid) : 0;
   const balance = toCents(totals.total) - paid;
   const title = kind === "Invoice" ? "Invoice" : "Quotation";
-  const contact = [settings.companyPhone, settings.companyEmail, settings.companyWebsite].filter(Boolean);
 
   return (
     <article className="relative mx-auto w-full max-w-[210mm] bg-white px-5 py-6 text-[12.5px] leading-relaxed text-stone-800 [print-color-adjust:exact] sm:px-12 sm:py-11 print:p-0">
-      {stamp && stamp.tone !== "paid" && (
-        <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
-          <span className="-rotate-[28deg] text-[110px] font-bold tracking-[0.15em] text-stone-900/[0.04] uppercase select-none">{stamp.label}</span>
-        </div>
-      )}
+      <Watermark stamp={stamp} />
 
-      {/* Letterhead */}
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-md bg-stone-900 text-white" aria-hidden>
-            <svg viewBox="0 0 32 32" className="size-5">
-              <path d="M8 10h16M8 16h11M8 22h7" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" />
-            </svg>
-          </span>
-          <div className="min-w-0">
-            <p className="text-[15px] leading-tight font-bold tracking-tight text-stone-900">{settings.companyName}</p>
-            {settings.companyAddress && <p className="mt-1 whitespace-pre-line text-stone-600">{settings.companyAddress}</p>}
-            {contact.length > 0 && <p className="text-stone-600">{contact.join("  ·  ")}</p>}
-            {settings.companyTaxNo && <p className="text-stone-600">Tax / Reg. no. {settings.companyTaxNo}</p>}
-          </div>
-        </div>
-        <div className="sm:text-right">
-          <p className="text-[26px] leading-none font-light tracking-[0.22em] text-stone-900 uppercase">{title}</p>
-          <p className="mt-2 font-mono text-[13px] font-semibold text-stone-900">No. {number}</p>
-          {stamp && (
-            <p
-              className={cn(
-                "mt-2 inline-block rounded border px-2 py-0.5 text-[10px] font-bold tracking-[0.15em] uppercase",
-                stamp.tone === "paid" && "border-emerald-600 text-emerald-700",
-                stamp.tone === "draft" && "border-stone-400 text-stone-500",
-                stamp.tone === "void" && "border-red-600 text-red-600",
-              )}
-            >
-              {stamp.label}
-            </p>
-          )}
-        </div>
-      </header>
-      <div className="mt-6 h-[3px] bg-stone-900" />
+      <Letterhead settings={settings} title={title} number={number} stamp={stamp} />
 
       {/* Parties and details */}
       <section className="mt-6 grid gap-4 sm:grid-cols-[1.15fr_1fr]">
-        <div className="rounded-md border border-stone-200 p-4">
-          <p className={label}>{kind === "Invoice" ? "Bill to" : "Prepared for"}</p>
-          <p className="mt-1.5 text-[13.5px] font-semibold text-stone-900">{customer.companyName || customer.contactPerson}</p>
-          {customer.companyName && <p>Attn: {customer.contactPerson}</p>}
-          {customer.address && <p className="whitespace-pre-line text-stone-600">{customer.address}</p>}
-          <p className="text-stone-600">{customer.phone}</p>
-          {customer.email && <p className="break-all text-stone-600">{customer.email}</p>}
-          {customer.taxNo && <p className="text-stone-600">Tax / Reg. no. {customer.taxNo}</p>}
-        </div>
-        <div className="rounded-md border border-stone-200 bg-stone-50 p-4">
-          <p className={label}>{title} details</p>
-          <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-            {meta.map((m) => (
-              <div key={m.label} className="contents">
-                <dt className="text-stone-500">{m.label}</dt>
-                <dd className="text-right font-medium text-stone-900">{m.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+        <PartyBox title={kind === "Invoice" ? "Bill to" : "Prepared for"} customer={customer} />
+        <DetailsBox title={`${title} details`} rows={meta} />
       </section>
 
       {subject && (
@@ -170,7 +117,7 @@ export function DocumentView({ kind, number, settings, customer, meta, subject, 
       </ol>
 
       {/* Amount in words + totals */}
-      <section className="mt-5 grid gap-5 sm:grid-cols-[1fr_17rem] sm:items-start">
+      <section className="mt-4 grid gap-5 sm:grid-cols-[1fr_17rem] sm:items-start">
         <div className="order-2 sm:order-1">
           <p className={label}>Amount in words</p>
           <p className="mt-1 font-medium text-stone-900 italic">{amountInWords(toCents(totals.total), c)}</p>
@@ -239,21 +186,34 @@ export function DocumentView({ kind, number, settings, customer, meta, subject, 
         </section>
       )}
 
-      {/* Terms */}
-      {terms && (
-        <section className="mt-7">
-          <p className={label}>Terms & conditions</p>
-          <p className="mt-1.5 whitespace-pre-wrap text-stone-700">{terms}</p>
+      {/* Terms, with the bank details beside them on a quotation */}
+      {(terms || (!payment && bankDetails)) && (
+        <section className={cn("mt-6 grid gap-5 break-inside-avoid", !payment && bankDetails && terms && "sm:grid-cols-2")}>
+          {!payment && bankDetails && (
+            <div className="rounded-md border border-stone-200 p-3.5">
+              <p className={label}>Bank details for payment (T/T)</p>
+              <p className="mt-1 whitespace-pre-line text-stone-800">{bankDetails}</p>
+              <p className="mt-1.5 text-stone-600">
+                Reference: <span className="font-mono font-semibold text-stone-900">{number}</span>
+              </p>
+            </div>
+          )}
+          {terms && (
+            <div>
+              <p className={label}>Terms & conditions</p>
+              <p className="mt-1.5 whitespace-pre-wrap text-stone-700">{terms}</p>
+            </div>
+          )}
         </section>
       )}
 
       {/* Signatures (an invoice signs inside the payment box) */}
       {!payment && (
-        <section className={cn("mt-9 grid gap-8 break-inside-avoid", kind === "Quotation" && "sm:grid-cols-2")}>
+        <section className={cn("mt-6 grid gap-8 break-inside-avoid", kind === "Quotation" && "sm:grid-cols-2")}>
           {kind === "Quotation" && (
             <div>
               <p className={label}>Accepted by the customer</p>
-              <div className="mt-12 border-t border-stone-400 pt-1.5 text-[11px] text-stone-500">Name, signature, company stamp and date</div>
+              <div className="mt-10 border-t border-stone-400 pt-1.5 text-[11px] text-stone-500">Name, signature, company stamp and date</div>
             </div>
           )}
           <div className={cn(kind === "Invoice" && "sm:ml-auto sm:w-72")}>
@@ -264,16 +224,98 @@ export function DocumentView({ kind, number, settings, customer, meta, subject, 
         </section>
       )}
 
-      <footer className="mt-8 border-t border-stone-200 pt-3 text-center text-[11px] text-stone-500">
-        {footer && <p className="font-medium text-stone-700">{footer}</p>}
-        <p>
-          {settings.companyName}
-          {settings.companyWebsite && `  ·  ${settings.companyWebsite}`}
-          {settings.companyEmail && `  ·  ${settings.companyEmail}`}
-        </p>
-      </footer>
+      {footer && <footer className="mt-6 border-t border-stone-200 pt-3 text-center text-[11px] font-medium text-stone-700">{footer}</footer>}
     </article>
   );
 }
 
 export const docDate = (iso: string | null | undefined) => formatDate(iso);
+
+type Stamp = { label: string; tone: "draft" | "paid" | "void" } | null | undefined;
+
+/** Faint diagonal word behind a draft or cancelled document. */
+export function Watermark({ stamp }: { stamp: Stamp }) {
+  if (!stamp || stamp.tone === "paid") return null;
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+      <span className="-rotate-[28deg] text-[110px] font-bold tracking-[0.15em] text-stone-900/[0.04] uppercase select-none">{stamp.label}</span>
+    </div>
+  );
+}
+
+/** Company letterhead with the document title and number (shared by every printed document). */
+export function Letterhead({ settings, title, number, stamp }: { settings: AppSettings; title: string; number: string; stamp?: Stamp }) {
+  const contact = [settings.companyPhone, settings.companyEmail, settings.companyWebsite].filter(Boolean);
+  return (
+    <>
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-md bg-stone-900 text-white" aria-hidden>
+            <svg viewBox="0 0 32 32" className="size-5">
+              <path d="M8 10h16M8 16h11M8 22h7" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] leading-tight font-bold tracking-tight text-stone-900">{settings.companyName}</p>
+            {settings.companyAddress && <p className="mt-1 whitespace-pre-line text-stone-600">{settings.companyAddress}</p>}
+            {contact.length > 0 && <p className="text-stone-600">{contact.join("  ·  ")}</p>}
+            {settings.companyTaxNo && <p className="text-stone-600">Tax / Reg. no. {settings.companyTaxNo}</p>}
+          </div>
+        </div>
+        <div className="sm:text-right">
+          <p className="text-[26px] leading-none font-light tracking-[0.22em] text-stone-900 uppercase">{title}</p>
+          <p className="mt-2 font-mono text-[13px] font-semibold text-stone-900">No. {number}</p>
+          {stamp && (
+            <p
+              className={cn(
+                "mt-2 inline-block rounded border px-2 py-0.5 text-[10px] font-bold tracking-[0.15em] uppercase",
+                stamp.tone === "paid" && "border-emerald-600 text-emerald-700",
+                stamp.tone === "draft" && "border-stone-400 text-stone-500",
+                stamp.tone === "void" && "border-red-600 text-red-600",
+              )}
+            >
+              {stamp.label}
+            </p>
+          )}
+        </div>
+      </header>
+      <div className="mt-6 h-[3px] bg-stone-900" />
+    </>
+  );
+}
+
+type Party = { companyName: string | null; contactPerson: string; phone: string; email: string | null; address: string | null; taxNo: string | null };
+
+/** A customer (or consignee) box. */
+export function PartyBox({ title, customer }: { title: string; customer: Party }) {
+  return (
+    <div className="rounded-md border border-stone-200 p-4">
+      <p className={label}>{title}</p>
+      <p className="mt-1.5 text-[13.5px] font-semibold text-stone-900">{customer.companyName || customer.contactPerson}</p>
+      {customer.companyName && <p>Attn: {customer.contactPerson}</p>}
+      {customer.address && <p className="whitespace-pre-line text-stone-600">{customer.address}</p>}
+      <p className="text-stone-600">{customer.phone}</p>
+      {customer.email && <p className="break-all text-stone-600">{customer.email}</p>}
+      {customer.taxNo && <p className="text-stone-600">Tax / Reg. no. {customer.taxNo}</p>}
+    </div>
+  );
+}
+
+/** The grey label/value box (dates, references, shipment details). */
+export function DetailsBox({ title, rows }: { title: string; rows: { label: string; value: ReactNode }[] }) {
+  return (
+    <div className="rounded-md border border-stone-200 bg-stone-50 p-4">
+      <p className={label}>{title}</p>
+      <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+        {rows.map((m) => (
+          <div key={m.label} className="contents">
+            <dt className="text-stone-500">{m.label}</dt>
+            <dd className="text-right font-medium text-stone-900">{m.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+export const docLabel = label;

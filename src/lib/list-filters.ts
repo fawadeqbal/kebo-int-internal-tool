@@ -140,8 +140,8 @@ export function parseInvoiceParams(sp: SearchParams) {
 
 /* ------------------------------------------------------------------ Audit log */
 
-export const AUDIT_TYPES = ["query", "customer", "quotation", "invoice", "payment", "attachment", "user", "settings"];
-export const auditTypeLabel = (t: string) => (t === "query" ? "Inquiry" : t[0].toUpperCase() + t.slice(1));
+export const AUDIT_TYPES = ["query", "customer", "quotation", "invoice", "packing_list", "payment", "attachment", "user", "settings"];
+export const auditTypeLabel = (t: string) => (t === "query" ? "Inquiry" : t === "packing_list" ? "Packing list" : t[0].toUpperCase() + t.slice(1));
 
 export function parseAuditParams(sp: SearchParams, people: Person[]) {
   const t = one(sp.type);

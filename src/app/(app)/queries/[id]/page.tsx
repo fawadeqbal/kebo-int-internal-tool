@@ -13,16 +13,16 @@ import { addCommentAction, assignQueryAction, changeStatusAction, deleteQueryAct
 import { AssignPanel, CommentForm, RemoveFileButton, StatusPanel } from "@/modules/queries/components/panels";
 import { AttachmentUploader } from "@/modules/queries/components/uploader";
 import { listActiveUsers } from "@/modules/users/repository";
-import { Avatar, buttonClass, ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, Table, THead, Td, Th, Tr } from "@/components/ui";
+import { Avatar, buttonClass, ButtonLink, Card, CardBody, CardHeader, DetailList } from "@/components/ui";
 import { Badge } from "@/components/ui/badge";
 import { DealTrack } from "@/modules/queries/components/inbox";
-import { InvoiceStatusBadge, PriorityBadge, QueryStatusBadge, QuotationStatusBadge } from "@/components/ui/badge";
+import { PriorityBadge, QueryStatusBadge } from "@/components/ui/badge";
 import { ConfirmSubmit } from "@/components/ui/client";
 import { QUERY_STATUS_LABEL, SOURCE_LABEL } from "@/lib/labels";
 import { formatDate, formatDateTime, formatDuration, todayISO } from "@/lib/utils/dates";
-import { formatMoney } from "@/lib/utils/money";
 import { getSettings } from "@/modules/settings/service";
-import { invoiceDisplayStatus } from "@/modules/invoices/status";
+import { listPackingListsForQuery } from "@/modules/packing/repository";
+import { DocumentsCard } from "@/modules/queries/components/documents";
 import type { QueryStatus } from "@/lib/db/schema";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +39,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const detail = isUuid(id) ? await getQueryDetail(user, id) : null;
   if (!detail) notFound();
-  const [people, settings] = await Promise.all([listActiveUsers(), getSettings()]);
+  const [people, settings, packingLists] = await Promise.all([listActiveUsers(), getSettings(), listPackingListsForQuery(id)]);
 
   const { query, customer } = detail;
   const workable = canWorkOn(user, query);
@@ -210,6 +210,15 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
             </CardBody>
           </Card>
 
+          <DocumentsCard
+            detail={detail}
+            packingLists={packingLists}
+            currency={settings.currency}
+            today={today}
+            canQuote={can(user.role, "quotations.manage")}
+            canInvoice={can(user.role, "invoices.manage")}
+          />
+
           <Card>
             <CardHeader title={`Files (${detail.files.length})`} description="Drawings, spec sheets, photos and factory quotes." />
             <CardBody className="flex flex-col gap-4">
@@ -243,67 +252,6 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
             </CardBody>
           </Card>
 
-          <Card className="overflow-hidden">
-            <CardHeader title="Quotations & invoices" />
-            {detail.quotations.length === 0 ? (
-              <EmptyState
-                icon={FileText}
-                title="No quotation yet"
-                description="When the factory price is in, quote the customer."
-                action={
-                  can(user.role, "quotations.manage") &&
-                  query.status !== "not_completed" && (
-                    <ButtonLink href={`/quotations/new?query=${id}`} variant="primary" size="sm">
-                      Create quotation
-                    </ButtonLink>
-                  )
-                }
-              />
-            ) : (
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Document</Th>
-                    <Th>Status</Th>
-                    <Th className="text-right">Amount</Th>
-                    <Th className="hidden sm:table-cell">Due</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {detail.quotations.map((q) => (
-                    <Tr key={q.id} className="hover:bg-surface-2/70">
-                      <Td>
-                        <Link href={`/quotations/${q.id}`} className="font-mono text-[13px] font-medium text-text hover:text-primary hover:underline">
-                          {q.refNo}
-                        </Link>
-                        <span className="ml-2 text-xs text-muted">Quotation v{q.version}</span>
-                      </Td>
-                      <Td>
-                        <QuotationStatusBadge status={q.status} />
-                      </Td>
-                      <Td className="text-right font-medium whitespace-nowrap tabular">{formatMoney(q.total, settings.currency)}</Td>
-                      <Td className="hidden text-text-2 sm:table-cell">{formatDate(q.dueDate)}</Td>
-                    </Tr>
-                  ))}
-                  {(can(user.role, "invoices.manage") ? detail.invoices : []).map((inv) => (
-                    <Tr key={inv.id} className="hover:bg-surface-2/70">
-                      <Td>
-                        <Link href={`/invoices/${inv.id}`} className="font-mono text-[13px] font-medium text-text hover:text-primary hover:underline">
-                          {inv.invoiceNo}
-                        </Link>
-                        <span className="ml-2 text-xs text-muted">Invoice</span>
-                      </Td>
-                      <Td>
-                        <InvoiceStatusBadge status={invoiceDisplayStatus(inv, today)} />
-                      </Td>
-                      <Td className="text-right font-medium whitespace-nowrap tabular">{formatMoney(inv.total, settings.currency)}</Td>
-                      <Td className="hidden text-text-2 sm:table-cell">{formatDate(inv.dueDate)}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
-          </Card>
 
           <Card>
             <CardHeader title="Internal notes" description="Only the team sees these." />

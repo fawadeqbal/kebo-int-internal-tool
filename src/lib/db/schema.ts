@@ -323,6 +323,61 @@ export const payments = pgTable(
 );
 
 /* ----------------------------------------------------------------------------
+ * Packing lists (shipping document made from an invoice; no prices)
+ * --------------------------------------------------------------------------*/
+export const packingLists = pgTable(
+  "packing_lists",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    plNo: varchar("pl_no", { length: 30 }).notNull().unique(),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id),
+    queryId: uuid("query_id")
+      .notNull()
+      .references(() => queries.id),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id),
+    packDate: date("pack_date", { mode: "string" }).notNull(),
+    incoterm: varchar("incoterm", { length: 60 }),
+    portOfLoading: varchar("port_of_loading", { length: 120 }),
+    portOfDischarge: varchar("port_of_discharge", { length: 120 }),
+    finalDestination: varchar("final_destination", { length: 160 }),
+    /** Vessel / voyage, flight or truck. */
+    transport: varchar("transport", { length: 160 }),
+    containerNo: varchar("container_no", { length: 200 }),
+    sealNo: varchar("seal_no", { length: 120 }),
+    marks: text("marks"),
+    notes: text("notes"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("packing_lists_invoice_idx").on(t.invoiceId), index("packing_lists_query_idx").on(t.queryId)],
+);
+
+export const packingListItems = pgTable("packing_list_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  packingListId: uuid("packing_list_id")
+    .notNull()
+    .references(() => packingLists.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  unit: varchar("unit", { length: 20 }).notNull().default("pcs"),
+  /** Number of packages (cartons, cases, pallets) for this line. */
+  packages: integer("packages").notNull().default(1),
+  packageType: varchar("package_type", { length: 40 }).notNull().default("Wooden case"),
+  netWeight: numeric("net_weight", { precision: 12, scale: 2 }).notNull().default("0"),
+  grossWeight: numeric("gross_weight", { precision: 12, scale: 2 }).notNull().default("0"),
+  /** Volume of this line's packages, cubic metres. */
+  cbm: numeric("cbm", { precision: 12, scale: 3 }).notNull().default("0"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/* ----------------------------------------------------------------------------
  * Notifications, audit, settings, counters
  * --------------------------------------------------------------------------*/
 export const notifications = pgTable(
@@ -443,5 +498,6 @@ export type Priority = (typeof priorityEnum.enumValues)[number];
 export type Quotation = typeof quotations.$inferSelect;
 export type QuotationStatus = (typeof quotationStatusEnum.enumValues)[number];
 export type Invoice = typeof invoices.$inferSelect;
+export type PackingList = typeof packingLists.$inferSelect;
 export type InvoiceStatus = (typeof invoiceStatusEnum.enumValues)[number];
 export type PaymentMethod = (typeof paymentMethodEnum.enumValues)[number];

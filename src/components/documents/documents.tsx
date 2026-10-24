@@ -28,6 +28,7 @@ export function QuotationDocument({ detail, settings }: { detail: QuotationDetai
       items={detail.items}
       totals={q}
       terms={q.terms}
+      bankDetails={settings.bankDetails}
     />
   );
 }

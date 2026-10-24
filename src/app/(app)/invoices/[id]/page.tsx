@@ -10,7 +10,9 @@ import { cancelInvoiceAction, recordPaymentAction } from "@/modules/invoices/act
 import { CancelInvoiceForm, PaymentForm } from "@/modules/invoices/components";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import { getSettings } from "@/modules/settings/service";
-import { buttonClass, Card, CardBody, CardHeader } from "@/components/ui";
+import { listPackingListsForQuery } from "@/modules/packing/repository";
+import { formatCbm, formatKg } from "@/lib/packing";
+import { buttonClass, ButtonLink, Card, CardBody, CardHeader } from "@/components/ui";
 import { InvoiceStatusBadge } from "@/components/ui/badge";
 import { InvoiceDocument } from "@/components/documents/documents";
 import { PAYMENT_METHOD_LABEL } from "@/lib/labels";
@@ -24,7 +26,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const detail = isUuid(id) ? await getInvoiceDetail(id) : null;
   if (!detail) notFound();
-  const settings = await getSettings();
+  const [settings, allPacking] = await Promise.all([getSettings(), listPackingListsForQuery(detail.query.id)]);
+  const packing = allPacking.filter((p) => p.invoiceId === id);
   const { invoice: inv, customer, query, quotation } = detail;
   const today = todayISO();
   const display = invoiceDisplayStatus(inv, today);
@@ -104,6 +107,37 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <InvoiceDocument detail={detail} settings={settings} />
         </div>
         <aside aria-label="Details" className="no-print flex flex-col gap-5 xl:col-start-2 xl:row-start-2">
+          {inv.status !== "cancelled" && (
+            <Card>
+              <CardHeader
+                title="Packing lists"
+                actions={
+                  <ButtonLink href={`/packing-lists/new?invoice=${id}`} variant="secondary" size="sm">
+                    New
+                  </ButtonLink>
+                }
+              />
+              <CardBody>
+                {packing.length === 0 ? (
+                  <p className="text-sm text-muted">None yet. Make one when the goods are packed.</p>
+                ) : (
+                  <ul className="flex flex-col divide-y divide-line text-sm">
+                    {packing.map((p) => (
+                      <li key={p.id} className="py-2 first:pt-0 last:pb-0">
+                        <Link href={`/packing-lists/${p.id}`} className="flex justify-between gap-3 hover:underline">
+                          <span className="font-mono font-medium text-text">{p.plNo}</span>
+                          <span className="text-muted">{formatDate(p.packDate)}</span>
+                        </Link>
+                        <p className="text-xs text-muted tabular">
+                          {p.packages} pkgs · {formatKg(Number(p.grossWeight))} · {formatCbm(Number(p.cbm))}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardBody>
+            </Card>
+          )}
           {detail.payments.length > 0 && (
             <Card>
               <CardHeader title="Payments received" />

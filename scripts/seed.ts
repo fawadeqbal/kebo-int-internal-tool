@@ -30,6 +30,8 @@ const {
   settings,
   counters,
   auditLogs,
+  packingLists,
+  packingListItems,
 } = schema;
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -155,12 +157,14 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
   const workers = [staff["Bilal Ahmed"], staff["Sana Malik"], staff["Usman Tariq"], accounts.staff];
 
   const customerIds: string[] = [];
+  const customerCity = new Map<string, string>();
   for (const [contactPerson, companyName, phone, email, address] of COMPANIES) {
     const [row] = await db
       .insert(customers)
       .values({ companyName, contactPerson, phone, email, address, createdBy: manager, createdAt: addDays(new Date(), -200) })
       .returning({ id: customers.id });
     customerIds.push(row.id);
+    customerCity.set(row.id, address);
   }
 
   const now = new Date();
@@ -335,6 +339,51 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
               sortOrder: idx,
             })),
           );
+          // Paid (or half-paid) orders have been packed and shipped.
+          if (paid > 0) {
+            const packOn = addDays(new Date(`${issueDate}T00:00:00Z`), 3 + rand() * 10);
+            const packDate = iso(packOn > now ? now : packOn);
+            const plNo = await nextRef(tx, "PL", Number(packDate.slice(0, 4)));
+            const dest = customerCity.get(customerId) ?? "";
+            const country = dest.split(",").at(-1)?.trim() ?? "";
+            const port = { Pakistan: "Karachi", Nigeria: "Lagos (Apapa)", Kenya: "Mombasa", "Saudi Arabia": "Dammam", Bangladesh: "Chittagong", Egypt: "Alexandria", Uzbekistan: "Tashkent (via Bandar Abbas)", Morocco: "Casablanca", UAE: "Jebel Ali" }[country] ?? country;
+            const cases = Math.max(1, Math.round(quantity > 1 ? quantity / 2 : 2 + rand() * 6));
+            const net = Math.round((job.price / 40) * quantity * (0.8 + rand() * 0.4));
+            const [pl] = await tx
+              .insert(packingLists)
+              .values({
+                plNo,
+                invoiceId: inv.id,
+                queryId: q.id,
+                customerId,
+                packDate,
+                incoterm: `CIF ${port}`,
+                portOfLoading: "Qingdao, China",
+                portOfDischarge: port ? `${port}, ${country}` : null,
+                finalDestination: dest,
+                transport: `By sea · ${pick(["COSCO", "MSC", "Maersk", "CMA CGM"])} V.${Math.floor(100 + rand() * 800)}W`,
+                containerNo: `1 × ${net > 6000 ? "40HQ" : "20GP"} ${pick(["MSKU", "CSNU", "TGHU", "CMAU"])}${Math.floor(1000000 + rand() * 8999999)}`,
+                sealNo: `SL${Math.floor(100000 + rand() * 899999)}`,
+                marks: `KEBO / ${refNo}\nC/NO. 1–${cases}\nMADE IN CHINA`,
+                createdBy: manager,
+                createdAt: new Date(`${packDate}T09:00:00Z`),
+              })
+              .returning({ id: packingLists.id });
+            await tx.insert(packingListItems).values([
+              {
+                packingListId: pl.id,
+                description: job.title,
+                quantity: String(quantity),
+                unit: quantity > 1 ? "units" : "set",
+                packages: cases,
+                packageType: job.category === "Medical Devices & Equipment" ? "Carton" : "Wooden case",
+                netWeight: String(net),
+                grossWeight: String(Math.round(net * 1.12)),
+                cbm: String(Math.round(net / 220) + 1),
+                sortOrder: 0,
+              },
+            ]);
+          }
           if (paid > 0) {
             const paidOn = addDays(new Date(`${issueDate}T00:00:00Z`), 5 + rand() * 20);
             await tx.insert(payments).values({
