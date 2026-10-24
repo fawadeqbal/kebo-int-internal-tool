@@ -189,11 +189,8 @@ function SidebarContent({ groups, companyName, roleLabel }: { groups: NavGroup[]
   return (
     <>
       <Link href="/dashboard" className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line px-4">
-        <span className="flex size-8 items-center justify-center rounded-lg bg-primary-solid text-primary-fg" aria-hidden>
-          <svg viewBox="0 0 32 32" className="size-4">
-            <path d="M8 10h16M8 16h11M8 22h7" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" />
-          </svg>
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
+        <img src="/brand/kebo-logo-96.png" alt="" width={32} height={32} className="size-8 shrink-0" />
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold text-text">{companyName}</span>
           <span className="block text-[11px] text-muted">RFQ Desk</span>

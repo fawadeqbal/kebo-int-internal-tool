@@ -70,25 +70,13 @@ class _Brand extends StatelessWidget {
   }
 }
 
-/// The three-line mark from the web's logo.
+/// The KEBO logo (as on keboint.com and the app icon).
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 36});
   final double size;
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: context.c.primarySolid, borderRadius: BorderRadius.circular(size * 0.3)),
-      padding: EdgeInsets.all(size * 0.27),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final w in [1.0, 0.7, 0.45]) Container(height: size * 0.075, width: size * 0.46 * w, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(9))),
-        ],
-      ),
-    );
+    return Image.asset('assets/brand/kebo-logo.png', width: size, height: size, filterQuality: FilterQuality.medium, semanticLabel: 'KEBO International');
   }
 }
 
