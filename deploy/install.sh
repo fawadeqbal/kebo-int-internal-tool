@@ -114,7 +114,7 @@ say "building the app image (a few minutes on first run)…"
 $D compose build app
 # Phone push notifications (optional): the Firebase service-account key, copied next to the code.
 mkdir -p secrets
-for f in firebase-service-account*.json *-firebase-adminsdk-*.json; do
+for f in firebase-service-account*.json *firebase-adminsdk*.json; do
   [ -f "$f" ] && mv -f "$f" secrets/firebase.json && say "Firebase key moved to secrets/firebase.json"
 done
 if [ -f secrets/firebase.json ]; then

@@ -18,4 +18,4 @@ portfolio/
 # Server keys (Firebase service account etc.), never in git
 secrets/
 firebase-service-account*.json
-*-firebase-adminsdk-*.json
+*firebase-adminsdk*.json

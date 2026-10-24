@@ -14,3 +14,4 @@ backups
 mobile
 secrets
 firebase-service-account*.json
+*firebase-adminsdk*.json
