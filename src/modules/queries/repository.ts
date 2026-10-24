@@ -266,3 +266,19 @@ export async function countByStatus(user: SessionUser, f: QueryFilters) {
   const by = Object.fromEntries(rows.map((r) => [r.status, r.n])) as Record<string, number>;
   return { pending: by.pending ?? 0, processing: by.processing ?? 0, completed: by.completed ?? 0, not_completed: by.not_completed ?? 0, overdue, unassigned };
 }
+
+/** Categories that inquiries actually use (includes ones typed in with "Other"), A–Z. */
+export async function listCategoriesInUse() {
+  const rows = await db
+    .selectDistinct({ category: queries.category })
+    .from(queries)
+    .where(and(isNull(queries.deletedAt), sql`${queries.category} is not null and ${queries.category} <> ''`))
+    .orderBy(asc(queries.category));
+  return rows.map((r) => r.category as string);
+}
+
+/** The settings list first (in its order), then any other categories in use. */
+export function mergeCategories(configured: string[], inUse: string[]) {
+  const known = new Set(configured.map((c) => c.toLowerCase()));
+  return [...configured, ...inUse.filter((c) => !known.has(c.toLowerCase()))];
+}

@@ -39,7 +39,7 @@ export function titleFrom(requirements: string, category?: string | null): strin
 export const queryDetailsSchema = z.object({
   source: z.enum(querySourceEnum.enumValues, { message: "Choose how the inquiry came in" }).default("phone"),
   title: optionalText(200),
-  category: z.string().trim().min(1, "Choose a sourcing category").max(120),
+  category: z.string().trim().min(1, "Choose a sourcing category, or type your own").max(120).transform((v) => v.replace(/\s+/g, " ")),
   specifications: z.string().trim().min(5, "Write what the customer needs").max(20000),
   quantity: z.preprocess((v) => (v === "" || v === undefined ? 1 : v), z.coerce.number({ message: "Enter a quantity" }).int("Use a whole number").min(1, "At least 1").max(1_000_000)),
   priority: z.enum(priorityEnum.enumValues).default("normal"),

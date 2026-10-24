@@ -8,6 +8,7 @@ import { getQueryDetail } from "@/modules/queries/repository";
 import { canWorkOn } from "@/modules/queries/service";
 import { PageHeader } from "@/components/ui";
 import { getSettings } from "@/modules/settings/service";
+import { listCategoriesInUse, mergeCategories } from "@/modules/queries/repository";
 
 export const metadata = { title: "Edit inquiry" };
 
@@ -18,7 +19,7 @@ export default async function EditQueryPage({ params }: { params: Promise<{ id: 
   if (!detail) notFound();
   if (!canWorkOn(user, detail.query)) redirect("/forbidden");
   const { query, customer } = detail;
-  const settings = await getSettings();
+  const [settings, usedCategories] = await Promise.all([getSettings(), listCategoriesInUse()]);
   return (
     <>
       <PageHeader title={`Edit ${query.refNo}`} backHref={`/queries/${id}`} backLabel={query.refNo} />
@@ -29,6 +30,7 @@ export default async function EditQueryPage({ params }: { params: Promise<{ id: 
           cancelHref={`/queries/${id}`}
           maxUploadMb={Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}
           categories={settings.categories}
+          otherCategories={mergeCategories(settings.categories, usedCategories).slice(settings.categories.length)}
           initial={{
             customer: { id: customer.id, companyName: customer.companyName, contactPerson: customer.contactPerson, phone: customer.phone, email: customer.email },
             source: query.source,

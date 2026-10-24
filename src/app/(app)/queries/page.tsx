@@ -3,7 +3,7 @@ import { ClipboardList, Plus, SearchX, X } from "lucide-react";
 import { ExportMenu } from "@/components/ui/export-menu";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
-import { countByStatus, listQueries } from "@/modules/queries/repository";
+import { countByStatus, listCategoriesInUse, listQueries, mergeCategories } from "@/modules/queries/repository";
 import { parseQueryFilters } from "@/modules/queries/filters";
 import { INQUIRY_SORTS, inquiryActiveFilters } from "@/lib/list-filters";
 import { listActiveUsers } from "@/modules/users/repository";
@@ -26,7 +26,7 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
   // The default view is the work still open: what people come here to act on.
   const filters = parseQueryFilters({ ...sp, status: sp.status ?? "open" });
   const status = sp.status === "all" ? "all" : filters.raw.status;
-  const [data, counts, people, settings] = await Promise.all([listQueries(user, { ...filters, page: toPage(sp.page) }), countByStatus(user, filters), listActiveUsers(), getSettings()]);
+  const [data, counts, people, settings, usedCategories] = await Promise.all([listQueries(user, { ...filters, page: toPage(sp.page) }), countByStatus(user, filters), listActiveUsers(), getSettings(), listCategoriesInUse()]);
 
   const raw = filters.raw;
   const statusParam = status === "open" ? undefined : status;
@@ -50,7 +50,8 @@ export default async function QueriesPage({ searchParams }: { searchParams: Prom
     { value: "unassigned", label: "Not assigned" },
     ...people.filter((p) => p.id !== user.id).map((p) => ({ value: p.id, label: p.name })),
   ];
-  const categories = [...settings.categories, ...(raw.category && !settings.categories.includes(raw.category) ? [raw.category] : [])];
+  const merged = mergeCategories(settings.categories, usedCategories);
+  const categories = [...merged, ...(raw.category && !merged.includes(raw.category) ? [raw.category] : [])];
   const sourceOptions = Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label }));
   const priorityOptions = Object.entries(PRIORITY_LABEL).map(([value, label]) => ({ value, label }));
 

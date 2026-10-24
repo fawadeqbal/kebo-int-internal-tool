@@ -33,6 +33,7 @@ export function QueryForm({
   cancelHref,
   maxUploadMb,
   categories,
+  otherCategories = [],
 }: {
   action: Action;
   mode: "create" | "edit";
@@ -43,6 +44,8 @@ export function QueryForm({
   cancelHref: string;
   maxUploadMb: number;
   categories: string[];
+  /** Categories typed in earlier with "Other", offered as suggestions. */
+  otherCategories?: string[];
 }) {
   const router = useRouter();
   const [state, formAction] = useActionState(action, {});
@@ -96,7 +99,7 @@ export function QueryForm({
               <div role="radiogroup" aria-label="Customer type" className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5">
                 {(["existing", "new"] as const).map((m) => (
                   <label key={m} className={`inline-flex h-7 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring ${customerMode === m ? "bg-surface text-text shadow-card" : "text-muted hover:text-text"}`}>
-                    <input type="radio" name="customerMode" value={m} checked={customerMode === m} onChange={() => setCustomerMode(m)} className="sr-only" />
+                    <input type="radio" name="customerMode" value={m} defaultChecked={customerMode === m} onChange={() => setCustomerMode(m)} className="sr-only" />
                     {m === "existing" ? "Existing customer" : "New customer"}
                   </label>
                 ))}
@@ -134,18 +137,7 @@ export function QueryForm({
       <Card>
         <CardHeader title="What does the customer need?" />
         <CardBody className="grid gap-5 sm:grid-cols-2">
-          <Field label="Sourcing category" htmlFor="category" required error={e.category}>
-            <Select id="category" name="category" defaultValue={v("category", initial?.category ?? "")} aria-invalid={!!e.category}>
-              <option value="" disabled>
-                Choose a sourcing category…
-              </option>
-              {[...categories, ...(initial?.category && !categories.includes(initial.category) ? [initial.category] : [])].map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <CategoryField categories={categories} suggestions={otherCategories} initial={v("category", initial?.category ?? "")} otherChosen={state.values?.categoryChoice === OTHER} error={e.category} />
           <Field label="Received via" htmlFor="source" error={e.source}>
             <Select id="source" name="source" defaultValue={v("source", initial?.source ?? "whatsapp")}>
               {Object.entries(SOURCE_LABEL).map(([k, label]) => (
@@ -222,5 +214,64 @@ export function QueryForm({
         {createdId && files.length > 0 && !uploadState?.error && <span className="text-sm text-muted">Uploading files… {uploadState?.pct ?? 0}%</span>}
       </div>
     </form>
+  );
+}
+
+const OTHER = "__other__";
+
+/**
+ * The settings categories, plus "Other" to type a new one. Inputs are
+ * uncontrolled (defaultValue mirrors state) so React's reset of the form
+ * after a failed submit puts back what was chosen instead of blanking it.
+ */
+function CategoryField({ categories, suggestions, initial, error, otherChosen }: { categories: string[]; suggestions: string[]; initial: string; error?: string[]; otherChosen?: boolean }) {
+  const listed = categories.some((c) => c === initial);
+  const [choice, setChoice] = useState(otherChosen || (initial !== "" && !listed) ? OTHER : initial);
+  const [custom, setCustom] = useState(listed ? "" : initial);
+  const other = choice === OTHER;
+  return (
+    <div className="grid content-start gap-3">
+      <Field label="Sourcing category" htmlFor="category-choice" required error={other ? undefined : error}>
+        <Select
+          id="category-choice"
+          name={other ? "categoryChoice" : "category"}
+          defaultValue={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          aria-invalid={!other && !!error}
+        >
+          <option value="" disabled>
+            Choose a sourcing category…
+          </option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+          <option value={OTHER}>Other (type your own)…</option>
+        </Select>
+      </Field>
+      {other && (
+        <Field label="Your category" htmlFor="category" required error={error} hint={suggestions.length ? "Pick one used before, or type a new one" : undefined}>
+          <Input
+            id="category"
+            name="category"
+            defaultValue={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            list="category-suggestions"
+            maxLength={120}
+            placeholder="e.g. Packaging Machinery"
+            autoFocus={initial === "" || listed}
+            aria-invalid={!!error}
+          />
+          {suggestions.length > 0 && (
+            <datalist id="category-suggestions">
+              {suggestions.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          )}
+        </Field>
+      )}
+    </div>
   );
 }

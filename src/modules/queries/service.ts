@@ -10,9 +10,18 @@ import { createCustomer } from "@/modules/customers/service";
 import { findCustomer } from "@/modules/customers/repository";
 import { publish } from "@/modules/events";
 import { QUERY_STATUS_LABEL } from "@/lib/labels";
-import { accessCondition, findQuery } from "./repository";
+import { accessCondition, findQuery, listCategoriesInUse } from "./repository";
+import { getSettings } from "@/modules/settings/service";
 import { titleFrom, type CreateQueryInput, type UpdateQueryInput } from "./schema";
 import { canTransition, isReopen } from "./workflow";
+
+/** Use the existing spelling when a typed category matches one already known (any letter case). */
+export async function canonicalCategory(category: string): Promise<string> {
+  const key = category.toLowerCase();
+  const settings = await getSettings();
+  const hit = settings.categories.find((c) => c.toLowerCase() === key) ?? (await listCategoriesInUse()).find((c) => c.toLowerCase() === key);
+  return hit ?? category;
+}
 
 /** Load a query the user is allowed to see, or fail. */
 export async function getAccessibleQuery(user: SessionUser, id: string): Promise<Query> {
@@ -69,6 +78,7 @@ export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
   assertCan(actor, "queries.create");
   await assertAssignable(actor, input.assignedTo);
   if (input.customerMode === "existing" && !(await findCustomer(input.customerId))) throw new DomainError("The selected customer no longer exists.");
+  const category = await canonicalCategory(input.category);
 
   const created = await db.transaction(async (tx) => {
     const customerId =
@@ -94,8 +104,8 @@ export async function createQuery(actor: SessionUser, input: CreateQueryInput) {
     const query = await insertQueryRecord(tx, actor.id, {
       customerId,
       source: input.source,
-      title: input.title || titleFrom(input.specifications, input.category),
-      category: input.category,
+      title: input.title || titleFrom(input.specifications, category),
+      category,
       specifications: input.specifications,
       quantity: input.quantity,
       priority: input.priority,
@@ -115,11 +125,12 @@ export async function updateQuery(actor: SessionUser, id: string, input: UpdateQ
   const existing = await getAccessibleQuery(actor, id);
   if (!canWorkOn(actor, existing)) throw new ForbiddenError("Only the assigned person or a manager can edit this inquiry.");
   if (!(await findCustomer(input.customerId))) throw new DomainError("The selected customer no longer exists.");
+  const category = await canonicalCategory(input.category);
   const row = {
     customerId: input.customerId,
     source: input.source,
-    title: input.title || titleFrom(input.specifications, input.category),
-    category: input.category,
+    title: input.title || titleFrom(input.specifications, category),
+    category,
     specifications: input.specifications,
     quantity: input.quantity,
     priority: input.priority,
