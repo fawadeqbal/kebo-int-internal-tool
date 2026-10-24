@@ -9,7 +9,7 @@ import { SESSION_COOKIE, SESSION_RENEW_AFTER_SECONDS, SESSION_TTL_SECONDS, sessi
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isLogin = pathname === "/login";
+  const isLogin = pathname === "/login" || pathname === "/login/verify";
   const claims = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
 
   if (!claims && !isLogin) {

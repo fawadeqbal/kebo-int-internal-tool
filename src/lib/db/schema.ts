@@ -51,6 +51,13 @@ export const users = pgTable("users", {
   /** Wrong passwords in a row; the account locks for a while after too many. */
   failedLogins: integer("failed_logins").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  /** Two-step sign-in: the authenticator secret (encrypted), set during setup; on once totpEnabledAt is set. */
+  totpSecret: text("totp_secret"),
+  totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+  /** Last 30-second step a code was accepted for, so a code can't be used twice. */
+  totpLastStep: integer("totp_last_step"),
+  /** sha256 hashes of the unused recovery codes. */
+  recoveryCodes: jsonb("recovery_codes").$type<string[]>(),
   ...timestamps,
 });
 

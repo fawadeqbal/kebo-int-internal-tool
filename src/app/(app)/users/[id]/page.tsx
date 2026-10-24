@@ -7,6 +7,8 @@ import { PasswordForm, UserForm } from "@/modules/users/components";
 import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/ui/client";
 import { Badge } from "@/components/ui/badge";
+import { twoStepRequired } from "@/lib/auth/permissions";
+import { adminResetTwoStepAction } from "@/modules/users/two-step-actions";
 
 export const metadata = { title: "Edit user" };
 
@@ -47,6 +49,29 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
             <PasswordForm action={resetPasswordAction.bind(null, user.id)} />
           </CardBody>
         </Card>
+        {actor.id !== user.id && (
+          <Card>
+            <CardHeader
+              title="Two-step sign-in"
+              description={
+                user.twoStepOn
+                  ? "On. If they lost their phone and their recovery codes, reset it: they are signed out and set it up again at next sign-in."
+                  : twoStepRequired(user.role)
+                    ? "Not set up yet. They will be asked to set it up when they next sign in."
+                    : "Off (optional for this role)."
+              }
+            />
+            {user.twoStepOn && (
+              <CardBody>
+                <form action={adminResetTwoStepAction.bind(null, user.id)}>
+                  <ConfirmSubmit variant="secondary" size="sm" message={`Reset two-step sign-in for ${user.name}? They will be signed out everywhere.`}>
+                    Reset two-step sign-in
+                  </ConfirmSubmit>
+                </form>
+              </CardBody>
+            )}
+          </Card>
+        )}
         {actor.id !== user.id && (
           <Card>
             <CardHeader

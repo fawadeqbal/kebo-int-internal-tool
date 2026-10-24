@@ -1,15 +1,17 @@
 import { z } from "zod";
 import { checkRateLimit, clientIp } from "@/lib/auth/rate-limit";
+import { verifyTurnstile } from "@/lib/turnstile";
+import { normalizeFields, websiteInquirySchema } from "@/modules/inquiries/schema";
+import { receiveWebsiteInquiry } from "@/modules/inquiries/service";
 
 /** Website inquiries accepted per hour in total (real traffic is a few a day). */
 const PUBLIC_INQUIRIES_PER_HOUR = Number(process.env.PUBLIC_INQUIRIES_PER_HOUR) || 40;
-import { normalizeFields, websiteInquirySchema } from "@/modules/inquiries/schema";
-import { receiveWebsiteInquiry } from "@/modules/inquiries/service";
 
 /**
  * Public endpoint for the RFQ / inquiry form on the company website.
  * Accepts JSON, multipart/form-data or a normal HTML form post.
- * Protection: allowed origins (CORS), a hidden honeypot field, per-IP rate limit and size limits.
+ * Protection: allowed origins (CORS), a hidden honeypot field, Cloudflare Turnstile
+ * (when TURNSTILE_SECRET_KEY is set), per-visitor and hourly limits, size limits.
  */
 export const dynamic = "force-dynamic";
 
@@ -82,6 +84,13 @@ export async function POST(request: Request) {
       message: parsed.error.issues[0]?.message ?? "Please check the form.",
       errors: z.flattenError(parsed.error).fieldErrors,
     });
+
+  // "Not a robot" check (Cloudflare Turnstile), when switched on.
+  const human = await verifyTurnstile(raw["cf-turnstile-response"] ?? raw.turnstileToken, ip);
+  if (!human.ok) {
+    console.warn(`[inquiry] Turnstile check failed (${human.reason}) from ${ip}`);
+    return reply(403, { ok: false, message: "We could not confirm you are not a robot. Please reload the page and try again, or contact us on WhatsApp." });
+  }
 
   // Overall cap, counted only for valid forms, so a flood from many addresses
   // can't fill the inbox or use up the email quota.

@@ -11,7 +11,7 @@ export const metadata = { title: "Customers report" };
 export default async function CustomersExport({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requirePagePermission("customers.export");
   const { filters, active } = parseCustomerParams(await searchParams);
-  const [data, settings] = await Promise.all([listCustomers({ ...filters, pageSize: PDF_ROW_LIMIT }), getSettings()]);
+  const [data, settings] = await Promise.all([listCustomers(user, { ...filters, pageSize: PDF_ROW_LIMIT }), getSettings()]);
   const inquiries = data.rows.reduce((n, c) => n + c.queryCount, 0);
   return (
     <ReportSheet

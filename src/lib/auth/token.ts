@@ -55,3 +55,28 @@ export function sessionCookieOptions(maxAge: number) {
     maxAge,
   };
 }
+
+/* --------------------------------------------- the step between password and code */
+
+/** Set after a correct password when the account has two-step sign-in; good for 5 minutes. */
+export const TWO_STEP_COOKIE = "qms_2fa";
+export const TWO_STEP_TTL_SECONDS = 5 * 60;
+
+export async function signTwoStepToken(userId: string): Promise<string> {
+  return new SignJWT({ purpose: "two-step" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(userId)
+    .setIssuedAt()
+    .setExpirationTime(`${TWO_STEP_TTL_SECONDS}s`)
+    .sign(secret());
+}
+
+export async function verifyTwoStepToken(token: string | undefined): Promise<string | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
+    return payload.purpose === "two-step" && payload.sub ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}

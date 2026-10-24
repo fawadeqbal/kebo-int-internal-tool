@@ -28,7 +28,7 @@ Built with **Next.js 16 (App Router) · TypeScript · PostgreSQL · Drizzle ORM 
 |---|---|
 | Super Admin | Everything, including users and settings |
 | Manager | All queries, assign work, reopen, quotations, invoices, payments, reports, audit log |
-| Staff | Create queries and customers, work on queries assigned to them, draft and send quotations |
+| Staff | Create inquiries and customers, work on inquiries assigned to or created by them, see only the customers on that work, draft and send quotations |
 
 **File storage:** uploads go to MinIO by default (`STORAGE_DRIVER=s3`). The same settings work for AWS S3, Cloudflare R2 or any S3-compatible store: change `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY`. Files are never public; every download goes through the app's permission check.
 
@@ -116,7 +116,7 @@ npm run worker                                    # reminder job (optional)
 |---|---|---|---|
 | **Super Admin** | The developer | Everything: all work and sales, users, settings, audit log | `admin@example.com` / `Admin@12345` |
 | **Manager** | Kebo's manager | All inquiries, assigning work, quotations, invoices, payments, reports, exports, audit log | `manager@example.com` / `Manager@12345` |
-| **Staff** | Sales and sourcing team | Their own inquiries (assigned to or created by them), customers, quotations | `staff@example.com` / `Staff@12345` |
+| **Staff** | Sales and sourcing team | Their own inquiries (assigned to or created by them), the customers on those (or added by them), quotations | `staff@example.com` / `Staff@12345` |
 
 `npm run db:reset` wipes the local database and seeds just these three accounts; `npm run db:reset -- --demo` adds sample customers, inquiries, quotations and invoices (and demo people `ayesha@` manager, `bilal@` / `sana@` / `usman@` staff, password `Demo@12345`). It only runs against a database on your own computer.
 

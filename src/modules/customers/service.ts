@@ -4,7 +4,7 @@ import { customers } from "@/lib/db/schema";
 import { assertCan, type SessionUser } from "@/lib/auth/session";
 import { DomainError, NotFoundError } from "@/lib/utils/result";
 import { diff, recordAudit } from "@/modules/audit/service";
-import { customerQueryCount, findCustomer, findDuplicates } from "./repository";
+import { customerQueryCount, findCustomerFor, findDuplicates } from "./repository";
 import { normalizePhone, type CustomerInput } from "./schema";
 
 export class DuplicateCustomerError extends DomainError {
@@ -52,7 +52,7 @@ export async function createCustomer(actor: SessionUser, input: CustomerInput, t
 
 export async function updateCustomer(actor: SessionUser, id: string, input: CustomerInput) {
   assertCan(actor, "customers.manage");
-  const existing = await findCustomer(id);
+  const existing = await findCustomerFor(actor, id);
   if (!existing) throw new NotFoundError("Customer");
   if (!input.allowDuplicate) {
     const matches = await findDuplicates(normalizePhone(input.phone), input.email, id);
@@ -69,7 +69,7 @@ export async function updateCustomer(actor: SessionUser, id: string, input: Cust
 
 export async function deleteCustomer(actor: SessionUser, id: string) {
   assertCan(actor, "customers.delete");
-  const existing = await findCustomer(id);
+  const existing = await findCustomerFor(actor, id);
   if (!existing) throw new NotFoundError("Customer");
   if ((await customerQueryCount(id)) > 0)
     throw new DomainError("This customer has inquiries, so it cannot be removed. Their history must be kept.");

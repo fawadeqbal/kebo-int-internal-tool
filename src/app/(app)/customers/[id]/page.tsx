@@ -8,7 +8,7 @@ import { can } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import { invoices } from "@/lib/db/schema";
 import { isUuid } from "@/lib/utils/ids";
-import { customerFinancials, findCustomer } from "@/modules/customers/repository";
+import { customerFinancials, findCustomerFor } from "@/modules/customers/repository";
 import { deleteCustomerAction } from "@/modules/customers/actions";
 import { listQueriesForCustomer } from "@/modules/queries/repository";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
@@ -25,7 +25,7 @@ export const metadata = { title: "Customer" };
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
-  const customer = isUuid(id) ? await findCustomer(id) : null;
+  const customer = isUuid(id) ? await findCustomerFor(user, id) : null;
   if (!customer) notFound();
   const showMoney = can(user.role, "invoices.manage");
   const [queryRows, money, invoiceRows, settings] = await Promise.all([

@@ -39,6 +39,42 @@ Kebo RFQ Desk fits in without touching them:
 
 Commit, then `bash deploy/push.sh` again. `.env`, the database, files and backups stay; migrations run on start.
 
+## Security settings
+
+**Two-step sign-in** is required for the Super Admin and Manager (`TWO_STEP_REQUIRED_ROLES`, default `admin,manager`).
+At their next sign-in each is asked to scan a QR code with an authenticator app and save 10 recovery codes.
+Lost phone: the Super Admin resets it for others under Users. For the Super Admin's own account, on the server:
+
+```bash
+docker compose exec app node dist/scripts/reset-two-step.js admin@fawadiqbal.dev
+```
+
+**Off-site backup copy.** Make a bucket at any S3-compatible service (Cloudflare R2, Backblaze B2, AWS S3, Wasabi)
+with a key that can only read/write that bucket, then add to `.env` and run `docker compose up -d`:
+
+```bash
+OFFSITE_S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com   # empty for AWS S3
+OFFSITE_S3_REGION=auto                                              # e.g. eu-central-1 for AWS
+OFFSITE_S3_BUCKET=kebo-rfq-backups
+OFFSITE_S3_ACCESS_KEY=...
+OFFSITE_S3_SECRET_KEY=...
+BACKUP_ENCRYPTION_KEY=...       # openssl rand -base64 32 — ALSO keep a copy off this server (password manager)
+OFFSITE_RETENTION_DAYS=30
+```
+
+Each night's backup is encrypted (AES-256) and copied within 30 minutes (`docker compose logs worker | grep offsite`).
+Without `BACKUP_ENCRYPTION_KEY` the copies can't be read, so store it somewhere other than this server. To restore one:
+
+```bash
+docker compose cp db-2026-10-24_0200.sql.gz.enc worker:/tmp/db.enc      # the file downloaded from the bucket
+docker compose exec worker node dist/scripts/decrypt-backup.js /tmp/db.enc /tmp/db.sql.gz
+docker compose cp worker:/tmp/db.sql.gz . && gunzip -c db.sql.gz | docker compose exec -T db psql -U qms -d qms
+```
+
+**"Not a robot" check on the website form** (Cloudflare Turnstile): follow the steps at the top of
+`docs/keboint-contact-form.js`. Put `TURNSTILE_SECRET_KEY=...` in `.env` only after the widget is live on keboint.com
+(before that, every website inquiry would be refused).
+
 ## Everyday commands (on the server, in /opt/kebo-rfq)
 
 ```bash

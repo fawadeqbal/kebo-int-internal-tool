@@ -84,6 +84,16 @@ SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM=
 
+# Security (see deploy/README.md → Security settings)
+TWO_STEP_REQUIRED_ROLES=admin,manager
+TURNSTILE_SECRET_KEY=
+BACKUP_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
+OFFSITE_S3_ENDPOINT=
+OFFSITE_S3_REGION=auto
+OFFSITE_S3_BUCKET=
+OFFSITE_S3_ACCESS_KEY=
+OFFSITE_S3_SECRET_KEY=
+
 # Starting accounts (only used when an account does not exist yet)
 SEED_ADMIN_NAME="Super Admin"
 SEED_ADMIN_EMAIL=$ADMIN_EMAIL

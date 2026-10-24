@@ -4,15 +4,15 @@ import { customerName } from "@/lib/utils/names";
 import { isUuid } from "@/lib/utils/ids";
 import { updateCustomerAction } from "@/modules/customers/actions";
 import { CustomerForm } from "@/modules/customers/components";
-import { findCustomer } from "@/modules/customers/repository";
+import { findCustomerFor } from "@/modules/customers/repository";
 import { Card, CardBody, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Edit customer" };
 
 export default async function EditCustomerPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePagePermission("customers.manage");
+  const user = await requirePagePermission("customers.manage");
   const { id } = await params;
-  const customer = isUuid(id) ? await findCustomer(id) : null;
+  const customer = isUuid(id) ? await findCustomerFor(user, id) : null;
   if (!customer) notFound();
   return (
     <>

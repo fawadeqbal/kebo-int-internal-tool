@@ -1,6 +1,21 @@
 import { and, asc, count, desc, eq, ilike, isNull, max, or, sql, type SQL } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import { customers, invoices, queries } from "@/lib/db/schema";
+import { can } from "@/lib/auth/permissions";
+import type { SessionUser } from "@/lib/auth/session";
+
+/**
+ * Staff see only customers they added, or that are on an inquiry they work on
+ * (assigned to or created by them). Managers and the Super Admin see all.
+ * Outer column written in full (single-table count queries render a bare "id").
+ */
+export function customerAccessCondition(user: SessionUser): SQL | undefined {
+  if (can(user.role, "queries.viewAll")) return undefined;
+  return or(
+    eq(customers.createdBy, user.id),
+    sql`exists (select 1 from ${queries} q where q.customer_id = "customers"."id" and q.deleted_at is null and (q.assigned_to = ${user.id} or q.created_by = ${user.id}))`,
+  );
+}
 
 /** Company name, or the contact person's name when there is no company. */
 export const customerDisplayName = sql<string>`coalesce(${customers.companyName}, ${customers.contactPerson})`;
@@ -35,8 +50,8 @@ function searchCondition(q?: string): SQL | undefined {
   );
 }
 
-export async function listCustomers({ q, page = 1, pageSize = 25, sort = "company", has }: CustomerListFilters) {
-  const where = and(isNull(customers.deletedAt), searchCondition(q), hasCondition(has));
+export async function listCustomers(user: SessionUser, { q, page = 1, pageSize = 25, sort = "company", has }: CustomerListFilters) {
+  const where = and(isNull(customers.deletedAt), customerAccessCondition(user), searchCondition(q), hasCondition(has));
   const stats = db
     .select({
       customerId: queries.customerId,
@@ -70,7 +85,7 @@ export async function listCustomers({ q, page = 1, pageSize = 25, sort = "compan
   return { rows, total, page, pageSize };
 }
 
-export async function searchCustomers(q: string, limit = 8) {
+export async function searchCustomers(user: SessionUser, q: string, limit = 8) {
   return db
     .select({
       id: customers.id,
@@ -80,7 +95,7 @@ export async function searchCustomers(q: string, limit = 8) {
       email: customers.email,
     })
     .from(customers)
-    .where(and(isNull(customers.deletedAt), searchCondition(q)))
+    .where(and(isNull(customers.deletedAt), customerAccessCondition(user), searchCondition(q)))
     .orderBy(asc(sql`lower(coalesce(${customers.companyName}, ${customers.contactPerson}))`))
     .limit(limit);
 }
@@ -90,6 +105,16 @@ export async function findCustomer(id: string, tx: DbOrTx = db) {
     .select()
     .from(customers)
     .where(and(eq(customers.id, id), isNull(customers.deletedAt)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** A customer this person may open (see customerAccessCondition). */
+export async function findCustomerFor(user: SessionUser, id: string) {
+  const [row] = await db
+    .select()
+    .from(customers)
+    .where(and(eq(customers.id, id), isNull(customers.deletedAt), customerAccessCondition(user)))
     .limit(1);
   return row ?? null;
 }

@@ -20,7 +20,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const { filters, params, active } = parseCustomerParams(sp);
   const { q, sort, has } = filters;
-  const data = await listCustomers({ ...filters, page: toPage(sp.page) });
+  const data = await listCustomers(user, { ...filters, page: toPage(sp.page) });
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/customers", params, { page: undefined, ...patch });
 
   return (

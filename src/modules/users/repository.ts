@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
@@ -10,6 +10,7 @@ const publicColumns = {
   isActive: users.isActive,
   lastLoginAt: users.lastLoginAt,
   createdAt: users.createdAt,
+  twoStepOn: sql<boolean>`${users.totpEnabledAt} is not null`,
 };
 
 export const listUsers = () => db.select(publicColumns).from(users).orderBy(asc(users.name));

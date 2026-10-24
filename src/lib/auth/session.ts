@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { and, eq, gt, isNull, lt, ne, or } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import { sessions, users, type Role } from "@/lib/db/schema";
-import { can, type Permission } from "./permissions";
+import { can, twoStepRequired, type Permission } from "./permissions";
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, sessionCookieOptions, signSessionToken, verifySessionToken } from "./token";
 import { ForbiddenError } from "@/lib/utils/result";
 
@@ -59,12 +59,17 @@ export async function currentSessionId(): Promise<string | null> {
  * The signed-in user, re-checked against the database on every request:
  * the session must exist, not be signed out or expired, and the user must be active.
  */
-export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
+/**
+ * The session's user before the two-step check: also returned while a Super
+ * Admin or Manager still has to set up two-step sign-in (only the setup page
+ * and sign-out use this directly).
+ */
+export const getSessionUser = cache(async (): Promise<(SessionUser & { twoStepSetupRequired: boolean }) | null> => {
   const store = await cookies();
   const claims = await verifySessionToken(store.get(SESSION_COOKIE)?.value);
   if (!claims) return null;
   const [row] = await db
-    .select({ id: users.id, name: users.name, email: users.email, role: users.role, lastSeenAt: sessions.lastSeenAt })
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role, totpEnabledAt: users.totpEnabledAt, lastSeenAt: sessions.lastSeenAt })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(
@@ -82,7 +87,18 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   if (Date.now() - row.lastSeenAt.getTime() > SLIDE_EVERY_MS) {
     await db.update(sessions).set({ lastSeenAt: new Date(), expiresAt: expiry() }).where(eq(sessions.id, claims.sessionId));
   }
-  return { id: row.id, name: row.name, email: row.email, role: row.role };
+  return { id: row.id, name: row.name, email: row.email, role: row.role, twoStepSetupRequired: twoStepRequired(row.role) && !row.totpEnabledAt };
+});
+
+/**
+ * The signed-in user, re-checked against the database on every request:
+ * the session must exist, not be signed out or expired, the user must be
+ * active, and a role that needs two-step sign-in must have it set up.
+ */
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
+  const user = await getSessionUser();
+  if (!user || user.twoStepSetupRequired) return null;
+  return { id: user.id, name: user.name, email: user.email, role: user.role };
 });
 
 /**
@@ -91,6 +107,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
  * deactivated), it is cleared first, so the login page doesn't bounce back.
  */
 export async function requireUser(): Promise<SessionUser> {
+  if ((await getSessionUser())?.twoStepSetupRequired) redirect("/two-step/setup");
   const user = await getCurrentUser();
   if (user) return user;
   const hasCookie = !!(await cookies()).get(SESSION_COOKIE)?.value;

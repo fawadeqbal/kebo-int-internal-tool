@@ -8,6 +8,17 @@
  *                         and ends with   }, 1800);
  * (inside contactForm.addEventListener('submit', …)) with the code below.
  * The validation and the "Sending Request..." spinner above it stay as they are.
+ *
+ * "Not a robot" check (Cloudflare Turnstile, free):
+ *   1. dash.cloudflare.com → Turnstile → Add widget, domain keboint.com, mode "Managed".
+ *      It gives a SITE KEY (public) and a SECRET KEY (private).
+ *   2. On keboint.com, inside the <form id="contactForm"> just above the submit button, add:
+ *        <div class="cf-turnstile" data-sitekey="YOUR-SITE-KEY"></div>
+ *      and once in the page <head>:
+ *        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+ *   3. Upload the website, check a test inquiry arrives, THEN put the secret key on the server:
+ *        TURNSTILE_SECRET_KEY=... in /opt/kebo-rfq/.env, then: docker compose up -d
+ *      (Doing step 3 before the website has the widget would refuse every website inquiry.)
  */
 
             const select = document.getElementById('form-service');
@@ -24,6 +35,8 @@
                     category: category,
                     requirements: message || ('Sourcing request: ' + category),
                     page: window.location.href,
+                    // Token from the Turnstile widget (empty until it is added to the page).
+                    turnstileToken: (contactForm.querySelector('[name="cf-turnstile-response"]') || {}).value || '',
                 }),
             })
                 .then(function (res) {
@@ -46,6 +59,7 @@
                         </div>`;
                 })
                 .catch(function (err) {
+                    if (window.turnstile) window.turnstile.reset(); // a token works once
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalText;
                     alert(err.message + '\n\nYou can also reach us on WhatsApp or email.');
