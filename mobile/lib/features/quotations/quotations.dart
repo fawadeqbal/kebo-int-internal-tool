@@ -256,6 +256,7 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
   final _lines = <EditLine>[];
   final _discount = TextEditingController(text: '0');
   f.Vat _vat = const f.Vat();
+  final _tax = TextEditingController();
   final _terms = TextEditingController();
   final _notes = TextEditingController();
   String _dueDate = '';
@@ -294,6 +295,7 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
         init = {
           'items': [for (final it in d.l('items')) {...it, 'sourceId': it.s('queryItemId')}],
           'discount': (num.tryParse(q.s('discount')) ?? 0).toString(),
+          'taxRate': (num.tryParse(q.s('taxRate')) ?? 0).toString(),
           'dueDate': q.s('dueDate'),
           'submittedAt': q.s('submittedAt'),
           'terms': q.s('terms'),
@@ -310,6 +312,7 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
       _lines.addAll(init.l('items').map(EditLine.fromJson));
       if (_lines.isEmpty) _lines.add(EditLine());
       _discount.text = init.s('discount', '0');
+      _tax.text = init.s('taxRate', '${_vat.rate}');
       _dueDate = init.s('dueDate');
       _submittedAt = init.s('submittedAt');
       _terms.text = init.s('terms');
@@ -325,6 +328,7 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
     final body = {
       'items': [for (final l in _lines) if (!l.isEmpty) l.toJson()],
       'discount': _discount.text,
+      'taxRate': _tax.text,
       'dueDate': _dueDate,
       'submittedAt': _submittedAt,
       'terms': _terms.text,
@@ -370,6 +374,7 @@ class _QuotationFormScreenState extends ConsumerState<QuotationFormScreen> {
             lines: _lines,
             discount: _discount,
             vat: _vat,
+            taxRate: _tax,
             currency: _currency,
             sourceLabel: 'Requested by the customer',
             costing: ref.read(sessionProvider).can('sourcing.manage'),

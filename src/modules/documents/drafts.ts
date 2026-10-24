@@ -53,6 +53,7 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
   const latest = detail.quotations[0];
   let items: EditableLine[];
   let discount = "0";
+  let taxRate = String(vat.rate);
   let terms = settings.defaultQuotationTerms;
   if (latest) {
     // A new version starts from the latest one.
@@ -78,6 +79,8 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
     }
     if (!can(user.role, "sourcing.manage")) items = items.map(withoutCost);
     discount = String(Number(prev?.quotation.discount ?? 0));
+    // A new version keeps the VAT typed on the one before.
+    if (prev) taxRate = String(Number(prev.quotation.taxRate));
     terms = prev?.quotation.terms ?? terms;
   } else {
     // Version 1 starts from what the customer asked for. Items with a factory
@@ -106,11 +109,12 @@ export async function quotationDraft(user: SessionUser, queryId: string) {
     requestedItems: detail.items,
     version: (latest?.version ?? 0) + 1,
     currency: settings.currency,
-    /** The VAT this quotation will carry (from Settings, none for a VAT-exempt customer). */
+    /** The default VAT (from Settings, none for a VAT-exempt customer); the quotation's own rate is initial.taxRate. */
     vat,
     initial: {
       items,
       discount,
+      taxRate,
       dueDate: addDaysISO(todayISO(), settings.quotationValidityDays),
       submittedAt: "",
       terms,
@@ -124,6 +128,7 @@ export function quotationEditValues(detail: NonNullable<Awaited<ReturnType<typeo
   return {
     items: detail.items.map((i) => toEditableLine(i, { sourceId: i.queryItemId })),
     discount: String(Number(q.discount)),
+    taxRate: String(Number(q.taxRate)),
     dueDate: q.dueDate,
     submittedAt: q.submittedAt ?? "",
     terms: q.terms ?? "",

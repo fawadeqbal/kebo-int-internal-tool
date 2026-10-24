@@ -19,7 +19,8 @@ export type { EditableLine };
 export function LineItemsEditor({
   initialItems,
   initialDiscount = "0",
-  vat = { rate: 0, included: false },
+  vat: vatDefault = { rate: 0, included: false },
+  initialTaxRate,
   currency = "USD",
   errors,
   priced = true,
@@ -32,6 +33,8 @@ export function LineItemsEditor({
   initialDiscount?: string;
   /** The VAT from Settings (never typed here): rate, whether prices include it, and whether the customer is exempt. */
   vat?: { rate: number; included: boolean; exempt?: boolean };
+  /** Given: the VAT % can be changed on this document (starts from this value); whether prices include VAT stays the setting. */
+  initialTaxRate?: string;
   currency?: string;
   errors?: Record<string, string[] | undefined>;
   /** false = requested items: no prices or totals. */
@@ -47,6 +50,19 @@ export function LineItemsEditor({
     initialItems.length ? initialItems : [emptyLine()],
   );
   const [discount, setDiscount] = useState(initialDiscount);
+  const [taxRate, setTaxRate] = useState(
+    initialTaxRate ?? String(vatDefault.rate),
+  );
+  const vat = useMemo(
+    () =>
+      initialTaxRate === undefined
+        ? vatDefault
+        : {
+            ...vatDefault,
+            rate: Math.min(Math.max(Number(taxRate) || 0, 0), 100),
+          },
+    [initialTaxRate, vatDefault, taxRate],
+  );
   const [marginText, setMarginText] = useState<Record<number, string>>({});
   const [costOpen, setCostOpen] = useState<Set<number>>(
     () => new Set(initialItems.flatMap((l, i) => (l.unitCost ? [i] : []))),
@@ -342,10 +358,38 @@ export function LineItemsEditor({
               onChange={(e) => setDiscount(e.target.value)}
             />
           </Field>
+          {initialTaxRate !== undefined && (
+            <Field
+              label="VAT (%)"
+              htmlFor="taxRate"
+              error={errors?.taxRate}
+              hint={
+                Number(taxRate) === vatDefault.rate
+                  ? vatDefault.exempt
+                    ? "This customer is VAT exempt"
+                    : "The rate from Settings"
+                  : `Settings: ${vatDefault.rate}%${vatDefault.exempt ? " (customer exempt)" : ""}. Changed for this quotation`
+              }
+            >
+              <Input
+                id="taxRate"
+                name="taxRate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                inputMode="decimal"
+                value={taxRate}
+                onChange={(e) => setTaxRate(e.target.value)}
+              />
+            </Field>
+          )}
           {!vat.included && (vat.rate > 0 || vat.exempt) && (
             <div className="flex justify-between text-sm">
               <span className="text-muted">
-                {vat.exempt ? "VAT (customer exempt)" : `VAT ${vat.rate}%`}
+                {vat.exempt && vat.rate === 0
+                  ? "VAT (customer exempt)"
+                  : `VAT ${vat.rate}%`}
               </span>
               <span className="tabular">
                 {formatCents(totals.taxAmount, currency)}
@@ -363,7 +407,7 @@ export function LineItemsEditor({
           {vat.included && (
             <div className="-mt-2 flex justify-between text-xs text-muted">
               <span>
-                {vat.exempt
+                {vat.exempt && vat.rate === 0
                   ? "No VAT (customer exempt)"
                   : `of which VAT ${vat.rate}%`}
               </span>
@@ -373,8 +417,8 @@ export function LineItemsEditor({
             </div>
           )}
           <p className="text-xs text-muted">
-            VAT is set by the super admin in Settings
-            {vat.exempt ? "; this customer is VAT exempt" : ""}.
+            {vat.included ? "Prices include VAT" : "VAT is added on top"} (set
+            by the super admin in Settings).
           </p>
           {summary && summary.costCents > 0 && (
             <div className="grid gap-1 rounded-lg border border-dashed border-line-strong p-3 text-xs">

@@ -22,8 +22,8 @@ export function QuotationForm({
   action: Action;
   /** Show our cost and margin per line (people who may see factory prices). */
   costing?: boolean;
-  initial: { items: EditableLine[]; discount: string; dueDate: string; submittedAt: string; terms: string; notes: string };
-  /** The VAT this quotation carries (from Settings). */
+  initial: { items: EditableLine[]; discount: string; taxRate: string; dueDate: string; submittedAt: string; terms: string; notes: string };
+  /** The default VAT from Settings (the rate can be changed on this quotation). */
   vat: { rate: number; included: boolean; exempt: boolean };
   currency: string;
   cancelHref: string;
@@ -43,6 +43,7 @@ export function QuotationForm({
             initialItems={items}
             initialDiscount={(state.values?.discount as string) ?? initial.discount}
             vat={vat}
+            initialTaxRate={(state.values?.taxRate as string) ?? initial.taxRate}
             currency={currency}
             errors={e}
             sourceLabel="Requested by the customer"

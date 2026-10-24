@@ -83,7 +83,7 @@ export const requestedItemsField = jsonLines(requestedItemSchema, "Add at least 
 export const moneyField = (label: string) =>
   z.coerce.number({ message: `Enter ${label}` }).min(0, `${label[0].toUpperCase()}${label.slice(1)} cannot be negative`).max(1_000_000_000_000);
 
-export const taxRateField = z.coerce.number({ message: "Enter the tax rate" }).min(0, "Tax cannot be negative").max(100, "Tax cannot exceed 100%");
+export const taxRateField = z.coerce.number({ message: "Enter the VAT rate" }).min(0, "VAT cannot be negative").max(100, "VAT cannot exceed 100%");
 
 export const isoDate = (message: string) => z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, message);
 

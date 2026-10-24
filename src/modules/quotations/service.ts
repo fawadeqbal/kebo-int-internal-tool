@@ -17,6 +17,9 @@ import { vatForCustomer, type Vat } from "@/modules/documents/vat";
 import type { QuotationInput } from "./schema";
 import { canMoveQuotation, isEditable } from "./workflow";
 
+/** The VAT typed on the quotation replaces the default rate (staff may change it for an order). */
+const withRate = (vat: Vat, typed?: number): Vat => (typed === undefined ? vat : { ...vat, rate: typed });
+
 function totalsFor(items: LineItem[], discount: number, vat: Vat) {
   const t = calculateTotals(items, discount, vat.rate, vat.included);
   return {
@@ -86,8 +89,9 @@ export async function createQuotation(actor: SessionUser, queryId: string, input
   assertCan(actor, "quotations.manage");
   const query = await getAccessibleQuery(actor, queryId);
   if (query.status === "not_completed") throw new DomainError("This inquiry is closed as not completed. Reopen it before quoting.");
-  // VAT is never typed on a quotation: it is the super admin's setting (none for a VAT-exempt customer).
-  const { t, columns, itemRows } = totalsFor(input.items, input.discount, await vatForCustomer(query.customerId));
+  // VAT: the rate typed on the quotation, or the super admin's setting (none for a VAT-exempt customer);
+  // whether prices include it is always the setting.
+  const { t, columns, itemRows } = totalsFor(input.items, input.discount, withRate(await vatForCustomer(query.customerId), input.taxRate));
   if (t.total <= 0) throw new DomainError("The quotation total must be more than zero.");
   const currency = (await getSettings()).currency;
 
@@ -130,7 +134,7 @@ export async function updateQuotation(actor: SessionUser, id: string, input: Quo
   if (!isEditable(existing.status)) throw new DomainError("Only draft quotations can be edited. Create a new version instead.");
   await assertLatest(existing, "edited");
   const [{ customerId }] = await db.select({ customerId: queries.customerId }).from(queries).where(eq(queries.id, existing.queryId));
-  const { t, columns, itemRows } = totalsFor(input.items, input.discount, await vatForCustomer(customerId));
+  const { t, columns, itemRows } = totalsFor(input.items, input.discount, withRate(await vatForCustomer(customerId), input.taxRate));
   if (t.total <= 0) throw new DomainError("The quotation total must be more than zero.");
   await db.transaction(async (tx) => {
     await tx
@@ -159,22 +163,15 @@ export async function changeQuotationStatus(actor: SessionUser, id: string, to: 
   await assertLatest(existing, `marked ${QUOTATION_STATUS_LABEL[to].toLowerCase()}`);
   const settings = to === "sent" ? await getSettings() : null;
   await db.transaction(async (tx) => {
-    // Sending freezes who it was for and who sent it (and in which currency), as on the PDF,
-    // and the VAT as it is set now (in case the setting changed since the draft was saved).
+    // Sending freezes who it was for and who sent it (and in which currency), as on the PDF.
+    // The VAT is the quotation's own (as saved).
     let frozen = {};
     if (to === "sent") {
       const customerId = (await tx.select({ c: queries.customerId }).from(queries).where(eq(queries.id, existing.queryId)))[0].c;
-      const vat = await vatForCustomer(customerId, tx);
-      const lines = await tx.select({ quantity: quotationItems.quantity, unitPrice: quotationItems.unitPrice }).from(quotationItems).where(eq(quotationItems.quotationId, id));
-      const t = calculateTotals(lines, existing.discount, vat.rate, vat.included);
       frozen = {
         submittedAt: submittedAt || existing.submittedAt || todayISO(),
         customerSnapshot: await customerSnapshotFor(tx, customerId),
         companySnapshot: companySnapshot(settings!),
-        taxRate: String(t.taxRate),
-        pricesIncludeVat: t.pricesIncludeVat,
-        taxAmount: fromCents(t.taxAmount),
-        total: fromCents(t.total),
       };
     }
     await tx.update(quotations).set({ status: to, ...frozen }).where(eq(quotations.id, id));
@@ -226,6 +223,7 @@ export async function reviseQuotation(actor: SessionUser, id: string) {
       fxRate: i.fxRate === null ? null : Number(i.fxRate),
     })),
     discount: Number(existing.discount),
+    taxRate: Number(existing.taxRate),
     dueDate: existing.dueDate < todayISO() ? todayISO() : existing.dueDate,
     submittedAt: null,
     terms: existing.terms,
