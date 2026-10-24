@@ -2,7 +2,7 @@ import { and, count, eq, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { dummyHash, hashPassword, verifyPassword } from "@/lib/auth/password";
-import { assertCan, type SessionUser } from "@/lib/auth/session";
+import { assertCan, currentSessionId, revokeUserSessions, type SessionUser } from "@/lib/auth/session";
 import { DomainError, NotFoundError } from "@/lib/utils/result";
 import { diff, recordAudit } from "@/modules/audit/service";
 import { findUserByEmailWithHash, findUserById } from "./repository";
@@ -82,6 +82,7 @@ export async function setUserActive(actor: SessionUser, id: string, isActive: bo
     throw new DomainError("At least one active Super Admin is required.");
   await db.transaction(async (tx) => {
     await tx.update(users).set({ isActive }).where(eq(users.id, id));
+    if (!isActive) await revokeUserSessions(id, undefined, tx); // signed out everywhere at once
     await recordAudit(tx, {
       userId: actor.id,
       action: isActive ? "activate" : "deactivate",
@@ -99,6 +100,8 @@ export async function resetPassword(actor: SessionUser, id: string, password: st
   const passwordHash = await hashPassword(password);
   await db.transaction(async (tx) => {
     await tx.update(users).set({ passwordHash }).where(eq(users.id, id));
+    // The old password may be known to someone else: end that user's sessions (unless it is the admin's own).
+    await revokeUserSessions(id, actor.id === id ? ((await currentSessionId()) ?? undefined) : undefined, tx);
     await recordAudit(tx, { userId: actor.id, action: "reset_password", entityType: "user", entityId: id, summary: `Reset password for ${existing.email}` });
   });
 }
@@ -109,6 +112,8 @@ export async function changeOwnPassword(actor: SessionUser, currentPassword: str
   const passwordHash = await hashPassword(password);
   await db.transaction(async (tx) => {
     await tx.update(users).set({ passwordHash }).where(eq(users.id, actor.id));
+    // Sign out other browsers and devices; this one stays signed in.
+    await revokeUserSessions(actor.id, (await currentSessionId()) ?? undefined, tx);
     await recordAudit(tx, { userId: actor.id, action: "change_password", entityType: "user", entityId: actor.id, summary: "Changed own password" });
   });
 }

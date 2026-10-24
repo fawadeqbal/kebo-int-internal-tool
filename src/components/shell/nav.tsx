@@ -84,7 +84,10 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
         {trigger}
       </button>
       {open && (
-        <div role="menu" className={cn("absolute top-full right-0 z-50 mt-2 min-w-44 animate-in rounded-xl border border-line bg-surface p-1 shadow-pop", className)} onClick={() => setOpen(false)}>
+        <div role="menu" className={cn("absolute top-full right-0 z-50 mt-2 min-w-44 animate-in rounded-xl border border-line bg-surface p-1 shadow-pop", className)}
+          // Close after a choice, but not for a form button: removing the form before it submits cancels the submit (Sign out).
+          onClick={(e) => !(e.target as HTMLElement).closest("form") && setOpen(false)}
+        >
           {children}
         </div>
       )}

@@ -39,7 +39,7 @@ export function ExportMenu({ pdfHref, csvHref, label = "Export" }: { pdfHref: st
         <ChevronDown className="opacity-60" aria-hidden />
       </button>
       {open && (
-        <div role="menu" className={cn("absolute top-full right-0 z-40 mt-1.5 w-64 animate-in rounded-xl border border-line bg-surface p-1 shadow-pop")} onClick={() => setOpen(false)}>
+        <div role="menu" className={cn("absolute top-full right-0 z-40 mt-1.5 w-64 animate-in rounded-xl border border-line bg-surface p-1 shadow-pop")} onClick={() => setTimeout(() => setOpen(false), 0)}>
           <a role="menuitem" href={pdfHref} download className={item}>
             <FileText className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
             <span>

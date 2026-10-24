@@ -51,6 +51,27 @@ export const users = pgTable("users", {
   ...timestamps,
 });
 
+/**
+ * One row per sign-in (browser / device). The cookie only carries the row's id,
+ * so signing out, a password change or deactivating a user ends sessions on the
+ * server at once. expiresAt slides forward while the session is used.
+ */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    userAgent: varchar("user_agent", { length: 300 }),
+  },
+  (t) => [index("sessions_user_idx").on(t.userId)],
+);
+
 /* ----------------------------------------------------------------------------
  * Customers
  * --------------------------------------------------------------------------*/
