@@ -473,23 +473,36 @@ class _FilesState extends ConsumerState<_Files> {
           CardList(children: [
             for (final file in files)
               RowTile(
-                leading: Icon(_icon(file.s('mimeType')), color: context.c.primary),
+                leading: _Thumb(file: file, icon: _icon(file.s('mimeType'))),
                 title: file.s('fileName'),
                 subtitle: Text('${f.fileSize(file.n('size'))} · ${file.s('uploadedBy')} · ${f.shortDate(file.s('createdAt'))}'),
-                onTap: () => openFile(context, ref, id: file.s('id'), fileName: file.s('fileName')),
-                trailing: (session.isManager || file.s('uploaderId') == session.userId)
-                    ? IconButton(
-                        icon: Icon(Icons.delete_outline_rounded, color: context.c.muted, size: 20),
-                        onPressed: () async {
-                          if (!await confirm(context, title: 'Remove ${file.s('fileName')}?', message: 'The file is removed from this inquiry.', action: 'Remove', danger: true)) return;
-                          try {
-                            await ref.mutate(() => ref.read(apiProvider).delete('/api/v1/files/${file.s('id')}'));
-                          } catch (e) {
-                            if (context.mounted) toast(context, e.toString(), error: true);
-                          }
-                        },
-                      )
-                    : Icon(Icons.download_rounded, size: 20, color: context.c.muted),
+                onTap: () => openFile(context, ref, id: file.s('id'), fileName: file.s('fileName'), mime: file.s('mimeType'), size: file.n('size')),
+                trailing: PopupMenuButton<String>(
+                  tooltip: 'File options',
+                  icon: Icon(Icons.more_vert_rounded, color: context.c.muted, size: 20),
+                  onSelected: (v) async {
+                    final path = '/api/attachments/${file.s('id')}';
+                    if (v == 'view') {
+                      openFile(context, ref, id: file.s('id'), fileName: file.s('fileName'), mime: file.s('mimeType'), size: file.n('size'));
+                    } else if (v == 'remove') {
+                      if (!await confirm(context, title: 'Remove ${file.s('fileName')}?', message: 'The file is removed from this inquiry.', action: 'Remove', danger: true)) return;
+                      try {
+                        await ref.mutate(() => ref.read(apiProvider).delete('/api/v1/files/${file.s('id')}'));
+                      } catch (e) {
+                        if (context.mounted) toast(context, e.toString(), error: true);
+                      }
+                    } else {
+                      if (context.mounted) await quickFileAction(context, ref, path: path, fileName: file.s('fileName'), mime: file.s('mimeType'), action: v);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'view', child: ListTile(dense: true, leading: Icon(Icons.visibility_outlined), title: Text('View'))),
+                    const PopupMenuItem(value: 'save', child: ListTile(dense: true, leading: Icon(Icons.download_rounded), title: Text('Save to phone'))),
+                    const PopupMenuItem(value: 'share', child: ListTile(dense: true, leading: Icon(Icons.ios_share_rounded), title: Text('Share'))),
+                    if (session.isManager || file.s('uploaderId') == session.userId)
+                      const PopupMenuItem(value: 'remove', child: ListTile(dense: true, leading: Icon(Icons.delete_outline_rounded), title: Text('Remove'))),
+                  ],
+                ),
               ),
           ]),
       ]),
@@ -502,6 +515,34 @@ class _FilesState extends ConsumerState<_Files> {
     if (mime.contains('zip')) return Icons.folder_zip_outlined;
     if (mime.contains('sheet') || mime.contains('excel')) return Icons.table_chart_outlined;
     return Icons.insert_drive_file_outlined;
+  }
+}
+
+/// A small preview for photos; an icon for everything else.
+class _Thumb extends ConsumerWidget {
+  const _Thumb({required this.file, required this.icon});
+  final Json file;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fallback = Icon(icon, color: context.c.primary);
+    if (viewKind(file.s('mimeType'), file.s('fileName')) != ViewKind.image) return fallback;
+    final api = ref.watch(apiProvider);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Image.network(
+          '${api.baseUrl}/api/attachments/${file.s('id')}?view=1',
+          headers: {if (api.token != null) 'Authorization': 'Bearer ${api.token}'},
+          fit: BoxFit.cover,
+          cacheWidth: 120,
+          errorBuilder: (_, _, _) => Center(child: fallback),
+          loadingBuilder: (_, child, p) => p == null ? child : ColoredBox(color: context.c.surface3),
+        ),
+      ),
+    );
   }
 }
 

@@ -70,6 +70,20 @@ class Api {
         data: form, onSendProgress: (a, b) => onProgress?.call(b > 0 ? a / b : 0)));
   }
 
+  /// A file or PDF as bytes (for the in-app viewers, saving and sharing).
+  Future<Uint8List> getBytes(String path, {void Function(double)? onProgress}) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        path,
+        options: Options(responseType: ResponseType.bytes, receiveTimeout: const Duration(minutes: 3)),
+        onReceiveProgress: (a, b) => onProgress?.call(b > 0 ? a / b : 0),
+      );
+      return Uint8List.fromList(res.data ?? const []);
+    } on DioException catch (e) {
+      throw _error(e);
+    }
+  }
+
   /// Download a PDF or file to the app's documents folder; returns its path.
   Future<String> download(String path, String fileName) async {
     final dir = await getApplicationDocumentsDirectory();
