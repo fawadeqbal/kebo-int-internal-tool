@@ -4,6 +4,8 @@ import { requirePagePermission } from "@/lib/auth/session";
 import { breakdown, finance, monthlyTrend, pipeline, rangeSummary, statusCounts, workload } from "@/modules/reports/repository";
 import { resolveRange } from "@/modules/reports/range";
 import { ReportFilters } from "./filters";
+import { ProfitSection } from "./profit-section";
+import { profitReport } from "@/modules/reports/profit";
 import { listActiveUsers } from "@/modules/users/repository";
 import { getSettings } from "@/modules/settings/service";
 import { Avatar, Card, CardBody, CardHeader, PageHeader, Table, THead, Td, Th, Tr } from "@/components/ui";
@@ -26,8 +28,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const range = resolveRange(sp.range, sp.from, sp.to);
   const staffId = isUuid(sp.staff) ? sp.staff : undefined;
-  const [settings, people, summary, counts, funnel, money, trend, bySource, byCategory, team] = await Promise.all([
-    getSettings(),
+  const settings = await getSettings();
+  const [people, summary, counts, funnel, money, trend, bySource, byCategory, team, profit] = await Promise.all([
     listActiveUsers(),
     rangeSummary(user, range, staffId),
     statusCounts(user, staffId),
@@ -37,6 +39,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     breakdown(user, range, "source", staffId),
     breakdown(user, range, "category", staffId),
     workload(range),
+    profitReport(range, settings.currency, staffId),
   ]);
   const staffName = people.find((p) => p.id === staffId)?.name;
   const params = { range: range.preset, from: range.preset === "custom" ? range.from : undefined, to: range.preset === "custom" ? range.to : undefined, staff: staffId };
@@ -62,6 +65,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <ReportFilters key={`${range.preset}${range.from}${range.to}${staffId}`} preset={range.preset} from={range.from} to={range.to} staffId={staffId} people={people} />
       </Card>
 
+      <ProfitSection p={profit} target={settings.defaultMarginPercent} staffName={staffName} />
+
+      <h2 className="pt-2 text-base font-semibold text-text">Inquiries & money</h2>
       <section aria-label="Summary" className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Inquiries received" icon={Inbox} tone="primary" value={summary.received} />
         <StatCard label="Completed" icon={CheckCircle2} tone="ok" value={summary.completed} hint={pct(summary.completed, summary.received) + " of received"} />
