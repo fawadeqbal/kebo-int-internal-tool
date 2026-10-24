@@ -1,6 +1,7 @@
 import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import { notifications, users } from "@/lib/db/schema";
+import { pushNotifications } from "./push";
 
 export interface NewNotification {
   userId: string;
@@ -11,9 +12,15 @@ export interface NewNotification {
   dedupeKey?: string;
 }
 
+/** Saves in-app notifications and sends them to the recipients' phones (in the background). */
 export async function insertNotifications(tx: DbOrTx, items: NewNotification[]): Promise<number> {
   if (items.length === 0) return 0;
-  const rows = await tx.insert(notifications).values(items).onConflictDoNothing().returning({ id: notifications.id });
+  const rows = await tx
+    .insert(notifications)
+    .values(items)
+    .onConflictDoNothing()
+    .returning({ userId: notifications.userId, type: notifications.type, title: notifications.title, body: notifications.body, link: notifications.link });
+  void pushNotifications(rows);
   return rows.length;
 }
 

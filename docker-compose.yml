@@ -43,6 +43,8 @@ x-app-env: &app-env
   TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
   PUBLIC_INQUIRIES_PER_HOUR: ${PUBLIC_INQUIRIES_PER_HOUR:-40}
   DAILY_SUMMARY_HOUR: ${DAILY_SUMMARY_HOUR:-8}
+  # Phone push notifications: the Firebase service-account key, put on the server as secrets/firebase.json (off without it)
+  FCM_SERVICE_ACCOUNT_FILE: /app/secrets/firebase.json
   # Roles that must use two-step sign-in (empty = optional for everyone, turned on in My account).
   TWO_STEP_REQUIRED_ROLES: ${TWO_STEP_REQUIRED_ROLES:-}
   SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Super Admin}
@@ -90,6 +92,8 @@ services:
     # Host-only: reachable by the reverse proxy on this server, not from the internet directly.
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3410}:3000"
+    volumes:
+      - ./secrets:/app/secrets:ro
     mem_limit: ${APP_MEMORY:-1536m}
     logging: *logging
 
@@ -132,6 +136,7 @@ services:
     group_add: ["${BACKUP_GID:-10560}"]
     volumes:
       - ./backups:/backups:ro
+      - ./secrets:/app/secrets:ro
     healthcheck:
       disable: true
     depends_on:

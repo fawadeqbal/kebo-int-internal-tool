@@ -14,3 +14,8 @@ server-check.txt
 
 # portfolio screenshots (large images, kept out of git)
 portfolio/
+
+# Server keys (Firebase service account etc.), never in git
+secrets/
+firebase-service-account*.json
+*-firebase-adminsdk-*.json

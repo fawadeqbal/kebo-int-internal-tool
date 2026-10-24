@@ -414,6 +414,24 @@ export const notifications = pgTable(
   ],
 );
 
+/** Phones signed in to the mobile app, for push notifications (Firebase Cloud Messaging). */
+export const deviceTokens = pgTable(
+  "device_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The app sign-in this phone belongs to: no push once it is signed out, revoked or expired. */
+    sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    platform: varchar("platform", { length: 20 }).notNull().default("android"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("device_tokens_token_uq").on(t.token), index("device_tokens_user_idx").on(t.userId)],
+);
+
 export const auditLogs = pgTable(
   "audit_logs",
   {

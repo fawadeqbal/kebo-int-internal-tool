@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -5,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'json.dart';
+import 'push.dart';
 
 /// Default server; changeable on the sign-in screen (Server…), or at build time:
 /// flutter build apk --dart-define=API_BASE=https://rfq.example.com
@@ -110,13 +113,14 @@ class SessionController extends Notifier<Session> {
 
   Future<void> signOut() async {
     try {
-      await _api.post('/api/v1/auth/logout');
+      await _api.post('/api/v1/auth/logout', {if (Push.token != null) 'deviceToken': Push.token});
     } catch (_) {}
     await _signedOut(null);
   }
 
   Future<void> _signedOut(String? message) async {
     _api.token = null;
+    unawaited(Push.forget());
     try {
       await _storage.delete(key: _tokenKey);
     } catch (_) {}

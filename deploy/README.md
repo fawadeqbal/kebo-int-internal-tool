@@ -51,6 +51,18 @@ Lost phone: the Super Admin resets it for others under Users. For the Super Admi
 docker compose exec app node dist/scripts/reset-two-step.js admin@fawadiqbal.dev
 ```
 
+**Phone push notifications** (Firebase Cloud Messaging). In the Firebase console of project
+`kebo-rfq`: Project settings → Service accounts → Generate new private key. Copy the downloaded file
+to the server (never into git) and deploy again:
+
+```bash
+scp kebo-rfq-firebase-adminsdk-*.json server:/opt/kebo-rfq/firebase-service-account.json
+bash deploy/push.sh
+```
+
+`install.sh` moves it to `secrets/firebase.json`, readable only by the app. Every in-app
+notification is then also sent to the person's phones (signed in to the app); signing out stops it.
+
 **Off-site backup copy.** Make a bucket at any S3-compatible service (Cloudflare R2, Backblaze B2, AWS S3, Wasabi)
 with a key that can only read/write that bucket, then add to `.env` and run `docker compose up -d`:
 

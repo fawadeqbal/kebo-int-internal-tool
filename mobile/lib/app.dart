@@ -1,7 +1,12 @@
+import 'dart:async';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/push.dart';
+import 'core/refresh.dart';
 import 'core/session.dart';
 import 'features/auth/auth_screens.dart';
 import 'features/customers/customers.dart';
@@ -29,16 +34,67 @@ class KeboApp extends ConsumerStatefulWidget {
 class _KeboAppState extends ConsumerState<KeboApp> {
   late final _refresh = ValueNotifier<int>(0);
   late final GoRouter _router = _buildRouter();
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+  final _subs = <StreamSubscription<dynamic>>[];
+  /// A tapped notification waiting for sign-in to finish.
+  String? _pendingLink;
+
+  @override
+  void initState() {
+    super.initState();
+    _subs.add(Push.onOpened.listen((m) => _openLink(m.data['link'])));
+    _subs.add(Push.onForeground.listen(_showForeground));
+    Push.initial().then((m) {
+      if (m != null) _openLink(m.data['link']);
+    });
+  }
 
   @override
   void dispose() {
+    for (final s in _subs) {
+      s.cancel();
+    }
     _refresh.dispose();
     super.dispose();
+  }
+
+  void _openLink(Object? link) {
+    final route = appRoute(link?.toString()) ?? '/notifications';
+    if (ref.read(sessionProvider).status == SessionStatus.signedIn) {
+      _router.push(route);
+    } else {
+      _pendingLink = route;
+    }
+  }
+
+  /// A push while the app is open: refresh the badge and lists, and show it as a banner.
+  void _showForeground(RemoteMessage m) {
+    if (ref.read(sessionProvider).status != SessionStatus.signedIn) return;
+    ref.read(dataVersionProvider.notifier).bump();
+    unawaited(ref.read(sessionProvider.notifier).refreshMe().catchError((_) {}));
+    final title = m.notification?.title ?? 'New notification';
+    final body = m.notification?.body;
+    _messenger.currentState?.showSnackBar(SnackBar(
+      duration: const Duration(seconds: 6),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        if (body != null && body.isNotEmpty) Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
+      ]),
+      action: SnackBarAction(label: 'Open', onPressed: () => _openLink(m.data['link'])),
+    ));
   }
 
   GoRouter _buildRouter() {
     ref.listenManual(sessionProvider, (prev, next) {
       if (prev?.status != next.status) _refresh.value++;
+      if (next.status == SessionStatus.signedIn && prev?.status != SessionStatus.signedIn) {
+        unawaited(Push.register(ref.read(apiProvider)));
+        final pending = _pendingLink;
+        if (pending != null) {
+          _pendingLink = null;
+          Future.delayed(const Duration(milliseconds: 400), () => _router.push(pending));
+        }
+      }
     });
     return GoRouter(
       initialLocation: '/home',
@@ -119,6 +175,7 @@ class _KeboAppState extends ConsumerState<KeboApp> {
       darkTheme: buildTheme(Brightness.dark),
       themeMode: mode,
       routerConfig: _router,
+      scaffoldMessengerKey: _messenger,
     );
   }
 }

@@ -112,6 +112,18 @@ grep -q '^COMPOSE_FILE=' .env || die ".env exists but has no COMPOSE_FILE line; 
 # ---------------------------------------------------------------- 3. Build and start
 say "building the app image (a few minutes on first run)…"
 $D compose build app
+# Phone push notifications (optional): the Firebase service-account key, copied next to the code.
+mkdir -p secrets
+for f in firebase-service-account*.json *-firebase-adminsdk-*.json; do
+  [ -f "$f" ] && mv -f "$f" secrets/firebase.json && say "Firebase key moved to secrets/firebase.json"
+done
+if [ -f secrets/firebase.json ]; then
+  app_uid=$($D run --rm --entrypoint id "kebo-rfq-app:${APP_VERSION:-latest}" -u)
+  $SUDO chown "$app_uid" secrets/firebase.json && $SUDO chmod 400 secrets/firebase.json
+  say "phone push: on"
+else
+  say "phone push: off (no Firebase key; see deploy/README.md → Phone push notifications)"
+fi
 say "starting containers…"
 $D compose up -d --remove-orphans
 say "waiting for the app to be healthy…"

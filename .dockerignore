@@ -12,3 +12,5 @@ tests
 backups
 # The phone app is built separately (Flutter), not part of the server image
 mobile
+secrets
+firebase-service-account*.json
