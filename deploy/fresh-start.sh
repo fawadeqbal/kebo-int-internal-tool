@@ -5,8 +5,9 @@
 #   Fawad Iqbal     Super Admin
 #   Faizur Rehman   Manager
 #   Tanveer ul Haq  Manager
-# Company settings (name, address, bank details, terms, categories, notification
-# emails) are kept. Two-step sign-in is switched off (anyone can still turn it
+# You choose one password for all three accounts, or press Enter for a strong
+# random one each. Company settings (name, address, bank details, terms,
+# categories, notification emails) are kept. Two-step sign-in is switched off (anyone can still turn it
 # on for themselves in My account).
 #
 # From your PC (uploads the latest commit first):  bash deploy/push.sh --fresh-start
@@ -52,6 +53,18 @@ for e in "$ADMIN_EMAIL" "$MANAGER_EMAIL" "$MANAGER2_EMAIL"; do
 done
 [ "$(printf '%s\n' "$ADMIN_EMAIL" "$MANAGER_EMAIL" "$MANAGER2_EMAIL" | tr 'A-Z' 'a-z' | sort -u | wc -l)" = 3 ] || die "the three emails must be different; nothing was changed"
 
+echo
+say "password (press Enter to give each account its own strong random password):"
+read -rsp "  One password for all three accounts: " SHARED_PW; echo
+if [ -n "$SHARED_PW" ]; then
+  read -rsp "  Type it again: " again; echo
+  [ "$SHARED_PW" = "$again" ] || die "the two passwords are different; nothing was changed"
+  [ "${#SHARED_PW}" -ge 10 ] || die "use at least 10 characters; nothing was changed"
+  case "$SHARED_PW" in
+    *[[:space:]\"\'\$\`\\#]*) die "the password can't contain spaces, quotes, \$, \`, \\ or #; nothing was changed" ;;
+  esac
+fi
+
 # ---------------------------------------------------------------- 1. Backup of the old data
 stamp=$(date +%Y-%m-%d_%H%M%S)
 say "saving a backup of the old data first…"
@@ -62,7 +75,11 @@ SETTINGS=$($D compose exec -T db psql -U qms -d qms -At -c "select value::text f
 
 # ---------------------------------------------------------------- 2. New accounts and settings in .env
 pw() { printf 'Kb%s7' "$(openssl rand -hex 7)"; }
-ADMIN_PW=$(pw); MANAGER_PW=$(pw); MANAGER2_PW=$(pw)
+if [ -n "$SHARED_PW" ]; then
+  ADMIN_PW=$SHARED_PW; MANAGER_PW=$SHARED_PW; MANAGER2_PW=$SHARED_PW
+else
+  ADMIN_PW=$(pw); MANAGER_PW=$(pw); MANAGER2_PW=$(pw)
+fi
 SUDO=""; [ -w .env ] || SUDO="sudo"
 $SUDO cp -p .env ".env.before-fresh-start-$stamp"
 $SUDO sed -i -E '/^SEED_(ADMIN|MANAGER|MANAGER2|STAFF)_(NAME|EMAIL|PASSWORD)=/d; /^TWO_STEP_REQUIRED_ROLES=/d; /^# Starting accounts/d' .env
