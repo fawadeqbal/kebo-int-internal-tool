@@ -19,3 +19,5 @@ portfolio/
 secrets/
 firebase-service-account*.json
 *firebase-adminsdk*.json
+# Google Cloud key downloads (kebo-rfq-<id>.json)
+kebo-rfq-*.json
