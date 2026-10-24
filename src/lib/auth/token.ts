@@ -21,6 +21,7 @@ export interface SessionClaims {
 function secret() {
   const value = process.env.AUTH_SECRET;
   if (!value || value.length < 32) throw new Error("AUTH_SECRET must be set and at least 32 characters long");
+  if (process.env.NODE_ENV === "production" && /replace-with|change-me|example/i.test(value)) throw new Error("AUTH_SECRET is still the example value from .env.example; generate one with: openssl rand -base64 48");
   return new TextEncoder().encode(value);
 }
 

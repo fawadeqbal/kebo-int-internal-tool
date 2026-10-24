@@ -48,6 +48,9 @@ export const users = pgTable("users", {
   role: roleEnum("role").notNull().default("staff"),
   isActive: boolean("is_active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  /** Wrong passwords in a row; the account locks for a while after too many. */
+  failedLogins: integer("failed_logins").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
   ...timestamps,
 });
 

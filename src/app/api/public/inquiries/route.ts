@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { checkRateLimit, clientIp } from "@/lib/auth/rate-limit";
+
+/** Website inquiries accepted per hour in total (real traffic is a few a day). */
+const PUBLIC_INQUIRIES_PER_HOUR = Number(process.env.PUBLIC_INQUIRIES_PER_HOUR) || 40;
 import { normalizeFields, websiteInquirySchema } from "@/modules/inquiries/schema";
 import { receiveWebsiteInquiry } from "@/modules/inquiries/service";
 
@@ -61,9 +64,9 @@ export async function POST(request: Request) {
   if (origin && !allowedOrigins().includes(origin) && origin !== new URL(request.url).origin)
     return reply(403, { ok: false, message: "This website is not allowed to send inquiries." });
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkRateLimit(`inquiry:${ip}`, 5, 10 * 60 * 1000).allowed)
-    return reply(429, { ok: false, message: "Too many inquiries were sent. Please try again in a few minutes or contact us on WhatsApp." });
+  const busy = () => reply(429, { ok: false, message: "Too many inquiries were sent. Please try again in a few minutes or contact us on WhatsApp." });
+  const ip = clientIp(request.headers);
+  if (!checkRateLimit(`inquiry:${ip}`, 5, 10 * 60 * 1000).allowed) return busy();
 
   const raw = await readBody(request);
   if (!raw) return reply(400, { ok: false, message: "We could not read the form. Please try again." });
@@ -79,6 +82,10 @@ export async function POST(request: Request) {
       message: parsed.error.issues[0]?.message ?? "Please check the form.",
       errors: z.flattenError(parsed.error).fieldErrors,
     });
+
+  // Overall cap, counted only for valid forms, so a flood from many addresses
+  // can't fill the inbox or use up the email quota.
+  if (!checkRateLimit("inquiry:all", PUBLIC_INQUIRIES_PER_HOUR, 60 * 60 * 1000).allowed) return busy();
 
   try {
     const { refNo } = await receiveWebsiteInquiry(parsed.data);

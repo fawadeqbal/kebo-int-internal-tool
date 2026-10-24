@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, ChevronRight, Plus, SearchX } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
+import { can } from "@/lib/auth/permissions";
 import { listCustomers } from "@/modules/customers/repository";
 import { CUSTOMER_SHOW, CUSTOMER_SORTS, parseCustomerParams } from "@/lib/list-filters";
 import { ActiveFilters, Avatar, ButtonLink, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
@@ -15,7 +16,7 @@ const SHOW = CUSTOMER_SHOW;
 const SORTS = CUSTOMER_SORTS;
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  await requireUser();
+  const user = await requireUser();
   const sp = await searchParams;
   const { filters, params, active } = parseCustomerParams(sp);
   const { q, sort, has } = filters;
@@ -29,7 +30,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         description="Everyone who has sent an RFQ, by website, WhatsApp, WeChat, email or phone."
         actions={
           <>
-            <ExportMenu pdfHref={buildHref("/api/export/customers/pdf", params, {})} />
+            {can(user.role, "customers.export") && <ExportMenu pdfHref={buildHref("/api/export/customers/pdf", params, {})} />}
             <ButtonLink href="/customers/new" variant="primary" size="sm">
               <Plus aria-hidden /> Add customer
             </ButtonLink>

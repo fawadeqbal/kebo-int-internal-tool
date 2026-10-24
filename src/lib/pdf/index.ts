@@ -115,7 +115,11 @@ export async function renderPdf({
       await page.setRequestInterception(true);
       page.on("request", (req) => {
         const url = req.url();
-        if (url.startsWith(origin) || url.startsWith("data:") || url.startsWith("blob:")) void req.continue();
+        let sameOrigin = false;
+        try {
+          sameOrigin = new URL(url).origin === origin;
+        } catch {}
+        if (sameOrigin || url.startsWith("data:") || url.startsWith("blob:")) void req.continue();
         else void req.abort();
       });
       await context.setCookie({ name: sessionCookie.name, value: sessionCookie.value, domain: new URL(base).hostname, path: "/", secure: false, httpOnly: true, sameSite: "Lax" });

@@ -50,13 +50,18 @@ export async function receiveWebsiteInquiry(input: WebsiteInquiry) {
       .limit(1);
 
     let customerId: string;
+    // Anyone can post the website form, so it never changes a customer record.
+    // When the details differ from what we have, they go into the inquiry for staff to check.
+    let contactNote = "";
     if (match) {
       customerId = match.id;
-      // Fill in anything we did not have before; never overwrite what staff entered.
-      const fill: Partial<typeof customers.$inferInsert> = {};
-      if (!match.companyName && input.company) fill.companyName = input.company;
-      if (!match.email) fill.email = input.email;
-      if (Object.keys(fill).length) await tx.update(customers).set(fill).where(eq(customers.id, match.id));
+      const given = [
+        input.fullName !== match.contactPerson && `Name: ${input.fullName}`,
+        input.company && input.company !== match.companyName && `Company: ${input.company}`,
+        input.email !== match.email && `Email: ${input.email}`,
+        normalizePhone(input.phone) !== normalizePhone(match.phone) && `Phone: ${input.phone}`,
+      ].filter(Boolean);
+      if (given.length) contactNote = `\n\n— Contact details on the form (not saved to the customer; check before using):\n${given.join("\n")}`;
     } else {
       const [created] = await tx
         .insert(customers)
@@ -77,7 +82,7 @@ export async function receiveWebsiteInquiry(input: WebsiteInquiry) {
       source: "website",
       title: titleFrom(input.requirements, category),
       category,
-      specifications: input.page ? `${input.requirements}\n\n— Sent from ${input.page}` : input.requirements,
+      specifications: `${input.requirements}${contactNote}${input.page ? `\n\n— Sent from ${input.page}` : ""}`,
       quantity: 1,
       priority: "normal",
       requiredBy: null,

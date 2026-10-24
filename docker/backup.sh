@@ -2,7 +2,11 @@
 # Nightly backup of the database and the MinIO file store, kept for BACKUP_RETENTION_DAYS.
 # Restore: gunzip -c db-YYYY-MM-DD.sql.gz | docker compose exec -T db psql -U qms -d qms
 set -eu
+# Backups hold every customer, price and file: readable by the owner only.
+umask 077
 mkdir -p /backups
+chmod 700 /backups
+chmod 600 /backups/* 2>/dev/null || true
 
 run_backup() {
   stamp=$(date +%Y-%m-%d_%H%M)

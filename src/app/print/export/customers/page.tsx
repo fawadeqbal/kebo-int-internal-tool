@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/session";
+import { requirePagePermission } from "@/lib/auth/session";
 import { listCustomers } from "@/modules/customers/repository";
 import { getSettings } from "@/modules/settings/service";
 import { describeFilters, parseCustomerParams } from "@/lib/list-filters";
@@ -9,7 +9,7 @@ import { generatedNow, limitNote, PDF_ROW_LIMIT, plural } from "../shared";
 export const metadata = { title: "Customers report" };
 
 export default async function CustomersExport({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requirePagePermission("customers.export");
   const { filters, active } = parseCustomerParams(await searchParams);
   const [data, settings] = await Promise.all([listCustomers({ ...filters, pageSize: PDF_ROW_LIMIT }), getSettings()]);
   const inquiries = data.rows.reduce((n, c) => n + c.queryCount, 0);

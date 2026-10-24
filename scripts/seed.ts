@@ -67,6 +67,10 @@ const ACCOUNTS = [
   { prefix: "SEED_STAFF", role: "staff" as const, name: "Kebo Staff", email: "staff@example.com", password: "Staff@12345" },
 ];
 
+const PRODUCTION = process.env.NODE_ENV === "production";
+/** Passwords printed in the README / .env.example: never accepted on a server. */
+const KNOWN_PASSWORDS = new Set(["Admin@12345", "Manager@12345", "Staff@12345", "Demo@12345", "change-me"]);
+
 async function seedAccounts() {
   const ids: Record<"admin" | "manager" | "staff", string> = { admin: "", manager: "", staff: "" };
   for (const a of ACCOUNTS) {
@@ -75,6 +79,10 @@ async function seedAccounts() {
     const given = process.env[`${a.prefix}_PASSWORD`];
     if (!given && process.env.NODE_ENV === "production") {
       console.log(`[seed] ${a.role.padEnd(7)} skipped: set ${a.prefix}_PASSWORD in .env to create this account on the server`);
+      continue;
+    }
+    if (PRODUCTION && given && (KNOWN_PASSWORDS.has(given) || given.length < 10)) {
+      console.log(`[seed] ${a.role.padEnd(7)} skipped: ${a.prefix}_PASSWORD is a published example or shorter than 10 characters; choose a strong one`);
       continue;
     }
     const password = given || a.password;
@@ -407,7 +415,11 @@ async function seedDemo(accounts: Awaited<ReturnType<typeof seedAccounts>>) {
 async function main() {
   await seedSettings();
   const accounts = await seedAccounts();
-  if (process.argv.includes("--demo") || process.env.SEED_DEMO === "true") await seedDemo(accounts);
+  if (process.argv.includes("--demo") || process.env.SEED_DEMO === "true") {
+    // Demo people sign in with a published password, so a live server never gets them.
+    if (PRODUCTION) console.log("[seed] --demo refused: demo data and demo logins are for a local computer only, not a live server");
+    else await seedDemo(accounts);
+  }
   await pool.end();
 }
 

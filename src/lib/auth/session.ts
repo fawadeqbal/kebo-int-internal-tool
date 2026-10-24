@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, eq, gt, isNull, ne } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, ne, or } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import { sessions, users, type Role } from "@/lib/db/schema";
 import { can, type Permission } from "./permissions";
@@ -17,11 +17,18 @@ export interface SessionUser {
 
 const SLIDE_EVERY_MS = 60 * 60 * 1000; // move the expiry forward at most once an hour
 const expiry = () => new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+/** However active a device is, it has to sign in again after this long. */
+export const SESSION_MAX_AGE_DAYS = 90;
+const maxAgeCutoff = () => new Date(Date.now() - SESSION_MAX_AGE_DAYS * 86400_000);
 
 /** Start a session for this browser after a successful sign-in. */
 export async function createSession(userId: string) {
   const userAgent = (await headers()).get("user-agent")?.slice(0, 300) ?? null;
   const [row] = await db.insert(sessions).values({ userId, expiresAt: expiry(), userAgent }).returning({ id: sessions.id });
+  // Tidy up this person's finished sessions (signed out, expired or too old).
+  await db
+    .delete(sessions)
+    .where(and(eq(sessions.userId, userId), or(lt(sessions.expiresAt, new Date()), lt(sessions.createdAt, maxAgeCutoff()), lt(sessions.revokedAt, new Date(Date.now() - 7 * 86400_000)))));
   const store = await cookies();
   store.set(SESSION_COOKIE, await signSessionToken(userId, row.id), sessionCookieOptions(SESSION_TTL_SECONDS));
 }
@@ -66,6 +73,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
         eq(sessions.userId, claims.userId),
         isNull(sessions.revokedAt),
         gt(sessions.expiresAt, new Date()),
+        gt(sessions.createdAt, maxAgeCutoff()),
         eq(users.isActive, true),
       ),
     )

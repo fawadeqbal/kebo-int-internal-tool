@@ -3,13 +3,15 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { can, type Permission } from "@/lib/auth/permissions";
 import { pdfResponse } from "@/lib/pdf/respond";
 import { todayISO } from "@/lib/utils/dates";
+import { db } from "@/lib/db";
+import { recordAudit } from "@/modules/audit/service";
 
 export const runtime = "nodejs";
 
 /** Every list export: what it is called, who may download it, and its paper orientation. */
 const EXPORTS: Record<string, { title: string; permission?: Permission; landscape: boolean }> = {
   inquiries: { title: "Inquiries", landscape: true },
-  customers: { title: "Customers", landscape: false },
+  customers: { title: "Customers", permission: "customers.export", landscape: false },
   quotations: { title: "Quotations", landscape: true },
   invoices: { title: "Invoices", permission: "invoices.manage", landscape: true },
   audit: { title: "Audit log", permission: "audit.view", landscape: true },
@@ -32,6 +34,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ kind
   query.delete("view");
   query.delete("page");
   const qs = query.toString();
+  // Lists leave the system as files, so each download is on record.
+  await recordAudit(db, { userId: user.id, action: "export", entityType: "export", summary: `Downloaded the ${spec.title} PDF${qs ? ` (${decodeURIComponent(qs).replace(/&/g, ", ").slice(0, 200)})` : ""}` });
   return pdfResponse(request, {
     pagePath: `/print/export/${kind}${qs ? `?${qs}` : ""}`,
     fileName: `${spec.title} ${todayISO()}`,

@@ -61,10 +61,9 @@ docker compose --profile standalone up -d --build
 
 # Create the starting accounts: Super Admin, Manager, Staff (run once)
 docker compose run --rm app node dist/scripts/seed.js
-
-# Optional: add demo data for a client demo / training
-docker compose run --rm app node dist/scripts/seed.js --demo
 ```
+
+Demo data (`--demo`) is refused on a live server: its demo logins use a published password. Use it on your own computer only (`npm run db:reset -- --demo`).
 
 Open `https://<DOMAIN>` and sign in with the admin account. Then:
 

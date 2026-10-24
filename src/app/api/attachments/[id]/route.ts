@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getStorage } from "@/lib/storage";
 import { isUuid } from "@/lib/utils/ids";
 import { getAccessibleQuery } from "@/modules/queries/service";
+import { recordAudit } from "@/modules/audit/service";
 
 const INLINE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"];
 
@@ -17,11 +18,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!isUuid(id)) return new NextResponse("Not found", { status: 404 });
   const [file] = await db.select().from(attachments).where(and(eq(attachments.id, id), isNull(attachments.deletedAt))).limit(1);
   if (!file) return new NextResponse("Not found", { status: 404 });
+  let refNo = "";
   try {
-    await getAccessibleQuery(user, file.queryId);
+    refNo = (await getAccessibleQuery(user, file.queryId)).refNo;
   } catch {
     return new NextResponse("Not found", { status: 404 });
   }
+  const view = new URL(request.url).searchParams.get("view") === "1";
+  await recordAudit(db, { userId: user.id, action: view ? "view_file" : "download", entityType: "attachment", entityId: file.id, summary: `${view ? "Opened" : "Downloaded"} ${file.fileName} (${refNo})` });
   try {
     const stream = await getStorage().getStream(file.storageKey);
     const inline = new URL(request.url).searchParams.get("view") === "1" && INLINE_TYPES.includes(file.mimeType);

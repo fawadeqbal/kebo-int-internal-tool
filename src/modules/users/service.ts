@@ -9,16 +9,47 @@ import { findUserByEmailWithHash, findUserById } from "./repository";
 import type { z } from "zod";
 import type { createUserSchema, updateUserSchema } from "./schema";
 
-export async function authenticate(email: string, password: string) {
+/** Wrong passwords in a row before the account is locked, and for how long. */
+export const MAX_FAILED_LOGINS = 8;
+export const LOCK_MINUTES = 15;
+
+export type AuthResult = { ok: true; user: NonNullable<Awaited<ReturnType<typeof findUserByEmailWithHash>>> } | { ok: false; lockedMinutes?: number };
+
+export async function authenticate(email: string, password: string, ip = "unknown"): Promise<AuthResult> {
   const user = await findUserByEmailWithHash(email);
+  const now = new Date();
+  if (user?.lockedUntil && user.lockedUntil > now) {
+    await verifyPassword(password, dummyHash()); // same timing as a normal attempt
+    return { ok: false, lockedMinutes: Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 60000) };
+  }
   // Always run a hash comparison so response time does not reveal whether the email exists.
   const ok = await verifyPassword(password, user?.passwordHash ?? dummyHash());
-  if (!user || !ok || !user.isActive) return null;
+  if (!user) return { ok: false };
+  if (!ok || !user.isActive) {
+    const fails = user.failedLogins + 1;
+    const lock = fails >= MAX_FAILED_LOGINS;
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set(lock ? { failedLogins: 0, lockedUntil: new Date(now.getTime() + LOCK_MINUTES * 60000) } : { failedLogins: fails })
+        .where(eq(users.id, user.id));
+      await recordAudit(tx, {
+        userId: user.id,
+        action: lock ? "locked" : "login_failed",
+        entityType: "user",
+        entityId: user.id,
+        summary: lock
+          ? `Sign-in locked for ${LOCK_MINUTES} minutes after ${MAX_FAILED_LOGINS} wrong passwords (last from ${ip})`
+          : `${user.isActive ? "Wrong password" : "Sign-in attempt on a deactivated account"} (from ${ip})`,
+      });
+    });
+    return lock ? { ok: false, lockedMinutes: LOCK_MINUTES } : { ok: false };
+  }
   await db.transaction(async (tx) => {
-    await tx.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
-    await recordAudit(tx, { userId: user.id, action: "login", entityType: "user", entityId: user.id, summary: "Signed in" });
+    await tx.update(users).set({ lastLoginAt: now, failedLogins: 0, lockedUntil: null }).where(eq(users.id, user.id));
+    await recordAudit(tx, { userId: user.id, action: "login", entityType: "user", entityId: user.id, summary: `Signed in (from ${ip})` });
   });
-  return user;
+  return { ok: true, user };
 }
 
 async function emailTaken(email: string, exceptId?: string) {
@@ -99,7 +130,7 @@ export async function resetPassword(actor: SessionUser, id: string, password: st
   if (!existing) throw new NotFoundError("User");
   const passwordHash = await hashPassword(password);
   await db.transaction(async (tx) => {
-    await tx.update(users).set({ passwordHash }).where(eq(users.id, id));
+    await tx.update(users).set({ passwordHash, failedLogins: 0, lockedUntil: null }).where(eq(users.id, id));
     // The old password may be known to someone else: end that user's sessions (unless it is the admin's own).
     await revokeUserSessions(id, actor.id === id ? ((await currentSessionId()) ?? undefined) : undefined, tx);
     await recordAudit(tx, { userId: actor.id, action: "reset_password", entityType: "user", entityId: id, summary: `Reset password for ${existing.email}` });

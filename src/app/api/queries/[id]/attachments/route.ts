@@ -8,6 +8,8 @@ import { can } from "@/lib/auth/permissions";
 
 /** Upload one or more files to a query (multipart/form-data, field "files"). */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Only our own pages may upload (server actions get this check from Next; this is a plain route).
+  if (!fromOwnSite(request)) return NextResponse.json({ error: "Upload refused." }, { status: 403 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
   const { id } = await params;
@@ -42,4 +44,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     saved.push(await recordAttachment(user, id, { fileName: name, mimeType: file.type || "application/octet-stream", size: file.size, storageKey: key }));
   }
   return NextResponse.json({ ok: true, count: saved.length });
+}
+
+/** True for requests from this app's own pages (not another site or a sibling subdomain). */
+function fromOwnSite(request: Request) {
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") return false;
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
 }
