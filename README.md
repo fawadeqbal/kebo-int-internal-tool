@@ -176,3 +176,4 @@ These were simplified to keep the first version small and easy to run; each sits
 | BullMQ + Redis worker | A simple scheduled worker (no Redis needed) | Enough for reminders; add a queue if heavier jobs come |
 | Prisma or Drizzle | Drizzle | Lighter, SQL-like, no engine binaries |
 | Auth.js | Signed session cookie (`jose`) + bcrypt, checked against the DB every request | Fewer moving parts for a credentials-only internal app |
+# kebo-int-internal-tool
