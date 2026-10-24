@@ -21,22 +21,35 @@ const expiry = () => new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
 export const SESSION_MAX_AGE_DAYS = 90;
 const maxAgeCutoff = () => new Date(Date.now() - SESSION_MAX_AGE_DAYS * 86400_000);
 
-/** Start a session for this browser after a successful sign-in. */
-export async function createSession(userId: string) {
+/**
+ * The session token for this request: the browser's cookie, or for the
+ * mobile app an "Authorization: Bearer <token>" header (the same signed
+ * token, backed by the same sessions row, so sign-out, password resets and
+ * deactivation end app sessions exactly like browser ones).
+ */
+export async function sessionToken(): Promise<string | undefined> {
+  const auth = (await headers()).get("authorization");
+  if (auth?.startsWith("Bearer ")) return auth.slice(7).trim() || undefined;
+  return (await cookies()).get(SESSION_COOKIE)?.value;
+}
+
+/** Start a session after a successful sign-in. Browsers get the cookie; the app takes the returned token. */
+export async function createSession(userId: string, { setCookie = true }: { setCookie?: boolean } = {}): Promise<string> {
   const userAgent = (await headers()).get("user-agent")?.slice(0, 300) ?? null;
   const [row] = await db.insert(sessions).values({ userId, expiresAt: expiry(), userAgent }).returning({ id: sessions.id });
   // Tidy up this person's finished sessions (signed out, expired or too old).
   await db
     .delete(sessions)
     .where(and(eq(sessions.userId, userId), or(lt(sessions.expiresAt, new Date()), lt(sessions.createdAt, maxAgeCutoff()), lt(sessions.revokedAt, new Date(Date.now() - 7 * 86400_000)))));
-  const store = await cookies();
-  store.set(SESSION_COOKIE, await signSessionToken(userId, row.id), sessionCookieOptions(SESSION_TTL_SECONDS));
+  const token = await signSessionToken(userId, row.id);
+  if (setCookie) (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions(SESSION_TTL_SECONDS));
+  return token;
 }
 
 /** Sign out this browser: the session ends on the server and the cookie is removed. */
 export async function destroySession() {
   const store = await cookies();
-  const claims = await verifySessionToken(store.get(SESSION_COOKIE)?.value);
+  const claims = await verifySessionToken(await sessionToken());
   if (claims) await db.update(sessions).set({ revokedAt: new Date() }).where(eq(sessions.id, claims.sessionId));
   store.set(SESSION_COOKIE, "", sessionCookieOptions(0));
 }
@@ -51,7 +64,7 @@ export async function revokeUserSessions(userId: string, exceptSessionId?: strin
 
 /** The id of the current browser's session (to keep it when changing your own password). */
 export async function currentSessionId(): Promise<string | null> {
-  const claims = await verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value);
+  const claims = await verifySessionToken(await sessionToken());
   return claims?.sessionId ?? null;
 }
 
@@ -65,8 +78,7 @@ export async function currentSessionId(): Promise<string | null> {
  * and sign-out use this directly).
  */
 export const getSessionUser = cache(async (): Promise<(SessionUser & { twoStepSetupRequired: boolean }) | null> => {
-  const store = await cookies();
-  const claims = await verifySessionToken(store.get(SESSION_COOKIE)?.value);
+  const claims = await verifySessionToken(await sessionToken());
   if (!claims) return null;
   const [row] = await db
     .select({ id: users.id, name: users.name, email: users.email, role: users.role, totpEnabledAt: users.totpEnabledAt, lastSeenAt: sessions.lastSeenAt })

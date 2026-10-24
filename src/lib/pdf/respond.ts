@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/token";
+import { sessionToken } from "@/lib/auth/session";
 import { pdfHeaders, PdfUnavailableError, renderPdf } from "./index";
 
 /** Render a print page as the current user and send it back as a PDF file. */
@@ -8,7 +8,8 @@ export async function pdfResponse(
   request: Request,
   { pagePath, fileName, footerLabel, landscape }: { pagePath: string; fileName: string; footerLabel: string; landscape?: boolean },
 ) {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  // The browser cookie, or the app's bearer token: the print page is opened with it as a cookie.
+  const token = await sessionToken();
   if (!token) return new NextResponse("Unauthorized", { status: 401 });
   const inline = new URL(request.url).searchParams.get("view") === "1";
   try {
