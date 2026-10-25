@@ -136,9 +136,6 @@ class _KeboAppState extends ConsumerState<KeboApp> {
         GoRoute(path: '/inquiries/new', builder: (_, s) => InquiryFormScreen(customerId: s.uri.queryParameters['customer'])),
         GoRoute(path: '/inquiries/:id', builder: (_, s) => InquiryDetailScreen(id: s.pathParameters['id']!)),
         GoRoute(path: '/inquiries/:id/edit', builder: (_, s) => InquiryFormScreen(editId: s.pathParameters['id'])),
-        GoRoute(path: '/inquiries/:id/sourcing', builder: (_, s) => SourcingScreen(queryId: s.pathParameters['id']!)),
-        GoRoute(path: '/inquiries/:id/offers/new', builder: (_, s) => OfferFormScreen(queryId: s.pathParameters['id'])),
-        GoRoute(path: '/offers/:id/edit', builder: (_, s) => OfferFormScreen(editId: s.pathParameters['id'])),
         // Factories
         GoRoute(path: '/factories', builder: (_, _) => const FactoriesScreen()),
         GoRoute(path: '/factories/new', builder: (_, _) => const FactoryFormScreen()),

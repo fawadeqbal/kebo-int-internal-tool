@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { handleForm, toActionError } from "@/lib/utils/action";
 import type { ActionState } from "@/lib/utils/result";
-import { choicesSchema, offerSchema, supplierSchema } from "./schema";
-import { chooseOffers, createOffer, createSupplier, deleteOffer, deleteSupplier, updateOffer, updateSupplier } from "./service";
+import { itemPriceSchema, supplierSchema } from "./schema";
+import { clearItemFactoryPrice, createSupplier, deleteSupplier, setItemFactoryPrice, updateSupplier } from "./service";
 
 export async function createSupplierAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const actor = await requireUser();
@@ -40,44 +40,24 @@ export async function deleteSupplierAction(id: string) {
   redirect("/factories?toast=Factory+removed");
 }
 
-export async function createOfferAction(queryId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function setItemPriceAction(queryId: string, itemId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
   const actor = await requireUser();
-  const result = await handleForm(formData, offerSchema, async (data) => {
-    await createOffer(actor, queryId, data);
+  const result = await handleForm(formData, itemPriceSchema, async (data) => {
+    await setItemFactoryPrice(actor, queryId, itemId, data);
   });
   if (!result.ok) return result;
   revalidatePath(`/queries/${queryId}`);
-  redirect(`/queries/${queryId}/sourcing?toast=Factory+offer+saved`);
+  return { ok: true, message: "Factory price saved." };
 }
 
-export async function updateOfferAction(offerId: string, queryId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  const actor = await requireUser();
-  const result = await handleForm(formData, offerSchema, async (data) => {
-    await updateOffer(actor, offerId, data);
-  });
-  if (!result.ok) return result;
-  revalidatePath(`/queries/${queryId}`);
-  redirect(`/queries/${queryId}/sourcing?toast=Factory+offer+saved`);
-}
-
-export async function deleteOfferAction(offerId: string, queryId: string) {
+export async function clearItemPriceAction(queryId: string, itemId: string): Promise<ActionState> {
   const actor = await requireUser();
   try {
-    await deleteOffer(actor, offerId);
+    await clearItemFactoryPrice(actor, queryId, itemId);
   } catch (error) {
-    redirect(`/queries/${queryId}/sourcing?toast=${encodeURIComponent(toActionError(error).message ?? "Could not remove")}`);
+    return toActionError(error);
   }
   revalidatePath(`/queries/${queryId}`);
-  redirect(`/queries/${queryId}/sourcing?toast=Factory+offer+removed`);
+  return { ok: true, message: "Factory price removed." };
 }
 
-export async function chooseOffersAction(queryId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  const actor = await requireUser();
-  const result = await handleForm(formData, choicesSchema, async (data) => {
-    await chooseOffers(actor, queryId, data.choices);
-  });
-  if (!result.ok) return result;
-  revalidatePath(`/queries/${queryId}`);
-  revalidatePath(`/queries/${queryId}/sourcing`);
-  return { ok: true, message: "Saved. New quotations are priced from these offers." };
-}

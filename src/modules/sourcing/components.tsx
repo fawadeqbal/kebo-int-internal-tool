@@ -1,14 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Alert, Button, ButtonLink, Card, CardBody, CardHeader, controlClass, Field, Input, Select, Textarea } from "@/components/ui";
+import { Alert, Button, ButtonLink, Card, CardBody, CardHeader, Field, Input, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/client";
 import { EditableCard } from "@/components/ui/editable-card";
-import { splitDescription, UNITS } from "@/lib/line-items";
-import { unitPriceWithVat } from "@/lib/costing";
-import { formatCents, formatMoney } from "@/lib/utils/money";
-import { cn } from "@/lib/utils/cn";
+import { formatMoney } from "@/lib/utils/money";
 import type { ActionState } from "@/lib/utils/result";
 
 type Action = (prev: ActionState, formData: FormData) => Promise<ActionState>;
@@ -85,335 +82,6 @@ export function SupplierForm({ action, initial, onDone, cancelHref }: { action: 
   );
 }
 
-/* ---------------------------------------------------------------- offer form */
-
-export interface OfferLine {
-  id?: string;
-  /** The customer's item it is for ("" = an extra line). */
-  sourceId: string;
-  description: string;
-  model: string;
-  quantity: string;
-  unit: string;
-  unitPrice: string;
-  vatRate: string;
-}
-
-export interface OfferValues {
-  supplierId: string;
-  reference: string;
-  quotedOn: string;
-  validUntil: string;
-  currency: string;
-  pricesIncludeVat: boolean;
-  priceBasis: string;
-  leadTime: string;
-  paymentTerms: string;
-  notes: string;
-  items: OfferLine[];
-}
-
-const NEW = "__new__";
-const CURRENCIES = ["CNY", "USD", "EUR"];
-
-/**
- * What one factory offered for this inquiry: one line per customer item it
- * quoted (filled in from the inquiry; untick or remove what they did not
- * quote), each with its own price and VAT %.
- */
-export function OfferForm({
-  action,
-  initial,
-  suppliers,
-  requested,
-  cancelHref,
-  submitLabel,
-}: {
-  action: Action;
-  initial: OfferValues;
-  suppliers: { id: string; name: string; defaultVatRate: string }[];
-  requested: { id: string; description: string; quantity: string; unit: string }[];
-  cancelHref: string;
-  submitLabel: string;
-}) {
-  const [state, formAction] = useActionState(action, {});
-  const e = state.errors ?? {};
-  const sent = state.values;
-  const [supplierId, setSupplierId] = useState<string>((sent?.supplierId as string) ?? (initial.supplierId || (suppliers.length ? "" : NEW)));
-  const [currency, setCurrency] = useState<string>((sent?.currency as string) ?? initial.currency);
-  const [inclVat, setInclVat] = useState<boolean>(sent ? sent.pricesIncludeVat === "on" : initial.pricesIncludeVat);
-  const [lines, setLines] = useState<OfferLine[]>(sent?.items ? (JSON.parse(sent.items as string) as OfferLine[]) : initial.items);
-  const v = (k: keyof Omit<OfferValues, "items" | "pricesIncludeVat">) => (sent?.[k] as string | undefined) ?? initial[k];
-  const update = (i: number, patch: Partial<OfferLine>) => setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-
-  const pickSupplier = (id: string) => {
-    setSupplierId(id);
-    const s = suppliers.find((x) => x.id === id);
-    // A new factory's usual VAT replaces the starting rate on lines nobody has priced yet.
-    if (s) setLines((prev) => prev.map((l) => (l.unitPrice === "" ? { ...l, vatRate: String(Number(s.defaultVatRate)) } : l)));
-  };
-
-  const total = useMemo(
-    () => lines.reduce((t, l) => t + Math.round(unitPriceWithVat(Number(l.unitPrice) || 0, Number(l.vatRate) || 0, inclVat) * 100) * (Number(l.quantity) || 0), 0),
-    [lines, inclVat],
-  );
-  const filled = lines.filter((l) => l.description.trim() && l.unitPrice !== "");
-  const itemName = (id: string) => splitDescription(requested.find((r) => r.id === id)?.description ?? "").name;
-
-  return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
-      {state.message && !state.ok && <Alert tone="error">{state.message}</Alert>}
-      <input type="hidden" name="items" value={JSON.stringify(filled)} />
-      <Card>
-        <CardHeader title="Factory" />
-        <CardBody className="grid gap-5 sm:grid-cols-2">
-          <Field label="Factory" htmlFor="supplierId" required error={e.supplierId}>
-            <Select id="supplierId" name={supplierId === NEW ? "" : "supplierId"} value={supplierId} onChange={(ev) => pickSupplier(ev.target.value)}>
-              <option value="" disabled>
-                Choose a factory…
-              </option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              <option value={NEW}>+ New factory…</option>
-            </Select>
-          </Field>
-          {supplierId === NEW ? (
-            <Field label="New factory's name" htmlFor="newSupplierName" required error={e.newSupplierName} hint="Add the contact details later under Factories">
-              <Input id="newSupplierName" name="newSupplierName" defaultValue={(sent?.newSupplierName as string) ?? ""} autoFocus />
-            </Field>
-          ) : (
-            <Field label="Their quotation no." htmlFor="reference" optional error={e.reference}>
-              <Input id="reference" name="reference" defaultValue={v("reference")} />
-            </Field>
-          )}
-          <Field label="Date of their offer" htmlFor="quotedOn" required error={e.quotedOn}>
-            <Input id="quotedOn" name="quotedOn" type="date" defaultValue={v("quotedOn")} />
-          </Field>
-          <Field label="Valid until" htmlFor="validUntil" optional error={e.validUntil}>
-            <Input id="validUntil" name="validUntil" type="date" defaultValue={v("validUntil")} />
-          </Field>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Prices" description="One line per item they quoted. Remove the ones they did not; add extras (tooling, spare parts) as new lines." />
-        <CardBody className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
-            <Field label="Currency" htmlFor="currency" error={e.currency}>
-              <Input id="currency" name="currency" list="offer-currencies" value={currency} onChange={(ev) => setCurrency(ev.target.value.toUpperCase())} maxLength={3} />
-            </Field>
-            <label className="flex cursor-pointer items-center gap-2.5 self-end rounded-lg border border-line px-3 py-2.5 text-sm text-text-2 has-[:checked]:border-primary/40 has-[:checked]:bg-primary-soft/40 has-[:checked]:text-text">
-              <input type="checkbox" name="pricesIncludeVat" checked={inclVat} onChange={(ev) => setInclVat(ev.target.checked)} className="size-4 accent-[var(--primary-solid)]" />
-              The prices below already include VAT (含税)
-            </label>
-          </div>
-          <datalist id="offer-currencies">
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-          <datalist id="offer-units">
-            {UNITS.map((u) => (
-              <option key={u} value={u} />
-            ))}
-          </datalist>
-          <ol className="flex flex-col divide-y divide-line rounded-xl border border-line">
-            {lines.map((l, i) => {
-              const withVat = unitPriceWithVat(Number(l.unitPrice) || 0, Number(l.vatRate) || 0, inclVat);
-              return (
-                <li key={l.id ?? `n${i}`} className="grid gap-3 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="flex items-center gap-2 text-xs text-muted">
-                      For
-                      <select
-                        value={l.sourceId}
-                        onChange={(ev) => update(i, { sourceId: ev.target.value })}
-                        className={cn(controlClass, "h-8 w-auto max-w-[18rem] py-0 text-xs")}
-                        aria-label={`Customer item for line ${i + 1}`}
-                      >
-                        {requested.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {splitDescription(r.description).name}
-                          </option>
-                        ))}
-                        <option value="">Extra (not asked for)</option>
-                      </select>
-                    </label>
-                    <button type="button" onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-muted hover:bg-bad-soft hover:text-bad" aria-label={`Remove line ${i + 1}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <textarea
-                    rows={l.description.includes("\n") ? 2 : 1}
-                    value={l.description}
-                    onChange={(ev) => update(i, { description: ev.target.value })}
-                    className={cn(controlClass, "field-sizing-content min-h-10 resize-y py-2")}
-                    aria-label={`What they offer, line ${i + 1}`}
-                    placeholder={l.sourceId ? `What they offer for: ${itemName(l.sourceId)}` : "What they offer"}
-                  />
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_6rem_6rem_9rem_6rem]">
-                    <Input aria-label={`Model, line ${i + 1}`} placeholder="Model" value={l.model} onChange={(ev) => update(i, { model: ev.target.value })} />
-                    <Input aria-label={`Quantity, line ${i + 1}`} type="number" min="0" step="any" value={l.quantity} onChange={(ev) => update(i, { quantity: ev.target.value })} />
-                    <Input aria-label={`Unit, line ${i + 1}`} list="offer-units" value={l.unit} onChange={(ev) => update(i, { unit: ev.target.value })} />
-                    <Input aria-label={`Unit price (${currency}), line ${i + 1}`} placeholder={`Unit price ${currency}`} type="number" min="0" step="0.01" value={l.unitPrice} onChange={(ev) => update(i, { unitPrice: ev.target.value })} />
-                    <div className="relative">
-                      <Input aria-label={`VAT %, line ${i + 1}`} type="number" min="0" max="100" step="0.01" value={l.vatRate} onChange={(ev) => update(i, { vatRate: ev.target.value })} className="pr-7" />
-                      <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs text-muted">%</span>
-                    </div>
-                  </div>
-                  {l.unitPrice !== "" && (
-                    <p className="text-right text-xs text-muted tabular">
-                      {inclVat ? "Incl." : "+ VAT ="} {formatMoney(withVat, currency)} / {l.unit || "unit"} · line {formatCents(Math.round(withVat * 100) * (Number(l.quantity) || 0), currency)} incl. VAT
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-          {(e.items || Object.keys(e).some((k) => k.startsWith("items"))) && <p className="text-xs text-bad">{e.items?.[0] ?? "Check the prices: each line needs a description and a price."}</p>}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setLines((prev) => [...prev, { sourceId: "", description: "", model: "", quantity: "1", unit: "pcs", unitPrice: "", vatRate: prev.at(-1)?.vatRate ?? "13" }])}
-            >
-              <Plus aria-hidden /> Add line
-            </Button>
-            <p className="text-sm">
-              Total incl. VAT <span className="font-semibold text-text tabular">{formatCents(total, currency)}</span>
-            </p>
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Terms" description="Optional" />
-        <CardBody className="grid gap-5 sm:grid-cols-2">
-          <Field label="Price basis" htmlFor="priceBasis" optional error={e.priceBasis} hint="EXW factory, FOB Qingdao, delivered to port…">
-            <Input id="priceBasis" name="priceBasis" defaultValue={v("priceBasis")} />
-          </Field>
-          <Field label="Lead time" htmlFor="leadTime" optional error={e.leadTime} hint="e.g. 45 days after deposit">
-            <Input id="leadTime" name="leadTime" defaultValue={v("leadTime")} />
-          </Field>
-          <Field label="Payment terms" htmlFor="paymentTerms" optional error={e.paymentTerms}>
-            <Input id="paymentTerms" name="paymentTerms" defaultValue={v("paymentTerms")} placeholder="30% deposit, 70% before shipment" />
-          </Field>
-          <Field label="Notes" htmlFor="notes" optional error={e.notes}>
-            <Input id="notes" name="notes" defaultValue={v("notes")} />
-          </Field>
-        </CardBody>
-      </Card>
-
-      <div className="flex flex-wrap gap-2">
-        <SubmitButton>{submitLabel}</SubmitButton>
-        <ButtonLink href={cancelHref} variant="secondary">
-          Cancel
-        </ButtonLink>
-      </div>
-    </form>
-  );
-}
-
-/* ---------------------------------------------------------------- compare & choose */
-
-export interface CompareItem {
-  id: string;
-  description: string;
-  quantity: string;
-  unit: string;
-  chosenId: string | null;
-  options: {
-    id: string;
-    supplierName: string;
-    description: string;
-    model: string | null;
-    quantity: string;
-    unit: string;
-    offerCurrency: string;
-    unitPrice: string;
-    vatRate: string;
-    unitPriceWithVat: number;
-    unitCost: number | null;
-    leadTime: string | null;
-  }[];
-}
-
-/** Per customer item, every factory line offered for it, cheapest first: pick the one to quote from. */
-export function ChooseOffersForm({ action, items, currency, canEdit }: { action: Action; items: CompareItem[]; currency: string; canEdit: boolean }) {
-  const [state, formAction] = useActionState(action, {});
-  const [choices, setChoices] = useState<Record<string, string>>(() => Object.fromEntries(items.map((i) => [i.id, i.chosenId ?? ""])));
-  const changed = items.some((i) => (i.chosenId ?? "") !== choices[i.id]);
-  return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <input type="hidden" name="choices" value={JSON.stringify(choices)} />
-      {state.message && <Alert tone={state.ok ? "success" : "error"}>{state.message}</Alert>}
-      {items.map((it, n) => {
-        const { name } = splitDescription(it.description);
-        const cheapest = it.options.find((o) => o.unitCost !== null)?.id;
-        return (
-          <Card key={it.id}>
-            <CardHeader title={`${n + 1}. ${name}`} description={`${Number(it.quantity)} ${it.unit} · ${it.options.length ? `${it.options.length} ${it.options.length === 1 ? "offer" : "offers"}` : "no factory offer yet"}`} />
-            {it.options.length > 0 && (
-              <CardBody className="p-0">
-                <ul className="divide-y divide-line">
-                  {it.options.map((o) => (
-                    <li key={o.id}>
-                      <label className={cn("flex cursor-pointer items-start gap-3 px-5 py-3 hover:bg-surface-2", choices[it.id] === o.id && "bg-primary-soft/40")}>
-                        <input
-                          type="radio"
-                          name={`choice-${it.id}`}
-                          checked={choices[it.id] === o.id}
-                          disabled={!canEdit}
-                          onChange={() => setChoices((c) => ({ ...c, [it.id]: o.id }))}
-                          className="mt-1 size-4 accent-[var(--primary-solid)]"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-text">{o.supplierName}</span>
-                            {o.id === cheapest && it.options.length > 1 && <span className="rounded-full bg-ok-soft px-2 py-0.5 text-[11px] font-medium text-ok">Cheapest</span>}
-                          </span>
-                          <span className="block text-xs text-muted">
-                            {splitDescription(o.description).name}
-                            {o.model && ` · ${o.model}`}
-                            {o.leadTime && ` · ${o.leadTime}`}
-                            {Number(o.quantity) !== Number(it.quantity) && ` · quoted for ${Number(o.quantity)} ${o.unit}`}
-                          </span>
-                        </span>
-                        <span className="text-right tabular">
-                          <span className="block text-sm font-semibold text-text">{o.unitCost === null ? "No rate" : formatMoney(o.unitCost, currency)}</span>
-                          <span className="block text-xs text-muted">
-                            {formatMoney(o.unitPriceWithVat, o.offerCurrency)} incl. {Number(o.vatRate)}% VAT
-                          </span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                  <li>
-                    <label className="flex cursor-pointer items-center gap-3 px-5 py-2.5 text-sm text-muted hover:bg-surface-2">
-                      <input type="radio" name={`choice-${it.id}`} checked={choices[it.id] === ""} disabled={!canEdit} onChange={() => setChoices((c) => ({ ...c, [it.id]: "" }))} className="size-4 accent-[var(--primary-solid)]" />
-                      None: price this item by hand
-                    </label>
-                  </li>
-                </ul>
-              </CardBody>
-            )}
-          </Card>
-        );
-      })}
-      {canEdit && (
-        <div className="sticky bottom-20 z-10 flex items-center justify-end gap-3 rounded-xl border border-line bg-surface/90 p-3 shadow-pop backdrop-blur lg:bottom-4">
-          {changed && <span className="text-sm text-muted">Not saved yet</span>}
-          <SubmitButton disabled={!changed}>Save choices</SubmitButton>
-        </div>
-      )}
-    </form>
-  );
-}
-
 /** A factory's details, read first; "Edit" opens the form in place. */
 export function SupplierProfileCard({ action, supplier }: { action: Action; supplier: SupplierValues }) {
   const rows: [string, string][] = [
@@ -441,5 +109,223 @@ export function SupplierProfileCard({ action, supplier }: { action: Action; supp
       }
       edit={(done) => <SupplierForm action={action} initial={supplier} onDone={done} />}
     />
+  );
+}
+
+/* ---------------------------------------------------------------- Factory prices (the simple way) */
+
+export interface ItemPriceRow {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  price: {
+    factory: string;
+    unitPrice: number;
+    vatRate: number;
+    pricesIncludeVat: boolean;
+    unitPriceWithVat: number;
+    unitCost: number | null;
+    leadTime: string | null;
+  } | null;
+}
+
+/**
+ * Per customer item: which factory supplies it and at what price. One price
+ * per item, typed straight in (no offers to compare). New quotations are
+ * priced from these. Internal: never shown to the customer.
+ */
+export function ItemPricesCard({
+  rows,
+  factories,
+  currency,
+  margin,
+  canEdit,
+  setAction,
+  clearAction,
+}: {
+  rows: ItemPriceRow[];
+  factories: { name: string; defaultVatRate: string }[];
+  currency: string;
+  margin: number;
+  canEdit: boolean;
+  /** Per item id: the bound save / remove actions. */
+  setAction: Record<string, Action>;
+  clearAction: Record<string, () => Promise<ActionState>>;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const priced = rows.filter((r) => r.price).length;
+  return (
+    <Card>
+      <CardHeader
+        title="Factory prices"
+        description={
+          rows.length === 0
+            ? "Add the customer's items first."
+            : `${priced} of ${rows.length} ${rows.length === 1 ? "item" : "items"} priced · internal, never shown to the customer`
+        }
+      />
+      <datalist id="factory-names">
+        {factories.map((f) => (
+          <option key={f.name} value={f.name} />
+        ))}
+      </datalist>
+      <CardBody className="p-0">
+        <ul className="divide-y divide-line">
+          {rows.map((r, n) => (
+            <li key={r.id} className="px-5 py-3">
+              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-text">
+                    {n + 1}. {r.name} <span className="font-normal text-muted">· {r.quantity} {r.unit}</span>
+                  </p>
+                  {r.price ? (
+                    <p className="mt-0.5 text-sm text-text-2">
+                      <span className="font-medium text-text">{r.price.factory}</span> · {formatMoney(r.price.unitPrice, currency)} {r.price.pricesIncludeVat ? "incl." : "+"} {r.price.vatRate}% VAT
+                      {r.price.leadTime && ` · ${r.price.leadTime}`}
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 text-sm text-muted">No factory price yet</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {r.price && (
+                    <span className="text-right text-xs text-muted">
+                      Our cost
+                      <span className="block text-sm font-semibold text-text tabular">{formatMoney(r.price.unitCost ?? r.price.unitPriceWithVat, currency)}</span>
+                      <span className="block">incl. VAT</span>
+                    </span>
+                  )}
+                  {canEdit && open !== r.id && (
+                    <Button type="button" variant={r.price ? "secondary" : "primary"} size="xs" onClick={() => setOpen(r.id)}>
+                      {r.price ? "Change" : <><Plus aria-hidden /> Add price</>}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {open === r.id && (
+                <ItemPriceForm
+                  key={r.id}
+                  row={r}
+                  factories={factories}
+                  currency={currency}
+                  action={setAction[r.id]}
+                  clear={r.price ? clearAction[r.id] : undefined}
+                  onDone={() => setOpen(null)}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+        {priced > 0 && (
+          <p className="border-t border-line px-5 py-2.5 text-xs text-muted">
+            New quotations are priced from these: our cost (VAT included) plus {margin}% margin. You can still change each price on the quotation.
+          </p>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+function ItemPriceForm({
+  row,
+  factories,
+  currency,
+  action,
+  clear,
+  onDone,
+}: {
+  row: ItemPriceRow;
+  factories: { name: string; defaultVatRate: string }[];
+  currency: string;
+  action: Action;
+  clear?: () => Promise<ActionState>;
+  onDone: () => void;
+}) {
+  const [state, formAction] = useActionState(async (prev: ActionState, fd: FormData) => {
+    const result = await action(prev, fd);
+    if (result.ok) onDone();
+    return result;
+  }, {});
+  const e = state.errors ?? {};
+  const sent = state.values;
+  const p = row.price;
+  const [vat, setVat] = useState<string>((sent?.vatRate as string) ?? String(p?.vatRate ?? 13));
+  const [clearing, setClearing] = useState(false);
+  const [name, setName] = useState<string>((sent?.factoryName as string) ?? p?.factory ?? "");
+  // A name we have not seen before is a new factory: ask for its contacts here, once.
+  const isNew = name.trim().length >= 2 && !factories.some((f) => f.name.toLowerCase() === name.trim().toLowerCase());
+  const id = (k: string) => `${k}-${row.id}`;
+  return (
+    <form action={formAction} className="mt-3 grid gap-3 rounded-xl border border-line bg-surface-2/60 p-4 sm:grid-cols-2" noValidate>
+      {state.message && !state.ok && (
+        <Alert tone="error" className="sm:col-span-2">
+          {state.message}
+        </Alert>
+      )}
+      <Field label="Factory" htmlFor={id("factoryName")} required error={e.factoryName} hint={isNew ? "New factory: it is added for you" : "Start typing to pick one you have used before"} className="sm:col-span-2">
+        <Input
+          id={id("factoryName")}
+          name="factoryName"
+          list="factory-names"
+          autoFocus
+          value={name}
+          placeholder="e.g. Jinan Pharma Machinery Co., Ltd."
+          onChange={(ev) => {
+            setName(ev.target.value);
+            const known = factories.find((f) => f.name.toLowerCase() === ev.target.value.trim().toLowerCase());
+            if (known && !p) setVat(String(Number(known.defaultVatRate)));
+          }}
+        />
+      </Field>
+      {isNew && (
+        <>
+          <Field label="Factory email" htmlFor={id("email")} optional error={e.email}>
+            <Input id={id("email")} name="email" type="email" defaultValue={(sent?.email as string) ?? ""} />
+          </Field>
+          <Field label="Phone / WeChat" htmlFor={id("phone")} optional error={e.phone}>
+            <Input id={id("phone")} name="phone" defaultValue={(sent?.phone as string) ?? ""} />
+          </Field>
+        </>
+      )}
+      <Field label={`Price for 1 ${row.unit || "unit"} (${currency})`} htmlFor={id("unitPrice")} required error={e.unitPrice}>
+        <Input id={id("unitPrice")} name="unitPrice" type="number" min="0" step="0.01" inputMode="decimal" defaultValue={(sent?.unitPrice as string) ?? (p ? String(p.unitPrice) : "")} />
+      </Field>
+      <div className="grid grid-cols-[6rem_1fr] items-end gap-3">
+        <Field label="VAT %" htmlFor={id("vatRate")} error={e.vatRate}>
+          <Input id={id("vatRate")} name="vatRate" type="number" min="0" max="100" step="0.01" inputMode="decimal" value={vat} onChange={(ev) => setVat(ev.target.value)} />
+        </Field>
+        <label className="mb-2.5 flex cursor-pointer items-center gap-2 text-sm text-text-2">
+          <input type="checkbox" name="pricesIncludeVat" defaultChecked={sent ? sent.pricesIncludeVat === "on" : (p?.pricesIncludeVat ?? true)} className="size-4 accent-[var(--primary-solid)]" />
+          The price includes VAT
+        </label>
+      </div>
+      <Field label="Lead time" htmlFor={id("leadTime")} optional error={e.leadTime} className="sm:col-span-2">
+        <Input id={id("leadTime")} name="leadTime" defaultValue={(sent?.leadTime as string) ?? p?.leadTime ?? ""} placeholder="e.g. 45 days after deposit" />
+      </Field>
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+        <SubmitButton size="sm">Save</SubmitButton>
+        <Button type="button" variant="ghost" size="sm" onClick={onDone}>
+          Cancel
+        </Button>
+        {clear && (
+          <Button
+            type="button"
+            variant="danger-ghost"
+            size="sm"
+            className="ml-auto"
+            disabled={clearing}
+            onClick={async () => {
+              setClearing(true);
+              const r = await clear();
+              setClearing(false);
+              if (r.ok) onDone();
+            }}
+          >
+            <Trash2 aria-hidden /> Remove price
+          </Button>
+        )}
+      </div>
+    </form>
   );
 }

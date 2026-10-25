@@ -1,11 +1,13 @@
-import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import { and, count, eq, ilike, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import { queryItems, supplierQuoteItems, supplierQuotes, suppliers } from "@/lib/db/schema";
 import { assertCan, type SessionUser } from "@/lib/auth/session";
 import { DomainError, ForbiddenError, NotFoundError } from "@/lib/utils/result";
 import { diff, recordAudit } from "@/modules/audit/service";
 import { canWorkOn, getAccessibleQuery } from "@/modules/queries/service";
-import type { OfferInput, OfferLineInput, SupplierInput } from "./schema";
+import type { ItemPriceInput, OfferInput, OfferLineInput, SupplierInput } from "./schema";
+import { todayISO } from "@/lib/utils/dates";
+import { getSettings } from "@/modules/settings/service";
 
 const supplierRow = (i: SupplierInput) => ({
   name: i.name,
@@ -190,3 +192,115 @@ export async function chooseOffers(actor: SessionUser, queryId: string, choices:
     await recordAudit(tx, { userId: actor.id, action: "update", entityType: "query", entityId: queryId, summary: `${query.refNo}: chose the factory offers to quote from` });
   });
 }
+
+/* ---------------------------------------------------------------- the simple way: one price per item */
+
+/** The factory with this name (ignoring case), or a new one with the contacts given. A known factory only gets the contacts it has none of. */
+async function factoryByName(actor: SessionUser, tx: DbOrTx, input: ItemPriceInput) {
+  const clean = input.factoryName.trim().replace(/\s+/g, " ");
+  const [found] = await tx
+    .select({ id: suppliers.id, name: suppliers.name, email: suppliers.email, phone: suppliers.phone })
+    .from(suppliers)
+    .where(and(isNull(suppliers.deletedAt), ilike(suppliers.name, clean.replace(/[\\%_]/g, (c) => `\\${c}`))))
+    .limit(1);
+  if (found) {
+    const fill = { ...(!found.email && input.email ? { email: input.email } : {}), ...(!found.phone && input.phone ? { phone: input.phone } : {}) };
+    if (Object.keys(fill).length) await tx.update(suppliers).set(fill).where(eq(suppliers.id, found.id));
+    return found;
+  }
+  const created = await createSupplier(actor, { name: clean, defaultVatRate: input.vatRate, email: input.email ?? null, phone: input.phone ?? null }, tx);
+  return { id: created.id, name: clean };
+}
+
+/** Removes the item's current factory line; an offer made only for it goes too. */
+async function dropChosenLine(tx: DbOrTx, item: { id: string; chosenOfferItemId: string | null }) {
+  if (!item.chosenOfferItemId) return;
+  const [line] = await tx.select({ id: supplierQuoteItems.id, offerId: supplierQuoteItems.supplierQuoteId }).from(supplierQuoteItems).where(eq(supplierQuoteItems.id, item.chosenOfferItemId)).limit(1);
+  await tx.update(queryItems).set({ chosenOfferItemId: null }).where(eq(queryItems.id, item.id));
+  if (!line) return;
+  const [{ n }] = await tx.select({ n: count() }).from(supplierQuoteItems).where(eq(supplierQuoteItems.supplierQuoteId, line.offerId));
+  if (n <= 1) {
+    await tx.delete(supplierQuoteItems).where(eq(supplierQuoteItems.id, line.id));
+    await tx.update(supplierQuotes).set({ deletedAt: new Date() }).where(eq(supplierQuotes.id, line.offerId));
+  }
+}
+
+async function ownItem(queryId: string, itemId: string) {
+  const [item] = await db.select().from(queryItems).where(and(eq(queryItems.id, itemId), eq(queryItems.queryId, queryId))).limit(1);
+  if (!item) throw new NotFoundError("Item");
+  return item;
+}
+
+/**
+ * Which factory supplies this customer item, at what price and VAT. One price
+ * per item: saving again replaces it. New quotations are priced from it.
+ */
+export async function setItemFactoryPrice(actor: SessionUser, queryId: string, itemId: string, input: ItemPriceInput) {
+  const query = await assertSourcing(actor, queryId);
+  const item = await ownItem(queryId, itemId);
+  // Factory prices are in the main currency (USD), like everything else.
+  const currency = (await getSettings()).currency;
+  await db.transaction(async (tx) => {
+    const factory = await factoryByName(actor, tx, input);
+    const offerFields = {
+      quotedOn: todayISO(),
+      currency,
+      pricesIncludeVat: input.pricesIncludeVat,
+      leadTime: input.leadTime ?? null,
+      supplierId: factory.id,
+    };
+    const lineFields = {
+      queryItemId: item.id,
+      description: item.description,
+      model: item.model,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: String(input.unitPrice),
+      vatRate: String(input.vatRate),
+      sortOrder: 0,
+    };
+    // Same factory, and the offer holds only this item: update it in place (quotations keep pointing at it).
+    const [current] = item.chosenOfferItemId
+      ? await tx
+          .select({ lineId: supplierQuoteItems.id, offerId: supplierQuotes.id, supplierId: supplierQuotes.supplierId })
+          .from(supplierQuoteItems)
+          .innerJoin(supplierQuotes, eq(supplierQuotes.id, supplierQuoteItems.supplierQuoteId))
+          .where(and(eq(supplierQuoteItems.id, item.chosenOfferItemId), isNull(supplierQuotes.deletedAt)))
+          .limit(1)
+      : [];
+    const alone = current ? (await tx.select({ n: count() }).from(supplierQuoteItems).where(eq(supplierQuoteItems.supplierQuoteId, current.offerId)))[0].n === 1 : false;
+    if (current && alone) {
+      await tx.update(supplierQuotes).set({ ...offerFields, updatedAt: new Date() }).where(eq(supplierQuotes.id, current.offerId));
+      await tx.update(supplierQuoteItems).set(lineFields).where(eq(supplierQuoteItems.id, current.lineId));
+    } else {
+      await dropChosenLine(tx, item);
+      const [offer] = await tx
+        .insert(supplierQuotes)
+        .values({ ...offerFields, queryId, createdBy: actor.id })
+        .returning({ id: supplierQuotes.id });
+      const [line] = await tx
+        .insert(supplierQuoteItems)
+        .values({ ...lineFields, supplierQuoteId: offer.id })
+        .returning({ id: supplierQuoteItems.id });
+      await tx.update(queryItems).set({ chosenOfferItemId: line.id }).where(eq(queryItems.id, item.id));
+    }
+    await recordAudit(tx, {
+      userId: actor.id,
+      action: "update",
+      entityType: "query",
+      entityId: queryId,
+      summary: `${query.refNo}: factory price for "${item.description.split("\n")[0]}": ${factory.name}, ${currency} ${input.unitPrice} (${input.pricesIncludeVat ? "incl." : "+"} ${input.vatRate}% VAT)`,
+    });
+  });
+}
+
+/** The item has no factory price any more (it is priced by hand on the quotation). */
+export async function clearItemFactoryPrice(actor: SessionUser, queryId: string, itemId: string) {
+  const query = await assertSourcing(actor, queryId);
+  const item = await ownItem(queryId, itemId);
+  await db.transaction(async (tx) => {
+    await dropChosenLine(tx, item);
+    await recordAudit(tx, { userId: actor.id, action: "update", entityType: "query", entityId: queryId, summary: `${query.refNo}: removed the factory price for "${item.description.split("\n")[0]}"` });
+  });
+}
+

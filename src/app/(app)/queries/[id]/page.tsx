@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { customerName } from "@/lib/utils/names";
-import { Download, Eye, FileText, Mail, MessageCircle, Paperclip, Phone, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Eye, FileText, Mail, MessageCircle, Paperclip, Phone, Pencil, Trash2 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { isUuid } from "@/lib/utils/ids";
@@ -26,7 +26,9 @@ import { DocumentsCard } from "@/modules/queries/components/documents";
 import type { QueryStatus } from "@/lib/db/schema";
 import { splitDescription } from "@/lib/line-items";
 import { formatMoney } from "@/lib/utils/money";
-import { sourcingForQuery } from "@/modules/sourcing/repository";
+import { allSuppliers, sourcingForQuery } from "@/modules/sourcing/repository";
+import { clearItemPriceAction, setItemPriceAction } from "@/modules/sourcing/actions";
+import { ItemPricesCard } from "@/modules/sourcing/components";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   return { title: `Inquiry ${(await params).id.slice(0, 8)}` };
@@ -44,6 +46,7 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
   if (!detail) notFound();
   const [people, settings, packingLists] = await Promise.all([listActiveUsers(), getSettings(), listPackingListsForQuery(id)]);
   const sourcing = can(user.role, "sourcing.manage") ? await sourcingForQuery(id, settings.currency, settings.currency, settings.exchangeRates) : null;
+  const factories = sourcing ? await allSuppliers() : [];
 
   const { query, customer } = detail;
   const workable = canWorkOn(user, query);
@@ -252,45 +255,31 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
           </Card>
 
           {sourcing && (
-            <Card>
-              <CardHeader
-                title="Factory offers"
-                description={sourcing.offers.length ? `${sourcing.offers.length} from ${new Set(sourcing.offers.map((o) => o.supplierId)).size} ${new Set(sourcing.offers.map((o) => o.supplierId)).size === 1 ? "factory" : "factories"} · internal, never shown to the customer` : "Internal: what factories quote you. Never shown to the customer."}
-                actions={
-                  <div className="flex gap-2">
-                    {workable && (
-                      <ButtonLink href={`/queries/${id}/offers/new`} variant="secondary" size="xs">
-                        <Plus aria-hidden /> Add offer
-                      </ButtonLink>
-                    )}
-                    {sourcing.offers.length > 0 && (
-                      <ButtonLink href={`/queries/${id}/sourcing`} variant="secondary" size="xs">
-                        Compare &amp; choose
-                      </ButtonLink>
-                    )}
-                  </div>
-                }
-              />
-              {sourcing.offers.length > 0 && (
-                <CardBody className="p-0">
-                  <ul className="divide-y divide-line">
-                    {sourcing.items.map((it) => (
-                      <li key={it.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                        <span className="min-w-0 truncate text-text">{splitDescription(it.description).name}</span>
-                        {it.chosen ? (
-                          <span className="shrink-0 text-right text-xs text-muted tabular">
-                            {it.chosen.supplierName} · cost <span className="font-medium text-text">{it.chosen.unitCost === null ? "no rate" : formatMoney(it.chosen.unitCost, settings.currency)}</span> / {it.chosen.unit}
-                            {it.options.length > 1 && ` · ${it.options.length} offers`}
-                          </span>
-                        ) : (
-                          <Badge tone={it.options.length ? "warn" : "neutral"}>{it.options.length ? "Not chosen" : "No offer yet"}</Badge>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </CardBody>
-              )}
-            </Card>
+            <ItemPricesCard
+              rows={sourcing.items.map((it) => ({
+                id: it.id,
+                name: splitDescription(it.description).name,
+                quantity: Number(it.quantity),
+                unit: it.unit,
+                price: it.chosen
+                  ? {
+                      factory: it.chosen.supplierName,
+                      unitPrice: Number(it.chosen.unitPrice),
+                      vatRate: Number(it.chosen.vatRate),
+                      pricesIncludeVat: it.chosen.pricesIncludeVat,
+                      unitPriceWithVat: it.chosen.unitPriceWithVat,
+                      unitCost: it.chosen.unitCost,
+                      leadTime: it.chosen.leadTime,
+                    }
+                  : null,
+              }))}
+              factories={factories}
+              currency={settings.currency}
+              margin={settings.defaultMarginPercent}
+              canEdit={workable}
+              setAction={Object.fromEntries(sourcing.items.map((it) => [it.id, setItemPriceAction.bind(null, id, it.id)]))}
+              clearAction={Object.fromEntries(sourcing.items.map((it) => [it.id, clearItemPriceAction.bind(null, id, it.id)]))}
+            />
           )}
 
           <DocumentsCard

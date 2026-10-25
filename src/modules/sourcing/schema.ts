@@ -87,3 +87,30 @@ export const choicesSchema = z.object({
 export type SupplierInput = z.infer<typeof supplierSchema>;
 export type OfferInput = z.infer<typeof offerSchema>;
 export type OfferLineInput = z.infer<typeof offerLineSchema>;
+
+/**
+ * The simple way: one factory price for one customer item. The factory is
+ * typed by name (an existing one is matched, a new one is added).
+ */
+export const itemPriceSchema = z.object({
+  factoryName: z.string().trim().min(2, "Enter the factory's name").max(200),
+  /** In the main currency (USD). */
+  unitPrice: z.coerce.number({ message: "Enter the factory's price for one unit" }).positive("Enter the factory's price for one unit").max(1_000_000_000_000),
+  vatRate: vatRate.default(13),
+  pricesIncludeVat: checkbox,
+  leadTime: optional(120),
+  /** A new factory's contacts (saved on the factory; filled in on a known one only where it has none). */
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(254)
+    .refine((v) => v === "" || z.email().safeParse(v).success, "Enter a valid email address")
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional(),
+  phone: optional(80),
+});
+
+export type ItemPriceInput = z.infer<typeof itemPriceSchema>;
+

@@ -16,7 +16,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
     <div className="space-y-5">
       <PageHeader
         title="Factories"
-        description="The manufacturers you source from. Their offers are recorded on each inquiry; prices and margins are never shown to customers."
+        description="The manufacturers you buy from. Their prices are added on each inquiry (Factory prices); customers never see them."
         actions={
           <ButtonLink href="/factories/new" variant="primary" size="sm">
             <Plus aria-hidden /> Add factory
@@ -34,7 +34,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           <EmptyState
             icon={Factory}
             title={sp.q ? "No factory matches" : "No factories yet"}
-            description={sp.q ? "Try another name." : "Add one here, or straight from an inquiry when you record its first offer."}
+            description={sp.q ? "Try another name." : "Add one here, or just type its name when you add a factory price on an inquiry."}
           />
         ) : (
           <ul className="divide-y divide-line">
@@ -49,7 +49,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                     <span className="block truncate text-xs text-muted">{[r.contactPerson, r.phone, r.wechat && `WeChat ${r.wechat}`].filter(Boolean).join(" · ") || "No contact details yet"}</span>
                   </span>
                   <span className="hidden text-right text-xs text-muted sm:block">
-                    {r.offers} {r.offers === 1 ? "offer" : "offers"}
+                    {r.offers} {r.offers === 1 ? "inquiry" : "inquiries"}
                     {r.lastOfferOn && <span className="block">last {formatDate(r.lastOfferOn)}</span>}
                   </span>
                   <ChevronRight className="size-4 text-muted" aria-hidden />

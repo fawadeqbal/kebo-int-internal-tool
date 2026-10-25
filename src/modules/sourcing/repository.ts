@@ -18,7 +18,8 @@ export async function listSuppliers({ q, page = 1, pageSize = 25 }: { q?: string
         phone: suppliers.phone,
         wechat: suppliers.wechat,
         defaultVatRate: suppliers.defaultVatRate,
-        offers: sql<number>`(select count(*)::int from supplier_quotes sq where sq.supplier_id = ${suppliers.id} and sq.deleted_at is null)`,
+        /** Inquiries this factory has a price on. */
+        offers: sql<number>`(select count(distinct sq.query_id)::int from supplier_quotes sq where sq.supplier_id = ${suppliers.id} and sq.deleted_at is null)`,
         lastOfferOn: sql<string | null>`(select max(sq.quoted_on)::text from supplier_quotes sq where sq.supplier_id = ${suppliers.id} and sq.deleted_at is null)`,
       })
       .from(suppliers)
@@ -57,23 +58,29 @@ export async function findSupplier(id: string) {
   return row ?? null;
 }
 
-/** A factory's offers, newest first, with the inquiry each was for. */
-export async function offersOfSupplier(supplierId: string, limit = 50) {
+/** What a factory has priced, newest first: per item, the inquiry it was for and the price. */
+export async function offersOfSupplier(supplierId: string, limit = 100) {
   return db
     .select({
-      id: supplierQuotes.id,
+      id: supplierQuoteItems.id,
       quotedOn: supplierQuotes.quotedOn,
       currency: supplierQuotes.currency,
       leadTime: supplierQuotes.leadTime,
+      pricesIncludeVat: supplierQuotes.pricesIncludeVat,
       queryId: queries.id,
       queryRef: queries.refNo,
       queryTitle: queries.title,
-      lines: sql<number>`(select count(*)::int from supplier_quote_items i where i.supplier_quote_id = ${supplierQuotes.id})`,
+      description: supplierQuoteItems.description,
+      quantity: supplierQuoteItems.quantity,
+      unit: supplierQuoteItems.unit,
+      unitPrice: supplierQuoteItems.unitPrice,
+      vatRate: supplierQuoteItems.vatRate,
     })
-    .from(supplierQuotes)
+    .from(supplierQuoteItems)
+    .innerJoin(supplierQuotes, eq(supplierQuotes.id, supplierQuoteItems.supplierQuoteId))
     .innerJoin(queries, eq(queries.id, supplierQuotes.queryId))
     .where(and(eq(supplierQuotes.supplierId, supplierId), isNull(supplierQuotes.deletedAt), isNull(queries.deletedAt)))
-    .orderBy(desc(supplierQuotes.quotedOn))
+    .orderBy(desc(supplierQuotes.quotedOn), desc(supplierQuotes.createdAt))
     .limit(limit);
 }
 
@@ -139,6 +146,8 @@ export async function sourcingForQuery(queryId: string, currency: string, main: 
     return {
       ...l,
       offerId: o.id,
+      supplierId: o.supplierId,
+      pricesIncludeVat: o.pricesIncludeVat,
       supplierName: o.supplierName,
       offerCurrency: o.currency,
       leadTime: o.leadTime,
