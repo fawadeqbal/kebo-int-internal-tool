@@ -1,0 +1,1 @@
+ALTER TABLE "suppliers" ADD COLUMN "prices_include_vat" boolean DEFAULT true NOT NULL;

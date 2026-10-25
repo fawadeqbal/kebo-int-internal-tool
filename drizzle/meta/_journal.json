@@ -78,6 +78,13 @@
       "when": 1792872181577,
       "tag": "0010_vat",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792921311999,
+      "tag": "0011_factory_vat",
+      "breakpoints": true
     }
   ]
 }

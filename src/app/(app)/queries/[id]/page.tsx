@@ -26,7 +26,7 @@ import { DocumentsCard } from "@/modules/queries/components/documents";
 import type { QueryStatus } from "@/lib/db/schema";
 import { splitDescription } from "@/lib/line-items";
 import { formatMoney } from "@/lib/utils/money";
-import { allSuppliers, sourcingForQuery } from "@/modules/sourcing/repository";
+import { sourcingForQuery } from "@/modules/sourcing/repository";
 import { clearItemPriceAction, setItemPriceAction } from "@/modules/sourcing/actions";
 import { ItemPricesCard } from "@/modules/sourcing/components";
 
@@ -46,7 +46,6 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
   if (!detail) notFound();
   const [people, settings, packingLists] = await Promise.all([listActiveUsers(), getSettings(), listPackingListsForQuery(id)]);
   const sourcing = can(user.role, "sourcing.manage") ? await sourcingForQuery(id, settings.currency, settings.currency, settings.exchangeRates) : null;
-  const factories = sourcing ? await allSuppliers() : [];
 
   const { query, customer } = detail;
   const workable = canWorkOn(user, query);
@@ -263,7 +262,12 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
                 unit: it.unit,
                 price: it.chosen
                   ? {
+                      supplierId: it.chosen.supplierId,
                       factory: it.chosen.supplierName,
+                      factoryEmail: it.chosen.supplierEmail,
+                      factoryPhone: it.chosen.supplierPhone,
+                      factoryVatRate: Number(it.chosen.supplierVatRate),
+                      factoryPricesIncludeVat: it.chosen.supplierPricesIncludeVat,
                       unitPrice: Number(it.chosen.unitPrice),
                       vatRate: Number(it.chosen.vatRate),
                       pricesIncludeVat: it.chosen.pricesIncludeVat,
@@ -273,7 +277,6 @@ export default async function QueryDetailPage({ params }: { params: Promise<{ id
                     }
                   : null,
               }))}
-              factories={factories}
               currency={settings.currency}
               margin={settings.defaultMarginPercent}
               canEdit={workable}

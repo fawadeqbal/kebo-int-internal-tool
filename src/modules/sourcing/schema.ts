@@ -12,6 +12,13 @@ const optional = (max: number) =>
 
 const vatRate = z.preprocess((v) => (v === "" || v === undefined || v === null ? 0 : v), z.coerce.number({ message: "Enter the VAT %" }).min(0, "VAT cannot be negative").max(100, "VAT cannot be over 100%"));
 const checkbox = z.preprocess((v) => v === "on" || v === true || v === "true", z.boolean());
+/** Yes / no / not sent (a form sends "off" then "on" when ticked; the last one counts). */
+const yesNo = z.preprocess((v) => {
+  const last = Array.isArray(v) ? v.at(-1) : v;
+  if (last === undefined || last === null || last === "") return undefined;
+  return last === "on" || last === true || last === "true";
+}, z.boolean().optional());
+const optionalVat = z.preprocess((v) => (v === "" || v === undefined || v === null ? undefined : v), z.coerce.number({ message: "Enter the VAT %" }).min(0, "VAT cannot be negative").max(100, "VAT cannot be over 100%").optional());
 
 /** A factory (supplier). Only the name is required; the rest can be filled in later. */
 export const supplierSchema = z.object({
@@ -30,6 +37,8 @@ export const supplierSchema = z.object({
     .optional(),
   address: optional(500),
   defaultVatRate: vatRate.default(13),
+  /** Whether their prices usually include that VAT (left out = unchanged; yes for a new factory). */
+  pricesIncludeVat: yesNo,
   bankDetails: optional(1000),
   notes: optional(2000),
 });
@@ -92,25 +101,31 @@ export type OfferLineInput = z.infer<typeof offerLineSchema>;
  * The simple way: one factory price for one customer item. The factory is
  * typed by name (an existing one is matched, a new one is added).
  */
-export const itemPriceSchema = z.object({
-  factoryName: z.string().trim().min(2, "Enter the factory's name").max(200),
-  /** In the main currency (USD). */
-  unitPrice: z.coerce.number({ message: "Enter the factory's price for one unit" }).positive("Enter the factory's price for one unit").max(1_000_000_000_000),
-  vatRate: vatRate.default(13),
-  pricesIncludeVat: checkbox,
-  leadTime: optional(120),
-  /** A new factory's contacts (saved on the factory; filled in on a known one only where it has none). */
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .max(254)
-    .refine((v) => v === "" || z.email().safeParse(v).success, "Enter a valid email address")
-    .transform((v) => (v === "" ? null : v))
-    .nullable()
-    .optional(),
-  phone: optional(80),
-});
+export const itemPriceSchema = z
+  .object({
+    /** An existing factory picked from the list… */
+    supplierId: z.preprocess((v) => (v === "" ? undefined : v), z.uuid().optional()),
+    /** …or a new one: its name (an existing factory with the same name is used instead). */
+    factoryName: z.string().trim().max(200).optional(),
+    /** In the main currency (USD). */
+    unitPrice: z.coerce.number({ message: "Enter the factory's price for one unit" }).positive("Enter the factory's price for one unit").max(1_000_000_000_000),
+    /** Left out = the factory's VAT (changed only for an item that differs, e.g. 6% on a service). */
+    vatRate: optionalVat,
+    pricesIncludeVat: yesNo,
+    leadTime: optional(120),
+    /** A new factory's contacts (saved on the factory; filled in on a known one only where it has none). */
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(254)
+      .refine((v) => v === "" || z.email().safeParse(v).success, "Enter a valid email address")
+      .transform((v) => (v === "" ? null : v))
+      .nullable()
+      .optional(),
+    phone: optional(40),
+  })
+  .refine((v) => v.supplierId || (v.factoryName && v.factoryName.length >= 2), { path: ["factoryName"], message: "Choose the factory, or type a new one's name" });
 
 export type ItemPriceInput = z.infer<typeof itemPriceSchema>;
 

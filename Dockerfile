@@ -30,6 +30,8 @@ RUN apk add --no-cache tini chromium font-noto font-noto-cjk \
 
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
+# Logo, brand fonts and other files served as they are (Next.js standalone does not include them).
+COPY --from=build --chown=app:app /app/public ./public
 COPY --from=build --chown=app:app /app/dist ./dist
 COPY --from=build --chown=app:app /app/drizzle ./drizzle
 

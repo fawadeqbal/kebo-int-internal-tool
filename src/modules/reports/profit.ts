@@ -71,7 +71,8 @@ async function quotationLines(kind: "accepted" | "waiting", r: Range, currency: 
       join customers c on c.id = q.customer_id
       join quotation_items qi on qi.quotation_id = qt.id
       left join users u on u.id = q.assigned_to
-     where qt.deleted_at is null and q.deleted_at is null and qt.currency = ${currency} and ${where} ${staffFilter(staffId)}`);
+     where qt.deleted_at is null and q.deleted_at is null and qt.currency = ${currency} and ${where} ${staffFilter(staffId)}
+     order by qt.id, qi.sort_order`);
   return costLines((res.rows as Row[]).map(toLine));
 }
 

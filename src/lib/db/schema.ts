@@ -214,8 +214,10 @@ export const suppliers = pgTable(
     wechat: varchar("wechat", { length: 80 }),
     email: varchar("email", { length: 254 }),
     address: text("address"),
-    /** What they usually charge, to start new offer lines with (each line keeps its own). */
+    /** Their usual VAT: new prices from them start with it (an item can differ, e.g. 6% on services). */
     defaultVatRate: numeric("default_vat_rate", { precision: 5, scale: 2 }).notNull().default("13"),
+    /** Whether their prices usually include that VAT. */
+    pricesIncludeVat: boolean("prices_include_vat").notNull().default(true),
     bankDetails: text("bank_details"),
     notes: text("notes"),
     createdBy: uuid("created_by").references(() => users.id),

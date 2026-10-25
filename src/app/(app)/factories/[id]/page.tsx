@@ -34,6 +34,7 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
             email: s(supplier.email),
             address: s(supplier.address),
             defaultVatRate: supplier.defaultVatRate,
+            pricesIncludeVat: supplier.pricesIncludeVat,
             bankDetails: s(supplier.bankDetails),
             notes: s(supplier.notes),
           }}

@@ -32,16 +32,38 @@ export async function listSuppliers({ q, page = 1, pageSize = 25 }: { q?: string
   return { rows, total, page, pageSize };
 }
 
-/** For the factory picker: name, contact and usual VAT. */
+/**
+ * The factory search box: with nothing typed, the factories used most recently;
+ * otherwise those whose name, email, phone or WeChat contains the text.
+ */
 export async function searchSuppliers(q: string, limit = 8) {
-  const term = `%${q.trim()}%`;
+  const text = q.trim();
+  const term = `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const lastUsed = sql<string | null>`(select max(sq.updated_at) from supplier_quotes sq where sq.supplier_id = ${suppliers.id} and sq.deleted_at is null)`;
   return db
-    .select({ id: suppliers.id, name: suppliers.name, contactPerson: suppliers.contactPerson, defaultVatRate: suppliers.defaultVatRate })
+    .select({
+      id: suppliers.id,
+      name: suppliers.name,
+      contactPerson: suppliers.contactPerson,
+      email: suppliers.email,
+      phone: suppliers.phone,
+      wechat: suppliers.wechat,
+      address: suppliers.address,
+      defaultVatRate: suppliers.defaultVatRate,
+      pricesIncludeVat: suppliers.pricesIncludeVat,
+    })
     .from(suppliers)
-    .where(and(isNull(suppliers.deletedAt), q.trim() ? or(ilike(suppliers.name, term), ilike(suppliers.contactPerson, term)) : undefined))
-    .orderBy(asc(suppliers.name))
+    .where(
+      and(
+        isNull(suppliers.deletedAt),
+        text ? or(ilike(suppliers.name, term), ilike(suppliers.email, term), ilike(suppliers.phone, term), ilike(suppliers.wechat, term), ilike(suppliers.contactPerson, term)) : undefined,
+      ),
+    )
+    .orderBy(text ? sql`position(lower(${text}) in lower(${suppliers.name})) = 1 desc` : sql`${lastUsed} desc nulls last`, asc(suppliers.name))
     .limit(limit);
 }
+
+export type FactoryOption = Awaited<ReturnType<typeof searchSuppliers>>[number];
 
 /** Every factory for the offer form's picker (A–Z). */
 export async function allSuppliers() {
@@ -107,6 +129,10 @@ export async function sourcingForQuery(queryId: string, currency: string, main: 
       id: supplierQuotes.id,
       supplierId: suppliers.id,
       supplierName: suppliers.name,
+      supplierVatRate: suppliers.defaultVatRate,
+      supplierPricesIncludeVat: suppliers.pricesIncludeVat,
+      supplierEmail: suppliers.email,
+      supplierPhone: suppliers.phone,
       reference: supplierQuotes.reference,
       quotedOn: supplierQuotes.quotedOn,
       validUntil: supplierQuotes.validUntil,
@@ -147,6 +173,10 @@ export async function sourcingForQuery(queryId: string, currency: string, main: 
       ...l,
       offerId: o.id,
       supplierId: o.supplierId,
+      supplierVatRate: o.supplierVatRate,
+      supplierPricesIncludeVat: o.supplierPricesIncludeVat,
+      supplierEmail: o.supplierEmail,
+      supplierPhone: o.supplierPhone,
       pricesIncludeVat: o.pricesIncludeVat,
       supplierName: o.supplierName,
       offerCurrency: o.currency,

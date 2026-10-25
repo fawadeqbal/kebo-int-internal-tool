@@ -17,6 +17,7 @@ const supplierRow = (i: SupplierInput) => ({
   email: i.email ?? null,
   address: i.address ?? null,
   defaultVatRate: String(i.defaultVatRate),
+  ...(i.pricesIncludeVat === undefined ? {} : { pricesIncludeVat: i.pricesIncludeVat }),
   bankDetails: i.bankDetails ?? null,
   notes: i.notes ?? null,
 });
@@ -195,11 +196,23 @@ export async function chooseOffers(actor: SessionUser, queryId: string, choices:
 
 /* ---------------------------------------------------------------- the simple way: one price per item */
 
-/** The factory with this name (ignoring case), or a new one with the contacts given. A known factory only gets the contacts it has none of. */
-async function factoryByName(actor: SessionUser, tx: DbOrTx, input: ItemPriceInput) {
-  const clean = input.factoryName.trim().replace(/\s+/g, " ");
+type Factory = { id: string; name: string; defaultVatRate: string; pricesIncludeVat: boolean };
+const factoryColumns = { id: suppliers.id, name: suppliers.name, email: suppliers.email, phone: suppliers.phone, defaultVatRate: suppliers.defaultVatRate, pricesIncludeVat: suppliers.pricesIncludeVat };
+
+/**
+ * The factory picked from the list, or for a typed name the factory with that name
+ * (ignoring case) or a new one with the contacts and VAT given. A known factory only
+ * gets the contacts it has none of.
+ */
+async function resolveFactory(actor: SessionUser, tx: DbOrTx, input: ItemPriceInput): Promise<Factory> {
+  if (input.supplierId) {
+    const [s] = await tx.select(factoryColumns).from(suppliers).where(and(eq(suppliers.id, input.supplierId), isNull(suppliers.deletedAt))).limit(1);
+    if (!s) throw new DomainError("That factory was removed. Choose another one.");
+    return s;
+  }
+  const clean = (input.factoryName ?? "").trim().replace(/\s+/g, " ");
   const [found] = await tx
-    .select({ id: suppliers.id, name: suppliers.name, email: suppliers.email, phone: suppliers.phone })
+    .select(factoryColumns)
     .from(suppliers)
     .where(and(isNull(suppliers.deletedAt), ilike(suppliers.name, clean.replace(/[\\%_]/g, (c) => `\\${c}`))))
     .limit(1);
@@ -208,8 +221,10 @@ async function factoryByName(actor: SessionUser, tx: DbOrTx, input: ItemPriceInp
     if (Object.keys(fill).length) await tx.update(suppliers).set(fill).where(eq(suppliers.id, found.id));
     return found;
   }
-  const created = await createSupplier(actor, { name: clean, defaultVatRate: input.vatRate, email: input.email ?? null, phone: input.phone ?? null }, tx);
-  return { id: created.id, name: clean };
+  const vat = input.vatRate ?? 13;
+  const incl = input.pricesIncludeVat ?? true;
+  const created = await createSupplier(actor, { name: clean, defaultVatRate: vat, pricesIncludeVat: incl, email: input.email ?? null, phone: input.phone ?? null }, tx);
+  return { id: created.id, name: clean, defaultVatRate: String(vat), pricesIncludeVat: incl };
 }
 
 /** Removes the item's current factory line; an offer made only for it goes too. */
@@ -241,11 +256,14 @@ export async function setItemFactoryPrice(actor: SessionUser, queryId: string, i
   // Factory prices are in the main currency (USD), like everything else.
   const currency = (await getSettings()).currency;
   await db.transaction(async (tx) => {
-    const factory = await factoryByName(actor, tx, input);
+    const factory = await resolveFactory(actor, tx, input);
+    // VAT: the factory's, unless this item was given its own (e.g. 6% on a service).
+    const vatRate = input.vatRate ?? Number(factory.defaultVatRate);
+    const pricesIncludeVat = input.pricesIncludeVat ?? factory.pricesIncludeVat;
     const offerFields = {
       quotedOn: todayISO(),
       currency,
-      pricesIncludeVat: input.pricesIncludeVat,
+      pricesIncludeVat,
       leadTime: input.leadTime ?? null,
       supplierId: factory.id,
     };
@@ -256,7 +274,7 @@ export async function setItemFactoryPrice(actor: SessionUser, queryId: string, i
       quantity: item.quantity,
       unit: item.unit,
       unitPrice: String(input.unitPrice),
-      vatRate: String(input.vatRate),
+      vatRate: String(vatRate),
       sortOrder: 0,
     };
     // Same factory, and the offer holds only this item: update it in place (quotations keep pointing at it).
@@ -289,7 +307,7 @@ export async function setItemFactoryPrice(actor: SessionUser, queryId: string, i
       action: "update",
       entityType: "query",
       entityId: queryId,
-      summary: `${query.refNo}: factory price for "${item.description.split("\n")[0]}": ${factory.name}, ${currency} ${input.unitPrice} (${input.pricesIncludeVat ? "incl." : "+"} ${input.vatRate}% VAT)`,
+      summary: `${query.refNo}: factory price for "${item.description.split("\n")[0]}": ${factory.name}, ${currency} ${input.unitPrice} (${pricesIncludeVat ? "incl." : "+"} ${vatRate}% VAT)`,
     });
   });
 }
