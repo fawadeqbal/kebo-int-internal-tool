@@ -45,8 +45,12 @@ class _KeboAppState extends ConsumerState<KeboApp> {
     super.initState();
     _subs.add(Push.onOpened.listen((m) => _openLink(m.data['link'])));
     _subs.add(Push.onForeground.listen(_showForeground));
+    _subs.add(Push.onShadeTap.listen(_openLink));
     Push.initial().then((m) {
       if (m != null) _openLink(m.data['link']);
+    });
+    Push.launchLink().then((link) {
+      if (link != null) _openLink(link);
     });
   }
 
@@ -68,21 +72,13 @@ class _KeboAppState extends ConsumerState<KeboApp> {
     }
   }
 
-  /// A push while the app is open: refresh the badge and lists, and show it as a banner.
+  /// A push while the app is open: refresh the badge and lists, and put it in the phone's
+  /// notification shade like any other notification, so several stack up instead of replacing each other.
   void _showForeground(RemoteMessage m) {
     if (ref.read(sessionProvider).status != SessionStatus.signedIn) return;
     ref.read(dataVersionProvider.notifier).bump();
     unawaited(ref.read(sessionProvider.notifier).refreshMe().catchError((_) {}));
-    final title = m.notification?.title ?? 'New notification';
-    final body = m.notification?.body;
-    _messenger.currentState?.showSnackBar(SnackBar(
-      duration: const Duration(seconds: 6),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        if (body != null && body.isNotEmpty) Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
-      ]),
-      action: SnackBarAction(label: 'Open', onPressed: () => _openLink(m.data['link'])),
-    ));
+    unawaited(Push.showInShade(m));
   }
 
   GoRouter _buildRouter() {

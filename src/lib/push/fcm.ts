@@ -86,7 +86,8 @@ export async function sendPush(tokens: string[], message: PushMessage): Promise<
               token,
               notification: { title: message.title.slice(0, 200), body: (message.body ?? "").slice(0, 500) },
               data: message.data ?? {},
-              android: { priority: "high", notification: { sound: "default" } },
+              // Each push is its own notification (a unique tag), on the "Updates" channel, so several stack up in the shade.
+              android: { priority: "high", notification: { sound: "default", channel_id: "kebo_updates", tag: `kebo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` } },
               apns: { payload: { aps: { sound: "default" } } },
             },
           }),

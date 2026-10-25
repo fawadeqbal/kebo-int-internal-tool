@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Color;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api.dart';
 
@@ -16,12 +18,22 @@ class Push {
   static String? _token;
   static StreamSubscription<String>? _refresh;
 
+  /// Notifications the app itself puts in the phone's notification shade while it is open
+  /// (Android only shows pushes there when the app is closed or in the background).
+  static final _local = FlutterLocalNotificationsPlugin();
+  static final _taps = StreamController<String?>.broadcast();
+  static int _seq = 0;
+
   /// Called once at start-up (before runApp). Never throws: push is a bonus.
   static Future<void> init() async {
     if (!supported) return;
     try {
       await Firebase.initializeApp(); // reads android/app/google-services.json
       _ready = true;
+      await _local.initialize(
+        settings: const InitializationSettings(android: AndroidInitializationSettings('ic_stat_notify')),
+        onDidReceiveNotificationResponse: (r) => _taps.add(r.payload),
+      );
     } catch (e) {
       debugPrint('[push] Firebase not available: $e');
     }
@@ -66,6 +78,49 @@ class Push {
       // ignore: deprecated_member_use
       await FirebaseMessaging.instance.deleteToken();
     } catch (_) {}
+  }
+
+  /// Shows a push that arrived while the app is open as its own notification in the
+  /// phone's notification shade: each one stays until it is tapped or cleared, so several stack up.
+  static Future<void> showInShade(RemoteMessage m) async {
+    if (!_ready) return;
+    final title = m.notification?.title ?? 'New notification';
+    final body = m.notification?.body ?? '';
+    try {
+      await _local.show(
+        id: (DateTime.now().millisecondsSinceEpoch ~/ 1000 + _seq++) & 0x7fffffff,
+        title: title,
+        body: body,
+        payload: m.data['link']?.toString(),
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            'kebo_updates',
+            'Updates',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: 'ic_stat_notify',
+            color: const Color(0xFF0B5ED7),
+            styleInformation: BigTextStyleInformation(body),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[push] could not show the notification: $e');
+    }
+  }
+
+  /// Tapping one of those notifications (the link to open).
+  static Stream<String?> get onShadeTap => _taps.stream;
+
+  /// The link of the shade notification that started the app from closed, if any.
+  static Future<String?> launchLink() async {
+    if (!_ready) return null;
+    try {
+      final d = await _local.getNotificationAppLaunchDetails();
+      return d?.didNotificationLaunchApp == true ? d!.notificationResponse?.payload : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Notifications that arrive while the app is open.
