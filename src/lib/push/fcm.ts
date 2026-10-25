@@ -23,7 +23,8 @@ function serviceAccount(): ServiceAccount | null {
       process.env.FCM_SERVICE_ACCOUNT_JSON ||
       (() => {
         const file = process.env.FCM_SERVICE_ACCOUNT_FILE || "./secrets/firebase.json";
-        return existsSync(file) ? readFileSync(file, "utf8") : "";
+        // The key file is read at run time only (not bundled into the build).
+        return existsSync(/* turbopackIgnore: true */ file) ? readFileSync(/* turbopackIgnore: true */ file, "utf8") : "";
       })();
     const parsed = raw ? (JSON.parse(raw) as ServiceAccount) : null;
     account = parsed?.project_id && parsed.client_email && parsed.private_key ? parsed : null;
