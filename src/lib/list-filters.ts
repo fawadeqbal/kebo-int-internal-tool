@@ -61,6 +61,10 @@ export const CUSTOMER_SHOW = [
   { value: "unpaid", label: "With unpaid invoices" },
   { value: "none", label: "No inquiries yet" },
 ];
+export const CUSTOMER_STATUS = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Not active" },
+];
 export const CUSTOMER_SORTS = [
   { value: "company", label: "Name (A–Z)" },
   { value: "recent", label: "Latest inquiry" },
@@ -71,11 +75,14 @@ export function parseCustomerParams(sp: SearchParams) {
   const sort: NonNullable<CustomerListFilters["sort"]> = one(sp.sort) === "recent" ? "recent" : "company";
   const hasValue = one(sp.has);
   const has = CUSTOMER_SHOW.some((s) => s.value === hasValue) ? (hasValue as CustomerListFilters["has"]) : undefined;
+  const statusValue = one(sp.status);
+  const status = CUSTOMER_STATUS.some((s) => s.value === statusValue) ? (statusValue as CustomerListFilters["status"]) : undefined;
   const active = [
+    status && { key: "status", label: "Status", value: CUSTOMER_STATUS.find((s) => s.value === status)!.label, clear: ["status"] },
     has && { key: "has", label: "Show", value: CUSTOMER_SHOW.find((s) => s.value === has)!.label, clear: ["has"] },
     sort !== "company" && { key: "sort", label: "Sort", value: "Latest inquiry", clear: ["sort"] },
   ].filter(Boolean) as ActiveFilter[];
-  return { filters: { q, sort, has }, params: { q, has, sort: sort === "company" ? undefined : sort }, active };
+  return { filters: { q, sort, has, status }, params: { q, has, status, sort: sort === "company" ? undefined : sort }, active };
 }
 
 /* ------------------------------------------------------------------ Quotations */

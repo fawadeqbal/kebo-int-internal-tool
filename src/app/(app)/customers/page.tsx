@@ -2,13 +2,14 @@ import Link from "next/link";
 import { Building2, ChevronRight, Plus, SearchX } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
-import { listCustomers } from "@/modules/customers/repository";
+import { ACTIVE_MONTHS, countCustomersByStatus, listCustomers } from "@/modules/customers/repository";
 import { CUSTOMER_SHOW, CUSTOMER_SORTS, parseCustomerParams } from "@/lib/list-filters";
-import { ActiveFilters, Avatar, ButtonLink, EmptyState, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
+import { ActiveFilters, Avatar, ButtonLink, EmptyState, LinkTabs, PageHeader, SearchField, Table, THead, Td, Th, Tr } from "@/components/ui";
 import { FilterSelect, FilterToolbar } from "@/components/ui/filters";
 import { ExportMenu } from "@/components/ui/export-menu";
 import { buildHref, Pagination, toPage } from "@/components/ui/pagination";
 import { formatDate } from "@/lib/utils/dates";
+import { Badge } from "@/components/ui/badge";
 
 export const metadata = { title: "Customers" };
 
@@ -19,8 +20,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const user = await requireUser();
   const sp = await searchParams;
   const { filters, params, active } = parseCustomerParams(sp);
-  const { q, sort, has } = filters;
-  const data = await listCustomers(user, { ...filters, page: toPage(sp.page) });
+  const { q, sort, has, status } = filters;
+  const [data, counts] = await Promise.all([listCustomers(user, { ...filters, page: toPage(sp.page) }), countCustomersByStatus(user, filters)]);
+  const filtered = Boolean(q || has || status);
   const hrefFor = (patch: Record<string, string | undefined>) => buildHref("/customers", params, { page: undefined, ...patch });
 
   return (
@@ -38,13 +40,26 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
       />
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+        <LinkTabs
+          label="Filter by status"
+          className="px-2"
+          tabs={[
+            { href: hrefFor({ status: undefined }), label: "All", count: counts.all, active: !status },
+            { href: hrefFor({ status: "active" }), label: "Active", count: counts.active, active: status === "active" },
+            { href: hrefFor({ status: "inactive" }), label: "Not active", count: counts.inactive, active: status === "inactive" },
+          ]}
+        />
+        <p className="border-b border-line px-4 py-2 text-xs text-muted">
+          Active: an inquiry in the last {ACTIVE_MONTHS} months, an inquiry still open, or an invoice still unpaid.
+        </p>
         <FilterToolbar
+          hidden={{ status }}
           activeCount={active.length}
           search={<SearchField defaultValue={q} placeholder="Name, company, phone or email" clearHref={hrefFor({ q: undefined })} label="Search customers" />}
           end={
             <>
               {active.length > 0 && (
-                <Link href={buildHref("/customers", { q }, {})} className="font-medium text-muted hover:text-text">
+                <Link href={buildHref("/customers", { q, status }, {})} className="font-medium text-muted hover:text-text">
                   Reset
                 </Link>
               )}
@@ -55,16 +70,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <FilterSelect name="has" label="Show" value={has} options={SHOW} allLabel="Everyone" />
           <FilterSelect name="sort" label="Sort" value={sort} options={SORTS} keepDefault="company" />
         </FilterToolbar>
-        <ActiveFilters clearHref={buildHref("/customers", { q }, {})} items={active.map((a) => ({ ...a, removeHref: hrefFor(Object.fromEntries(a.clear.map((k) => [k, undefined]))) }))} />
+        <ActiveFilters clearHref={buildHref("/customers", { q, status }, {})} items={active.filter((a) => a.key !== "status").map((a) => ({ ...a, removeHref: hrefFor(Object.fromEntries(a.clear.map((k) => [k, undefined]))) }))} />
 
         {data.rows.length === 0 ? (
           <EmptyState
-            icon={q || has ? SearchX : Building2}
-            title={q || has ? "No customers match" : "No customers yet"}
-            description={q || has ? "Try a different name or number, or remove the filter." : "Customers are added automatically from website RFQs, or when you enter an inquiry."}
+            icon={filtered ? SearchX : Building2}
+            title={filtered ? "No customers match" : "No customers yet"}
+            description={filtered ? "Try a different name or number, or remove the filter." : "Customers are added automatically from website RFQs, or when you enter an inquiry."}
             action={
-              !q &&
-              !has && (
+              !filtered && (
                 <ButtonLink href="/customers/new" variant="primary" size="sm">
                   Add customer
                 </ButtonLink>
@@ -80,6 +94,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     <Th>Customer</Th>
                     <Th>Phone / WhatsApp</Th>
                     <Th className="hidden lg:table-cell">Email</Th>
+                    <Th>Status</Th>
                     <Th className="text-right">Inquiries</Th>
                     <Th>Last inquiry</Th>
                   </tr>
@@ -98,6 +113,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       </Td>
                       <Td className="whitespace-nowrap text-text-2 tabular">{c.phone}</Td>
                       <Td className="hidden text-text-2 lg:table-cell">{c.email ?? <span className="text-muted">—</span>}</Td>
+                      <Td>
+                        <ActiveBadge active={c.active} />
+                      </Td>
                       <Td className="text-right tabular">{c.queryCount}</Td>
                       <Td className="whitespace-nowrap text-muted">{formatDate(c.lastQueryAt)}</Td>
                     </Tr>
@@ -113,7 +131,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-text">{c.contactPerson}</span>
                       <span className="block truncate text-xs text-muted">{c.companyName ?? "No company"}</span>
-                      <span className="mt-0.5 block truncate text-xs text-text-2 tabular">{c.phone}</span>
+                      <span className="mt-0.5 flex items-center gap-2 text-xs text-text-2">
+                        <span className="truncate tabular">{c.phone}</span>
+                        <ActiveBadge active={c.active} />
+                      </span>
                     </span>
                     <span className="shrink-0 text-right text-xs text-muted">
                       <span className="block font-medium text-text tabular">{c.queryCount}</span>
@@ -129,5 +150,17 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         <Pagination base="/customers" params={params} page={data.page} pageSize={data.pageSize} total={data.total} />
       </div>
     </div>
+  );
+}
+
+function ActiveBadge({ active }: { active: boolean }) {
+  return active ? (
+    <Badge tone="ok" dot>
+      Active
+    </Badge>
+  ) : (
+    <Badge tone="neutral" dot>
+      Not active
+    </Badge>
   );
 }

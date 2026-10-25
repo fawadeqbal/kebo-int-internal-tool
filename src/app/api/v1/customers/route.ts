@@ -1,17 +1,22 @@
 import { apiUser, formBody, handle, json, page, parse, searchParams } from "@/lib/api/http";
 import { parseCustomerParams } from "@/lib/list-filters";
-import { listCustomers } from "@/modules/customers/repository";
+import { countCustomersByStatus, listCustomers } from "@/modules/customers/repository";
 import { customerSchema } from "@/modules/customers/schema";
 import { createCustomer } from "@/modules/customers/service";
 
 export const runtime = "nodejs";
 
-/** ?q&has=open|unpaid|none&sort=company|recent&page — Staff get only their own customers. Quick search: /api/customers/search?q= */
+/**
+ * ?q&status=active|inactive&has=open|unpaid|none&sort=company|recent&page — Staff get only their own customers.
+ * Each row says whether the customer is `active`; `counts` gives { all, active, inactive } for the Status tabs.
+ * Quick search: /api/customers/search?q=
+ */
 export const GET = handle(async (request: Request) => {
   const user = await apiUser();
   const sp = searchParams(request);
   const { filters } = parseCustomerParams(sp);
-  return json(await listCustomers(user, { ...filters, page: page(sp.page), pageSize: 25 }));
+  const [list, counts] = await Promise.all([listCustomers(user, { ...filters, page: page(sp.page), pageSize: 25 }), countCustomersByStatus(user, filters)]);
+  return json({ ...list, counts });
 });
 
 /** 409 { duplicates } when the phone or email exists; resend with allowDuplicate: "on" to add anyway. */

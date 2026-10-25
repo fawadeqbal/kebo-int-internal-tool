@@ -8,13 +8,13 @@ import { can } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import { invoices } from "@/lib/db/schema";
 import { isUuid } from "@/lib/utils/ids";
-import { customerFinancials, findCustomerFor } from "@/modules/customers/repository";
+import { ACTIVE_MONTHS, customerFinancials, findCustomerFor } from "@/modules/customers/repository";
 import { deleteCustomerAction } from "@/modules/customers/actions";
 import { listQueriesForCustomer } from "@/modules/queries/repository";
 import { invoiceDisplayStatus } from "@/modules/invoices/status";
 import { getSettings } from "@/modules/settings/service";
 import { Avatar, buttonClass, ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, PageHeader, Table, Td, Th, THead, Tr } from "@/components/ui";
-import { InvoiceStatusBadge, QueryStatusBadge } from "@/components/ui/badge";
+import { Badge, InvoiceStatusBadge, QueryStatusBadge } from "@/components/ui/badge";
 import { ConfirmSubmit } from "@/components/ui/client";
 import { formatDate } from "@/lib/utils/dates";
 import { formatCents, formatMoney, toCents } from "@/lib/utils/money";
@@ -93,6 +93,21 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               <DetailList
                 columns={1}
                 items={[
+                  {
+                    label: "Status",
+                    value: customer.active ? (
+                      <Badge tone="ok" dot>
+                        Active
+                      </Badge>
+                    ) : (
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Badge tone="neutral" dot>
+                          Not active
+                        </Badge>
+                        <span className="text-xs text-muted">No inquiry in {ACTIVE_MONTHS} months and nothing open or unpaid</span>
+                      </span>
+                    ),
+                  },
                   { label: "Phone / WhatsApp", value: <span className="tabular">{customer.phone}</span> },
                   { label: "Email", value: customer.email, hidden: !customer.email },
                   { label: "Address / country", value: customer.address, hidden: !customer.address },
