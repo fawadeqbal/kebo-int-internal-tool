@@ -4,10 +4,12 @@ The new stack (`kebo-desk`) runs beside the old one (`kebo-rfq`) on the same ser
 
 Server: `145.241.156.60`, shared Caddy `global-caddy` on network `global-proxy`. Old app: `/opt/kebo-rfq`, domain `rfq.fawadiqbal.dev`.
 
+> **Do not `git pull` in `/opt/kebo-rfq`.** `main` no longer contains the old app, so pulling there would replace it. The old app keeps running from what is already on the server, and the undo in step 6 uses those same containers.
+
 ## 1. Put the code on the server
 
 ```bash
-git clone -b revamp/monorepo https://github.com/fawadeqbal/kebo-int-internal-tool /opt/kebo-desk
+git clone https://github.com/fawadeqbal/kebo-int-internal-tool /opt/kebo-desk
 cd /opt/kebo-desk && mkdir -p secrets backups
 cp /opt/kebo-rfq/secrets/firebase.json secrets/ 2>/dev/null || true   # phone push, if set up
 ```

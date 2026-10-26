@@ -2,7 +2,7 @@
 
 Internal tool for **Shandong Kebo International Trade Co., Ltd.** to run every RFQ from first message to closed order: sourcing from factories, quotations with revisions, the order checklist (deposit, factory order, production, inspection, balance, shipping, documents), and money in and out.
 
-> **Status: rebuild in progress** on the `revamp/monorepo` branch. Production still runs the previous app from `main`; its code is kept in [`legacy/`](legacy/) and is ported module by module. See [docs/revamp-plan.md](docs/revamp-plan.md).
+> **Status:** the rebuild is complete on `main`. The live server still runs the previous app until the switch-over in [docs/switch-over.md](docs/switch-over.md); the previous app's code is in the git history (before this cleanup), not in the tree.
 
 ## Layout
 
@@ -12,12 +12,11 @@ apps/
   mobile/     Flutter app
 packages/
   config/     tsconfig and ESLint presets, typed environment loader
-  database/   Prisma schema, migrations, client, seed (+ legacy import, coming)
+  database/   Prisma schema, migrations, client, seed, and the import of the previous app's data
   money/      all money maths in integer minor units: totals, VAT, FX, margins, deposits, profit
   shared/     the domain: statuses, labels, permissions, workflows, the order checklist and next-step engine, input schemas
   ui/         design system for the web app (tokens, components, status badges)
   utils/      dates, errors, ids, document numbers, amounts in words
-legacy/       the previous Next.js + Drizzle app, unchanged, until everything is ported
 ```
 
 Dependencies only point downwards: `utils` and `money` know nothing about the business; `shared` holds the business rules as pure functions; `database` stores them; `api` enforces them; `ui`/`web` show them.
