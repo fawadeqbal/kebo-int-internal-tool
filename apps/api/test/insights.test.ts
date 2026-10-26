@@ -71,4 +71,13 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     expect(a.rows.length).toBeGreaterThan(0);
     expect(a.rows[0]).toHaveProperty("userName");
   });
+
+  it("keeps the company stamp image in the settings (a data URL of a few hundred KB)", async () => {
+    const before = (await api(app, admin).get("/settings").expect(200)).body.company;
+    const stamp = `data:image/jpeg;base64,${"A".repeat(300_000)}`;
+    const saved = (await api(app, admin).put("/settings/company", { ...before, stamp }).expect(200)).body;
+    expect(JSON.stringify(saved)).toContain(stamp.slice(0, 40));
+    await api(app, admin).put("/settings/company", { ...before, stamp: "javascript:alert(1)" }).expect(422);
+    await api(app, admin).put("/settings/company", before).expect(200);
+  });
 });

@@ -5,7 +5,7 @@ import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, type SettingsKey } from 
  * and the action turns them back into the group's object for PUT /settings/:key
  * (see packages/shared/src/schemas/settings.ts for the rules).
  */
-export type FieldKind = "text" | "textarea" | "number" | "bool" | "lines" | "rates" | "select";
+export type FieldKind = "text" | "textarea" | "number" | "bool" | "lines" | "rates" | "select" | "image";
 
 export interface SettingField {
   name: string;
@@ -37,8 +37,8 @@ export const SETTING_GROUPS: SettingGroup[] = [
     save: "Save company details",
     fields: [
       { name: "name", label: "Company name", kind: "text", wide: true, hint: "The legal name in English, as on contracts" },
-      { name: "nameLocal", label: "Name in Chinese", kind: "text", hint: "Printed under the English name", placeholder: "山东科博国际贸易有限公司" },
-      { name: "taxNo", label: "Tax number", kind: "text", hint: "Unified social credit code" },
+      { name: "nameLocal", label: "Name in Chinese", kind: "text", hint: "Printed above the English name", placeholder: "山东科波国际贸易有限公司" },
+      { name: "taxNo", label: "Business license number", kind: "text", hint: "Unified social credit code" },
       { name: "address", label: "Address", kind: "textarea", wide: true },
       { name: "phone", label: "Phone", kind: "text" },
       { name: "website", label: "Website", kind: "text" },
@@ -46,12 +46,13 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "email2", label: "Second email", kind: "text", hint: "Also printed, if given" },
       { name: "bankDetails", label: "Bank details for customers", kind: "textarea", wide: true, hint: "Beneficiary, bank, SWIFT and account number, printed on invoices so customers can pay" },
       { name: "invoiceFooter", label: "Invoice footer", kind: "textarea", wide: true, hint: "A line at the bottom of every invoice, e.g. thanks or payment notes" },
+      { name: "stamp", label: "Company stamp", kind: "image", wide: true, hint: "The red seal printed on proforma invoices. A PNG or JPEG under 300 KB, scanned on white." },
     ],
   },
   {
     key: "sales",
     title: "Sales and quotations",
-    description: "Starting values for new quotations. People can change them on each quotation.",
+    description: "Starting values for new quotations. People can change them on each quotation. Tax comes from the customer's country: 13% on top in China, none for exports.",
     save: "Save sales settings",
     fields: [
       { name: "currency", label: "Main currency", kind: "text", hint: "Reports and totals are shown in it. Three letters, e.g. USD." },
@@ -67,8 +68,6 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "defaultDepositPercent", label: "Usual deposit", kind: "number", unit: "%", hint: "Asked from the customer before production starts" },
       { name: "defaultBalanceTerms", label: "Usual balance terms", kind: "select", options: BALANCE_TERMS.map((b) => ({ value: b, label: BALANCE_TERMS_LABEL[b] })), hint: "When the rest of the money is due" },
       { name: "defaultIncoterm", label: "Usual Incoterm", kind: "select", options: INCOTERMS.map((i) => ({ value: i, label: i })), hint: "Who pays freight and insurance. FOB: we deliver onto the ship at the Chinese port." },
-      { name: "vatRate", label: "VAT on our sales", kind: "number", unit: "%", hint: "0 for export sales; only domestic sales carry VAT" },
-      { name: "pricesIncludeVat", label: "Our prices include VAT", kind: "bool", hint: "Tick if the prices we quote already contain the VAT above" },
       { name: "defaultTerms", label: "Terms printed on quotations", kind: "textarea", wide: true, hint: "Payment, delivery and warranty terms that go on every new quotation" },
       { name: "categories", label: "Product categories", kind: "lines", wide: true, hint: "One per line. Every deal is filed under one of these." },
     ],

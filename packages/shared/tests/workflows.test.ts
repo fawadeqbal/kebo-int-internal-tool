@@ -156,7 +156,7 @@ describe("settings", () => {
     expect(s.sales.defaultDepositPercent).toBe(50);
     expect(s.sales.currency).toBe("USD");
     expect(s.reminders.depositDays).toBe(7);
-    expect(s.company.website).toBe("keboint.com");
+    expect(s.company.website).toBe("www.keboint.com"); // Kebo's details, as on its proforma
   });
 });
 

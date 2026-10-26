@@ -3,7 +3,7 @@ import { UNKNOWN_COUNTRY } from "@kebo/shared";
 /**
  * ISO 3166-1 alpha-2 countries Kebo sells to most (Africa, the Gulf, South and
  * South-East Asia, Latin America, Europe, CIS), by name. "ZZ" means not known
- * yet: the screens ask for it because it decides VAT and shipping.
+ * yet: the screens ask for it because it decides tax and shipping.
  */
 export const COUNTRIES: readonly (readonly [code: string, name: string])[] = [
   ["AF", "Afghanistan"],

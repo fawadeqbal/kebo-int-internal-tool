@@ -152,7 +152,7 @@ export function DetailsForm({
   today: string;
   /** Read-only rows (incoterm, payment terms, ordered on). */
   fixed: { label: string; value: ReactNode }[];
-  values: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null };
+  values: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null; documentTitle: string | null; portOfDischarge: string | null };
   /** The same values, formatted for reading. */
   shown: { shipBy: string; readyOn: string; shippedOn: string; blNo: string };
 }) {
@@ -168,6 +168,8 @@ export function DetailsForm({
             { label: "Ready on", value: shown.readyOn },
             { label: "Shipped on", value: shown.shippedOn },
             { label: "B/L number", value: shown.blNo },
+            { label: "Port of discharge", value: values.portOfDischarge ?? "—" },
+            { label: "Heading on documents", value: values.documentTitle ?? "—" },
           ]}
         />
         {canEdit && (
@@ -195,6 +197,12 @@ export function DetailsForm({
           </Field>
           <Field label="B/L number" htmlFor="d-blNo" optional error={s.errors?.blNo}>
             <Input id="d-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? values.blNo ?? ""} />
+          </Field>
+          <Field label="Port of discharge" htmlFor="d-pod" optional hint="Printed on the proforma, e.g. Hairatan, Afghanistan" error={s.errors?.portOfDischarge}>
+            <Input id="d-pod" name="portOfDischarge" maxLength={120} defaultValue={s.values?.portOfDischarge ?? values.portOfDischarge ?? ""} />
+          </Field>
+          <Field label="Heading on documents" htmlFor="d-title" optional hint="Over the items, e.g. Complete automatic liquid syrup filling line" error={s.errors?.documentTitle}>
+            <Input id="d-title" name="documentTitle" maxLength={200} defaultValue={s.values?.documentTitle ?? values.documentTitle ?? ""} />
           </Field>
           <div className="flex gap-2">
             <SubmitButton size="sm" pendingText="Saving…">

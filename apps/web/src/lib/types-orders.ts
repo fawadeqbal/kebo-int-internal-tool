@@ -54,6 +54,8 @@ export interface OrderView {
   readyOn: string | null;
   shippedOn: string | null;
   blNo: string | null;
+  documentTitle: string | null;
+  portOfDischarge: string | null;
   currency: string;
   total: string;
   depositPercent: number;
@@ -69,7 +71,20 @@ export interface OrderView {
   cancelled: { at: string | null; reason: string | null } | null;
   lines: OrderLineView[];
   goods: OrderGoodsView;
+  /** The export rebate on this order and its paperwork. */
+  tax: OrderTax;
   documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
+}
+
+/** The export rebate of an order: how much comes back, and the paperwork (factory's VAT invoice, filing within 90 days of shipping). */
+export interface OrderTax {
+  /** Expected rebate per factory currency (empty when none). */
+  rebate: { currency: string; amount: string }[];
+  vatInvoiceReceivedOn: string | null;
+  rebateFiledOn: string | null;
+  /** File the rebate by this date (shipped + 90 days); null until shipped. */
+  deadline: string | null;
+  needs: (OrderNeed & { deadline: string }) | null;
 }
 
 /** The packing list figures of one goods line (null until filled in). */
@@ -154,6 +169,8 @@ export interface CompanySnapshot {
   taxNo?: string | null;
   bankDetails?: string | null;
   invoiceFooter?: string | null;
+  /** The company stamp as a data URL (printed on the proforma). */
+  stamp?: string | null;
 }
 
 /** The customer as it was when the document was sent (imported snapshots may lack fields). */
@@ -162,6 +179,7 @@ export interface CustomerSnapshot {
   country?: string | null;
   address?: string | null;
   taxNo?: string | null;
+  regNo?: string | null;
   contact?: { name?: string | null; email?: string | null; phone?: string | null } | null;
 }
 
@@ -186,8 +204,13 @@ export interface OrderDocument {
     incoterm: Incoterm;
     incotermPlace: string | null;
     quotation: string;
+    documentTitle: string | null;
+    portOfDischarge: string | null;
+    leadTime: string | null;
   };
   paymentTerms: string;
+  /** "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
+  paymentSentence: string;
   currency: string;
   showPrices: boolean;
   lines: {

@@ -47,7 +47,8 @@ export default async function QuotationPrint({
       return { customerId: deal.customer.id, contactId: deal.contactId };
     }),
   ]);
-  const vat = r.vatRate > 0 ? `${r.pricesIncludeVat ? "Incl. " : ""}VAT ${r.vatRate}%` : null;
+  // Tax only when there is some; old revisions may have had prices including it.
+  const vat = r.vatRate > 0 ? `Tax ${r.vatRate}%${r.pricesIncludeVat ? " (included)" : ""}` : null;
   const terms = `${r.depositPercent > 0 ? `${r.depositPercent}% deposit with the order; ` : ""}${BALANCE_TERMS_LABEL[r.balanceTerms]}`;
   return (
     <>
@@ -100,7 +101,7 @@ export default async function QuotationPrint({
           rows={[
             { label: "Subtotal", value: money(r.subtotal, r.currency) },
             { label: "Discount", value: Number(r.discount) ? `− ${money(r.discount, r.currency)}` : null },
-            { label: vat ?? "VAT", value: vat ? money(r.vatAmount, r.currency) : null },
+            { label: vat ?? "Tax", value: vat ? money(r.vatAmount, r.currency) : null },
           ]}
           totalLabel={`Total ${r.incoterm}${r.incotermPlace ? ` ${r.incotermPlace}` : ""}`}
         />

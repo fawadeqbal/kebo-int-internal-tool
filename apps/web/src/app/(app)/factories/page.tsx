@@ -8,8 +8,6 @@ import type { FactoryRow } from "@/lib/types-people";
 
 export const metadata = { title: "Factories" };
 
-const vat = (f: { defaultVatRate: string; pricesIncludeVat: boolean }) => `${Number(f.defaultVatRate)}% ${f.pricesIncludeVat ? "included" : "on top"}`;
-
 /** The suppliers the team buys from, with how many price quotes each has. */
 export default async function FactoriesPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   await requirePermission("sourcing.manage");
@@ -18,7 +16,14 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   const keep = { q: sp.q };
   return (
     <div>
-      <PageHeader title="Factories" description="The suppliers we source from. Prices and costs here are never shown to customers." actions={<ButtonLink href="/factories/new" variant="primary">New factory</ButtonLink>} />
+      <PageHeader title="Factories" description="The suppliers we source from. Prices and costs here are never shown to customers." actions={
+          <>
+            <ButtonLink href="/factories/rebates">Export rebate by HS code</ButtonLink>
+            <ButtonLink href="/factories/new" variant="primary">
+              New factory
+            </ButtonLink>
+          </>
+        } />
       <Card className="overflow-hidden p-0">
         <FilterBar>
           <form className="flex flex-1 flex-wrap items-center gap-2">
@@ -38,7 +43,6 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
               <tr>
                 <Th>Factory</Th>
                 <Th>Contact</Th>
-                <Th>VAT on their prices</Th>
                 <Th className="text-right">Price quotes</Th>
               </tr>
             </THead>
@@ -61,7 +65,6 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                       <span className="text-xs text-muted">No contact details</span>
                     )}
                   </Td>
-                  <Td className="text-sm whitespace-nowrap">{vat(f)}</Td>
                   <Td className="text-right tabular">{f._count.quotes || <span className="text-muted">0</span>}</Td>
                 </Tr>
               ))}

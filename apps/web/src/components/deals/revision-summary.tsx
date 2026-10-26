@@ -16,7 +16,7 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
           { label: "Payment", value: `${r.depositPercent}% deposit · ${BALANCE_TERMS_LABEL[r.balanceTerms].toLowerCase()}` },
           { label: "Lead time", value: r.leadTime },
           { label: "Valid until", value: date(r.validUntil) },
-          { label: "VAT", value: r.vatRate ? `${r.vatRate}% ${r.pricesIncludeVat ? "included" : "on top"}` : "None (export)" },
+          { label: "Tax", value: `${r.vatRate}% ${r.pricesIncludeVat ? "(included)" : "added on top"}`, hidden: !(r.vatRate > 0) },
         ]}
       />
       <div className="rounded-lg border border-line">
@@ -71,9 +71,9 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
                 <dd className="tabular">− {money(r.discount, r.currency)}</dd>
               </div>
             )}
-            {Number(r.vatAmount) > 0 && (
+            {r.vatRate > 0 && (
               <div className="flex justify-between py-1">
-                <dt className="text-muted">{r.pricesIncludeVat ? `Includes VAT ${r.vatRate}%` : `VAT ${r.vatRate}%`}</dt>
+                <dt className="text-muted">{r.pricesIncludeVat ? `Tax ${r.vatRate}% (included)` : `+ Tax ${r.vatRate}%`}</dt>
                 <dd className="tabular">{money(r.vatAmount, r.currency)}</dd>
               </div>
             )}

@@ -5,10 +5,9 @@ import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
 
-/** Create or edit a factory. An unticked box sends nothing, so "prices include VAT" is always sent explicitly. */
+/** Create or edit a factory. */
 export async function saveFactoryAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const body = { ...v, pricesIncludeVat: v.pricesIncludeVat === "on" };
+  const body = formValues(form);
   const r = await attempt(form, () => (id ? api.put<{ id: string }>(`/factories/${id}`, body) : api.post<{ id: string }>("/factories", body)));
   if (!r.ok) return r;
   const savedId = id ?? (r.data as { id: string }).id;

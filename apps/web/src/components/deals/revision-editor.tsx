@@ -4,9 +4,10 @@ import { useState, type ReactNode } from "react";
 import { Lock, Plus } from "lucide-react";
 import { costSummary, documentTotals, formatMinor, fromMinor, marginPercent, priceForMargin, toMinor, type VatRule } from "@kebo/money";
 import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, LINE_TYPE_LABEL, LINE_TYPES, type BalanceTerms, type Incoterm, type LineType } from "@kebo/shared";
-import { Button, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { PercentChoice } from "@/components/common/percent-choice";
 import type { ActionState } from "@/lib/actions";
 import type { RevisionDraft } from "@/lib/types-deals";
 import { ErrorText, MiniLabel, move, numberText, RowButtons, rowKey } from "./form-bits";
@@ -36,8 +37,8 @@ interface EditorState {
   balanceTerms: BalanceTerms;
   leadTime: string;
   validUntil: string;
+  /** Tax % added on top of the prices (0 for exports). */
   vatRate: string;
-  pricesIncludeVat: boolean;
   discount: string;
   terms: string;
   notes: string;
@@ -45,6 +46,12 @@ interface EditorState {
 }
 
 const str = (v: number | string | null | undefined) => (v === null || v === undefined ? "" : String(v));
+
+/** Prices are without tax; the tax % is added on top. Exports carry none, a customer in China pays 13%. */
+const TAX_OPTIONS = [
+  { value: 0, label: "No tax (export)" },
+  { value: 13, label: "13% (China)" },
+] as const;
 
 function fromDraft(d: RevisionDraft): EditorState {
   return {
@@ -56,7 +63,6 @@ function fromDraft(d: RevisionDraft): EditorState {
     leadTime: str(d.leadTime),
     validUntil: d.validUntil,
     vatRate: str(d.vatRate),
-    pricesIncludeVat: d.pricesIncludeVat,
     discount: Number(d.discount) ? Number(d.discount).toFixed(2) : "",
     terms: str(d.terms),
     notes: str(d.notes),
@@ -86,8 +92,7 @@ function payload(s: EditorState, showCosts: boolean) {
     balanceTerms: s.balanceTerms,
     leadTime: s.leadTime,
     validUntil: s.validUntil,
-    vatRate: numberText(s.vatRate),
-    pricesIncludeVat: s.pricesIncludeVat,
+    vatRate: numberText(s.vatRate) || "0",
     discount: numberText(s.discount),
     terms: s.terms,
     notes: s.notes,
@@ -147,7 +152,7 @@ export function RevisionEditor({
   const setLine = (i: number, patch: Partial<LineState>) => update((st) => ({ ...st, lines: st.lines.map((l, n) => (n === i ? { ...l, ...patch } : l)) }));
 
   const currency = /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—";
-  const vat: VatRule = { rate: Number(numberText(s.vatRate)) || 0, pricesIncludeVat: s.pricesIncludeVat };
+  const vat: VatRule = { rate: Number(numberText(s.vatRate)) || 0, pricesIncludeVat: false };
   const totals = documentTotals(
     s.lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPrice: numberText(l.unitPrice) || 0 })),
     numberText(s.discount) || 0,
@@ -215,18 +220,12 @@ export function RevisionEditor({
                 ))}
               </Select>
             </Field>
-            <Field label="Lead time" htmlFor={`lead-${number}`} optional error={st.errors?.leadTime}>
+            <Field label="Lead time" htmlFor={`lead-${number}`} optional error={st.errors?.leadTime} className="sm:col-span-2">
               <Input id={`lead-${number}`} value={s.leadTime} maxLength={120} placeholder="e.g. 30 days after deposit" onChange={(e) => set("leadTime", e.target.value)} />
             </Field>
-            <Field label="VAT %" htmlFor={`vat-${number}`} error={st.errors?.vatRate} hint="0 for export sales">
-              <Input id={`vat-${number}`} inputMode="decimal" className="tabular" value={s.vatRate} onChange={(e) => set("vatRate", e.target.value)} />
+            <Field label="Tax added on top" htmlFor={`tax-${number}`} error={st.errors?.vatRate} hint="Prices are without tax" className="sm:col-span-2 lg:col-span-4">
+              <PercentChoice id={`tax-${number}`} label="Tax added on top" value={s.vatRate} onChange={(v) => set("vatRate", v)} choices={TAX_OPTIONS} invalid={!!st.errors?.vatRate} />
             </Field>
-            <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
-              <Checkbox id={`incl-${number}`} checked={s.pricesIncludeVat} onChange={(e) => set("pricesIncludeVat", e.target.checked)} />
-              <label htmlFor={`incl-${number}`} className="text-sm">
-                Prices include VAT <span className="text-muted">(domestic sales only)</span>
-              </label>
-            </div>
           </section>
 
           <section aria-label="Lines">
@@ -366,9 +365,9 @@ export function RevisionEditor({
                   </dd>
                 </div>
                 <ErrorText error={st.errors?.discount} />
-                {(vat.rate > 0 || totals.vat > 0) && (
+                {vat.rate > 0 && (
                   <div className="flex justify-between py-1">
-                    <dt className="text-muted">{s.pricesIncludeVat ? `Includes VAT ${vat.rate}%` : `VAT ${vat.rate}%`}</dt>
+                    <dt className="text-muted">+ Tax {vat.rate}%</dt>
                     <dd className="tabular">{fmt(totals.vat)}</dd>
                   </div>
                 )}
@@ -414,7 +413,7 @@ export function CostingBox({ currency, cost, sales, profit, margin, uncosted }: 
           <dd className="tabular">{fmt(cost)}</dd>
         </div>
         <div className="flex justify-between py-0.5">
-          <dt className="text-text-2" title="After the discount, without VAT">
+          <dt className="text-text-2" title="After the discount, without tax">
             Sales <span className="text-xs text-muted">net</span>
           </dt>
           <dd className="tabular">{fmt(sales)}</dd>

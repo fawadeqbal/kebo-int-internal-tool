@@ -119,7 +119,7 @@ export const factoryQuoteLineInput = z.object({
   model: optionalText(120),
   quantity,
   unit: z.string().trim().max(20).default("pcs"),
-  unitPrice: amount("Enter the factory's price, including its VAT"),
+  unitPrice: amount("Enter the factory's price (without tax)"),
   /** Customs code of the product; its rebate rate is remembered by this code. */
   hsCode: z.string().trim().max(20).regex(/^[0-9.\s]*$/, "Use digits only, e.g. 8437.80").transform((v) => v.replace(/\s+/g, "") || null).nullish(),
   rebateRate: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number({ message: "Choose the export rebate for this item" }).min(0, "Cannot be negative").max(100, "Cannot be more than 100%")),
