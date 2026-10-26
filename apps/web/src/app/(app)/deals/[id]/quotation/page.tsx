@@ -7,43 +7,14 @@ import { api } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
-import type { QuotationView, RevisionDraft, RevisionView, SalesSettings } from "@/lib/types-deals";
+import type { QuotationView, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { AnswerPanel, DraftPanel, StartRevision } from "@/components/deals/quotation-panels";
 import { RevisionSummary } from "@/components/deals/revision-summary";
-import { createRevisionAction, deleteRevisionAction, moveRevisionAction, updateRevisionAction } from "./actions";
+import { createRevisionAction, deleteRevisionAction, moveRevisionAction, offersAction, updateRevisionAction } from "./actions";
 
 export const metadata = { title: "Quotation" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
-
-/** A saved draft as editor values. */
-function asDraft(r: RevisionView): RevisionDraft {
-  return {
-    number: r.number,
-    currency: r.currency,
-    incoterm: r.incoterm,
-    incotermPlace: r.incotermPlace,
-    depositPercent: r.depositPercent,
-    balanceTerms: r.balanceTerms,
-    leadTime: r.leadTime,
-    validUntil: r.validUntil,
-    discount: Number(r.discount),
-    terms: r.terms,
-    notes: r.notes,
-    lines: r.lines.map((l) => ({
-      requestedItemId: l.requestedItemId,
-      type: l.type,
-      description: l.description,
-      model: l.model,
-      quantity: Number(l.quantity),
-      unit: l.unit,
-      unitPrice: Number(l.unitPrice),
-      unitCost: l.unitCost ? Number(l.unitCost) : null,
-      factoryQuoteLineId: l.factoryQuoteLineId ?? null,
-      fxRate: l.fxRate ? Number(l.fxRate) : null,
-    })),
-  };
-}
 
 const printHref = (r: { id: string }) => `/print/revisions/${r.id}`;
 const pdfHref = (r: { id: string }) => `/pdf/revisions/${r.id}`;
@@ -62,21 +33,20 @@ export default async function QuotationPage({
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
-  const [d, q, settings] = await Promise.all([
-    load(() => api.get<DealDetail>(`/inquiries/${id}`)),
-    load(() => api.get<QuotationView>(`/inquiries/${id}/quotation`)),
-    api.get<{ sales: SalesSettings }>("/settings"),
-  ]);
+  const [d, q] = await Promise.all([load(() => api.get<DealDetail>(`/inquiries/${id}`)), load(() => api.get<QuotationView>(`/inquiries/${id}/quotation`))]);
   const quoter = can(me.role, "quotations.manage");
   const manage = quoter && d.allowed.quote;
   const showCosts = can(me.role, "sourcing.manage");
-  const itemNumbers = Object.fromEntries(d.items.map((it) => [it.id, it.no]));
-  const draftValues =
-    manage && q.canStartRevision ? await api.get<RevisionDraft>(`/inquiries/${id}/quotation/draft`).catch(() => null) : null;
-  const startValues = draftValues && { ...draftValues, itemNumbers };
   const today = todayIn(TZ);
-
   const draft = q.revisions.find((r) => r.status === "draft") ?? null;
+  // The editor's values and what it can offer (each factory offer, costed in the quotation currency).
+  const [startValues, draftValues] = await Promise.all([
+    manage && q.canStartRevision ? api.get<RevisionDraft>(`/inquiries/${id}/quotation/draft`).catch(() => null) : null,
+    manage && draft ? api.get<RevisionDraft>(`/revisions/${draft.id}/values`).catch(() => null) : null,
+  ]);
+  const currencyOf = draftValues?.currency ?? startValues?.currency;
+  const offers = manage && currencyOf ? await api.get<QuoteOffers>(`/inquiries/${id}/quotation/offers`, { currency: currencyOf }).catch(() => null) : null;
+  const loadOffers = offersAction.bind(null, d.id);
   const live = q.revisions.find((r) => r.status !== "draft") ?? null;
   const viewing = sp.r ? (q.revisions.find((r) => String(r.number) === sp.r && r.status !== "draft") ?? live) : live;
   const accepted = q.revisions.find((r) => r.status === "accepted");
@@ -88,10 +58,11 @@ export default async function QuotationPage({
     <StartRevision
       action={createRevisionAction.bind(null, d.id)}
       draft={startValues}
+      offers={offers}
+      loadOffers={loadOffers}
       allowed={manage && q.canStartRevision && !!startValues}
       whyNot={q.whyNotStart ?? (!manage ? "Only the person handling this deal (or a manager) can quote." : null)}
       showCosts={showCosts}
-      defaultMargin={settings.sales.defaultMarginPercent}
       first={q.revisions.length === 0}
     />
   );
@@ -121,7 +92,7 @@ export default async function QuotationPage({
         <Card>
           <CardHeader
             title="No quotation yet"
-            description="The first revision (R1) starts from the factory prices chosen on the Factory prices tab, plus the default margin."
+            description="Each option you offer is one factory's offer from the Factory prices tab, with your prices. The customer accepts one option."
           />
           <CardBody className="flex flex-col gap-3">
             {quoter ? start : <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this deal makes the quotation."}</p>}
@@ -152,13 +123,14 @@ export default async function QuotationPage({
             }
           />
           <CardBody>
-            {manage ? (
+            {manage && draftValues && offers ? (
               <DraftPanel
                 key={draft.id}
                 number={draft.number}
-                initial={{ ...asDraft(draft), itemNumbers }}
+                initial={draftValues}
+                offers={offers}
+                loadOffers={loadOffers}
                 showCosts={showCosts}
-                defaultMargin={settings.sales.defaultMarginPercent}
                 saveAction={updateRevisionAction.bind(null, d.id, draft.id)}
                 deleteAction={deleteRevisionAction.bind(null, d.id, draft.id)}
                 moveAction={move(draft)}
@@ -179,7 +151,9 @@ export default async function QuotationPage({
             title={
               <span className="flex flex-wrap items-center gap-2">
                 {q.quotation?.refNo} R{viewing.number} <RevisionBadge status={viewing.status} />
-                <span className="text-sm font-normal text-muted tabular">{money(viewing.total, viewing.currency)}</span>
+                <span className="text-sm font-normal text-muted tabular">
+                  {viewing.options.length > 1 && viewing.status !== "accepted" ? `${viewing.options.length} options` : money(viewing.total, viewing.currency)}
+                </span>
               </span>
             }
             description={
@@ -206,7 +180,7 @@ export default async function QuotationPage({
             {viewing.canAnswer && manage && (
               <div className="rounded-lg border border-primary/25 bg-primary-soft/40 p-3">
                 <p className="mb-2 text-sm font-medium">What did the customer say about R{viewing.number}?</p>
-                <AnswerPanel number={viewing.number} action={move(viewing)} today={today} />
+                <AnswerPanel number={viewing.number} action={move(viewing)} today={today} options={viewing.options} currency={viewing.currency} />
                 {draft && (
                   <p className="mt-2 text-xs text-muted">
                     Accepting R{viewing.number} discards the R{draft.number} draft.
@@ -264,7 +238,15 @@ export default async function QuotationPage({
                   <Td>
                     <RevisionBadge status={r.status} />
                   </Td>
-                  <Td className="text-right whitespace-nowrap tabular">{money(r.total, r.currency)}</Td>
+                  <Td className="text-right whitespace-nowrap tabular">
+                    {r.options.length > 1 && r.status !== "accepted" ? (
+                      <span title={r.options.map((o) => `Option ${o.letter}: ${money(o.total, r.currency)}`).join("\n")}>
+                        {r.options.map((o) => `${o.letter} ${money(o.total, r.currency)}`).join(" · ")}
+                      </span>
+                    ) : (
+                      money(r.total, r.currency)
+                    )}
+                  </Td>
                   <Td className="whitespace-nowrap">{date(r.validUntil)}</Td>
                   <Td className="whitespace-nowrap">{date(r.sentOn)}</Td>
                   <Td className="whitespace-nowrap">{date(r.answeredOn)}</Td>

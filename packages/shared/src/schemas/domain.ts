@@ -78,8 +78,9 @@ export type FactoryInput = z.infer<typeof factoryInput>;
 
 export const requestedItemInput = z.object({
   id: optionalId,
-  /** A part of another item (split at factory pricing): that item's id. */
+  /** A part of another item: that item's id (saved items), or its position in `items` (0-based, for new ones). */
   parentId: optionalId,
+  partOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
   description: text(2000, "Each item needs a description"),
   model: optionalText(120),
   quantity,

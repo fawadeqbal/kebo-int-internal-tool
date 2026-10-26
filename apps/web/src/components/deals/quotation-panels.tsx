@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { CheckCircle2, Clock, Download, FilePlus2, Printer, Send, XCircle } from "lucide-react";
-import { Button, buttonClass, Field, Input } from "@kebo/ui";
+import { Button, buttonClass, cn, Field, Input } from "@kebo/ui";
+import { money } from "@/lib/format";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
-import type { RevisionDraft } from "@/lib/types-deals";
+import type { OptionView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { RevisionEditor } from "./revision-editor";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -16,26 +17,28 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 export function StartRevision({
   action,
   draft,
+  offers,
+  loadOffers,
   allowed,
   whyNot,
   showCosts,
-  defaultMargin,
   first,
 }: {
   action: Action;
   draft: RevisionDraft | null;
+  offers: QuoteOffers | null;
+  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
   allowed: boolean;
   whyNot: string | null;
   showCosts: boolean;
-  defaultMargin: number;
   first: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const label = first ? "Make the quotation (R1)" : `Start a new revision${draft ? ` (R${draft.number})` : ""}`;
-  if (!open || !draft)
+  if (!open || !draft || !offers)
     return (
       <div className="flex flex-col items-start gap-1.5">
-        <Button variant={first ? "primary" : "secondary"} onClick={() => setOpen(true)} disabled={!allowed || !draft} aria-describedby={!allowed && whyNot ? "why-not-start" : undefined}>
+        <Button variant={first ? "primary" : "secondary"} onClick={() => setOpen(true)} disabled={!allowed || !draft || !offers} aria-describedby={!allowed && whyNot ? "why-not-start" : undefined}>
           <FilePlus2 aria-hidden /> {label}
         </Button>
         {!allowed && whyNot && (
@@ -48,8 +51,8 @@ export function StartRevision({
   return (
     <div className="w-full rounded-xl border border-primary/30 bg-primary-soft/20 p-4">
       <h3 className="mb-1 text-sm font-semibold">New revision R{draft.number}</h3>
-      <p className="mb-4 text-xs text-muted">{first ? "Prices start from the chosen factory costs plus the default margin. Check them, then save the draft." : "Starts as a copy of the latest revision. Change what is different, then save the draft."}</p>
-      <RevisionEditor action={action} number={draft.number} initial={draft} showCosts={showCosts} defaultMargin={defaultMargin} submitLabel={`Save R${draft.number} as a draft`} onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />
+      <p className="mb-4 text-xs text-muted">{first ? "Starts with the factory offer that covers the most at the lowest cost, priced at the default margin. Add more offers as Options B, C… for the customer to choose from." : "Starts as a copy of the latest revision. Change what is different, then save the draft."}</p>
+      <RevisionEditor action={action} number={draft.number} initial={draft} offers={offers} loadOffers={loadOffers} showCosts={showCosts} submitLabel={`Save R${draft.number} as a draft`} onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />
     </div>
   );
 }
@@ -58,8 +61,9 @@ export function StartRevision({
 export function DraftPanel({
   number,
   initial,
+  offers,
+  loadOffers,
   showCosts,
-  defaultMargin,
   saveAction,
   deleteAction,
   moveAction,
@@ -69,8 +73,9 @@ export function DraftPanel({
 }: {
   number: number;
   initial: RevisionDraft;
+  offers: QuoteOffers;
+  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
   showCosts: boolean;
-  defaultMargin: number;
   saveAction: Action;
   deleteAction: Action;
   moveAction: Action;
@@ -83,8 +88,9 @@ export function DraftPanel({
       action={saveAction}
       number={number}
       initial={initial}
+      offers={offers}
+      loadOffers={loadOffers}
       showCosts={showCosts}
-      defaultMargin={defaultMargin}
       submitLabel="Save draft"
       requireChanges
       footer={(dirty) => (
@@ -130,9 +136,10 @@ const ANSWERS = [
   { to: "expired", label: "Mark expired", icon: Clock, variant: "ghost" as const },
 ];
 
-/** The customer's answer on the live sent revision. Accepting creates the order. */
-export function AnswerPanel({ number, action, today }: { number: number; action: Action; today: string }) {
+/** The customer's answer on the live sent revision. Accepting means choosing exactly one option; it creates the order. */
+export function AnswerPanel({ number, action, today, options, currency }: { number: number; action: Action; today: string; options: OptionView[]; currency: string }) {
   const [to, setTo] = useState<string | null>(null);
+  const [optionId, setOptionId] = useState<string>(options.length === 1 ? options[0]!.id : "");
   const [order, setOrder] = useState<{ orderId: string; orderRefNo: string } | null>(null);
   const chosen = ANSWERS.find((a) => a.to === to);
   if (order)
@@ -166,12 +173,30 @@ export function AnswerPanel({ number, action, today }: { number: number; action:
           {(s) => (
             <>
               <input type="hidden" name="to" value={chosen.to} />
+              {chosen.to === "accepted" && options.length > 1 && (
+                <fieldset className="w-full">
+                  <legend className="mb-1.5 text-sm font-medium">Which option did the customer accept?</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {options.map((o) => (
+                      <label key={o.id} className={cn("flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm", optionId === o.id ? "border-primary bg-primary-soft" : "border-line bg-surface")}>
+                        <input type="radio" name="optionId" value={o.id} checked={optionId === o.id} onChange={() => setOptionId(o.id)} className="accent-[var(--color-primary)]" />
+                        <span>
+                          <span className="font-semibold">Option {o.letter}</span> <span className="tabular">{money(o.total, currency)}</span>
+                          {o.factory && <span className="block text-xs text-muted">{o.factory.name}</span>}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-muted">The other options are marked not chosen. The order is made from this option only.</p>
+                </fieldset>
+              )}
+              {chosen.to === "accepted" && options.length === 1 && <input type="hidden" name="optionId" value={options[0]!.id} />}
               <Field label={chosen.to === "expired" ? "Expired on" : "Answered on"} htmlFor={`answer-on-${number}`} optional hint="Today when empty" error={s.errors?.on}>
                 <Input id={`answer-on-${number}`} name="on" type="date" max={today} className="w-40" defaultValue={s.values?.on} />
               </Field>
               <div className="flex gap-2">
-                <SubmitButton size="md" variant={chosen.to === "accepted" ? "primary" : "secondary"} pendingText="Saving…">
-                  {chosen.to === "accepted" ? `Confirm: R${number} accepted, create the order` : chosen.to === "rejected" ? "Confirm the rejection" : "Confirm expired"}
+                <SubmitButton size="md" variant={chosen.to === "accepted" ? "primary" : "secondary"} pendingText="Saving…" disabled={chosen.to === "accepted" && !optionId}>
+                  {chosen.to === "accepted" ? `Confirm: ${options.length > 1 ? (optionId ? `Option ${options.find((o) => o.id === optionId)!.letter}` : "choose an option") : `R${number}`} accepted, create the order` : chosen.to === "rejected" ? "Confirm the rejection" : "Confirm expired"}
                 </SubmitButton>
                 <Button variant="ghost" onClick={() => setTo(null)}>
                   Cancel

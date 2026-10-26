@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { numberToWords } from "@kebo/utils";
 import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
@@ -116,6 +116,7 @@ export function KeboDoc<T>({
   rows,
   sums = [],
   total,
+  groups,
   foot,
   boxTitle = "Payment terms:",
   bullets,
@@ -141,6 +142,11 @@ export function KeboDoc<T>({
   sums?: { label: string; value: string }[];
   /** "Total FOB Price : USD Ninety Thousand only   $ 90,000" */
   total?: { label: string; words: string; amount: string } | null;
+  /**
+   * Instead of rows / sums / total: several blocks in the same table, each
+   * under its own heading with its own total — a quotation's options A, B…
+   */
+  groups?: { heading: string; rows: T[]; sums?: { label: string; value: string }[]; total?: { label: string; words: string; amount: string } | null }[];
   /** Rows after the items instead of a money total (the packing list). */
   foot?: ReactNode;
   boxTitle?: string;
@@ -318,34 +324,45 @@ export function KeboDoc<T>({
               <td style={cell} />
             </tr>
           )}
-          {rows.map((r, i) => (
-            <tr key={i} style={{ breakInside: "avoid", height: "20.2pt" }}>
-              {columns.map((c) => (
-                <td key={c.label} style={{ ...cell, textAlign: c.align ?? "left", whiteSpace: c.width && !c.wrap ? "nowrap" : "pre-line" }}>
-                  {c.render(r, i)}
-                </td>
+          {(groups ?? [{ heading: "", rows, sums, total }]).map((g, gi) => (
+            <Fragment key={gi}>
+              {g.heading && (
+                <tr style={{ breakInside: "avoid", breakAfter: "avoid" }}>
+                  <td colSpan={columns.length} style={{ ...cell, textAlign: "center", fontWeight: 700, fontSize: "11pt", lineHeight: "13pt", padding: "2pt 5.6pt", background: "#F3F4F6", printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" }}>
+                    {g.heading}
+                  </td>
+                </tr>
+              )}
+              {g.rows.map((r, i) => (
+                <tr key={i} style={{ breakInside: "avoid", height: "20.2pt" }}>
+                  {columns.map((c) => (
+                    <td key={c.label} style={{ ...cell, textAlign: c.align ?? "left", whiteSpace: c.width && !c.wrap ? "nowrap" : "pre-line" }}>
+                      {c.render(r, i)}
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </tr>
+              {(g.sums ?? []).map((s) => (
+                <tr key={s.label}>
+                  <td colSpan={columns.length - 1} style={{ ...cell, fontWeight: 700 }}>
+                    {s.label}
+                  </td>
+                  <td style={{ ...cell, fontWeight: 700, whiteSpace: "nowrap", textAlign: columns.at(-1)?.align ?? "left" }}>{s.value}</td>
+                </tr>
+              ))}
+              {g.total && (
+                <tr style={{ fontWeight: 700, fontSize: "12pt", lineHeight: "13.8pt", breakInside: "avoid" }}>
+                  <td colSpan={columns.length - 1} style={{ ...cell, padding: "0 5.6pt" }}>
+                    <span style={{ display: "inline-block", minWidth: "133.7pt" }}>{g.total.label}</span>
+                    {g.total.words}
+                  </td>
+                  <td style={{ ...cell, padding: "0 5.1pt", whiteSpace: "nowrap", textAlign: columns.at(-1)?.align ?? "left" }}>
+                    {g.total.amount}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
-          {sums.map((s) => (
-            <tr key={s.label}>
-              <td colSpan={columns.length - 1} style={{ ...cell, fontWeight: 700 }}>
-                {s.label}
-              </td>
-              <td style={{ ...cell, fontWeight: 700, whiteSpace: "nowrap", textAlign: columns.at(-1)?.align ?? "left" }}>{s.value}</td>
-            </tr>
-          ))}
-          {total && (
-            <tr style={{ fontWeight: 700, fontSize: "12pt", lineHeight: "13.8pt", breakInside: "avoid" }}>
-              <td colSpan={columns.length - 1} style={{ ...cell, padding: "0 5.6pt" }}>
-                <span style={{ display: "inline-block", minWidth: "133.7pt" }}>{total.label}</span>
-                {total.words}
-              </td>
-              <td style={{ ...cell, padding: "0 5.1pt", whiteSpace: "nowrap", textAlign: columns.at(-1)?.align ?? "left" }}>
-                {total.amount}
-              </td>
-            </tr>
-          )}
           {foot}
         </tbody>
       </table>

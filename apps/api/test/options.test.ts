@@ -50,6 +50,57 @@ describe("quotation options from factory offers", () => {
 
   const items = async () => (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items as { id: string }[];
 
+  it("takes parts on a new inquiry (by position) and keeps them when edited", async () => {
+    const d = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
+    const base = { customerId: d.customer.id, category: "Machinery" };
+    // A part of a part, or of itself, is refused.
+    await api(app, sana)
+      .post("/inquiries", {
+        ...base,
+        items: [
+          { description: "Line", quantity: 1, unit: "set" },
+          { description: "Filler", quantity: 1, unit: "set", partOf: 0 },
+          { description: "Nozzle", quantity: 1, unit: "set", partOf: 1 },
+        ],
+      })
+      .expect(400);
+    const id = (
+      await api(app, sana)
+        .post("/inquiries", {
+          ...base,
+          items: [
+            { description: "Bottling line", quantity: 1, unit: "set" },
+            { description: "Labeller", quantity: 1, unit: "set" },
+            { description: "Filler", quantity: 1, unit: "set", partOf: 0 },
+            { description: "Capper", quantity: 1, unit: "set", partOf: 0 },
+          ],
+        })
+        .expect(201)
+    ).body.id;
+    const saved = (await api(app, sana).get(`/inquiries/${id}`)).body.items as { id: string; no: string; description: string; parentId: string | null }[];
+    expect(saved.map((i) => i.description)).toEqual(["Bottling line", "Filler", "Capper", "Labeller"]);
+    expect(saved.filter((i) => i.parentId).every((i) => i.parentId === saved[0]!.id)).toBe(true);
+    // Edit: the capper becomes an item of its own, a new part goes under the labeller.
+    await api(app, sana)
+      .put(`/inquiries/${id}`, {
+        ...base,
+        items: [
+          { id: saved[0]!.id, description: "Bottling line", quantity: 1, unit: "set" },
+          { id: saved[1]!.id, description: "Filler", quantity: 1, unit: "set", partOf: 0 },
+          { id: saved[2]!.id, description: "Capper", quantity: 1, unit: "set" },
+          { id: saved[3]!.id, description: "Labeller", quantity: 1, unit: "set" },
+          { description: "Glue unit", quantity: 1, unit: "set", partOf: 3 },
+        ],
+      })
+      .expect(200);
+    const after = (await api(app, sana).get(`/inquiries/${id}`)).body.items as { id: string; description: string; parentId: string | null }[];
+    const by = (n: string) => after.find((i) => i.description === n)!;
+    expect(after.map((i) => i.description)).toEqual(["Bottling line", "Filler", "Capper", "Labeller", "Glue unit"]);
+    expect(by("Capper").parentId).toBeNull();
+    expect(by("Capper").id).toBe(saved[2]!.id);
+    expect(by("Glue unit").parentId).toBe(by("Labeller").id);
+  });
+
   it("keeps each factory's own lines, models and parts, and says which items an offer covers", async () => {
     const [boiler, line] = await items();
     const x = {

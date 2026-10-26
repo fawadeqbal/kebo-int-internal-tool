@@ -51,8 +51,8 @@ export interface DealFormItem {
   quantity: string;
   unit: string;
   targetPrice: string;
-  /** A part of another (saved) item: that item's id. Parts are numbered under it ("2.1"). */
-  parentId: string | null;
+  /** A part of another item: that row's key. Parts come right after their item and are numbered under it ("2.1"). */
+  parentKey: string | null;
   /** A factory has priced it: changing or removing it asks why. */
   priced: boolean;
 }
@@ -74,7 +74,13 @@ export interface DealFormValues {
 
 export interface FactoryQuoteLineView {
   id: string;
+  /** "1", "2", "2.1" within the offer (the factory's own breakdown). */
+  no: string;
+  /** A part of this line of the same offer. */
+  parentId: string | null;
   requestedItemId: string | null;
+  /** The customer's item it answers, by number. */
+  answersNo: string | null;
   description: string;
   model: string | null;
   quantity: string;
@@ -103,6 +109,10 @@ export interface FactoryQuoteView {
   notes: string | null;
   fxRate: number | null;
   lines: FactoryQuoteLineView[];
+  /** What the whole offer costs us in the selling currency (null when a rate is missing). */
+  totalCost: string | null;
+  /** Which of the customer's items it answers. */
+  coverage: Coverage;
 }
 
 export interface SourcingOption extends FactoryQuoteLineView {
@@ -126,7 +136,6 @@ export interface SourcingView {
     model: string | null;
     quantity: string;
     unit: string;
-    preferredLineId: string | null;
     cheapestLineId: string | null;
     options: SourcingOption[];
   }[];
@@ -163,6 +172,31 @@ export interface Costing {
   profit: string;
 }
 
+export type OptionStatus = "open" | "accepted" | "not_chosen";
+
+/** Which of the customer's items (by number) an offer or option covers. */
+export interface Coverage {
+  covered: string[];
+  missing: string[];
+}
+
+/** One option of a revision: one factory's offer (or the customer's items priced by hand). */
+export interface OptionView {
+  id: string;
+  letter: string;
+  status: OptionStatus;
+  /** Internal: whose offer it is (people who see costs). */
+  factory: { id: string; name: string } | null;
+  factoryQuoteId: string | null;
+  leadTime: string | null;
+  subtotal: string;
+  discount: string;
+  total: string;
+  coverage: Coverage;
+  lines: QuoteLineView[];
+  costing: Costing | null;
+}
+
 export interface RevisionView {
   id: string;
   number: number;
@@ -182,8 +216,7 @@ export interface RevisionView {
   sentOn: string | null;
   answeredOn: string | null;
   createdAt: string;
-  lines: QuoteLineView[];
-  costing: Costing | null;
+  options: OptionView[];
   canAnswer: boolean;
   editable: boolean;
 }
@@ -196,33 +229,61 @@ export interface QuotationView {
   whyNotStart: string | null;
 }
 
-/** GET …/quotation/draft: the starting values of the next revision (the API's revision input). */
+/** One option as the editor sends it: our price per line (factory line, or customer item without factory prices), charges, discount, lead time. */
+export interface OptionValues {
+  factoryQuoteId: string | null;
+  leadTime: string | null;
+  discount: number;
+  prices: { lineId: string; unitPrice: number }[];
+  charges: { type: "service" | "charge"; description: string; quantity: number; unit: string; unitPrice: number; unitCost: number | null }[];
+}
+
+/** GET …/quotation/draft and GET /revisions/:id/values: the editor's values (the API's revision input). */
 export interface RevisionDraft {
   number: number;
-  /** The deal's item numbers ("2", "2.1") by item id, to label each line (screen only, not sent). */
-  itemNumbers?: Record<string, string>;
   currency: string;
   incoterm: Incoterm;
   incotermPlace: string | null;
   depositPercent: number;
   balanceTerms: BalanceTerms;
-  leadTime: string | null;
   validUntil: string;
-  discount: number;
   terms: string | null;
   notes: string | null;
-  lines: {
-    requestedItemId: string | null;
-    type: LineType;
-    description: string;
-    model: string | null;
-    quantity: number;
-    unit: string;
-    unitPrice: number;
-    unitCost: number | null;
-    factoryQuoteLineId: string | null;
-    fxRate: number | null;
+  options: OptionValues[];
+}
+
+/** A line of a factory offer as the quotation editor shows it (locked; costs in the quotation currency). */
+export interface OfferLine {
+  id: string;
+  no: string;
+  parentId: string | null;
+  requestedItemId: string | null;
+  answersNo: string | null;
+  description: string;
+  model: string | null;
+  quantity: string;
+  unit: string;
+  unitCost: string | null;
+}
+
+/** GET …/quotation/offers?currency=: what a revision can offer. */
+export interface QuoteOffers {
+  currency: string;
+  defaultMargin: number;
+  offers: {
+    factoryQuoteId: string;
+    factory: { id: string; name: string };
+    currency: string;
+    receivedOn: string;
+    validUntil: string | null;
+    leadTime: string | null;
+    coverage: Coverage;
+    missingRate: boolean;
+    totalCost: string | null;
+    lines: OfferLine[];
   }[];
+  /** The customer's items, for an option priced by hand. */
+  items: { id: string; no: string; parentId: string | null; description: string; model: string | null; quantity: string; unit: string }[];
 }
 
 /* ---------------------------------------------------------------- reports */
