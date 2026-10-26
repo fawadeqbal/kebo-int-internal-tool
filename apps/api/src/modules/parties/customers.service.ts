@@ -132,7 +132,6 @@ export class CustomersService {
       country: input.country,
       address: input.address,
       taxNo: input.taxNo,
-      taxTreatment: input.taxTreatment,
       defaultCurrency: input.defaultCurrency,
       notes: input.notes,
     };
@@ -178,7 +177,7 @@ export class CustomersService {
         entityType: "customer",
         entityId: id,
         summary: `Edited customer ${updated.name}`,
-        oldValues: { type: existing.type, name: existing.name, country: existing.country, address: existing.address, taxNo: existing.taxNo, taxTreatment: existing.taxTreatment, defaultCurrency: existing.defaultCurrency, notes: existing.notes },
+        oldValues: { type: existing.type, name: existing.name, country: existing.country, address: existing.address, taxNo: existing.taxNo, defaultCurrency: existing.defaultCurrency, notes: existing.notes },
         newValues: this.fields(input),
       });
       return updated;

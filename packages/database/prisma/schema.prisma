@@ -68,11 +68,6 @@ enum CustomerType {
   individual
 }
 
-enum TaxTreatment {
-  export_zero_rated
-  domestic_vat
-}
-
 enum RevisionStatus {
   draft
   sent
@@ -272,11 +267,10 @@ model Customer {
   id              String       @id @default(uuid()) @db.Uuid
   type            CustomerType @default(company)
   name            String       @db.VarChar(200)
-  /// ISO 3166-1 alpha-2 (e.g. NG, AE). Drives tax treatment and destination.
+  /// ISO 3166-1 alpha-2 (e.g. NG, AE): where the goods go.
   country         String       @db.Char(2)
   address         String?
   taxNo           String?      @map("tax_no") @db.VarChar(60)
-  taxTreatment    TaxTreatment @default(export_zero_rated) @map("tax_treatment")
   defaultCurrency String       @default("USD") @map("default_currency") @db.Char(3)
   notes           String?
   createdById     String?      @map("created_by") @db.Uuid
@@ -319,22 +313,20 @@ model Contact {
 }
 
 model Factory {
-  id               String    @id @default(uuid()) @db.Uuid
-  name             String    @db.VarChar(200)
-  contactPerson    String?   @map("contact_person") @db.VarChar(120)
-  phone            String?   @db.VarChar(40)
-  wechat           String?   @db.VarChar(80)
-  email            String?   @db.VarChar(254)
-  address          String?
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String    @db.VarChar(200)
+  contactPerson String?   @map("contact_person") @db.VarChar(120)
+  phone         String?   @db.VarChar(40)
+  wechat        String?   @db.VarChar(80)
+  email         String?   @db.VarChar(254)
+  address       String?
   /// Their usual VAT on prices (13% goods, 6% services).
-  defaultVatRate   Decimal   @default(13) @map("default_vat_rate") @db.Decimal(5, 2)
-  pricesIncludeVat Boolean   @default(true) @map("prices_include_vat")
-  bankDetails      String?   @map("bank_details")
-  notes            String?
-  createdById      String?   @map("created_by") @db.Uuid
-  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  bankDetails   String?   @map("bank_details")
+  notes         String?
+  createdById   String?   @map("created_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   quotes FactoryQuote[]
 
@@ -487,7 +479,11 @@ model FactoryQuote {
   receivedOn       DateTime  @map("received_on") @db.Date
   validUntil       DateTime? @map("valid_until") @db.Date
   currency         String    @default("CNY") @db.Char(3)
+  /// Prices from Chinese factories include their VAT (older records may not).
   pricesIncludeVat Boolean   @default(true) @map("prices_include_vat")
+  /// The factory's VAT % in these prices, and the export VAT rebate % we get back on them.
+  vatRate          Decimal   @default(13) @map("vat_rate") @db.Decimal(5, 2)
+  rebateRate       Decimal   @default(0) @map("rebate_rate") @db.Decimal(5, 2)
   /// EXW, FOB Qingdao, delivered to port…
   priceBasis       String?   @map("price_basis") @db.VarChar(60)
   leadTime         String?   @map("lead_time") @db.VarChar(120)
@@ -518,9 +514,6 @@ model FactoryQuoteLine {
   quantity        Decimal        @db.Decimal(12, 2)
   unit            String         @default("pcs") @db.VarChar(20)
   unitPrice       Decimal        @map("unit_price") @db.Decimal(14, 2)
-  vatRate         Decimal        @default(13) @map("vat_rate") @db.Decimal(5, 2)
-  /// Export VAT rebate % for this product's HS code (0 = not claimed).
-  rebateRate      Decimal        @default(0) @map("rebate_rate") @db.Decimal(5, 2)
   sortOrder       Int            @default(0) @map("sort_order")
 
   preferredBy RequestedItem[] @relation("PreferredLine")

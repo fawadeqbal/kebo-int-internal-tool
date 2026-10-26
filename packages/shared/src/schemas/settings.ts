@@ -30,8 +30,6 @@ export const salesSettings = z.object({
     .default({ CNY: 7.1 })
     .transform((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.toUpperCase(), v]))),
   defaultMarginPercent: z.coerce.number().min(0).max(95).default(15),
-  vatRate: z.coerce.number().min(0).max(100).default(0),
-  pricesIncludeVat: z.boolean().default(false),
   quotationValidityDays: days(15),
   defaultDepositPercent: z.coerce.number().min(0).max(100).default(30),
   defaultBalanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
