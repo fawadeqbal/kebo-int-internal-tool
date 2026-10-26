@@ -306,7 +306,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     )}
                     {h.note && <p className="text-xs whitespace-pre-line text-text-2">{h.note}</p>}
                     <p className="text-xs text-muted">
-                      {h.by.name} · {dateTime(h.at)}
+                      {h.by?.name ?? "System"} · {dateTime(h.at)}
                     </p>
                   </li>
                 ))}

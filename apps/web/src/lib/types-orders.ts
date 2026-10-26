@@ -64,7 +64,7 @@ export interface OrderView {
   next: OrderNext | null;
   back: { to: OrderStage; label: string } | null;
   needs: OrderNeed | null;
-  history: { id: string; from: OrderStage | null; to: OrderStage; note: string | null; confirmed: boolean; by: Person; at: string }[];
+  history: { id: string; from: OrderStage | null; to: OrderStage; note: string | null; confirmed: boolean; /** Null for moves the system made (e.g. stages set when the order checklist was replaced). */ by: Person | null; at: string }[];
   cancelled: { at: string; reason: string | null } | null;
   documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
 }
