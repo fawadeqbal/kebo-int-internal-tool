@@ -128,7 +128,6 @@ export class NotificationsService implements OnModuleInit {
   }
 
   private async paymentRecorded(e: Extract<DomainEvent, { type: "payment.recorded" }>) {
-    if (e.direction !== "in") return;
     await this.notify(e.notify, { type: "payment.in", title: `${e.refNo}: received ${e.amount}`, link: links.order(e.orderId) }, e.actorId);
     await this.emailAdmins("paymentReceived", `Payment received on ${e.refNo}: ${e.amount}`, { heading: `Payment received: ${e.amount}`, rows: [["Order", e.refNo]], link: links.order(e.orderId), linkLabel: "Open the order" });
   }

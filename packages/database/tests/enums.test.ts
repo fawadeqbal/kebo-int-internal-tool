@@ -6,7 +6,6 @@ import * as db from "../src/generated/prisma/enums";
 describe("enums stay in sync", () => {
   for (const [name, values] of Object.entries(ENUMS)) {
     it(name, () => {
-      if (name === "Team") return; // UI-only grouping, not stored
       const prisma = (db as Record<string, Record<string, string> | undefined>)[name];
       expect(prisma, `Prisma enum ${name} is missing`).toBeDefined();
       expect(Object.values(prisma!).sort()).toEqual([...values].sort());

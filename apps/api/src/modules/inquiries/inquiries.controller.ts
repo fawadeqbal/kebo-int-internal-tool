@@ -71,17 +71,16 @@ export class InquiriesController {
     return { ok: true };
   }
 
-  /** multipart/form-data: file, and optionally milestoneId / factoryQuoteId / paymentId to tie it to a step. */
+  /** multipart/form-data with one `file`. */
   @Post(":id/files")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   upload(
     @CurrentUser() user: SessionUser,
     @Param("id", ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Body(Validate(z.object({ milestoneId: z.uuid().optional(), factoryQuoteId: z.uuid().optional(), paymentId: z.uuid().optional() }))) links: { milestoneId?: string; factoryQuoteId?: string; paymentId?: string },
   ) {
     if (!file) throw new z.ZodError([{ code: "custom", path: ["file"], message: "Choose a file to upload", input: undefined }]);
-    return this.inquiries.upload(user, id, file, links);
+    return this.inquiries.upload(user, id, file);
   }
 }
 

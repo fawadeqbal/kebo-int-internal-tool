@@ -1,4 +1,4 @@
-import { fromMinor, toMinor, type Minor } from "@kebo/money";
+import { toMinor, type Minor } from "@kebo/money";
 import type { ISODate } from "@kebo/utils";
 
 /**
@@ -13,4 +13,3 @@ export const fromDbDateOrNull = (d: Date | null | undefined): ISODate | null => 
 
 /** Decimal columns ↔ integer minor units. */
 export const decimalToMinor = (d: { toString(): string } | null | undefined): Minor => toMinor(d);
-export const minorToDecimal = (m: Minor): string => fromMinor(m);

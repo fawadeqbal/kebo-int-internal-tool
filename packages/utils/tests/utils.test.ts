@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, amountInWords, daysBetween, formatReference, isISODate, maxDate, minDate, parseReference, todayIn, ForbiddenError, DomainError } from "../src";
+import { addDays, amountInWords, daysBetween, formatReference, isISODate, parseReference, todayIn, ForbiddenError, DomainError } from "../src";
 
 describe("dates", () => {
   it("gives today in the business time zone", () => {
@@ -12,12 +12,10 @@ describe("dates", () => {
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(daysBetween("2026-10-01", "2026-10-26")).toBe(25);
   });
-  it("validates and compares dates", () => {
+  it("validates dates", () => {
     expect(isISODate("2026-02-28")).toBe(true);
     expect(isISODate("2026-02-30")).toBe(false);
     expect(isISODate("26-10-2026")).toBe(false);
-    expect(minDate(null, "2026-05-01", "2026-01-01")).toBe("2026-01-01");
-    expect(maxDate(undefined, "2026-05-01", "2026-01-01")).toBe("2026-05-01");
   });
 });
 

@@ -96,7 +96,7 @@ export class RemindersService {
     const orders = await this.prisma.db.order.findMany({
       // Closed orders too: one closed with money still owed keeps being chased (orderNeeds decides).
       where: { status: { in: ["open", "closed"] }, inquiry: { onHold: false } },
-      include: { payments: { where: { voidedAt: null, direction: "in" } }, inquiry: { select: { id: true, assigneeId: true } }, lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } } },
+      include: { payments: { where: { voidedAt: null } }, inquiry: { select: { id: true, assigneeId: true } }, lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } } },
     });
     // Collected first and sent per person: a few one by one, many as one summary,
     // so a backlog (e.g. right after the import of old orders) does not bury people every morning.

@@ -69,22 +69,16 @@ function same(a: Money, b: Money) {
 }
 
 export const add = (a: Money, b: Money): Money => (same(a, b), { amount: a.amount + b.amount, currency: a.currency });
-export const subtract = (a: Money, b: Money): Money => (same(a, b), { amount: a.amount - b.amount, currency: a.currency });
 export const sum = (items: Money[], currency: string): Money => items.reduce(add, zero(currency));
-export const negate = (a: Money): Money => ({ amount: -a.amount, currency: a.currency });
 export const compare = (a: Money, b: Money): -1 | 0 | 1 => (same(a, b), a.amount < b.amount ? -1 : a.amount > b.amount ? 1 : 0);
-export const isZero = (a: Money) => a.amount === 0;
-export const isPositive = (a: Money) => a.amount > 0;
 export const max = (a: Money, b: Money): Money => (compare(a, b) >= 0 ? a : b);
 export const min = (a: Money, b: Money): Money => (compare(a, b) <= 0 ? a : b);
 
 /** Minor units × a decimal quantity (e.g. 2.5 m), rounded to the nearest minor unit. */
 export const multiplyMinor = (minor: Minor, factor: number | string): Minor => roundHalfAway(minor * Number(factor || 0));
-export const multiply = (a: Money, factor: number | string): Money => ({ amount: multiplyMinor(a.amount, factor), currency: a.currency });
 
 /** `percent`% of an amount (15 → 15%), rounded to the nearest minor unit. */
 export const percentOfMinor = (minor: Minor, percent: number): Minor => roundHalfAway((minor * percent) / 100);
-export const percentOf = (a: Money, percent: number): Money => ({ amount: percentOfMinor(a.amount, percent), currency: a.currency });
 
 /** Rounds .5 away from zero, as accountants expect (−6.25 → −6.3 at one decimal). */
 export function roundHalfAway(n: number): number {
@@ -126,4 +120,3 @@ export function formatMinor(minor: Minor, currency: string, locale = "en-US"): s
   return `${currency} ${amount}`;
 }
 
-export const formatMoney = (m: Money, locale?: string) => formatMinor(m.amount, m.currency, locale);

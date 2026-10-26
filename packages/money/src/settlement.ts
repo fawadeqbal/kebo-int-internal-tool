@@ -1,8 +1,7 @@
 import { percentOfMinor, type Minor } from "./core";
 
 /**
- * Payment terms and what has been paid against them, for both directions: the
- * customer paying Kebo, and Kebo paying a factory. Standard export terms are a
+ * Payment terms and what the customer has paid against them. Standard export terms are a
  * deposit (often 30%) before production and the balance before shipment or
  * against a copy of the bill of lading.
  */

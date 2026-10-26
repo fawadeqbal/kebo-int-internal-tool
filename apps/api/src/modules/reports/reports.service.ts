@@ -79,11 +79,11 @@ export class ReportsService {
     const [quoted, won, paidIn, openOrders] = await Promise.all([
       this.prisma.db.quotationRevision.findMany({ where: { deletedAt: null, status: { in: LIVE_QUOTED }, sentOn: { gte: day(monthStart) } }, select: { total: true, currency: true } }),
       this.prisma.db.order.findMany({ where: { status: { not: "cancelled" }, orderedOn: { gte: day(monthStart) } }, select: { total: true, currency: true } }),
-      this.prisma.db.payment.findMany({ where: { voidedAt: null, direction: "in", paidOn: { gte: day(monthStart) } }, select: { amount: true, bankCharges: true, currency: true } }),
+      this.prisma.db.payment.findMany({ where: { voidedAt: null, paidOn: { gte: day(monthStart) } }, select: { amount: true, bankCharges: true, currency: true } }),
       this.prisma.db.order.findMany({
         // Closed orders too: money still owed on them is still to receive.
         where: { status: { in: ["open", "closed"] } },
-        select: { total: true, currency: true, stage: true, status: true, payments: { where: { voidedAt: null, direction: "in" }, select: { amount: true, bankCharges: true, currency: true } } },
+        select: { total: true, currency: true, stage: true, status: true, payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, currency: true } } },
       }),
     ]);
     const sum = (rows: { total: { toString(): string }; currency: string }[]) => rows.reduce((t, r) => t + toMain(decimalToMinor(r.total), r.currency), 0);

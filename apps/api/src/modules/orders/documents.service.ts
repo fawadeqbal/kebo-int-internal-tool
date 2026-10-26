@@ -47,7 +47,7 @@ export class DocumentsService {
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         revision: { include: { quotation: { select: { refNo: true } } } },
-        payments: { where: { voidedAt: null, direction: "in" }, orderBy: { paidOn: "asc" } },
+        payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
         inquiry: { select: { contactId: true } },
       },
     });

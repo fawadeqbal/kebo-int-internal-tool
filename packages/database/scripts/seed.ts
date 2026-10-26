@@ -246,12 +246,12 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     if (o.order.paid !== "none") {
       await db.payment.create({
-        data: { direction: "in", kind: "deposit", orderId: order.id, customerId: customer.id, amount: fromMinor(deposit - 2500), bankCharges: "25.00", currency: "USD", paidOn: toDbDate(addDays(orderedOn, 4)), reference: "TT-DEMO-1", recordedById: people.manager.id },
+        data: { kind: "deposit", orderId: order.id, customerId: customer.id, amount: fromMinor(deposit - 2500), bankCharges: "25.00", currency: "USD", paidOn: toDbDate(addDays(orderedOn, 4)), reference: "TT-DEMO-1", recordedById: people.manager.id },
       });
     }
     if (o.order.paid === "full") {
       await db.payment.create({
-        data: { direction: "in", kind: "balance", orderId: order.id, customerId: customer.id, amount: fromMinor(balance), currency: "USD", paidOn: toDbDate(addDays(shippedOn ?? orderedOn, 3)), reference: "TT-DEMO-2", recordedById: people.manager.id },
+        data: { kind: "balance", orderId: order.id, customerId: customer.id, amount: fromMinor(balance), currency: "USD", paidOn: toDbDate(addDays(shippedOn ?? orderedOn, 3)), reference: "TT-DEMO-2", recordedById: people.manager.id },
       });
     }
   }

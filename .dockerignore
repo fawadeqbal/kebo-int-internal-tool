@@ -11,9 +11,7 @@
 secrets
 backups
 storage
-legacy
 apps/mobile
-portfolio
 credentials.txt
 *firebase-adminsdk*.json
 kebo-rfq-*.json

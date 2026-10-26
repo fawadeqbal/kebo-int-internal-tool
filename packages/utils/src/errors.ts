@@ -54,4 +54,3 @@ export class GateError extends DomainError {
   }
 }
 
-export const isDomainError = (e: unknown): e is DomainError => e instanceof DomainError;

@@ -35,12 +35,6 @@ export function daysBetween(from: ISODate, to: ISODate): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
-export const minDate = (...dates: (ISODate | null | undefined)[]): ISODate | null =>
-  dates.filter((d): d is ISODate => !!d).sort()[0] ?? null;
-
-export const maxDate = (...dates: (ISODate | null | undefined)[]): ISODate | null =>
-  dates.filter((d): d is ISODate => !!d).sort().at(-1) ?? null;
-
 export function formatDate(value: ISODate | Date | null | undefined, timeZone = "UTC"): string {
   if (!value) return "—";
   const isDay = typeof value === "string" && value.length === 10;

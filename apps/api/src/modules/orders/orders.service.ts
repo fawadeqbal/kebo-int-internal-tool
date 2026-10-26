@@ -36,7 +36,7 @@ export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
 }
 
 const orderInclude = {
-  payments: { where: { voidedAt: null, direction: "in" }, orderBy: { paidOn: "asc" } },
+  payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
   lines: {
     orderBy: { sortOrder: "asc" },
     // The factory each line was quoted from (through the quotation line and the factory's price).

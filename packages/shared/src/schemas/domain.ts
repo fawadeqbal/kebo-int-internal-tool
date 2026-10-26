@@ -166,7 +166,6 @@ export const quoteLineInput = z.object({
   factoryQuoteLineId: optionalId,
   fxRate: optionalRate,
 });
-export type QuoteLineInput = z.infer<typeof quoteLineInput>;
 
 export const revisionInput = z.object({
   currency: currency.default("USD"),

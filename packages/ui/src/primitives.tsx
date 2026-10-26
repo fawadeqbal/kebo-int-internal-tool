@@ -198,21 +198,6 @@ export function PageHeader({
   );
 }
 
-export function Section({ title, description, actions, children, className }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section className={cn("space-y-3", className)}>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-text">{title}</h2>
-          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-        </div>
-        {actions}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 export function EmptyState({
   icon: Icon = Inbox,
   title,
@@ -415,26 +400,3 @@ export function SearchField({ defaultValue, placeholder, clearHref, label = "Sea
   );
 }
 
-/**
- * The filters in use, as removable chips ("Category: Beverage ✕ · Clear all").
- * Shown under the toolbar on phones, where the chips themselves are folded away.
- */
-export function ActiveFilters({ items, clearHref, className }: { items: { label: string; value: string; removeHref: string }[]; clearHref: string; className?: string }) {
-  if (items.length === 0) return null;
-  return (
-    <div className={cn("flex flex-wrap items-center gap-1.5 border-b border-line px-3 py-2 md:hidden", className)}>
-      {items.map((i) => (
-        <Link key={i.label} href={i.removeHref} className="inline-flex h-7 items-center gap-1 rounded-md bg-primary-soft px-2 text-xs text-primary" aria-label={`Remove filter ${i.label}: ${i.value}`}>
-          <span className="text-primary/70">{i.label}:</span>
-          <span className="max-w-40 truncate font-medium">{i.value}</span>
-          <svg aria-hidden viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </Link>
-      ))}
-      <Link href={clearHref} className="ml-1 text-xs font-medium text-muted hover:text-text">
-        Clear all
-      </Link>
-    </div>
-  );
-}

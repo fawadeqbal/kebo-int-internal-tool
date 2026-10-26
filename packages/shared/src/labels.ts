@@ -27,14 +27,6 @@ export const INQUIRY_STAGE_LABEL: Record<InquiryStage, string> = {
 };
 
 /** One line under each stage: whose turn it is. */
-export const INQUIRY_STAGE_HINT: Record<InquiryStage, string> = {
-  new: "Nobody has started yet",
-  sourcing: "We are getting factory prices",
-  quoted: "Waiting for the customer",
-  won: "Order confirmed",
-  lost: "Closed without an order",
-};
-
 export const CHANNEL_LABEL: Record<InquiryChannel, string> = {
   website: "Website form",
   whatsapp: "WhatsApp",

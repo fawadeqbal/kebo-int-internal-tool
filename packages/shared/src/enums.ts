@@ -70,9 +70,6 @@ export type OrderStage = (typeof ORDER_STAGES)[number];
 
 /* ---------------------------------------------------------------- money */
 
-export const PAYMENT_DIRECTIONS = values("in", "out");
-export type PaymentDirection = (typeof PAYMENT_DIRECTIONS)[number];
-
 export const PAYMENT_KINDS = values("deposit", "balance", "other");
 export type PaymentKind = (typeof PAYMENT_KINDS)[number];
 
@@ -93,7 +90,6 @@ export const ENUMS = {
   BalanceTerms: BALANCE_TERMS,
   OrderStatus: ORDER_STATUSES,
   OrderStage: ORDER_STAGES,
-  PaymentDirection: PAYMENT_DIRECTIONS,
   PaymentKind: PAYMENT_KINDS,
   PaymentMethod: PAYMENT_METHODS,
 } as const;
