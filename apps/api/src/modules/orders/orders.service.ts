@@ -229,57 +229,74 @@ export class OrdersService {
    */
   async applyStep(user: SessionUser, id: string, input: StepActionInput) {
     if (!can(user.role, "milestones.update")) throw new ForbiddenError("You cannot change order steps.");
+    const event = await this.prisma.tx((tx) => this.stepInTx(tx, user, id, input));
+    if (event) await this.events.publish(event);
+    return this.get(user, id);
+  }
+
+  /**
+   * The same, inside a caller's transaction: payments, factory orders,
+   * invoices and shipments tick their step when the real thing is recorded.
+   * `ifTodo` makes it a no-op when the step is already settled.
+   */
+  async stepInTx(tx: Tx, user: SessionUser, id: string, input: StepActionInput, opts: { ifTodo?: boolean } = {}): Promise<DomainEvent | null> {
     const today = this.clock.today();
     const on: ISODate = input.on ?? today;
     if (input.action === "done" && on > today) throw new GateError("A step cannot be marked done on a future date.", "future_date");
-
-    await this.prisma.tx(async (tx) => {
-      // Lock the order row first, then read its steps: two people ticking steps at
-      // once are served one after the other, each seeing the other's change.
-      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
-      const o = await this.load(user, id, tx);
-      const states = this.states(o);
-      const reopening = input.action === "undo" && o.status === "closed";
-      const check = checkStepAction(input.key, input.action, {
-        terms: o.balanceTerms,
-        states,
-        orderStatus: reopening ? "open" : o.status,
-        canOverride: can(user.role, "milestones.override"),
-        note: input.note,
-      });
-      if (!check.ok) throw new GateError(check.message, check.code);
-
-      const m = o.milestones.find((x) => x.key === input.key)!;
-      const to = input.action === "done" ? "done" : input.action === "skip" ? "skipped" : "todo";
-      await tx.milestone.update({
-        where: { id: m.id },
-        data: {
-          status: to,
-          doneOn: to === "done" ? toDbDate(on) : null,
-          doneById: to === "todo" ? null : user.id,
-          note: input.note ?? (to === "todo" ? null : m.note),
-          overridden: check.overridden,
-        },
-      });
-      await tx.milestoneEvent.create({
-        data: { milestoneId: m.id, action: input.action, fromStatus: m.status, toStatus: to, on: to === "done" ? toDbDate(on) : null, note: input.note, overridden: check.overridden, byId: user.id },
-      });
-
-      const after = states.map((s) => (s.key === input.key ? { ...s, status: to, doneOn: to === "done" ? on : null } : s));
-      const complete = after.every((s) => s.status !== "todo");
-      if (complete && o.status === "open") await tx.order.update({ where: { id: o.id }, data: { status: "closed", closedAt: new Date() } });
-      if (reopening) await tx.order.update({ where: { id: o.id }, data: { status: "open", closedAt: null } });
-
-      const title = STEPS[input.key as MilestoneKey];
-      await this.audit.record(tx, {
-        userId: user.id,
-        action: `step_${input.action}`,
-        entityType: "order",
-        entityId: o.id,
-        summary: `${o.refNo}: ${input.action === "undo" ? `undid "${title.doneTitle}"` : input.action === "skip" ? `skipped "${title.title}"` : title.doneTitle}${check.overridden ? " (manager override)" : ""}${input.note ? ` — ${input.note}` : ""}`,
-      });
+    // Lock the order row first, then read its steps: two people ticking steps at
+    // once are served one after the other, each seeing the other's change.
+    await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+    const o = await this.load(user, id, tx);
+    const m = o.milestones.find((x) => x.key === input.key);
+    if (opts.ifTodo && m && m.status !== "todo") return null;
+    const states = this.states(o);
+    const reopening = input.action === "undo" && o.status === "closed";
+    const check = checkStepAction(input.key, input.action, {
+      terms: o.balanceTerms,
+      states,
+      orderStatus: reopening ? "open" : o.status,
+      canOverride: can(user.role, "milestones.override"),
+      note: input.note,
     });
-    return this.get(user, id);
+    if (!check.ok) throw new GateError(check.message, check.code);
+
+    const to = input.action === "done" ? "done" : input.action === "skip" ? "skipped" : "todo";
+    await tx.milestone.update({
+      where: { id: m!.id },
+      data: {
+        status: to,
+        doneOn: to === "done" ? toDbDate(on) : null,
+        doneById: to === "todo" ? null : user.id,
+        note: input.note ?? (to === "todo" ? null : m!.note),
+        overridden: check.overridden,
+      },
+    });
+    await tx.milestoneEvent.create({
+      data: { milestoneId: m!.id, action: input.action, fromStatus: m!.status, toStatus: to, on: to === "done" ? toDbDate(on) : null, note: input.note, overridden: check.overridden, byId: user.id },
+    });
+
+    const after = states.map((s) => (s.key === input.key ? { ...s, status: to, doneOn: to === "done" ? on : null } : s));
+    const complete = after.every((s) => s.status !== "todo");
+    if (complete && o.status === "open") await tx.order.update({ where: { id: o.id }, data: { status: "closed", closedAt: new Date() } });
+    if (reopening) await tx.order.update({ where: { id: o.id }, data: { status: "open", closedAt: null } });
+
+    const step = STEPS[input.key as MilestoneKey];
+    await this.audit.record(tx, {
+      userId: user.id,
+      action: `step_${input.action}`,
+      entityType: "order",
+      entityId: o.id,
+      summary: `${o.refNo}: ${input.action === "undo" ? `undid "${step.doneTitle}"` : input.action === "skip" ? `skipped "${step.title}"` : step.doneTitle}${check.overridden ? " (manager override)" : ""}${input.note ? ` — ${input.note}` : ""}`,
+    });
+    return {
+      type: "order.stepChanged",
+      orderId: o.id,
+      refNo: o.refNo,
+      key: input.key,
+      action: input.action,
+      actorId: user.id,
+      notify: [o.inquiry.assigneeId].filter((v): v is string => !!v && v !== user.id),
+    };
   }
 
   /** The promised ship date and the factory's ready date drive the later due dates. */
