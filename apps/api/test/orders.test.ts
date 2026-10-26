@@ -1,7 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
-import { paymentTermsOf } from "../src/modules/orders/documents.service";
+import { paymentSentenceOf, paymentTermsOf } from "../src/modules/orders/documents.service";
 
 /**
  * An order from acceptance to Done: Confirmed → In production → Shipped → Done,
@@ -190,6 +190,15 @@ describe("orders: four stages", () => {
     expect(pi.paymentTerms).toBe("30% deposit, balance before shipment");
     expect(paymentTermsOf(30, "against_bl_copy")).toBe("30% deposit, balance against B/L copy"); // "B/L" is not lowered
     expect(paymentTermsOf(0, "letter_of_credit")).toBe("Letter of credit");
+    // As Kebo writes it on its proforma invoices.
+    expect(pi.paymentSentence).toBe("Our usual payment is made by 30% Advance deposit and 70% before shipment.");
+    expect(paymentSentenceOf(30, "against_bl_copy")).toBe("Our usual payment is made by 30% Advance deposit and 70% against B/L copy.");
+    expect(paymentSentenceOf(0, "letter_of_credit")).toBe("Payment: Letter of credit.");
+    expect(pi.company).toMatchObject({ nameLocal: "山东科波国际贸易有限公司", taxNo: "91370811MAK4PH5B1N" }); // Kebo's details until changed in Settings
+    // The heading over the lines and the port of discharge, set on the order.
+    await api(app, sana).patch(`/orders/${orderId}/details`, { documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria" }).expect(200);
+    const pi2 = (await api(app, sana).get(`/orders/${orderId}/documents/proforma`).expect(200)).body;
+    expect(pi2.order).toMatchObject({ documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria", incoterm: expect.any(String) });
     const inv = (await api(app, sana).get(`/orders/${orderId}/documents/invoice`).expect(200)).body;
     expect(inv).toMatchObject({ title: "Commercial invoice", number: o.refNo.replace("SO-", "INV-"), date: "2026-10-24", totals: { received: o.total, due: "0.00" } });
     expect(inv.order.blNo).toBe("QDLOS-77");

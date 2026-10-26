@@ -45,6 +45,7 @@ export async function customerSnapshot(tx: Tx, customerId: string, contactId: st
     country: c.country,
     address: c.address,
     taxNo: c.taxNo,
+    regNo: c.regNo,
     contact: contact && { name: contact.name, email: contact.email, phone: contact.phone ?? contact.whatsapp },
   };
 }

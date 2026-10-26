@@ -41,6 +41,7 @@ export const customerInput = z.object({
     .regex(/^[A-Z]{2}$/, "Choose a country"),
   address: optionalText(500),
   taxNo: optionalText(60),
+  regNo: optionalText(60),
   defaultCurrency: currency.default("USD"),
   notes: optionalText(5000),
   contacts: z.array(contactInput).min(1, "Add at least one contact").max(20),
@@ -206,7 +207,15 @@ export const moveStageInput = z.object({
 export type MoveStageInput = z.infer<typeof moveStageInput>;
 
 /** The order's dates and B/L, editable at any time. Only the fields sent change (empty clears one). */
-export const orderDetailsInput = z.object({ shipBy: optionalDate.optional(), readyOn: optionalDate.optional(), shippedOn: optionalDate.optional(), blNo: optionalText(60).optional() });
+export const orderDetailsInput = z.object({
+  shipBy: optionalDate.optional(),
+  readyOn: optionalDate.optional(),
+  shippedOn: optionalDate.optional(),
+  blNo: optionalText(60).optional(),
+  /** Heading over the lines on the proforma / invoice / packing list. */
+  documentTitle: optionalText(200).optional(),
+  portOfDischarge: optionalText(120).optional(),
+});
 export type OrderDetailsInput = z.infer<typeof orderDetailsInput>;
 
 /** How many of each goods line came in from the factory (the total so far, not an addition). */

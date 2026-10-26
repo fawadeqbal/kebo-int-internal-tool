@@ -9,17 +9,32 @@ import { DEFAULT_ORDER_REMINDER_DAYS } from "../workflows/order";
  */
 const days = (fallback: number, max = 365) => z.coerce.number().int().min(0).max(max).default(fallback);
 
+/** Kebo's details as on its proforma invoices (used until changed in Settings). */
 export const companySettings = z.object({
   name: z.string().trim().min(1).max(200).default("Shandong Kebo International Trade Co., Ltd."),
-  nameLocal: z.string().trim().max(120).default(""),
-  address: z.string().trim().max(500).default(""),
-  phone: z.string().trim().max(60).default(""),
-  email: z.string().trim().max(254).default(""),
+  nameLocal: z.string().trim().max(120).default("山东科波国际贸易有限公司"),
+  address: z.string().trim().max(500).default("No.5, Jielu Road, High-Tech Zone, City Jining, Shandong, China"),
+  phone: z.string().trim().max(60).default("+86-151-54754812  +86-178-53758700"),
+  email: z.string().trim().max(254).default("shandongkeboint@gmail.com"),
   email2: z.string().trim().max(254).default(""),
-  website: z.string().trim().max(120).default("keboint.com"),
-  taxNo: z.string().trim().max(60).default(""),
-  bankDetails: z.string().trim().max(1000).default(""),
+  website: z.string().trim().max(120).default("www.keboint.com"),
+  /** Business license number (unified social credit code). */
+  taxNo: z.string().trim().max(60).default("91370811MAK4PH5B1N"),
+  bankDetails: z
+    .string()
+    .trim()
+    .max(1000)
+    .default(
+      "ACCOUNT NAME: SHANDONG KEBO INTERNATIONAL TRADE CO., LTD.\nBANK NAME: BANK OF CHINA RENCHENG SUB BRANCH\nBANK ADDRESS: B.O.C TOWER,1 TAIBAI ROAD JINING, SHANDONG, P, R. CHINA,\nPOST CODE: 272000\nSWIFT CODE: BKCHCNBJ500\nACCOUNT NO: 242895006310",
+    ),
   invoiceFooter: z.string().trim().max(1000).default(""),
+  /** The company stamp (seal) printed on proforma invoices: a PNG/JPEG image as a data URL, or empty. */
+  stamp: z
+    .string()
+    .trim()
+    .max(400_000, "The stamp image is too large (keep it under 300 KB)")
+    .refine((v) => v === "" || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v), "Upload the stamp as a PNG or JPEG image")
+    .default(""),
 });
 
 export const salesSettings = z.object({

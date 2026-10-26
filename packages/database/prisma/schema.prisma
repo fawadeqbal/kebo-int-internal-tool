@@ -281,7 +281,10 @@ model Customer {
   /// ISO 3166-1 alpha-2 (e.g. NG, AE): where the goods go. China (CN) means a domestic sale with VAT.
   country         String       @db.Char(2)
   address         String?
+  /// Business license / tax number (shown on documents as "Business License Number").
   taxNo           String?      @map("tax_no") @db.VarChar(60)
+  /// Registration number (shown on documents as "Reg. Number").
+  regNo           String?      @map("reg_no") @db.VarChar(60)
   defaultCurrency String       @default("USD") @map("default_currency") @db.Char(3)
   notes           String?
   createdById     String?      @map("created_by") @db.Uuid
@@ -643,6 +646,10 @@ model Order {
   readyOn              DateTime?         @map("ready_on") @db.Date
   shippedOn            DateTime?         @map("shipped_on") @db.Date
   blNo                 String?           @map("bl_no") @db.VarChar(60)
+  /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
+  documentTitle        String?           @map("document_title") @db.VarChar(200)
+  /// Where the goods are unloaded, e.g. "Hairatan, Afghanistan" (the port of loading is the Incoterm place).
+  portOfDischarge      String?           @map("port_of_discharge") @db.VarChar(120)
   /// Export rebate paperwork: the factory's special VAT invoice arrived, and the rebate was filed (within 90 days of export).
   vatInvoiceReceivedOn DateTime?         @map("vat_invoice_received_on") @db.Date
   rebateFiledOn        DateTime?         @map("rebate_filed_on") @db.Date

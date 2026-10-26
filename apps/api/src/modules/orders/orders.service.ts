@@ -251,6 +251,8 @@ export class OrdersService {
       readyOn: fromDbDateOrNull(o.readyOn),
       shippedOn: fromDbDateOrNull(o.shippedOn),
       blNo: o.blNo,
+      documentTitle: o.documentTitle,
+      portOfDischarge: o.portOfDischarge,
       currency: o.currency,
       total: o.total.toFixed(2),
       depositPercent: m.depositPercent,
@@ -509,7 +511,9 @@ export class OrdersService {
       if (input.readyOn !== undefined) data.readyOn = toDbDateOrNull(input.readyOn);
       if (input.shippedOn !== undefined) data.shippedOn = toDbDateOrNull(input.shippedOn);
       if (input.blNo !== undefined) data.blNo = input.blNo;
-      const before = { shipBy: fromDbDateOrNull(o.shipBy), readyOn: fromDbDateOrNull(o.readyOn), shippedOn: fromDbDateOrNull(o.shippedOn), blNo: o.blNo };
+      if (input.documentTitle !== undefined) data.documentTitle = input.documentTitle;
+      if (input.portOfDischarge !== undefined) data.portOfDischarge = input.portOfDischarge;
+      const before = { shipBy: fromDbDateOrNull(o.shipBy), readyOn: fromDbDateOrNull(o.readyOn), shippedOn: fromDbDateOrNull(o.shippedOn), blNo: o.blNo, documentTitle: o.documentTitle, portOfDischarge: o.portOfDischarge };
       await tx.order.update({ where: { id: o.id }, data });
       await this.audit.record(tx, { userId: user.id, action: "update", entityType: "order", entityId: o.id, summary: `${o.refNo}: dates and B/L changed`, oldValues: before, newValues: input });
     });
