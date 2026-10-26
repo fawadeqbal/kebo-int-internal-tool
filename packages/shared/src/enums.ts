@@ -76,6 +76,10 @@ export type PaymentKind = (typeof PAYMENT_KINDS)[number];
 export const PAYMENT_METHODS = values("bank_transfer", "letter_of_credit", "cash", "cheque", "online", "other");
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+/** What a cost was for. Order expenses belong to one order; general ones to the company (rent, salaries…). */
+export const EXPENSE_CATEGORIES = values("freight", "inland_transport", "inspection", "customs", "bank_charges", "commission", "samples", "travel", "office", "salaries", "rent", "other");
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
 export const ENUMS = {
   Role: ROLES,
   InquiryStage: INQUIRY_STAGES,

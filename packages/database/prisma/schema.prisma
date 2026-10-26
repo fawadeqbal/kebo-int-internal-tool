@@ -169,6 +169,8 @@ model User {
   createdDeals  Inquiry[]          @relation("InquiryCreator")
   orderMoves    OrderStageChange[]
   factories     Factory[]          @relation("FactoryOwner")
+  factoryPaid   FactoryPayment[]   @relation("FactoryPaymentPaidBy")
+  expensesPaid  Expense[]          @relation("ExpensePaidBy")
 
   @@map("users")
 }
@@ -336,7 +338,8 @@ model Factory {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  quotes FactoryQuote[]
+  quotes   FactoryQuote[]
+  payments FactoryPayment[]
 
   @@index([name])
   @@index([ownerId])
@@ -667,6 +670,9 @@ model Order {
   lines        OrderLine[]
   stageChanges OrderStageChange[]
   payments     Payment[]
+  planItems    PaymentPlanItem[]
+  factoryPaid  FactoryPayment[]
+  expenses     Expense[]
 
   @@index([inquiryId])
   @@index([status])
@@ -728,6 +734,85 @@ model OrderStageChange {
 // ============================================================================
 // Money: payments in (customer) and out (factory), invoices
 // ============================================================================
+
+/// The customer's instalments for an order (deposit, balance, or more). They add
+/// up to the order total; money received pays the earliest first.
+model PaymentPlanItem {
+  id         String    @id @default(uuid()) @db.Uuid
+  orderId    String    @map("order_id") @db.Uuid
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  label      String    @db.VarChar(80)
+  amount     Decimal   @db.Decimal(14, 2)
+  /// Null until known (a balance before shipment is dated when the ship date is).
+  dueOn      DateTime? @map("due_on") @db.Date
+  sortOrder  Int       @default(0) @map("sort_order")
+  /// The day the last reminder went out, so it is not sent twice a day.
+  remindedOn DateTime? @map("reminded_on") @db.Date
+
+  @@index([orderId])
+  @@index([dueOn])
+  @@map("payment_plan_items")
+}
+
+/// Money we sent a factory for an order, in the currency we paid in.
+model FactoryPayment {
+  id           String        @id @default(uuid()) @db.Uuid
+  orderId      String        @map("order_id") @db.Uuid
+  order        Order         @relation(fields: [orderId], references: [id])
+  factoryId    String        @map("factory_id") @db.Uuid
+  factory      Factory       @relation(fields: [factoryId], references: [id])
+  kind         PaymentKind   @default(deposit)
+  amount       Decimal       @db.Decimal(14, 2)
+  currency     String        @db.Char(3)
+  /// Units of `currency` per one unit of the order's currency when it was paid (CNY 7.10 per USD).
+  rate         Decimal       @db.Decimal(14, 6)
+  paidOn       DateTime      @map("paid_on") @db.Date
+  method       PaymentMethod @default(bank_transfer)
+  /// Who in our team paid it.
+  paidById     String?       @map("paid_by") @db.Uuid
+  paidBy       User?         @relation("FactoryPaymentPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  reference    String?       @db.VarChar(120)
+  note         String?
+  recordedById String        @map("recorded_by") @db.Uuid
+  voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
+  voidReason   String?       @map("void_reason")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([orderId])
+  @@index([factoryId])
+  @@index([paidOn])
+  @@map("factory_payments")
+}
+
+/// A cost: for one order (freight, inspection…) or for the company when orderId
+/// is empty (rent, salaries…). Only managers and the super admin see these.
+model Expense {
+  id           String    @id @default(uuid()) @db.Uuid
+  orderId      String?   @map("order_id") @db.Uuid
+  order        Order?    @relation(fields: [orderId], references: [id])
+  /// See EXPENSE_CATEGORIES in @kebo/shared.
+  category     String    @db.VarChar(30)
+  description  String    @db.VarChar(200)
+  amount       Decimal   @db.Decimal(14, 2)
+  currency     String    @db.Char(3)
+  /// Units of `currency` per one unit of the main currency when it was spent.
+  rate         Decimal   @db.Decimal(14, 6)
+  spentOn      DateTime  @map("spent_on") @db.Date
+  paidById     String?   @map("paid_by") @db.Uuid
+  paidBy       User?     @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  reference    String?   @db.VarChar(120)
+  note         String?
+  recordedById String    @map("recorded_by") @db.Uuid
+  voidedAt     DateTime? @map("voided_at") @db.Timestamptz
+  voidReason   String?   @map("void_reason")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([orderId])
+  @@index([spentOn])
+  @@map("expenses")
+}
 
 model Payment {
   id           String        @id @default(uuid()) @db.Uuid

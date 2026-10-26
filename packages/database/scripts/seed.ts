@@ -8,7 +8,7 @@
 import "./env";
 import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, splitDeposit, withTaxMinor, priceForMargin, toMinor } from "@kebo/money";
-import { readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
+import { defaultPlan, readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
 import { addDays, todayIn } from "@kebo/utils";
 import { createPrismaClient, nextReference, toDbDate, type PrismaClient } from "../src";
 
@@ -126,7 +126,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     if (o.stage === "new") return;
 
     // Factory prices (CNY, without tax; each item's 13% tax is added on top) for each goods line.
-    const costByLine = new Map<number, { lineId: string; costMinor: number }>();
+    const costByLine = new Map<number, { lineId: string; costMinor: number; costCny: number; factory: number }>();
     for (const [i, l] of o.lines.entries()) {
       if (l.type === "charge") continue;
       const fq = await db.factoryQuote.create({
@@ -141,7 +141,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
         include: { lines: true },
       });
       const costCny = withTaxMinor(toMinor(l.factoryPrice), Number(fq.lines[0].taxRate));
-      costByLine.set(i, { lineId: fq.lines[0].id, costMinor: Math.round(costCny / rate) });
+      costByLine.set(i, { lineId: fq.lines[0].id, costMinor: Math.round(costCny / rate), costCny, factory: l.factory });
     }
     if (!o.revisions?.length) return;
 
@@ -243,6 +243,26 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
       const at = st === "confirmed" ? orderedOn : st === "in_production" ? addDays(orderedOn, 5) : st === "shipped" ? shippedOn! : stageSince;
       await db.orderStageChange.create({ data: { orderId: order.id, fromStage: i === 0 ? null : flow[i - 1], toStage: st, byId: i === 0 ? people.manager.id : o.assignee ?? people.manager.id, at: new Date(`${at}T09:00:00Z`) } });
     }
+    // The customer's plan from the terms; the balance is dated once shipped.
+    for (const [k, p] of defaultPlan(accepted.total, 30, orderedOn, 7).entries()) {
+      await db.paymentPlanItem.create({ data: { orderId: order.id, label: p.label, amount: fromMinor(p.amountMinor), dueOn: p.dueOn ? toDbDate(p.dueOn) : shippedOn ? toDbDate(addDays(shippedOn, 14)) : null, sortOrder: k } });
+    }
+    // What we paid the factories: 30% once production started, the rest before shipping (CNY, with tax).
+    const owed = new Map<number, number>();
+    for (const [i, l] of o.lines.entries()) {
+      const c = costByLine.get(i);
+      if (c) owed.set(c.factory, (owed.get(c.factory) ?? 0) + Math.round(c.costCny * Number(l.quantity)));
+    }
+    for (const [f, cny] of owed) {
+      const pay = async (kind: "deposit" | "balance", minor: number, on: string) =>
+        db.factoryPayment.create({ data: { orderId: order.id, factoryId: factories[f].id, kind, amount: fromMinor(minor), currency: "CNY", rate, paidOn: toDbDate(on), reference: `FP-DEMO-${kind}`, recordedById: people.manager.id, paidById: o.assignee ?? people.manager.id } });
+      if (o.order.stage !== "confirmed") await pay("deposit", Math.round(cny * 0.3), addDays(orderedOn, 6));
+      if (shippedOn) await pay("balance", cny - Math.round(cny * 0.3), addDays(shippedOn, -3));
+    }
+    if (shippedOn) {
+      await db.expense.create({ data: { orderId: order.id, category: "inland_transport", description: "Truck from the factory to Qingdao port", amount: "3200.00", currency: "CNY", rate, spentOn: toDbDate(addDays(shippedOn, -2)), paidById: o.assignee ?? people.manager.id, recordedById: people.manager.id } });
+      await db.expense.create({ data: { orderId: order.id, category: "inspection", description: "Pre-shipment inspection", amount: "280.00", currency: "USD", rate: 1, spentOn: toDbDate(addDays(shippedOn, -4)), recordedById: people.manager.id } });
+    }
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     if (o.order.paid !== "none") {
       await db.payment.create({
@@ -283,6 +303,12 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     order: { stage: "shipped", paid: "deposit", terms: "against_bl_copy", shippedAfterDays: 38 },
     lines: [{ description: "Ball valve DN50, stainless", quantity: 300, factoryPrice: 165, factory: 1 }],
   });
+  // Company costs for the last two months.
+  for (const back of [0, 1]) {
+    const on = addDays(today, -back * 30);
+    await db.expense.create({ data: { category: "rent", description: "Office rent, Jining", amount: "8000.00", currency: "CNY", rate, spentOn: toDbDate(on), recordedById: people.manager.id } });
+    await db.expense.create({ data: { category: "office", description: "Phone and internet", amount: "450.00", currency: "CNY", rate, spentOn: toDbDate(on), recordedById: people.manager.id } });
+  }
   console.log("[seed] demo data created: 4 customers, 3 factories, 10 deals (orders: 1 confirmed, 1 in production, 1 shipped, 1 done)");
   console.log("[seed] demo people bilal@example.com / sana@example.com, password Demo@12345");
 }

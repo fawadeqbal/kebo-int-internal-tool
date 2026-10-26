@@ -6,6 +6,7 @@ export * from "./workflows/quotation";
 export * from "./workflows/order";
 export * from "./workflows/tax";
 export * from "./workflows/reasons";
+export * from "./workflows/money";
 export * from "./schemas/common";
 export * from "./schemas/domain";
 export * from "./schemas/settings";

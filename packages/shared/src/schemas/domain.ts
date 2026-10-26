@@ -3,6 +3,7 @@ import {
   ATTACHMENT_KINDS,
   BALANCE_TERMS,
   CUSTOMER_TYPES,
+  EXPENSE_CATEGORIES,
   INCOTERMS,
   INQUIRY_CHANNELS,
   INQUIRY_STAGES,
@@ -300,3 +301,77 @@ export const paymentInput = z.object({
 export type PaymentInput = z.infer<typeof paymentInput>;
 
 export const voidPaymentInput = z.object({ reason: text(2000, "Say why this payment is being removed") });
+
+/** Changing a recorded payment says why (it is kept in the order's history). */
+export const editPaymentInput = paymentInput.extend({ reason: text(500, "Say why this payment is changed") });
+export type EditPaymentInput = z.infer<typeof editPaymentInput>;
+
+/* ---------------------------------------------------------------- payment plan */
+
+/**
+ * The customer's instalments for an order (deposit, balance, or more). They must
+ * add up to the order total; a due date is optional ("before shipment" has none
+ * until the ship date is known).
+ */
+export const paymentPlanInput = z.object({
+  items: z
+    .array(
+      z.object({
+        id: optionalId,
+        label: text(80, "Name each instalment, e.g. Deposit"),
+        amount: amount().refine((v) => (v as number) > 0, "Each instalment must be more than 0"),
+        dueOn: optionalDate,
+      }),
+    )
+    .min(1, "Add at least one instalment")
+    .max(12, "Use at most 12 instalments"),
+  reason: optionalText(500).optional(),
+});
+export type PaymentPlanInput = z.infer<typeof paymentPlanInput>;
+
+/* ---------------------------------------------------------------- factory payments */
+
+/**
+ * Money we sent a factory for an order, in the currency we paid in. `rate` is
+ * how many of that currency make one unit of the order's currency (CNY 7.10
+ * per USD), so profit can be worked out; it starts from Settings.
+ */
+export const factoryPaymentInput = z.object({
+  factoryId: id("Choose the factory"),
+  kind: z.enum(PAYMENT_KINDS).default("deposit"),
+  amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+  currency,
+  rate: optionalRate,
+  paidOn: isoDate(),
+  method: z.enum(PAYMENT_METHODS).default("bank_transfer"),
+  /** Who in our team paid it (defaults to the person who looks after the factory). */
+  paidById: optionalId,
+  reference: optionalText(120),
+  note: optionalText(2000),
+  reason: optionalText(500).optional(),
+});
+export type FactoryPaymentInput = z.infer<typeof factoryPaymentInput>;
+
+/* ---------------------------------------------------------------- expenses */
+
+/**
+ * A cost: for one order (freight, inspection…) or for the company (rent,
+ * salaries…). `rate` turns it into the main currency (units of its currency per
+ * one main-currency unit); it starts from Settings.
+ */
+export const expenseInput = z.object({
+  orderId: optionalId,
+  category: z.enum(EXPENSE_CATEGORIES),
+  description: text(200, "Say what it was for"),
+  amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+  currency,
+  rate: optionalRate,
+  spentOn: isoDate(),
+  paidById: optionalId,
+  reference: optionalText(120),
+  note: optionalText(2000),
+  reason: optionalText(500).optional(),
+});
+export type ExpenseInput = z.infer<typeof expenseInput>;
+
+export const voidInput = z.object({ reason: text(500, "Say why it is removed") });

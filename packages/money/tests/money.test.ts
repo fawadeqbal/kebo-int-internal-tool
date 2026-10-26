@@ -19,6 +19,8 @@ import {
   splitDeposit,
   toMinor,
   withTaxMinor,
+  orderProfit,
+  payInstalments,
 } from "../src";
 
 describe("minor units", () => {
@@ -179,5 +181,19 @@ describe("profit", () => {
       ["Gulf Foods", 100_00],
     ]);
     expect(profitBy(lines, "factory").find((g) => g.key === "Wenzhou")?.marginPercent).toBe(2);
+  });
+});
+
+describe("order profit", () => {
+  it("earned: worth less goods cost and expenses; cash: in less out", () => {
+    const p = orderProfit({ revenueMinor: 10_000_00, goodsCostMinor: 7_000_00, uncostedRevenueMinor: 1_000_00, receivedMinor: 3_000_00, factoryPaidMinor: 2_000_00, expensesMinor: 500_00 });
+    expect(p).toEqual({ earnedMinor: 2_500_00, cashMinor: 500_00, marginPercent: 25, coveragePercent: 90 });
+  });
+
+  it("pays instalments in order", () => {
+    expect(payInstalments([{ amountMinor: 300 }, { amountMinor: 700 }], 500).map((i) => [i.paidMinor, i.openMinor])).toEqual([
+      [300, 0],
+      [200, 500],
+    ]);
   });
 });
