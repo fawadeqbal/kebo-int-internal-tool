@@ -51,5 +51,6 @@ Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up
 | `pnpm db:migrate` | Create a migration after changing `packages/database/prisma/schema.prisma` |
 | `pnpm db:deploy` | Apply migrations |
 | `pnpm db:seed [--demo]` | Starting accounts and settings (`--demo` adds sample deals; refused on a non-local database) |
+| `pnpm db:reset` | Empty the local database, apply all migrations and seed it again with the demo data |
 
 The API tests run against a real database: migrate and seed with `--demo` first (CI does this).

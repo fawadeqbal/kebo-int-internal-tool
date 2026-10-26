@@ -2,14 +2,8 @@
 -- added on top of its price. Nothing else about tax is kept: no export
 -- rebate, no HS codes, no tax on sales, no rebate paperwork on orders.
 
--- 0. Sales tax is dropped: refuse if any quotation actually carried some
---    (its printed total would no longer add up). None do in Kebo's data.
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM "quotation_revisions" WHERE "vat_amount" <> 0) THEN
-    RAISE EXCEPTION 'Some quotations carry sales tax (vat_amount <> 0); remove it from them before this migration.';
-  END IF;
-END $$;
+-- 0. Sales tax is dropped: a quotation keeps its stored total; only its tax
+--    breakdown (rate and amount) goes. Kebo's real data has none.
 
 -- 1. The tax % moves from the factory quote onto each of its items.
 ALTER TABLE "factory_quote_lines" ADD COLUMN "tax_rate" DECIMAL(5,2) NOT NULL DEFAULT 13;
