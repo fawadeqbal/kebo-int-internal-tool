@@ -1,5 +1,5 @@
 import { splitDeposit, formatMinor, type Minor } from "@kebo/money";
-import { addDays, daysBetween, type ISODate } from "@kebo/utils";
+import { addDays, daysBetween, maxDate, type ISODate } from "@kebo/utils";
 import type { BalanceTerms, MilestoneKey, MilestoneStatus, OrderStage, OrderStatus, Team } from "../enums";
 
 /**
@@ -219,7 +219,8 @@ export function dueDates(facts: OrderFacts, states: MilestoneState[], cfg: PlanS
             : after("shipped", facts.balanceTerms === "after_arrival" ? cfg.balanceAfterArrivalDays : cfg.balanceAfterShipDays);
         break;
       case "documents_released":
-        d = facts.balanceTerms === "letter_of_credit" ? after("shipped", cfg.documentsDays) : after("customer_balance", cfg.documentsDays);
+        // The originals go out after the goods have left, and (except under an L/C) after the balance is in.
+        d = facts.balanceTerms === "letter_of_credit" ? after("shipped", cfg.documentsDays) : maxDate(after("customer_balance", cfg.documentsDays), after("shipped", cfg.documentsDays));
         break;
       case "factory_vat_invoice":
         d = after("shipped", cfg.vatInvoiceDays);

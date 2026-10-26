@@ -89,6 +89,13 @@ describe("order plan", () => {
     expect(plan.overdue).toBeGreaterThanOrEqual(1);
   });
 
+  it("never asks for the documents before the goods have shipped", () => {
+    const plan = orderPlan(facts, initialStates(facts), "2026-11-02");
+    const due = (k: string) => plan.steps.find((s) => s.key === k)!.due!;
+    expect(due("documents_released") > due("shipped")).toBe(true);
+    expect(due("documents_released") >= due("customer_balance")).toBe(true);
+  });
+
   it("skips the deposit step for 0% deposit terms", () => {
     const noDeposit = { ...facts, depositPercent: 0 };
     const states = initialStates(noDeposit);
