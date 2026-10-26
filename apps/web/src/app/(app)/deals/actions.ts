@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
+import type { Paged } from "@/lib/types";
+import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
 
@@ -49,6 +51,26 @@ export async function removeFileAction(dealId: string, fileId: string, _prev: Ac
   const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
   if (r.ok) refresh(dealId);
   return r;
+}
+
+/** Customer picker on the inquiry form: search as you type (name, contact, email, phone). */
+export async function searchCustomersAction(q: string): Promise<CustomerOption[]> {
+  try {
+    const res = await api.get<Paged<CustomerOption>>("/customers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
+    return res.rows.map((c) => ({ id: c.id, name: c.name, country: c.country, primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name } }));
+  } catch {
+    return [];
+  }
+}
+
+/** The contacts of the chosen customer. */
+export async function customerContactsAction(customerId: string): Promise<ContactOption[]> {
+  try {
+    const c = await api.get<{ contacts: ContactOption[] }>(`/customers/${customerId}`);
+    return c.contacts.map((x) => ({ id: x.id, name: x.name, email: x.email, phone: x.phone, whatsapp: x.whatsapp, isPrimary: x.isPrimary }));
+  } catch {
+    return [];
+  }
 }
 
 /** Create or edit a deal (the form sends JSON in `payload`, with its line items). */
