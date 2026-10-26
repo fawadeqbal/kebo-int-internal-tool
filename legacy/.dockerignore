@@ -1,0 +1,18 @@
+node_modules
+.next
+dist
+storage
+.env
+.env.*
+!.env.example
+.git
+tests
+*.log
+# Server-only folders next to the code (backups are readable by the backup service only)
+backups
+# The phone app is built separately (Flutter), not part of the server image
+mobile
+secrets
+firebase-service-account*.json
+*firebase-adminsdk*.json
+kebo-rfq-*.json

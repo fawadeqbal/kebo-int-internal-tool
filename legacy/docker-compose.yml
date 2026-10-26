@@ -1,0 +1,194 @@
+# Production stack. Made to share a server with other apps:
+#   - every container, volume, network and image is prefixed "kebo-rfq" (COMPOSE_PROJECT_NAME)
+#   - nothing listens on 80/443; the app is published on 127.0.0.1:${APP_PORT} only,
+#     for the server's existing reverse proxy (Caddy / nginx) to forward to
+#   - the database and file storage are not reachable from outside Docker
+#   - memory and log sizes are capped so the other apps are not starved
+#
+#   docker compose up -d --build
+#   docker compose run --rm app node dist/scripts/seed.js          # starting accounts
+#   docker compose --profile standalone up -d                      # only on a server WITHOUT its own proxy
+# See deploy/README.md.
+
+name: ${COMPOSE_PROJECT_NAME:-kebo-rfq}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://qms:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/qms
+  AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+  APP_URL: ${APP_URL:-https://localhost}
+  APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Shanghai}
+  COOKIE_SECURE: ${COOKIE_SECURE:-true}
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+  STORAGE_DRIVER: s3
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_BUCKET: ${S3_BUCKET:-kebo-files}
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER:-kebo}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+  S3_FORCE_PATH_STYLE: "true"
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  PUBLIC_FORM_ORIGINS: ${PUBLIC_FORM_ORIGINS:-https://keboint.com,https://www.keboint.com}
+  NOTIFY_EMAILS: ${NOTIFY_EMAILS:-}
+  # Cloudflare Turnstile secret for the website form (empty = off). Add only after the widget is on keboint.com.
+  TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+  PUBLIC_INQUIRIES_PER_HOUR: ${PUBLIC_INQUIRIES_PER_HOUR:-40}
+  DAILY_SUMMARY_HOUR: ${DAILY_SUMMARY_HOUR:-8}
+  # Phone push notifications: the Firebase service-account key, put on the server as secrets/firebase.json (off without it)
+  FCM_SERVICE_ACCOUNT_FILE: /app/secrets/firebase.json
+  # Roles that must use two-step sign-in (empty = optional for everyone, turned on in My account).
+  TWO_STEP_REQUIRED_ROLES: ${TWO_STEP_REQUIRED_ROLES:-}
+  SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Super Admin}
+  SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+  SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+  SEED_MANAGER_NAME: ${SEED_MANAGER_NAME:-Manager}
+  SEED_MANAGER_EMAIL: ${SEED_MANAGER_EMAIL:-}
+  SEED_MANAGER_PASSWORD: ${SEED_MANAGER_PASSWORD:-}
+  SEED_MANAGER2_NAME: ${SEED_MANAGER2_NAME:-Manager}
+  SEED_MANAGER2_EMAIL: ${SEED_MANAGER2_EMAIL:-}
+  SEED_MANAGER2_PASSWORD: ${SEED_MANAGER2_PASSWORD:-}
+  SEED_STAFF_NAME: ${SEED_STAFF_NAME:-Staff}
+  SEED_STAFF_EMAIL: ${SEED_STAFF_EMAIL:-}
+  SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qms
+      POSTGRES_USER: qms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qms -d qms"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: ${DB_MEMORY:-512m}
+    logging: *logging
+
+  app:
+    build: .
+    image: kebo-rfq-app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    # Host-only: reachable by the reverse proxy on this server, not from the internet directly.
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3410}:3000"
+    volumes:
+      - ./secrets:/app/secrets:ro
+    mem_limit: ${APP_MEMORY:-1536m}
+    logging: *logging
+
+  # S3-compatible file storage for drawings, spec sheets and photos.
+  # The official MinIO community image stopped being published in Oct 2025;
+  # Chainguard's free image is built from MinIO's source and rebuilt daily.
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    # root inside the container so it can always write to the new volume; MinIO is not exposed outside Docker
+    user: "0:0"
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-kebo}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - files:/data
+    expose:
+      - "9000"
+    mem_limit: ${MINIO_MEMORY:-512m}
+    logging: *logging
+
+  worker:
+    image: kebo-rfq-app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    command: ["node", "dist/worker/index.js"]
+    environment:
+      <<: *app-env
+      REMINDER_INTERVAL_MINUTES: ${REMINDER_INTERVAL_MINUTES:-60}
+      # Off-site copy of the nightly backups (off while OFFSITE_S3_BUCKET is empty)
+      OFFSITE_S3_ENDPOINT: ${OFFSITE_S3_ENDPOINT:-}
+      OFFSITE_S3_REGION: ${OFFSITE_S3_REGION:-auto}
+      OFFSITE_S3_BUCKET: ${OFFSITE_S3_BUCKET:-}
+      OFFSITE_S3_ACCESS_KEY: ${OFFSITE_S3_ACCESS_KEY:-}
+      OFFSITE_S3_SECRET_KEY: ${OFFSITE_S3_SECRET_KEY:-}
+      OFFSITE_S3_PREFIX: ${OFFSITE_S3_PREFIX:-kebo-rfq/}
+      OFFSITE_RETENTION_DAYS: ${OFFSITE_RETENTION_DAYS:-30}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+    # Read the backups (group-readable to this group only), never write them.
+    group_add: ["${BACKUP_GID:-10560}"]
+    volumes:
+      - ./backups:/backups:ro
+      - ./secrets:/app/secrets:ro
+    healthcheck:
+      disable: true
+    depends_on:
+      app:
+        condition: service_healthy
+    mem_limit: ${WORKER_MEMORY:-384m}
+    logging: *logging
+
+  # Only for a server that has no reverse proxy of its own:
+  #   docker compose --profile standalone up -d
+  proxy:
+    image: caddy:2-alpine
+    profiles: ["standalone"]
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: qms
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: qms
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_HOUR: ${BACKUP_HOUR:-2}
+      BACKUP_GID: ${BACKUP_GID:-10560}
+      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
+    volumes:
+      - ./docker/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+      - files:/data/files:ro
+    entrypoint: ["sh", "/backup.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 256m
+    logging: *logging
+
+volumes:
+  pgdata:
+  files:
+  caddy_data:
+  caddy_config:

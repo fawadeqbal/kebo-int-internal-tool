@@ -1,15 +1,13 @@
-# Add-on for a server whose existing Caddy runs in Docker on a shared network
-# (on 145.241.156.60: container "global-caddy", network "global-proxy").
-# Only the app joins that network, under the unique name "kebo-rfq-app";
-# the database, file storage and worker stay on the private kebo-rfq network.
-# install.sh sets COMPOSE_FILE so plain "docker compose" always includes this file.
+# On a server whose Caddy runs in Docker on a shared network (145.241.156.60: "global-caddy" on "global-proxy").
+# Only the web and the API join it, under unique names; the database, files and worker stay private.
+#   COMPOSE_FILE=docker-compose.yml:deploy/compose.shared-proxy.yml docker compose up -d
 services:
-  app:
-    container_name: kebo-rfq-app
-    networks:
-      default: {}
-      proxy:
-        aliases: [kebo-rfq-app]
+  web:
+    container_name: kebo-desk-web
+    networks: { default: {}, proxy: { aliases: [kebo-desk-web] } }
+  api:
+    container_name: kebo-desk-api
+    networks: { default: {}, proxy: { aliases: [kebo-desk-api] } }
 
 networks:
   proxy:

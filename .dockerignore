@@ -1,18 +1,20 @@
-node_modules
-.next
-dist
-storage
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+.git
 .env
 .env.*
 !.env.example
-.git
-tests
-*.log
-# Server-only folders next to the code (backups are readable by the backup service only)
-backups
-# The phone app is built separately (Flutter), not part of the server image
-mobile
 secrets
-firebase-service-account*.json
+backups
+storage
+legacy
+apps/mobile
+portfolio
+credentials.txt
 *firebase-adminsdk*.json
 kebo-rfq-*.json
+.claude

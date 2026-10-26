@@ -1,0 +1,1 @@
+{ "extends": "@kebo/config/tsconfig/library.json", "include": ["src", "tests", "scripts", "tsup.config.ts", "prisma.config.ts"] }

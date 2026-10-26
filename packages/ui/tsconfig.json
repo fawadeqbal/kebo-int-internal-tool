@@ -1,0 +1,5 @@
+{
+  "extends": "@kebo/config/tsconfig/library.json",
+  "compilerOptions": { "jsx": "react-jsx", "lib": ["dom", "dom.iterable", "ES2023"], "types": [] },
+  "include": ["src"]
+}

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "revamp/**"]
   pull_request:
 
 jobs:
@@ -12,32 +12,41 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: qms
-          POSTGRES_USER: qms
-          POSTGRES_PASSWORD: qms
+          POSTGRES_DB: kebo
+          POSTGRES_USER: kebo
+          POSTGRES_PASSWORD: kebo
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U qms" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U kebo" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgres://qms:qms@localhost:5432/qms
+      DATABASE_URL: postgres://kebo:kebo@localhost:5432/kebo
       AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret-1234
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - name: Migrations and seed run cleanly
-        run: node dist/scripts/migrate.js && node dist/scripts/seed.js --demo
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - name: Migrations apply cleanly and the demo seed runs
+        run: pnpm db:deploy && pnpm db:seed --demo
+      - run: pnpm turbo run typecheck lint test
 
-  docker:
+  mobile:
     runs-on: ubuntu-latest
-    needs: check
+    defaults:
+      run:
+        working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t qms-app:ci .
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      # The tests that call a running API are skipped here (no KEBO_API_URL); widget and unit tests run.
+      - run: flutter test

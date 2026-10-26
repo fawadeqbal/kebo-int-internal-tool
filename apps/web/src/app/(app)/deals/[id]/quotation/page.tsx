@@ -1,0 +1,234 @@
+import Link from "next/link";
+import { CheckCircle2, Printer } from "lucide-react";
+import { can } from "@kebo/shared";
+import { Alert, buttonClass, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { todayIn } from "@kebo/utils";
+import { api } from "@/lib/api";
+import { load, requireUser } from "@/lib/session";
+import { date, money } from "@/lib/format";
+import type { DealDetail } from "@/lib/types";
+import type { QuotationView, RevisionDraft, RevisionView, SalesSettings } from "@/lib/types-deals";
+import { AnswerPanel, DraftPanel, StartRevision } from "@/components/deals/quotation-panels";
+import { RevisionSummary } from "@/components/deals/revision-summary";
+import { createRevisionAction, deleteRevisionAction, moveRevisionAction, updateRevisionAction } from "./actions";
+
+export const metadata = { title: "Quotation" };
+
+const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+
+/** A saved draft as editor values. */
+function asDraft(r: RevisionView): RevisionDraft {
+  return {
+    number: r.number,
+    currency: r.currency,
+    incoterm: r.incoterm,
+    incotermPlace: r.incotermPlace,
+    depositPercent: r.depositPercent,
+    balanceTerms: r.balanceTerms,
+    leadTime: r.leadTime,
+    validUntil: r.validUntil,
+    vatRate: r.vatRate,
+    pricesIncludeVat: r.pricesIncludeVat,
+    discount: Number(r.discount),
+    terms: r.terms,
+    notes: r.notes,
+    lines: r.lines.map((l) => ({
+      requestedItemId: l.requestedItemId,
+      type: l.type,
+      description: l.description,
+      model: l.model,
+      hsCode: l.hsCode,
+      quantity: Number(l.quantity),
+      unit: l.unit,
+      unitPrice: Number(l.unitPrice),
+      unitCost: l.unitCost ? Number(l.unitCost) : null,
+      factoryQuoteLineId: l.factoryQuoteLineId ?? null,
+      fxRate: l.fxRate ? Number(l.fxRate) : null,
+    })),
+  };
+}
+
+const printHref = (r: { id: string }) => `/print/revisions/${r.id}`;
+
+/**
+ * The deal's quotation: the open draft (editable), the live revision waiting
+ * for the customer's answer, and every revision sent so far.
+ */
+export default async function QuotationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ r?: string }> }) {
+  const { id } = await params;
+  const sp = await searchParams;
+  const me = await requireUser();
+  const [d, q, settings] = await Promise.all([load(() => api.get<DealDetail>(`/inquiries/${id}`)), load(() => api.get<QuotationView>(`/inquiries/${id}/quotation`)), api.get<{ sales: SalesSettings }>("/settings")]);
+  const quoter = can(me.role, "quotations.manage");
+  const manage = quoter && d.allowed.quote;
+  const showCosts = can(me.role, "sourcing.manage");
+  const startValues = manage && q.canStartRevision ? await api.get<RevisionDraft>(`/inquiries/${id}/quotation/draft`).catch(() => null) : null;
+  const today = todayIn(TZ);
+
+  const draft = q.revisions.find((r) => r.status === "draft") ?? null;
+  const live = q.revisions.find((r) => r.status !== "draft") ?? null;
+  const viewing = sp.r ? (q.revisions.find((r) => String(r.number) === sp.r && r.status !== "draft") ?? live) : live;
+  const accepted = q.revisions.find((r) => r.status === "accepted");
+  const order = d.orders.find((o) => o.status !== "cancelled");
+  const move = (r: RevisionView) => moveRevisionAction.bind(null, d.id, r.id);
+
+  // Shown to everyone who makes quotations; disabled with the API's reason when it cannot start now.
+  const start = quoter && (
+    <StartRevision
+      action={createRevisionAction.bind(null, d.id)}
+      draft={startValues}
+      allowed={manage && q.canStartRevision && !!startValues}
+      whyNot={q.whyNotStart ?? (!manage ? "Only the person handling this deal (or a manager) can quote." : null)}
+      showCosts={showCosts}
+      defaultMargin={settings.sales.defaultMarginPercent}
+      first={q.revisions.length === 0}
+    />
+  );
+
+  return (
+    <div className="flex flex-col gap-5">
+      {accepted && order && (
+        <section aria-label="Order created" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4">
+          <p className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="size-5 shrink-0 text-ok" aria-hidden />
+            <span>
+              The customer accepted R{accepted.number}
+              {accepted.answeredOn ? ` on ${date(accepted.answeredOn)}` : ""}. <span className="font-medium">Order {order.refNo}</span> was created ({money(order.total, order.currency)}) — the work continues there.
+            </span>
+          </p>
+          <ButtonLink href={`/orders/${order.id}`} variant="primary" size="sm">
+            Go to order {order.refNo}
+          </ButtonLink>
+        </section>
+      )}
+
+      {q.revisions.length === 0 && (
+        <Card>
+          <CardHeader title="No quotation yet" description="The first revision (R1) starts from the factory prices chosen on the Factory prices tab, plus the default margin." />
+          <CardBody className="flex flex-col gap-3">
+            {quoter ? start : <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this deal makes the quotation."}</p>}
+          </CardBody>
+        </Card>
+      )}
+
+      {draft && (
+        <Card className="border-primary/30">
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                {q.quotation?.refNo} R{draft.number} <RevisionBadge status="draft" />
+              </span>
+            }
+            description="Only drafts can change. When it is right, mark it as sent: from then on it is frozen."
+            actions={!manage ? <Link href={printHref(draft)} target="_blank" className={buttonClass("secondary", "sm")}><Printer aria-hidden /> Preview</Link> : undefined}
+          />
+          <CardBody>
+            {manage ? (
+              <DraftPanel
+                key={draft.id}
+                number={draft.number}
+                initial={asDraft(draft)}
+                showCosts={showCosts}
+                defaultMargin={settings.sales.defaultMarginPercent}
+                saveAction={updateRevisionAction.bind(null, d.id, draft.id)}
+                deleteAction={deleteRevisionAction.bind(null, d.id, draft.id)}
+                moveAction={move(draft)}
+                printHref={printHref(draft)}
+                today={today}
+              />
+            ) : (
+              <RevisionSummary r={draft} />
+            )}
+          </CardBody>
+        </Card>
+      )}
+
+      {viewing && (
+        <Card>
+          <CardHeader
+            title={
+              <span className="flex flex-wrap items-center gap-2">
+                {q.quotation?.refNo} R{viewing.number} <RevisionBadge status={viewing.status} />
+                <span className="text-sm font-normal text-muted tabular">{money(viewing.total, viewing.currency)}</span>
+              </span>
+            }
+            description={
+              viewing.status === "sent"
+                ? `Sent ${date(viewing.sentOn)} · valid until ${date(viewing.validUntil)}${viewing.validUntil < today ? " (validity has passed)" : ""}`
+                : viewing.answeredOn
+                  ? `Sent ${date(viewing.sentOn)} · answered ${date(viewing.answeredOn)}`
+                  : viewing.sentOn
+                    ? `Sent ${date(viewing.sentOn)}`
+                    : undefined
+            }
+            actions={
+              <Link href={printHref(viewing)} target="_blank" className={buttonClass("secondary", "sm")}>
+                <Printer aria-hidden /> Print / PDF
+              </Link>
+            }
+          />
+          <CardBody className="flex flex-col gap-5">
+            {viewing.canAnswer && manage && (
+              <div className="rounded-lg border border-primary/25 bg-primary-soft/40 p-3">
+                <p className="mb-2 text-sm font-medium">What did the customer say about R{viewing.number}?</p>
+                <AnswerPanel number={viewing.number} action={move(viewing)} today={today} />
+                {draft && <p className="mt-2 text-xs text-muted">Accepting R{viewing.number} discards the R{draft.number} draft.</p>}
+              </div>
+            )}
+            {viewing.status === "superseded" && <Alert tone="info">R{viewing.number} was replaced by a newer revision; the customer&apos;s answer is recorded on the newest one.</Alert>}
+            <RevisionSummary r={viewing} />
+          </CardBody>
+        </Card>
+      )}
+
+      {q.revisions.length > 0 && (
+        <Card>
+          <CardHeader title="Revisions" description={q.quotation ? `${q.quotation.refNo} · the newest one is the one that counts` : undefined} />
+          {quoter && <div className="border-b border-line px-4 py-3">{start}</div>}
+          <Table>
+            <THead>
+              <tr>
+                <Th>Revision</Th>
+                <Th>Status</Th>
+                <Th className="text-right">Total</Th>
+                <Th>Valid until</Th>
+                <Th>Sent</Th>
+                <Th>Answered</Th>
+                <Th className="relative">
+                  <span className="sr-only">Print</span>
+                </Th>
+              </tr>
+            </THead>
+            <tbody>
+              {q.revisions.map((r) => (
+                <Tr key={r.id} className={cn(viewing?.id === r.id && "bg-surface-2/60")}>
+                  <Td className="font-medium">
+                    {r.status === "draft" ? (
+                      `R${r.number}`
+                    ) : (
+                      <Link href={`/deals/${d.id}/quotation?r=${r.number}`} className="hover:text-primary" aria-current={viewing?.id === r.id ? "true" : undefined}>
+                        R{r.number}
+                      </Link>
+                    )}
+                  </Td>
+                  <Td>
+                    <RevisionBadge status={r.status} />
+                  </Td>
+                  <Td className="text-right whitespace-nowrap tabular">{money(r.total, r.currency)}</Td>
+                  <Td className="whitespace-nowrap">{date(r.validUntil)}</Td>
+                  <Td className="whitespace-nowrap">{date(r.sentOn)}</Td>
+                  <Td className="whitespace-nowrap">{date(r.answeredOn)}</Td>
+                  <Td className="text-right">
+                    <Link href={printHref(r)} target="_blank" className="text-xs font-medium text-primary hover:underline">
+                      Print / PDF
+                    </Link>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
+      )}
+    </div>
+  );
+}
