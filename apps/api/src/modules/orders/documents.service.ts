@@ -94,7 +94,22 @@ export class DocumentsService {
         unit: l.unit,
         unitPrice: goodsOnly ? null : l.unitPrice.toFixed(2),
         lineTotal: goodsOnly ? null : l.lineTotal.toFixed(2),
+        // Packing list only: what the packing list form recorded (null until filled in).
+        packing: goodsOnly ? { packages: l.packages, packageType: l.packageType, netWeightKg: l.netWeightKg?.toFixed(2) ?? null, grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null, cbm: l.cbm?.toFixed(3) ?? null } : null,
       })),
+      packing: goodsOnly
+        ? {
+            done: o.packedAt !== null,
+            containerNo: o.containerNo,
+            shippingMarks: o.shippingMarks,
+            totals: {
+              packages: lines.reduce((t, l) => t + (l.packages ?? 0), 0),
+              netWeightKg: lines.reduce((t, l) => t + Number(l.netWeightKg ?? 0), 0).toFixed(2),
+              grossWeightKg: lines.reduce((t, l) => t + Number(l.grossWeightKg ?? 0), 0).toFixed(2),
+              cbm: lines.reduce((t, l) => t + Number(l.cbm ?? 0), 0).toFixed(3),
+            },
+          }
+        : null,
       totals: goodsOnly
         ? null
         : {

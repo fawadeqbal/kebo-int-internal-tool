@@ -11,8 +11,9 @@ import type { OrderView, PaymentsView, PaymentStatus } from "@/lib/types-orders"
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { NoteForm, RemoveFile, UploadForm } from "../../deals/[id]/panels";
-import { cancelOrderAction, detailsAction, moveStageAction, orderNoteAction, orderRemoveFileAction, orderUploadAction, paymentAction, voidPaymentAction } from "../actions";
+import { cancelOrderAction, detailsAction, moveStageAction, orderNoteAction, orderRemoveFileAction, orderUploadAction, packingAction, paymentAction, receiptAction, voidPaymentAction } from "../actions";
 import { CancelOrderForm, DetailsForm, PaymentForm, StageActions, VoidPayment } from "./forms";
+import { GoodsReceipt, PackingList, type GoodsLine } from "./goods";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -84,6 +85,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const incoterm = `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
   const balance = BALANCE_TERMS_LABEL[o.balanceTerms];
   const terms = o.depositPercent > 0 ? `${o.depositPercent}% deposit, ${balance.charAt(0).toLowerCase()}${balance.slice(1)}` : balance;
+  // Goods from the factory and the packing list (goods lines only; charges are not shipped).
+  const goods: GoodsLine[] = o.lines
+    .filter((l) => l.type === "goods")
+    .map((l) => ({ id: l.id, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit, factory: l.factory?.name ?? null, receivedQty: l.receivedQty, receivedOn: l.receivedOn ? date(l.receivedOn) : null, packing: l.packing }));
+  const showPacking = goods.length > 0 && (o.goods.allReceived || o.stage !== "confirmed");
+  const packingDoc = docHref(o, { kind: "packing-list", label: "Packing list" });
 
   return (
     <div>
@@ -142,6 +149,41 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               )}
             </CardBody>
           </Card>
+
+          {goods.length > 0 && (
+            <Card>
+              <CardHeader
+                title="Goods from the factory"
+                description={o.goods.allReceived ? "Everything has come in." : `${o.goods.received} of ${o.goods.lines} item${o.goods.lines === 1 ? "" : "s"} complete. Record what comes in as it arrives.`}
+                actions={o.goods.allReceived ? <Badge tone="ok">All in</Badge> : undefined}
+              />
+              <CardBody>
+                <GoodsReceipt key={goods.map((l) => l.receivedQty).join()} lines={goods} canEdit={canMove} action={receiptAction.bind(null, o.id)} today={now} />
+              </CardBody>
+            </Card>
+          )}
+
+          {showPacking && (
+            <Card>
+              <CardHeader
+                title="Packing list"
+                description={o.goods.packed ? undefined : "Packages, weights and volume for each line, before shipping."}
+                actions={o.goods.packed ? undefined : <Badge tone="warn">Not made yet</Badge>}
+              />
+              <CardBody>
+                <PackingList
+                  lines={goods}
+                  containerNo={o.goods.containerNo}
+                  shippingMarks={o.goods.shippingMarks}
+                  packed={o.goods.packed}
+                  totals={o.goods.totals}
+                  canEdit={canMove}
+                  action={packingAction.bind(null, o.id)}
+                  links={packingDoc}
+                />
+              </CardBody>
+            </Card>
+          )}
 
           <Card>
             <CardHeader title="Money" description={`In ${o.currency}. Bank charges the banks deducted count as paid.`} actions={<Badge tone={st.tone}>{st.label}</Badge>} />
@@ -306,7 +348,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     )}
                     {h.note && <p className="text-xs whitespace-pre-line text-text-2">{h.note}</p>}
                     <p className="text-xs text-muted">
-                      {h.by.name} · {dateTime(h.at)}
+                      {h.by?.name ?? "System"} · {dateTime(h.at)}
                     </p>
                   </li>
                 ))}

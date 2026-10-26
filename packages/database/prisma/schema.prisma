@@ -701,6 +701,10 @@ model Order {
   readyOn            DateTime?         @map("ready_on") @db.Date
   shippedOn          DateTime?         @map("shipped_on") @db.Date
   blNo               String?           @map("bl_no") @db.VarChar(60)
+  /// When the packing list was filled in (null: not yet).
+  packedAt           DateTime?         @map("packed_at") @db.Timestamptz
+  containerNo        String?           @map("container_no") @db.VarChar(120)
+  shippingMarks      String?           @map("shipping_marks")
   currency           String            @db.Char(3)
   total              Decimal           @db.Decimal(14, 2)
   depositPercent     Decimal           @map("deposit_percent") @db.Decimal(5, 2)
@@ -747,6 +751,16 @@ model OrderLine {
   lineTotal   Decimal   @map("line_total") @db.Decimal(14, 2)
   unitCost    Decimal?  @map("unit_cost") @db.Decimal(14, 2)
   sortOrder   Int       @default(0) @map("sort_order")
+
+  /// How many have come in from the factory so far (goods lines), and when last.
+  receivedQty   Decimal   @default(0) @map("received_qty") @db.Decimal(12, 2)
+  receivedOn    DateTime? @map("received_on") @db.Date
+  /// The packing list, filled in before shipping (goods lines).
+  packages      Int?
+  packageType   String?   @map("package_type") @db.VarChar(40)
+  netWeightKg   Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
+  grossWeightKg Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
+  cbm           Decimal?  @db.Decimal(10, 3)
 
   factoryLines  FactoryOrderLine[]
   invoiceLines  InvoiceLine[]

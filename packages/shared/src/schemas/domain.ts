@@ -211,6 +211,43 @@ export type MoveStageInput = z.infer<typeof moveStageInput>;
 export const orderDetailsInput = z.object({ shipBy: optionalDate.optional(), readyOn: optionalDate.optional(), shippedOn: optionalDate.optional(), blNo: optionalText(60).optional() });
 export type OrderDetailsInput = z.infer<typeof orderDetailsInput>;
 
+/** How many of each goods line came in from the factory (the total so far, not an addition). */
+export const receiptInput = z.object({
+  on: optionalDate,
+  lines: z
+    .array(
+      z.object({
+        lineId: id("Each line must come from the order"),
+        receivedQty: z.preprocess((v) => (v === "" || v === null ? 0 : v), z.coerce.number().min(0, "Cannot be negative").max(10_000_000).refine((n) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6, "Use at most 2 decimals")),
+      }),
+    )
+    .min(1)
+    .max(300),
+});
+export type ReceiptInput = z.infer<typeof receiptInput>;
+
+const measure = (max: number) => z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number().min(0, "Cannot be negative").max(max).nullable());
+
+/** The packing list: per goods line the packages, weights and volume; for the order the container and shipping marks. */
+export const packingInput = z.object({
+  containerNo: optionalText(120),
+  shippingMarks: optionalText(2000),
+  lines: z
+    .array(
+      z.object({
+        lineId: id("Each line must come from the order"),
+        packages: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number().int("Whole packages only").min(0).max(1_000_000).nullable()),
+        packageType: z.string().trim().max(40).default("Carton").transform((v) => v || "Carton"),
+        netWeightKg: measure(10_000_000),
+        grossWeightKg: measure(10_000_000),
+        cbm: measure(100_000),
+      }),
+    )
+    .min(1)
+    .max(300),
+});
+export type PackingInput = z.infer<typeof packingInput>;
+
 export const cancelOrderInput = z.object({ reason: text(2000, "Say why the order is cancelled") });
 
 /* ---------------------------------------------------------------- payments */

@@ -91,13 +91,13 @@ export function StageActions({
               )}
               {warn && (
                 <div role="alert" className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft p-3 text-sm">
-                  <p className="flex items-start gap-2">
+                  <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
-                    <span>
+                    <div>
                       <span className="block font-medium">Check before you go ahead</span>
-                      {s.message}
-                    </span>
-                  </p>
+                      <Warnings text={s.message ?? ""} />
+                    </div>
+                  </div>
                   <input type="hidden" name="confirm" value="true" />
                   <Field label="Note" htmlFor="move-note" optional hint="Why you are going ahead; it is kept in the order's history" error={s.errors?.note}>
                     <Textarea id="move-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
@@ -121,6 +121,19 @@ export function StageActions({
       </ActionForm>
       {backLink && <div>{backLink}</div>}
     </div>
+  );
+}
+
+/** The API sends its warnings as sentences in one message; more than one reads better as a list. */
+function Warnings({ text }: { text: string }) {
+  const parts = text.split(/(?<=\.)\s+(?=[A-Z])/).filter(Boolean);
+  if (parts.length < 2) return <>{text}</>;
+  return (
+    <ul className="mt-0.5 list-disc pl-4">
+      {parts.map((p) => (
+        <li key={p}>{p}</li>
+      ))}
+    </ul>
   );
 }
 

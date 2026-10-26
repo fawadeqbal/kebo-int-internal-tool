@@ -1,7 +1,21 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { cancelOrderInput, moveStageInput, ORDER_STAGES, orderDetailsInput, paymentInput, voidPaymentInput, type MoveStageInput, type OrderDetailsInput, type PaymentInput } from "@kebo/shared";
+import {
+  cancelOrderInput,
+  moveStageInput,
+  ORDER_STAGES,
+  orderDetailsInput,
+  packingInput,
+  paymentInput,
+  receiptInput,
+  voidPaymentInput,
+  type MoveStageInput,
+  type OrderDetailsInput,
+  type PackingInput,
+  type PaymentInput,
+  type ReceiptInput,
+} from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -52,6 +66,18 @@ export class OrdersController {
   @Patch(":id/details")
   details(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderDetailsInput)) body: OrderDetailsInput) {
     return this.orders.setDetails(user, id, body);
+  }
+
+  /** { on?, lines: [{ lineId, receivedQty }] } — how many of each goods line came in from the factory so far. */
+  @Put(":id/receipt")
+  receipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(receiptInput)) body: ReceiptInput) {
+    return this.orders.recordReceipt(user, id, body);
+  }
+
+  /** { containerNo?, shippingMarks?, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } — the packing list. */
+  @Put(":id/packing")
+  packing(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(packingInput)) body: PackingInput) {
+    return this.orders.savePacking(user, id, body);
   }
 
   /** { reason } — managers only; the deal becomes lost (customer cancelled) and can be reopened. */

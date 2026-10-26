@@ -93,7 +93,8 @@ class KeboRepository {
   Future<List<Json>> orders({bool mine = false, bool late = false, String? status, String? stage}) =>
       api.getList('/api/orders', query: {if (mine) 'mine': 'true', if (late) 'late': 'true', 'status': status, 'stage': stage});
 
-  /// The order: `stage`, `next` (the one button), `back`, `money`, `needs`, `history`, `documents`.
+  /// The order: `stage`, `next` (the one button), `back`, `money`, `needs`, `history`, `documents`,
+  /// `lines` (each with `factory`, `receivedQty`, `receivedOn`, `packing`) and `goods` (received, packed).
   Future<Json> order(String id) => api.get('/api/orders/$id');
 
   /// One stage forward or back: `{ to, confirm?, note?, readyOn?, shippedOn?, blNo? }`. Returns the order.
@@ -110,6 +111,14 @@ class KeboRepository {
       'blNo': ?clean(blNo),
     });
   }
+
+  /// How many of each goods line came in from the factory so far: [received] is lineId → the
+  /// total received (not an addition), [on] the day (today when left out). Returns the order,
+  /// with `lines[].receivedQty / receivedOn` and `goods` updated. More than ordered is a 400.
+  Future<Json> recordReceipt(String orderId, Map<String, num> received, {String? on}) => api.put('/api/orders/$orderId/receipt', {
+        if (on != null && on.isNotEmpty) 'on': on,
+        'lines': [for (final e in received.entries) {'lineId': e.key, 'receivedQty': e.value}],
+      });
 
   /// Money in from the customer: `{ currency, total, received, due, depositDue, status, payments: [...] }`.
   Future<Json> payments(String orderId) => api.get('/api/orders/$orderId/payments');
