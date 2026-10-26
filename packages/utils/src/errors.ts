@@ -32,6 +32,17 @@ export class ConflictError extends DomainError {
   }
 }
 
+/** Looks like something that already exists; `matches` lets the UI offer the existing record instead. */
+export class DuplicateError extends ConflictError {
+  constructor(
+    message: string,
+    public readonly matches: { id: string; label: string; detail?: string }[],
+  ) {
+    super(message);
+    this.name = "DuplicateError";
+  }
+}
+
 /** A business rule says no until something else is done first; `code` lets the UI offer the fix. */
 export class GateError extends DomainError {
   constructor(

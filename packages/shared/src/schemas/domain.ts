@@ -50,6 +50,20 @@ export const customerInput = z.object({
 });
 export type CustomerInput = z.infer<typeof customerInput>;
 
+export const factoryInput = z.object({
+  name: text(200, "Enter the factory's name"),
+  contactPerson: optionalText(120),
+  phone,
+  wechat: optionalText(80),
+  email,
+  address: optionalText(500),
+  defaultVatRate: percentOr(13),
+  pricesIncludeVat: bool.default(true),
+  bankDetails: optionalText(1000),
+  notes: optionalText(5000),
+});
+export type FactoryInput = z.infer<typeof factoryInput>;
+
 /* ---------------------------------------------------------------- inquiries */
 
 export const requestedItemInput = z.object({
@@ -98,6 +112,43 @@ export const inquiryListQuery = listQuery.extend({
 });
 export type InquiryListQuery = z.infer<typeof inquiryListQuery>;
 
+/* ---------------------------------------------------------------- sourcing */
+
+export const factoryQuoteLineInput = z.object({
+  id: optionalId,
+  requestedItemId: optionalId,
+  description: text(2000, "Each line needs a description"),
+  model: optionalText(120),
+  quantity,
+  unit: z.string().trim().max(20).default("pcs"),
+  unitPrice: amount("Enter the factory's price"),
+  vatRate: percentOr(13),
+  rebateRate: percentOr(0),
+});
+
+export const factoryQuoteInput = z
+  .object({
+    /** An existing factory, or a new one by name. */
+    factoryId: optionalId,
+    newFactoryName: optionalText(200),
+    reference: optionalText(80),
+    receivedOn: isoDate(),
+    validUntil: optionalDate,
+    currency: currency.default("CNY"),
+    pricesIncludeVat: bool.default(true),
+    priceBasis: optionalText(60),
+    leadTime: optionalText(120),
+    moq: optionalText(60),
+    paymentTerms: optionalText(2000),
+    notes: optionalText(5000),
+    lines: z.array(factoryQuoteLineInput).min(1, "Add at least one price").max(300),
+  })
+  .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] });
+export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
+
+/** Which factory price each requested item is quoted from by default ({ itemId: lineId | null }). */
+export const preferredLinesInput = z.object({ choices: z.record(z.uuid(), z.uuid().nullable()) });
+
 /* ---------------------------------------------------------------- quotations */
 
 export const quoteLineInput = z.object({
@@ -135,7 +186,7 @@ export const revisionInput = z.object({
 export type RevisionInput = z.infer<typeof revisionInput>;
 
 export const revisionMoveInput = z.object({
-  to: z.enum(REVISION_STATUSES).exclude(["draft", "superseded"]),
+  to: z.enum(REVISION_STATUSES).exclude(["draft", "superseded", "void"]),
   /** The day it was sent or answered; today when empty. */
   on: optionalDate,
 });

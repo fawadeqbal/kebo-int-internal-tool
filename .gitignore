@@ -23,3 +23,6 @@ apps/mobile/android/app/google-services.json
 
 # generated Prisma client
 packages/database/src/generated/
+
+# agent worktrees
+.claude/

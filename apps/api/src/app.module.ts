@@ -7,6 +7,13 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { HealthModule } from "./modules/health/health.module";
 import { SettingsModule } from "./modules/settings/settings.module";
 import { OrdersModule } from "./modules/orders/orders.module";
+import { UsersModule } from "./modules/users/users.module";
+import { PartiesModule } from "./modules/parties/parties.module";
+import { InquiriesModule } from "./modules/inquiries/inquiries.module";
+import { SourcingModule } from "./modules/sourcing/sourcing.module";
+import { QuotationsModule } from "./modules/quotations/quotations.module";
+import { StorageModule } from "./common/storage/storage.service";
+import { EventsModule } from "./common/events/event-bus";
 
 /**
  * Feature modules (one per business area) sit on four global ones:
@@ -14,6 +21,6 @@ import { OrdersModule } from "./modules/orders/orders.module";
  * AuthCore (the guard every route passes through).
  */
 @Module({
-  imports: [EnvModule, PrismaModule, CommonModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, OrdersModule],
+  imports: [EnvModule, PrismaModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule],
 })
 export class AppModule {}

@@ -31,5 +31,7 @@ export const api = (app: INestApplication, token?: string) => {
     get: (url: string) => auth(request(server).get(`/api${url}`)),
     post: (url: string, body?: object) => auth(request(server).post(`/api${url}`)).send(body ?? {}),
     patch: (url: string, body?: object) => auth(request(server).patch(`/api${url}`)).send(body ?? {}),
+    put: (url: string, body?: object) => auth(request(server).put(`/api${url}`)).send(body ?? {}),
+    delete: (url: string) => auth(request(server).delete(`/api${url}`)),
   };
 };

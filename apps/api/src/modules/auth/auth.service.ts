@@ -5,9 +5,8 @@ import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { SESSION_MAX_AGE_DAYS, SESSION_TTL_SECONDS, TokensService } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
+import { UsersService } from "../users/users.service";
 
-const MAX_FAILED = 5;
-const LOCK_MINUTES = 15;
 const IP_LIMIT = 20;
 const IP_WINDOW_MS = 15 * 60 * 1000;
 
@@ -23,6 +22,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly tokens: TokensService,
     private readonly audit: AuditService,
+    private readonly users: UsersService,
   ) {}
 
   private limitIp(ip: string) {
@@ -49,12 +49,7 @@ export class AuthService {
       throw new HttpException({ message: "Too many wrong passwords. This account is locked for a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
     }
     if (!ok) {
-      // One atomic statement, so parallel wrong passwords each count, and a failure never lifts a lock.
-      await this.prisma.db.$executeRaw`
-        update users set
-          failed_logins = case when failed_logins + 1 >= ${MAX_FAILED} then 0 else failed_logins + 1 end,
-          locked_until = case when failed_logins + 1 >= ${MAX_FAILED} then now() + make_interval(mins => ${LOCK_MINUTES}) else locked_until end
-        where id = ${user.id}::uuid`;
+      await this.users.registerFailure(user.id);
       throw wrong;
     }
     if (!user.isActive) throw new HttpException({ message: "This account is switched off. Ask an admin." }, HttpStatus.FORBIDDEN);
@@ -82,6 +77,42 @@ export class AuthService {
       /** The authenticator code is still needed (POST /auth/two-step). */
       twoStepRequired: twoStep,
       user: twoStep ? null : this.profile({ id: user.id, name: user.name, email: user.email, role: user.role, sessionId: session.id }),
+    };
+  }
+
+  /**
+   * The second sign-in step: the session made by the password is only usable
+   * once a correct authenticator (or recovery) code is given.
+   */
+  async completeTwoStep(token: string | undefined, code: string, ip: string) {
+    this.limitIp(ip);
+    const claims = await this.tokens.verify(token);
+    const session = claims && (await this.prisma.db.session.findUnique({ where: { id: claims.sessionId }, include: { user: true } }));
+    if (!session || !session.pendingTwoStep || session.revokedAt || session.expiresAt < new Date() || session.userId !== claims.userId) {
+      throw new HttpException({ message: "Sign in with your password again." }, HttpStatus.UNAUTHORIZED);
+    }
+    const result = await this.users.verifySecondStep(session.userId, code);
+    if (!result.ok) {
+      throw new HttpException(
+        { message: result.locked ? "Too many wrong codes. This account is locked for a few minutes." : "That code is not right. Enter the newest code from your app." },
+        result.locked ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.UNAUTHORIZED,
+      );
+    }
+    await this.prisma.tx(async (tx) => {
+      await tx.session.update({ where: { id: session.id }, data: { pendingTwoStep: false } });
+      await this.audit.record(tx, {
+        userId: session.userId,
+        action: "login",
+        entityType: "user",
+        entityId: session.userId,
+        summary: result.usedRecovery ? `Signed in with a recovery code, ${result.recoveryLeft} left` : "Signed in with a two-step code",
+      });
+    });
+    const u = session.user;
+    return {
+      user: this.profile({ id: u.id, name: u.name, email: u.email, role: u.role, sessionId: session.id }),
+      recoveryCodesLeft: result.recoveryLeft,
+      usedRecoveryCode: result.usedRecovery,
     };
   }
 

@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
 import { settle } from "@kebo/money";
 import {
   can,
   checkStepAction,
+  initialStates,
   orderPlan,
   STEPS,
   type MilestoneKey,
@@ -12,12 +13,14 @@ import {
   type OrderPlan,
   type StepActionInput,
 } from "@kebo/shared";
-import { ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
+import { DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
+import { EventBus, type DomainEvent } from "../../common/events/event-bus";
+import { StagesService } from "../inquiries/stages.service";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -41,7 +44,79 @@ export class OrdersService {
     private readonly audit: AuditService,
     private readonly clock: Clock,
     private readonly settings: SettingsService,
+    private readonly events: EventBus,
+    private readonly stages: StagesService,
   ) {}
+
+  /* ---------------------------------------------------------------- creating and cancelling */
+
+  /**
+   * The order made when a revision is accepted (inside that transaction): the
+   * accepted lines frozen, the terms copied, and the checklist for its terms.
+   */
+  async createFromRevision(tx: Tx, revisionId: string, acceptedOn: ISODate, actorId: string) {
+    const rev = await tx.quotationRevision.findUniqueOrThrow({ where: { id: revisionId }, include: { lines: { orderBy: { sortOrder: "asc" } }, quotation: { include: { inquiry: true } } } });
+    const inquiry = rev.quotation.inquiry;
+    const refNo = await nextReference(tx, "order", Number(this.clock.today().slice(0, 4)));
+    const depositPercent = Number(rev.depositPercent);
+    const order = await tx.order.create({
+      data: {
+        refNo,
+        inquiryId: inquiry.id,
+        revisionId: rev.id,
+        customerId: inquiry.customerId,
+        orderedOn: toDbDate(acceptedOn),
+        currency: rev.currency,
+        total: rev.total,
+        depositPercent: rev.depositPercent,
+        balanceTerms: rev.balanceTerms,
+        incoterm: rev.incoterm,
+        incotermPlace: rev.incotermPlace,
+        createdById: actorId,
+        lines: {
+          create: rev.lines.map((l) => ({
+            quoteLineId: l.id,
+            type: l.type,
+            description: l.description,
+            model: l.model,
+            hsCode: l.hsCode,
+            quantity: l.quantity,
+            unit: l.unit,
+            unitPrice: l.unitPrice,
+            lineTotal: l.lineTotal,
+            unitCost: l.unitCost,
+            sortOrder: l.sortOrder,
+          })),
+        },
+        milestones: { create: initialStates({ depositPercent, balanceTerms: rev.balanceTerms }).map((m, i) => ({ key: m.key, status: m.status, sortOrder: i })) },
+      },
+    });
+    await this.audit.record(tx, { userId: actorId, action: "create", entityType: "order", entityId: order.id, summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} (${rev.currency} ${rev.total.toString()})` });
+    const event: DomainEvent = { type: "order.created", orderId: order.id, refNo, inquiryId: inquiry.id, actorId, notify: [inquiry.assigneeId, inquiry.createdById].filter((v): v is string => !!v) };
+    return { order, event };
+  }
+
+  /**
+   * The customer called it off. The accepted revision becomes "void" and the
+   * deal "lost" (customer cancelled); it can be reopened and quoted again.
+   * Money already received stays recorded on the order.
+   */
+  async cancel(user: SessionUser, id: string, reason: string) {
+    if (!can(user.role, "orders.manage")) throw new ForbiddenError("Only a manager can cancel an order.");
+    const events = await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+      const o = await this.load(user, id, tx);
+      if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
+      await tx.order.update({ where: { id }, data: { status: "cancelled", cancelledAt: new Date(), cancelReason: reason } });
+      await tx.quotationRevision.update({ where: { id: o.revisionId }, data: { status: "void" } });
+      await this.audit.record(tx, { userId: user.id, action: "cancel", entityType: "order", entityId: id, summary: `Cancelled order ${o.refNo}: ${reason}` });
+      const inquiry = await tx.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId } });
+      const moved = await this.stages.after(tx, inquiry, "order_cancelled", user.id);
+      return moved ? [moved] : [];
+    });
+    await this.events.publish(...events);
+    return this.get(user, id);
+  }
 
   /* ---------------------------------------------------------------- reading */
 
@@ -94,7 +169,7 @@ export class OrdersService {
       shipBy: facts.shipBy,
       readyOn: facts.readyOn,
       currency: o.currency,
-      total: o.total.toString(),
+      total: o.total.toFixed(2),
       depositPercent: facts.depositPercent,
       balanceTerms: o.balanceTerms,
       incoterm: o.incoterm,

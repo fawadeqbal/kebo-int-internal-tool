@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { orderDatesInput, stepActionInput, stepDueInput, type StepActionInput } from "@kebo/shared";
+import { cancelOrderInput, orderDatesInput, stepActionInput, stepDueInput, type StepActionInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -41,6 +41,13 @@ export class OrdersController {
   @Patch(":id/steps/due")
   due(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(stepDueInput)) body: z.infer<typeof stepDueInput>) {
     return this.orders.setStepDue(user, id, body.key, body.due);
+  }
+
+  /** { reason } — managers only; the deal becomes lost (customer cancelled) and can be reopened. */
+  @Post(":id/cancel")
+  @HttpCode(200)
+  cancel(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(cancelOrderInput)) body: z.infer<typeof cancelOrderInput>) {
+    return this.orders.cancel(user, id, body.reason);
   }
 
   /** { shipBy, readyOn } */

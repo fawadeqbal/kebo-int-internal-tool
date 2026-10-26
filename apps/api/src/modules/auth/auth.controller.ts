@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, Public } from "../../common/auth/decorators";
-import { SESSION_COOKIE, sessionCookieOptions } from "../../common/auth/tokens.service";
+import { SESSION_COOKIE, sessionCookieOptions, tokenFrom } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { AuthService } from "./auth.service";
 
@@ -32,6 +32,14 @@ export class AuthController {
       res.cookie(SESSION_COOKIE, result.token, sessionCookieOptions());
     }
     return result;
+  }
+
+  /** { code } with the token from login (header or cookie): finishes a two-step sign-in. */
+  @Public()
+  @Post("two-step")
+  @HttpCode(200)
+  twoStep(@Body(Validate(z.object({ code: z.string().trim().min(6, "Enter the code").max(20) }))) body: { code: string }, @Req() req: Request) {
+    return this.auth.completeTwoStep(tokenFrom(req.headers), body.code, clientIp(req));
   }
 
   @Post("logout")

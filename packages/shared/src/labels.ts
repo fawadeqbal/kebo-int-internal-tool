@@ -62,6 +62,9 @@ export const LOST_REASON_LABEL: Record<LostReason, string> = {
   other: "Other",
 };
 
+/** Country "ZZ" means not known yet (e.g. a website inquiry): the screens ask for it. */
+export const UNKNOWN_COUNTRY = "ZZ";
+
 export const CUSTOMER_TYPE_LABEL: Record<CustomerType, string> = { company: "Company", individual: "Individual" };
 
 export const TAX_TREATMENT_LABEL: Record<TaxTreatment, string> = {

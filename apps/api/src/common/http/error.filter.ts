@@ -1,7 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from "@nestjs/common";
 import type { Response } from "express";
 import { ZodError, z } from "zod";
-import { ConflictError, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
+import { ConflictError, DomainError, DuplicateError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
 import { DB_ERROR, isDbError } from "@kebo/database";
 
 /**
@@ -20,6 +20,7 @@ export class ErrorFilter implements ExceptionFilter {
     if (error instanceof ZodError) {
       return send(422, { error: error.issues[0]?.message ?? "Some details are not valid.", fieldErrors: z.flattenError(error).fieldErrors });
     }
+    if (error instanceof DuplicateError) return send(409, { error: error.message, code: "duplicate", matches: error.matches });
     if (error instanceof GateError) return send(409, { error: error.message, code: error.code });
     if (error instanceof NotFoundError) return send(404, { error: error.message });
     if (error instanceof ForbiddenError) return send(403, { error: error.message });

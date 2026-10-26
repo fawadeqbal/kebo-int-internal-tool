@@ -1,0 +1,89 @@
+import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
+import { ApiTags } from "@nestjs/swagger";
+import { z } from "zod";
+import { customerInput, factoryInput, listQuery, type CustomerInput, type FactoryInput, type ListQuery } from "@kebo/shared";
+import { Validate } from "../../common/http/zod.pipe";
+import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import type { SessionUser } from "../../common/auth/session-user";
+import { CustomersService } from "./customers.service";
+import { FactoriesService } from "./factories.service";
+
+const customerList = listQuery.extend({ country: z.string().trim().toUpperCase().length(2).optional() });
+
+@ApiTags("customers")
+@Controller("customers")
+class CustomersController {
+  constructor(private readonly customers: CustomersService) {}
+
+  @Get()
+  list(@CurrentUser() user: SessionUser, @Query(Validate(customerList)) q: z.infer<typeof customerList>) {
+    return this.customers.list(user, q);
+  }
+
+  @Get(":id")
+  get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.customers.get(user, id);
+  }
+
+  /** 409 { code: "duplicate", matches } when a contact's email/phone is already known; resend with allowDuplicate. */
+  @Post()
+  @RequirePermissions("customers.manage")
+  create(@CurrentUser() user: SessionUser, @Body(Validate(customerInput)) body: CustomerInput) {
+    return this.customers.create(user, body);
+  }
+
+  @Put(":id")
+  @RequirePermissions("customers.manage")
+  update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(customerInput)) body: CustomerInput) {
+    return this.customers.update(user, id, body);
+  }
+
+  @Delete(":id")
+  @HttpCode(200)
+  @RequirePermissions("customers.delete")
+  async remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.customers.remove(user, id);
+    return { ok: true };
+  }
+}
+
+@ApiTags("factories")
+@Controller("factories")
+class FactoriesController {
+  constructor(private readonly factories: FactoriesService) {}
+
+  @Get()
+  @RequirePermissions("sourcing.manage")
+  list(@Query(Validate(listQuery)) q: ListQuery) {
+    return this.factories.list(q);
+  }
+
+  @Get(":id")
+  @RequirePermissions("sourcing.manage")
+  get(@Param("id", ParseUUIDPipe) id: string) {
+    return this.factories.get(id);
+  }
+
+  @Post()
+  @RequirePermissions("sourcing.manage")
+  create(@CurrentUser() user: SessionUser, @Body(Validate(factoryInput)) body: FactoryInput) {
+    return this.factories.create(user, body);
+  }
+
+  @Put(":id")
+  @RequirePermissions("sourcing.manage")
+  update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryInput)) body: FactoryInput) {
+    return this.factories.update(user, id, body);
+  }
+
+  @Delete(":id")
+  @HttpCode(200)
+  @RequirePermissions("sourcing.manage")
+  async remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.factories.remove(user, id);
+    return { ok: true };
+  }
+}
+
+@Module({ controllers: [CustomersController, FactoriesController], providers: [CustomersService, FactoriesService], exports: [CustomersService, FactoriesService] })
+export class PartiesModule {}
