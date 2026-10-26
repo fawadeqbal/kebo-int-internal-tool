@@ -252,8 +252,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 const h = docHref(o, d);
                 return (
                   <li key={d.kind} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                    <span className="flex items-center gap-2 text-sm font-medium">
-                      <FileText className="size-4 text-muted" aria-hidden /> {d.label}
+                    <span className="flex flex-col">
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <FileText className="size-4 text-muted" aria-hidden /> {d.label}
+                      </span>
+                      {d.kind !== "packing-list" && (
+                        <a href={`${h.pdf}${h.pdf.includes("?") ? "&" : "?"}copy=internal`} className="ml-6 text-xs text-muted underline-offset-2 hover:text-primary hover:underline">
+                          Internal copy (all prices, costs, payments)
+                        </a>
+                      )}
                     </span>
                     <span className="flex flex-wrap gap-2">
                       <Link href={h.view} target="_blank" className={buttonClass("secondary", "sm")} aria-label={`View or print the ${d.label.toLowerCase()}`}>

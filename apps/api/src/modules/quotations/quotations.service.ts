@@ -32,9 +32,10 @@ const MAX_TOTAL_MINOR = 999_999_999_999_99;
 const revisionInclude = { lines: { orderBy: { sortOrder: "asc" } } } satisfies Prisma.QuotationRevisionInclude;
 type RevisionRow = Prisma.QuotationRevisionGetPayload<{ include: typeof revisionInclude }>;
 
-/** What is frozen on a document when it is sent or issued. */
+/** The letterhead frozen on a document when it is sent (the stamp image is not copied: documents print the current one). */
 export function companySnapshot(s: Settings) {
-  return { ...s.company };
+  const { stamp: _stamp, ...company } = s.company;
+  return company;
 }
 
 export async function customerSnapshot(tx: Tx, customerId: string, contactId: string | null) {

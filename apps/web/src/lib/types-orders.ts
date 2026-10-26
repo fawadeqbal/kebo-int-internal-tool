@@ -222,6 +222,8 @@ export interface OrderDocument {
     unit: string;
     unitPrice: string | null;
     lineTotal: string | null;
+    /** Internal copy, for people who may see factory costs: one unit's cost in the order currency. */
+    unitCost?: string | null;
     /** Packing list only. */
     packing: LinePacking | null;
   }[];
@@ -241,6 +243,9 @@ export interface OrderDocument {
   } | null;
   terms: string | null;
   bankDetails: string | null;
+  /** Every payment received (the internal copy lists them; the customer's copy only the total). */
+  payments: { paidOn: string; kind: string; amount: string; bankCharges: string; currency: string; reference: string | null }[];
+  notes: string | null;
   footer: string | null;
 }
 
@@ -254,6 +259,8 @@ export interface DocLine {
   unit: string;
   unitPrice: string;
   lineTotal: string;
+  /** For people who may see factory costs. */
+  unitCost?: string | null;
 }
 
 /** GET /revisions/:id (printing a quotation). */
@@ -282,6 +289,8 @@ export interface RevisionDoc {
   companySnapshot: CompanySnapshot | null;
   createdAt: string;
   lines: DocLine[];
+  /** For people who may see factory costs. */
+  costing?: { cost: string; sales: string; profit: string; marginPercent: number | null; uncostedLines: number } | null;
 }
 
 /** For documents not yet sent (no snapshot yet): the customer as it is now. */
