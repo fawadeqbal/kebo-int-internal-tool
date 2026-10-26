@@ -31,15 +31,20 @@ Dependencies only point downwards: `utils` and `money` know nothing about the bu
 
 ## Develop
 
+Needs Node 22+, Docker (for PostgreSQL) and Git. First time:
+
 ```bash
-corepack enable                                   # pnpm, pinned in package.json
+corepack enable                                   # pnpm, pinned in package.json (or: npm i -g pnpm@10.18.0)
 pnpm install
 docker compose -f docker-compose.dev.yml up -d    # PostgreSQL on localhost:5433
-cp .env.example .env && cp .env packages/database/.env
+cp .env.example .env                              # one .env at the root; the API and database scripts read it
 pnpm build                                        # builds the packages (and generates the Prisma client)
-pnpm db:deploy && pnpm db:seed --demo             # schema + sample deals (demo logins: Demo@12345)
-pnpm --filter @kebo/api dev                       # http://localhost:4000/api, docs at /api/docs
+pnpm db:deploy && pnpm db:seed --demo             # schema + sample deals
+pnpm dev                                          # API http://localhost:4000/api (docs /api/docs) + web http://localhost:3000
 ```
+
+Sign in at http://localhost:3000 with admin@example.com / Admin@12345, manager@example.com / Manager@12345, staff@example.com / Staff@12345, or the demo staff bilal@example.com / sana@example.com (Demo@12345).
+Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up -d`) and run `pnpm dev`.
 
 | Command | |
 |---|---|

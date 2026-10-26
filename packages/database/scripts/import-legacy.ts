@@ -15,7 +15,7 @@
  *
  * The mapping rules themselves are pure functions in ./import-legacy/map.ts.
  */
-import "dotenv/config";
+import "./env";
 import { randomUUID } from "node:crypto";
 import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
