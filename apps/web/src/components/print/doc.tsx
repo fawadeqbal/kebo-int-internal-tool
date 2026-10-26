@@ -104,15 +104,14 @@ export function PartyBox({ title, party }: { title: string; party: { name: strin
   );
 }
 
-export const customerLines = (c: CustomerSnapshot) => ({
-  name: c.name,
-  lines: [
-    c.address,
-    countryName(c.country),
-    c.taxNo && `Tax ID ${c.taxNo}`,
-    c.contact && `Attn: ${[c.contact.name, c.contact.phone, c.contact.email].filter(Boolean).join(" · ")}`,
-  ],
-});
+export const customerLines = (c: CustomerSnapshot) => {
+  // Snapshots imported from the old system may lack any of these.
+  const attn = c.contact ? [c.contact.name, c.contact.phone, c.contact.email].filter(Boolean).join(" · ") : "";
+  return {
+    name: c.name || "—",
+    lines: [c.address, countryName(c.country), c.taxNo && `Tax ID ${c.taxNo}`, attn && `Attn: ${attn}`],
+  };
+};
 
 /** Label/value pairs in a box (terms, shipping details…). */
 export function FactsBox({

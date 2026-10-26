@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
-import { attempt, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
 
 const refresh = (orderId: string) => {
   revalidatePath(`/orders/${orderId}`);
@@ -37,6 +37,22 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
     () => api.patch(`/orders/${orderId}/details`, { shipBy: v.shipBy || null, readyOn: v.readyOn || null, shippedOn: v.shippedOn || null, blNo: v.blNo?.trim() || null }),
     "Details saved.",
   );
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
+/** How many of each goods line came in from the factory so far: payload { on, lines: [{ lineId, receivedQty }] }. */
+export async function receiptAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const body = formBody(form);
+  const all = formValues(form).all === "true";
+  const r = await attempt(form, () => api.put(`/orders/${orderId}/receipt`, body), all ? "All goods marked as received." : "Saved what came in.");
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
+/** The packing list: payload { containerNo, shippingMarks, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] }. */
+export async function packingAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.put(`/orders/${orderId}/packing`, formBody(form)), "Packing list saved.");
   if (r.ok) refresh(orderId);
   return r;
 }
