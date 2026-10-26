@@ -19,6 +19,7 @@ export function ActionForm({
   onDone,
   resetOnSuccess,
   showSuccess = true,
+  quietCodes,
 }: {
   action: Action;
   children: ReactNode | ((state: ActionState) => ReactNode);
@@ -26,6 +27,8 @@ export function ActionForm({
   onDone?: (state: ActionState) => void;
   resetOnSuccess?: boolean;
   showSuccess?: boolean;
+  /** Error codes the form explains itself (e.g. "confirm": a warning with "Go ahead anyway"), so the usual red message is not shown. */
+  quietCodes?: string[];
 }) {
   const [state, formAction] = useActionState(action, {});
   const router = useRouter();
@@ -42,7 +45,7 @@ export function ActionForm({
   }, [state, router, onDone, resetOnSuccess]);
   return (
     <form ref={formRef} action={formAction} className={className} noValidate>
-      {state.message && (state.ok === false || showSuccess) && (
+      {state.message && (state.ok === false || showSuccess) && !(state.code && quietCodes?.includes(state.code)) && (
         <Alert tone={state.ok ? "success" : "error"} className="mb-3">
           {state.message}
         </Alert>

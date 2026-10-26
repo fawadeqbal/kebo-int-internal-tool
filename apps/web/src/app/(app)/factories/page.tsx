@@ -10,7 +10,7 @@ export const metadata = { title: "Factories" };
 
 const vat = (f: { defaultVatRate: string; pricesIncludeVat: boolean }) => `${Number(f.defaultVatRate)}% ${f.pricesIncludeVat ? "included" : "on top"}`;
 
-/** The suppliers the team buys from, with how many price quotes and factory orders each has. */
+/** The suppliers the team buys from, with how many price quotes each has. */
 export default async function FactoriesPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   await requirePermission("sourcing.manage");
   const sp = await searchParams;
@@ -40,7 +40,6 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                 <Th>Contact</Th>
                 <Th>VAT on their prices</Th>
                 <Th className="text-right">Price quotes</Th>
-                <Th className="text-right">Factory orders</Th>
               </tr>
             </THead>
             <tbody>
@@ -64,7 +63,6 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                   </Td>
                   <Td className="text-sm whitespace-nowrap">{vat(f)}</Td>
                   <Td className="text-right tabular">{f._count.quotes || <span className="text-muted">0</span>}</Td>
-                  <Td className="text-right tabular">{f._count.orders || <span className="text-muted">0</span>}</Td>
                 </Tr>
               ))}
             </tbody>

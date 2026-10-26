@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, FileDown } from "lucide-react";
 import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { buildHref, buttonClass, Card, CardBody, CardHeader, Input, PageHeader, Segmented, Select, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { addDays, formatDuration, todayIn } from "@kebo/utils";
@@ -113,6 +113,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const quick = ranges(today);
   const keep = { from: r.range.from, to: r.range.to, staff };
   const csvHref = buildHref("/reports/csv", keep, {});
+  const pdfHref = buildHref("/pdf/report/summary", keep, {});
+  const printHref = buildHref("/print/report", keep, {});
   const f = r.funnel;
   const person = people.find((p) => p.id === staff);
   const t = r.profit.total;
@@ -123,9 +125,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         title="Reports"
         description={`${date(r.range.from)} – ${date(r.range.to)}${person ? ` · deals handled by ${person.name}` : " · everyone"}. Amounts in ${r.currency} at today's exchange rates.`}
         actions={
-          <a href={csvHref} className={buttonClass("secondary")} download>
-            <Download aria-hidden /> Download CSV
-          </a>
+          <>
+            <a href={printHref} target="_blank" rel="noopener" className={buttonClass("ghost")}>
+              Print
+            </a>
+            <a href={pdfHref} className={buttonClass("secondary")}>
+              <FileDown aria-hidden /> Download PDF
+            </a>
+            <a href={csvHref} className={buttonClass("secondary")} download>
+              <Download aria-hidden /> Download CSV
+            </a>
+          </>
         }
       />
 

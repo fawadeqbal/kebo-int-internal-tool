@@ -1,16 +1,14 @@
 import Link from "next/link";
-import { can, FACTORY_ORDER_STATUS_LABEL, type FactoryOrderStatus } from "@kebo/shared";
-import { Badge, ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { can } from "@kebo/shared";
+import { ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
-import { date, money } from "@/lib/format";
+import { date } from "@/lib/format";
 import type { FactoryDetail } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeFactoryAction } from "../actions";
 
 export const metadata = { title: "Factory" };
-
-const PO_TONE: Record<FactoryOrderStatus, "neutral" | "info" | "ok"> = { draft: "neutral", sent: "info", confirmed: "ok", cancelled: "neutral" };
 
 export default async function FactoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -60,45 +58,6 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
               </Table>
             )}
           </Card>
-          <Card>
-            <CardHeader title="Factory orders" description="Our purchase orders to this factory" />
-            {f.orders.length === 0 ? (
-              <EmptyState title="No factory orders yet" description="A factory order is made from a customer's order, once the deposit is in." className="py-8" />
-            ) : (
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Factory order</Th>
-                    <Th>For order</Th>
-                    <Th>Status</Th>
-                    <Th className="text-right">Total</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {f.orders.map((o) => (
-                    <Tr key={o.id} className="hover:bg-surface-2/50">
-                      <Td>
-                        <Link href={`/orders/${o.order.id}/factory-orders`} className="font-medium hover:text-primary">
-                          {o.refNo}
-                        </Link>
-                      </Td>
-                      <Td>
-                        <Link href={`/orders/${o.order.id}`} className="text-sm hover:text-primary">
-                          {o.order.refNo}
-                        </Link>
-                      </Td>
-                      <Td>
-                        <Badge tone={PO_TONE[o.status]} dot>
-                          {FACTORY_ORDER_STATUS_LABEL[o.status]}
-                        </Badge>
-                      </Td>
-                      <Td className="text-right tabular">{money(o.total, o.currency)}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
-          </Card>
         </div>
         <aside className="flex flex-col gap-5">
           <Card>
@@ -122,7 +81,7 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
           </Card>
           {canRemove && (
             <Card>
-              <CardHeader title="Remove factory" description="Hides it from lists and pickers. Its past prices and orders stay on their deals." />
+              <CardHeader title="Remove factory" description="Hides it from lists and pickers. Its past prices stay on their deals." />
               <CardBody>
                 <ConfirmAction action={removeFactoryAction.bind(null, f.id)} confirm={`Remove ${f.name}? It will no longer appear in lists and pickers.`} label="Remove this factory" pendingText="Removing…" variant="danger-ghost" />
               </CardBody>

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import type { InquiryStage, Priority } from "@kebo/shared";
+import { ORDER_STAGE_LABEL, type InquiryStage, type Priority } from "@kebo/shared";
 import { Card, CardBody, CardHeader, EmptyState, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
-import type { OrderRow, Person } from "@/lib/types";
+import type { Person } from "@/lib/types";
+import type { OrderRow } from "@/lib/types-orders";
 import { Stat } from "@/components/common/stat";
 
 export const metadata = { title: "Dashboard" };
@@ -28,7 +29,11 @@ interface Dashboard {
   myDeals: DealLine[];
   newDeals: DealLine[];
   expiringQuotes: { id: string; label: string; validUntil: string; total: string; currency: string; inquiry: { id: string; title: string; customer: { name: string } } }[];
-  money: { currency: string; thisMonth: { quoted: string; won: string; received: string; paidToFactories: string }; now: { toReceive: string; owedToFactories: string; openOrders: number } } | null;
+  money: {
+    currency: string;
+    thisMonth: { quoted: string; won: string; received: string };
+    now: { toReceive: string; openOrders: number; ordersByStage: { confirmed: number; in_production: number; shipped: number } };
+  } | null;
   workload: { id: string; name: string; openDeals: number; openOrders: number }[] | null;
 }
 
@@ -71,28 +76,28 @@ export default async function DashboardPage() {
         <Stat label="Quoted" value={d.counts.quoted} hint="Waiting for customers" href="/deals?stage=quoted" />
         <Stat label="Past needed-by" value={d.counts.overdue} href="/deals?stage=overdue" tone={d.counts.overdue ? "bad" : undefined} />
         <Stat label="On hold" value={d.counts.onHold} href="/deals?stage=on_hold" />
-        <Stat label="Order steps to do" value={d.todo.length} hint={`${d.todo.filter((t) => t.next?.overdue).length} late`} href="/orders?view=mine" tone={d.todo.some((t) => t.next?.overdue) ? "bad" : undefined} />
+        <Stat label="My orders to act on" value={d.todo.length} hint={`${d.todo.filter((t) => t.needs?.late).length} late`} href="/orders?mine=1" tone={d.todo.some((t) => t.needs?.late) ? "bad" : undefined} />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">
         <Card>
-          <CardHeader title="My to-do" description="The next step of each order you handle, late ones first" />
+          <CardHeader title="My to-do" description="What each order you handle needs now, late ones first" />
           <CardBody>
             {d.todo.length === 0 ? (
-              <EmptyState title="Nothing waiting" description="Order steps you handle will appear here." className="py-6" />
+              <EmptyState title="Nothing waiting" description="What your orders need will appear here." className="py-6" />
             ) : (
               <ul className="flex flex-col divide-y divide-line">
                 {d.todo.map((t) => (
                   <li key={t.id}>
                     <Link href={`/orders/${t.id}`} className="flex items-center gap-3 py-2.5 hover:text-primary">
-                      {t.next?.overdue ? <AlertTriangle className="size-4 shrink-0 text-bad" aria-hidden /> : <ArrowRight className="size-4 shrink-0 text-primary" aria-hidden />}
+                      {t.needs?.late ? <AlertTriangle className="size-4 shrink-0 text-bad" aria-hidden /> : <ArrowRight className="size-4 shrink-0 text-primary" aria-hidden />}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{t.next?.title}</p>
+                        <p className={`truncate text-sm font-medium ${t.needs?.late ? "text-bad" : ""}`}>{t.needs?.title}</p>
                         <p className="truncate text-xs text-muted">
-                          {t.refNo} · {t.customer.name}
+                          {t.refNo} · {t.customer.name} · {ORDER_STAGE_LABEL[t.stage]}
                         </p>
                       </div>
-                      <span className={`shrink-0 text-xs ${t.next?.overdue ? "font-medium text-bad" : "text-muted"}`}>{t.next?.due ? date(t.next.due) : "—"}</span>
+                      <span className={`shrink-0 text-xs ${t.needs?.late ? "font-medium text-bad" : "text-muted"}`}>{t.needs ? `${t.needs.late ? "was due " : ""}${date(t.needs.due)}` : "—"}</span>
                     </Link>
                   </li>
                 ))}
@@ -145,13 +150,17 @@ export default async function DashboardPage() {
       </div>
 
       {d.money && (
-        <section aria-label="Money" className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <section aria-label="Money" className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           <Stat label="Quoted this month" value={money(d.money.thisMonth.quoted, cur)} />
           <Stat label="Won this month" value={money(d.money.thisMonth.won, cur)} tone="ok" />
           <Stat label="Received this month" value={money(d.money.thisMonth.received, cur)} />
-          <Stat label="Paid to factories" value={money(d.money.thisMonth.paidToFactories, cur)} hint="this month, at today's rates" />
-          <Stat label="To receive" value={money(d.money.now.toReceive, cur)} hint={`${d.money.now.openOrders} open orders`} />
-          <Stat label="Owed to factories" value={money(d.money.now.owedToFactories, cur)} />
+          <Stat label="To receive now" value={money(d.money.now.toReceive, cur)} hint={`On ${d.money.now.openOrders} open order${d.money.now.openOrders === 1 ? "" : "s"}, at today's rates`} />
+          <Stat
+            label="Open orders"
+            value={d.money.now.openOrders}
+            href="/orders"
+            hint={(["confirmed", "in_production", "shipped"] as const).map((s) => `${d.money!.now.ordersByStage[s]} ${ORDER_STAGE_LABEL[s].toLowerCase()}`).join(" · ")}
+          />
         </section>
       )}
 

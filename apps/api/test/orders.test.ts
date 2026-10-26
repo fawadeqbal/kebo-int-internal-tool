@@ -1,6 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
+import { paymentTermsOf } from "../src/modules/orders/documents.service";
 
 /**
  * An order from acceptance to Done: Confirmed → In production → Shipped → Done,
@@ -135,6 +136,9 @@ describe("orders: four stages", () => {
     expect(pi.lines.map((l: { type: string }) => l.type)).toEqual(["goods", "charge"]);
     expect(pi.totals).toMatchObject({ discount: "100.00", total: o.total, depositPercent: 30 });
     expect(pi.customer).toMatchObject({ name: `Kano Agro ${tag}` });
+    expect(pi.paymentTerms).toBe("30% deposit, balance before shipment");
+    expect(paymentTermsOf(30, "against_bl_copy")).toBe("30% deposit, balance against B/L copy"); // "B/L" is not lowered
+    expect(paymentTermsOf(0, "letter_of_credit")).toBe("Letter of credit");
     const inv = (await api(app, sana).get(`/orders/${orderId}/documents/invoice`).expect(200)).body;
     expect(inv).toMatchObject({ title: "Commercial invoice", number: o.refNo.replace("SO-", "INV-"), date: "2026-10-24", totals: { received: o.total, due: "0.00" } });
     expect(inv.order.blNo).toBe("QDLOS-77");

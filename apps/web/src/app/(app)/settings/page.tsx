@@ -8,7 +8,7 @@ import { SETTING_GROUPS } from "./groups";
 
 export const metadata = { title: "Settings" };
 
-/** Company details, sales defaults, reminders, order plan timings and email notifications; each group saves on its own. */
+/** Company details, sales defaults, reminders and email notifications; each group saves on its own. */
 export default async function SettingsPage() {
   await requirePermission("settings.manage");
   const settings = await api.get<Settings>("/settings");

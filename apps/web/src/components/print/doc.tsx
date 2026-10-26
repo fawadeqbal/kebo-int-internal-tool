@@ -7,7 +7,7 @@ import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 
 /**
  * The building blocks of Kebo's printed documents (quotation, proforma and
- * commercial invoices, packing list, purchase order): an A4 sheet on white
+ * commercial invoices, packing list, report): an A4 sheet on white
  * paper in the keboint.com brand, with the letterhead from the document's
  * company snapshot. Always light, whatever the app theme.
  */

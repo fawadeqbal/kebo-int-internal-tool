@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "Kebo Deal Desk", template: "%s · Kebo" },
-  description: "Kebo's internal desk for RFQs, quotations, orders and shipments",
+  description: "Kebo's internal desk for RFQs, quotations and orders",
   robots: { index: false, follow: false },
 };
 

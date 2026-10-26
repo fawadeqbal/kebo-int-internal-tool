@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CheckCircle2, Clock, FilePlus2, Printer, Send, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Download, FilePlus2, Printer, Send, XCircle } from "lucide-react";
 import { Button, buttonClass, Field, Input } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -64,6 +64,7 @@ export function DraftPanel({
   deleteAction,
   moveAction,
   printHref,
+  pdfHref,
   today,
 }: {
   number: number;
@@ -74,6 +75,7 @@ export function DraftPanel({
   deleteAction: Action;
   moveAction: Action;
   printHref: string;
+  pdfHref: string;
   today: string;
 }) {
   return (
@@ -105,8 +107,11 @@ export function DraftPanel({
           </ActionForm>
           <div className="flex flex-wrap items-center gap-2">
             <Link href={printHref} target="_blank" className={buttonClass("secondary")}>
-              <Printer aria-hidden /> Print / PDF
+              <Printer aria-hidden /> Preview
             </Link>
+            <a href={pdfHref} className={buttonClass("secondary")}>
+              <Download aria-hidden /> Download PDF
+            </a>
             <ActionForm action={deleteAction} showSuccess={false}>
               <ConfirmSubmit variant="danger-ghost" pendingText="Deleting…" message={`Delete the R${number} draft? This cannot be undone.`}>
                 Delete draft
