@@ -8,8 +8,9 @@ import { join } from "node:path";
  *
  * 1. `CHROME_PATH` (or `PUPPETEER_EXECUTABLE_PATH`): set this in production,
  *    e.g. `CHROME_PATH=/usr/bin/chromium` after `apt-get install chromium`.
- * 2. A system install: /usr/bin/chromium, chromium-browser, google-chrome(-stable),
- *    /opt/google/chrome/chrome, or Chrome on macOS.
+ * 2. A browser already on the computer: Chromium or Google Chrome on Linux and
+ *    macOS, and on Windows Google Chrome or Microsoft Edge (Edge comes with
+ *    every Windows, so `pnpm dev` there makes PDFs with nothing to install).
  * 3. A Chromium downloaded by Playwright (`npx playwright install chromium`), in
  *    `PLAYWRIGHT_BROWSERS_PATH`, ~/.cache/ms-playwright or /ms-playwright — the
  *    newest one. This is what dev containers and CI usually have.
@@ -20,7 +21,11 @@ export function chromiumPath(): string | null {
   const fromEnv = process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH;
   if (fromEnv) return existsSync(fromEnv) ? fromEnv : null;
 
+  const windows = [process.env.PROGRAMFILES, process.env["PROGRAMFILES(X86)"], process.env.LOCALAPPDATA, "C:\\Program Files", "C:\\Program Files (x86)"]
+    .filter((d): d is string => !!d)
+    .flatMap((d) => [join(d, "Google", "Chrome", "Application", "chrome.exe"), join(d, "Microsoft", "Edge", "Application", "msedge.exe"), join(d, "Chromium", "Application", "chrome.exe")]);
   const system = [
+    ...(process.platform === "win32" ? windows : []),
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
     "/usr/bin/google-chrome",
@@ -28,6 +33,9 @@ export function chromiumPath(): string | null {
     "/opt/google/chrome/chrome",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/usr/bin/microsoft-edge",
+    "/usr/bin/microsoft-edge-stable",
   ];
   const found = system.find((p) => existsSync(p));
   if (found) return found;

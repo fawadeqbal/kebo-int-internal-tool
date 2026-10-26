@@ -131,7 +131,7 @@ void main() {
       expect(o.m('back'), {'to': 'confirmed', 'label': 'Back to Confirmed'});
       expect(o.m('money').keys, containsAll(['total', 'deposit', 'received', 'due', 'depositDue', 'status']));
       expect(o.l('history').last.s('to'), 'in_production');
-      expect(o.l('documents').map((d) => d.s('kind')), ['quotation', 'proforma', 'invoice', 'packing-list']);
+      expect(o.l('documents').map((d) => d.s('kind')), ['quotation', 'proforma', 'packing-list']);
       expect(o.l('documents').first.s('revisionId'), isNotEmpty);
 
       // Balance before shipment, money still due: the server asks to confirm, and nothing moves.
@@ -173,9 +173,7 @@ void main() {
       expect(pi.s('number'), 'PI-$n');
       expect(pi.b('showPrices'), isTrue);
       expect(pi.m('totals')['total'], o.s('total'));
-      final inv = await staff.orderDocument(o.s('id'), 'invoice');
-      expect(inv.s('number'), 'INV-$n');
-      expect(inv.m('totals')['due'], o.m('money')['due']);
+      expect(pi.m('totals')['due'], o.m('money')['due']);
       final pl = await staff.orderDocument(o.s('id'), 'packing-list');
       expect(pl.s('number'), 'PL-$n');
       expect(pl.b('showPrices'), isFalse);

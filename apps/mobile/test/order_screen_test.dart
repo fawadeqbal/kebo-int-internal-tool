@@ -183,11 +183,11 @@ void main() {
       expect(find.text('FOB Qingdao'), findsOneWidget);
       expect(find.text('22 Oct 2026'), findsOneWidget);
       // Documents, each a PDF.
-      for (final label in ['Quotation (accepted)', 'Proforma invoice', 'Commercial invoice', 'Packing list']) {
+      for (final label in ['Quotation (accepted)', 'Proforma invoice', 'Packing list']) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.text('Proforma invoice PI-2026-0001'), findsOneWidget);
-      expect(find.byIcon(Icons.picture_as_pdf_outlined), findsNWidgets(4));
+      expect(find.byIcon(Icons.picture_as_pdf_outlined), findsNWidgets(3));
       // History, newest first.
       expect(find.text('Confirmed → In production'), findsOneWidget);
       expect(find.text('Order confirmed'), findsOneWidget);

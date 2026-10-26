@@ -38,7 +38,7 @@ type Target = { name: string; path: string };
 type Kind = (id: string, token: string, url: URL) => Promise<Target>;
 
 const orderDocument =
-  (kind: "proforma" | "invoice" | "packing-list"): Kind =>
+  (kind: "proforma" | "packing-list"): Kind =>
   async (id, token) => {
     const d = await ask<OrderDocument>(token, `/orders/${id}/documents/${kind}`);
     return { name: `${d.title} ${d.number}${d.order.status === "cancelled" ? " (cancelled)" : ""}`, path: `/print/orders/${id}/${kind}` };
@@ -53,7 +53,6 @@ const KINDS: Record<string, { id: (id: string) => boolean; target: Kind }> = {
     },
   },
   proforma: { id: (id) => UUID.test(id), target: orderDocument("proforma") },
-  invoice: { id: (id) => UUID.test(id), target: orderDocument("invoice") },
   "packing-list": { id: (id) => UUID.test(id), target: orderDocument("packing-list") },
   report: {
     id: (id) => id === "summary" || UUID.test(id),
@@ -99,7 +98,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
 
   const executablePath = chromiumPath();
   if (!executablePath)
-    return new Response("PDF download is not set up on this server (no Chromium found; set CHROME_PATH). Use Print → Save as PDF instead.", { status: 503 });
+    return new Response("PDF download needs Google Chrome, Microsoft Edge or Chromium on the server, and none was found (or set CHROME_PATH to one). Meanwhile use Print → Save as PDF.", { status: 503 });
 
   if (rendering >= MAX_RENDERS) return new Response("Busy making other PDFs — please try again in a few seconds.", { status: 503, headers: { "retry-after": "5" } });
 

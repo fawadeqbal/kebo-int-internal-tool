@@ -11,15 +11,15 @@ import { docDate, docMoney, docQty, docWords, InternalTable, KeboDoc, labelled, 
 /** The print page for the customer's or the internal copy, keeping where Back goes. */
 const copyHref = (path: string, back: string | undefined, internal: boolean) => `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
 
-const KINDS: readonly OrderDocumentKind[] = ["proforma", "invoice", "packing-list"];
+const KINDS: readonly OrderDocumentKind[] = ["proforma", "packing-list"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Weights with up to 2 decimals and volume with up to 3; blank when not recorded. */
 const kg = (v: string | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
 const m3 = (v: string | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 }));
 
-const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE", invoice: "COMMERCIAL  INVOICE", "packing-list": "PACKING  LIST" };
-const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", invoice: "Invoice.NO.", "packing-list": "Packing List NO." };
+const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE", "packing-list": "PACKING  LIST" };
+const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", "packing-list": "Packing List NO." };
 
 async function getDoc(id: string, kind: string) {
   if (!KINDS.includes(kind as OrderDocumentKind) || !UUID.test(id)) notFound();
@@ -37,8 +37,8 @@ type Line = OrderDocument["lines"][number];
 /**
  * An order's documents, made from the order itself (GET /orders/:id/documents/:kind),
  * all in Kebo's own layout (components/print/kebo-doc.tsx):
- *  - proforma: the whole order, asking for the deposit, with Kebo's bank details;
- *  - invoice: the whole order once shipped, with the shipment details and the bank details;
+ *  - proforma: the whole order with Kebo's bank details — the one invoice Kebo sends
+ *    (once shipped it also carries the ship date and B/L number);
  *  - packing-list: the goods only, with packages, weights and volume.
  * The customer's copy shows the items and one total; ?copy=internal adds unit prices,
  * amounts, costs and margin, and every payment.
@@ -124,9 +124,15 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
         ...ports,
         "Country of origin: China",
       ]
-    : d.kind === "invoice"
-      ? [d.paymentSentence, o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn)) : null, o.blNo ? labelled("B/L No.:", o.blNo) : null, ...ports, "Country of origin: China", ...textBullets(d.terms), ...textBullets(d.notes)]
-      : [d.paymentSentence, o.leadTime ? `Delivery: ${o.leadTime}` : null, ...textBullets(d.terms), ...textBullets(d.notes), ...ports];
+    : [
+        d.paymentSentence,
+        o.leadTime ? `Delivery: ${o.leadTime}` : null,
+        ...textBullets(d.terms),
+        ...textBullets(d.notes),
+        ...ports,
+        o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn)) : null,
+        o.blNo ? labelled("B/L No.:", o.blNo) : null,
+      ];
 
   const packingTotals =
     packing && pk ? (

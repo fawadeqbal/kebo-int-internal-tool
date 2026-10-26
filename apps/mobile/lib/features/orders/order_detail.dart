@@ -572,7 +572,7 @@ class _DetailsCard extends StatelessWidget {
 /* ---------------------------------------------------------------- documents */
 
 /// The PDF behind one of the order's documents (`documents[]`): the accepted quotation
-/// (its revision) or the proforma, commercial invoice and packing list (the order).
+/// (its revision) or the proforma invoice and packing list (the order).
 ({String kind, String id, String fileName}) documentPdf(Json order, Json doc) {
   final kind = doc.s('kind');
   final refNo = order.s('refNo');
@@ -580,7 +580,6 @@ class _DetailsCard extends StatelessWidget {
   return switch (kind) {
     'quotation' => (kind: 'revisions', id: doc.s('revisionId'), fileName: 'Quotation for $refNo.pdf'),
     'proforma' => (kind: 'proforma', id: order.s('id'), fileName: 'Proforma invoice ${numbered('PI')}.pdf'),
-    'invoice' => (kind: 'invoice', id: order.s('id'), fileName: 'Commercial invoice ${numbered('INV')}.pdf'),
     'packing-list' => (kind: 'packing-list', id: order.s('id'), fileName: 'Packing list ${numbered('PL')}.pdf'),
     _ => (kind: kind, id: order.s('id'), fileName: '${doc.s('label', kind)} $refNo.pdf'),
   };
