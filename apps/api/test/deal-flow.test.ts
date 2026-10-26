@@ -82,14 +82,14 @@ describe("a whole deal through the API", () => {
         newFactoryName: `Wenzhou Valve ${tag}`,
         receivedOn: "2026-10-20",
         currency: "CNY",
-        pricesIncludeVat: true,
-        lines: [{ requestedItemId: itemId, description: "Gate valve DN100 PN16", quantity: 200, unitPrice: "710", vatRate: 13, rebateRate: "" }],
+        vatRate: 13,
+        lines: [{ requestedItemId: itemId, description: "Gate valve DN100 PN16", quantity: 200, unitPrice: "710", rebateRate: 13 }],
       })
       .expect(201);
     expect(q.body.id).toBeTruthy();
     const s = await api(app, staff).get(`/inquiries/${inquiryId}/sourcing`).expect(200);
     const item = s.body.items.find((i: { id: string }) => i.id === itemId);
-    expect(item.options[0].unitCost).toBe("100.00"); // CNY 710 incl. VAT at 7.1 = USD 100
+    expect(item.options[0].unitCost).toBe("100.00"); // CNY 710 + 13% tax − 13% rebate, at 7.1 = USD 100
     expect(item.preferredLineId).toBe(item.options[0].id);
   });
 

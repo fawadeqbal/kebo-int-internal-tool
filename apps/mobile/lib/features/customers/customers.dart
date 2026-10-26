@@ -123,7 +123,6 @@ class CustomerDetailScreen extends ConsumerWidget {
               SectionCard(
                 title: 'Details',
                 child: kv([
-                  ('Tax', taxTreatmentLabel[c.s('taxTreatment')] ?? c.s('taxTreatment')),
                   ('Currency', c.s('defaultCurrency', 'USD')),
                   ('Address', c.s('address', '—')),
                   ('Tax / Reg. no.', c.s('taxNo', '—')),
@@ -203,7 +202,6 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
   final _name = TextEditingController();
   String _country = '';
   final _otherCountry = TextEditingController();
-  String _tax = 'export_zero_rated';
   final _address = TextEditingController();
   final _taxNo = TextEditingController();
   final _notes = TextEditingController();
@@ -228,7 +226,6 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
         'type': _type,
         'name': _name.text.trim(),
         'country': _countryValue,
-        'taxTreatment': _tax,
         if (_address.text.trim().isNotEmpty) 'address': _address.text.trim(),
         if (_taxNo.text.trim().isNotEmpty) 'taxNo': _taxNo.text.trim(),
         if (_notes.text.trim().isNotEmpty) 'notes': _notes.text.trim(),
@@ -314,12 +311,6 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
               onChanged: (v) => setState(() => _country = v ?? ''),
             ),
             if (_country == '__other__') Field(label: 'Country code', controller: _otherCountry, hint: 'e.g. FR', error: e?.field('country')),
-            SelectField<String>(
-              label: 'Tax',
-              value: _tax,
-              items: [for (final t in taxTreatmentLabel.entries) (t.key, t.value)],
-              onChanged: (v) => setState(() => _tax = v ?? 'export_zero_rated'),
-            ),
           ]),
         ),
         for (var i = 0; i < _contacts.length; i++)

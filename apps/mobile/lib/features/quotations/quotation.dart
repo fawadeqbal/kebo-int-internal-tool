@@ -202,7 +202,8 @@ class QuoteLines extends StatelessWidget {
       Divider(height: 24, color: context.c.lineStrong),
       total('Subtotal', f.money(r['subtotal'], cur)),
       if (f.toCents(r['discount']) > 0) total('Discount', '− ${f.money(r['discount'], cur)}'),
-      if (f.toCents(r['vatAmount']) > 0) total('VAT (${r['vatRate']}%)${r.b('pricesIncludeVat') ? ', included' : ''}', f.money(r['vatAmount'], cur)),
+      // Tax is added on top; only revisions from before kept prices that included it.
+      if (f.toCents(r['vatAmount']) > 0) total('Tax (${f.qty(r['vatRate'])}%)${r.b('pricesIncludeVat') ? ', included' : ''}', f.money(r['vatAmount'], cur)),
       total('Total', f.money(r['total'], cur), strong: true),
     ]);
   }

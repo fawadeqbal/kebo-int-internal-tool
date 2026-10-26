@@ -1,7 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
-import { paymentTermsOf } from "../src/modules/orders/documents.service";
+import { paymentSentenceOf, paymentTermsOf } from "../src/modules/orders/documents.service";
 
 /**
  * An order from acceptance to Done: Confirmed → In production → Shipped → Done,
@@ -31,7 +31,7 @@ describe("orders: four stages", () => {
     const inquiry = (await api(app, sana).post("/inquiries", { customerId, category: "Machinery", assigneeId: me, items: [{ description: "Maize sheller 5t/h", quantity: 100 }] }).expect(201)).body;
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Henan Agri ${tag}`, receivedOn: "2026-10-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Maize sheller", quantity: 100, unitPrice: 1420, vatRate: 13 }] })
+      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Henan Agri ${tag}`, receivedOn: "2026-10-01", currency: "CNY", vatRate: 13, lines: [{ requestedItemId: item.id, description: "Maize sheller", hsCode: "8433.52", quantity: 100, unitPrice: 1420, rebateRate: 13 }] })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
     draft.lines.push({ type: "charge", description: "Sea freight to Lagos", quantity: 1, unitPrice: 1500 });
@@ -152,7 +152,8 @@ describe("orders: four stages", () => {
     const [a, b] = await Promise.all([move(sana, { to: "done" }), move(sana, { to: "done" })]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     const done = await order();
-    expect(done).toMatchObject({ stage: "done", status: "closed", next: null, needs: null, back: { to: "shipped" } });
+    // Paid and closed: what is left is the export rebate paperwork.
+    expect(done).toMatchObject({ stage: "done", status: "closed", next: null, needs: { title: expect.stringMatching(/^Get the factory's special VAT invoice/) }, back: { to: "shipped" } });
     expect(done.money).toMatchObject({ due: "0.00", status: "paid" });
     expect((await api(app, sana).get("/orders?status=closed").expect(200)).body.map((x: { id: string }) => x.id)).toContain(orderId);
   });
@@ -160,6 +161,23 @@ describe("orders: four stages", () => {
   it("reopens when moved back from Done", async () => {
     expect((await move(sana, { to: "shipped", note: "Customer claims a short shipment" }).expect(200)).body).toMatchObject({ stage: "shipped", status: "open" });
     expect((await move(sana, { to: "done" }).expect(200)).body.status).toBe("closed");
+  });
+
+  it("tracks the export rebate: expected amount, the factory's VAT invoice, filing within 90 days", async () => {
+    const o = await order();
+    // CNY 1,420 without tax, 13% rebate: 1,420 × 13% × 100 machines.
+    expect(o.tax).toMatchObject({ rebate: [{ currency: "CNY", amount: "18460.00" }], vatInvoiceReceivedOn: null, rebateFiledOn: null, deadline: "2027-01-22" });
+    expect(o.tax.needs).toMatchObject({ title: "Get the factory's special VAT invoice (rebate CNY 18,460.00)", due: "2026-11-23", deadline: "2027-01-22" });
+    await api(app, sana).patch(`/orders/${orderId}/tax`, { vatInvoiceReceivedOn: "2099-01-01" }).expect(400); // no future dates
+    const got = (await api(app, sana).patch(`/orders/${orderId}/tax`, { vatInvoiceReceivedOn: "2026-10-25" }).expect(200)).body;
+    expect(got.tax).toMatchObject({ vatInvoiceReceivedOn: "2026-10-25", rebateFiledOn: null });
+    expect(got.tax.needs.title).toBe("File the export rebate (CNY 18,460.00) by 2027-01-22");
+    const filed = (await api(app, sana).patch(`/orders/${orderId}/tax`, { rebateFiledOn: "2026-10-26" }).expect(200)).body;
+    expect(filed.tax).toMatchObject({ vatInvoiceReceivedOn: "2026-10-25", rebateFiledOn: "2026-10-26", needs: null });
+    expect(filed.needs).toBeNull();
+    // Undo the filing (a cleared date).
+    expect((await api(app, sana).patch(`/orders/${orderId}/tax`, { rebateFiledOn: null }).expect(200)).body.tax.rebateFiledOn).toBeNull();
+    await api(app, bilal).patch(`/orders/${orderId}/tax`, { rebateFiledOn: "2026-10-26" }).expect(404); // not his order
   });
 
   it("makes the documents from the order", async () => {
@@ -172,6 +190,15 @@ describe("orders: four stages", () => {
     expect(pi.paymentTerms).toBe("30% deposit, balance before shipment");
     expect(paymentTermsOf(30, "against_bl_copy")).toBe("30% deposit, balance against B/L copy"); // "B/L" is not lowered
     expect(paymentTermsOf(0, "letter_of_credit")).toBe("Letter of credit");
+    // As Kebo writes it on its proforma invoices.
+    expect(pi.paymentSentence).toBe("Our usual payment is made by 30% Advance deposit and 70% before shipment.");
+    expect(paymentSentenceOf(30, "against_bl_copy")).toBe("Our usual payment is made by 30% Advance deposit and 70% against B/L copy.");
+    expect(paymentSentenceOf(0, "letter_of_credit")).toBe("Payment: Letter of credit.");
+    expect(pi.company).toMatchObject({ nameLocal: "山东科波国际贸易有限公司", taxNo: "91370811MAK4PH5B1N" }); // Kebo's details until changed in Settings
+    // The heading over the lines and the port of discharge, set on the order.
+    await api(app, sana).patch(`/orders/${orderId}/details`, { documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria" }).expect(200);
+    const pi2 = (await api(app, sana).get(`/orders/${orderId}/documents/proforma`).expect(200)).body;
+    expect(pi2.order).toMatchObject({ documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria", incoterm: expect.any(String) });
     const inv = (await api(app, sana).get(`/orders/${orderId}/documents/invoice`).expect(200)).body;
     expect(inv).toMatchObject({ title: "Commercial invoice", number: o.refNo.replace("SO-", "INV-"), date: "2026-10-24", totals: { received: o.total, due: "0.00" } });
     expect(inv.order.blNo).toBe("QDLOS-77");

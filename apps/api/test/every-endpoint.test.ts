@@ -32,7 +32,7 @@ describe("every read endpoint answers for every record", () => {
 
   it("lists and pages", async () => {
     for (const who of [manager, staff]) {
-      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true"]) await ok(who, path);
+      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true", "/hs-codes", "/hs-codes/8481.80"]) await ok(who, path);
     }
     for (const path of ["/reports", "/audit", "/users", "/settings"]) await ok(admin, path);
   });

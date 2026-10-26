@@ -22,6 +22,15 @@ export function paymentTermsOf(depositPercent: number, balanceTerms: BalanceTerm
   return `${depositPercent > 0 ? `${depositPercent}% deposit, ` : ""}${depositPercent > 0 ? terms.charAt(0).toLowerCase() + terms.slice(1) : terms}`;
 }
 
+/** "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
+export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceTerms): string {
+  const rest = BALANCE_TERMS_LABEL[balanceTerms];
+  const lower = rest.charAt(0).toLowerCase() + rest.slice(1);
+  if (depositPercent <= 0) return `Payment: ${rest}.`;
+  if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
+  return `Our usual payment is made by ${depositPercent}% Advance deposit and ${100 - depositPercent}% ${lower.replace(/^balance /, "")}.`;
+}
+
 /**
  * The documents of an order, made from the order itself whenever they are
  * opened: nothing to create, issue or keep in step. Their numbers follow the
@@ -38,6 +47,14 @@ export class DocumentsService {
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
   ) {}
+
+  /** The customer as sent on the quotation; details missing there (e.g. a registration number added later) come from the customer now. */
+  private async customerOf(customerId: string, contactId: string | null, sent: Partial<Awaited<ReturnType<typeof customerSnapshot>>> | null) {
+    const now = await customerSnapshot(this.prisma.db, customerId, contactId);
+    if (!sent) return now;
+    const filled = Object.fromEntries(Object.entries(sent).filter(([, v]) => v !== null && v !== undefined && v !== ""));
+    return { ...now, ...filled };
+  }
 
   async get(user: SessionUser, orderId: string, kind: OrderDocumentKind) {
     if (!ORDER_DOCUMENTS.includes(kind)) throw new NotFoundError("Document");
@@ -67,7 +84,7 @@ export class DocumentsService {
       number: o.refNo.replace(/^[A-Z]+-/, `${PREFIX[kind]}-`),
       date: kind === "proforma" ? fromDbDate(o.orderedOn) : (shippedOn ?? this.clock.today()),
       company: companySnapshot(settings),
-      customer: (rev.customerSnapshot as Awaited<ReturnType<typeof customerSnapshot>> | null) ?? (await customerSnapshot(this.prisma.db, o.customerId, o.inquiry.contactId)),
+      customer: await this.customerOf(o.customerId, o.inquiry.contactId, rev.customerSnapshot as Partial<Awaited<ReturnType<typeof customerSnapshot>>> | null),
       order: {
         id: o.id,
         refNo: o.refNo,
@@ -81,8 +98,15 @@ export class DocumentsService {
         incoterm: o.incoterm,
         incotermPlace: o.incotermPlace,
         quotation: `${rev.quotation.refNo} R${rev.number}`,
+        /** Heading over the lines, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE". */
+        documentTitle: o.documentTitle,
+        portOfDischarge: o.portOfDischarge,
+        /** e.g. "90 days after receiving advance payment". */
+        leadTime: rev.leadTime,
       },
       paymentTerms: paymentTermsOf(Number(o.depositPercent), o.balanceTerms),
+      /** The payment terms as Kebo writes them on a proforma, e.g. "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
+      paymentSentence: paymentSentenceOf(Number(o.depositPercent), o.balanceTerms),
       currency: o.currency,
       showPrices: !goodsOnly,
       lines: lines.map((l) => ({

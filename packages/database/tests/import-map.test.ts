@@ -12,7 +12,6 @@ import {
   mapPaymentMethod,
   mapRevisionStatuses,
   mapSettings,
-  mapTaxTreatment,
   orderStatusFor,
   parseIncoterm,
   paymentKind,
@@ -134,12 +133,6 @@ describe("lines, channels, payments", () => {
 
   it("first payment is the deposit, the rest balance", () => {
     expect([0, 1, 2].map(paymentKind)).toEqual(["deposit", "balance", "balance"]);
-  });
-
-  it("tax treatment", () => {
-    expect(mapTaxTreatment(true, 13)).toBe("export_zero_rated");
-    expect(mapTaxTreatment(false, 13)).toBe("domestic_vat");
-    expect(mapTaxTreatment(false, 0)).toBe("export_zero_rated");
   });
 
   it("country hint from the phone's calling code", () => {
@@ -271,11 +264,8 @@ describe("settings", () => {
     expect(values.reminders).toMatchObject({ newDays: 2, sourcingDays: 9, dueSoonDays: 4 });
     expect(values.notifications).toEqual({ emails: ["boss@keboint.com"], newInquiry: false, dealWonOrLost: true, paymentReceived: false, dailySummary: true });
     expect(values.reminders.depositDays).toBe(7);
-    expect(dropped.sort()).toEqual(["invoicePaymentDays", "notifyQuotation"]);
-  });
-
-  it("the old defaultTaxRate counts as the VAT rate", () => {
-    expect(mapSettings({ defaultTaxRate: 13 }).values.sales.vatRate).toBe(13);
+    // VAT now comes from the customer's country and the factory, not from Settings.
+    expect(dropped.sort()).toEqual(["invoicePaymentDays", "notifyQuotation", "pricesIncludeVat", "vatRate"]);
   });
 
   it("nothing stored → all defaults", () => {

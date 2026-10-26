@@ -61,7 +61,6 @@ const stageCauseLabel = {
 const unknownCountry = 'ZZ';
 
 const customerTypeLabel = {'company': 'Company', 'individual': 'Individual'};
-const taxTreatmentLabel = {'export_zero_rated': 'Export (no VAT)', 'domestic_vat': 'Domestic (VAT)'};
 
 /* ---------------------------------------------------------------- quotations */
 

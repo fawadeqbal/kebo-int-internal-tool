@@ -100,8 +100,8 @@ describe("people: users, two-step sign-in, customers, factories", () => {
   });
 
   it("manages factories with unique names", async () => {
-    const f = await api(app, staff).post("/factories", { name: `Ningbo Pumps ${tag}`, defaultVatRate: "" }).expect(201);
-    expect(Number(f.body.defaultVatRate)).toBe(13);
+    const f = await api(app, staff).post("/factories", { name: `Ningbo Pumps ${tag}` }).expect(201);
+    expect(f.body).not.toHaveProperty("vatRate"); // no tax setting on a factory
     await api(app, staff).post("/factories", { name: `ningbo pumps ${tag}` }).expect(409);
     await api(app, staff).delete(`/factories/${f.body.id}`).expect(403);
   });

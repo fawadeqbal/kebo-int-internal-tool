@@ -19,7 +19,7 @@ RUN pnpm turbo run build --filter=@kebo/web...
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 CHROME_PATH=/usr/bin/chromium
-RUN apk add --no-cache tini chromium font-noto font-noto-cjk && addgroup -S app && adduser -S app -G app
+RUN apk add --no-cache tini chromium font-noto font-noto-cjk font-liberation && addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/apps/web/.next/standalone ./
 COPY --from=build --chown=app:app /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=app:app /app/apps/web/public ./apps/web/public
