@@ -132,7 +132,8 @@ export class QuotationsService {
     const refs = items.map((i) => ({ id: i.id, parentId: i.parentId, no: i.no }));
     const quotes = can(user.role, "sourcing.manage")
       ? await db.factoryQuote.findMany({
-          where: { inquiryId, deletedAt: null },
+          // An offer still being typed in (no lines yet) cannot be offered.
+          where: { inquiryId, deletedAt: null, lines: { some: {} } },
           include: { factory: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
           orderBy: { receivedOn: "asc" },
         })
