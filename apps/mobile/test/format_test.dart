@@ -1,35 +1,59 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kebo_rfq/core/api.dart';
 import 'package:kebo_rfq/core/format.dart';
-import 'package:kebo_rfq/core/labels.dart';
 import 'package:kebo_rfq/features/more/notifications.dart';
 
 void main() {
-  test('line totals match the server (cents, rounded per line, discount capped, tax on taxable)', () {
-    final t = lineTotals([(quantity: '2', unitPrice: '23500'), (quantity: '1', unitPrice: '2800')], '300', '0');
-    expect(t.subtotal, 4980000);
-    expect(t.discount, 30000);
-    expect(t.total, 4950000);
-    final taxed = lineTotals([(quantity: '3', unitPrice: '10.335')], '0', '17');
-    expect(taxed.lines.first, 3102); // same as the server's calculateTotals()
-    expect(taxed.tax, 527);
-    expect(lineTotals([(quantity: '1', unitPrice: '10')], '50', '0').total, 0); // discount never exceeds subtotal
-  });
-
   test('money and dates format like the web', () {
     expect(money('49500', 'USD'), 'USD 49,500.00');
+    expect(minor(3038939, 'USD'), 'USD 30,389.39');
     expect(date('2026-10-24'), '24 Oct 2026');
     expect(duration(3 * 3600000 + 20 * 60000), '3h 20m');
     expect(duration(2 * 86400000 + 4 * 3600000), '2d 4h');
   });
 
-  test('overdue is derived from the due date', () {
-    expect(invoiceDisplayStatus({'status': 'unpaid', 'dueDate': '2026-01-01'}, '2026-10-24'), 'overdue');
-    expect(invoiceDisplayStatus({'status': 'paid', 'dueDate': '2026-01-01'}, '2026-10-24'), 'paid');
+  test('step lateness reads like a person would say it', () {
+    expect(dueIn(0), 'today');
+    expect(dueIn(3), 'in 3 days');
+    expect(dueIn(-10), '10 days late');
+    expect(dueIn(-1), '1 day late');
   });
 
-  test('notification links open the right screen', () {
-    expect(appRoute('/queries/abc'), '/inquiries/abc');
-    expect(appRoute('https://rfq.fawadiqbal.dev/invoices/x'), '/invoices/x');
+  test('push and notification links open the right screen', () {
+    expect(appRoute('/deals/abc'), '/deals/abc');
+    expect(appRoute('/orders/xyz'), '/orders/xyz');
+    expect(appRoute('https://kebo.example.com/deals/abc/quotation'), '/deals/abc/quotation');
+    expect(appRoute('/inquiries/abc'), '/deals/abc');
     expect(appRoute('/settings'), isNull);
+    expect(appRoute(null), isNull);
+  });
+
+  test('server errors keep their code, field messages and duplicate matches', () {
+    final dup = Api.errorFromBody(409, {
+      'error': 'A customer with the same email or phone already exists. Use it, or save anyway.',
+      'code': 'duplicate',
+      'matches': [
+        {'id': 'c1', 'label': 'Al-Shifa Pharma Ltd', 'detail': 'Ibrahim Musa'},
+      ],
+    });
+    expect(dup.duplicate, isTrue);
+    expect(dup.matches.single['label'], 'Al-Shifa Pharma Ltd');
+
+    final gate = Api.errorFromBody(409, {'error': "Wait for the customer's deposit before paying the factory.", 'code': 'deposit_first'});
+    expect(gate.gate, isTrue);
+    expect(gate.duplicate, isFalse);
+
+    final invalid = Api.errorFromBody(422, {
+      'error': 'Choose why the deal was lost',
+      'fieldErrors': {
+        'lostReason': ['Choose why the deal was lost'],
+      },
+    });
+    expect(invalid.field('lostReason'), 'Choose why the deal was lost');
+  });
+
+  test('a server address typed with /api still works', () {
+    expect(Api.normalizeServer('http://localhost:4104/api/'), 'http://localhost:4104');
+    expect(Api.normalizeServer('https://kebo.example.com'), 'https://kebo.example.com');
   });
 }

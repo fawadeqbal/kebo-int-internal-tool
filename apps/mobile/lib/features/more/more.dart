@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/json.dart';
+import '../../core/labels.dart';
 import '../../core/session.dart';
 import '../../ui/kit.dart';
 import '../shell/shell.dart';
 
-/// Everything that isn't a bottom tab, shown by role (same permissions as the web's sidebar).
+/// Everything that isn't a bottom tab.
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
 
@@ -22,6 +23,12 @@ class MoreScreen extends ConsumerWidget {
           subtitle: sub == null ? null : Text(sub),
           onTap: () => context.push(route),
         );
+    final onWeb = [
+      'Factory prices and quotation editing',
+      'Payments, factory orders, invoices and shipments',
+      if (s.can('reports.view')) 'Reports',
+      if (s.can('users.manage') || s.can('settings.manage')) 'Users, settings and the audit log',
+    ];
     return Scaffold(
       appBar: tabBar(context, 'More'),
       body: ListView(padding: pagePadding, children: [
@@ -37,7 +44,7 @@ class MoreScreen extends ConsumerWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(s.user.s('name'), style: context.t.titleMedium),
-                    Text('${s.user.s('email')} · ${s.me?.m('user').s('roleLabel') ?? ''}', style: context.t.bodySmall),
+                    Text('${s.user.s('email')} · ${roleLabel[s.role] ?? s.role}', style: context.t.bodySmall),
                   ]),
                 ),
                 Icon(Icons.chevron_right_rounded, color: context.c.muted),
@@ -50,22 +57,11 @@ class MoreScreen extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           child: CardList(children: [
             item(Icons.notifications_none_rounded, 'Notifications', '/notifications'),
-            if (s.can('sourcing.manage')) item(Icons.factory_outlined, 'Factories', '/factories', sub: 'Who you buy from, their offers and VAT'),
-            if (s.can('invoices.manage')) item(Icons.receipt_long_outlined, 'Invoices', '/invoices', sub: 'Payments, balances and packing lists'),
-            if (s.can('reports.view')) item(Icons.insights_rounded, 'Reports', '/reports', sub: 'Conversion, money, team, trends'),
+            item(Icons.lock_outline_rounded, 'My account', '/account', sub: 'Password and two-step sign-in'),
           ]),
         ),
-        if (s.can('users.manage') || s.can('settings.manage') || s.can('audit.view')) ...[
-          const Overline('Administration'),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: CardList(children: [
-              if (s.can('users.manage')) item(Icons.manage_accounts_outlined, 'Users', '/users', sub: 'Accounts, roles, passwords, two-step'),
-              if (s.can('settings.manage')) item(Icons.settings_outlined, 'Settings', '/settings', sub: 'Company, bank details, categories, emails'),
-              if (s.can('audit.view')) item(Icons.history_rounded, 'Audit log', '/audit', sub: 'Who changed what, and when'),
-            ]),
-          ),
-        ],
+        const Overline('On the web'),
+        WebNote('Use the web app for: ${onWeb.join('; ')}. The phone follows the same deals and orders, and ticks order steps.'),
         const Overline('App'),
         Card(
           child: Padding(
@@ -92,7 +88,7 @@ class MoreScreen extends ConsumerWidget {
         gap12,
         OutlinedButton.icon(
           onPressed: () async {
-            if (await confirm(context, title: 'Sign out?', message: 'This phone is signed out. Your other devices stay signed in.', action: 'Sign out')) {
+            if (await confirm(context, title: 'Sign out?', message: 'This phone is signed out and stops getting notifications. Your other devices stay signed in.', action: 'Sign out')) {
               await ref.read(sessionProvider.notifier).signOut();
             }
           },
@@ -100,7 +96,7 @@ class MoreScreen extends ConsumerWidget {
           label: Text('Sign out', style: TextStyle(color: context.c.bad)),
         ),
         gap16,
-        Center(child: Text('Kebo RFQ Desk 1.0 · ${Uri.tryParse(server)?.host ?? server}', style: context.t.bodySmall)),
+        Center(child: Text('Kebo 2.0 · ${Uri.tryParse(server)?.host ?? server}', style: context.t.bodySmall)),
       ]),
     );
   }

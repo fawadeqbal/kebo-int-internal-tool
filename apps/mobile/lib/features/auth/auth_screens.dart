@@ -39,7 +39,7 @@ class AuthFrame extends ConsumerWidget {
                       gap24,
                       Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children))),
                       gap16,
-                      Text('Website, WhatsApp, WeChat and email RFQs, from first message to final invoice.', textAlign: TextAlign.center, style: context.t.bodySmall),
+                      Text('Deals, quotations and orders, from the first message to shipment.', textAlign: TextAlign.center, style: context.t.bodySmall),
                     ],
                   ),
                 ),
@@ -220,11 +220,12 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
 
 /* ---------------------------------------------------------------- Setup */
 
-final _setupProvider = FutureProvider.autoDispose<Json>((ref) => ref.read(apiProvider).get('/api/v1/me/two-step/setup'));
+/// POST /api/me/two-step/setup: a new secret and its otpauth:// link (until confirmed).
+final _setupProvider = FutureProvider.autoDispose<Json>((ref) => ref.read(repoProvider).twoStepSetup());
 
-/// Two-step setup: shown only when the server makes it compulsory for a role (off by default).
+/// Two-step setup, opened from My account.
 class TwoStepSetupScreen extends ConsumerStatefulWidget {
-  const TwoStepSetupScreen({super.key, this.fromAccount = false});
+  const TwoStepSetupScreen({super.key, this.fromAccount = true});
   final bool fromAccount;
   @override
   ConsumerState<TwoStepSetupScreen> createState() => _TwoStepSetupScreenState();
@@ -238,7 +239,7 @@ class _TwoStepSetupScreenState extends ConsumerState<TwoStepSetupScreen> {
   Future<void> _confirm() async {
     setState(() => _error = null);
     try {
-      final res = await ref.read(apiProvider).post('/api/v1/me/two-step/confirm', {'code': _code.text.trim()});
+      final res = await ref.read(repoProvider).twoStepConfirm(_code.text);
       setState(() => _codes = res.ls('recoveryCodes'));
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -254,10 +255,7 @@ class _TwoStepSetupScreenState extends ConsumerState<TwoStepSetupScreen> {
         RecoveryCodes(codes: _codes!),
         gap16,
         FilledButton(
-          onPressed: () async {
-            await ref.read(sessionProvider.notifier).refreshMe();
-            if (widget.fromAccount && context.mounted) Navigator.of(context).maybePop();
-          },
+          onPressed: () => Navigator.of(context).maybePop(),
           child: const Text("I've saved them — continue"),
         ),
       ]);
@@ -333,10 +331,7 @@ class _TwoStepSetupScreenState extends ConsumerState<TwoStepSetupScreen> {
       gap8,
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         TextButton(
-          onPressed: () async {
-            await ref.read(apiProvider).post('/api/v1/me/two-step/setup');
-            ref.invalidate(_setupProvider);
-          },
+          onPressed: () => ref.invalidate(_setupProvider),
           child: Text('New key', style: TextStyle(color: context.c.muted)),
         ),
         if (widget.fromAccount)

@@ -6,7 +6,7 @@ import '../../core/refresh.dart';
 import '../../core/session.dart';
 import '../../ui/kit.dart';
 
-/// Bottom tabs: Home, Inquiries, Customers, Quotations, More — the same for every role;
+/// Bottom tabs: Home, Deals, Orders, Customers, More — the same for every role;
 /// what's inside each depends on the role (exactly like the web).
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.shell});
@@ -23,9 +23,9 @@ class AppShell extends ConsumerWidget {
           onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
           destinations: const [
             NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard_rounded), label: 'Home'),
-            NavigationDestination(icon: Icon(Icons.inbox_outlined), selectedIcon: Icon(Icons.inbox_rounded), label: 'Inquiries'),
+            NavigationDestination(icon: Icon(Icons.inbox_outlined), selectedIcon: Icon(Icons.inbox_rounded), label: 'Deals'),
+            NavigationDestination(icon: Icon(Icons.local_shipping_outlined), selectedIcon: Icon(Icons.local_shipping_rounded), label: 'Orders'),
             NavigationDestination(icon: Icon(Icons.people_outline_rounded), selectedIcon: Icon(Icons.people_rounded), label: 'Customers'),
-            NavigationDestination(icon: Icon(Icons.request_quote_outlined), selectedIcon: Icon(Icons.request_quote_rounded), label: 'Quotations'),
             NavigationDestination(icon: Icon(Icons.menu_rounded), selectedIcon: Icon(Icons.menu_open_rounded), label: 'More'),
           ],
         ),
@@ -37,7 +37,7 @@ class AppShell extends ConsumerWidget {
 /// The unread count, refreshed with the data.
 final unreadProvider = FutureProvider.autoDispose<int>((ref) async {
   ref.watch(dataVersionProvider);
-  final res = await ref.read(apiProvider).get('/api/v1/notifications');
+  final res = await ref.read(repoProvider).notifications(unreadOnly: true);
   return (res['unread'] as num?)?.toInt() ?? 0;
 });
 
@@ -46,7 +46,7 @@ class BellButton extends ConsumerWidget {
   const BellButton({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(unreadProvider).value ?? ref.watch(sessionProvider).unread;
+    final unread = ref.watch(unreadProvider).value ?? 0;
     return IconButton(
       tooltip: 'Notifications',
       onPressed: () => context.push('/notifications'),

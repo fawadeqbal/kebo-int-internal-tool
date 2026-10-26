@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
 
-/// Same formats as the web (src/lib/utils/money.ts, dates.ts).
+/// Same formats as the web (packages/money, packages/utils).
 final _money = NumberFormat('#,##0.00', 'en_US');
 final _qty = NumberFormat('#,##0.##', 'en_US');
 final _date = DateFormat('dd MMM yyyy', 'en_US');
@@ -76,45 +76,17 @@ String fileSize(num bytes) {
 String kg(num v) => '${_money.format(v)} kg';
 String cbm(num v) => '${NumberFormat('#,##0.000', 'en_US').format(v)} m³';
 
-/// Line totals exactly as the server calculates them (cents, rounded per line).
-/// [included]: the prices already include VAT, so the total stays and [tax] is the VAT inside it.
-({List<int> lines, int subtotal, int discount, int tax, int total}) lineTotals(List<({String quantity, String unitPrice})> items, String discount, String taxRate, {bool included = false}) {
-  final lines = items.map((i) => ((num.tryParse(i.quantity) ?? 0) * toCents(i.unitPrice)).round()).toList();
-  final subtotal = lines.fold<int>(0, (a, b) => a + b);
-  final d = toCents(discount).clamp(0, subtotal);
-  final taxable = subtotal - d;
-  final rate = (num.tryParse(taxRate) ?? 0).clamp(0, 100);
-  if (included) {
-    final tax = (taxable * rate / (100 + rate)).round();
-    return (lines: lines, subtotal: subtotal, discount: d, tax: tax, total: taxable);
-  }
-  final tax = (taxable * rate / 100).round();
-  return (lines: lines, subtotal: subtotal, discount: d, tax: tax, total: taxable + tax);
-}
+/// Amounts the API gives in minor units (cents), e.g. `outstandingMinor`.
+String minor(Object? v, String currency) => cents(v is num ? v.round() : int.tryParse('$v') ?? 0, currency);
 
-/// The VAT on a document: from the super admin's setting (none for a VAT-exempt customer).
-class Vat {
-  const Vat({this.rate = 0, this.included = false, this.exempt = false});
-  factory Vat.fromJson(Map<String, dynamic> j) => Vat(
-        rate: j['rate'] is num ? j['rate'] as num : num.tryParse('${j['rate']}') ?? 0,
-        included: j['included'] == true,
-        exempt: j['exempt'] == true,
-      );
-  final num rate;
-  final bool included;
-  final bool exempt;
-
-  /// A price without our VAT (margins are worked on it).
-  num net(num price) => included && rate > 0 ? price / (1 + rate / 100) : price;
-
-  /// The selling price for a margin on a cost (our VAT added in when prices include it).
-  num gross(num price) => included && rate > 0 ? price * (1 + rate / 100) : price;
-}
-
-String customerName(Map<String, dynamic> c) {
-  final company = (c['companyName'] ?? '').toString();
-  final person = (c['contactPerson'] ?? '').toString();
-  return company.isNotEmpty ? company : person;
+/// "today", "in 3 days", "2 days late" for a step's `dueInDays`.
+String dueIn(num? days) {
+  if (days == null) return '';
+  final d = days.round();
+  if (d == 0) return 'today';
+  if (d == 1) return 'tomorrow';
+  if (d > 1) return 'in $d days';
+  return d == -1 ? '1 day late' : '${-d} days late';
 }
 
 String initials(String name) {

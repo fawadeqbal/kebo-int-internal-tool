@@ -8,6 +8,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/format.dart' as f;
+import '../core/repository.dart';
 import '../core/session.dart';
 import 'kit.dart';
 
@@ -33,8 +34,6 @@ String _mimeFor(String fileName, String mime) {
     _ => 'application/octet-stream',
   };
 }
-
-String _withPdfExt(String name) => name.toLowerCase().endsWith('.pdf') ? name : '$name.pdf';
 
 /* ---------------------------------------------------------------- actions */
 
@@ -72,13 +71,9 @@ Future<void> openViewer(BuildContext context, {required String path, required St
   ));
 }
 
-/// The quotation / invoice / packing list / report PDFs.
-Future<void> openPdf(BuildContext context, WidgetRef ref, {required String path, required String fileName, bool share = false}) =>
-    openViewer(context, path: path, fileName: _withPdfExt(fileName), mime: 'application/pdf');
-
-/// An inquiry attachment.
+/// A deal's file (GET /api/files/:id).
 Future<void> openFile(BuildContext context, WidgetRef ref, {required String id, required String fileName, String mime = '', num? size}) =>
-    openViewer(context, path: '/api/attachments/$id', fileName: fileName, mime: mime, size: size);
+    openViewer(context, path: KeboRepository.filePath(id), fileName: fileName, mime: mime, size: size);
 
 /// Save / share an attachment straight from a list, without opening it.
 Future<void> quickFileAction(BuildContext context, WidgetRef ref, {required String path, required String fileName, String mime = '', required String action}) async {
@@ -264,29 +259,6 @@ class _OtherFile extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// PDF button for document screens: opens the in-app viewer (save / share are inside).
-class PdfButton extends ConsumerWidget {
-  const PdfButton({super.key, required this.path, required this.fileName});
-  final String path;
-  final String fileName;
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return PopupMenuButton<String>(
-      tooltip: 'PDF',
-      icon: const Icon(Icons.picture_as_pdf_outlined),
-      onSelected: (v) => v == 'view'
-          ? openPdf(context, ref, path: path, fileName: fileName)
-          : quickFileAction(context, ref, path: path, fileName: _withPdfExt(fileName), mime: 'application/pdf', action: v),
-      itemBuilder: (_) => [
-        const PopupMenuItem(value: 'view', child: ListTile(dense: true, leading: Icon(Icons.visibility_outlined), title: Text('View PDF'))),
-        const PopupMenuItem(value: 'save', child: ListTile(dense: true, leading: Icon(Icons.download_rounded), title: Text('Save to phone'))),
-        const PopupMenuItem(value: 'share', child: ListTile(dense: true, leading: Icon(Icons.ios_share_rounded), title: Text('Share'))),
-        if (!kIsWeb) const PopupMenuItem(value: 'open', child: ListTile(dense: true, leading: Icon(Icons.open_in_new_rounded), title: Text('Open in another app'))),
-      ],
     );
   }
 }
