@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'api.dart';
+import 'repository.dart';
 
 /// Phone push notifications (Firebase Cloud Messaging). Android only for now:
 /// iPhone needs an Apple push key and GoogleService-Info.plist first.
@@ -40,7 +40,7 @@ class Push {
   }
 
   /// After sign-in: ask once for permission, then tell the server this phone's token.
-  static Future<void> register(Api api) async {
+  static Future<void> register(KeboRepository repo) async {
     if (!_ready) return;
     try {
       final settings = await FirebaseMessaging.instance.requestPermission();
@@ -51,13 +51,13 @@ class Push {
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
       _token = token;
-      await api.post('/api/v1/devices', {'token': token, 'platform': 'android'});
+      await repo.registerDevice(token, 'android');
       await _refresh?.cancel();
       // ignore: deprecated_member_use
       _refresh = FirebaseMessaging.instance.onTokenRefresh.listen((t) async {
         _token = t;
         try {
-          await api.post('/api/v1/devices', {'token': t, 'platform': 'android'});
+          await repo.registerDevice(t, 'android');
         } catch (_) {}
       });
     } catch (e) {
@@ -65,7 +65,7 @@ class Push {
     }
   }
 
-  /// The token to send with sign-out, so the server stops pushing to this phone.
+  /// This phone's token, removed from the server at sign-out (DELETE /api/me/devices).
   static String? get token => _token;
 
   /// After sign-out: forget the token (a new one is made at the next sign-in).

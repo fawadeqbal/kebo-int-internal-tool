@@ -1,19 +1,22 @@
-# Kebo RFQ Desk — mobile app (Flutter)
+# Kebo — mobile app (Flutter)
 
-The same system as the web, for Android (and iPhone): every role, every screen, the same rules.
-It talks to the web server's JSON API (`/api/v1`, see `src/app/api/v1`), which calls the same
-services, permissions and validation as the web screens — nothing is duplicated.
+The phone app for staff on the move, on the Kebo API (`apps/api`, every path under `/api`).
+All calls go through one layer: `lib/core/repository.dart` (on `lib/core/api.dart`, which turns
+the API's `{ error, code?, fieldErrors?, matches? }` into an `ApiException`).
 
 | Area | What's in the app |
 |---|---|
-| Sign-in | Email + password, two-step code or recovery code, two-step setup (QR / "open in authenticator"), sessions end with web sign-outs and password resets |
-| Home | Dashboard cards by role: open / overdue work, this month, money (managers), team |
-| Inquiries | List with status tabs, search and filters; create (existing or new customer, "Other" category, files); detail with status changes, assignment, call / WhatsApp / email, documents, files, notes, history; edit; remove |
-| Customers | List (Staff: their own), detail with inquiries and money, add / edit / remove |
-| Quotations | List and filters, create with live totals, edit drafts, mark sent / accepted / rejected / expired, new version, delete draft, PDF |
-| Invoices | List and filters, issue from an accepted quotation, record payments, cancel, PDF |
-| Packing lists | Create from an invoice, edit, remove, PDF |
-| More | Notifications, reports (charts, PDF), users, settings, audit log, account (password, two-step), light / dark |
+| Sign-in | Email + password, two-step code or recovery code, sign out (forgets this phone's push token), push registration (`POST /api/me/devices`); push links `/deals/<id>` and `/orders/<id>` open the right screen |
+| Home | My to-do (next step of each order, late first), my open deals, new deals (managers), counts, money and team (managers) |
+| Deals | Stage tabs (open, new, sourcing, quoted, won, lost, on hold), search, "mine / not assigned" (managers); deal page with items, customer and contact (call / WhatsApp / email), notes, files, history; take it / assign, start, on hold / resume, mark as lost with a reason, reopen (managers); new deal with a customer search and items |
+| Quotation | Every revision (R1, R2…) with status, lines and totals; on the live one: mark as sent, customer accepted (makes the order) or rejected |
+| Orders | Open / late / closed lists; order page with the 12-step checklist and the next step highlighted: mark done, skip, undo, with the rule shown when a step is refused (deposit first, inspection first, balance first, a note needed…); read-only payments, factory orders, invoices and shipments |
+| Customers | Search, customer page with contacts, deals and orders, add a customer (contacts, country) with the duplicate warning and "save anyway" |
+| More | Notifications, account (password, two-step sign-in), light / dark, sign out |
+
+On the web only (the app says so where it matters): editing deals and customers, factory prices,
+quotation prices and new revisions, recording payments, factory orders, invoices and shipments,
+reports, users and settings.
 
 ## Build
 
@@ -28,3 +31,11 @@ The server address can also be changed on the sign-in screen (the server name un
 
 Release signing: `android/key.properties` and `android/kebo-rfq-release.jks` (both kept out of git).
 Keep a safe copy of both — every future update must be signed with the same key.
+
+## Tests
+
+```bash
+flutter analyze
+flutter test                                                    # unit + widget tests (checklist from a real API response)
+KEBO_API_URL=http://localhost:4000 flutter test test/api_integration_test.dart   # the repository against a running API (demo logins)
+```

@@ -4,7 +4,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'json.dart';
 
-/// The server's error, with per-field messages from the same validation as the web forms.
+/// The server's error: always `{ error, code?, fieldErrors?, matches? }`.
 class ApiException implements Exception {
   ApiException(this.message, {this.status = 0, this.fieldErrors = const {}, this.code, this.data});
   final String message;
@@ -14,9 +14,16 @@ class ApiException implements Exception {
   final Json? data;
 
   bool get unauthorized => status == 401;
-  bool get twoStepSetupRequired => code == 'two_step_setup_required';
-  bool get duplicate => status == 409;
-  List<Json> get duplicates => data?.l('duplicates') ?? const [];
+  bool get forbidden => status == 403;
+
+  /// 409 with code "duplicate": a customer with the same email or phone exists.
+  bool get duplicate => code == 'duplicate';
+
+  /// The records it matched: `[{ id, label, detail }]`.
+  List<Json> get matches => data?.l('matches') ?? const [];
+
+  /// An order step refused by a rule (deposit first, inspection first, a note needed…).
+  bool get gate => code != null && gateCodes.contains(code);
 
   String? field(String name) => fieldErrors[name];
 
@@ -24,9 +31,25 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// Talks to /api/v1 on the Kebo RFQ Desk server with the bearer token.
+/// Codes the order checklist answers with when a step can't be changed yet.
+const gateCodes = {
+  'deposit_first',
+  'inspect_first',
+  'balance_first',
+  'note_required',
+  'required_step',
+  'dependents_done',
+  'future_date',
+  'order_not_open',
+  'already_done',
+  'not_done',
+  'unknown_step',
+  'stage_move',
+};
+
+/// Talks to the Kebo API (`<server>/api/...`) with the bearer token.
 class Api {
-  Api({required String baseUrl, this.onSignedOut, this.onSetupRequired}) : _dio = Dio() {
+  Api({required String baseUrl, this.onSignedOut, Dio? dio}) : _dio = dio ?? Dio() {
     this.baseUrl = baseUrl;
     _dio.options
       ..connectTimeout = const Duration(seconds: 15)
@@ -41,16 +64,23 @@ class Api {
   final Dio _dio;
   String? token;
   void Function()? onSignedOut;
-  void Function()? onSetupRequired;
 
   String get baseUrl => _dio.options.baseUrl;
-  set baseUrl(String v) => _dio.options.baseUrl = v.replaceAll(RegExp(r'/+$'), '');
 
-  Future<Json> get(String path, {Map<String, dynamic>? query}) => _send(() => _dio.get(path, queryParameters: _clean(query)));
-  Future<Json> post(String path, [Object? body]) => _send(() => _dio.post(path, data: body ?? const {}));
-  Future<Json> patch(String path, Object body) => _send(() => _dio.patch(path, data: body));
-  Future<Json> put(String path, Object body) => _send(() => _dio.put(path, data: body));
-  Future<Json> delete(String path) => _send(() => _dio.delete(path));
+  /// The server's address. Every path starts with `/api/`, so a trailing `/api` typed by someone is dropped.
+  set baseUrl(String v) => _dio.options.baseUrl = normalizeServer(v);
+
+  static String normalizeServer(String v) => v.trim().replaceAll(RegExp(r'/+$'), '').replaceAll(RegExp(r'/api$'), '');
+
+  Future<Json> get(String path, {Map<String, dynamic>? query}) async => _asMap(await _send(() => _dio.get(path, queryParameters: _clean(query))));
+
+  /// Endpoints that answer with a plain list (orders, factory orders, invoices, people).
+  Future<List<Json>> getList(String path, {Map<String, dynamic>? query}) async => _asList(await _send(() => _dio.get(path, queryParameters: _clean(query))));
+
+  Future<Json> post(String path, [Object? body]) async => _asMap(await _send(() => _dio.post(path, data: body ?? const {})));
+  Future<Json> patch(String path, Object body) async => _asMap(await _send(() => _dio.patch(path, data: body)));
+  Future<Json> put(String path, Object body) async => _asMap(await _send(() => _dio.put(path, data: body)));
+  Future<Json> delete(String path, [Object? body]) async => _asMap(await _send(() => _dio.delete(path, data: body)));
 
   static Map<String, dynamic>? _clean(Map<String, dynamic>? q) {
     if (q == null) return null;
@@ -60,17 +90,16 @@ class Api {
     };
   }
 
-  /// Upload files to an inquiry (same endpoint as the web uploader).
-  Future<void> uploadFiles(String inquiryId, List<({String name, String path})> files, {void Function(double)? onProgress}) async {
-    final form = FormData();
-    for (final f in files) {
-      form.files.add(MapEntry('files', await MultipartFile.fromFile(f.path, filename: f.name)));
-    }
-    await _send(() => _dio.post('/api/queries/$inquiryId/attachments',
-        data: form, onSendProgress: (a, b) => onProgress?.call(b > 0 ? a / b : 0)));
+  static Json _asMap(dynamic data) => data is Map ? data.cast<String, dynamic>() : <String, dynamic>{};
+  static List<Json> _asList(dynamic data) => data is List ? data.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList() : const [];
+
+  /// Upload one file to a deal (multipart field "file", one file per request).
+  Future<Json> uploadFile(String dealId, {required String name, required String path, void Function(double)? onProgress}) async {
+    final form = FormData()..files.add(MapEntry('file', await MultipartFile.fromFile(path, filename: name)));
+    return _asMap(await _send(() => _dio.post('/api/inquiries/$dealId/files', data: form, onSendProgress: (a, b) => onProgress?.call(b > 0 ? a / b : 0))));
   }
 
-  /// A file or PDF as bytes (for the in-app viewers, saving and sharing).
+  /// A file as bytes (for the in-app viewer, saving and sharing).
   Future<Uint8List> getBytes(String path, {void Function(double)? onProgress}) async {
     try {
       final res = await _dio.get<List<int>>(
@@ -84,7 +113,7 @@ class Api {
     }
   }
 
-  /// Download a PDF or file to the app's documents folder; returns its path.
+  /// Download a file to the app's documents folder; returns its path.
   Future<String> download(String path, String fileName) async {
     final dir = await getApplicationDocumentsDirectory();
     final safe = fileName.replaceAll(RegExp(r'[^\w.\- ]+'), '_');
@@ -97,12 +126,10 @@ class Api {
     return target;
   }
 
-  Future<Json> _send(Future<Response<dynamic>> Function() request) async {
+  Future<dynamic> _send(Future<Response<dynamic>> Function() request) async {
     try {
       final res = await request();
-      final data = res.data;
-      if (data is Map) return data.cast<String, dynamic>();
-      return <String, dynamic>{};
+      return res.data;
     } on DioException catch (e) {
       throw _error(e);
     }
@@ -118,23 +145,31 @@ class Api {
             : 'Can\'t reach the server. Check your internet connection.',
       );
     }
-    final body = res.data is Map ? (res.data as Map).cast<String, dynamic>() : <String, dynamic>{};
+    final err = errorFromBody(res.statusCode ?? 0, res.data);
+    if (err.unauthorized && token != null && !res.requestOptions.path.contains('/auth/')) onSignedOut?.call();
+    return err;
+  }
+
+  /// `{ error, code?, fieldErrors?, matches? }` → [ApiException]. fieldErrors are `{ field: [messages] }`.
+  static ApiException errorFromBody(int status, Object? data) {
+    final body = data is Map ? data.cast<String, dynamic>() : <String, dynamic>{};
     final fields = <String, String>{};
     final fe = body['fieldErrors'];
     if (fe is Map) {
       fe.forEach((k, v) {
-        if (v is List && v.isNotEmpty) fields[k.toString()] = v.first.toString();
+        if (v is List && v.isNotEmpty) {
+          fields[k.toString()] = v.first.toString();
+        } else if (v is String && v.isNotEmpty) {
+          fields[k.toString()] = v;
+        }
       });
     }
-    final err = ApiException(
-      body.s('error', res.statusCode == 404 ? 'Not found.' : 'Something went wrong (${res.statusCode}).'),
-      status: res.statusCode ?? 0,
+    return ApiException(
+      body.s('error', status == 404 ? 'Not found.' : 'Something went wrong ($status).'),
+      status: status,
       fieldErrors: fields,
       code: body.sn('code'),
       data: body,
     );
-    if (err.unauthorized && token != null && !(res.requestOptions.path.contains('/auth/'))) onSignedOut?.call();
-    if (err.twoStepSetupRequired) onSetupRequired?.call();
-    return err;
   }
 }

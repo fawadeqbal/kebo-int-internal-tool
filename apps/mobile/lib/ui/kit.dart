@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
 import '../core/format.dart' as f;
+import '../core/json.dart';
 import '../core/labels.dart';
 import '../theme/colors.dart';
 
@@ -154,31 +156,45 @@ class KeyValues extends StatelessWidget {
 
 KeyValues kv(List<(String, String)> rows) => KeyValues([for (final r in rows) (r.$1, Text(r.$2, textAlign: TextAlign.right))]);
 
-/// Call / WhatsApp / Email for a customer.
-class ContactButtons extends StatelessWidget {
-  const ContactButtons({super.key, required this.phone, this.email, required this.onCall, required this.onWhatsApp, this.onEmail});
-  final String phone;
-  final String? email;
-  final VoidCallback onCall;
-  final VoidCallback onWhatsApp;
-  final VoidCallback? onEmail;
+/// Call / WhatsApp / Email for a contact (`{ name, phone, whatsapp, email, wechat }`): only the ways it has.
+class ContactActions extends StatelessWidget {
+  const ContactActions(this.contact, {super.key});
+  final Json contact;
+
+  static String digits(String phone) => phone.replaceAll(RegExp(r'\D'), '');
+
   @override
   Widget build(BuildContext context) {
-    Widget b(IconData icon, String label, VoidCallback onTap) => Expanded(
+    final phone = contact.sn('phone');
+    final whatsapp = contact.sn('whatsapp') ?? phone;
+    final email = contact.sn('email');
+    Widget b(IconData icon, String label, Uri uri) => Expanded(
           child: OutlinedButton(
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), textStyle: const TextStyle(fontFamily: 'Geist', fontSize: 13, fontWeight: FontWeight.w600)),
-            onPressed: onTap,
+            onPressed: () => launchUrl(uri, mode: LaunchMode.externalApplication),
             child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 19), const SizedBox(height: 3), Text(label, maxLines: 1)]),
           ),
         );
+    final buttons = <Widget>[
+      if (phone != null) b(Icons.call_outlined, 'Call', Uri.parse('tel:${phone.replaceAll(' ', '')}')),
+      if (whatsapp != null) b(Icons.chat_outlined, 'WhatsApp', Uri.parse('https://wa.me/${digits(whatsapp)}')),
+      if (email != null) b(Icons.mail_outline_rounded, 'Email', Uri.parse('mailto:$email')),
+    ];
+    if (buttons.isEmpty) return const SizedBox.shrink();
     return Row(children: [
-      b(Icons.call_outlined, 'Call', onCall),
-      gap8,
-      b(Icons.chat_outlined, 'WhatsApp', onWhatsApp),
-      if (email != null && onEmail != null) ...[gap8, b(Icons.mail_outline_rounded, 'Email', onEmail!)],
+      for (var i = 0; i < buttons.length; i++) ...[if (i > 0) gap8, buttons[i]],
     ]);
   }
 }
+
+/// The ways to reach a contact, as label / value rows.
+List<(String, String)> contactRows(Json c) => [
+      if (c.sn('phone') != null) ('Phone', c.s('phone')),
+      if (c.sn('whatsapp') != null && c.s('whatsapp') != c.s('phone')) ('WhatsApp', c.s('whatsapp')),
+      if (c.sn('email') != null) ('Email', c.s('email')),
+      if (c.sn('wechat') != null) ('WeChat', c.s('wechat')),
+      if (c.sn('position') != null) ('Position', c.s('position')),
+    ];
 
 /// 2 × 2 figures on a dark band (packing totals).
 class FigureBand extends StatelessWidget {
@@ -232,10 +248,11 @@ class ToneBadge extends StatelessWidget {
   }
 }
 
-Widget queryStatusBadge(String s) => ToneBadge(queryStatusLabel[s] ?? s, tone: queryStatusTone[s] ?? Tone.neutral, dot: true);
-Widget quotationStatusBadge(String s) => ToneBadge(quotationStatusLabel[s] ?? s, tone: quotationStatusTone[s] ?? Tone.neutral, dot: true);
-Widget invoiceStatusBadge(String s) => ToneBadge(invoiceStatusLabel[s] ?? s, tone: invoiceStatusTone[s] ?? Tone.neutral, dot: true);
+Widget stageBadge(String s) => ToneBadge(stageLabel[s] ?? s, tone: stageTone[s] ?? Tone.neutral, dot: true);
+Widget revisionStatusBadge(String s) => ToneBadge(revisionStatusLabel[s] ?? s, tone: revisionStatusTone[s] ?? Tone.neutral, dot: true);
+Widget orderStageBadge(String s) => ToneBadge(orderStageLabel[s] ?? s, tone: orderStageTone[s] ?? Tone.neutral, dot: true);
 Widget priorityBadge(String p) => ToneBadge(priorityLabel[p] ?? p, tone: priorityTone[p] ?? Tone.neutral);
+const onHoldBadge = ToneBadge('On hold', tone: Tone.warn);
 
 class Avatar extends StatelessWidget {
   const Avatar(this.name, {super.key, this.size = 32});
@@ -790,4 +807,12 @@ class MoneyText extends StatelessWidget {
         f.money(value, currency),
         style: (style ?? context.t.bodyMedium!.copyWith(fontWeight: FontWeight.w600)).copyWith(fontFeatures: const [FontFeature.tabularFigures()], color: bad ? context.c.bad : null),
       );
+}
+
+/// Where a feature lives now ("Editing prices stays on the web").
+class WebNote extends StatelessWidget {
+  const WebNote(this.text, {super.key});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Notice(text, tone: Tone.neutral, icon: Icons.computer_rounded);
 }

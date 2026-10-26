@@ -8,38 +8,54 @@ import '../../core/refresh.dart';
 import '../../core/session.dart';
 import '../../ui/kit.dart';
 
-/// Web paths in notifications (/queries/…) → app routes (/inquiries/…).
+/// Links in notifications and pushes (`/deals/<id>`, `/orders/<id>`, full web URLs too) → app routes.
 String? appRoute(String? link) {
   if (link == null || link.isEmpty) return null;
-  final path = Uri.tryParse(link)?.path ?? link;
-  if (path.startsWith('/queries/')) return path.replaceFirst('/queries/', '/inquiries/');
-  for (final p in ['/quotations/', '/invoices/', '/packing-lists/', '/customers/']) {
-    if (path.startsWith(p)) return path;
-  }
-  return null;
+  final path = (Uri.tryParse(link)?.path ?? link).replaceAll(RegExp(r'/+$'), '');
+  final parts = path.split('/').where((p) => p.isNotEmpty).toList();
+  if (parts.length < 2) return null;
+  final id = parts[1];
+  return switch (parts[0]) {
+    'deals' || 'inquiries' || 'queries' => parts.length > 2 && parts[2] == 'quotation' ? '/deals/$id/quotation' : '/deals/$id',
+    'orders' => '/orders/$id',
+    'customers' => '/customers/$id',
+    _ => null,
+  };
 }
+
+final notificationsProvider = FutureProvider.autoDispose<Json>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.read(repoProvider).notifications();
+});
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   IconData _icon(String type) => switch (type) {
-        'query.assigned' => Icons.person_add_alt_1_outlined,
-        'query.created' => Icons.move_to_inbox_outlined,
-        'reminder.pending' || 'reminder.processing' || 'reminder.due' => Icons.alarm_rounded,
-        _ when type.contains('quotation') => Icons.request_quote_outlined,
-        _ when type.contains('payment') || type.contains('invoice') => Icons.payments_outlined,
+        'inquiry.assigned' => Icons.person_add_alt_1_outlined,
+        'inquiry.created' || 'inquiry.new' => Icons.move_to_inbox_outlined,
+        'inquiry.lost' => Icons.block_rounded,
+        'inquiry.won' => Icons.emoji_events_outlined,
+        _ when type.startsWith('reminder') => Icons.alarm_rounded,
+        _ when type.contains('quotation') || type.contains('revision') => Icons.request_quote_outlined,
+        _ when type.contains('payment') => Icons.payments_outlined,
+        _ when type.startsWith('order') => Icons.local_shipping_outlined,
         _ => Icons.notifications_none_rounded,
       };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final data = ref.watch(getProvider('/api/v1/notifications'));
-    final api = ref.read(apiProvider);
+    final data = ref.watch(notificationsProvider);
+    final repo = ref.read(repoProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Notifications'), actions: [
         TextButton(
           onPressed: () async {
-            await ref.mutate(() => api.post('/api/v1/notifications/read', {}));
+            try {
+              await ref.mutate(repo.markAllRead);
+            } catch (e) {
+              if (context.mounted) toast(context, e.toString(), error: true);
+            }
           },
           child: const Text('Mark all read'),
         ),
@@ -48,11 +64,11 @@ class NotificationsScreen extends ConsumerWidget {
         onRefresh: () async => ref.read(dataVersionProvider.notifier).bump(),
         child: data.when(
           loading: () => const LoadingView(),
-          error: (e, _) => ListView(children: [ErrorState(e, onRetry: () => ref.invalidate(getProvider('/api/v1/notifications')))]),
+          error: (e, _) => ListView(children: [ErrorState(e, onRetry: () => ref.invalidate(notificationsProvider))]),
           data: (d) {
             final items = d.l('items');
             if (items.isEmpty) {
-              return ListView(children: const [EmptyState(icon: Icons.notifications_none_rounded, title: 'No notifications', message: 'Assignments, reminders and updates on your work show up here.')]);
+              return ListView(children: const [EmptyState(icon: Icons.notifications_none_rounded, title: 'No notifications', message: 'Assignments, reminders and updates on your deals and orders show up here.')]);
             }
             return ListView(padding: pagePadding, children: [
               Card(
@@ -62,7 +78,7 @@ class NotificationsScreen extends ConsumerWidget {
                     InkWell(
                       onTap: () async {
                         if (n.sn('readAt') == null) {
-                          ref.mutate(() => api.post('/api/v1/notifications/read', {'ids': [n.s('id')]})).ignore();
+                          ref.mutate(() => repo.markRead([n.s('id')])).ignore();
                         }
                         final route = appRoute(n.sn('link'));
                         if (route != null && context.mounted) context.push(route);

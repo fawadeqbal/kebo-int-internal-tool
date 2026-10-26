@@ -8,9 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'json.dart';
 import 'push.dart';
+import 'repository.dart';
 
 /// Default server; changeable on the sign-in screen (Server…), or at build time:
-/// flutter build apk --dart-define=API_BASE=https://rfq.example.com
+/// flutter build apk --dart-define=API_BASE=https://kebo.example.com
 const defaultServer = String.fromEnvironment('API_BASE', defaultValue: 'https://rfq.fawadiqbal.dev');
 
 final prefsProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError('overridden in main'));
@@ -20,38 +21,39 @@ final apiProvider = Provider<Api>((ref) {
   return Api(baseUrl: prefs.getString('server') ?? defaultServer);
 });
 
-enum SessionStatus { loading, signedOut, needsCode, needsSetup, signedIn }
+final repoProvider = Provider<KeboRepository>((ref) => KeboRepository(ref.watch(apiProvider)));
+
+enum SessionStatus { loading, signedOut, needsCode, signedIn }
 
 @immutable
 class Session {
-  const Session(this.status, {this.me, this.challenge, this.message});
+  const Session(this.status, {this.user = const {}, this.message});
   final SessionStatus status;
-  final Json? me;
-  final String? challenge;
+
+  /// `{ id, name, email, role, permissions }` from /api/auth/me.
+  final Json user;
   final String? message;
 
-  Json get user => me?.m('user') ?? const {};
   String get role => user.s('role');
   String get userId => user.s('id');
-  List<String> get permissions => me?.ls('permissions') ?? const [];
+  List<String> get permissions => user.ls('permissions');
   bool can(String permission) => permissions.contains(permission);
-  bool get isManager => can('queries.viewAll');
-  int get unread => me?.i('unreadNotifications') ?? 0;
+
+  /// Managers (and admins) see every deal and can assign, reopen and override steps.
+  bool get isManager => can('inquiries.viewAll');
 }
 
 const _storage = FlutterSecureStorage();
-const _tokenKey = 'kebo_rfq_token';
+const _tokenKey = 'kebo_token';
 
 class SessionController extends Notifier<Session> {
+  KeboRepository get _repo => ref.read(repoProvider);
   Api get _api => ref.read(apiProvider);
 
   @override
   Session build() {
     final api = ref.read(apiProvider);
     api.onSignedOut = () => _signedOut('Your session ended. Please sign in again.');
-    api.onSetupRequired = () {
-      if (state.status == SessionStatus.signedIn) state = Session(SessionStatus.needsSetup, me: state.me);
-    };
     Future.microtask(_restore);
     return const Session(SessionStatus.loading);
   }
@@ -79,41 +81,53 @@ class SessionController extends Notifier<Session> {
   }
 
   Future<void> refreshMe() async {
-    final me = await _api.get('/api/v1/me');
-    state = Session(me.b('twoStepSetupRequired') ? SessionStatus.needsSetup : SessionStatus.signedIn, me: me);
+    final me = await _repo.me();
+    state = Session(SessionStatus.signedIn, user: me);
   }
 
   /// Step 1: email + password. Throws [ApiException] with the server's message.
   Future<void> signIn(String email, String password) async {
-    final res = await _api.post('/api/v1/auth/login', {'email': email.trim(), 'password': password});
-    if (res.b('twoStep')) {
-      state = Session(SessionStatus.needsCode, challenge: res.s('challenge'));
+    final res = await _repo.login(email, password);
+    // The token is needed for the second step too (sent as the bearer), but is only kept once complete.
+    _api.token = res.s('token');
+    if (res.b('twoStepRequired')) {
+      state = const Session(SessionStatus.needsCode);
       return;
     }
-    await _useToken(res.s('token'));
+    await _keep(res.s('token'), res.m('user'));
   }
 
-  /// Step 2: the 6-digit code (or a recovery code).
+  /// Step 2: the 6-digit code (or a recovery code), with the token from step 1.
   Future<Json> verifyCode(String code) async {
-    final res = await _api.post('/api/v1/auth/two-step', {'challenge': state.challenge, 'code': code.trim()});
-    await _useToken(res.s('token'));
+    final res = await _repo.twoStep(code);
+    await _keep(_api.token!, res.m('user'));
     return res;
   }
 
-  Future<void> _useToken(String token) async {
+  Future<void> _keep(String token, Json user) async {
     _api.token = token;
     try {
       await _storage.write(key: _tokenKey, value: token);
     } catch (_) {}
-    await refreshMe();
-    ref.invalidate(metaProvider);
+    if (user.isEmpty) {
+      await refreshMe();
+    } else {
+      state = Session(SessionStatus.signedIn, user: user);
+    }
   }
 
-  void backToSignIn() => state = const Session(SessionStatus.signedOut);
+  void backToSignIn() {
+    _api.token = null;
+    state = const Session(SessionStatus.signedOut);
+  }
 
   Future<void> signOut() async {
     try {
-      await _api.post('/api/v1/auth/logout', {if (Push.token != null) 'deviceToken': Push.token});
+      final push = Push.token;
+      if (push != null) await _repo.forgetDevice(push);
+    } catch (_) {}
+    try {
+      await _repo.logout();
     } catch (_) {}
     await _signedOut(null);
   }
@@ -128,7 +142,7 @@ class SessionController extends Notifier<Session> {
   }
 
   Future<void> setServer(String url) async {
-    final clean = url.trim().replaceAll(RegExp(r'/+$'), '');
+    final clean = Api.normalizeServer(url);
     await ref.read(prefsProvider).setString('server', clean);
     _api.baseUrl = clean;
   }
@@ -136,11 +150,18 @@ class SessionController extends Notifier<Session> {
 
 final sessionProvider = NotifierProvider<SessionController, Session>(SessionController.new);
 
-/// Labels, categories, people, defaults and company details for the forms.
-final metaProvider = FutureProvider<Json>((ref) async {
+/// Categories, currency and company details (GET /api/settings), for the forms.
+final settingsProvider = FutureProvider<Json>((ref) async {
   final s = ref.watch(sessionProvider.select((s) => s.status));
   if (s != SessionStatus.signedIn) return <String, dynamic>{};
-  return ref.read(apiProvider).get('/api/v1/meta');
+  return ref.read(repoProvider).settings();
+});
+
+/// Active people for "assign to".
+final peopleProvider = FutureProvider<List<Json>>((ref) async {
+  final s = ref.watch(sessionProvider.select((s) => s.status));
+  if (s != SessionStatus.signedIn) return const [];
+  return ref.read(repoProvider).people();
 });
 
 /// Light / dark / system, remembered on the phone.
