@@ -214,3 +214,22 @@ describe("tax", () => {
     expect(revisionInput.parse({ validUntil: "2026-11-01", vatRate: 13, lines: [{ description: "x", quantity: 1, unitPrice: 1 }] })).not.toHaveProperty("vatRate");
   });
 });
+
+describe("line numbers", () => {
+  it("numbers items 1, 2, 3 and their parts 3.1, 3.2", async () => {
+    const { lineNumbers } = await import("../src");
+    expect(lineNumbers([{ key: "a" }, { key: "b" }, { key: "b1", parentKey: "b" }, { key: "b2", parentKey: "b" }, { key: "c" }, { key: "x", parentKey: "missing" }])).toEqual(["1", "2", "2.1", "2.2", "3", "4"]);
+  });
+});
+
+describe("reasons", () => {
+  it("offers quick choices for every kind of change", async () => {
+    const { REASON_CHOICES, inquiryInput, splitItemInput } = await import("../src");
+    expect(Object.values(REASON_CHOICES).every((c) => c.length >= 2)).toBe(true);
+    const base = { customerId: "8d5c1f0e-3c51-4c9e-9b8e-7f3c2a1b0c9d", category: "Machinery", items: [{ description: "x", quantity: 1 }] };
+    expect(inquiryInput.parse({ ...base, reason: "  Customer changed the quantity " }).reason).toBe("Customer changed the quantity");
+    expect(inquiryInput.parse(base).reason).toBeUndefined();
+    expect(splitItemInput.safeParse({ parts: [] }).success).toBe(false);
+  });
+});
+

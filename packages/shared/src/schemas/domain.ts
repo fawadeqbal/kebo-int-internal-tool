@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ATTACHMENT_KINDS,
   BALANCE_TERMS,
   CUSTOMER_TYPES,
   INCOTERMS,
@@ -15,6 +16,12 @@ import {
 } from "../enums";
 import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
+
+/**
+ * Why a change was made. Optional in the schema: the API asks for it (409
+ * "reason_needed") only where a change affects others (see workflows/reasons).
+ */
+export const reasonField = optionalText(500).optional();
 
 /* ---------------------------------------------------------------- customers */
 
@@ -45,6 +52,7 @@ export const customerInput = z.object({
   defaultCurrency: currency.default("USD"),
   notes: optionalText(5000),
   contacts: z.array(contactInput).min(1, "Add at least one contact").max(20),
+  reason: reasonField,
   /** Save even though a contact's email or phone matches another customer. */
   allowDuplicate: bool.default(false),
 });
@@ -59,6 +67,9 @@ export const factoryInput = z.object({
   address: optionalText(500),
   bankDetails: optionalText(1000),
   notes: optionalText(5000),
+  /** The person in our team who looks after this factory. */
+  ownerId: optionalId,
+  reason: reasonField,
 });
 export type FactoryInput = z.infer<typeof factoryInput>;
 
@@ -66,6 +77,8 @@ export type FactoryInput = z.infer<typeof factoryInput>;
 
 export const requestedItemInput = z.object({
   id: optionalId,
+  /** A part of another item (split at factory pricing): that item's id. */
+  parentId: optionalId,
   description: text(2000, "Each item needs a description"),
   model: optionalText(120),
   quantity,
@@ -83,7 +96,8 @@ export const inquiryInput = z.object({
   priority: z.enum(PRIORITIES).default("normal"),
   requiredBy: optionalDate,
   assigneeId: optionalId,
-  items: z.array(requestedItemInput).min(1, "Add at least one item").max(200),
+  items: z.array(requestedItemInput).min(1, "Add at least one item").max(300),
+  reason: reasonField,
 });
 export type InquiryInput = z.infer<typeof inquiryInput>;
 
@@ -92,12 +106,27 @@ export const stageMoveInput = z
     to: z.enum(INQUIRY_STAGES),
     lostReason: z.enum(LOST_REASONS).nullish(),
     note: optionalText(2000),
+    reason: reasonField,
   })
   .refine((v) => v.to !== "lost" || !!v.lostReason, { message: "Choose why the deal was lost", path: ["lostReason"] });
 export type StageMoveInput = z.infer<typeof stageMoveInput>;
 
-export const holdInput = z.object({ onHold: bool, note: optionalText(2000) });
-export const assignInput = z.object({ assigneeId: optionalId });
+export const holdInput = z.object({ onHold: bool, note: optionalText(2000), reason: reasonField });
+export const assignInput = z.object({ assigneeId: optionalId, reason: reasonField });
+
+/** Split an item into parts (at factory pricing): each part is an item of its own, numbered under it (3.1, 3.2). */
+export const splitItemInput = z.object({
+  parts: z
+    .array(z.object({ description: text(2000, "Each part needs a description"), model: optionalText(120), quantity, unit: z.string().trim().max(20).default("pcs") }))
+    .min(1, "Add at least one part")
+    .max(50),
+  reason: reasonField,
+});
+export type SplitItemInput = z.infer<typeof splitItemInput>;
+
+/** A file's type and note (URS & Documents). */
+export const attachmentInput = z.object({ kind: z.enum(ATTACHMENT_KINDS).default("other"), note: optionalText(300) });
+export type AttachmentInput = z.infer<typeof attachmentInput>;
 export const noteInput = z.object({ body: text(5000, "Write a note first") });
 
 export const inquiryListQuery = listQuery.extend({
@@ -139,12 +168,13 @@ export const factoryQuoteInput = z
     paymentTerms: optionalText(2000),
     notes: optionalText(5000),
     lines: z.array(factoryQuoteLineInput).min(1, "Add at least one price").max(300),
+    reason: reasonField,
   })
   .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] });
 export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
 
 /** Which factory price each requested item is quoted from by default ({ itemId: lineId | null }). */
-export const preferredLinesInput = z.object({ choices: z.record(z.uuid(), z.uuid().nullable()) });
+export const preferredLinesInput = z.object({ choices: z.record(z.uuid(), z.uuid().nullable()), reason: reasonField });
 
 /* ---------------------------------------------------------------- quotations */
 
@@ -175,6 +205,7 @@ export const revisionInput = z.object({
   terms: optionalText(5000),
   notes: optionalText(5000),
   lines: z.array(quoteLineInput).min(1, "Add at least one line").max(300),
+  reason: reasonField,
 });
 export type RevisionInput = z.infer<typeof revisionInput>;
 
@@ -182,6 +213,7 @@ export const revisionMoveInput = z.object({
   to: z.enum(REVISION_STATUSES).exclude(["draft", "superseded", "void"]),
   /** The day it was sent or answered; today when empty. */
   on: optionalDate,
+  reason: reasonField,
 });
 
 /* ---------------------------------------------------------------- orders */
@@ -197,6 +229,7 @@ export const moveStageInput = z.object({
   /** Shipped: the ship date (today when empty) and the B/L number. */
   shippedOn: optionalDate,
   blNo: optionalText(60),
+  reason: reasonField,
 });
 export type MoveStageInput = z.infer<typeof moveStageInput>;
 
@@ -209,6 +242,7 @@ export const orderDetailsInput = z.object({
   /** Heading over the lines on the proforma / invoice / packing list. */
   documentTitle: optionalText(200).optional(),
   portOfDischarge: optionalText(120).optional(),
+  reason: reasonField,
 });
 export type OrderDetailsInput = z.infer<typeof orderDetailsInput>;
 

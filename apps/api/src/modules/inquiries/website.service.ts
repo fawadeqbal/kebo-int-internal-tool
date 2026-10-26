@@ -162,7 +162,7 @@ export class WebsiteService {
           requiredBy: null,
           assigneeId: null,
           // One free-text message: one item to split up later; the full text is kept as the requirements.
-          items: [{ id: null, description: firstLine.slice(0, 2000), model: null, quantity: 1, unit: "pcs", targetPrice: null }],
+          items: [{ id: null, parentId: null, description: firstLine.slice(0, 2000), model: null, quantity: 1, unit: "pcs", targetPrice: null }],
         },
         { channelNote: [note, input.page && `— Sent from ${input.page}`].filter(Boolean).join("\n\n") || undefined },
       );

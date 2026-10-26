@@ -1,9 +1,9 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Options, Param, ParseUUIDPipe, Post, Put, Query, Req, Res, StreamableFile, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, HttpCode, Options, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, Res, StreamableFile, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { assignInput, holdInput, inquiryInput, inquiryListQuery, noteInput, stageMoveInput, type InquiryInput, type InquiryListQuery, type StageMoveInput } from "@kebo/shared";
+import { assignInput, attachmentInput, holdInput, inquiryInput, inquiryListQuery, noteInput, splitItemInput, stageMoveInput, type AttachmentInput, type InquiryInput, type InquiryListQuery, type SplitItemInput, type StageMoveInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, Public, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -55,7 +55,14 @@ export class InquiriesController {
   @Post(":id/assign")
   @HttpCode(200)
   assign(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(assignInput)) body: z.infer<typeof assignInput>) {
-    return this.inquiries.assign(user, id, body.assigneeId);
+    return this.inquiries.assign(user, id, body.assigneeId, body.reason);
+  }
+
+  /** { parts: [{ description, model?, quantity, unit }], reason? } — the item is quoted in parts (numbered under it). */
+  @Post(":id/items/:itemId/parts")
+  @HttpCode(200)
+  split(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("itemId", ParseUUIDPipe) itemId: string, @Body(Validate(splitItemInput)) body: SplitItemInput) {
+    return this.inquiries.split(user, id, itemId, body);
   }
 
   @Post(":id/notes")
@@ -71,16 +78,30 @@ export class InquiriesController {
     return { ok: true };
   }
 
-  /** multipart/form-data with one `file`. */
+  /** multipart/form-data with one `file`, and optionally `kind` (urs | drawing | photo | specification | other) and `note`. */
   @Post(":id/files")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   upload(
     @CurrentUser() user: SessionUser,
     @Param("id", ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Body(Validate(attachmentInput)) meta: AttachmentInput,
   ) {
     if (!file) throw new z.ZodError([{ code: "custom", path: ["file"], message: "Choose a file to upload", input: undefined }]);
-    return this.inquiries.upload(user, id, file);
+    return this.inquiries.upload(user, id, file, meta);
+  }
+
+  /** Every file on the deal in one zip. */
+  @Get(":id/files.zip")
+  async zip(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
+    const z = await this.inquiries.zipFiles(user, id);
+    res.set({
+      "Content-Type": "application/zip",
+      "Content-Length": String(z.data.byteLength),
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(z.fileName)}`,
+      "Cache-Control": "private, no-store",
+    });
+    return new StreamableFile(Buffer.from(z.data));
   }
 }
 
@@ -100,6 +121,12 @@ export class FilesController {
       "Cache-Control": "private, no-store",
     });
     return new StreamableFile(f.stream);
+  }
+
+  /** { kind, note } — what the file is (URS, drawing…) and a note. */
+  @Patch(":id")
+  describe(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(attachmentInput)) body: AttachmentInput) {
+    return this.inquiries.describeFile(user, id, body);
   }
 
   @Delete(":id")

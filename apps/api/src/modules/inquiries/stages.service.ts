@@ -23,7 +23,7 @@ export interface StageSubject {
 export class StagesService {
   constructor(private readonly audit: AuditService) {}
 
-  private async write(tx: Tx, subject: StageSubject, to: InquiryStage, cause: string, actorId: string | null, extra: { lostReason?: LostReason | null; note?: string | null } = {}) {
+  private async write(tx: Tx, subject: StageSubject, to: InquiryStage, cause: string, actorId: string | null, extra: { lostReason?: LostReason | null; note?: string | null; reason?: string | null } = {}) {
     const closing = to === "won" || to === "lost";
     await tx.inquiry.update({
       where: { id: subject.id },
@@ -47,6 +47,7 @@ export class StagesService {
       summary: `${subject.refNo}: ${INQUIRY_STAGE_LABEL[subject.stage]} → ${INQUIRY_STAGE_LABEL[to]}${cause === "manual" ? "" : ` (${cause.replace(/_/g, " ")})`}${extra.note ? ` — ${extra.note}` : ""}`,
       oldValues: { stage: subject.stage },
       newValues: { stage: to },
+      reason: extra.reason ?? (to === "lost" ? (extra.note ?? null) : null),
     });
     const event: DomainEvent = {
       type: "inquiry.stageChanged",
@@ -69,7 +70,7 @@ export class StagesService {
   }
 
   /** A person's decision: mark lost (with a reason), start working, or reopen. */
-  async manual(tx: Tx, subject: StageSubject, to: InquiryStage, input: { lostReason?: LostReason | null; note?: string | null }, actor: { id: string; canReopen: boolean }) {
+  async manual(tx: Tx, subject: StageSubject, to: InquiryStage, input: { lostReason?: LostReason | null; note?: string | null; reason?: string | null }, actor: { id: string; canReopen: boolean }) {
     const problems = checkManualMove(subject.stage, to, { lostReason: input.lostReason, canReopen: actor.canReopen });
     if (problems.length) throw new GateError(problems[0], "stage_move");
     return this.write(tx, subject, to, "manual", actor.id, input);

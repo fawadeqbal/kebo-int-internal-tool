@@ -48,6 +48,10 @@ export type RevisionStatus = (typeof REVISION_STATUSES)[number];
 export const LINE_TYPES = values("goods", "service", "charge");
 export type LineType = (typeof LINE_TYPES)[number];
 
+/** What a file on a deal is: the customer's URS (user requirement specification), a drawing, a photo… */
+export const ATTACHMENT_KINDS = values("urs", "drawing", "photo", "specification", "other");
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
 export const INCOTERMS = values("EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP");
 export type Incoterm = (typeof INCOTERMS)[number];
 
