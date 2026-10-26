@@ -44,7 +44,7 @@ pnpm dev                                          # API http://localhost:4000/ap
 ```
 
 Sign in at http://localhost:3000 with admin@example.com / Admin@12345, manager@example.com / Manager@12345, staff@example.com / Staff@12345, or the demo staff bilal@example.com / sana@example.com (Demo@12345).
-Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up -d`) and run `pnpm dev`.
+Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up -d`) and run `pnpm dev`. After changing code in `packages/`, run `pnpm build` (the API and web pick it up).
 
 | Command | |
 |---|---|
