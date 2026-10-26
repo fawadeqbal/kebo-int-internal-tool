@@ -55,8 +55,6 @@ export class SourcingService {
         validUntil: fromDbDateOrNull(q.validUntil),
         currency: q.currency,
         pricesIncludeVat: q.pricesIncludeVat,
-        vatRate: Number(q.vatRate),
-        rebateRate: Number(q.rebateRate),
         priceBasis: q.priceBasis,
         leadTime: q.leadTime,
         moq: q.moq,
@@ -65,7 +63,7 @@ export class SourcingService {
         /** null when the exchange rate for this currency is missing in Settings. */
         fxRate: rate,
         lines: q.lines.map((l) => {
-          const costInFactoryCurrency = unitCostMinor({ unitPriceMinor: decimalToMinor(l.unitPrice), vatRate: Number(q.vatRate), pricesIncludeVat: q.pricesIncludeVat, rebateRate: Number(q.rebateRate) });
+          const costInFactoryCurrency = unitCostMinor({ unitPriceMinor: decimalToMinor(l.unitPrice), vatRate: Number(l.vatRate), pricesIncludeVat: q.pricesIncludeVat, rebateRate: Number(l.rebateRate) });
           const cost = rate ? convertMinor(costInFactoryCurrency, rate) : null;
           return {
             id: l.id,
@@ -75,7 +73,9 @@ export class SourcingService {
             quantity: l.quantity.toString(),
             unit: l.unit,
             unitPrice: l.unitPrice.toFixed(2),
-            /** One unit's landed cost in the selling currency (its VAT, less the export rebate). */
+            vatRate: Number(l.vatRate),
+            rebateRate: Number(l.rebateRate),
+            /** One unit's landed cost in the selling currency. */
             unitCost: cost === null ? null : fromMinor(cost),
           };
         }),
@@ -105,7 +105,7 @@ export class SourcingService {
   }
 
   /** An existing factory, a known one with the same name, or a new one. */
-  private async factoryFor(tx: Tx, user: SessionUser, input: FactoryQuoteInput) {
+  private async factoryFor(tx: Tx, user: SessionUser, input: FactoryQuoteInput, lines: FactoryQuoteInput["lines"]) {
     if (input.factoryId) {
       const f = await tx.factory.findFirst({ where: { id: input.factoryId, deletedAt: null } });
       if (!f) throw new DomainError("That factory was removed. Choose another one.");
@@ -114,7 +114,7 @@ export class SourcingService {
     const name = input.newFactoryName!.trim().replace(/\s+/g, " ");
     const known = await tx.factory.findFirst({ where: { deletedAt: null, name: { equals: name, mode: "insensitive" } } });
     if (known) return known;
-    const f = await tx.factory.create({ data: { name, createdById: user.id } });
+    const f = await tx.factory.create({ data: { name, defaultVatRate: lines[0]?.vatRate ?? 13, pricesIncludeVat: input.pricesIncludeVat, createdById: user.id } });
     await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: f.id, summary: `Added factory ${f.name}` });
     return f;
   }
@@ -131,7 +131,7 @@ export class SourcingService {
     }
     for (const [n, l] of lines.entries()) {
       if (l.requestedItemId && !own.has(l.requestedItemId)) throw new DomainError("A price is linked to an item that is not on this deal. Reload and try again.");
-      const row = { requestedItemId: l.requestedItemId, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit, unitPrice: l.unitPrice, sortOrder: n };
+      const row = { requestedItemId: l.requestedItemId, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit, unitPrice: l.unitPrice, vatRate: l.vatRate, rebateRate: l.rebateRate, sortOrder: n };
       if (l.id && existing.has(l.id)) await tx.factoryQuoteLine.update({ where: { id: l.id }, data: row });
       else await tx.factoryQuoteLine.create({ data: { ...row, factoryQuoteId: quoteId } });
     }
@@ -148,8 +148,7 @@ export class SourcingService {
       receivedOn: toDbDate(input.receivedOn),
       validUntil: toDbDateOrNull(input.validUntil),
       currency: input.currency,
-      vatRate: input.vatRate,
-      rebateRate: input.rebateRate,
+      pricesIncludeVat: input.pricesIncludeVat,
       priceBasis: input.priceBasis,
       leadTime: input.leadTime,
       moq: input.moq,
@@ -164,7 +163,7 @@ export class SourcingService {
     const quote = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${inquiryId}::uuid for update`;
       const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
-      const factory = await this.factoryFor(tx, user, input);
+      const factory = await this.factoryFor(tx, user, input, input.lines);
       const q = await tx.factoryQuote.create({ data: { ...this.header(input), inquiryId, factoryId: factory.id, createdById: user.id } });
       await this.writeLines(tx, q.id, inquiryId, input.lines);
       await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory_quote", entityId: q.id, summary: `${inquiry.refNo}: prices from ${factory.name} (${input.lines.length} lines, ${input.currency})` });
@@ -187,7 +186,7 @@ export class SourcingService {
     this.assertCan(user);
     return this.prisma.tx(async (tx) => {
       const { q, inquiry } = await this.findQuote(user, quoteId, tx);
-      const factory = await this.factoryFor(tx, user, input);
+      const factory = await this.factoryFor(tx, user, input, input.lines);
       const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input), factoryId: factory.id } });
       await this.writeLines(tx, quoteId, q.inquiryId, input.lines);
       await this.audit.record(tx, { userId: user.id, action: "update", entityType: "factory_quote", entityId: quoteId, summary: `${inquiry.refNo}: edited prices from ${factory.name}` });

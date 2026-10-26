@@ -12,6 +12,7 @@ import {
   PAYMENT_METHODS,
   PRIORITIES,
   REVISION_STATUSES,
+  TAX_TREATMENTS,
 } from "../enums";
 import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, percentOr, phone, quantity, text } from "./common";
 
@@ -40,6 +41,7 @@ export const customerInput = z.object({
     .regex(/^[A-Z]{2}$/, "Choose a country"),
   address: optionalText(500),
   taxNo: optionalText(60),
+  taxTreatment: z.enum(TAX_TREATMENTS).default("export_zero_rated"),
   defaultCurrency: currency.default("USD"),
   notes: optionalText(5000),
   contacts: z.array(contactInput).min(1, "Add at least one contact").max(20),
@@ -55,6 +57,8 @@ export const factoryInput = z.object({
   wechat: optionalText(80),
   email,
   address: optionalText(500),
+  defaultVatRate: percentOr(13),
+  pricesIncludeVat: bool.default(true),
   bankDetails: optionalText(1000),
   notes: optionalText(5000),
 });
@@ -117,7 +121,9 @@ export const factoryQuoteLineInput = z.object({
   model: optionalText(120),
   quantity,
   unit: z.string().trim().max(20).default("pcs"),
-  unitPrice: amount("Enter the factory's price, including its VAT"),
+  unitPrice: amount("Enter the factory's price"),
+  vatRate: percentOr(13),
+  rebateRate: percentOr(0),
 });
 
 export const factoryQuoteInput = z
@@ -129,9 +135,7 @@ export const factoryQuoteInput = z
     receivedOn: isoDate(),
     validUntil: optionalDate,
     currency: currency.default("CNY"),
-    /** The factory's VAT in its prices (Chinese factories quote with VAT), and the export rebate we get back. Both must be chosen. */
-    vatRate: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number({ message: "Choose the factory's VAT" }).min(0).max(100)),
-    rebateRate: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number({ message: "Choose the export rebate" }).min(0).max(100)),
+    pricesIncludeVat: bool.default(true),
     priceBasis: optionalText(60),
     leadTime: optionalText(120),
     moq: optionalText(60),
@@ -139,8 +143,7 @@ export const factoryQuoteInput = z
     notes: optionalText(5000),
     lines: z.array(factoryQuoteLineInput).min(1, "Add at least one price").max(300),
   })
-  .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] })
-  .refine((v) => v.rebateRate <= v.vatRate, { message: "The rebate cannot be more than the VAT", path: ["rebateRate"] });
+  .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] });
 export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
 
 /** Which factory price each requested item is quoted from by default ({ itemId: lineId | null }). */
@@ -172,6 +175,8 @@ export const revisionInput = z.object({
   balanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
   leadTime: optionalText(120),
   validUntil: isoDate(),
+  vatRate: percentOr(0),
+  pricesIncludeVat: bool.default(false),
   discount: amountOr(0),
   terms: optionalText(5000),
   notes: optionalText(5000),

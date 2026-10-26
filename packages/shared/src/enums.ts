@@ -38,6 +38,9 @@ export const CUSTOMER_TYPES = values("company", "individual");
 export type CustomerType = (typeof CUSTOMER_TYPES)[number];
 
 /** Export sales are zero-rated; domestic sales carry VAT. */
+export const TAX_TREATMENTS = values("export_zero_rated", "domestic_vat");
+export type TaxTreatment = (typeof TAX_TREATMENTS)[number];
+
 /* ---------------------------------------------------------------- quotations */
 
 /** Status of one revision (R1, R2…) of a quotation. */
@@ -80,6 +83,7 @@ export const ENUMS = {
   Priority: PRIORITIES,
   LostReason: LOST_REASONS,
   CustomerType: CUSTOMER_TYPES,
+  TaxTreatment: TAX_TREATMENTS,
   RevisionStatus: REVISION_STATUSES,
   LineType: LINE_TYPES,
   Incoterm: INCOTERMS,

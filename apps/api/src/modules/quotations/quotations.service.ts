@@ -160,6 +160,8 @@ export class QuotationsService {
         balanceTerms: v.balanceTerms,
         leadTime: v.leadTime,
         validUntil: v.validUntil < this.clock.today() ? validUntil : v.validUntil,
+        vatRate: v.vatRate,
+        pricesIncludeVat: v.pricesIncludeVat,
         discount: Number(v.discount),
         terms: v.terms,
         notes: v.notes,
@@ -178,6 +180,8 @@ export class QuotationsService {
         })),
       };
     }
+    const domestic = customer.taxTreatment === "domestic_vat";
+    const vat = { rate: domestic ? settings.sales.vatRate : 0, pricesIncludeVat: domestic && settings.sales.pricesIncludeVat };
     const options = seeCosts ? (await this.sourcing.forInquiry(user, inquiryId)).items : [];
     const items = await this.prisma.db.requestedItem.findMany({ where: { inquiryId }, orderBy: { sortOrder: "asc" } });
     return {
@@ -189,6 +193,8 @@ export class QuotationsService {
       balanceTerms: settings.sales.defaultBalanceTerms,
       leadTime: null,
       validUntil,
+      vatRate: vat.rate,
+      pricesIncludeVat: vat.pricesIncludeVat,
       discount: 0,
       terms: settings.sales.defaultTerms || null,
       notes: null,
@@ -204,7 +210,7 @@ export class QuotationsService {
           hsCode: null,
           quantity: Number(it.quantity),
           unit: it.unit,
-          unitPrice: cost === null ? 0 : Number(fromMinor(priceForMargin(cost, settings.sales.defaultMarginPercent))),
+          unitPrice: cost === null ? 0 : Number(fromMinor(priceForMargin(cost, settings.sales.defaultMarginPercent, vat))),
           unitCost: cost === null ? null : Number(fromMinor(cost)),
           factoryQuoteLineId: line?.id ?? null,
           fxRate: null,
@@ -224,6 +230,7 @@ export class QuotationsService {
     const totals = documentTotals(
       input.lines.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice })),
       input.discount,
+      { rate: input.vatRate, pricesIncludeVat: input.pricesIncludeVat },
     );
     if (totals.total <= 0) throw new DomainError("The quotation total must be more than zero.");
     if (totals.total > MAX_TOTAL_MINOR) throw new DomainError("The quotation total is too large.");
@@ -258,9 +265,8 @@ export class QuotationsService {
         balanceTerms: input.balanceTerms,
         leadTime: input.leadTime,
         validUntil: toDbDate(input.validUntil),
-        // Kebo exports: quotations carry no VAT (older ones that had VAT keep it).
-        vatRate: 0,
-        pricesIncludeVat: false,
+        vatRate: input.vatRate,
+        pricesIncludeVat: input.pricesIncludeVat,
         subtotal: fromMinor(totals.subtotal),
         discount: fromMinor(totals.discount),
         vatAmount: fromMinor(totals.vat),
