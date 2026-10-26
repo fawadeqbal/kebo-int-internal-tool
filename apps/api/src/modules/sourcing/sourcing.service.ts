@@ -104,6 +104,7 @@ export class SourcingService {
         ),
       };
     });
+    const rank = (cost: string | null) => (cost === null ? Number.MAX_VALUE : Number(cost) > 0 ? Number(cost) : Number.MAX_VALUE / 2);
     const allLines = priced.flatMap((q) => q.lines.map((l) => ({ ...l, factory: q.factory, quoteId: q.id, currency: q.currency })));
     return {
       currency: sales.currency,
@@ -112,7 +113,8 @@ export class SourcingService {
       items: items.map((it, n) => {
         const options = allLines
           .filter((l) => l.requestedItemId === it.id)
-          .sort((a, b) => (a.unitCost === null ? 1 : b.unitCost === null ? -1 : Number(a.unitCost) - Number(b.unitCost)));
+          // A line at 0 is priced in its parts (or included): it goes last and is never "cheapest".
+          .sort((a, b) => rank(a.unitCost) - rank(b.unitCost));
         return {
           id: it.id,
           /** "2", "2.1" (a part of item 2). */
@@ -123,7 +125,7 @@ export class SourcingService {
           model: it.model,
           quantity: it.quantity.toString(),
           unit: it.unit,
-          cheapestLineId: options.find((o) => o.unitCost !== null)?.id ?? null,
+          cheapestLineId: options.find((o) => o.unitCost !== null && Number(o.unitCost) > 0)?.id ?? null,
           options,
         };
       }),

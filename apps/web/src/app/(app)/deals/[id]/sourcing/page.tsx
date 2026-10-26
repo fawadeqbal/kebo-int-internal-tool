@@ -96,66 +96,76 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
         </Card>
       )}
 
-      <Card>
-        <CardHeader title="Compare by item" description={`Each of the customer's items and the factory lines that answer it, cheapest first (your cost per unit in ${s.currency}).`} />
-        <CardBody className="flex flex-col gap-5">
-          {s.items.map((it) => (
-            <section key={it.id} aria-label={`${it.parentId ? "Part" : "Item"} ${it.no}`} className={cn(it.parentId && "ml-4 border-l-2 border-line pl-4 sm:ml-6")}>
-              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="min-w-0 text-sm font-semibold">
-                  <span className="mr-1.5 text-muted tabular">{it.no}</span>
-                  <span className="whitespace-pre-line">{it.description}</span>
-                  {it.model && <span className="ml-2 text-xs font-normal text-muted">{it.model}</span>}
-                </h3>
-                <span className="text-sm text-muted tabular">
-                  {qty(it.quantity)} {it.unit}
-                </span>
-              </div>
-              {it.options.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">{it.hasParts ? "Answered through its parts below." : "No factory has answered this item yet."}</p>
-              ) : (
-                <div className="rounded-lg border border-line">
-                  <Table>
-                    <THead>
-                      <tr>
-                        <Th>Factory line</Th>
-                        <Th className="text-right">Their price</Th>
-                        <Th className="text-right">Your cost / unit</Th>
-                        <Th className="hidden text-right sm:table-cell">For their quantity</Th>
-                      </tr>
-                    </THead>
-                    <tbody>
-                      {it.options.map((o) => (
-                        <Tr key={o.id}>
-                          <Td>
-                            <span className="flex flex-wrap items-center gap-1.5">
-                              <span className="font-medium">{o.factory.name}</span>
-                              {o.id === it.cheapestLineId && it.options.length > 1 && <Badge tone="ok">Cheapest</Badge>}
-                            </span>
-                            <span className="block text-xs text-muted">
-                              {o.no} {o.description.split("\n")[0]}
-                              {o.model ? ` · ${o.model}` : ""}
-                            </span>
-                            <span className="mt-0.5 block text-xs text-text-2">{o.costNote}</span>
-                          </Td>
-                          <Td className="text-right whitespace-nowrap tabular">
-                            {money(o.unitPrice, o.currency)}
-                            <span className="block text-xs text-muted">without tax</span>
-                          </Td>
-                          <Td className="text-right font-medium whitespace-nowrap tabular">{o.unitCost === null ? <span className="text-xs font-normal text-warn">No exchange rate</span> : money(o.unitCost, s.currency)}</Td>
-                          <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">
-                            {o.unitCost === null ? "—" : `${formatMinor(multiplyMinor(toMinor(o.unitCost), o.quantity), s.currency)} (${qty(o.quantity)} ${o.unit})`}
-                          </Td>
-                        </Tr>
-                      ))}
-                    </tbody>
-                  </Table>
+      {s.quotes.length > 0 && (
+        <Card>
+          <CardHeader title="Compare by item" description={`Each of the customer's items and the factory lines that answer it, cheapest first (your cost per unit in ${s.currency}).`} />
+          <CardBody className="flex flex-col gap-5">
+            {s.items.map((it) => (
+              <section key={it.id} aria-label={`${it.parentId ? "Part" : "Item"} ${it.no}`} className={cn(it.parentId && "ml-4 border-l-2 border-line pl-4 sm:ml-6")}>
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="min-w-0 text-sm font-semibold">
+                    <span className="mr-1.5 text-muted tabular">{it.no}</span>
+                    <span className="whitespace-pre-line">{it.description}</span>
+                    {it.model && <span className="ml-2 text-xs font-normal text-muted">{it.model}</span>}
+                  </h3>
+                  <span className="text-sm text-muted tabular">
+                    {qty(it.quantity)} {it.unit}
+                  </span>
                 </div>
-              )}
-            </section>
-          ))}
-        </CardBody>
-      </Card>
+                {it.options.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">{it.hasParts ? "No factory line answers it as a whole yet — see its parts below." : "No factory has answered this item yet."}</p>
+                ) : (
+                  <div className="rounded-lg border border-line">
+                    <Table>
+                      <THead>
+                        <tr>
+                          <Th>Factory line</Th>
+                          <Th className="text-right">Their price</Th>
+                          <Th className="text-right">Your cost / unit</Th>
+                          <Th className="hidden text-right sm:table-cell">For their quantity</Th>
+                        </tr>
+                      </THead>
+                      <tbody>
+                        {it.options.map((o) => (
+                          <Tr key={o.id}>
+                            <Td>
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-medium">{o.factory.name}</span>
+                                {o.id === it.cheapestLineId && it.options.length > 1 && <Badge tone="ok">Cheapest</Badge>}
+                              </span>
+                              <span className="block text-xs text-muted">
+                                {o.no} {o.description.split("\n")[0]}
+                                {o.model ? ` · ${o.model}` : ""}
+                              </span>
+                              <span className="mt-0.5 block text-xs text-text-2">{o.costNote}</span>
+                            </Td>
+                            <Td className="text-right whitespace-nowrap tabular">
+                              {money(o.unitPrice, o.currency)}
+                              <span className="block text-xs text-muted">without tax</span>
+                            </Td>
+                            <Td className="text-right font-medium whitespace-nowrap tabular">
+                              {Number(o.unitPrice) === 0 ? (
+                                <span className="text-xs font-normal text-muted">Not priced on its own</span>
+                              ) : o.unitCost === null ? (
+                                <span className="text-xs font-normal text-warn">No exchange rate</span>
+                              ) : (
+                                money(o.unitCost, s.currency)
+                              )}
+                            </Td>
+                            <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">
+                              {o.unitCost === null ? "—" : `${formatMinor(multiplyMinor(toMinor(o.unitCost), o.quantity), s.currency)} (${qty(o.quantity)} ${o.unit})`}
+                            </Td>
+                          </Tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+                )}
+              </section>
+            ))}
+          </CardBody>
+        </Card>
+      )}
 
       <FactoryQuotes
         quotes={s.quotes}

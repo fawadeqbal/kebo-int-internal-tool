@@ -24,9 +24,30 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
           { label: "Valid until", value: date(r.validUntil) },
         ]}
       />
-      {r.options.map((o) => (
-        <OptionSummary key={o.id} o={o} currency={r.currency} single={r.options.length === 1} />
-      ))}
+      {r.options.map((o) =>
+        o.status === "not_chosen" ? (
+          // Once the customer has chosen, the other options are kept for reference, folded away.
+          <details key={o.id} className="group rounded-xl border border-line">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="font-semibold">Option {o.letter}</span>
+                <Badge tone="neutral">Not chosen</Badge>
+                {o.factory && <span className="text-xs text-muted">from {o.factory.name}</span>}
+              </span>
+              <span className="flex items-center gap-2 text-muted">
+                <span className="tabular">{money(o.total, r.currency)}</span>
+                <span className="text-xs group-open:hidden">Show</span>
+                <span className="hidden text-xs group-open:inline">Hide</span>
+              </span>
+            </summary>
+            <div className="border-t border-line p-2">
+              <OptionSummary o={o} currency={r.currency} single={false} />
+            </div>
+          </details>
+        ) : (
+          <OptionSummary key={o.id} o={o} currency={r.currency} single={r.options.length === 1} />
+        ),
+      )}
       {(r.terms || r.notes) && (
         <div className="text-sm">
           {r.terms && <p className="whitespace-pre-line text-text-2">{r.terms}</p>}
@@ -41,7 +62,10 @@ function OptionSummary({ o, currency, single }: { o: OptionView; currency: strin
   const showCosts = !!o.costing;
   const st = STATUS[o.status];
   return (
-    <section aria-label={`Option ${o.letter}`} className={cn("rounded-xl border border-line", o.status === "accepted" && "border-ok/50", o.status === "not_chosen" && "opacity-75")}>
+    <section
+      aria-label={`Option ${o.letter}`}
+      className={cn("rounded-xl border border-line", o.status === "accepted" && "border-ok/50", o.status === "not_chosen" && "opacity-75")}
+    >
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold">{single ? "The offer" : `Option ${o.letter}`}</span>
@@ -83,7 +107,9 @@ function OptionSummary({ o, currency, single }: { o: OptionView; currency: strin
                 {qty(l.quantity)} {l.unit}
               </Td>
               <Td className="text-right whitespace-nowrap tabular">{money(l.unitPrice, currency)}</Td>
-              {showCosts && <Td className="text-right whitespace-nowrap text-text-2 tabular">{l.unitCost ? money(l.unitCost, currency) : "—"}</Td>}
+              {showCosts && (
+                <Td className="text-right whitespace-nowrap text-text-2 tabular">{l.unitCost ? money(l.unitCost, currency) : "—"}</Td>
+              )}
               <Td className="text-right font-medium whitespace-nowrap tabular">{money(l.lineTotal, currency)}</Td>
             </Tr>
           ))}
@@ -109,7 +135,14 @@ function OptionSummary({ o, currency, single }: { o: OptionView; currency: strin
             </div>
           </dl>
           {o.costing && (
-            <CostingBox currency={currency} cost={o.costing.costMinor} sales={o.costing.salesMinor} profit={o.costing.profitMinor} margin={o.costing.marginPercent} uncosted={o.costing.uncostedLines} />
+            <CostingBox
+              currency={currency}
+              cost={o.costing.costMinor}
+              sales={o.costing.salesMinor}
+              profit={o.costing.profitMinor}
+              margin={o.costing.marginPercent}
+              uncosted={o.costing.uncostedLines}
+            />
           )}
         </div>
       </div>

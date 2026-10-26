@@ -248,17 +248,16 @@ export function FileDrop({
   const [over, setOver] = useState(false);
   const add = (list: FileList | null) => {
     if (!list?.length) return;
-    setStaged((s) => [
-      ...s,
-      ...Array.from(list).map((file) => ({
-        key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
-        file,
-        kind: guessKind(file.name, file.type),
-        note: "",
-        progress: null,
-        error: null,
-      })),
-    ]);
+    // Read the list now: the input is cleared right after, which empties it.
+    const added = Array.from(list).map((file) => ({
+      key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
+      file,
+      kind: guessKind(file.name, file.type),
+      note: "",
+      progress: null,
+      error: null,
+    }));
+    setStaged((s) => [...s, ...added]);
   };
   const patch = (key: string, p: Partial<Staged>) => setStaged((s) => s.map((x) => (x.key === key ? { ...x, ...p } : x)));
   const drop = (e: DragEvent) => {

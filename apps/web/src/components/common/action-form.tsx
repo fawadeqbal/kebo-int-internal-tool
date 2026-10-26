@@ -22,6 +22,7 @@ export function ActionForm({
   resetOnSuccess,
   showSuccess = true,
   quietCodes,
+  keepFields,
 }: {
   action: Action;
   children: ReactNode | ((state: ActionState) => ReactNode);
@@ -31,6 +32,11 @@ export function ActionForm({
   showSuccess?: boolean;
   /** Error codes the form explains itself (e.g. "confirm": a warning with "Go ahead anyway"), so the usual red message is not shown. */
   quietCodes?: string[];
+  /**
+   * Forms whose fields live in React state: React resets a form after each send, which puts every <select>
+   * back on its first option while the state still holds the choice. These forms skip that reset.
+   */
+  keepFields?: boolean;
 }) {
   const [state, formAction] = useActionState(action, {});
   const router = useRouter();
@@ -46,7 +52,7 @@ export function ActionForm({
     }
   }, [state, router, onDone, resetOnSuccess]);
   return (
-    <form ref={formRef} action={formAction} className={className} noValidate>
+    <form ref={formRef} action={formAction} className={className} noValidate onReset={keepFields ? (e) => e.preventDefault() : undefined}>
       {state.code === "reason_needed" && <ReasonPrompt key={state.message} state={state} />}
       {state.message &&
         (state.ok === false || showSuccess) &&

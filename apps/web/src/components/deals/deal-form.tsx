@@ -144,7 +144,7 @@ export function DealForm({
     );
 
   return (
-    <ActionForm action={submit}>
+    <ActionForm action={submit} keepFields>
       {(s) => (
         <>
           <input type="hidden" name="payload" value={JSON.stringify(payload(v, mode === "create"))} />

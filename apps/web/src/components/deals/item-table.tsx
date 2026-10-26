@@ -129,7 +129,7 @@ export function itemsPayload(items: DealFormItem[]) {
 /* ------------------------------------------------------------------- the table */
 
 type Field = "description" | "model" | "quantity" | "unit" | "targetPrice";
-const COLS = "sm:grid-cols-[2.5rem_minmax(0,1fr)_8.5rem_5rem_5.5rem_7rem_6.5rem]";
+const COLS = "sm:grid-cols-[2.5rem_minmax(0,1fr)_8.5rem_5rem_5rem_6.5rem_7.5rem]";
 
 /**
  * The customer's items as a quick table: Enter adds a row, Tab on a new row
@@ -148,6 +148,8 @@ export function ItemTable({ items, onChange, error }: { items: DealFormItem[]; o
   /** A multi-line paste into one description: offer to split it into rows. */
   const [offer, setOffer] = useState<{ key: string; before: string; rows: PastedItem[] } | null>(null);
 
+  // The API names the first problem only; point at every row it could be.
+  const missingQty = !!error && /quantity/i.test(error);
   const numbers = lineNumbers(items.map((it) => ({ key: it.key, parentKey: it.parentKey })));
   const pasted = pasteText.trim() ? parseList(pasteText) : [];
 
@@ -331,7 +333,8 @@ export function ItemTable({ items, onChange, error }: { items: DealFormItem[]; o
                     aria-label={`${label} quantity`}
                     placeholder="Qty"
                     inputMode="decimal"
-                    className={cn(cell, "text-right tabular")}
+                    aria-invalid={missingQty && !it.quantity.trim() && !isBlank(it) ? true : undefined}
+                    className={cn(cell, "text-right tabular aria-invalid:border-bad")}
                     onChange={(e) => update(it.key, { quantity: e.target.value })}
                   />
                   <input
