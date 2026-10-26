@@ -148,7 +148,8 @@ export class OrdersService {
     return orderPlan(this.facts(o), this.states(o), this.clock.today(), (await this.settings.get()).plan);
   }
 
-  private async load(user: SessionUser, id: string, db: PrismaService["db"] | Tx = this.prisma.db): Promise<OrderRow> {
+  /** An order the person may see (with its steps and payments), or 404. */
+  async load(user: SessionUser, id: string, db: PrismaService["db"] | Tx = this.prisma.db): Promise<OrderRow> {
     const o = await db.order.findFirst({ where: { id, ...orderAccess(user) }, include: orderInclude });
     if (!o) throw new NotFoundError("Order");
     return o;

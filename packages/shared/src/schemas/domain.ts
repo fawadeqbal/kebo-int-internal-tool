@@ -207,6 +207,34 @@ export const stepDueInput = z.object({ key: z.enum(MILESTONE_KEYS), due: optiona
 
 export const cancelOrderInput = z.object({ reason: text(2000, "Say why the order is cancelled") });
 
+/* ---------------------------------------------------------------- factory orders (Kebo's purchase orders) */
+
+export const factoryOrderLineInput = z.object({
+  orderLineId: optionalId,
+  factoryQuoteLineId: optionalId,
+  description: text(2000, "Each line needs a description"),
+  model: optionalText(120),
+  quantity,
+  unit: z.string().trim().max(20).default("pcs"),
+  unitPrice: amount("Enter the factory price"),
+  vatRate: percentOr(13),
+});
+
+export const factoryOrderInput = z.object({
+  factoryId: id("Choose the factory"),
+  currency: currency.default("CNY"),
+  pricesIncludeVat: bool.default(true),
+  depositPercent: percentOr(30),
+  paymentTerms: optionalText(2000),
+  readyOn: optionalDate,
+  notes: optionalText(5000),
+  lines: z.array(factoryOrderLineInput).min(1, "Add at least one line").max(300),
+});
+export type FactoryOrderInput = z.infer<typeof factoryOrderInput>;
+
+export const factoryOrderConfirmInput = z.object({ readyOn: isoDate("Enter the ready date the factory confirmed"), on: optionalDate });
+export const factoryVatInvoiceInput = z.object({ number: text(60, "Enter the VAT invoice number"), on: isoDate() });
+
 /* ---------------------------------------------------------------- payments */
 
 export const paymentInput = z.object({
@@ -222,3 +250,51 @@ export const paymentInput = z.object({
   note: optionalText(2000),
 });
 export type PaymentInput = z.infer<typeof paymentInput>;
+
+export const voidPaymentInput = z.object({ reason: text(2000, "Say why this payment is being removed") });
+
+/* ---------------------------------------------------------------- invoices */
+
+export const invoiceInput = z.object({
+  type: z.enum(["proforma", "commercial"]),
+  /** Commercial invoices: the shipment they bill (its goods), plus any service/charge lines of the order. */
+  shipmentId: optionalId,
+  issueDate: optionalDate,
+  dueDate: optionalDate,
+  notes: optionalText(5000),
+});
+export type InvoiceInput = z.infer<typeof invoiceInput>;
+
+export const voidInvoiceInput = z.object({ reason: text(2000, "Say why the invoice is void") });
+
+/* ---------------------------------------------------------------- shipments */
+
+export const shipmentLineInput = z.object({
+  orderLineId: id("Each packed line must come from the order"),
+  quantity,
+  packages: z.coerce.number().int().min(0).max(100_000).default(1),
+  packageType: z.string().trim().max(40).default("Carton"),
+  netWeightKg: amountOr(0),
+  grossWeightKg: amountOr(0),
+  cbm: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().min(0).max(100_000).default(0)),
+});
+
+export const shipmentInput = z.object({
+  forwarder: optionalText(120),
+  portOfLoading: optionalText(120),
+  portOfDischarge: optionalText(120),
+  finalDestination: optionalText(160),
+  transport: optionalText(160),
+  containerNos: optionalText(200),
+  sealNos: optionalText(120),
+  blNo: optionalText(60),
+  etd: optionalDate,
+  eta: optionalDate,
+  marks: optionalText(2000),
+  notes: optionalText(5000),
+  lines: z.array(shipmentLineInput).min(1, "Pack at least one line").max(300),
+});
+export type ShipmentInput = z.infer<typeof shipmentInput>;
+
+export const shipmentStatusInput = z.object({ to: z.enum(["booked", "departed", "arrived"]), on: optionalDate, note: optionalText(2000) });
+export const documentsReleasedInput = z.object({ on: optionalDate, note: optionalText(2000) });

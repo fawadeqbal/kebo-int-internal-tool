@@ -12,6 +12,7 @@ import { PartiesModule } from "./modules/parties/parties.module";
 import { InquiriesModule } from "./modules/inquiries/inquiries.module";
 import { SourcingModule } from "./modules/sourcing/sourcing.module";
 import { QuotationsModule } from "./modules/quotations/quotations.module";
+import { FulfilmentModule } from "./modules/fulfilment/fulfilment.module";
 import { StorageModule } from "./common/storage/storage.service";
 import { EventsModule } from "./common/events/event-bus";
 
@@ -21,6 +22,6 @@ import { EventsModule } from "./common/events/event-bus";
  * AuthCore (the guard every route passes through).
  */
 @Module({
-  imports: [EnvModule, PrismaModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule],
+  imports: [EnvModule, PrismaModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, FulfilmentModule],
 })
 export class AppModule {}
