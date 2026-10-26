@@ -1,0 +1,5 @@
+{
+  "extends": "@kebo/config/tsconfig/nest.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": ".", "baseUrl": ".", "ignoreDeprecations": "6.0", "types": ["node"] },
+  "include": ["src", "test"]
+}

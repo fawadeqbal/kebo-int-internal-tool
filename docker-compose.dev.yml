@@ -1,0 +1,13 @@
+# Local development: PostgreSQL only (the API and web run on your machine with pnpm dev).
+#   docker compose -f docker-compose.dev.yml up -d
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: kebo
+      POSTGRES_USER: kebo
+      POSTGRES_PASSWORD: kebo
+    ports: ["5433:5432"]
+    volumes: [kebo-dev-db:/var/lib/postgresql/data]
+volumes:
+  kebo-dev-db:
