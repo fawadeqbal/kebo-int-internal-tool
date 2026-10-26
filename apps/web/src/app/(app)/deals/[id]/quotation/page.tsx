@@ -16,12 +16,8 @@ export const metadata = { title: "Quotation" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
-/**
- * A saved draft as editor values. Prices are always without tax now: a draft
- * made when its prices included tax gets them without it (same total).
- */
+/** A saved draft as editor values. */
 function asDraft(r: RevisionView): RevisionDraft {
-  const net = (price: string) => (r.pricesIncludeVat && r.vatRate > 0 ? Math.round((Number(price) / (1 + r.vatRate / 100)) * 100) / 100 : Number(price));
   return {
     number: r.number,
     currency: r.currency,
@@ -31,7 +27,6 @@ function asDraft(r: RevisionView): RevisionDraft {
     balanceTerms: r.balanceTerms,
     leadTime: r.leadTime,
     validUntil: r.validUntil,
-    vatRate: r.vatRate,
     discount: Number(r.discount),
     terms: r.terms,
     notes: r.notes,
@@ -40,10 +35,9 @@ function asDraft(r: RevisionView): RevisionDraft {
       type: l.type,
       description: l.description,
       model: l.model,
-      hsCode: l.hsCode,
       quantity: Number(l.quantity),
       unit: l.unit,
-      unitPrice: net(l.unitPrice),
+      unitPrice: Number(l.unitPrice),
       unitCost: l.unitCost ? Number(l.unitCost) : null,
       factoryQuoteLineId: l.factoryQuoteLineId ?? null,
       fxRate: l.fxRate ? Number(l.fxRate) : null,

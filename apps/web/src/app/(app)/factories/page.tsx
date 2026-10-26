@@ -17,12 +17,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader title="Factories" description="The suppliers we source from. Prices and costs here are never shown to customers." actions={
-          <>
-            <ButtonLink href="/factories/rebates">Export rebate by HS code</ButtonLink>
-            <ButtonLink href="/factories/new" variant="primary">
-              New factory
-            </ButtonLink>
-          </>
+          <ButtonLink href="/factories/new" variant="primary">
+            New factory
+          </ButtonLink>
         } />
       <Card className="overflow-hidden p-0">
         <FilterBar>

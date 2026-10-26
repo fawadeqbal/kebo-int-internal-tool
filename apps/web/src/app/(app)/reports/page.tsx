@@ -219,7 +219,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <Card>
         <CardHeader
           title="Estimated profit"
-          description={`On ${t.orders} order${t.orders === 1 ? "" : "s"} made in the period, from the costs recorded on their lines (sales after discount, without tax).`}
+          description={`On ${t.orders} order${t.orders === 1 ? "" : "s"} made in the period, from the costs recorded on their lines (sales after discount).`}
         />
         <CardBody className="flex flex-col gap-5">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

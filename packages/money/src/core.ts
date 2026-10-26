@@ -1,6 +1,6 @@
 /**
  * Money is always handled as an integer number of minor units (cents, fen,
- * paisa) plus a currency code. Integers add up exactly, so totals, VAT and
+ * paisa) plus a currency code. Integers add up exactly, so totals, taxes and
  * balances match on every screen, PDF and report. Decimal strings ("1234.50")
  * are only used at the edges: the database (NUMERIC columns) and forms.
  *

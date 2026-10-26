@@ -135,7 +135,6 @@ describe("input schemas", () => {
       lines: [{ description: "Tablet press", quantity: "2", unitPrice: "12500.50" }],
     });
     expect(r.depositPercent).toBe(30);
-    expect(r.vatRate).toBe(0); // exports carry no VAT
     expect(r.lines[0]).toMatchObject({ type: "goods", unit: "pcs", unitPrice: 12500.5 });
     expect(r.incoterm).toBe("FOB");
   });
@@ -198,48 +197,20 @@ describe("review fixes", () => {
 });
 
 describe("tax", () => {
-  it("charges VAT only to customers in China", async () => {
-    const { saleVatFor } = await import("../src");
-    expect(saleVatFor("CN")).toBe(13);
-    expect(saleVatFor("ng")).toBe(0);
-    expect(saleVatFor(null)).toBe(0);
+  it("adds each factory item's tax on top of its price", async () => {
+    const { taxSentence } = await import("../src");
+    expect(taxSentence(100_00, 13, "CNY")).toBe("CNY 100.00 + 13% tax = CNY 113.00");
+    expect(taxSentence(100_00, 0, "CNY")).toBe("CNY 100.00, no tax");
   });
 
-  it("gives back price × the rebate rate, never more than the tax, nothing without tax", async () => {
-    const { rebateMinor, effectiveRebate } = await import("../src");
-    const line = { unitPriceMinor: 100_00, quantity: 10 };
-    expect(rebateMinor({ ...line, vatRate: 13, rebateRate: 13 })).toBe(130_00); // 100 × 13% × 10
-    expect(rebateMinor({ ...line, vatRate: 13, rebateRate: 9 })).toBe(90_00);
-    expect(rebateMinor({ ...line, vatRate: 0, rebateRate: 13 })).toBe(0); // no tax paid, nothing back
-    expect(effectiveRebate(13, 3)).toBe(3); // 3% tax caps the rebate
-  });
-
-  it("explains a factory price in one line", async () => {
-    const { costSentence } = await import("../src");
-    const p = { unitPriceMinor: 100_00, currency: "CNY" };
-    expect(costSentence({ ...p, vatRate: 13, rebateRate: 13, costMinor: 100_00 })).toBe("CNY 100.00 + 13% tax = CNY 113.00 · 13% rebate back · your cost CNY 100.00");
-    expect(costSentence({ ...p, vatRate: 13, rebateRate: 0, costMinor: 113_00 })).toBe("CNY 100.00 + 13% tax = CNY 113.00 · your cost CNY 113.00");
-    expect(costSentence({ ...p, vatRate: 0, rebateRate: 13, costMinor: 100_00 })).toBe("CNY 100.00, no tax · your cost CNY 100.00");
-  });
-
-  it("reminds about the VAT invoice, then filing the rebate within 90 days", async () => {
-    const { rebateNeeds } = await import("../src");
-    const o = { shippedOn: "2026-08-01", rebate: [{ amountMinor: 130_00, currency: "CNY" }], vatInvoiceReceivedOn: null, rebateFiledOn: null };
-    expect(rebateNeeds(o, "2026-08-20")).toEqual({ title: "Get the factory's special VAT invoice (rebate CNY 130.00)", due: "2026-08-31", late: false, deadline: "2026-10-30" });
-    expect(rebateNeeds({ ...o, vatInvoiceReceivedOn: "2026-08-10" }, "2026-10-01")).toEqual({ title: "File the export rebate (CNY 130.00) by 2026-10-30", due: "2026-09-30", late: true, deadline: "2026-10-30" });
-    expect(rebateNeeds({ ...o, rebateFiledOn: "2026-09-01" }, "2026-10-01")).toBeNull();
-    expect(rebateNeeds({ ...o, shippedOn: null }, "2026-10-01")).toBeNull();
-    expect(rebateNeeds({ ...o, rebate: [{ amountMinor: 0, currency: "CNY" }] }, "2026-10-01")).toBeNull();
-  });
-
-  it("adds 13% tax to factory prices unless changed, and asks each item's rebate", async () => {
-    const { factoryInput, factoryQuoteInput, factoryQuoteLineInput } = await import("../src");
-    expect(factoryInput.parse({ name: "X" })).not.toHaveProperty("vatRate"); // nothing about tax on the factory
-    const quote = { newFactoryName: "X", receivedOn: "2026-10-20", currency: "CNY", lines: [{ description: "x", quantity: 1, unitPrice: 10, rebateRate: 0 }] };
-    expect(factoryQuoteInput.parse(quote).vatRate).toBe(13);
-    expect(factoryQuoteInput.parse({ ...quote, vatRate: "15" }).vatRate).toBe(15);
-    expect(factoryQuoteLineInput.safeParse({ description: "x", quantity: 1, unitPrice: 10 }).error?.issues[0]!.message).toBe("Choose the export rebate for this item");
-    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, hsCode: " 8437 .80", rebateRate: "9" })).toMatchObject({ hsCode: "8437.80", rebateRate: 9 });
-    expect(factoryQuoteLineInput.safeParse({ description: "x", quantity: 1, unitPrice: 10, hsCode: "ABC", rebateRate: 9 }).success).toBe(false);
+  it("takes 13% unless an item says otherwise, and nothing else about tax", async () => {
+    const { factoryInput, factoryQuoteInput, factoryQuoteLineInput, revisionInput } = await import("../src");
+    expect(factoryInput.parse({ name: "X" })).not.toHaveProperty("vatRate");
+    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10 }).taxRate).toBe(13);
+    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, taxRate: "9" }).taxRate).toBe(9);
+    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, hsCode: "8437", rebateRate: 13 })).not.toHaveProperty("hsCode");
+    const quote = factoryQuoteInput.parse({ newFactoryName: "X", receivedOn: "2026-10-20", lines: [{ description: "x", quantity: 1, unitPrice: 10 }] });
+    expect(quote).not.toHaveProperty("vatRate");
+    expect(revisionInput.parse({ validUntil: "2026-11-01", vatRate: 13, lines: [{ description: "x", quantity: 1, unitPrice: 1 }] })).not.toHaveProperty("vatRate");
   });
 });

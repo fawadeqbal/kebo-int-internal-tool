@@ -63,8 +63,7 @@ export class DocumentsService {
     });
     const settings = await this.settings.get();
     const rev = o.revision;
-    const vat = { rate: Number(rev.vatRate), pricesIncludeVat: rev.pricesIncludeVat };
-    const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), rev.discount.toString(), vat);
+    const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), rev.discount.toString());
     const ins = o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
     const position = settle(t.total, ins, Number(o.depositPercent));
     const shippedOn = fromDbDateOrNull(o.shippedOn);
@@ -107,7 +106,6 @@ export class DocumentsService {
         type: l.type,
         description: l.description,
         model: l.model,
-        hsCode: l.hsCode,
         quantity: l.quantity.toString(),
         unit: l.unit,
         unitPrice: goodsOnly ? null : l.unitPrice.toFixed(2),
@@ -135,9 +133,6 @@ export class DocumentsService {
         : {
             subtotal: fromMinor(t.subtotal),
             discount: fromMinor(t.discount),
-            vatRate: t.vatRate,
-            pricesIncludeVat: t.pricesIncludeVat,
-            vat: fromMinor(t.vat),
             total: fromMinor(t.total),
             deposit: fromMinor(splitDeposit(t.total, Number(o.depositPercent)).deposit),
             depositPercent: Number(o.depositPercent),

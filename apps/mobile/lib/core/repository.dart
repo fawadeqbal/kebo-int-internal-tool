@@ -94,8 +94,7 @@ class KeboRepository {
       api.getList('/api/orders', query: {if (mine) 'mine': 'true', if (late) 'late': 'true', 'status': status, 'stage': stage});
 
   /// The order: `stage`, `next` (the one button), `back`, `money`, `needs`, `history`, `documents`,
-  /// `lines` (each with `factory`, `receivedQty`, `receivedOn`, `packing`), `goods` (received, packed)
-  /// and `tax` (export rebate: `rebate[]`, `vatInvoiceReceivedOn`, `rebateFiledOn`, `deadline`, `needs`).
+  /// `lines` (each with `factory`, `receivedQty`, `receivedOn`, `packing`) and `goods` (received, packed).
   Future<Json> order(String id) => api.get('/api/orders/$id');
 
   /// One stage forward or back: `{ to, confirm?, note?, readyOn?, shippedOn?, blNo? }`. Returns the order.
@@ -120,14 +119,6 @@ class KeboRepository {
         if (on != null && on.isNotEmpty) 'on': on,
         'lines': [for (final e in received.entries) {'lineId': e.key, 'receivedQty': e.value}],
       });
-
-  /// The export rebate paperwork (`tax` on the order): [field] is `vatInvoiceReceivedOn` or
-  /// `rebateFiledOn`, [on] the day ("YYYY-MM-DD", not in the future) or null to clear it.
-  /// Returns the order. A future date or a cancelled order is a 400.
-  Future<Json> setOrderTax(String orderId, String field, String? on) {
-    assert(field == 'vatInvoiceReceivedOn' || field == 'rebateFiledOn');
-    return api.patch('/api/orders/$orderId/tax', {field: on});
-  }
 
   /// Money in from the customer: `{ currency, total, received, due, depositDue, status, payments: [...] }`.
   Future<Json> payments(String orderId) => api.get('/api/orders/$orderId/payments');

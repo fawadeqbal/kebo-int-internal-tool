@@ -71,7 +71,6 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
       <>
         {l.description}
         {l.model ? `\nModel: ${l.model}` : ""}
-        {packing && l.hsCode ? `\nHS Code: ${l.hsCode}` : ""}
       </>
     ),
   };
@@ -103,13 +102,12 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
         ]
       : [no, description, qty];
 
-  // Subtotal, discount and tax: on the customer's copy only when they change the total.
+  // Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const sums =
-    t && (internal || Number(t.discount) || t.vatRate > 0)
+    t && (internal || Number(t.discount))
       ? [
           { label: "Subtotal", value: docMoney(t.subtotal, c) },
           ...(Number(t.discount) ? [{ label: "Discount", value: docMoney(-Number(t.discount), c) }] : []),
-          ...(t.vatRate > 0 ? [{ label: `Tax ${t.vatRate}%${t.pricesIncludeVat ? " (included)" : ""}`, value: docMoney(t.vat, c) }] : []),
         ]
       : [];
 

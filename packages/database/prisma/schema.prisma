@@ -243,17 +243,6 @@ model AuditLog {
 }
 
 /// Company profile, defaults, reminder rules, plan timings: one JSON value per key.
-/// Export VAT rebate rate per customs (HS) code, remembered from the factory prices and editable in Settings.
-model HsCode {
-  code        String   @id @db.VarChar(20)
-  rebateRate  Decimal  @map("rebate_rate") @db.Decimal(5, 2)
-  description String?  @db.VarChar(200)
-  updatedById String?  @map("updated_by") @db.Uuid
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
-
-  @@map("hs_codes")
-}
-
 model Setting {
   key       String   @id @db.VarChar(100)
   value     Json
@@ -492,8 +481,6 @@ model FactoryQuote {
   receivedOn   DateTime  @map("received_on") @db.Date
   validUntil   DateTime? @map("valid_until") @db.Date
   currency     String    @default("CNY") @db.Char(3)
-  /// Tax % added on top of these prices (they are always without tax): 13 unless changed.
-  vatRate      Decimal   @default(13) @map("vat_rate") @db.Decimal(5, 2)
   /// EXW, FOB Qingdao, delivered to port…
   priceBasis   String?   @map("price_basis") @db.VarChar(60)
   leadTime     String?   @map("lead_time") @db.VarChar(120)
@@ -523,11 +510,10 @@ model FactoryQuoteLine {
   model           String?        @db.VarChar(120)
   quantity        Decimal        @db.Decimal(12, 2)
   unit            String         @default("pcs") @db.VarChar(20)
+  /// The factory's price for one unit, without tax.
   unitPrice       Decimal        @map("unit_price") @db.Decimal(14, 2)
-  /// Customs code of the product: its export rebate rate is remembered by this code.
-  hsCode          String?        @map("hs_code") @db.VarChar(20)
-  /// Export VAT rebate % for this product (13 / 9 / 6 / 0); never more than the VAT on the invoice.
-  rebateRate      Decimal        @default(0) @map("rebate_rate") @db.Decimal(5, 2)
+  /// Tax % added on top of this item's price (13 unless changed): price + tax is what one unit costs Kebo.
+  taxRate         Decimal        @default(13) @map("tax_rate") @db.Decimal(5, 2)
   sortOrder       Int            @default(0) @map("sort_order")
 
   preferredBy RequestedItem[] @relation("PreferredLine")
@@ -567,11 +553,8 @@ model QuotationRevision {
   balanceTerms     BalanceTerms   @default(before_shipment) @map("balance_terms")
   leadTime         String?        @map("lead_time") @db.VarChar(120)
   validUntil       DateTime       @map("valid_until") @db.Date
-  vatRate          Decimal        @default(0) @map("vat_rate") @db.Decimal(5, 2)
-  pricesIncludeVat Boolean        @default(false) @map("prices_include_vat")
   subtotal         Decimal        @default(0) @db.Decimal(14, 2)
   discount         Decimal        @default(0) @db.Decimal(14, 2)
-  vatAmount        Decimal        @default(0) @map("vat_amount") @db.Decimal(14, 2)
   total            Decimal        @default(0) @db.Decimal(14, 2)
   terms            String?
   notes            String?
@@ -602,7 +585,6 @@ model QuoteLine {
   type               LineType          @default(goods)
   description        String
   model              String?           @db.VarChar(120)
-  hsCode             String?           @map("hs_code") @db.VarChar(20)
   quantity           Decimal           @db.Decimal(12, 2)
   unit               String            @default("pcs") @db.VarChar(20)
   unitPrice          Decimal           @map("unit_price") @db.Decimal(14, 2)
@@ -626,49 +608,46 @@ model QuoteLine {
 // ============================================================================
 
 model Order {
-  id                   String            @id @default(uuid()) @db.Uuid
+  id              String            @id @default(uuid()) @db.Uuid
   /// SO-2026-0001
-  refNo                String            @unique @map("ref_no") @db.VarChar(30)
-  inquiryId            String            @map("inquiry_id") @db.Uuid
-  inquiry              Inquiry           @relation(fields: [inquiryId], references: [id])
-  revisionId           String            @unique @map("revision_id") @db.Uuid
-  revision             QuotationRevision @relation(fields: [revisionId], references: [id])
-  customerId           String            @map("customer_id") @db.Uuid
-  customer             Customer          @relation(fields: [customerId], references: [id])
-  status               OrderStatus       @default(open)
-  stage                OrderStage        @default(confirmed)
+  refNo           String            @unique @map("ref_no") @db.VarChar(30)
+  inquiryId       String            @map("inquiry_id") @db.Uuid
+  inquiry         Inquiry           @relation(fields: [inquiryId], references: [id])
+  revisionId      String            @unique @map("revision_id") @db.Uuid
+  revision        QuotationRevision @relation(fields: [revisionId], references: [id])
+  customerId      String            @map("customer_id") @db.Uuid
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  status          OrderStatus       @default(open)
+  stage           OrderStage        @default(confirmed)
   /// When the order entered its current stage.
-  stageSince           DateTime          @default(now()) @map("stage_since") @db.Timestamptz
-  orderedOn            DateTime          @map("ordered_on") @db.Date
+  stageSince      DateTime          @default(now()) @map("stage_since") @db.Timestamptz
+  orderedOn       DateTime          @map("ordered_on") @db.Date
   /// Ship date promised to the customer.
-  shipBy               DateTime?         @map("ship_by") @db.Date
+  shipBy          DateTime?         @map("ship_by") @db.Date
   /// Ready date the factory confirmed.
-  readyOn              DateTime?         @map("ready_on") @db.Date
-  shippedOn            DateTime?         @map("shipped_on") @db.Date
-  blNo                 String?           @map("bl_no") @db.VarChar(60)
+  readyOn         DateTime?         @map("ready_on") @db.Date
+  shippedOn       DateTime?         @map("shipped_on") @db.Date
+  blNo            String?           @map("bl_no") @db.VarChar(60)
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
-  documentTitle        String?           @map("document_title") @db.VarChar(200)
+  documentTitle   String?           @map("document_title") @db.VarChar(200)
   /// Where the goods are unloaded, e.g. "Hairatan, Afghanistan" (the port of loading is the Incoterm place).
-  portOfDischarge      String?           @map("port_of_discharge") @db.VarChar(120)
-  /// Export rebate paperwork: the factory's special VAT invoice arrived, and the rebate was filed (within 90 days of export).
-  vatInvoiceReceivedOn DateTime?         @map("vat_invoice_received_on") @db.Date
-  rebateFiledOn        DateTime?         @map("rebate_filed_on") @db.Date
+  portOfDischarge String?           @map("port_of_discharge") @db.VarChar(120)
   /// When the packing list was filled in (null: not yet).
-  packedAt             DateTime?         @map("packed_at") @db.Timestamptz
-  containerNo          String?           @map("container_no") @db.VarChar(120)
-  shippingMarks        String?           @map("shipping_marks")
-  currency             String            @db.Char(3)
-  total                Decimal           @db.Decimal(14, 2)
-  depositPercent       Decimal           @map("deposit_percent") @db.Decimal(5, 2)
-  balanceTerms         BalanceTerms      @map("balance_terms")
-  incoterm             Incoterm
-  incotermPlace        String?           @map("incoterm_place") @db.VarChar(80)
-  closedAt             DateTime?         @map("closed_at") @db.Timestamptz
-  cancelledAt          DateTime?         @map("cancelled_at") @db.Timestamptz
-  cancelReason         String?           @map("cancel_reason")
-  createdById          String            @map("created_by") @db.Uuid
-  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  packedAt        DateTime?         @map("packed_at") @db.Timestamptz
+  containerNo     String?           @map("container_no") @db.VarChar(120)
+  shippingMarks   String?           @map("shipping_marks")
+  currency        String            @db.Char(3)
+  total           Decimal           @db.Decimal(14, 2)
+  depositPercent  Decimal           @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms    BalanceTerms      @map("balance_terms")
+  incoterm        Incoterm
+  incotermPlace   String?           @map("incoterm_place") @db.VarChar(80)
+  closedAt        DateTime?         @map("closed_at") @db.Timestamptz
+  cancelledAt     DateTime?         @map("cancelled_at") @db.Timestamptz
+  cancelReason    String?           @map("cancel_reason")
+  createdById     String            @map("created_by") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
   lines        OrderLine[]
   stageChanges OrderStageChange[]
@@ -691,7 +670,6 @@ model OrderLine {
   type        LineType   @default(goods)
   description String
   model       String?    @db.VarChar(120)
-  hsCode      String?    @map("hs_code") @db.VarChar(20)
   quantity    Decimal    @db.Decimal(12, 2)
   unit        String     @default("pcs") @db.VarChar(20)
   unitPrice   Decimal    @map("unit_price") @db.Decimal(14, 2)

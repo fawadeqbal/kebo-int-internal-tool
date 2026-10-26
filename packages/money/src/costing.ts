@@ -1,5 +1,4 @@
 import { allocate, roundHalfAway, type Minor } from "./core";
-import { netOf, type VatRule } from "./totals";
 
 /**
  * Costing for a trading company: what a factory line costs us in the quotation
@@ -30,42 +29,22 @@ export const convertMinor = (minor: Minor, rate: number): Minor => {
   return roundHalfAway(minor / rate);
 };
 
-/**
- * What one unit really costs us. A factory price may or may not include its
- * VAT (usually 13%); when Kebo exports and claims the export VAT rebate, part
- * of that VAT comes back, so it is not a cost. rebateRate is the rebate % for
- * the product's HS code (0 when not claimed).
- */
-export interface FactoryPrice {
-  unitPriceMinor: Minor;
-  vatRate: number;
-  pricesIncludeVat: boolean;
-  rebateRate?: number;
+/** A factory price with its tax % added on top: 100.00 + 13% → 113.00 (what one unit costs Kebo). */
+export function withTaxMinor(unitPriceMinor: Minor, taxRate: number): Minor {
+  const rate = Math.max(Number(taxRate) || 0, 0);
+  return roundHalfAway(unitPriceMinor * (1 + rate / 100));
 }
 
-export function unitCostMinor(p: FactoryPrice): Minor {
-  const vat = Math.max(p.vatRate, 0);
-  const gross = p.pricesIncludeVat ? p.unitPriceMinor : roundHalfAway(p.unitPriceMinor * (1 + vat / 100));
-  const rebate = Math.min(Math.max(p.rebateRate ?? 0, 0), vat);
-  if (rebate <= 0) return gross;
-  // The rebate is a share of the VAT-free price.
-  const net = vat > 0 ? gross / (1 + vat / 100) : gross;
-  return roundHalfAway(gross - net * (rebate / 100));
+/** Margin as a share of the selling price, in % with one decimal: (price − cost) / price. */
+export function marginPercent(unitPriceMinor: Minor, unitCost: Minor): number | null {
+  if (!(unitPriceMinor > 0)) return null;
+  return roundHalfAway(((unitPriceMinor - unitCost) / unitPriceMinor) * 1000) / 10;
 }
 
-/** Margin as a share of the selling price without our VAT, in % with one decimal: (price − cost) / price. */
-export function marginPercent(unitPriceMinor: Minor, unitCost: Minor, vat?: VatRule): number | null {
-  const price = vat ? netOf(unitPriceMinor, vat) : unitPriceMinor;
-  if (!(price > 0)) return null;
-  return roundHalfAway(((price - unitCost) / price) * 1000) / 10;
-}
-
-/** The selling price that leaves `margin`% on a unit cost (with our VAT put back in when prices include it). */
-export function priceForMargin(unitCost: Minor, margin: number, vat?: VatRule): Minor {
+/** The selling price that leaves `margin`% on a unit cost. */
+export function priceForMargin(unitCost: Minor, margin: number): Minor {
   if (margin >= 100) throw new Error("Margin must be under 100%");
-  const net = unitCost / (1 - margin / 100);
-  const gross = vat?.pricesIncludeVat && vat.rate > 0 ? net * (1 + vat.rate / 100) : net;
-  return roundHalfAway(gross);
+  return roundHalfAway(unitCost / (1 - margin / 100));
 }
 
 export interface CostedLine {
@@ -79,7 +58,7 @@ export interface CostedLine {
  * a cost; lines without one are counted apart. The document discount is spread
  * over all lines by amount (as on the invoice), so it lowers the profit shown.
  */
-export function costSummary(lines: CostedLine[], vat?: VatRule, discountMinor: Minor = 0) {
+export function costSummary(lines: CostedLine[], discountMinor: Minor = 0) {
   const gross = lines.map((l) => roundHalfAway(l.unitPriceMinor * (Number(l.quantity) || 0)));
   const subtotal = gross.reduce((s, g) => s + g, 0);
   const shares = allocate(Math.min(Math.max(discountMinor, 0), Math.max(subtotal, 0)), gross);
@@ -92,7 +71,7 @@ export function costSummary(lines: CostedLine[], vat?: VatRule, discountMinor: M
       return;
     }
     const afterDiscount = gross[i] - shares[i];
-    sales += vat ? netOf(afterDiscount, vat) : afterDiscount;
+    sales += afterDiscount;
     cost += roundHalfAway(l.unitCostMinor * (Number(l.quantity) || 0));
   });
   return {

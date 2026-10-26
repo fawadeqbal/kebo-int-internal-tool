@@ -11,10 +11,9 @@ import type { OrderView, PaymentsView, PaymentStatus } from "@/lib/types-orders"
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { NoteForm, RemoveFile, UploadForm } from "../../deals/[id]/panels";
-import { cancelOrderAction, detailsAction, moveStageAction, orderNoteAction, orderRemoveFileAction, orderTaxAction, orderUploadAction, packingAction, paymentAction, receiptAction, voidPaymentAction } from "../actions";
+import { cancelOrderAction, detailsAction, moveStageAction, orderNoteAction, orderRemoveFileAction, orderUploadAction, packingAction, paymentAction, receiptAction, voidPaymentAction } from "../actions";
 import { CancelOrderForm, DetailsForm, PaymentForm, StageActions, VoidPayment } from "./forms";
 import { GoodsReceipt, PackingList, type GoodsLine } from "./goods";
-import { RebateCard } from "./rebate";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -337,13 +336,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   blNo: o.blNo ?? "—",
                 }}
               />
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader title="Export rebate" />
-            <CardBody>
-              <RebateCard tax={o.tax} action={orderTaxAction.bind(null, o.id)} canEdit={can(me.role, "orders.update") && open} today={now} />
             </CardBody>
           </Card>
 

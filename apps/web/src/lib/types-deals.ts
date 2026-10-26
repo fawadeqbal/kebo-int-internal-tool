@@ -77,12 +77,9 @@ export interface FactoryQuoteLineView {
   unit: string;
   /** Without tax. */
   unitPrice: string;
-  hsCode: string | null;
-  /** Export rebate % entered for this line (e.g. 13, 9, 6, 0). */
-  rebateRate: number;
-  /** The rebate that really comes back (never more than the tax). */
-  rebateBack: number;
-  /** e.g. "CNY 100.00 + 13% tax = CNY 113.00 · 13% rebate back · your cost CNY 100.00" (factory currency). */
+  /** Tax % added on top of the price (13 unless changed). */
+  taxRate: number;
+  /** e.g. "CNY 100.00 + 13% tax = CNY 113.00" (factory currency). */
   costNote: string;
   /** One unit's landed cost in the selling currency; null when the exchange rate is missing. */
   unitCost: string | null;
@@ -95,8 +92,6 @@ export interface FactoryQuoteView {
   receivedOn: string;
   validUntil: string | null;
   currency: string;
-  /** Tax % added on top of these prices (they are without tax). */
-  vatRate: number;
   priceBasis: string | null;
   leadTime: string | null;
   moq: string | null;
@@ -128,18 +123,6 @@ export interface SourcingView {
   }[];
 }
 
-/** GET /hs-codes: the export rebate remembered per HS code. */
-export interface HsCodeRow {
-  code: string;
-  rebateRate: number;
-  description: string | null;
-  updatedAt: string;
-  updatedBy: { id: string; name: string } | null;
-}
-
-/** GET /hs-codes/:code ({ code: null } the first time a code is used). */
-export type HsCodeLookup = { code: string; rebateRate: number; description: string | null } | { code: null };
-
 /* ---------------------------------------------------------------- quotation */
 
 export interface QuoteLineView {
@@ -148,7 +131,6 @@ export interface QuoteLineView {
   type: LineType;
   description: string;
   model: string | null;
-  hsCode: string | null;
   quantity: string;
   unit: string;
   unitPrice: string;
@@ -181,12 +163,8 @@ export interface RevisionView {
   balanceTerms: BalanceTerms;
   leadTime: string | null;
   validUntil: string;
-  vatRate: number;
-  /** Only old revisions can have prices that include tax; new ones add it on top. */
-  pricesIncludeVat: boolean;
   subtotal: string;
   discount: string;
-  vatAmount: string;
   total: string;
   terms: string | null;
   notes: string | null;
@@ -217,8 +195,6 @@ export interface RevisionDraft {
   balanceTerms: BalanceTerms;
   leadTime: string | null;
   validUntil: string;
-  /** Tax % added on top: 13 for a customer in China, 0 for exports. */
-  vatRate: number;
   discount: number;
   terms: string | null;
   notes: string | null;
@@ -227,7 +203,6 @@ export interface RevisionDraft {
     type: LineType;
     description: string;
     model: string | null;
-    hsCode: string | null;
     quantity: number;
     unit: string;
     unitPrice: number;

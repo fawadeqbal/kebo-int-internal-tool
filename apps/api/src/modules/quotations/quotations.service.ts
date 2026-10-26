@@ -13,7 +13,8 @@ import {
   supersededBy,
   type RevisionInput,
   type RevisionStatus,
-  type Settings, saleVatFor } from "@kebo/shared";
+  type Settings,
+} from "@kebo/shared";
 import { addDays, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -74,11 +75,9 @@ export class QuotationsService {
 
   private view(user: SessionUser, r: RevisionRow) {
     const seeCosts = can(user.role, "sourcing.manage");
-    const vat = { rate: Number(r.vatRate), pricesIncludeVat: r.pricesIncludeVat };
     const costing = seeCosts
       ? costSummary(
           r.lines.map((l) => ({ quantity: l.quantity.toString(), unitPriceMinor: decimalToMinor(l.unitPrice), unitCostMinor: l.unitCost === null ? null : decimalToMinor(l.unitCost) })),
-          vat,
           decimalToMinor(r.discount),
         )
       : null;
@@ -93,11 +92,8 @@ export class QuotationsService {
       balanceTerms: r.balanceTerms,
       leadTime: r.leadTime,
       validUntil: fromDbDate(r.validUntil),
-      vatRate: Number(r.vatRate),
-      pricesIncludeVat: r.pricesIncludeVat,
       subtotal: r.subtotal.toFixed(2),
       discount: r.discount.toFixed(2),
-      vatAmount: r.vatAmount.toFixed(2),
       total: r.total.toFixed(2),
       terms: r.terms,
       notes: r.notes,
@@ -112,7 +108,6 @@ export class QuotationsService {
         type: l.type,
         description: l.description,
         model: l.model,
-        hsCode: l.hsCode,
         quantity: l.quantity.toString(),
         unit: l.unit,
         unitPrice: l.unitPrice.toFixed(2),
@@ -143,9 +138,8 @@ export class QuotationsService {
 
   /** Starting values for the next revision: a copy of the latest, or R1 priced from factory costs plus the default margin. */
   async draft(user: SessionUser, inquiryId: string): Promise<RevisionInput & { number: number }> {
-    const inquiry = await this.inquiries.find(user, inquiryId);
+    await this.inquiries.find(user, inquiryId); // only for people who may see the deal
     const settings = await this.settings.get();
-    const customer = await this.prisma.db.customer.findUniqueOrThrow({ where: { id: inquiry.customerId } });
     const q = await this.prisma.db.quotation.findUnique({ where: { inquiryId }, include: { revisions: { where: { deletedAt: null }, include: revisionInclude, orderBy: { number: "desc" } } } });
     const latest = q?.revisions[0];
     const seeCosts = can(user.role, "sourcing.manage");
@@ -161,7 +155,6 @@ export class QuotationsService {
         balanceTerms: v.balanceTerms,
         leadTime: v.leadTime,
         validUntil: v.validUntil < this.clock.today() ? validUntil : v.validUntil,
-        vatRate: v.vatRate,
         discount: Number(v.discount),
         terms: v.terms,
         notes: v.notes,
@@ -170,7 +163,6 @@ export class QuotationsService {
           type: l.type,
           description: l.description,
           model: l.model,
-          hsCode: l.hsCode,
           quantity: Number(l.quantity),
           unit: l.unit,
           unitPrice: Number(l.unitPrice),
@@ -180,8 +172,6 @@ export class QuotationsService {
         })),
       };
     }
-    // VAT on the sale comes from where the customer is: none for exports, 13% in China.
-    const vatRate = saleVatFor(customer.country);
     const options = seeCosts ? (await this.sourcing.forInquiry(user, inquiryId)).items : [];
     const items = await this.prisma.db.requestedItem.findMany({ where: { inquiryId }, orderBy: { sortOrder: "asc" } });
     return {
@@ -193,7 +183,6 @@ export class QuotationsService {
       balanceTerms: settings.sales.defaultBalanceTerms,
       leadTime: null,
       validUntil,
-      vatRate,
       discount: 0,
       terms: settings.sales.defaultTerms || null,
       notes: null,
@@ -206,7 +195,6 @@ export class QuotationsService {
           type: "goods" as const,
           description: it.description,
           model: it.model ?? line?.model ?? null,
-          hsCode: line?.hsCode ?? null,
           quantity: Number(it.quantity),
           unit: it.unit,
           unitPrice: cost === null ? 0 : Number(fromMinor(priceForMargin(cost, settings.sales.defaultMarginPercent))),
@@ -229,7 +217,6 @@ export class QuotationsService {
     const totals = documentTotals(
       input.lines.map((l) => ({ quantity: l.quantity, unitPrice: l.unitPrice })),
       input.discount,
-      { rate: input.vatRate, pricesIncludeVat: false },
     );
     if (totals.total <= 0) throw new DomainError("The quotation total must be more than zero.");
     if (totals.total > MAX_TOTAL_MINOR) throw new DomainError("The quotation total is too large.");
@@ -243,7 +230,6 @@ export class QuotationsService {
         type: l.type,
         description: l.description,
         model: l.model,
-        hsCode: l.hsCode,
         quantity: l.quantity,
         unit: l.unit,
         unitPrice: l.unitPrice,
@@ -264,12 +250,8 @@ export class QuotationsService {
         balanceTerms: input.balanceTerms,
         leadTime: input.leadTime,
         validUntil: toDbDate(input.validUntil),
-        // VAT is added on top (older revisions may have had prices including VAT; they keep it).
-        vatRate: input.vatRate,
-        pricesIncludeVat: false,
         subtotal: fromMinor(totals.subtotal),
         discount: fromMinor(totals.discount),
-        vatAmount: fromMinor(totals.vat),
         total: fromMinor(totals.total),
         terms: input.terms,
         notes: input.notes,

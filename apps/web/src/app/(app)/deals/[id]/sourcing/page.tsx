@@ -8,7 +8,7 @@ import { money, qty } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { SalesSettings, SourcingView } from "@/lib/types-deals";
 import { ChoosePrice, FactoryQuotes } from "@/components/deals/sourcing-board";
-import { choosePriceAction, lookupHsCodeAction, removeFactoryQuoteAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { choosePriceAction, removeFactoryQuoteAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 
 export const metadata = { title: "Factory prices" };
 
@@ -39,7 +39,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
       <Card>
         <CardHeader
           title="Compare by item"
-          description={`Your cost per unit in ${s.currency}: the factory price plus its tax, less the export rebate. ${priced} of ${s.items.length} item${s.items.length === 1 ? "" : "s"} priced.`}
+          description={`Your cost per unit in ${s.currency}: the factory price plus its tax. ${priced} of ${s.items.length} item${s.items.length === 1 ? "" : "s"} priced.`}
           actions={
             priced > 0 ? (
               <Link href={`/deals/${d.id}/quotation`} className="text-sm font-medium text-primary hover:underline">
@@ -119,7 +119,6 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
         saveAction={saveFactoryQuoteAction.bind(null, d.id)}
         removeAction={removeFactoryQuoteAction.bind(null, d.id)}
         searchFactories={searchFactoriesAction}
-        lookupHsCode={lookupHsCodeAction}
       />
     </div>
   );

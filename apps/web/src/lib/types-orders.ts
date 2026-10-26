@@ -71,20 +71,7 @@ export interface OrderView {
   cancelled: { at: string | null; reason: string | null } | null;
   lines: OrderLineView[];
   goods: OrderGoodsView;
-  /** The export rebate on this order and its paperwork. */
-  tax: OrderTax;
   documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
-}
-
-/** The export rebate of an order: how much comes back, and the paperwork (factory's VAT invoice, filing within 90 days of shipping). */
-export interface OrderTax {
-  /** Expected rebate per factory currency (empty when none). */
-  rebate: { currency: string; amount: string }[];
-  vatInvoiceReceivedOn: string | null;
-  rebateFiledOn: string | null;
-  /** File the rebate by this date (shipped + 90 days); null until shipped. */
-  deadline: string | null;
-  needs: (OrderNeed & { deadline: string }) | null;
 }
 
 /** The packing list figures of one goods line (null until filled in). */
@@ -217,7 +204,6 @@ export interface OrderDocument {
     type: LineType;
     description: string;
     model: string | null;
-    hsCode: string | null;
     quantity: string;
     unit: string;
     unitPrice: string | null;
@@ -232,9 +218,6 @@ export interface OrderDocument {
   totals: {
     subtotal: string;
     discount: string;
-    vatRate: number;
-    pricesIncludeVat: boolean;
-    vat: string;
     total: string;
     deposit: string;
     depositPercent: number;
@@ -254,7 +237,6 @@ export interface DocLine {
   type: LineType;
   description: string;
   model: string | null;
-  hsCode: string | null;
   quantity: string;
   unit: string;
   unitPrice: string;
@@ -276,11 +258,8 @@ export interface RevisionDoc {
   balanceTerms: BalanceTerms;
   leadTime: string | null;
   validUntil: string;
-  vatRate: number;
-  pricesIncludeVat: boolean;
   subtotal: string;
   discount: string;
-  vatAmount: string;
   total: string;
   terms: string | null;
   notes: string | null;

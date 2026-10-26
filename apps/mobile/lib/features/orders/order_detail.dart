@@ -12,7 +12,6 @@ import '../../theme/colors.dart';
 import '../../ui/docs.dart';
 import '../../ui/kit.dart';
 import 'goods.dart';
-import 'rebate.dart';
 
 /// GET /api/orders/:id.
 final orderProvider = FutureProvider.autoDispose.family<Json, String>((ref, id) {
@@ -52,7 +51,6 @@ class OrderDetailScreen extends ConsumerWidget {
             _StageCard(o: o),
             GoodsCard(o: o),
             _MoneyCard(o: o),
-            RebateCard(o: o),
             _DetailsCard(o: o),
             _DocumentsCard(o: o),
             _HistoryCard(o: o),

@@ -48,7 +48,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       />
       {c.country === UNKNOWN_COUNTRY && (
         <p className="mb-4 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-sm">
-          This customer&apos;s country is not set yet. {canEdit ? <Link href={`/customers/${c.id}/edit`} className="font-medium underline">Add it</Link> : "Ask someone to add it"} — it decides tax and shipping.
+          This customer&apos;s country is not set yet. {canEdit ? <Link href={`/customers/${c.id}/edit`} className="font-medium underline">Add it</Link> : "Ask someone to add it"} — it decides shipping.
         </p>
       )}
 

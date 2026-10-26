@@ -5,7 +5,7 @@ import { factoryQuoteInput } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
-import type { FactoryOption, HsCodeLookup } from "@/lib/types-deals";
+import type { FactoryOption } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
 
@@ -19,21 +19,9 @@ export async function searchFactoriesAction(q: string): Promise<FactoryOption[]>
   }
 }
 
-/** The export rebate remembered for an HS code: null the first time it is used, undefined when it cannot be checked. */
-export async function lookupHsCodeAction(code: string): Promise<{ rebateRate: number; description: string | null } | null | undefined> {
-  const clean = code.replace(/\s+/g, "");
-  if (!/^[0-9.]{2,20}$/.test(clean)) return undefined;
-  try {
-    const r = await api.get<HsCodeLookup>(`/hs-codes/${encodeURIComponent(clean)}`);
-    return r.code === null ? null : { rebateRate: r.rebateRate, description: r.description };
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * The API reports a problem inside a price line under one key ("lines"). Point
- * it at the exact line field ("lines.2.rebateRate") so the form shows it next
+ * it at the exact line field ("lines.2.taxRate") so the form shows it next
  * to its box. The API has already decided; this only locates.
  */
 function locateLineErrors(body: Record<string, unknown>, r: ActionState): ActionState {

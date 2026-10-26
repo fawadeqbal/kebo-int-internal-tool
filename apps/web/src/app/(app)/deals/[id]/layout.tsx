@@ -79,7 +79,7 @@ export default async function DealLayout({ children, params }: { children: React
           <Link href={`/customers/${d.customer.id}/edit`} className="font-medium underline">
             Add it
           </Link>{" "}
-          — it decides tax and shipping.
+          — it decides shipping.
         </p>
       )}
       <DealTabs id={d.id} source={can(me.role, "sourcing.manage")} orderId={order?.id ?? null} />

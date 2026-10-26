@@ -56,12 +56,12 @@ export default async function QuotationPrint({ params, searchParams }: { params:
       ]
     : [no, description, { label: "Qty.", width: 71.4, render: (l) => docQty(l.quantity, l.unit) }];
 
+  // Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const sums =
-    internal || Number(r.discount) || r.vatRate > 0
+    internal || Number(r.discount)
       ? [
           { label: "Subtotal", value: docMoney(r.subtotal, c) },
           ...(Number(r.discount) ? [{ label: "Discount", value: docMoney(-Number(r.discount), c) }] : []),
-          ...(r.vatRate > 0 ? [{ label: `Tax ${r.vatRate}%${r.pricesIncludeVat ? " (included)" : ""}`, value: docMoney(r.vatAmount, c) }] : []),
         ]
       : [];
 
@@ -98,7 +98,7 @@ export default async function QuotationPrint({ params, searchParams }: { params:
             <InternalTable
               title="Costing (internal)"
               rows={[
-                ["Sales (without tax)", docMoney(r.costing.sales, c)],
+                ["Sales (after discount)", docMoney(r.costing.sales, c)],
                 ["Factory cost", docMoney(r.costing.cost, c)],
                 ["Profit", docMoney(r.costing.profit, c)],
                 ["Margin", r.costing.marginPercent === null ? "—" : `${r.costing.marginPercent}%`],

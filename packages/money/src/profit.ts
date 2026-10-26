@@ -5,7 +5,7 @@ import { allocate, roundHalfAway, type Minor } from "./core";
  * own. Two views:
  *
  * - Estimated (from documents): each sold line's revenue (after its share of
- *   the discount, without our VAT) less its recorded unit cost. Lines with no
+ *   the discount) less its recorded unit cost. Lines with no
  *   cost (freight, hand-priced) are revenue with unknown cost, reported apart
  *   so they never inflate profit.
  * - Actual (from cash): money received from the customer less money paid to
@@ -25,8 +25,6 @@ export interface SoldLine {
 export interface SoldDoc {
   id: string;
   discountMinor: Minor;
-  vatRate: number;
-  pricesIncludeVat: boolean;
   lines: SoldLine[];
 }
 
@@ -39,8 +37,7 @@ export interface CostedSoldLine extends SoldLine {
 export function costDocLines(doc: SoldDoc): CostedSoldLine[] {
   const shares = allocate(doc.discountMinor, doc.lines.map((l) => l.lineTotalMinor));
   return doc.lines.map((l, i) => {
-    const after = l.lineTotalMinor - shares[i];
-    const revenue = doc.pricesIncludeVat && doc.vatRate > 0 ? roundHalfAway(after / (1 + doc.vatRate / 100)) : after;
+    const revenue = l.lineTotalMinor - shares[i];
     const cost = l.unitCostMinor === null ? null : roundHalfAway(l.unitCostMinor * l.quantity);
     return { ...l, revenueMinor: revenue, costMinor: cost, profitMinor: cost === null ? null : revenue - cost };
   });

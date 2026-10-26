@@ -6,14 +6,12 @@ import {
   moveStageInput,
   ORDER_STAGES,
   orderDetailsInput,
-  orderTaxInput,
   packingInput,
   paymentInput,
   receiptInput,
   voidPaymentInput,
   type MoveStageInput,
   type OrderDetailsInput,
-  type OrderTaxInput,
   type PackingInput,
   type PaymentInput,
   type ReceiptInput,
@@ -68,12 +66,6 @@ export class OrdersController {
   @Patch(":id/details")
   details(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderDetailsInput)) body: OrderDetailsInput) {
     return this.orders.setDetails(user, id, body);
-  }
-
-  /** { vatInvoiceReceivedOn?, rebateFiledOn? } — the export rebate paperwork; null clears a date. */
-  @Patch(":id/tax")
-  tax(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderTaxInput)) body: OrderTaxInput) {
-    return this.orders.setTax(user, id, body);
   }
 
   /** { on?, lines: [{ lineId, receivedQty }] } — how many of each goods line came in from the factory so far. */

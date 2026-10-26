@@ -23,7 +23,6 @@ import 'package:kebo_rfq/theme/theme.dart';
 ///    the spare parts kit 1 of 2; no packing list yet.
 ///  - order_packed.json: the same order with everything in and the packing list made (3 packages,
 ///    2,002.50 kg gross, 6.350 CBM, container TGHU 123456-7).
-///  The fixtures are from before the export rebate (`tax`); the rebate tests add it as the API sends it.
 Json fixture(String name) => (jsonDecode(File('test/fixtures/$name.json').readAsStringSync()) as Map).cast<String, dynamic>();
 List<Json> fixtureList(String name) => (jsonDecode(File('test/fixtures/$name.json').readAsStringSync()) as List).cast<Map>().map((m) => m.cast<String, dynamic>()).toList();
 
@@ -54,17 +53,6 @@ class FakeRepo extends KeboRepository {
     receipts.add((received, on));
     if (receiptError case final e?) throw e;
     current = afterReceipt ?? current;
-    return current;
-  }
-
-  final taxCalls = <(String, String?)>[];
-  ApiException? taxError;
-
-  @override
-  Future<Json> setOrderTax(String orderId, String field, String? on) async {
-    taxCalls.add((field, on));
-    if (taxError case final e?) throw e;
-    current = {...current, 'tax': {...current.m('tax'), field: on}};
     return current;
   }
 
@@ -446,165 +434,6 @@ void main() {
       await settle(tester);
       expect(find.text('Goods from the factory'), findsNothing);
       expect(tester.takeException(), isNull);
-    });
-  });
-
-  group('export rebate', () {
-    // SO-2026-0004 shipped 10 Oct 2026: the rebate is filed by 08 Jan 2027 (90 days).
-    Json shipped({List<Json> rebate = const [{'currency': 'CNY', 'amount': '2340.00'}], String? invoice, String? filed, Json? needs}) => {
-          ...fixture('order_shipped'),
-          'tax': {
-            'rebate': rebate,
-            'vatInvoiceReceivedOn': invoice,
-            'rebateFiledOn': filed,
-            'deadline': '2027-01-08',
-            'needs': needs,
-          },
-        };
-    const needInvoice = {'title': "Get the factory's special VAT invoice (rebate CNY 2,340.00)", 'due': '2026-11-09', 'late': false, 'deadline': '2027-01-08'};
-    Finder inCard(Finder f) => find.descendant(of: find.byKey(const ValueKey('rebate')), matching: f);
-    Switch switchOf(WidgetTester tester, String field) => tester.widget<Switch>(find.byKey(ValueKey('rebate-switch-$field')));
-
-    testWidgets('the expected rebate, file by the deadline, what it needs, both steps off', (tester) async {
-      await phone(tester);
-      final o = shipped(needs: needInvoice);
-      await tester.pumpWidget(app(FakeRepo(o, fixture('payments_shipped')), OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      expect(inCard(find.text('Export rebate')), findsOneWidget);
-      expect(inCard(find.text('File by 08 Jan 2027')), findsOneWidget);
-      expect(inCard(find.text('Expected rebate')), findsOneWidget);
-      expect(inCard(find.text('CNY 2,340.00')), findsOneWidget);
-      final need = tester.widget<Text>(inCard(find.text(needInvoice['title']! as String)));
-      expect(need.style!.color, isNot(AppColors.of(tester.element(find.byKey(const ValueKey('rebate')))).bad));
-      expect(inCard(find.text("Factory's VAT invoice received")), findsOneWidget);
-      expect(inCard(find.text('Rebate filed')), findsOneWidget);
-      expect(inCard(find.text('Not yet')), findsNWidgets(2));
-      expect(switchOf(tester, 'vatInvoiceReceivedOn').value, isFalse);
-      expect(switchOf(tester, 'rebateFiledOn').value, isFalse);
-      // After the money, before the details.
-      expect(tester.getTopLeft(find.text('Money')).dy, lessThan(tester.getTopLeft(find.text('Export rebate')).dy));
-      expect(tester.getTopLeft(find.text('Export rebate')).dy, lessThan(tester.getTopLeft(find.text('Details')).dy));
-    });
-
-    testWidgets('late: what it needs in red, with a Late badge', (tester) async {
-      await phone(tester);
-      const late = {'title': 'File the export rebate (CNY 2,340.00) by 2027-01-08', 'due': '2026-12-09', 'late': true, 'deadline': '2027-01-08'};
-      final o = shipped(invoice: '2026-10-20', needs: late);
-      await tester.pumpWidget(app(FakeRepo(o, fixture('payments_shipped')), OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      final need = tester.widget<Text>(inCard(find.text(late['title']! as String)));
-      expect(need.style!.color, AppColors.of(tester.element(find.byKey(const ValueKey('rebate')))).bad);
-      expect(inCard(find.text('Late')), findsOneWidget);
-    });
-
-    testWidgets('switching on sends today and shows the order again; off sends null', (tester) async {
-      await phone(tester);
-      final o = shipped(needs: needInvoice);
-      final repo = FakeRepo(o, fixture('payments_shipped'));
-      await tester.pumpWidget(app(repo, OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-
-      await tester.tap(find.byKey(const ValueKey('rebate-switch-vatInvoiceReceivedOn')));
-      await settle(tester);
-      expect(repo.taxCalls, [('vatInvoiceReceivedOn', f.today())]);
-      expect(switchOf(tester, 'vatInvoiceReceivedOn').value, isTrue);
-      expect(inCard(find.text(f.date(f.today()))), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('rebate-switch-rebateFiledOn')));
-      await settle(tester);
-      expect(repo.taxCalls.last, ('rebateFiledOn', f.today()));
-      expect(inCard(find.text('Filed')), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('rebate-switch-vatInvoiceReceivedOn')));
-      await settle(tester);
-      expect(repo.taxCalls.last, ('vatInvoiceReceivedOn', null));
-      expect(switchOf(tester, 'vatInvoiceReceivedOn').value, isFalse);
-    });
-
-    testWidgets('another day: tap the date, pick it (no future days)', (tester) async {
-      await phone(tester);
-      final o = shipped(invoice: f.today());
-      final repo = FakeRepo(o, fixture('payments_shipped'));
-      await tester.pumpWidget(app(repo, OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      await tester.tap(find.byKey(const ValueKey('rebate-date-vatInvoiceReceivedOn')));
-      await settle(tester);
-      expect(find.byType(DatePickerDialog), findsOneWidget);
-      final picker = tester.widget<DatePickerDialog>(find.byType(DatePickerDialog));
-      expect(f.isoDate(picker.lastDate), f.today());
-      final now = DateTime.now();
-      await tester.tap(find.descendant(of: find.byType(DatePickerDialog), matching: find.text('1')));
-      await tester.tap(find.text('OK'));
-      await settle(tester);
-      // The same day again sends nothing (on the 1st of a month, day 1 is today).
-      expect(repo.taxCalls, now.day == 1 ? isEmpty : [('vatInvoiceReceivedOn', f.isoDate(DateTime(now.year, now.month, 1)))]);
-    });
-
-    testWidgets("the server's refusal is shown, nothing changes", (tester) async {
-      await phone(tester);
-      final o = shipped();
-      final repo = FakeRepo(o, fixture('payments_shipped'))..taxError = Api.errorFromBody(400, {'error': 'The date cannot be in the future.'});
-      await tester.pumpWidget(app(repo, OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      await tester.tap(find.byKey(const ValueKey('rebate-switch-rebateFiledOn')));
-      await settle(tester);
-      expect(repo.taxCalls, hasLength(1));
-      expect(find.text('The date cannot be in the future.'), findsOneWidget);
-      expect(switchOf(tester, 'rebateFiledOn').value, isFalse);
-    });
-
-    for (final (why, change, permissions) in <(String, Json Function(Json), List<String>)>[
-      ('without orders.update', (o) => o, const <String>[]),
-      ('cancelled', (o) => {...o, 'status': 'cancelled', 'cancelled': {'at': '2026-10-25T10:00:00.000Z', 'reason': 'Customer changed plans'}}, const ['orders.update']),
-    ]) {
-      testWidgets('$why: the dates are shown, no switches', (tester) async {
-        await phone(tester);
-        final o = change(shipped(invoice: '2026-10-20'));
-        await tester.pumpWidget(app(FakeRepo(o, fixture('payments_shipped')), OrderDetailScreen(id: o.s('id')), permissions: permissions));
-        await settle(tester);
-        expect(inCard(find.text('20 Oct 2026')), findsOneWidget);
-        expect(inCard(find.text('Not yet')), findsOneWidget);
-        expect(inCard(find.byType(Switch)), findsNothing);
-        expect(find.byKey(const ValueKey('rebate-date-vatInvoiceReceivedOn')), findsNothing);
-      });
-    }
-
-    testWidgets('no rebate and nothing filed: one muted line', (tester) async {
-      await phone(tester);
-      final o = {...shipped(rebate: const []), 'tax': {...shipped().m('tax'), 'rebate': const [], 'deadline': null}};
-      await tester.pumpWidget(app(FakeRepo(o, fixture('payments_shipped')), OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      expect(inCard(find.text('No export rebate on this order')), findsOneWidget);
-      expect(inCard(find.byType(Switch)), findsNothing);
-      expect(find.text('Expected rebate'), findsNothing);
-    });
-
-    testWidgets('before shipping: no deadline yet', (tester) async {
-      await phone(tester);
-      final o = {...fixture('order_in_production'), 'tax': {'rebate': [{'currency': 'CNY', 'amount': '2340.00'}], 'vatInvoiceReceivedOn': null, 'rebateFiledOn': null, 'deadline': null, 'needs': null}};
-      await tester.pumpWidget(app(FakeRepo(o, fixture('payments_in_production')), OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      expect(inCard(find.text('File within 90 days of shipping')), findsOneWidget);
-      expect(find.byKey(const ValueKey('rebate-needs')), findsNothing);
-    });
-
-    testWidgets('an answer without tax (older server): no rebate card', (tester) async {
-      await phone(tester);
-      final o = fixture('order_shipped');
-      await tester.pumpWidget(app(FakeRepo(o, fixture('payments_shipped')), OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      expect(tester.takeException(), isNull);
-      expect(find.text('Export rebate'), findsNothing);
-    });
-
-    testWidgets('tax with every field null: no crash', (tester) async {
-      await phone(tester);
-      final o = fixture('order_shipped');
-      final bare = {...o, 'tax': {'rebate': null, 'vatInvoiceReceivedOn': null, 'rebateFiledOn': null, 'deadline': null, 'needs': null}};
-      await tester.pumpWidget(app(FakeRepo(bare, fixture('payments_shipped')), OrderDetailScreen(id: o.s('id'))));
-      await settle(tester);
-      expect(tester.takeException(), isNull);
-      expect(find.text('No export rebate on this order'), findsOneWidget);
     });
   });
 
