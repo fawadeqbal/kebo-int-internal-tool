@@ -170,3 +170,14 @@ describe("input schemas", () => {
     expect(stageMoveInput.safeParse({ to: "lost" }).error?.issues[0].message).toBe("Choose why the deal was lost");
   });
 });
+
+describe("settings", () => {
+  it("fills in defaults and survives bad stored values", async () => {
+    const { readSettings } = await import("../src");
+    const s = readSettings({ sales: { defaultDepositPercent: 50 }, plan: "garbage" });
+    expect(s.sales.defaultDepositPercent).toBe(50);
+    expect(s.sales.currency).toBe("USD");
+    expect(s.plan.depositDays).toBe(5);
+    expect(s.company.website).toBe("keboint.com");
+  });
+});

@@ -1,0 +1,990 @@
+// Kebo deal tracker: the data model.
+//
+// Conventions
+// - Tables and columns are snake_case in Postgres (@@map / @map); models are PascalCase.
+// - Money: Decimal(14,2) columns, always handled as integer minor units in code (@kebo/money).
+// - Calendar dates (due, issued, paid) are DATE columns with no time of day.
+// - Business records are soft-deleted (deleted_at) so history never disappears.
+// - Enum values match @kebo/shared/enums (a test checks they stay in sync).
+// - Snapshot JSON columns freeze who a document was for/from when it was sent or issued.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum Role {
+  admin
+  manager
+  staff
+}
+
+enum InquiryStage {
+  new
+  sourcing
+  quoted
+  won
+  lost
+}
+
+enum InquiryChannel {
+  website
+  whatsapp
+  wechat
+  email
+  phone
+  visit
+  other
+}
+
+enum Priority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum LostReason {
+  price_too_high
+  no_reply
+  factory_cannot_supply
+  bought_elsewhere
+  customer_cancelled
+  duplicate_or_spam
+  other
+}
+
+enum CustomerType {
+  company
+  individual
+}
+
+enum TaxTreatment {
+  export_zero_rated
+  domestic_vat
+}
+
+enum RevisionStatus {
+  draft
+  sent
+  accepted
+  rejected
+  expired
+  superseded
+}
+
+enum LineType {
+  goods
+  service
+  charge
+}
+
+enum Incoterm {
+  EXW
+  FCA
+  FAS
+  FOB
+  CFR
+  CIF
+  CPT
+  CIP
+  DAP
+  DPU
+  DDP
+}
+
+enum BalanceTerms {
+  before_shipment
+  against_bl_copy
+  after_arrival
+  letter_of_credit
+}
+
+enum OrderStatus {
+  open
+  closed
+  cancelled
+}
+
+enum MilestoneKey {
+  proforma_sent
+  customer_deposit
+  factory_order
+  factory_deposit
+  factory_confirmed
+  samples_approved
+  inspection_passed
+  customer_balance
+  factory_balance
+  shipped
+  documents_released
+  factory_vat_invoice
+}
+
+enum MilestoneStatus {
+  todo
+  done
+  skipped
+}
+
+enum FactoryOrderStatus {
+  draft
+  sent
+  confirmed
+  cancelled
+}
+
+enum PaymentDirection {
+  in
+  out
+}
+
+enum PaymentKind {
+  deposit
+  balance
+  other
+}
+
+enum PaymentMethod {
+  bank_transfer
+  letter_of_credit
+  cash
+  cheque
+  online
+  other
+}
+
+enum InvoiceType {
+  proforma
+  commercial
+}
+
+enum InvoiceStatus {
+  draft
+  issued
+  void
+}
+
+enum ShipmentStatus {
+  planned
+  booked
+  departed
+  arrived
+}
+
+// ============================================================================
+// Platform: people, sign-in, settings, numbering, audit, notifications
+// ============================================================================
+
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @db.VarChar(120)
+  email          String    @unique @db.VarChar(254)
+  passwordHash   String    @map("password_hash")
+  role           Role      @default(staff)
+  isActive       Boolean   @default(true) @map("is_active")
+  /// Built-in account that records website inquiries; can never sign in.
+  isSystem       Boolean   @default(false) @map("is_system")
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz
+  failedLogins   Int       @default(0) @map("failed_logins")
+  lockedUntil    DateTime? @map("locked_until") @db.Timestamptz
+  /// Two-step sign-in: encrypted authenticator secret; on once totpEnabledAt is set.
+  totpSecret     String?   @map("totp_secret")
+  totpEnabledAt  DateTime? @map("totp_enabled_at") @db.Timestamptz
+  totpLastStep   Int?      @map("totp_last_step")
+  /// sha256 hashes of unused recovery codes.
+  recoveryCodes  String[]  @default([]) @map("recovery_codes")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions       Session[]
+  devices        DeviceToken[]
+  notifications  Notification[]
+  assignedDeals  Inquiry[]          @relation("InquiryAssignee")
+  createdDeals   Inquiry[]          @relation("InquiryCreator")
+
+  @@map("users")
+}
+
+/// One row per signed-in browser or phone; the token only carries this id, so sign-out and deactivation end sessions at once.
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
+  userAgent  String?   @map("user_agent") @db.VarChar(300)
+  /// Signed in, but the second step (authenticator code) is not done yet.
+  pendingTwoStep Boolean @default(false) @map("pending_two_step")
+
+  devices DeviceToken[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Phones that receive push notifications.
+model DeviceToken {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId  String?  @map("session_id") @db.Uuid
+  session    Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  platform   String   @default("android") @db.VarChar(20)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    @db.VarChar(60)
+  title     String    @db.VarChar(255)
+  body      String?
+  link      String?   @db.VarChar(255)
+  /// Stops the reminder job sending the same reminder twice.
+  dedupeKey String?   @map("dedupe_key") @db.VarChar(200)
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/// Who changed what, with old and new values.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(60)
+  entityType String   @map("entity_type") @db.VarChar(60)
+  entityId   String?  @map("entity_id") @db.Uuid
+  summary    String?
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// Company profile, defaults, reminder rules, plan timings: one JSON value per key.
+model Setting {
+  key       String   @id @db.VarChar(100)
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("settings")
+}
+
+/// Gap-free yearly counters for document numbers (RFQ-2026-0001, SO-2026-0001…).
+model Counter {
+  key   String @id @db.VarChar(50)
+  value Int    @default(0)
+
+  @@map("counters")
+}
+
+// ============================================================================
+// Parties: customers (with contacts) and factories
+// ============================================================================
+
+model Customer {
+  id              String       @id @default(uuid()) @db.Uuid
+  type            CustomerType @default(company)
+  name            String       @db.VarChar(200)
+  /// ISO 3166-1 alpha-2 (e.g. NG, AE). Drives tax treatment and destination.
+  country         String       @db.Char(2)
+  address         String?
+  taxNo           String?      @map("tax_no") @db.VarChar(60)
+  taxTreatment    TaxTreatment @default(export_zero_rated) @map("tax_treatment")
+  defaultCurrency String       @default("USD") @map("default_currency") @db.Char(3)
+  notes           String?
+  createdById     String?      @map("created_by") @db.Uuid
+  deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  contacts  Contact[]
+  inquiries Inquiry[]
+  orders    Order[]
+  payments  Payment[]
+
+  @@index([name])
+  @@index([country])
+  @@map("customers")
+}
+
+model Contact {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String    @db.VarChar(120)
+  position   String?   @db.VarChar(80)
+  email      String?   @db.VarChar(254)
+  phone      String?   @db.VarChar(40)
+  whatsapp   String?   @db.VarChar(40)
+  wechat     String?   @db.VarChar(80)
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  inquiries Inquiry[]
+
+  @@index([customerId])
+  @@index([email])
+  @@index([phone])
+  @@index([whatsapp])
+  @@map("contacts")
+}
+
+model Factory {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String    @db.VarChar(200)
+  contactPerson    String?   @map("contact_person") @db.VarChar(120)
+  phone            String?   @db.VarChar(40)
+  wechat           String?   @db.VarChar(80)
+  email            String?   @db.VarChar(254)
+  address          String?
+  /// Their usual VAT on prices (13% goods, 6% services).
+  defaultVatRate   Decimal   @default(13) @map("default_vat_rate") @db.Decimal(5, 2)
+  pricesIncludeVat Boolean   @default(true) @map("prices_include_vat")
+  bankDetails      String?   @map("bank_details")
+  notes            String?
+  createdById      String?   @map("created_by") @db.Uuid
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  quotes   FactoryQuote[]
+  orders   FactoryOrder[]
+  payments Payment[]
+
+  @@index([name])
+  @@map("factories")
+}
+
+// ============================================================================
+// Sales: the inquiry (deal) and what the customer asked for
+// ============================================================================
+
+model Inquiry {
+  id           String         @id @default(uuid()) @db.Uuid
+  /// RFQ-2026-0001
+  refNo        String         @unique @map("ref_no") @db.VarChar(30)
+  customerId   String         @map("customer_id") @db.Uuid
+  customer     Customer       @relation(fields: [customerId], references: [id])
+  contactId    String?        @map("contact_id") @db.Uuid
+  contact      Contact?       @relation(fields: [contactId], references: [id])
+  channel      InquiryChannel @default(email)
+  category     String         @db.VarChar(120)
+  title        String         @db.VarChar(200)
+  /// Anything else the customer said: destination port, standards, delivery…
+  requirements String?
+  priority     Priority       @default(normal)
+  requiredBy   DateTime?      @map("required_by") @db.Date
+  stage        InquiryStage   @default(new)
+  onHold       Boolean        @default(false) @map("on_hold")
+  lostReason   LostReason?    @map("lost_reason")
+  lostNote     String?        @map("lost_note")
+  assigneeId   String?        @map("assignee_id") @db.Uuid
+  assignee     User?          @relation("InquiryAssignee", fields: [assigneeId], references: [id])
+  createdById  String         @map("created_by") @db.Uuid
+  createdBy    User           @relation("InquiryCreator", fields: [createdById], references: [id])
+  /// When it was won or lost (turnaround = closedAt − createdAt).
+  closedAt     DateTime?      @map("closed_at") @db.Timestamptz
+  deletedAt    DateTime?      @map("deleted_at") @db.Timestamptz
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  items         RequestedItem[]
+  stageChanges  InquiryStageChange[]
+  assignments   InquiryAssignment[]
+  notes         InquiryNote[]
+  attachments   Attachment[]
+  factoryQuotes FactoryQuote[]
+  quotation     Quotation?
+  order         Order?
+
+  @@index([stage])
+  @@index([assigneeId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("inquiries")
+}
+
+model RequestedItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  inquiryId   String  @map("inquiry_id") @db.Uuid
+  inquiry     Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  description String
+  model       String? @db.VarChar(120)
+  quantity    Decimal @db.Decimal(12, 2)
+  unit        String  @default("pcs") @db.VarChar(20)
+  targetPrice Decimal? @map("target_price") @db.Decimal(14, 2)
+  sortOrder   Int     @default(0) @map("sort_order")
+  /// The factory price line to quote from by default.
+  preferredFactoryLineId String?           @map("preferred_factory_line_id") @db.Uuid
+  preferredFactoryLine   FactoryQuoteLine? @relation("PreferredLine", fields: [preferredFactoryLineId], references: [id], onDelete: SetNull)
+
+  factoryLines FactoryQuoteLine[] @relation("AnswersItem")
+  quoteLines   QuoteLine[]
+
+  @@index([inquiryId])
+  @@map("requested_items")
+}
+
+/// Every stage move, automatic or by hand; turnaround and time-in-stage come from here.
+model InquiryStageChange {
+  id          String        @id @default(uuid()) @db.Uuid
+  inquiryId   String        @map("inquiry_id") @db.Uuid
+  inquiry     Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  fromStage   InquiryStage? @map("from_stage")
+  toStage     InquiryStage  @map("to_stage")
+  /// What caused it: a person ("manual") or an event ("quotation_sent"…).
+  cause       String        @default("manual") @db.VarChar(40)
+  lostReason  LostReason?   @map("lost_reason")
+  note        String?
+  changedById String?       @map("changed_by") @db.Uuid
+  changedAt   DateTime      @default(now()) @map("changed_at") @db.Timestamptz
+
+  @@index([inquiryId])
+  @@map("inquiry_stage_changes")
+}
+
+model InquiryAssignment {
+  id           String   @id @default(uuid()) @db.Uuid
+  inquiryId    String   @map("inquiry_id") @db.Uuid
+  inquiry      Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  assigneeId   String?  @map("assignee_id") @db.Uuid
+  assignedById String   @map("assigned_by") @db.Uuid
+  assignedAt   DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+
+  @@index([inquiryId])
+  @@map("inquiry_assignments")
+}
+
+model InquiryNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  inquiryId String   @map("inquiry_id") @db.Uuid
+  inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  body      String
+  authorId  String   @map("author_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([inquiryId])
+  @@map("inquiry_notes")
+}
+
+/// Files on a deal. Optionally tied to an order step (inspection report, payment slip, B/L copy).
+model Attachment {
+  id           String       @id @default(uuid()) @db.Uuid
+  inquiryId    String       @map("inquiry_id") @db.Uuid
+  inquiry      Inquiry      @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  milestoneId  String?      @map("milestone_id") @db.Uuid
+  milestone    Milestone?   @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  factoryQuoteId String?    @map("factory_quote_id") @db.Uuid
+  factoryQuote FactoryQuote? @relation(fields: [factoryQuoteId], references: [id], onDelete: SetNull)
+  paymentId    String?      @map("payment_id") @db.Uuid
+  payment      Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  fileName     String       @map("file_name") @db.VarChar(255)
+  mimeType     String       @map("mime_type") @db.VarChar(150)
+  size         Int
+  storageKey   String       @map("storage_key")
+  uploadedById String       @map("uploaded_by") @db.Uuid
+  deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([inquiryId])
+  @@index([milestoneId])
+  @@map("attachments")
+}
+
+// ============================================================================
+// Sourcing: factory prices for a deal (internal, never shown to customers)
+// ============================================================================
+
+model FactoryQuote {
+  id               String    @id @default(uuid()) @db.Uuid
+  inquiryId        String    @map("inquiry_id") @db.Uuid
+  inquiry          Inquiry   @relation(fields: [inquiryId], references: [id])
+  factoryId        String    @map("factory_id") @db.Uuid
+  factory          Factory   @relation(fields: [factoryId], references: [id])
+  /// The factory's own quotation number.
+  reference        String?   @db.VarChar(80)
+  receivedOn       DateTime  @map("received_on") @db.Date
+  validUntil       DateTime? @map("valid_until") @db.Date
+  currency         String    @default("CNY") @db.Char(3)
+  pricesIncludeVat Boolean   @default(true) @map("prices_include_vat")
+  /// EXW, FOB Qingdao, delivered to port…
+  priceBasis       String?   @map("price_basis") @db.VarChar(60)
+  leadTime         String?   @map("lead_time") @db.VarChar(120)
+  moq              String?   @db.VarChar(60)
+  paymentTerms     String?   @map("payment_terms")
+  notes            String?
+  createdById      String    @map("created_by") @db.Uuid
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  lines       FactoryQuoteLine[]
+  attachments Attachment[]
+
+  @@index([inquiryId])
+  @@index([factoryId])
+  @@map("factory_quotes")
+}
+
+model FactoryQuoteLine {
+  id              String         @id @default(uuid()) @db.Uuid
+  factoryQuoteId  String         @map("factory_quote_id") @db.Uuid
+  factoryQuote    FactoryQuote   @relation(fields: [factoryQuoteId], references: [id], onDelete: Cascade)
+  /// The customer's item this answers (empty for extras the factory added).
+  requestedItemId String?        @map("requested_item_id") @db.Uuid
+  requestedItem   RequestedItem? @relation("AnswersItem", fields: [requestedItemId], references: [id], onDelete: SetNull)
+  description     String
+  model           String?        @db.VarChar(120)
+  quantity        Decimal        @db.Decimal(12, 2)
+  unit            String         @default("pcs") @db.VarChar(20)
+  unitPrice       Decimal        @map("unit_price") @db.Decimal(14, 2)
+  vatRate         Decimal        @default(13) @map("vat_rate") @db.Decimal(5, 2)
+  /// Export VAT rebate % for this product's HS code (0 = not claimed).
+  rebateRate      Decimal        @default(0) @map("rebate_rate") @db.Decimal(5, 2)
+  sortOrder       Int            @default(0) @map("sort_order")
+
+  preferredBy RequestedItem[]    @relation("PreferredLine")
+  quoteLines  QuoteLine[]
+  orderLines  FactoryOrderLine[]
+
+  @@index([factoryQuoteId])
+  @@map("factory_quote_lines")
+}
+
+// ============================================================================
+// Quotation: one per deal, with revisions R1, R2…
+// ============================================================================
+
+model Quotation {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// QUO-2026-0007 (revisions print as QUO-2026-0007 R2)
+  refNo     String   @unique @map("ref_no") @db.VarChar(30)
+  inquiryId String   @unique @map("inquiry_id") @db.Uuid
+  inquiry   Inquiry  @relation(fields: [inquiryId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  revisions QuotationRevision[]
+
+  @@map("quotations")
+}
+
+model QuotationRevision {
+  id               String         @id @default(uuid()) @db.Uuid
+  quotationId      String         @map("quotation_id") @db.Uuid
+  quotation        Quotation      @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  number           Int
+  status           RevisionStatus @default(draft)
+  currency         String         @default("USD") @db.Char(3)
+  incoterm         Incoterm       @default(FOB)
+  incotermPlace    String?        @map("incoterm_place") @db.VarChar(80)
+  depositPercent   Decimal        @default(30) @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms     BalanceTerms   @default(before_shipment) @map("balance_terms")
+  leadTime         String?        @map("lead_time") @db.VarChar(120)
+  validUntil       DateTime       @map("valid_until") @db.Date
+  vatRate          Decimal        @default(0) @map("vat_rate") @db.Decimal(5, 2)
+  pricesIncludeVat Boolean        @default(false) @map("prices_include_vat")
+  subtotal         Decimal        @default(0) @db.Decimal(14, 2)
+  discount         Decimal        @default(0) @db.Decimal(14, 2)
+  vatAmount        Decimal        @default(0) @map("vat_amount") @db.Decimal(14, 2)
+  total            Decimal        @default(0) @db.Decimal(14, 2)
+  terms            String?
+  notes            String?
+  sentOn           DateTime?      @map("sent_on") @db.Date
+  answeredOn       DateTime?      @map("answered_on") @db.Date
+  /// Frozen when sent, so the PDF never changes afterwards.
+  customerSnapshot Json?          @map("customer_snapshot")
+  companySnapshot  Json?          @map("company_snapshot")
+  createdById      String         @map("created_by") @db.Uuid
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  lines QuoteLine[]
+  order Order?
+
+  @@unique([quotationId, number])
+  @@index([status])
+  @@map("quotation_revisions")
+}
+
+model QuoteLine {
+  id                 String            @id @default(uuid()) @db.Uuid
+  revisionId         String            @map("revision_id") @db.Uuid
+  revision           QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  requestedItemId    String?           @map("requested_item_id") @db.Uuid
+  requestedItem      RequestedItem?    @relation(fields: [requestedItemId], references: [id], onDelete: SetNull)
+  type               LineType          @default(goods)
+  description        String
+  model              String?           @db.VarChar(120)
+  hsCode             String?           @map("hs_code") @db.VarChar(20)
+  quantity           Decimal           @db.Decimal(12, 2)
+  unit               String            @default("pcs") @db.VarChar(20)
+  unitPrice          Decimal           @map("unit_price") @db.Decimal(14, 2)
+  lineTotal          Decimal           @map("line_total") @db.Decimal(14, 2)
+  /// Internal costing (never printed): what one unit costs us in the quotation currency, and where from.
+  unitCost           Decimal?          @map("unit_cost") @db.Decimal(14, 2)
+  factoryQuoteLineId String?           @map("factory_quote_line_id") @db.Uuid
+  factoryQuoteLine   FactoryQuoteLine? @relation(fields: [factoryQuoteLineId], references: [id], onDelete: SetNull)
+  /// Factory currency units per quotation currency unit when the cost was converted.
+  fxRate             Decimal?          @map("fx_rate") @db.Decimal(14, 6)
+  sortOrder          Int               @default(0) @map("sort_order")
+
+  orderLines OrderLine[]
+
+  @@index([revisionId])
+  @@map("quote_lines")
+}
+
+// ============================================================================
+// Orders: made when a revision is accepted; the checklist lives here
+// ============================================================================
+
+model Order {
+  id                 String            @id @default(uuid()) @db.Uuid
+  /// SO-2026-0001
+  refNo              String            @unique @map("ref_no") @db.VarChar(30)
+  inquiryId          String            @unique @map("inquiry_id") @db.Uuid
+  inquiry            Inquiry           @relation(fields: [inquiryId], references: [id])
+  revisionId         String            @unique @map("revision_id") @db.Uuid
+  revision           QuotationRevision @relation(fields: [revisionId], references: [id])
+  customerId         String            @map("customer_id") @db.Uuid
+  customer           Customer          @relation(fields: [customerId], references: [id])
+  status             OrderStatus       @default(open)
+  orderedOn          DateTime          @map("ordered_on") @db.Date
+  /// Ship date promised to the customer.
+  shipBy             DateTime?         @map("ship_by") @db.Date
+  /// Ready date the factory confirmed.
+  readyOn            DateTime?         @map("ready_on") @db.Date
+  currency           String            @db.Char(3)
+  total              Decimal           @db.Decimal(14, 2)
+  depositPercent     Decimal           @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms       BalanceTerms      @map("balance_terms")
+  incoterm           Incoterm
+  incotermPlace      String?           @map("incoterm_place") @db.VarChar(80)
+  closedAt           DateTime?         @map("closed_at") @db.Timestamptz
+  cancelledAt        DateTime?         @map("cancelled_at") @db.Timestamptz
+  cancelReason       String?           @map("cancel_reason")
+  createdById        String            @map("created_by") @db.Uuid
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  lines         OrderLine[]
+  milestones    Milestone[]
+  factoryOrders FactoryOrder[]
+  payments      Payment[]
+  invoices      Invoice[]
+  shipments     Shipment[]
+
+  @@index([status])
+  @@index([customerId])
+  @@map("orders")
+}
+
+/// The accepted lines, frozen; shipped and invoiced quantities are tracked against them.
+model OrderLine {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderId     String    @map("order_id") @db.Uuid
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  quoteLineId String?   @map("quote_line_id") @db.Uuid
+  quoteLine   QuoteLine? @relation(fields: [quoteLineId], references: [id], onDelete: SetNull)
+  type        LineType  @default(goods)
+  description String
+  model       String?   @db.VarChar(120)
+  hsCode      String?   @map("hs_code") @db.VarChar(20)
+  quantity    Decimal   @db.Decimal(12, 2)
+  unit        String    @default("pcs") @db.VarChar(20)
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(14, 2)
+  lineTotal   Decimal   @map("line_total") @db.Decimal(14, 2)
+  unitCost    Decimal?  @map("unit_cost") @db.Decimal(14, 2)
+  sortOrder   Int       @default(0) @map("sort_order")
+
+  factoryLines  FactoryOrderLine[]
+  invoiceLines  InvoiceLine[]
+  shipmentLines ShipmentLine[]
+
+  @@index([orderId])
+  @@map("order_lines")
+}
+
+/// One step of the order checklist (see @kebo/shared workflows/order).
+model Milestone {
+  id          String          @id @default(uuid()) @db.Uuid
+  orderId     String          @map("order_id") @db.Uuid
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  key         MilestoneKey
+  status      MilestoneStatus @default(todo)
+  sortOrder   Int             @map("sort_order")
+  doneOn      DateTime?       @map("done_on") @db.Date
+  doneById    String?         @map("done_by") @db.Uuid
+  /// A due date typed in, replacing the calculated one.
+  dueOverride DateTime?       @map("due_override") @db.Date
+  /// Someone other than the deal's handler owns this step.
+  assigneeId  String?         @map("assignee_id") @db.Uuid
+  note        String?
+  /// Done past a gate or skipped while required (a manager decided; note says why).
+  overridden  Boolean         @default(false)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  events      MilestoneEvent[]
+  attachments Attachment[]
+
+  @@unique([orderId, key])
+  @@map("milestones")
+}
+
+model MilestoneEvent {
+  id          String          @id @default(uuid()) @db.Uuid
+  milestoneId String          @map("milestone_id") @db.Uuid
+  milestone   Milestone       @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  action      String          @db.VarChar(20)
+  fromStatus  MilestoneStatus @map("from_status")
+  toStatus    MilestoneStatus @map("to_status")
+  on          DateTime?       @db.Date
+  note        String?
+  overridden  Boolean         @default(false)
+  byId        String          @map("by") @db.Uuid
+  at          DateTime        @default(now()) @db.Timestamptz
+
+  @@index([milestoneId])
+  @@map("milestone_events")
+}
+
+/// Kebo's purchase order to a factory, linked back to the customer order lines it supplies.
+model FactoryOrder {
+  id              String             @id @default(uuid()) @db.Uuid
+  /// PO-2026-0001
+  refNo           String             @unique @map("ref_no") @db.VarChar(30)
+  orderId         String             @map("order_id") @db.Uuid
+  order           Order              @relation(fields: [orderId], references: [id])
+  factoryId       String             @map("factory_id") @db.Uuid
+  factory         Factory            @relation(fields: [factoryId], references: [id])
+  status          FactoryOrderStatus @default(draft)
+  currency        String             @default("CNY") @db.Char(3)
+  pricesIncludeVat Boolean           @default(true) @map("prices_include_vat")
+  total           Decimal            @default(0) @db.Decimal(14, 2)
+  depositPercent  Decimal            @default(30) @map("deposit_percent") @db.Decimal(5, 2)
+  paymentTerms    String?            @map("payment_terms")
+  /// Ready date the factory confirmed.
+  readyOn         DateTime?          @map("ready_on") @db.Date
+  sentOn          DateTime?          @map("sent_on") @db.Date
+  confirmedOn     DateTime?          @map("confirmed_on") @db.Date
+  /// Their VAT invoice (fapiao) received.
+  vatInvoiceNo    String?            @map("vat_invoice_no") @db.VarChar(60)
+  vatInvoiceOn    DateTime?          @map("vat_invoice_on") @db.Date
+  notes           String?
+  createdById     String             @map("created_by") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  lines    FactoryOrderLine[]
+  payments Payment[]
+
+  @@index([orderId])
+  @@index([factoryId])
+  @@map("factory_orders")
+}
+
+model FactoryOrderLine {
+  id                 String            @id @default(uuid()) @db.Uuid
+  factoryOrderId     String            @map("factory_order_id") @db.Uuid
+  factoryOrder       FactoryOrder      @relation(fields: [factoryOrderId], references: [id], onDelete: Cascade)
+  orderLineId        String?           @map("order_line_id") @db.Uuid
+  orderLine          OrderLine?        @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+  factoryQuoteLineId String?           @map("factory_quote_line_id") @db.Uuid
+  factoryQuoteLine   FactoryQuoteLine? @relation(fields: [factoryQuoteLineId], references: [id], onDelete: SetNull)
+  description        String
+  model              String?           @db.VarChar(120)
+  quantity           Decimal           @db.Decimal(12, 2)
+  unit               String            @default("pcs") @db.VarChar(20)
+  unitPrice          Decimal           @map("unit_price") @db.Decimal(14, 2)
+  vatRate            Decimal           @default(13) @map("vat_rate") @db.Decimal(5, 2)
+  lineTotal          Decimal           @map("line_total") @db.Decimal(14, 2)
+  sortOrder          Int               @default(0) @map("sort_order")
+
+  @@index([factoryOrderId])
+  @@map("factory_order_lines")
+}
+
+// ============================================================================
+// Money: payments in (customer) and out (factory), invoices
+// ============================================================================
+
+model Payment {
+  id             String           @id @default(uuid()) @db.Uuid
+  direction      PaymentDirection
+  kind           PaymentKind
+  orderId        String           @map("order_id") @db.Uuid
+  order          Order            @relation(fields: [orderId], references: [id])
+  /// Incoming: the customer who paid.
+  customerId     String?          @map("customer_id") @db.Uuid
+  customer       Customer?        @relation(fields: [customerId], references: [id])
+  /// Outgoing: the factory paid and for which factory order.
+  factoryId      String?          @map("factory_id") @db.Uuid
+  factory        Factory?         @relation(fields: [factoryId], references: [id])
+  factoryOrderId String?          @map("factory_order_id") @db.Uuid
+  factoryOrder   FactoryOrder?    @relation(fields: [factoryOrderId], references: [id])
+  /// What arrived (in) or was sent (out).
+  amount         Decimal          @db.Decimal(14, 2)
+  /// Taken by banks on the way; still counts towards settling the amount due.
+  bankCharges    Decimal          @default(0) @map("bank_charges") @db.Decimal(14, 2)
+  currency       String           @db.Char(3)
+  paidOn         DateTime         @map("paid_on") @db.Date
+  method         PaymentMethod    @default(bank_transfer)
+  reference      String?          @db.VarChar(120)
+  note           String?
+  recordedById   String           @map("recorded_by") @db.Uuid
+  voidedAt       DateTime?        @map("voided_at") @db.Timestamptz
+  voidReason     String?          @map("void_reason")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  attachments Attachment[]
+
+  @@index([orderId])
+  @@index([direction, paidOn])
+  @@map("payments")
+}
+
+model Invoice {
+  id               String        @id @default(uuid()) @db.Uuid
+  type             InvoiceType
+  /// PI-2026-0001 / INV-2026-0001; given when issued, never reused.
+  number           String?       @unique @db.VarChar(30)
+  orderId          String        @map("order_id") @db.Uuid
+  order            Order         @relation(fields: [orderId], references: [id])
+  shipmentId       String?       @map("shipment_id") @db.Uuid
+  shipment         Shipment?     @relation(fields: [shipmentId], references: [id])
+  status           InvoiceStatus @default(draft)
+  issueDate        DateTime?     @map("issue_date") @db.Date
+  dueDate          DateTime?     @map("due_date") @db.Date
+  currency         String        @db.Char(3)
+  vatRate          Decimal       @default(0) @map("vat_rate") @db.Decimal(5, 2)
+  pricesIncludeVat Boolean       @default(false) @map("prices_include_vat")
+  subtotal         Decimal       @default(0) @db.Decimal(14, 2)
+  discount         Decimal       @default(0) @db.Decimal(14, 2)
+  vatAmount        Decimal       @default(0) @map("vat_amount") @db.Decimal(14, 2)
+  total            Decimal       @default(0) @db.Decimal(14, 2)
+  /// Proforma: the deposit asked for on it.
+  depositPercent   Decimal?      @map("deposit_percent") @db.Decimal(5, 2)
+  notes            String?
+  voidReason       String?       @map("void_reason")
+  customerSnapshot Json?         @map("customer_snapshot")
+  companySnapshot  Json?         @map("company_snapshot")
+  createdById      String        @map("created_by") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  lines InvoiceLine[]
+
+  @@index([orderId])
+  @@index([status, dueDate])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id          String     @id @default(uuid()) @db.Uuid
+  invoiceId   String     @map("invoice_id") @db.Uuid
+  invoice     Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  orderLineId String?    @map("order_line_id") @db.Uuid
+  orderLine   OrderLine? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+  type        LineType   @default(goods)
+  description String
+  model       String?    @db.VarChar(120)
+  hsCode      String?    @map("hs_code") @db.VarChar(20)
+  quantity    Decimal    @db.Decimal(12, 2)
+  unit        String     @default("pcs") @db.VarChar(20)
+  unitPrice   Decimal    @map("unit_price") @db.Decimal(14, 2)
+  lineTotal   Decimal    @map("line_total") @db.Decimal(14, 2)
+  sortOrder   Int        @default(0) @map("sort_order")
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+// ============================================================================
+// Shipping: a shipment (one or more per order) and its packing list
+// ============================================================================
+
+model Shipment {
+  id               String         @id @default(uuid()) @db.Uuid
+  /// SH-2026-0001
+  refNo            String         @unique @map("ref_no") @db.VarChar(30)
+  orderId          String         @map("order_id") @db.Uuid
+  order            Order          @relation(fields: [orderId], references: [id])
+  status           ShipmentStatus @default(planned)
+  forwarder        String?        @db.VarChar(120)
+  portOfLoading    String?        @map("port_of_loading") @db.VarChar(120)
+  portOfDischarge  String?        @map("port_of_discharge") @db.VarChar(120)
+  finalDestination String?        @map("final_destination") @db.VarChar(160)
+  /// Vessel / voyage, flight or truck.
+  transport        String?        @db.VarChar(160)
+  containerNos     String?        @map("container_nos") @db.VarChar(200)
+  sealNos          String?        @map("seal_nos") @db.VarChar(120)
+  blNo             String?        @map("bl_no") @db.VarChar(60)
+  etd              DateTime?      @db.Date
+  eta              DateTime?      @db.Date
+  departedOn       DateTime?      @map("departed_on") @db.Date
+  /// Original B/L (or other documents of title) handed to the customer.
+  documentsReleasedOn DateTime?   @map("documents_released_on") @db.Date
+  marks            String?
+  notes            String?
+  customerSnapshot Json?          @map("customer_snapshot")
+  companySnapshot  Json?          @map("company_snapshot")
+  createdById      String         @map("created_by") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  lines    ShipmentLine[]
+  invoices Invoice[]
+
+  @@index([orderId])
+  @@map("shipments")
+}
+
+model ShipmentLine {
+  id          String    @id @default(uuid()) @db.Uuid
+  shipmentId  String    @map("shipment_id") @db.Uuid
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderLineId String?   @map("order_line_id") @db.Uuid
+  orderLine   OrderLine? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+  description String
+  model       String?   @db.VarChar(120)
+  hsCode      String?   @map("hs_code") @db.VarChar(20)
+  quantity    Decimal   @db.Decimal(12, 2)
+  unit        String    @default("pcs") @db.VarChar(20)
+  packages    Int       @default(1)
+  packageType String    @default("Carton") @map("package_type") @db.VarChar(40)
+  netWeightKg   Decimal @default(0) @map("net_weight_kg") @db.Decimal(12, 2)
+  grossWeightKg Decimal @default(0) @map("gross_weight_kg") @db.Decimal(12, 2)
+  cbm         Decimal   @default(0) @db.Decimal(12, 3)
+  sortOrder   Int       @default(0) @map("sort_order")
+
+  @@index([shipmentId])
+  @@map("shipment_lines")
+}
