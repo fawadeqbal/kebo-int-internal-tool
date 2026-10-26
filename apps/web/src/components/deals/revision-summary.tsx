@@ -16,7 +16,6 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
           { label: "Payment", value: `${r.depositPercent}% deposit · ${BALANCE_TERMS_LABEL[r.balanceTerms].toLowerCase()}` },
           { label: "Lead time", value: r.leadTime },
           { label: "Valid until", value: date(r.validUntil) },
-          { label: "Tax", value: `${r.vatRate}% ${r.pricesIncludeVat ? "(included)" : "added on top"}`, hidden: !(r.vatRate > 0) },
         ]}
       />
       <div className="rounded-lg border border-line">
@@ -40,7 +39,6 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
                   <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
                     {l.type !== "goods" && <Badge tone="outline">{LINE_TYPE_LABEL[l.type]}</Badge>}
                     {l.model}
-                    {l.hsCode && <span>HS {l.hsCode}</span>}
                   </span>
                 </Td>
                 <Td className="text-right whitespace-nowrap tabular">
@@ -69,12 +67,6 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
               <div className="flex justify-between py-1">
                 <dt className="text-muted">Discount</dt>
                 <dd className="tabular">− {money(r.discount, r.currency)}</dd>
-              </div>
-            )}
-            {r.vatRate > 0 && (
-              <div className="flex justify-between py-1">
-                <dt className="text-muted">{r.pricesIncludeVat ? `Tax ${r.vatRate}% (included)` : `+ Tax ${r.vatRate}%`}</dt>
-                <dd className="tabular">{money(r.vatAmount, r.currency)}</dd>
               </div>
             )}
             <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">

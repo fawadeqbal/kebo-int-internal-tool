@@ -57,15 +57,6 @@ export async function packingAction(orderId: string, _prev: ActionState, form: F
   return r;
 }
 
-/** The export rebate paperwork: one date at a time (the factory's VAT invoice received, the rebate filed); empty clears it. */
-export async function orderTaxAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  if (v.field !== "vatInvoiceReceivedOn" && v.field !== "rebateFiledOn") return { ok: false, message: "Something went wrong. Please try again." };
-  const r = await attempt(form, () => api.patch(`/orders/${orderId}/tax`, { [v.field]: v.value || null }), "Saved.");
-  if (r.ok) refresh(orderId);
-  return r;
-}
-
 /** Money in from the customer (managers), always in the order's currency. */
 export async function paymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);

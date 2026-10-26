@@ -137,7 +137,7 @@ export function KeboDoc<T>({
   heading?: string | null;
   columns: DocColumn<T>[];
   rows: T[];
-  /** Bold rows before the total (subtotal, discount, tax). */
+  /** Bold rows before the total (subtotal, discount). */
   sums?: { label: string; value: string }[];
   /** "Total FOB Price : USD Ninety Thousand only   $ 90,000" */
   total?: { label: string; words: string; amount: string } | null;

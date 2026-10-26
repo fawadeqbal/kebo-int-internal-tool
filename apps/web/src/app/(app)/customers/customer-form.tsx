@@ -90,7 +90,7 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
                 label="Country"
                 htmlFor="country"
                 error={s.errors?.country}
-                hint={draft.country === UNKNOWN_COUNTRY ? <span className="text-warn">Set it as soon as you know: it decides tax and shipping.</span> : draft.country === "CN" ? "Quotations add 13% tax (customer in China)" : "Where the goods are shipped to · export, no tax"}
+                hint={draft.country === UNKNOWN_COUNTRY ? <span className="text-warn">Set it as soon as you know: it decides shipping.</span> : "Where the goods are shipped to"}
               >
                 <CountrySelect form={DRAFT} id="country" value={draft.country} onChange={(e) => set("country", e.target.value)} aria-invalid={!!s.errors?.country} />
               </Field>

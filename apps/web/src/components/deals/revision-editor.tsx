@@ -2,12 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import { Lock, Plus } from "lucide-react";
-import { costSummary, documentTotals, formatMinor, fromMinor, marginPercent, priceForMargin, toMinor, type VatRule } from "@kebo/money";
+import { costSummary, documentTotals, formatMinor, fromMinor, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, LINE_TYPE_LABEL, LINE_TYPES, type BalanceTerms, type Incoterm, type LineType } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PercentChoice } from "@/components/common/percent-choice";
 import type { ActionState } from "@/lib/actions";
 import type { RevisionDraft } from "@/lib/types-deals";
 import { ErrorText, MiniLabel, move, numberText, RowButtons, rowKey } from "./form-bits";
@@ -22,7 +21,6 @@ interface LineState {
   type: LineType;
   description: string;
   model: string;
-  hsCode: string;
   quantity: string;
   unit: string;
   unitPrice: string;
@@ -37,8 +35,6 @@ interface EditorState {
   balanceTerms: BalanceTerms;
   leadTime: string;
   validUntil: string;
-  /** Tax % added on top of the prices (0 for exports). */
-  vatRate: string;
   discount: string;
   terms: string;
   notes: string;
@@ -46,12 +42,6 @@ interface EditorState {
 }
 
 const str = (v: number | string | null | undefined) => (v === null || v === undefined ? "" : String(v));
-
-/** Prices are without tax; the tax % is added on top. Exports carry none, a customer in China pays 13%. */
-const TAX_OPTIONS = [
-  { value: 0, label: "No tax (export)" },
-  { value: 13, label: "13% (China)" },
-] as const;
 
 function fromDraft(d: RevisionDraft): EditorState {
   return {
@@ -62,7 +52,6 @@ function fromDraft(d: RevisionDraft): EditorState {
     balanceTerms: d.balanceTerms,
     leadTime: str(d.leadTime),
     validUntil: d.validUntil,
-    vatRate: str(d.vatRate),
     discount: Number(d.discount) ? Number(d.discount).toFixed(2) : "",
     terms: str(d.terms),
     notes: str(d.notes),
@@ -74,7 +63,6 @@ function fromDraft(d: RevisionDraft): EditorState {
       type: l.type,
       description: l.description,
       model: str(l.model),
-      hsCode: str(l.hsCode),
       quantity: str(l.quantity),
       unit: l.unit,
       unitPrice: Number(l.unitPrice).toFixed(2),
@@ -92,7 +80,6 @@ function payload(s: EditorState, showCosts: boolean) {
     balanceTerms: s.balanceTerms,
     leadTime: s.leadTime,
     validUntil: s.validUntil,
-    vatRate: numberText(s.vatRate) || "0",
     discount: numberText(s.discount),
     terms: s.terms,
     notes: s.notes,
@@ -101,7 +88,6 @@ function payload(s: EditorState, showCosts: boolean) {
       type: l.type,
       description: l.description,
       model: l.model,
-      hsCode: l.hsCode,
       quantity: numberText(l.quantity),
       unit: l.unit.trim() || "pcs",
       unitPrice: numberText(l.unitPrice),
@@ -152,16 +138,13 @@ export function RevisionEditor({
   const setLine = (i: number, patch: Partial<LineState>) => update((st) => ({ ...st, lines: st.lines.map((l, n) => (n === i ? { ...l, ...patch } : l)) }));
 
   const currency = /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—";
-  const vat: VatRule = { rate: Number(numberText(s.vatRate)) || 0, pricesIncludeVat: false };
   const totals = documentTotals(
     s.lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPrice: numberText(l.unitPrice) || 0 })),
     numberText(s.discount) || 0,
-    vat,
   );
   const costing = showCosts
     ? costSummary(
         s.lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPriceMinor: toMinor(numberText(l.unitPrice)), unitCostMinor: valid(l.unitCost) ? toMinor(numberText(l.unitCost)) : null })),
-        vat,
         totals.discount,
       )
     : null;
@@ -172,7 +155,7 @@ export function RevisionEditor({
 
   const applyMargin = () => {
     if (!marginOk) return;
-    update((st) => ({ ...st, lines: st.lines.map((l) => (valid(l.unitCost) ? { ...l, unitPrice: fromMinor(priceForMargin(toMinor(numberText(l.unitCost)), marginNumber, vat)) } : l)) }));
+    update((st) => ({ ...st, lines: st.lines.map((l) => (valid(l.unitCost) ? { ...l, unitPrice: fromMinor(priceForMargin(toMinor(numberText(l.unitCost)), marginNumber)) } : l)) }));
   };
 
   return (
@@ -223,9 +206,6 @@ export function RevisionEditor({
             <Field label="Lead time" htmlFor={`lead-${number}`} optional error={st.errors?.leadTime} className="sm:col-span-2">
               <Input id={`lead-${number}`} value={s.leadTime} maxLength={120} placeholder="e.g. 30 days after deposit" onChange={(e) => set("leadTime", e.target.value)} />
             </Field>
-            <Field label="Tax added on top" htmlFor={`tax-${number}`} error={st.errors?.vatRate} hint="Prices are without tax" className="sm:col-span-2 lg:col-span-4">
-              <PercentChoice id={`tax-${number}`} label="Tax added on top" value={s.vatRate} onChange={(v) => set("vatRate", v)} choices={TAX_OPTIONS} invalid={!!st.errors?.vatRate} />
-            </Field>
           </section>
 
           <section aria-label="Lines">
@@ -251,7 +231,7 @@ export function RevisionEditor({
             <ol className="flex flex-col gap-3">
               {s.lines.map((l, i) => {
                 const price = toMinor(numberText(l.unitPrice));
-                const lineMargin = showCosts && valid(l.unitCost) && price > 0 ? marginPercent(price, toMinor(numberText(l.unitCost)), vat) : null;
+                const lineMargin = showCosts && valid(l.unitCost) && price > 0 ? marginPercent(price, toMinor(numberText(l.unitCost))) : null;
                 return (
                   <li key={l.key} className="rounded-lg border border-line p-3">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -275,13 +255,9 @@ export function RevisionEditor({
                         <MiniLabel htmlFor={`desc-${l.key}`}>Description (printed)</MiniLabel>
                         <Textarea id={`desc-${l.key}`} rows={2} className="min-h-0" value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
                       </div>
-                      <div className="col-span-1 sm:col-span-3">
+                      <div className="col-span-2 sm:col-span-5">
                         <MiniLabel htmlFor={`model-${l.key}`}>Model</MiniLabel>
                         <Input id={`model-${l.key}`} value={l.model} maxLength={120} onChange={(e) => setLine(i, { model: e.target.value })} />
-                      </div>
-                      <div className="col-span-1 sm:col-span-2">
-                        <MiniLabel htmlFor={`hs-${l.key}`}>HS code</MiniLabel>
-                        <Input id={`hs-${l.key}`} value={l.hsCode} maxLength={20} onChange={(e) => setLine(i, { hsCode: e.target.value })} />
                       </div>
                       <div className="sm:col-span-2">
                         <MiniLabel htmlFor={`qty-${l.key}`}>Quantity</MiniLabel>
@@ -295,7 +271,7 @@ export function RevisionEditor({
                         <MiniLabel htmlFor={`price-${l.key}`}>Unit price</MiniLabel>
                         <Input id={`price-${l.key}`} inputMode="decimal" className="tabular" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} />
                       </div>
-                      <div className="col-span-2 flex flex-col justify-end text-right sm:col-span-2">
+                      <div className="flex flex-col justify-end text-right sm:col-span-2">
                         <span className="mb-1 block text-xs text-muted">Line total</span>
                         <span className="flex h-9 items-center justify-end text-sm font-semibold tabular">{fmt(totals.lines[i]?.lineTotal ?? 0)}</span>
                       </div>
@@ -310,7 +286,7 @@ export function RevisionEditor({
                             <span className={cn("font-semibold tabular", lineMargin === null ? "text-muted" : lineMargin < 0 ? "text-bad" : lineMargin < 5 ? "text-warn" : "text-ok")}>{lineMargin === null ? "—" : `${lineMargin.toFixed(1)}%`}</span>
                           </p>
                           {valid(l.unitCost) && marginOk && (
-                            <Button size="xs" variant="ghost" className="mb-0.5" onClick={() => setLine(i, { unitPrice: fromMinor(priceForMargin(toMinor(numberText(l.unitCost)), marginNumber, vat)) })}>
+                            <Button size="xs" variant="ghost" className="mb-0.5" onClick={() => setLine(i, { unitPrice: fromMinor(priceForMargin(toMinor(numberText(l.unitCost)), marginNumber)) })}>
                               Price at {marginNumber}% margin
                             </Button>
                           )}
@@ -329,7 +305,7 @@ export function RevisionEditor({
                 onClick={() =>
                   update((x) => ({
                     ...x,
-                    lines: [...x.lines, { key: rowKey(), requestedItemId: null, factoryQuoteLineId: null, fxRate: null, type: "charge", description: "", model: "", hsCode: "", quantity: "1", unit: "lot", unitPrice: "", unitCost: "" }],
+                    lines: [...x.lines, { key: rowKey(), requestedItemId: null, factoryQuoteLineId: null, fxRate: null, type: "charge", description: "", model: "", quantity: "1", unit: "lot", unitPrice: "", unitCost: "" }],
                   }))
                 }
               >
@@ -365,12 +341,6 @@ export function RevisionEditor({
                   </dd>
                 </div>
                 <ErrorText error={st.errors?.discount} />
-                {vat.rate > 0 && (
-                  <div className="flex justify-between py-1">
-                    <dt className="text-muted">+ Tax {vat.rate}%</dt>
-                    <dd className="tabular">{fmt(totals.vat)}</dd>
-                  </div>
-                )}
                 <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">
                   <dt>Total</dt>
                   <dd className="tabular">{fmt(totals.total)}</dd>
@@ -413,8 +383,8 @@ export function CostingBox({ currency, cost, sales, profit, margin, uncosted }: 
           <dd className="tabular">{fmt(cost)}</dd>
         </div>
         <div className="flex justify-between py-0.5">
-          <dt className="text-text-2" title="After the discount, without tax">
-            Sales <span className="text-xs text-muted">net</span>
+          <dt className="text-text-2" title="After the discount">
+            Sales <span className="text-xs text-muted">after discount</span>
           </dt>
           <dd className="tabular">{fmt(sales)}</dd>
         </div>

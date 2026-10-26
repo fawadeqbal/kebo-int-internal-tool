@@ -37,7 +37,6 @@ export type LostReason = (typeof LOST_REASONS)[number];
 export const CUSTOMER_TYPES = values("company", "individual");
 export type CustomerType = (typeof CUSTOMER_TYPES)[number];
 
-/** Export sales are zero-rated; domestic sales carry VAT. */
 /* ---------------------------------------------------------------- quotations */
 
 /** Status of one revision (R1, R2…) of a quotation. */

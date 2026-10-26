@@ -52,7 +52,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
   {
     key: "sales",
     title: "Sales and quotations",
-    description: "Starting values for new quotations. People can change them on each quotation. Tax comes from the customer's country: 13% on top in China, none for exports.",
+    description: "Starting values for new quotations. People can change them on each quotation.",
     save: "Save sales settings",
     fields: [
       { name: "currency", label: "Main currency", kind: "text", hint: "Reports and totals are shown in it. Three letters, e.g. USD." },

@@ -19,7 +19,7 @@ export function PercentChoice({
 }: {
   /** Id of the "Other" box (for a <label htmlFor>). */
   id: string;
-  /** What the group is, for screen readers (e.g. "Tax added on top"). */
+  /** What the group is, for screen readers (e.g. "Tax % for price 1"). */
   label: string;
   value: string;
   onChange: (v: string) => void;
