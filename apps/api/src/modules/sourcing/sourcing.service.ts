@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
 import { convertMinor, fxRate, withTaxMinor, fromMinor } from "@kebo/money";
-import { can, lineNumbers, taxSentence, type FactoryQuoteInput } from "@kebo/shared";
+import { can, coverage, lineNumbers, taxSentence, type FactoryQuoteInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -13,10 +13,12 @@ import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 
 /**
- * Factory prices for a deal (internal: never shown to customers). Each line's
- * cost is worked out in the selling currency: the factory price (without tax)
- * plus the item's tax %, converted at today's rate. The quotation starts from
- * these costs plus the default margin.
+ * Factory offers for a deal (internal: never shown to customers). Each offer is
+ * one factory's lines as it gave them — its models, quantities and breakdown
+ * into parts — each saying which of the customer's items it answers. Each
+ * line's cost is worked out in the selling currency: the factory price
+ * (without tax) plus its tax %, converted at today's rate. A quotation offers
+ * one or more whole offers as options A, B…
  */
 @Injectable()
 export class SourcingService {
@@ -33,7 +35,7 @@ export class SourcingService {
     if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
   }
 
-  /** Every price for the deal with its cost in the selling currency, and per item the options cheapest first. */
+  /** Every offer with its lines (numbered, parts under their line), costs in the selling currency and which items it covers; per item the prices cheapest first. */
   async forInquiry(user: SessionUser, inquiryId: string) {
     this.assertCan(user);
     await this.inquiries.find(user, inquiryId);
@@ -46,8 +48,38 @@ export class SourcingService {
         orderBy: { receivedOn: "desc" },
       }),
     ]);
+    const numbers = lineNumbers(items.map((it) => ({ key: it.id, parentKey: it.parentId })));
+    const itemRefs = items.map((it, n) => ({ id: it.id, parentId: it.parentId, no: numbers[n]! }));
     const priced = quotes.map((q) => {
       const rate = fxRate(q.currency, sales.currency, sales.currency, sales.exchangeRates);
+      const lineNo = lineNumbers(q.lines.map((l) => ({ key: l.id, parentKey: l.parentId })));
+      const lines = q.lines.map((l, n) => {
+        const taxRate = Number(l.taxRate);
+        const unitPriceMinor = decimalToMinor(l.unitPrice);
+        const costInFactoryCurrency = withTaxMinor(unitPriceMinor, taxRate);
+        const cost = rate ? convertMinor(costInFactoryCurrency, rate) : null;
+        return {
+          id: l.id,
+          /** "1", "2", "2.1" within this offer. */
+          no: lineNo[n]!,
+          parentId: l.parentId,
+          requestedItemId: l.requestedItemId,
+          /** The customer's item it answers, by number ("2"). */
+          answersNo: itemRefs.find((i) => i.id === l.requestedItemId)?.no ?? null,
+          description: l.description,
+          model: l.model,
+          quantity: l.quantity.toString(),
+          unit: l.unit,
+          unitPrice: l.unitPrice.toFixed(2),
+          /** Tax % added on top of the price. */
+          taxRate,
+          /** e.g. "CNY 100.00 + 13% tax = CNY 113.00" (in the factory's currency). */
+          costNote: taxSentence(unitPriceMinor, taxRate, q.currency),
+          /** One unit's landed cost in the selling currency. */
+          unitCost: cost === null ? null : fromMinor(cost),
+          costMinor: cost === null ? null : Math.round(cost * Number(l.quantity)),
+        };
+      });
       return {
         id: q.id,
         factory: q.factory,
@@ -62,30 +94,17 @@ export class SourcingService {
         notes: q.notes,
         /** null when the exchange rate for this currency is missing in Settings. */
         fxRate: rate,
-        lines: q.lines.map((l) => {
-          const taxRate = Number(l.taxRate);
-          const unitPriceMinor = decimalToMinor(l.unitPrice);
-          const costInFactoryCurrency = withTaxMinor(unitPriceMinor, taxRate);
-          const cost = rate ? convertMinor(costInFactoryCurrency, rate) : null;
-          return {
-            id: l.id,
-            requestedItemId: l.requestedItemId,
-            description: l.description,
-            model: l.model,
-            quantity: l.quantity.toString(),
-            unit: l.unit,
-            unitPrice: l.unitPrice.toFixed(2),
-            /** Tax % added on top of the price. */
-            taxRate,
-            /** e.g. "CNY 100.00 + 13% tax = CNY 113.00" (in the factory's currency). */
-            costNote: taxSentence(unitPriceMinor, taxRate, q.currency),
-            /** One unit's landed cost in the selling currency. */
-            unitCost: cost === null ? null : fromMinor(cost),
-          };
-        }),
+        lines: lines.map(({ costMinor: _c, ...l }) => l),
+        /** What the whole offer costs us in the selling currency (null when a rate is missing). */
+        totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + (l.costMinor ?? 0), 0)),
+        /** Which of the customer's items it answers, and which it misses. */
+        coverage: coverage(
+          itemRefs,
+          q.lines.map((l) => l.requestedItemId),
+        ),
       };
     });
-    const numbers = lineNumbers(items.map((it) => ({ key: it.id, parentKey: it.parentId })));
+    const rank = (cost: string | null) => (cost === null ? Number.MAX_VALUE : Number(cost) > 0 ? Number(cost) : Number.MAX_VALUE / 2);
     const allLines = priced.flatMap((q) => q.lines.map((l) => ({ ...l, factory: q.factory, quoteId: q.id, currency: q.currency })));
     return {
       currency: sales.currency,
@@ -94,7 +113,8 @@ export class SourcingService {
       items: items.map((it, n) => {
         const options = allLines
           .filter((l) => l.requestedItemId === it.id)
-          .sort((a, b) => (a.unitCost === null ? 1 : b.unitCost === null ? -1 : Number(a.unitCost) - Number(b.unitCost)));
+          // A line at 0 is priced in its parts (or included): it goes last and is never "cheapest".
+          .sort((a, b) => rank(a.unitCost) - rank(b.unitCost));
         return {
           id: it.id,
           /** "2", "2.1" (a part of item 2). */
@@ -105,8 +125,7 @@ export class SourcingService {
           model: it.model,
           quantity: it.quantity.toString(),
           unit: it.unit,
-          preferredLineId: it.preferredFactoryLineId,
-          cheapestLineId: options.find((o) => o.unitCost !== null)?.id ?? null,
+          cheapestLineId: options.find((o) => o.unitCost !== null && Number(o.unitCost) > 0)?.id ?? null,
           options,
         };
       }),
@@ -134,8 +153,16 @@ export class SourcingService {
     return f;
   }
 
-  /** Lines keep their ids (quotation lines and preferences point at them). Item links must be this deal's items. */
+  /**
+   * Lines keep their ids (quotation lines point at them). Item links must be this
+   * deal's items. A part (partOf) points at an earlier line that is not a part itself.
+   */
   private async writeLines(tx: Tx, quoteId: string, inquiryId: string, lines: FactoryQuoteInput["lines"]) {
+    for (const [n, l] of lines.entries()) {
+      if (l.partOf === null) continue;
+      if (l.partOf >= n || lines[l.partOf]!.partOf !== null)
+        throw new DomainError(`"${l.description.split("\n")[0]}" can only be a part of a line above it that is not a part itself.`);
+    }
     const own = new Set((await tx.requestedItem.findMany({ where: { inquiryId }, select: { id: true } })).map((r) => r.id));
     const existing = new Set(
       (await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId }, select: { id: true } })).map((r) => r.id),
@@ -143,9 +170,10 @@ export class SourcingService {
     const keep = lines.map((l) => l.id).filter((id): id is string => !!id && existing.has(id));
     const dropped = [...existing].filter((id) => !keep.includes(id));
     if (dropped.length) {
-      await tx.requestedItem.updateMany({ where: { preferredFactoryLineId: { in: dropped } }, data: { preferredFactoryLineId: null } });
+      await tx.factoryQuoteLine.updateMany({ where: { parentId: { in: dropped } }, data: { parentId: null } });
       await tx.factoryQuoteLine.deleteMany({ where: { id: { in: dropped } } });
     }
+    const ids: string[] = [];
     for (const [n, l] of lines.entries()) {
       if (l.requestedItemId && !own.has(l.requestedItemId))
         throw new DomainError("A price is linked to an item that is not on this deal. Reload and try again.");
@@ -158,15 +186,11 @@ export class SourcingService {
         unitPrice: l.unitPrice,
         taxRate: l.taxRate,
         sortOrder: n,
+        parentId: l.partOf === null ? null : ids[l.partOf]!,
       };
-      if (l.id && existing.has(l.id)) await tx.factoryQuoteLine.update({ where: { id: l.id }, data: row });
-      else await tx.factoryQuoteLine.create({ data: { ...row, factoryQuoteId: quoteId } });
+      if (l.id && existing.has(l.id)) ids.push((await tx.factoryQuoteLine.update({ where: { id: l.id }, data: row })).id);
+      else ids.push((await tx.factoryQuoteLine.create({ data: { ...row, factoryQuoteId: quoteId } })).id);
     }
-    // Items with no preferred price yet start with the cheapest-entered first one from this quote.
-    await tx.$executeRaw`
-      update requested_items ri set preferred_factory_line_id = l.id
-        from factory_quote_lines l
-       where l.factory_quote_id = ${quoteId}::uuid and l.requested_item_id = ri.id and ri.preferred_factory_line_id is null`;
   }
 
   private header(input: FactoryQuoteInput) {
@@ -260,7 +284,7 @@ export class SourcingService {
     });
   }
 
-  /** Removed from the deal; items that preferred one of its lines are left without a preference. Quotations keep their own copy of the cost. */
+  /** Removed from the deal. Quotations keep their own copy of the lines and costs. */
   async remove(user: SessionUser, quoteId: string, reasonInput?: string) {
     this.assertCan(user);
     await this.prisma.tx(async (tx) => {
@@ -268,8 +292,6 @@ export class SourcingService {
       const reason = (await this.usedLines(tx, quoteId)).size
         ? requireReason(reasonInput, "factoryPrice", "you are removing prices a quotation uses")
         : reasonInput;
-      const lineIds = (await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId }, select: { id: true } })).map((l) => l.id);
-      await tx.requestedItem.updateMany({ where: { preferredFactoryLineId: { in: lineIds } }, data: { preferredFactoryLineId: null } });
       await tx.factoryQuote.update({ where: { id: quoteId }, data: { deletedAt: new Date() } });
       await this.audit.record(tx, {
         userId: user.id,
@@ -280,48 +302,5 @@ export class SourcingService {
         reason,
       });
     });
-  }
-
-  /** Which factory price each item is quoted from by default. */
-  async choose(user: SessionUser, inquiryId: string, choices: Record<string, string | null>, reasonInput?: string) {
-    this.assertCan(user);
-    await this.prisma.tx(async (tx) => {
-      const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
-      const rows = await tx.requestedItem.findMany({
-        where: { inquiryId },
-        select: { id: true, description: true, preferredFactoryLineId: true },
-      });
-      const items = new Set(rows.map((r) => r.id));
-      // Once a quotation exists, switching an item to another factory's price needs a reason.
-      const quoted = await tx.quotationRevision.count({ where: { quotation: { inquiryId }, deletedAt: null } });
-      const switched = rows.filter((r) => r.preferredFactoryLineId && r.id in choices && choices[r.id] !== r.preferredFactoryLineId);
-      const reason =
-        quoted && switched.length
-          ? requireReason(reasonInput, "factoryChoice", "you are changing which factory an item is quoted from")
-          : reasonInput;
-      const lineIds = Object.values(choices).filter((v): v is string => !!v);
-      const valid = new Set(
-        (
-          await tx.factoryQuoteLine.findMany({
-            where: { id: { in: lineIds }, factoryQuote: { inquiryId, deletedAt: null } },
-            select: { id: true },
-          })
-        ).map((l) => l.id),
-      );
-      for (const [itemId, lineId] of Object.entries(choices)) {
-        if (!items.has(itemId)) continue;
-        if (lineId && !valid.has(lineId)) throw new DomainError("One of the chosen prices is no longer on this deal. Reload the page.");
-        await tx.requestedItem.update({ where: { id: itemId }, data: { preferredFactoryLineId: lineId } });
-      }
-      await this.audit.record(tx, {
-        userId: user.id,
-        action: "update",
-        entityType: "inquiry",
-        entityId: inquiryId,
-        summary: `${inquiry.refNo}: chose the factory prices to quote from${switched.length ? ` (changed: ${switched.map((r) => r.description).join(", ")})` : ""}`,
-        reason,
-      });
-    });
-    return this.forInquiry(user, inquiryId);
   }
 }

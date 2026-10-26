@@ -78,8 +78,9 @@ export type FactoryInput = z.infer<typeof factoryInput>;
 
 export const requestedItemInput = z.object({
   id: optionalId,
-  /** A part of another item (split at factory pricing): that item's id. */
+  /** A part of another item: that item's id (saved items), or its position in `items` (0-based, for new ones). */
   parentId: optionalId,
+  partOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
   description: text(2000, "Each item needs a description"),
   model: optionalText(120),
   quantity,
@@ -144,7 +145,10 @@ export type InquiryListQuery = z.infer<typeof inquiryListQuery>;
 
 export const factoryQuoteLineInput = z.object({
   id: optionalId,
+  /** Which of the customer's items this answers (empty for extras the factory added). */
   requestedItemId: optionalId,
+  /** A part of an earlier line of this offer: that line's position in `lines` (0-based). */
+  partOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
   description: text(2000, "Each line needs a description"),
   model: optionalText(120),
   quantity,
@@ -174,25 +178,35 @@ export const factoryQuoteInput = z
   .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] });
 export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
 
-/** Which factory price each requested item is quoted from by default ({ itemId: lineId | null }). */
-export const preferredLinesInput = z.object({ choices: z.record(z.uuid(), z.uuid().nullable()), reason: reasonField });
 
 /* ---------------------------------------------------------------- quotations */
 
-export const quoteLineInput = z.object({
-  requestedItemId: optionalId,
-  type: z.enum(LINE_TYPES).default("goods"),
-  description: text(2000, "Each line needs a description"),
-  model: optionalText(120),
+/** Our selling price for one line of an option: a factory line, or (without factory prices) one of the customer's items. */
+export const optionPriceInput = z.object({ lineId: id("Unknown line"), unitPrice: amount("Enter a price") });
+
+/** An extra the factory does not supply: sea freight, inspection, insurance… (our own price and, if known, cost). */
+export const chargeInput = z.object({
+  type: z.enum(LINE_TYPES).exclude(["goods"]).default("charge"),
+  description: text(2000, "Each charge needs a description"),
   quantity,
-  unit: z.string().trim().max(20).default("pcs"),
+  unit: z.string().trim().max(20).default("lot"),
   unitPrice: amount("Enter a price"),
-  /** Our cost for one unit in the quotation currency (internal, never printed). */
   unitCost: optionalAmount,
-  /** The factory price line the cost came from. */
-  factoryQuoteLineId: optionalId,
-  fxRate: optionalRate,
 });
+
+/**
+ * One option (A, B…): one factory's offer — its lines exactly as the factory
+ * gave them, locked — with our prices, discount and lead time, plus charges.
+ * Without factory prices (factoryQuoteId empty) the lines are the customer's items.
+ */
+export const optionInput = z.object({
+  factoryQuoteId: optionalId,
+  prices: z.array(optionPriceInput).max(300),
+  charges: z.array(chargeInput).max(20).default([]),
+  discount: amountOr(0),
+  leadTime: optionalText(120),
+});
+export type OptionInput = z.infer<typeof optionInput>;
 
 export const revisionInput = z.object({
   currency: currency.default("USD"),
@@ -200,18 +214,19 @@ export const revisionInput = z.object({
   incotermPlace: optionalText(80),
   depositPercent: percentOr(30),
   balanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
-  leadTime: optionalText(120),
   validUntil: isoDate(),
-  discount: amountOr(0),
   terms: optionalText(5000),
   notes: optionalText(5000),
-  lines: z.array(quoteLineInput).min(1, "Add at least one line").max(300),
+  /** Options A, B… in this order; the customer accepts exactly one. */
+  options: z.array(optionInput).min(1, "Add at least one option").max(6, "Use at most 6 options"),
   reason: reasonField,
 });
 export type RevisionInput = z.infer<typeof revisionInput>;
 
 export const revisionMoveInput = z.object({
   to: z.enum(REVISION_STATUSES).exclude(["draft", "superseded", "void"]),
+  /** Accepted: the option the customer chose (needed when there is more than one). */
+  optionId: optionalId,
   /** The day it was sent or answered; today when empty. */
   on: optionalDate,
   reason: reasonField,

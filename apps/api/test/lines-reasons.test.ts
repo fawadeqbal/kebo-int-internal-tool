@@ -163,7 +163,9 @@ describe("lines, reasons and history", () => {
   it("numbers the quotation like the deal, and asks why prices it uses change", async () => {
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     const r1 = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, draft).expect(201)).body;
-    expect(r1.lines.map((l: { no: string }) => l.no)).toEqual(["1", "2", "2.1", "2.2", "2.3"]);
+    // The option is the factory's offer: its own lines (boiler, filling machine, capping machine), covering items 1 and 2.
+    expect(r1.options[0].lines.map((l: { no: string; description: string }) => `${l.no} ${l.description}`)).toEqual(["1 Boiler", "2 Filling machine", "3 Capping machine"]);
+    expect(r1.options[0].coverage).toEqual({ covered: ["1", "2"], missing: [] });
 
     const src = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body.quotes[0];
     quoteBody = {

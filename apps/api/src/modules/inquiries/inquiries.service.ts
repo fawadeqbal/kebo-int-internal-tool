@@ -294,29 +294,36 @@ export class InquiriesService {
     const existing = new Map(
       (await tx.requestedItem.findMany({ where: { inquiryId }, select: { id: true, parentId: true } })).map((r) => [r.id, r]),
     );
-    const tops = items.filter((i) => !i.parentId);
-    for (const part of items.filter((i) => i.parentId)) {
-      const parent = items.find((i) => i.id && i.id === part.parentId);
-      if (!parent || parent.parentId)
-        throw new DomainError(
-          `"${part.description.split("\n")[0]}" is a part of an item that is not on this deal any more. Remove the part or keep its item.`,
-        );
+    // Each item's parent by position: a saved parent by id, a new one by its place in the list.
+    const parentOf = items.map((item) => {
+      if (item.partOf !== null && item.partOf !== undefined) return item.partOf;
+      if (!item.parentId) return null;
+      const at = items.findIndex((i) => i.id && i.id === item.parentId);
+      return at < 0 ? -1 : at;
+    });
+    for (const [n, item] of items.entries()) {
+      const p = parentOf[n];
+      if (p === null) continue;
+      if (p === -1 || p === n || p >= items.length || parentOf[p] !== null)
+        throw new DomainError(`"${item.description.split("\n")[0]}" is a part of an item that is not on this deal any more. Remove the part or keep its item.`);
     }
-    const ordered = tops.flatMap((t) => [t, ...items.filter((p) => p.parentId && p.parentId === t.id)]);
-    const keep = ordered.map((i) => i.id).filter((id): id is string => !!id && existing.has(id));
+    const order = items.map((_, n) => n).filter((n) => parentOf[n] === null).flatMap((t) => [t, ...items.map((_, n) => n).filter((n) => parentOf[n] === t)]);
+    const keep = items.map((i) => i.id).filter((id): id is string => !!id && existing.has(id));
     await tx.requestedItem.deleteMany({ where: { inquiryId, id: { notIn: keep } } });
-    for (const [n, item] of ordered.entries()) {
+    const ids = new Map<number, string>();
+    for (const [sortOrder, n] of order.entries()) {
+      const item = items[n]!;
       const row = {
         description: item.description,
         model: item.model,
         quantity: item.quantity,
         unit: item.unit,
         targetPrice: item.targetPrice ?? null,
-        sortOrder: n,
-        parentId: item.parentId ?? null,
+        sortOrder,
+        parentId: parentOf[n] === null ? null : ids.get(parentOf[n]!)!,
       };
-      if (item.id && existing.has(item.id)) await tx.requestedItem.update({ where: { id: item.id }, data: row });
-      else await tx.requestedItem.create({ data: { ...row, inquiryId } });
+      const saved = item.id && existing.has(item.id) ? await tx.requestedItem.update({ where: { id: item.id }, data: row }) : await tx.requestedItem.create({ data: { ...row, inquiryId } });
+      ids.set(n, saved.id);
     }
   }
 

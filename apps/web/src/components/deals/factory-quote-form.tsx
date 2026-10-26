@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Factory, Loader2, Plus } from "lucide-react";
+import { CornerDownRight, Factory, IndentDecrease, IndentIncrease, Loader2, Plus } from "lucide-react";
 import { convertMinor, formatMinor, fxRate, toMinor, withTaxMinor } from "@kebo/money";
-import { DEFAULT_TAX_RATE, TAX_CHOICES, taxSentence } from "@kebo/shared";
+import { DEFAULT_TAX_RATE, lineNumbers, TAX_CHOICES, taxSentence } from "@kebo/shared";
 import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -28,6 +28,8 @@ interface LineState {
   unitPrice: string;
   /** Tax % added on top of this item's price (13 unless changed). */
   taxRate: string;
+  /** A part of another line of this offer (the factory's own breakdown): that line's key. */
+  partOfKey: string | null;
 }
 
 interface QuoteState {
@@ -48,6 +50,7 @@ type Item = SourcingView["items"][number];
 
 // Keys of the first rows are fixed (from the item), so the server and browser render the same ids.
 
+// A new offer starts as a copy of what the customer asked for (their parts as parts); change it to what the factory offers.
 const lineFromItem = (it: Item): LineState => ({
   key: `item-${it.id}`,
   id: null,
@@ -58,7 +61,14 @@ const lineFromItem = (it: Item): LineState => ({
   unit: it.unit,
   unitPrice: "",
   taxRate: DEFAULT_TAX,
+  partOfKey: it.parentId ? `item-${it.parentId}` : null,
 });
+
+/** Lines with each line's parts right after it (the order the API keeps). */
+function grouped(lines: LineState[]) {
+  const tops = lines.filter((l) => !l.partOfKey || !lines.some((p) => p.key === l.partOfKey));
+  return tops.flatMap((t) => [{ ...t, partOfKey: null }, ...lines.filter((p) => p.partOfKey === t.key)]);
+}
 
 function initialState(quote: FactoryQuoteView | null, items: Item[], today: string): QuoteState {
   if (quote)
@@ -83,6 +93,7 @@ function initialState(quote: FactoryQuoteView | null, items: Item[], today: stri
         unit: l.unit,
         unitPrice: l.unitPrice,
         taxRate: String(l.taxRate),
+        partOfKey: l.parentId,
       })),
     };
   return {
@@ -97,7 +108,7 @@ function initialState(quote: FactoryQuoteView | null, items: Item[], today: stri
     paymentTerms: "",
     notes: "",
     // An item quoted in parts is priced part by part.
-    lines: items.filter((it) => !it.hasParts).map((it) => lineFromItem(it)),
+    lines: items.map((it) => lineFromItem(it)),
   };
 }
 
@@ -116,6 +127,7 @@ function payload(s: QuoteState) {
     notes: s.notes,
     lines: s.lines.map((l) => ({
       id: l.id,
+      partOf: l.partOfKey ? s.lines.findIndex((p) => p.key === l.partOfKey) : null,
       requestedItemId: l.requestedItemId || null,
       description: l.description,
       model: l.model,
@@ -300,6 +312,11 @@ export function FactoryQuoteForm({
     };
   };
 
+  const numbers = lineNumbers(s.lines.map((l) => ({ key: l.key, parentKey: l.partOfKey })));
+  /** The nearest line above that is not a part: what a line becomes a part of. */
+  const topAbove = (i: number) => [...s.lines.slice(0, i)].reverse().find((l) => !l.partOfKey) ?? null;
+  const blankLine = (patch: Partial<LineState> = {}): LineState => ({ key: rowKey(), id: null, requestedItemId: "", description: "", model: "", quantity: "1", unit: "pcs", unitPrice: "", taxRate: DEFAULT_TAX, partOfKey: null, ...patch });
+
   const linkItem = (i: number, itemId: string) => {
     const it = items.find((x) => x.id === itemId);
     setS((st) => ({
@@ -404,34 +421,67 @@ export function FactoryQuoteForm({
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold">Prices</h3>
+            <h3 className="text-sm font-semibold">The factory&apos;s lines</h3>
+            <p className="mb-2 text-xs text-muted">
+              As the factory offers them: its descriptions, models, quantities and parts. These are the lines the customer gets if this offer is chosen.
+            </p>
             <ol className="flex flex-col gap-3">
               {s.lines.map((l, i) => {
                 const cost = costOf(l);
                 const err = (f: string) => st.errors?.[`lines.${i}.${f}`];
                 return (
-                  <li key={l.key} className="rounded-lg border border-line p-3">
+                  <li key={l.key} className={cn("rounded-lg border border-line p-3", l.partOfKey && "ml-5 border-dashed sm:ml-8")}>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1 sm:max-w-md">
+                      <div className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-lg">
+                        <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted tabular">
+                          {l.partOfKey && <CornerDownRight className="size-3.5" aria-hidden />}
+                          {numbers[i]}
+                        </span>
                         <label htmlFor={`fq-item-${l.key}`} className="sr-only">
-                          For which requested item
+                          Which of the customer&apos;s items this answers
                         </label>
                         <Select id={`fq-item-${l.key}`} compact value={l.requestedItemId} onChange={(e) => linkItem(i, e.target.value)}>
-                          <option value="">Not linked to a requested item</option>
+                          <option value="">An extra (not one of the customer&apos;s items)</option>
                           {items.map((it) => (
                             <option key={it.id} value={it.id}>
-                              {it.parentId ? "For part" : "For item"} {it.no}: {it.description.split("\n")[0].slice(0, 60)}
+                              Answers {it.no}: {it.description.split("\n")[0].slice(0, 60)}
                             </option>
                           ))}
                         </Select>
                       </div>
-                      <RowButtons
-                        index={i}
-                        count={s.lines.length}
-                        label={`price ${i + 1}`}
-                        onMove={(to) => setS((x) => ({ ...x, lines: move(x.lines, i, to) }))}
-                        onRemove={() => setS((x) => ({ ...x, lines: x.lines.filter((_, n) => n !== i) }))}
-                      />
+                      <div className="flex items-center gap-1">
+                        {l.partOfKey ? (
+                          <Button size="xs" variant="ghost" onClick={() => setS((x) => ({ ...x, lines: grouped(x.lines.map((y) => (y.key === l.key ? { ...y, partOfKey: null } : y))) }))} title="Make it a line of its own">
+                            <IndentDecrease aria-hidden /> Not a part
+                          </Button>
+                        ) : (
+                          topAbove(i) &&
+                          !s.lines.some((p) => p.partOfKey === l.key) && (
+                            <Button size="xs" variant="ghost" onClick={() => setS((x) => ({ ...x, lines: grouped(x.lines.map((y) => (y.key === l.key ? { ...y, partOfKey: topAbove(i)!.key } : y))) }))} title="When the factory lists it as part of the line above">
+                              <IndentIncrease aria-hidden /> Part of {numbers[s.lines.indexOf(topAbove(i)!)]}
+                            </Button>
+                          )
+                        )}
+                        {!l.partOfKey && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() =>
+                              setS((x) => ({ ...x, lines: grouped([...x.lines, blankLine({ partOfKey: l.key, requestedItemId: l.requestedItemId, unit: "set" })]) }))
+                            }
+                            title="The factory breaks this line into parts (machine, conveyor, spares…)"
+                          >
+                            <Plus aria-hidden /> Part
+                          </Button>
+                        )}
+                        <RowButtons
+                          index={i}
+                          count={s.lines.length}
+                          label={`line ${numbers[i]}`}
+                          onMove={(to) => setS((x) => ({ ...x, lines: grouped(move(x.lines, i, to)) }))}
+                          onRemove={() => setS((x) => ({ ...x, lines: x.lines.filter((y) => y.key !== l.key && y.partOfKey !== l.key) }))}
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-8">
                       <div className="col-span-2 sm:col-span-5">
@@ -523,24 +573,11 @@ export function FactoryQuoteForm({
                 onClick={() =>
                   setS((x) => ({
                     ...x,
-                    lines: [
-                      ...x.lines,
-                      {
-                        key: rowKey(),
-                        id: null,
-                        requestedItemId: "",
-                        description: "",
-                        model: "",
-                        quantity: "1",
-                        unit: "pcs",
-                        unitPrice: "",
-                        taxRate: DEFAULT_TAX,
-                      },
-                    ],
+                    lines: [...x.lines, blankLine()],
                   }))
                 }
               >
-                <Plus aria-hidden /> Add a price
+                <Plus aria-hidden /> Add a line
               </Button>
             </div>
           </div>

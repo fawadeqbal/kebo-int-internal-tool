@@ -51,7 +51,7 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
       quantity: it.quantity,
       unit: it.unit,
       targetPrice: it.targetPrice ?? "",
-      parentId: it.parentId,
+      parentKey: it.parentId, // saved rows are keyed by id
       priced: it.priced,
     })),
   };

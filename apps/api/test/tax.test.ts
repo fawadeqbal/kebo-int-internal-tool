@@ -56,8 +56,10 @@ describe("tax", () => {
     const { inquiryId } = await deal("CN");
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     expect(draft).not.toHaveProperty("vatRate");
-    const lines = [{ description: "Gear pump", quantity: 10, unitPrice: 20 }];
-    const r = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, discount: 5, vatRate: 13, lines }).expect(201)).body;
+    // No factory prices: the option is the customer's own items, priced by hand.
+    const [pump, seals] = draft.options[0].prices.map((p: { lineId: string }) => p.lineId);
+    const options = [{ ...draft.options[0], discount: 5, prices: [{ lineId: pump, unitPrice: 20 }, { lineId: seals, unitPrice: 0 }] }];
+    const r = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, vatRate: 13, options }).expect(201)).body;
     expect(r).toMatchObject({ subtotal: "200.00", discount: "5.00", total: "195.00" });
     expect(r).not.toHaveProperty("vatAmount");
   });

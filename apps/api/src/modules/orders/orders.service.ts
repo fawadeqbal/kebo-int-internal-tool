@@ -8,7 +8,7 @@ import {
   depositOf,
   dueOf,
   nextStage,
-  numberLines,
+  numberQuoteLines,
   orderNeeds,
   ORDER_STAGE_HINT,
   ORDER_STAGE_LABEL,
@@ -48,7 +48,8 @@ const orderInclude = {
         select: {
           requestedItemId: true,
           requestedItem: { select: { parentId: true } },
-          factoryQuoteLine: { select: { factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } },
+          factoryQuoteLineId: true,
+          factoryQuoteLine: { select: { parentId: true, factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } },
         },
       },
     },
@@ -59,16 +60,37 @@ const orderInclude = {
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
-/** "1", "2", "2.1" for an order's lines (parts of an item under that item). */
-export function orderLineNumbers(lines: { id: string; quoteLine: { requestedItemId: string | null; requestedItem: { parentId: string | null } | null } | null }[]) {
-  return numberLines(lines.map((l) => ({ id: l.id, requestedItemId: l.quoteLine?.requestedItemId ?? null, parentItemId: l.quoteLine?.requestedItem?.parentId ?? null })));
+/** "1", "2", "2.1" for an order's lines (a factory's parts under their line). */
+export function orderLineNumbers(
+  lines: {
+    id: string;
+    quoteLine: {
+      requestedItemId: string | null;
+      requestedItem: { parentId: string | null } | null;
+      factoryQuoteLineId: string | null;
+      factoryQuoteLine: { parentId: string | null } | null;
+    } | null;
+  }[],
+) {
+  return numberQuoteLines(
+    lines.map((l) => ({
+      id: l.id,
+      factoryQuoteLineId: l.quoteLine?.factoryQuoteLineId ?? null,
+      factoryParentId: l.quoteLine?.factoryQuoteLine?.parentId ?? null,
+      requestedItemId: l.quoteLine?.requestedItemId ?? null,
+      itemParentId: l.quoteLine?.requestedItem?.parentId ?? null,
+    })),
+  );
 }
 
 const qty = (d: { toString(): string }) => Number(d.toString());
 const trimQty = (d: { toString(): string }) => String(qty(d));
 
 /** What came in from the factory and whether the packing list is made, for the rules in @kebo/shared. */
-export function goodsOf(lines: { type: string; description: string; quantity: { toString(): string }; receivedQty: { toString(): string }; unit: string }[], packedAt: Date | null): OrderGoods {
+export function goodsOf(
+  lines: { type: string; description: string; quantity: { toString(): string }; receivedQty: { toString(): string }; unit: string }[],
+  packedAt: Date | null,
+): OrderGoods {
   const goods = lines.filter((l) => l.type === "goods");
   const short = goods.filter((l) => qty(l.receivedQty) < qty(l.quantity));
   return {
@@ -98,8 +120,16 @@ export class OrdersService {
   /* ---------------------------------------------------------------- creating and cancelling */
 
   /** The order made when a revision is accepted (inside that transaction): the accepted lines frozen and the terms copied. */
-  async createFromRevision(tx: Tx, revisionId: string, acceptedOn: ISODate, actorId: string) {
-    const rev = await tx.quotationRevision.findUniqueOrThrow({ where: { id: revisionId }, include: { lines: { orderBy: { sortOrder: "asc" } }, quotation: { include: { inquiry: true } } } });
+  async createFromRevision(tx: Tx, revisionId: string, optionId: string, acceptedOn: ISODate, actorId: string) {
+    const rev = await tx.quotationRevision.findUniqueOrThrow({
+      where: { id: revisionId },
+      include: { quotation: { include: { inquiry: true } } },
+    });
+    // The order is the accepted option: its lines, its total.
+    const option = await tx.quotationOption.findFirstOrThrow({
+      where: { id: optionId, revisionId },
+      include: { lines: { orderBy: { sortOrder: "asc" } } },
+    });
     const inquiry = rev.quotation.inquiry;
     const refNo = await nextReference(tx, "order", Number(this.clock.today().slice(0, 4)));
     const order = await tx.order.create({
@@ -111,14 +141,14 @@ export class OrdersService {
         orderedOn: toDbDate(acceptedOn),
         stage: "confirmed",
         currency: rev.currency,
-        total: rev.total,
+        total: option.total,
         depositPercent: rev.depositPercent,
         balanceTerms: rev.balanceTerms,
         incoterm: rev.incoterm,
         incotermPlace: rev.incotermPlace,
         createdById: actorId,
         lines: {
-          create: rev.lines.map((l) => ({
+          create: option.lines.map((l) => ({
             quoteLineId: l.id,
             type: l.type,
             description: l.description,
@@ -131,15 +161,38 @@ export class OrdersService {
             sortOrder: l.sortOrder,
           })),
         },
-        stageChanges: { create: { toStage: "confirmed", byId: actorId, note: `${rev.quotation.refNo} R${rev.number} accepted` } },
+        stageChanges: {
+          create: { toStage: "confirmed", byId: actorId, note: `${rev.quotation.refNo} R${rev.number} Option ${option.letter} accepted` },
+        },
       },
     });
     // The customer's payment plan starts from the terms (deposit dated, balance dated when the ship date is known).
     const days = (await this.settings.get()).reminders;
-    const plan = defaultPlan(decimalToMinor(rev.total), Number(rev.depositPercent), acceptedOn, days.depositDays);
-    await tx.paymentPlanItem.createMany({ data: plan.map((p, i) => ({ orderId: order.id, label: p.label, amount: fromMinor(p.amountMinor), dueOn: toDbDateOrNull(p.dueOn), sortOrder: i })) });
-    await this.audit.record(tx, { userId: actorId, action: "create", entityType: "order", entityId: order.id, summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} (${rev.currency} ${rev.total.toString()})` });
-    const event: DomainEvent = { type: "order.created", orderId: order.id, refNo, inquiryId: inquiry.id, actorId, notify: [inquiry.assigneeId, inquiry.createdById].filter((v): v is string => !!v) };
+    const plan = defaultPlan(decimalToMinor(option.total), Number(rev.depositPercent), acceptedOn, days.depositDays);
+    await tx.paymentPlanItem.createMany({
+      data: plan.map((p, i) => ({
+        orderId: order.id,
+        label: p.label,
+        amount: fromMinor(p.amountMinor),
+        dueOn: toDbDateOrNull(p.dueOn),
+        sortOrder: i,
+      })),
+    });
+    await this.audit.record(tx, {
+      userId: actorId,
+      action: "create",
+      entityType: "order",
+      entityId: order.id,
+      summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} Option ${option.letter} (${rev.currency} ${option.total.toString()})`,
+    });
+    const event: DomainEvent = {
+      type: "order.created",
+      orderId: order.id,
+      refNo,
+      inquiryId: inquiry.id,
+      actorId,
+      notify: [inquiry.assigneeId, inquiry.createdById].filter((v): v is string => !!v),
+    };
     return { order, event };
   }
 
@@ -156,7 +209,16 @@ export class OrdersService {
       if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
       await tx.order.update({ where: { id }, data: { status: "cancelled", cancelledAt: new Date(), cancelReason: reason } });
       await tx.quotationRevision.update({ where: { id: o.revisionId }, data: { status: "void" } });
-      await this.audit.record(tx, { userId: user.id, action: "cancel", entityType: "order", entityId: id, summary: `Cancelled order ${o.refNo}`, reason, oldValues: { status: o.status }, newValues: { status: "cancelled" } });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "cancel",
+        entityType: "order",
+        entityId: id,
+        summary: `Cancelled order ${o.refNo}`,
+        reason,
+        oldValues: { status: o.status },
+        newValues: { status: "cancelled" },
+      });
       const inquiry = await tx.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId } });
       const moved = await this.stages.after(tx, inquiry, "order_cancelled", user.id);
       return moved ? [moved] : [];
@@ -177,9 +239,18 @@ export class OrdersService {
   /** Money in, in the order's currency (another currency must be converted first and is not mixed in). */
   private moneyOf(o: OrderRow) {
     const totalMinor = decimalToMinor(o.total);
-    const ins = o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
+    const ins = o.payments
+      .filter((p) => p.currency === o.currency)
+      .map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
     const position = settle(totalMinor, ins, Number(o.depositPercent));
-    return { totalMinor, receivedMinor: position.settledMinor, depositPercent: Number(o.depositPercent), currency: o.currency, balanceTerms: o.balanceTerms, position };
+    return {
+      totalMinor,
+      receivedMinor: position.settledMinor,
+      depositPercent: Number(o.depositPercent),
+      currency: o.currency,
+      balanceTerms: o.balanceTerms,
+      position,
+    };
   }
 
   private facts(o: OrderRow): OrderFacts {
@@ -207,7 +278,11 @@ export class OrdersService {
   private async view(o: OrderRow) {
     const m = this.moneyOf(o);
     const days = (await this.settings.get()).reminders;
-    const history = await this.prisma.db.orderStageChange.findMany({ where: { orderId: o.id }, orderBy: { at: "asc" }, include: { by: { select: { id: true, name: true } } } });
+    const history = await this.prisma.db.orderStageChange.findMany({
+      where: { orderId: o.id },
+      orderBy: { at: "asc" },
+      include: { by: { select: { id: true, name: true } } },
+    });
     const back = o.status === "cancelled" ? null : previousStage(o.stage);
     const numbers = orderLineNumbers(o.lines);
     return {
@@ -253,7 +328,13 @@ export class OrdersService {
         factory: l.quoteLine?.factoryQuoteLine?.factoryQuote.factory ?? null,
         receivedQty: trimQty(l.receivedQty),
         receivedOn: fromDbDateOrNull(l.receivedOn),
-        packing: { packages: l.packages, packageType: l.packageType, netWeightKg: l.netWeightKg?.toFixed(2) ?? null, grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null, cbm: l.cbm?.toFixed(3) ?? null },
+        packing: {
+          packages: l.packages,
+          packageType: l.packageType,
+          netWeightKg: l.netWeightKg?.toFixed(2) ?? null,
+          grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null,
+          cbm: l.cbm?.toFixed(3) ?? null,
+        },
       })),
       goods: (() => {
         const g = goodsOf(o.lines, o.packedAt);
@@ -279,7 +360,15 @@ export class OrdersService {
       next: this.nextOf(o),
       back: back ? { to: back, label: `Back to ${ORDER_STAGE_LABEL[back]}` } : null,
       needs: orderNeeds(this.facts(o), this.clock.today(), days),
-      history: history.map((h) => ({ id: h.id, from: h.fromStage, to: h.toStage, note: h.note, confirmed: h.confirmed, by: h.by, at: h.at })),
+      history: history.map((h) => ({
+        id: h.id,
+        from: h.fromStage,
+        to: h.toStage,
+        note: h.note,
+        confirmed: h.confirmed,
+        by: h.by,
+        at: h.at,
+      })),
       cancelled: o.status === "cancelled" ? { at: o.cancelledAt, reason: o.cancelReason } : null,
       documents: this.documentsOf(o),
     };
@@ -302,7 +391,10 @@ export class OrdersService {
    * Orders with their stage, money due and what each needs now.
    * status: open (the board: Confirmed, In production, Shipped), closed (Done) or cancelled.
    */
-  async list(user: SessionUser, filter: { mine?: boolean; status?: "open" | "closed" | "cancelled"; stage?: OrderStage; lateOnly?: boolean }) {
+  async list(
+    user: SessionUser,
+    filter: { mine?: boolean; status?: "open" | "closed" | "cancelled"; stage?: OrderStage; lateOnly?: boolean },
+  ) {
     const rows = await this.prisma.db.order.findMany({
       where: {
         ...orderAccess(user),
@@ -343,7 +435,9 @@ export class OrdersService {
   /** "My to-do": what each open order I handle needs, late ones first, then by date. */
   async todo(user: SessionUser) {
     // Closed orders appear only while money is still owed on them.
-    const items = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed" }))].filter((i) => i.needs);
+    const items = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed" }))].filter(
+      (i) => i.needs,
+    );
     return items.sort((a, b) => Number(b.needs!.late) - Number(a.needs!.late) || a.needs!.due.localeCompare(b.needs!.due));
   }
 
@@ -367,7 +461,10 @@ export class OrdersService {
       const check = checkMove(o.stage, input.to, o.status, { ...m, goods: goodsOf(o.lines, o.packedAt) });
       if (!check.ok) throw new GateError(check.message, check.code);
       if (check.warnings.some((w) => w.code === "money_due") && !can(user.role, "orders.manage")) {
-        throw new GateError(`${check.warnings.find((w) => w.code === "money_due")!.message} Record the payment first, or ask a manager to close it.`, "manager_needed");
+        throw new GateError(
+          `${check.warnings.find((w) => w.code === "money_due")!.message} Record the payment first, or ask a manager to close it.`,
+          "manager_needed",
+        );
       }
       if (check.warnings.length && !input.confirm) throw new GateError(check.warnings.map((w) => w.message).join(" "), "confirm");
       const forward = input.to === nextStage(o.stage);
@@ -387,8 +484,24 @@ export class OrdersService {
       if (input.to === "done") Object.assign(data, { status: "closed", closedAt: new Date() });
       if (o.stage === "done" && !forward) Object.assign(data, { status: "open", closedAt: null });
       await tx.order.update({ where: { id: o.id }, data });
-      await this.datePlan(tx, o, input.to, forward, input.readyOn ?? null, data.shippedOn instanceof Date ? fromDbDate(data.shippedOn) : null);
-      await tx.orderStageChange.create({ data: { orderId: o.id, fromStage: o.stage, toStage: input.to, note: input.note ?? (reason || null), confirmed: check.warnings.length > 0, byId: user.id } });
+      await this.datePlan(
+        tx,
+        o,
+        input.to,
+        forward,
+        input.readyOn ?? null,
+        data.shippedOn instanceof Date ? fromDbDate(data.shippedOn) : null,
+      );
+      await tx.orderStageChange.create({
+        data: {
+          orderId: o.id,
+          fromStage: o.stage,
+          toStage: input.to,
+          note: input.note ?? (reason || null),
+          confirmed: check.warnings.length > 0,
+          byId: user.id,
+        },
+      });
       await this.audit.record(tx, {
         userId: user.id,
         action: "stage_change",
@@ -422,7 +535,8 @@ export class OrdersService {
     if (!forward) return;
     let due: ISODate | null = null;
     if (to === "in_production" && readyOn && o.balanceTerms === "before_shipment") due = readyOn;
-    if (to === "shipped" && shippedOn) due = o.balanceTerms === "before_shipment" ? shippedOn : addDays(shippedOn, (await this.settings.get()).reminders.balanceDays);
+    if (to === "shipped" && shippedOn)
+      due = o.balanceTerms === "before_shipment" ? shippedOn : addDays(shippedOn, (await this.settings.get()).reminders.balanceDays);
     if (due) await tx.paymentPlanItem.updateMany({ where: { orderId: o.id, dueOn: null }, data: { dueOn: toDbDate(due) } });
   }
 
@@ -434,7 +548,8 @@ export class OrdersService {
     const o = await this.load(user, id, tx);
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     const byId = new Map(o.lines.filter((l) => l.type === "goods").map((l) => [l.id, l]));
-    for (const lineId of lineIds) if (!byId.has(lineId)) throw new DomainError("Only the goods lines of this order can be received or packed.");
+    for (const lineId of lineIds)
+      if (!byId.has(lineId)) throw new DomainError("Only the goods lines of this order can be received or packed.");
     if (new Set(lineIds).size !== lineIds.length) throw new DomainError("Each line can appear only once.");
     return { o, byId };
   }
@@ -446,16 +561,34 @@ export class OrdersService {
     const on = input.on ?? today;
     if (on > today) throw new DomainError("The date cannot be in the future.");
     await this.prisma.tx(async (tx) => {
-      const { o, byId } = await this.goodsLinesFor(tx, user, id, input.lines.map((l) => l.lineId));
+      const { o, byId } = await this.goodsLinesFor(
+        tx,
+        user,
+        id,
+        input.lines.map((l) => l.lineId),
+      );
       const changes: string[] = [];
       for (const r of input.lines) {
         const line = byId.get(r.lineId)!;
-        if (r.receivedQty > qty(line.quantity)) throw new DomainError(`${line.description.split("\n")[0]}: ${r.receivedQty} is more than the ${trimQty(line.quantity)} ${line.unit} ordered.`);
+        if (r.receivedQty > qty(line.quantity))
+          throw new DomainError(
+            `${line.description.split("\n")[0]}: ${r.receivedQty} is more than the ${trimQty(line.quantity)} ${line.unit} ordered.`,
+          );
         if (r.receivedQty === qty(line.receivedQty)) continue;
-        await tx.orderLine.update({ where: { id: line.id }, data: { receivedQty: r.receivedQty, receivedOn: r.receivedQty > 0 ? toDbDate(on) : null } });
+        await tx.orderLine.update({
+          where: { id: line.id },
+          data: { receivedQty: r.receivedQty, receivedOn: r.receivedQty > 0 ? toDbDate(on) : null },
+        });
         changes.push(`${line.description.split("\n")[0]!.slice(0, 40)} ${trimQty(line.receivedQty)} → ${r.receivedQty}`);
       }
-      if (changes.length) await this.audit.record(tx, { userId: user.id, action: "goods_received", entityType: "order", entityId: o.id, summary: `${o.refNo}: received from the factory (${on}): ${changes.join("; ")}` });
+      if (changes.length)
+        await this.audit.record(tx, {
+          userId: user.id,
+          action: "goods_received",
+          entityType: "order",
+          entityId: o.id,
+          summary: `${o.refNo}: received from the factory (${on}): ${changes.join("; ")}`,
+        });
     });
     return this.get(user, id);
   }
@@ -464,16 +597,44 @@ export class OrdersService {
   async savePacking(user: SessionUser, id: string, input: PackingInput) {
     if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     await this.prisma.tx(async (tx) => {
-      const { o, byId } = await this.goodsLinesFor(tx, user, id, input.lines.map((l) => l.lineId));
+      const { o, byId } = await this.goodsLinesFor(
+        tx,
+        user,
+        id,
+        input.lines.map((l) => l.lineId),
+      );
       for (const p of input.lines) {
-        if (p.netWeightKg !== null && p.grossWeightKg !== null && p.netWeightKg > p.grossWeightKg) throw new DomainError(`${byId.get(p.lineId)!.description.split("\n")[0]}: the net weight cannot be more than the gross weight.`);
-        await tx.orderLine.update({ where: { id: p.lineId }, data: { packages: p.packages, packageType: p.packageType, netWeightKg: p.netWeightKg, grossWeightKg: p.grossWeightKg, cbm: p.cbm } });
+        if (p.netWeightKg !== null && p.grossWeightKg !== null && p.netWeightKg > p.grossWeightKg)
+          throw new DomainError(`${byId.get(p.lineId)!.description.split("\n")[0]}: the net weight cannot be more than the gross weight.`);
+        await tx.orderLine.update({
+          where: { id: p.lineId },
+          data: {
+            packages: p.packages,
+            packageType: p.packageType,
+            netWeightKg: p.netWeightKg,
+            grossWeightKg: p.grossWeightKg,
+            cbm: p.cbm,
+          },
+        });
       }
       // Made once every goods line has its packages counted.
       const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
       const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
-      await tx.order.update({ where: { id: o.id }, data: { containerNo: input.containerNo, shippingMarks: input.shippingMarks, packedAt: complete ? (o.packedAt ?? new Date()) : null } });
-      await this.audit.record(tx, { userId: user.id, action: "packing_list", entityType: "order", entityId: o.id, summary: `${o.refNo}: packing list ${complete ? "saved" : "saved (not complete: some lines have no packages)"}` });
+      await tx.order.update({
+        where: { id: o.id },
+        data: {
+          containerNo: input.containerNo,
+          shippingMarks: input.shippingMarks,
+          packedAt: complete ? (o.packedAt ?? new Date()) : null,
+        },
+      });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "packing_list",
+        entityType: "order",
+        entityId: o.id,
+        summary: `${o.refNo}: packing list ${complete ? "saved" : "saved (not complete: some lines have no packages)"}`,
+      });
     });
     return this.get(user, id);
   }
@@ -496,11 +657,28 @@ export class OrdersService {
       // Once shipped, the ship date and B/L are on the customer's documents: changing them says why.
       const shippedFacts =
         (o.stage === "shipped" || o.stage === "done") &&
-        ((input.shippedOn !== undefined && input.shippedOn !== fromDbDateOrNull(o.shippedOn) && o.shippedOn !== null) || (input.blNo !== undefined && (input.blNo ?? null) !== o.blNo && o.blNo !== null));
+        ((input.shippedOn !== undefined && input.shippedOn !== fromDbDateOrNull(o.shippedOn) && o.shippedOn !== null) ||
+          (input.blNo !== undefined && (input.blNo ?? null) !== o.blNo && o.blNo !== null));
       const reason = shippedFacts ? requireReason(input.reason, "shipping", "the ship date or B/L changes after shipping") : input.reason;
-      const before = { shipBy: fromDbDateOrNull(o.shipBy), readyOn: fromDbDateOrNull(o.readyOn), shippedOn: fromDbDateOrNull(o.shippedOn), blNo: o.blNo, documentTitle: o.documentTitle, portOfDischarge: o.portOfDischarge };
+      const before = {
+        shipBy: fromDbDateOrNull(o.shipBy),
+        readyOn: fromDbDateOrNull(o.readyOn),
+        shippedOn: fromDbDateOrNull(o.shippedOn),
+        blNo: o.blNo,
+        documentTitle: o.documentTitle,
+        portOfDischarge: o.portOfDischarge,
+      };
       await tx.order.update({ where: { id: o.id }, data });
-      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "order", entityId: o.id, summary: `${o.refNo}: dates and B/L changed`, oldValues: before, newValues: { ...input, reason: undefined }, reason });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "update",
+        entityType: "order",
+        entityId: o.id,
+        summary: `${o.refNo}: dates and B/L changed`,
+        oldValues: before,
+        newValues: { ...input, reason: undefined },
+        reason,
+      });
     });
     return this.get(user, id);
   }

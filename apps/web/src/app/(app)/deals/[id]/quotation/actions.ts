@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
+import type { QuoteOffers } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
 
@@ -41,7 +42,7 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form) }),
+    () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form), optionId: v.optionId || null }),
     DONE[v.to] ?? "Saved.",
   );
   if (!r.ok) return r;
@@ -55,4 +56,13 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
     }
   }
   return r;
+}
+
+/** The offers with costs in another currency (the editor asks when the quotation currency changes). */
+export async function offersAction(dealId: string, currency: string): Promise<QuoteOffers | null> {
+  try {
+    return await api.get<QuoteOffers>(`/inquiries/${dealId}/quotation/offers`, { currency: currency.trim().toUpperCase().slice(0, 3) });
+  } catch {
+    return null;
+  }
 }

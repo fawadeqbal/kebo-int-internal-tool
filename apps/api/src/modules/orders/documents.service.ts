@@ -55,7 +55,7 @@ export class DocumentsService {
     const o = await this.prisma.db.order.findUniqueOrThrow({
       where: { id: orderId },
       include: {
-        lines: { orderBy: { sortOrder: "asc" }, include: { quoteLine: { select: { requestedItemId: true, requestedItem: { select: { parentId: true } } } } } },
+        lines: { orderBy: { sortOrder: "asc" }, include: { quoteLine: { select: { requestedItemId: true, requestedItem: { select: { parentId: true } }, factoryQuoteLineId: true, factoryQuoteLine: { select: { parentId: true } } } } } },
         revision: { include: { quotation: { select: { refNo: true } } } },
         payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
         inquiry: { select: { contactId: true } },

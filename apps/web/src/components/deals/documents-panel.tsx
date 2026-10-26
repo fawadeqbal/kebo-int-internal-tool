@@ -38,10 +38,10 @@ export function guessKind(name: string, type: string): AttachmentKind {
   return "other";
 }
 
-type Staged = { key: string; file: File; kind: AttachmentKind; note: string; progress: number | null; error: string | null };
+export type Staged = { key: string; file: File; kind: AttachmentKind; note: string; progress: number | null; error: string | null };
 
 /** Sends one file with progress (XHR: fetch cannot report upload progress). */
-function send(dealId: string, s: Staged, onProgress: (p: number) => void): Promise<string | null> {
+export function send(dealId: string, s: Staged, onProgress: (p: number) => void): Promise<string | null> {
   return new Promise((resolve) => {
     const body = new FormData();
     body.set("file", s.file, s.file.name);
@@ -70,32 +70,11 @@ function send(dealId: string, s: Staged, onProgress: (p: number) => void): Promi
  */
 export function DocumentsPanel({ dealId, files, canUpload }: { dealId: string; files: DocumentRow[]; canUpload: boolean }) {
   const router = useRouter();
-  const input = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<Staged[]>([]);
-  const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
 
-  const add = (list: FileList | null) => {
-    if (!list?.length) return;
-    setStaged((s) => [
-      ...s,
-      ...Array.from(list).map((file) => ({
-        key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
-        file,
-        kind: guessKind(file.name, file.type),
-        note: "",
-        progress: null,
-        error: null,
-      })),
-    ]);
-  };
   const patch = (key: string, p: Partial<Staged>) => setStaged((s) => s.map((x) => (x.key === key ? { ...x, ...p } : x)));
-  const drop = (e: DragEvent) => {
-    e.preventDefault();
-    setOver(false);
-    if (canUpload && !busy) add(e.dataTransfer.files);
-  };
 
   const uploadAll = async () => {
     setBusy(true);
@@ -117,112 +96,7 @@ export function DocumentsPanel({ dealId, files, canUpload }: { dealId: string; f
 
   return (
     <div className="flex flex-col gap-4">
-      {canUpload && (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setOver(true);
-          }}
-          onDragLeave={() => setOver(false)}
-          onDrop={drop}
-          className={cn(
-            "flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-line px-4 py-6 text-center transition-colors",
-            over && "border-primary bg-primary-soft/50",
-          )}
-        >
-          <UploadCloud className="size-6 text-muted" aria-hidden />
-          <p className="text-sm">
-            <span className="font-medium">Drop the URS, drawings, photos or specs here</span>
-            <span className="block text-xs text-muted">Several at once is fine. You can say what each one is before uploading.</span>
-          </p>
-          <Button size="sm" variant="secondary" onClick={() => input.current?.click()} disabled={busy}>
-            Choose files
-          </Button>
-          <input
-            ref={input}
-            type="file"
-            multiple
-            hidden
-            onChange={(e) => {
-              add(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </div>
-      )}
-
-      {staged.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-          <p className="text-sm font-medium">
-            {staged.length} file{staged.length === 1 ? "" : "s"} to upload
-          </p>
-          <ul className="flex flex-col gap-2">
-            {staged.map((s) => (
-              <li key={s.key} className="flex flex-col gap-1.5 rounded-md bg-surface-2/60 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate text-sm">
-                    {s.file.name} <span className="text-xs text-muted">· {size(s.file.size)}</span>
-                  </span>
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    onClick={() => setStaged((x) => x.filter((y) => y.key !== s.key))}
-                    disabled={busy}
-                    aria-label={`Don't upload ${s.file.name}`}
-                  >
-                    <X aria-hidden />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Select
-                    aria-label={`What ${s.file.name} is`}
-                    value={s.kind}
-                    onChange={(e) => patch(s.key, { kind: e.target.value as AttachmentKind })}
-                    disabled={busy}
-                    className="w-40"
-                  >
-                    {ATTACHMENT_KINDS.map((k) => (
-                      <option key={k} value={k}>
-                        {ATTACHMENT_KIND_LABEL[k]}
-                      </option>
-                    ))}
-                  </Select>
-                  <Input
-                    aria-label={`Note for ${s.file.name}`}
-                    placeholder="Note (optional), e.g. Rev B from the customer"
-                    maxLength={300}
-                    value={s.note}
-                    onChange={(e) => patch(s.key, { note: e.target.value })}
-                    disabled={busy}
-                    className="min-w-0 flex-1 basis-48"
-                  />
-                </div>
-                {s.progress !== null && (
-                  <div
-                    className="h-1.5 overflow-hidden rounded-full bg-surface-3"
-                    role="progressbar"
-                    aria-valuenow={s.progress}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`Uploading ${s.file.name}`}
-                  >
-                    <div className="h-full bg-primary transition-[width]" style={{ width: `${s.progress}%` }} />
-                  </div>
-                )}
-                {s.error && <p className="text-xs text-bad">{s.error}</p>}
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="primary" onClick={uploadAll} disabled={busy}>
-              {busy ? "Uploading…" : `Upload ${staged.length === 1 ? "the file" : `${staged.length} files`}`}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setStaged([])} disabled={busy}>
-              Clear
-            </Button>
-          </div>
-        </div>
-      )}
+      {canUpload && <FileDrop staged={staged} setStaged={setStaged} busy={busy} onUpload={uploadAll} />}
 
       {files.length === 0 ? (
         <p className="text-sm text-muted">No files yet.</p>
@@ -351,5 +225,154 @@ export function DocumentsPanel({ dealId, files, canUpload }: { dealId: string; f
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * A drop zone and the files waiting to go up, each with what it is and a note.
+ * With onUpload it shows an Upload button; without, the files go up when the
+ * surrounding form is saved (a new inquiry).
+ */
+export function FileDrop({
+  staged,
+  setStaged,
+  busy,
+  onUpload,
+}: {
+  staged: Staged[];
+  setStaged: (fn: (s: Staged[]) => Staged[]) => void;
+  busy: boolean;
+  onUpload?: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  const add = (list: FileList | null) => {
+    if (!list?.length) return;
+    // Read the list now: the input is cleared right after, which empties it.
+    const added = Array.from(list).map((file) => ({
+      key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
+      file,
+      kind: guessKind(file.name, file.type),
+      note: "",
+      progress: null,
+      error: null,
+    }));
+    setStaged((s) => [...s, ...added]);
+  };
+  const patch = (key: string, p: Partial<Staged>) => setStaged((s) => s.map((x) => (x.key === key ? { ...x, ...p } : x)));
+  const drop = (e: DragEvent) => {
+    e.preventDefault();
+    setOver(false);
+    if (!busy) add(e.dataTransfer.files);
+  };
+  return (
+    <>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={drop}
+        className={cn(
+          "flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-line px-4 py-6 text-center transition-colors",
+          over && "border-primary bg-primary-soft/50",
+        )}
+      >
+        <UploadCloud className="size-6 text-muted" aria-hidden />
+        <p className="text-sm">
+          <span className="font-medium">Drop the URS, drawings, photos or specs here</span>
+          <span className="block text-xs text-muted">Several at once is fine. You can say what each one is before uploading.</span>
+        </p>
+        <Button size="sm" variant="secondary" onClick={() => input.current?.click()} disabled={busy}>
+          Choose files
+        </Button>
+        <input
+          ref={input}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => {
+            add(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {staged.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+          <p className="text-sm font-medium">
+            {staged.length} file{staged.length === 1 ? "" : "s"} to upload{onUpload ? "" : " with the inquiry"}
+          </p>
+          <ul className="flex flex-col gap-2">
+            {staged.map((s) => (
+              <li key={s.key} className="flex flex-col gap-1.5 rounded-md bg-surface-2/60 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate text-sm">
+                    {s.file.name} <span className="text-xs text-muted">· {size(s.file.size)}</span>
+                  </span>
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    onClick={() => setStaged((x) => x.filter((y) => y.key !== s.key))}
+                    disabled={busy}
+                    aria-label={`Don't upload ${s.file.name}`}
+                  >
+                    <X aria-hidden />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Select
+                    aria-label={`What ${s.file.name} is`}
+                    value={s.kind}
+                    onChange={(e) => patch(s.key, { kind: e.target.value as AttachmentKind })}
+                    disabled={busy}
+                    className="w-40"
+                  >
+                    {ATTACHMENT_KINDS.map((k) => (
+                      <option key={k} value={k}>
+                        {ATTACHMENT_KIND_LABEL[k]}
+                      </option>
+                    ))}
+                  </Select>
+                  <Input
+                    aria-label={`Note for ${s.file.name}`}
+                    placeholder="Note (optional), e.g. Rev B from the customer"
+                    maxLength={300}
+                    value={s.note}
+                    onChange={(e) => patch(s.key, { note: e.target.value })}
+                    disabled={busy}
+                    className="min-w-0 flex-1 basis-48"
+                  />
+                </div>
+                {s.progress !== null && (
+                  <div
+                    className="h-1.5 overflow-hidden rounded-full bg-surface-3"
+                    role="progressbar"
+                    aria-valuenow={s.progress}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Uploading ${s.file.name}`}
+                  >
+                    <div className="h-full bg-primary transition-[width]" style={{ width: `${s.progress}%` }} />
+                  </div>
+                )}
+                {s.error && <p className="text-xs text-bad">{s.error}</p>}
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            {onUpload && (
+              <Button size="sm" variant="primary" onClick={onUpload} disabled={busy}>
+                {busy ? "Uploading…" : `Upload ${staged.length === 1 ? "the file" : `${staged.length} files`}`}
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setStaged(() => [])} disabled={busy}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

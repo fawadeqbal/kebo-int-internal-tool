@@ -456,9 +456,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       sortOrder: l.sort_order,
     })),
   });
-  for (const i of old.queryItems.filter((x) => x.chosen_offer_item_id)) {
-    await tx.requestedItem.update({ where: { id: i.id }, data: { preferredFactoryLineId: i.chosen_offer_item_id } });
-  }
 
   /* ---- quotations: one per deal, each old version a revision */
   const quotationRows: Prisma.QuotationCreateManyInput[] = [];
@@ -511,6 +508,20 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   }
   await tx.quotation.createMany({ data: quotationRows });
   await tx.quotationRevision.createMany({ data: revisionRows });
+  // Each old version had one set of lines: it becomes Option A of its revision.
+  const optionOf = new Map(revisionRows.map((r) => [r.id!, randomUUID()]));
+  await tx.quotationOption.createMany({
+    data: revisionRows.map((r) => ({
+      id: optionOf.get(r.id!)!,
+      revisionId: r.id!,
+      letter: "A",
+      status: r.status === "accepted" || r.status === "void" ? ("accepted" as const) : ("open" as const),
+      leadTime: r.leadTime ?? null,
+      subtotal: r.subtotal,
+      discount: r.discount,
+      total: r.total,
+    })),
+  });
   for (const v of old.quotations.filter((q) => Number(q.tax_amount) !== 0)) report.judge("Quotations with tax (sales carry no tax now; the total is kept)", `${v.ref_no} v${v.version}: tax ${v.tax_amount}`);
   if (depositDefaulted)
     report.judge("Deposit %", `${depositDefaulted} quotation versions whose terms do not state an "N% advance/deposit" → ${settings.values.sales.defaultDepositPercent}%`);
@@ -522,6 +533,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     data: quoteLines.map((l) => ({
       id: l.id,
       revisionId: l.quotation_id,
+      optionId: optionOf.get(l.quotation_id)!,
       requestedItemId: l.query_item_id,
       type: map.lineType(l.description),
       description: l.description,

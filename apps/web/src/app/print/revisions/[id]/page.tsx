@@ -60,7 +60,10 @@ export default async function QuotationPrint({
   ]);
   const c = r.currency;
   const internal = sp.copy === "internal";
-  const costs = internal && r.lines.some((l) => l.unitCost != null);
+  // Once the customer accepted one option, the quotation shows that one; before, every option.
+  const options = r.options.some((o) => o.status === "accepted") ? r.options.filter((o) => o.status === "accepted") : r.options;
+  const single = options.length === 1;
+  const costs = internal && options.some((o) => o.lines.some((l) => l.unitCost != null));
 
   const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<DocLine> = {
@@ -83,14 +86,19 @@ export default async function QuotationPrint({
       ]
     : [no, description, { label: "Qty.", width: 71.4, render: (l) => docQty(l.quantity, l.unit) }];
 
-  // Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
-  const sums =
-    internal || Number(r.discount)
-      ? [
-          { label: "Subtotal", value: docMoney(r.subtotal, c) },
-          ...(Number(r.discount) ? [{ label: "Discount", value: docMoney(-Number(r.discount), c) }] : []),
-        ]
-      : [];
+  // Each option: its lines and its own total. Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
+  const groups = options.map((o) => ({
+    heading: single ? "" : `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.factory ? ` (${o.factory.name})` : ""}`,
+    rows: o.lines,
+    sums:
+      internal || Number(o.discount)
+        ? [
+            { label: single ? "Subtotal" : `Option ${o.letter} subtotal`, value: docMoney(o.subtotal, c) },
+            ...(Number(o.discount) ? [{ label: "Discount", value: docMoney(-Number(o.discount), c) }] : []),
+          ]
+        : [],
+    total: { label: `${single ? "" : `Option ${o.letter} `}Total ${r.incoterm} Price :`, words: docWords(o.total, c), amount: docMoney(o.total, c) },
+  }));
 
   return (
     <>
@@ -113,28 +121,29 @@ export default async function QuotationPrint({
         date={r.sentOn ?? r.createdAt}
         meta={[{ label: "Valid until:", value: docDate(r.validUntil) }]}
         columns={columns}
-        rows={r.lines}
-        sums={sums}
-        total={{ label: `Total ${r.incoterm} Price :`, words: docWords(r.total, c), amount: docMoney(r.total, c) }}
+        rows={[]}
+        groups={groups}
         bullets={[
           paymentSentenceOf(r.depositPercent, r.balanceTerms),
-          r.leadTime ? `Delivery: ${r.leadTime}` : null,
+          single ? (options[0]!.leadTime ? `Delivery: ${options[0]!.leadTime}` : null) : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
           ...textBullets(r.terms),
           ...textBullets(r.notes),
           ...portBullets(r.incoterm, r.incotermPlace),
           `This quotation is valid until ${docDate(r.validUntil)}.`,
         ].filter(Boolean)}
         internal={
-          internal && r.costing ? (
+          internal && options.some((o) => o.costing) ? (
             <InternalTable
               title="Costing (internal)"
+              head={single ? undefined : ["", ...options.map((o) => `Option ${o.letter}`)]}
               rows={[
-                ["Sales (after discount)", docMoney(r.costing.sales, c)],
-                ["Factory cost", docMoney(r.costing.cost, c)],
-                ["Profit", docMoney(r.costing.profit, c)],
-                ["Margin", r.costing.marginPercent === null ? "—" : `${r.costing.marginPercent}%`],
+                ["Factory", ...options.map((o) => o.factory?.name ?? "—")],
+                ["Sales (after discount)", ...options.map((o) => (o.costing ? docMoney(o.costing.sales, c) : "—"))],
+                ["Factory cost", ...options.map((o) => (o.costing ? docMoney(o.costing.cost, c) : "—"))],
+                ["Profit", ...options.map((o) => (o.costing ? docMoney(o.costing.profit, c) : "—"))],
+                ["Margin", ...options.map((o) => (o.costing?.marginPercent == null ? "—" : `${o.costing.marginPercent}%`))],
               ]}
-              note={r.costing.uncostedLines ? `${r.costing.uncostedLines} line(s) have no factory cost and are left out.` : null}
+              note={options.some((o) => o.costing?.uncostedLines) ? "Lines without a factory cost are left out." : null}
             />
           ) : internal ? (
             <span />

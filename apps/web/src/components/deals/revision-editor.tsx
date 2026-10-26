@@ -1,39 +1,37 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Lock, Plus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CornerDownRight, Lock, Plus, Trash2, X } from "lucide-react";
 import { costSummary, documentTotals, formatMinor, fromMinor, marginPercent, priceForMargin, toMinor } from "@kebo/money";
-import {
-  BALANCE_TERMS,
-  BALANCE_TERMS_LABEL,
-  INCOTERMS,
-  LINE_TYPE_LABEL,
-  LINE_TYPES,
-  type BalanceTerms,
-  type Incoterm,
-  type LineType,
-} from "@kebo/shared";
-import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, optionLetter, type BalanceTerms, type Incoterm } from "@kebo/shared";
+import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
-import type { RevisionDraft } from "@/lib/types-deals";
-import { ErrorText, MiniLabel, move, numberText, RowButtons, rowKey } from "./form-bits";
+import type { OfferLine, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import { ErrorText, numberText, rowKey } from "./form-bits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-interface LineState {
+interface ChargeState {
   key: string;
-  requestedItemId: string | null;
-  factoryQuoteLineId: string | null;
-  fxRate: number | null;
-  type: LineType;
+  type: "service" | "charge";
   description: string;
-  model: string;
   quantity: string;
   unit: string;
   unitPrice: string;
   unitCost: string;
+}
+
+interface OptionState {
+  key: string;
+  /** null: the customer's items, priced by hand. */
+  factoryQuoteId: string | null;
+  leadTime: string;
+  discount: string;
+  /** Our price per line, by factory line id (or customer item id). */
+  prices: Record<string, string>;
+  charges: ChargeState[];
 }
 
 interface EditorState {
@@ -42,15 +40,15 @@ interface EditorState {
   incotermPlace: string;
   depositPercent: string;
   balanceTerms: BalanceTerms;
-  leadTime: string;
   validUntil: string;
-  discount: string;
   terms: string;
   notes: string;
-  lines: LineState[];
+  options: OptionState[];
 }
 
 const str = (v: number | string | null | undefined) => (v === null || v === undefined ? "" : String(v));
+const money2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : "");
+const valid = (v: string) => v.trim() !== "" && Number.isFinite(Number(numberText(v)));
 
 function fromDraft(d: RevisionDraft): EditorState {
   return {
@@ -59,66 +57,76 @@ function fromDraft(d: RevisionDraft): EditorState {
     incotermPlace: str(d.incotermPlace),
     depositPercent: str(d.depositPercent),
     balanceTerms: d.balanceTerms,
-    leadTime: str(d.leadTime),
     validUntil: d.validUntil,
-    discount: Number(d.discount) ? Number(d.discount).toFixed(2) : "",
     terms: str(d.terms),
     notes: str(d.notes),
-    lines: d.lines.map((l, i) => ({
-      key: `line-${i}`,
-      requestedItemId: l.requestedItemId,
-      factoryQuoteLineId: l.factoryQuoteLineId,
-      fxRate: l.fxRate,
-      type: l.type,
-      description: l.description,
-      model: str(l.model),
-      quantity: str(l.quantity),
-      unit: l.unit,
-      unitPrice: Number(l.unitPrice).toFixed(2),
-      unitCost: l.unitCost === null ? "" : Number(l.unitCost).toFixed(2),
+    options: d.options.map((o, i) => ({
+      key: `option-${i}`,
+      factoryQuoteId: o.factoryQuoteId,
+      leadTime: str(o.leadTime),
+      discount: Number(o.discount) ? Number(o.discount).toFixed(2) : "",
+      prices: Object.fromEntries(o.prices.map((p) => [p.lineId, money2(Number(p.unitPrice))])),
+      charges: o.charges.map((c, k) => ({
+        key: `charge-${i}-${k}`,
+        type: c.type,
+        description: c.description,
+        quantity: str(c.quantity),
+        unit: c.unit,
+        unitPrice: money2(Number(c.unitPrice)),
+        unitCost: c.unitCost === null ? "" : money2(Number(c.unitCost)),
+      })),
     })),
   };
 }
 
-function payload(s: EditorState, showCosts: boolean) {
+/** The lines an option offers: the factory's (locked), or the customer's items when there are no factory prices. */
+function linesOf(o: OptionState, offers: QuoteOffers): OfferLine[] | null {
+  if (!o.factoryQuoteId) return offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
+  return offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.lines ?? null;
+}
+
+function payload(s: EditorState, offers: QuoteOffers) {
   return {
     currency: s.currency.trim().toUpperCase(),
     incoterm: s.incoterm,
     incotermPlace: s.incotermPlace,
     depositPercent: numberText(s.depositPercent),
     balanceTerms: s.balanceTerms,
-    leadTime: s.leadTime,
     validUntil: s.validUntil,
-    discount: numberText(s.discount),
     terms: s.terms,
     notes: s.notes,
-    lines: s.lines.map((l) => ({
-      requestedItemId: l.requestedItemId,
-      type: l.type,
-      description: l.description,
-      model: l.model,
-      quantity: numberText(l.quantity),
-      unit: l.unit.trim() || "pcs",
-      unitPrice: numberText(l.unitPrice),
-      ...(showCosts ? { unitCost: numberText(l.unitCost) || null, factoryQuoteLineId: l.factoryQuoteLineId, fxRate: l.fxRate } : {}),
+    options: s.options.map((o) => ({
+      factoryQuoteId: o.factoryQuoteId,
+      leadTime: o.leadTime,
+      discount: numberText(o.discount),
+      prices: (linesOf(o, offers) ?? []).filter((l) => valid(o.prices[l.id] ?? "")).map((l) => ({ lineId: l.id, unitPrice: numberText(o.prices[l.id]!) })),
+      charges: o.charges.map((c) => ({ type: c.type, description: c.description, quantity: numberText(c.quantity), unit: c.unit.trim() || "lot", unitPrice: numberText(c.unitPrice), unitCost: numberText(c.unitCost) || null })),
     })),
   };
 }
 
-const valid = (v: string) => v.trim() !== "" && Number.isFinite(Number(numberText(v)));
+/** Prices for every line that has a cost, at a margin (lines without a cost keep what they have). */
+function priced(lines: OfferLine[], prices: Record<string, string>, margin: number) {
+  const next = { ...prices };
+  for (const l of lines) if (l.unitCost !== null) next[l.id] = fromMinor(priceForMargin(toMinor(l.unitCost), margin));
+  return next;
+}
 
 /**
- * The editor for a draft revision: terms, lines and live totals worked out
- * with the API's own maths (@kebo/money). People who may see costs also get
- * each line's cost and margin, a "price from margin" helper, and the internal
- * costing box.
+ * The editor for a draft revision: terms, then the options (A, B…) the
+ * customer chooses from. Each option is one factory's offer — its lines exactly
+ * as the factory gave them, locked — and we set our prices, the discount, the
+ * lead time and charges such as freight. Totals use the API's own maths
+ * (@kebo/money); people who may see costs get costs and margins per line and
+ * per option.
  */
 export function RevisionEditor({
   action,
   number,
   initial,
+  offers: initialOffers,
+  loadOffers,
   showCosts,
-  defaultMargin,
   submitLabel,
   onDone,
   requireChanges,
@@ -128,8 +136,10 @@ export function RevisionEditor({
   action: Action;
   number: number;
   initial: RevisionDraft;
+  offers: QuoteOffers;
+  /** The offers with costs in another currency (when the quotation currency changes). */
+  loadOffers?: (currency: string) => Promise<QuoteOffers | null>;
   showCosts: boolean;
-  defaultMargin: number;
   submitLabel: string;
   onDone?: () => void;
   /** Saving needs a change (editing an existing draft). */
@@ -140,42 +150,64 @@ export function RevisionEditor({
 }) {
   const [s, setS] = useState<EditorState>(() => fromDraft(initial));
   const [saved, setSaved] = useState(() => JSON.stringify(fromDraft(initial)));
-  const [margin, setMargin] = useState(String(defaultMargin));
+  const [offers, setOffers] = useState(initialOffers);
+  const [active, setActive] = useState(0);
+  const [adding, setAdding] = useState(false);
+  const [margin, setMargin] = useState(String(initialOffers.defaultMargin));
   const dirty = JSON.stringify(s) !== saved;
-  const update = (fn: (st: EditorState) => EditorState) => setS(fn);
-  const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => update((st) => ({ ...st, [k]: v }));
-  const setLine = (i: number, patch: Partial<LineState>) =>
-    update((st) => ({ ...st, lines: st.lines.map((l, n) => (n === i ? { ...l, ...patch } : l)) }));
+  const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
+  const setOption = (i: number, patch: Partial<OptionState> | ((o: OptionState) => Partial<OptionState>)) =>
+    setS((st) => ({ ...st, options: st.options.map((o, n) => (n === i ? { ...o, ...(typeof patch === "function" ? patch(o) : patch) } : o)) }));
 
   const currency = /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—";
-  const totals = documentTotals(
-    s.lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPrice: numberText(l.unitPrice) || 0 })),
-    numberText(s.discount) || 0,
-  );
-  const costing = showCosts
-    ? costSummary(
-        s.lines.map((l) => ({
-          quantity: numberText(l.quantity) || 0,
-          unitPriceMinor: toMinor(numberText(l.unitPrice)),
-          unitCostMinor: valid(l.unitCost) ? toMinor(numberText(l.unitCost)) : null,
-        })),
-        totals.discount,
-      )
-    : null;
   const fmt = (minor: number) => formatMinor(minor, currency);
-  const costed = s.lines.filter((l) => valid(l.unitCost)).length;
   const marginNumber = Number(numberText(margin));
   const marginOk = margin.trim() !== "" && Number.isFinite(marginNumber) && marginNumber >= 0 && marginNumber < 100;
+  const opt = s.options[Math.min(active, s.options.length - 1)]!;
+  const at = s.options.indexOf(opt);
 
-  const applyMargin = () => {
-    if (!marginOk) return;
-    update((st) => ({
-      ...st,
-      lines: st.lines.map((l) =>
-        valid(l.unitCost) ? { ...l, unitPrice: fromMinor(priceForMargin(toMinor(numberText(l.unitCost)), marginNumber)) } : l,
-      ),
-    }));
+  const totalsOf = (o: OptionState) => {
+    const lines = linesOf(o, offers) ?? [];
+    const rows = [
+      ...lines.map((l) => ({ quantity: numberText(l.quantity) || 0, unitPrice: numberText(o.prices[l.id] ?? "") || 0, cost: l.unitCost })),
+      ...o.charges.map((c) => ({ quantity: numberText(c.quantity) || 0, unitPrice: numberText(c.unitPrice) || 0, cost: valid(c.unitCost) ? numberText(c.unitCost) : null })),
+    ];
+    const totals = documentTotals(rows, numberText(o.discount) || 0);
+    const costing = costSummary(
+      rows.map((r) => ({ quantity: r.quantity, unitPriceMinor: toMinor(r.unitPrice), unitCostMinor: r.cost === null || r.cost === undefined ? null : toMinor(r.cost) })),
+      totals.discount,
+    );
+    return { lines, totals, costing };
   };
+
+  // What can still be added: offers not used yet, and the customer's items when no option uses them.
+  const used = new Set(s.options.map((o) => o.factoryQuoteId ?? "items"));
+  const addable = [
+    ...offers.offers.filter((o) => !used.has(o.factoryQuoteId)),
+    ...(!used.has("items") ? [null] : []),
+  ];
+  const addOption = (factoryQuoteId: string | null) => {
+    const offer = offers.offers.find((o) => o.factoryQuoteId === factoryQuoteId);
+    const lines = offer?.lines ?? offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
+    setS((st) => ({
+      ...st,
+      options: [...st.options, { key: rowKey(), factoryQuoteId, leadTime: offer?.leadTime ?? "", discount: "", prices: priced(lines, {}, marginOk ? marginNumber : offers.defaultMargin), charges: [] }],
+    }));
+    setActive(s.options.length);
+    setAdding(false);
+  };
+
+  const refreshCosts = async (code: string) => {
+    if (!loadOffers || !/^[A-Z]{3}$/.test(code) || code === offers.currency) return;
+    const next = await loadOffers(code);
+    if (next) setOffers(next);
+  };
+
+  const { lines, totals, costing } = totalsOf(opt);
+  const offer = opt.factoryQuoteId ? offers.offers.find((o) => o.factoryQuoteId === opt.factoryQuoteId) : null;
+  const coverage = opt.factoryQuoteId ? offer?.coverage : { covered: offers.items.filter((i) => !i.parentId).map((i) => i.no), missing: [] };
+  const costed = lines.filter((l) => l.unitCost !== null).length;
+  const itemName = (no: string) => offers.items.find((i) => i.no === no)?.description.split("\n")[0] ?? "";
 
   return (
     <>
@@ -189,16 +221,17 @@ export function RevisionEditor({
       >
         {(st) => (
           <>
-            <input type="hidden" name="payload" value={JSON.stringify(payload(s, showCosts))} />
+            <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
 
             <section aria-label="Terms" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Currency" htmlFor={`cur-${number}`} error={st.errors?.currency}>
+              <Field label="Currency" htmlFor={`cur-${number}`} error={st.errors?.currency} hint={showCosts && offers.currency !== currency && currency !== "—" ? "Costs update when you leave this box" : undefined}>
                 <Input
                   id={`cur-${number}`}
                   value={s.currency}
                   maxLength={3}
                   className="uppercase"
                   onChange={(e) => set("currency", e.target.value.toUpperCase())}
+                  onBlur={(e) => void refreshCosts(e.target.value.trim().toUpperCase())}
                 />
               </Field>
               <Field label="Incoterm" htmlFor={`inco-${number}`} error={st.errors?.incoterm}>
@@ -210,32 +243,14 @@ export function RevisionEditor({
                   ))}
                 </Select>
               </Field>
-              <Field
-                label="Place"
-                htmlFor={`place-${number}`}
-                optional
-                error={st.errors?.incotermPlace}
-                hint="Port or place for the Incoterm"
-              >
-                <Input
-                  id={`place-${number}`}
-                  value={s.incotermPlace}
-                  maxLength={80}
-                  placeholder="e.g. Qingdao"
-                  onChange={(e) => set("incotermPlace", e.target.value)}
-                />
+              <Field label="Place" htmlFor={`place-${number}`} optional error={st.errors?.incotermPlace} hint="Port or place for the Incoterm">
+                <Input id={`place-${number}`} value={s.incotermPlace} maxLength={80} placeholder="e.g. Qingdao" onChange={(e) => set("incotermPlace", e.target.value)} />
               </Field>
               <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil}>
                 <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
               </Field>
               <Field label="Deposit %" htmlFor={`dep-${number}`} error={st.errors?.depositPercent}>
-                <Input
-                  id={`dep-${number}`}
-                  inputMode="decimal"
-                  className="tabular"
-                  value={s.depositPercent}
-                  onChange={(e) => set("depositPercent", e.target.value)}
-                />
+                <Input id={`dep-${number}`} inputMode="decimal" className="tabular" value={s.depositPercent} onChange={(e) => set("depositPercent", e.target.value)} />
               </Field>
               <Field label="Balance" htmlFor={`bal-${number}`} error={st.errors?.balanceTerms}>
                 <Select id={`bal-${number}`} value={s.balanceTerms} onChange={(e) => set("balanceTerms", e.target.value as BalanceTerms)}>
@@ -246,280 +261,271 @@ export function RevisionEditor({
                   ))}
                 </Select>
               </Field>
-              <Field label="Lead time" htmlFor={`lead-${number}`} optional error={st.errors?.leadTime} className="sm:col-span-2">
-                <Input
-                  id={`lead-${number}`}
-                  value={s.leadTime}
-                  maxLength={120}
-                  placeholder="e.g. 30 days after deposit"
-                  onChange={(e) => set("leadTime", e.target.value)}
-                />
-              </Field>
             </section>
 
-            <section aria-label="Lines">
-              <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-                <h3 className="text-sm font-semibold">Lines</h3>
+            <section aria-label="Options" className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Options for the customer</h3>
+                  <p className="text-xs text-muted">Each option is one factory&apos;s offer, lines as the factory gave them. The customer accepts one.</p>
+                </div>
                 {showCosts && (
-                  <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-line px-3 py-2">
+                  <div className="flex items-end gap-2">
                     <div>
                       <label htmlFor={`margin-${number}`} className="mb-1 block text-xs text-muted">
-                        Set prices from a margin of
+                        Margin
                       </label>
                       <div className="flex items-center gap-1.5">
-                        <Input
-                          id={`margin-${number}`}
-                          inputMode="decimal"
-                          className="h-8 w-20 tabular"
-                          value={margin}
-                          onChange={(e) => setMargin(e.target.value)}
-                        />
+                        <Input id={`margin-${number}`} inputMode="decimal" className="h-8 w-20 tabular" value={margin} onChange={(e) => setMargin(e.target.value)} />
                         <span className="text-sm text-muted">%</span>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={applyMargin}
-                      disabled={!marginOk || costed === 0}
-                      title={costed === 0 ? "No line has a cost yet" : undefined}
-                    >
-                      Apply to {costed} line{costed === 1 ? "" : "s"} with a cost
+                    <Button size="sm" onClick={() => marginOk && setOption(at, (o) => ({ prices: priced(lines, o.prices, marginNumber) }))} disabled={!marginOk || costed === 0}>
+                      Price Option {optionLetter(at)} at {marginOk ? marginNumber : "…"}%
                     </Button>
                   </div>
                 )}
               </div>
-              <ol className="flex flex-col gap-3">
-                {s.lines.map((l, i) => {
-                  const price = toMinor(numberText(l.unitPrice));
-                  const lineMargin =
-                    showCosts && valid(l.unitCost) && price > 0 ? marginPercent(price, toMinor(numberText(l.unitCost))) : null;
+
+              <div role="tablist" aria-label="Options" className="flex flex-wrap items-center gap-1.5">
+                {s.options.map((o, i) => {
+                  const t = totalsOf(o);
                   return (
-                    <li key={l.key} className="rounded-lg border border-line p-3">
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-muted">
-                            {l.requestedItemId && initial.itemNumbers?.[l.requestedItemId]
-                              ? `${initial.itemNumbers[l.requestedItemId]!.includes(".") ? "Part" : "Item"} ${initial.itemNumbers[l.requestedItemId]}`
-                              : `Line ${i + 1}`}
-                          </span>
-                          <label htmlFor={`type-${l.key}`} className="sr-only">
-                            Line type
-                          </label>
-                          <Select
-                            id={`type-${l.key}`}
-                            compact
-                            className="w-48"
-                            value={l.type}
-                            onChange={(e) => setLine(i, { type: e.target.value as LineType })}
-                          >
-                            {LINE_TYPES.map((t) => (
-                              <option key={t} value={t}>
-                                {LINE_TYPE_LABEL[t]}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-                        <RowButtons
-                          index={i}
-                          count={s.lines.length}
-                          label={`line ${i + 1}`}
-                          onMove={(to) => update((x) => ({ ...x, lines: move(x.lines, i, to) }))}
-                          onRemove={() => update((x) => ({ ...x, lines: x.lines.filter((_, n) => n !== i) }))}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
-                        <div className="col-span-2 sm:col-span-12">
-                          <MiniLabel htmlFor={`desc-${l.key}`}>Description (printed)</MiniLabel>
-                          <Textarea
-                            id={`desc-${l.key}`}
-                            rows={2}
-                            className="min-h-0"
-                            value={l.description}
-                            onChange={(e) => setLine(i, { description: e.target.value })}
-                          />
-                        </div>
-                        <div className="col-span-2 sm:col-span-5">
-                          <MiniLabel htmlFor={`model-${l.key}`}>Model</MiniLabel>
-                          <Input
-                            id={`model-${l.key}`}
-                            value={l.model}
-                            maxLength={120}
-                            onChange={(e) => setLine(i, { model: e.target.value })}
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <MiniLabel htmlFor={`qty-${l.key}`}>Quantity</MiniLabel>
-                          <Input
-                            id={`qty-${l.key}`}
-                            inputMode="decimal"
-                            className="tabular"
-                            value={l.quantity}
-                            onChange={(e) => setLine(i, { quantity: e.target.value })}
-                          />
-                        </div>
-                        <div className="sm:col-span-1">
-                          <MiniLabel htmlFor={`unit-${l.key}`}>Unit</MiniLabel>
-                          <Input
-                            id={`unit-${l.key}`}
-                            value={l.unit}
-                            maxLength={20}
-                            onChange={(e) => setLine(i, { unit: e.target.value })}
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <MiniLabel htmlFor={`price-${l.key}`}>Unit price</MiniLabel>
-                          <Input
-                            id={`price-${l.key}`}
-                            inputMode="decimal"
-                            className="tabular"
-                            value={l.unitPrice}
-                            onChange={(e) => setLine(i, { unitPrice: e.target.value })}
-                          />
-                        </div>
-                        <div className="flex flex-col justify-end text-right sm:col-span-2">
-                          <span className="mb-1 block text-xs text-muted">Line total</span>
-                          <span className="flex h-9 items-center justify-end text-sm font-semibold tabular">
-                            {fmt(totals.lines[i]?.lineTotal ?? 0)}
-                          </span>
-                        </div>
-                        {showCosts && (
-                          <div className="col-span-2 flex flex-wrap items-end gap-3 rounded-md bg-surface-2/70 px-2.5 py-2 sm:col-span-12">
-                            <div className="w-36">
-                              <MiniLabel htmlFor={`cost-${l.key}`}>Our unit cost</MiniLabel>
-                              <Input
-                                id={`cost-${l.key}`}
-                                inputMode="decimal"
-                                className="h-8 tabular"
-                                value={l.unitCost}
-                                placeholder="No cost"
-                                onChange={(e) => setLine(i, { unitCost: e.target.value })}
-                              />
-                            </div>
-                            <p className="flex h-8 items-center gap-1.5 text-sm">
-                              <span className="text-muted">Margin</span>
-                              <span
-                                className={cn(
-                                  "font-semibold tabular",
-                                  lineMargin === null
-                                    ? "text-muted"
-                                    : lineMargin < 0
-                                      ? "text-bad"
-                                      : lineMargin < 5
-                                        ? "text-warn"
-                                        : "text-ok",
-                                )}
-                              >
-                                {lineMargin === null ? "—" : `${lineMargin.toFixed(1)}%`}
-                              </span>
-                            </p>
-                            {valid(l.unitCost) && marginOk && (
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                className="mb-0.5"
-                                onClick={() =>
-                                  setLine(i, { unitPrice: fromMinor(priceForMargin(toMinor(numberText(l.unitCost)), marginNumber)) })
-                                }
-                              >
-                                Price at {marginNumber}% margin
-                              </Button>
-                            )}
-                            {l.factoryQuoteLineId && <span className="mb-1.5 ml-auto text-xs text-muted">from a factory price</span>}
-                          </div>
-                        )}
-                      </div>
-                    </li>
+                    <button
+                      key={o.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={i === at}
+                      onClick={() => setActive(i)}
+                      className={cn(
+                        "flex flex-col items-start rounded-lg border px-3 py-1.5 text-left text-sm",
+                        i === at ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface hover:border-line-strong",
+                      )}
+                    >
+                      <span className="font-semibold">Option {optionLetter(i)}</span>
+                      <span className="text-xs tabular">{fmt(t.totals.total)}</span>
+                    </button>
                   );
                 })}
-              </ol>
-              <ErrorText error={st.errors?.lines} />
-              <div className="mt-3">
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    update((x) => ({
-                      ...x,
-                      lines: [
-                        ...x.lines,
-                        {
-                          key: rowKey(),
-                          requestedItemId: null,
-                          factoryQuoteLineId: null,
-                          fxRate: null,
-                          type: "charge",
-                          description: "",
-                          model: "",
-                          quantity: "1",
-                          unit: "lot",
-                          unitPrice: "",
-                          unitCost: "",
-                        },
-                      ],
-                    }))
-                  }
-                >
-                  <Plus aria-hidden /> Add a line
-                </Button>
-                <span className="ml-2 text-xs text-muted">e.g. freight, inspection, samples</span>
+                {addable.length > 0 && (
+                  <Button size="sm" variant="ghost" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
+                    <Plus aria-hidden /> Add an option
+                  </Button>
+                )}
+              </div>
+
+              {adding && (
+                <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Offers to add">
+                  {addable.map((o) => (
+                    <li key={o?.factoryQuoteId ?? "items"} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                      <span className="min-w-0">
+                        <span className="font-medium">{o ? o.factory.name : "The customer's items, priced by hand"}</span>
+                        <span className="block text-xs text-muted">
+                          {o
+                            ? `${o.lines.length} line${o.lines.length === 1 ? "" : "s"}${o.leadTime ? ` · ${o.leadTime}` : ""}${o.totalCost ? ` · cost ${formatMinor(toMinor(o.totalCost), currency)}` : ""}`
+                            : "No factory prices: the items as the customer asked for them"}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        {o && <CoverageBadge missing={o.coverage.missing} />}
+                        <Button size="xs" variant="secondary" onClick={() => addOption(o?.factoryQuoteId ?? null)}>
+                          Add as Option {optionLetter(s.options.length)}
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div role="tabpanel" aria-label={`Option ${optionLetter(at)}`} className="flex flex-col gap-4 rounded-xl border border-line p-3 sm:p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      Option {optionLetter(at)} — {opt.factoryQuoteId ? (offer?.factory.name ?? "an offer that was removed") : "the customer's items"}
+                    </p>
+                    {coverage && (
+                      <p className="mt-0.5 text-xs">
+                        {coverage.missing.length ? (
+                          <span className="flex items-start gap-1 text-warn">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                            Does not cover {coverage.missing.map((n) => `${n} (${itemName(n)})`).join(", ")}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-ok">
+                            <CheckCircle2 className="size-3.5" aria-hidden /> Covers everything the customer asked for
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon-xs" variant="ghost" disabled={at === 0} aria-label="Move this option left" onClick={() => {
+                        setS((x) => ({ ...x, options: swap(x.options, at, at - 1) }));
+                        setActive(at - 1);
+                      }}>
+                      <ArrowLeft aria-hidden />
+                    </Button>
+                    <Button size="icon-xs" variant="ghost" disabled={at === s.options.length - 1} aria-label="Move this option right" onClick={() => {
+                        setS((x) => ({ ...x, options: swap(x.options, at, at + 1) }));
+                        setActive(at + 1);
+                      }}>
+                      <ArrowRight aria-hidden />
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="danger-ghost"
+                      disabled={s.options.length === 1}
+                      onClick={() => {
+                        setS((x) => ({ ...x, options: x.options.filter((_, n) => n !== at) }));
+                        setActive(Math.max(0, at - 1));
+                      }}
+                    >
+                      <Trash2 aria-hidden /> Remove option
+                    </Button>
+                  </div>
+                </div>
+
+                {lines.length === 0 && opt.factoryQuoteId && !offer && (
+                  <p className="rounded-md bg-warn-soft px-3 py-2 text-sm">This factory offer was removed from the deal. Remove this option or choose another offer.</p>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead>
+                      <tr className="border-b border-line text-left text-xs text-muted">
+                        <th className="w-10 py-2 font-medium">No.</th>
+                        <th className="py-2 font-medium">Description</th>
+                        <th className="py-2 text-right font-medium">Qty</th>
+                        {showCosts && <th className="py-2 text-right font-medium">Cost</th>}
+                        <th className="w-32 py-2 text-right font-medium">Unit price</th>
+                        {showCosts && <th className="py-2 text-right font-medium">Margin</th>}
+                        <th className="py-2 text-right font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lines.map((l, i) => {
+                        const price = opt.prices[l.id] ?? "";
+                        const m = showCosts && l.unitCost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), toMinor(l.unitCost)) : null;
+                        return (
+                          <tr key={l.id} className="border-b border-line/70 align-top">
+                            <td className="py-2 text-muted tabular">{l.no}</td>
+                            <td className={cn("py-2 pr-3", l.parentId && "pl-4")}>
+                              <span className="flex items-start gap-1">
+                                {l.parentId && <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />}
+                                <span className="whitespace-pre-line">{l.description}</span>
+                              </span>
+                              <span className="block text-xs text-muted">
+                                {[l.model, opt.factoryQuoteId && l.answersNo ? `for item ${l.answersNo}` : null].filter(Boolean).join(" · ")}
+                              </span>
+                            </td>
+                            <td className="py-2 text-right whitespace-nowrap tabular">
+                              {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
+                            </td>
+                            {showCosts && <td className="py-2 text-right whitespace-nowrap text-text-2 tabular">{l.unitCost === null ? "—" : fmt(toMinor(l.unitCost))}</td>}
+                            <td className="py-1.5 pl-2">
+                              <Input
+                                aria-label={`Unit price for ${l.no}`}
+                                inputMode="decimal"
+                                className="h-8 text-right tabular"
+                                value={price}
+                                placeholder="0.00"
+                                onChange={(e) => setOption(at, (o) => ({ prices: { ...o.prices, [l.id]: e.target.value } }))}
+                              />
+                            </td>
+                            {showCosts && (
+                              <td className={cn("py-2 text-right font-medium tabular", m === null ? "text-muted" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : "text-ok")}>
+                                {m === null ? "—" : `${m.toFixed(1)}%`}
+                              </td>
+                            )}
+                            <td className="py-2 text-right font-semibold whitespace-nowrap tabular">{fmt(totals.lines[i]?.lineTotal ?? 0)}</td>
+                          </tr>
+                        );
+                      })}
+                      {opt.charges.map((c, k) => {
+                        const i = lines.length + k;
+                        const setCharge = (patch: Partial<ChargeState>) => setOption(at, (o) => ({ charges: o.charges.map((x) => (x.key === c.key ? { ...x, ...patch } : x)) }));
+                        return (
+                          <tr key={c.key} className="border-b border-line/70 align-top">
+                            <td className="py-2 text-muted tabular">{lines.length + k + 1}</td>
+                            <td className="py-1.5 pr-3">
+                              <Input aria-label={`Charge ${k + 1}`} className="h-8" value={c.description} placeholder="e.g. Sea freight to Mombasa" onChange={(e) => setCharge({ description: e.target.value })} />
+                            </td>
+                            <td className="py-1.5">
+                              <div className="flex justify-end gap-1">
+                                <Input aria-label={`Charge ${k + 1} quantity`} inputMode="decimal" className="h-8 w-14 text-right tabular" value={c.quantity} onChange={(e) => setCharge({ quantity: e.target.value })} />
+                                <Input aria-label={`Charge ${k + 1} unit`} className="h-8 w-14" value={c.unit} maxLength={20} onChange={(e) => setCharge({ unit: e.target.value })} />
+                              </div>
+                            </td>
+                            {showCosts && (
+                              <td className="py-1.5 pl-2">
+                                <Input aria-label={`Charge ${k + 1} cost`} inputMode="decimal" className="h-8 w-24 text-right tabular" value={c.unitCost} placeholder="Cost" onChange={(e) => setCharge({ unitCost: e.target.value })} />
+                              </td>
+                            )}
+                            <td className="py-1.5 pl-2">
+                              <Input aria-label={`Charge ${k + 1} price`} inputMode="decimal" className="h-8 text-right tabular" value={c.unitPrice} placeholder="0.00" onChange={(e) => setCharge({ unitPrice: e.target.value })} />
+                            </td>
+                            {showCosts && <td />}
+                            <td className="py-2 text-right whitespace-nowrap">
+                              <span className="font-semibold tabular">{fmt(totals.lines[i]?.lineTotal ?? 0)}</span>
+                              <Button size="icon-xs" variant="ghost" className="ml-1" aria-label={`Remove charge ${k + 1}`} onClick={() => setOption(at, (o) => ({ charges: o.charges.filter((x) => x.key !== c.key) }))}>
+                                <X aria-hidden />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => setOption(at, (o) => ({ charges: [...o.charges, { key: rowKey(), type: "charge", description: "", quantity: "1", unit: "lot", unitPrice: "", unitCost: "" }] }))}
+                  >
+                    <Plus aria-hidden /> Add a charge
+                  </Button>
+                  <span className="text-xs text-muted">Freight, inspection, insurance… The factory&apos;s lines cannot change here: edit the offer on Factory prices.</span>
+                </div>
+                <ErrorText error={st.errors?.options} />
+
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+                  <Field label="Lead time" htmlFor={`lead-${opt.key}`} optional hint="For this option, e.g. 45 days after deposit">
+                    <Input id={`lead-${opt.key}`} value={opt.leadTime} maxLength={120} onChange={(e) => setOption(at, { leadTime: e.target.value })} />
+                  </Field>
+                  <div className="flex flex-col gap-3">
+                    <dl className="rounded-lg border border-line p-3 text-sm">
+                      <div className="flex justify-between py-1">
+                        <dt className="text-muted">Subtotal</dt>
+                        <dd className="tabular">{fmt(totals.subtotal)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 py-1">
+                        <dt>
+                          <label htmlFor={`disc-${opt.key}`} className="text-muted">
+                            Discount
+                          </label>
+                        </dt>
+                        <dd>
+                          <Input id={`disc-${opt.key}`} inputMode="decimal" className="h-8 w-32 text-right tabular" value={opt.discount} placeholder="0.00" onChange={(e) => setOption(at, { discount: e.target.value })} />
+                        </dd>
+                      </div>
+                      <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">
+                        <dt>Option {optionLetter(at)} total</dt>
+                        <dd className="tabular">{fmt(totals.total)}</dd>
+                      </div>
+                    </dl>
+                    {showCosts && <CostingBox currency={currency} cost={costing.costMinor} sales={costing.salesMinor} profit={costing.profitMinor} margin={costing.marginPercent} uncosted={costing.uncostedLines} />}
+                  </div>
+                </div>
               </div>
             </section>
 
-            <section aria-label="Totals" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-              <div className="grid content-start gap-4">
-                <Field label="Terms" htmlFor={`terms-${number}`} optional error={st.errors?.terms} hint="Printed on the quotation">
-                  <Textarea id={`terms-${number}`} rows={3} value={s.terms} onChange={(e) => set("terms", e.target.value)} />
-                </Field>
-                <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes}>
-                  <Textarea
-                    id={`notes-${number}`}
-                    rows={2}
-                    className="min-h-0"
-                    value={s.notes}
-                    onChange={(e) => set("notes", e.target.value)}
-                  />
-                </Field>
-              </div>
-              <div className="flex flex-col gap-3">
-                <dl className="rounded-lg border border-line p-3 text-sm">
-                  <div className="flex justify-between py-1">
-                    <dt className="text-muted">Subtotal</dt>
-                    <dd className="tabular">{fmt(totals.subtotal)}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 py-1">
-                    <dt>
-                      <label htmlFor={`disc-${number}`} className="text-muted">
-                        Discount
-                      </label>
-                    </dt>
-                    <dd>
-                      <Input
-                        id={`disc-${number}`}
-                        inputMode="decimal"
-                        className="h-8 w-32 text-right tabular"
-                        value={s.discount}
-                        placeholder="0.00"
-                        onChange={(e) => set("discount", e.target.value)}
-                        aria-invalid={!!st.errors?.discount || undefined}
-                      />
-                    </dd>
-                  </div>
-                  <ErrorText error={st.errors?.discount} />
-                  <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">
-                    <dt>Total</dt>
-                    <dd className="tabular">{fmt(totals.total)}</dd>
-                  </div>
-                </dl>
-                {costing && (
-                  <CostingBox
-                    currency={currency}
-                    cost={costing.costMinor}
-                    sales={costing.salesMinor}
-                    profit={costing.profitMinor}
-                    margin={costing.marginPercent}
-                    uncosted={costing.uncostedLines}
-                  />
-                )}
-              </div>
+            <section aria-label="Terms and notes" className="grid gap-4 lg:grid-cols-2">
+              <Field label="Terms" htmlFor={`terms-${number}`} optional error={st.errors?.terms} hint="Printed on the quotation">
+                <Textarea id={`terms-${number}`} rows={3} value={s.terms} onChange={(e) => set("terms", e.target.value)} />
+              </Field>
+              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes}>
+                <Textarea id={`notes-${number}`} rows={3} value={s.notes} onChange={(e) => set("notes", e.target.value)} />
+              </Field>
             </section>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -541,22 +547,28 @@ export function RevisionEditor({
   );
 }
 
-/** Cost, sales, profit and margin of a revision. Internal: never printed. */
-export function CostingBox({
-  currency,
-  cost,
-  sales,
-  profit,
-  margin,
-  uncosted,
-}: {
-  currency: string;
-  cost: number;
-  sales: number;
-  profit: number;
-  margin: number | null;
-  uncosted: number;
-}) {
+function swap<T>(list: T[], a: number, b: number): T[] {
+  if (b < 0 || b >= list.length) return list;
+  const next = [...list];
+  [next[a], next[b]] = [next[b]!, next[a]!];
+  return next;
+}
+
+/** "Covers everything" or what it misses, by item number. */
+export function CoverageBadge({ missing }: { missing: string[] }) {
+  return missing.length ? (
+    <Badge tone="warn">
+      <AlertTriangle aria-hidden /> Misses {missing.join(", ")}
+    </Badge>
+  ) : (
+    <Badge tone="ok">
+      <CheckCircle2 aria-hidden /> Covers all
+    </Badge>
+  );
+}
+
+/** Cost, sales, profit and margin of an option. Internal: never printed. */
+export function CostingBox({ currency, cost, sales, profit, margin, uncosted }: { currency: string; cost: number; sales: number; profit: number; margin: number | null; uncosted: number }) {
   const fmt = (minor: number) => formatMinor(minor, currency);
   return (
     <div className="rounded-lg border border-dashed border-money/40 bg-money-soft/50 p-3 text-sm">
@@ -580,9 +592,7 @@ export function CostingBox({
         </div>
         <div className="flex justify-between py-0.5">
           <dt className="text-text-2">Margin</dt>
-          <dd className={cn("font-semibold tabular", margin !== null && margin < 0 && "text-bad")}>
-            {margin === null ? "—" : `${margin.toFixed(1)}%`}
-          </dd>
+          <dd className={cn("font-semibold tabular", margin !== null && margin < 0 && "text-bad")}>{margin === null ? "—" : `${margin.toFixed(1)}%`}</dd>
         </div>
       </dl>
       {uncosted > 0 && (

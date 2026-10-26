@@ -85,11 +85,24 @@ export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceT
  * whose item is not on the document (or comes later) is numbered on its own.
  */
 /**
- * Numbers for document lines that follow the deal's items: a line for a part
- * of an item is numbered under the line for that item ("2.1").
+ * Numbers for quotation and order lines: "1", "2", "2.1". A line from a factory
+ * part is numbered under the line of its factory line; a line for one of the
+ * customer's item parts (options without factory prices) under that item's line.
+ * Charges (freight…) are numbered after the goods.
  */
-export function numberLines(lines: { id: string; requestedItemId: string | null; parentItemId: string | null }[]): string[] {
-  return lineNumbers(lines.map((l) => ({ key: l.id, parentKey: l.parentItemId ? (lines.find((x) => x.requestedItemId === l.parentItemId)?.id ?? null) : null })));
+export function numberQuoteLines(
+  lines: { id: string; factoryQuoteLineId: string | null; factoryParentId: string | null; requestedItemId: string | null; itemParentId: string | null }[],
+): string[] {
+  return lineNumbers(
+    lines.map((l) => ({
+      key: l.id,
+      parentKey: l.factoryParentId
+        ? (lines.find((x) => x.factoryQuoteLineId === l.factoryParentId)?.id ?? null)
+        : !l.factoryQuoteLineId && l.itemParentId
+          ? (lines.find((x) => !x.factoryQuoteLineId && x.requestedItemId === l.itemParentId)?.id ?? null)
+          : null,
+    })),
+  );
 }
 
 export function lineNumbers(lines: { key: string; parentKey?: string | null }[]): string[] {
@@ -110,4 +123,19 @@ export function lineNumbers(lines: { key: string; parentKey?: string | null }[])
     numberOf.set(l.key, no);
     return no;
   });
+}
+
+/** Options are lettered A, B, C… in the order they are offered. */
+export const optionLetter = (index: number) => String.fromCharCode(65 + index);
+
+/**
+ * Which of the customer's items (top level) an offer answers. An item counts as
+ * covered when the offer answers it or any of its parts; extras the factory
+ * added (no item) do not count.
+ */
+export function coverage(items: { id: string; parentId: string | null; no: string }[], answered: Iterable<string | null | undefined>) {
+  const set = new Set([...answered].filter((v): v is string => !!v));
+  const top = items.filter((i) => !i.parentId);
+  const isCovered = (t: { id: string }) => set.has(t.id) || items.some((p) => p.parentId === t.id && set.has(p.id));
+  return { covered: top.filter(isCovered).map((t) => t.no), missing: top.filter((t) => !isCovered(t)).map((t) => t.no) };
 }

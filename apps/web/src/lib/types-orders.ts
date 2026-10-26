@@ -286,9 +286,20 @@ export interface RevisionDoc {
   customerSnapshot: CustomerSnapshot | null;
   companySnapshot: CompanySnapshot | null;
   createdAt: string;
-  lines: DocLine[];
-  /** For people who may see factory costs. */
-  costing?: { cost: string; sales: string; profit: string; marginPercent: number | null; uncostedLines: number } | null;
+  /** The options A, B… (one when there is no choice); once accepted, one is "accepted" and the others "not_chosen". */
+  options: {
+    id: string;
+    letter: string;
+    status: "open" | "accepted" | "not_chosen";
+    factory: { id: string; name: string } | null;
+    leadTime: string | null;
+    subtotal: string;
+    discount: string;
+    total: string;
+    lines: DocLine[];
+    /** For people who may see factory costs. */
+    costing?: { cost: string; sales: string; profit: string; marginPercent: number | null; uncostedLines: number } | null;
+  }[];
 }
 
 /** For documents not yet sent (no snapshot yet): the customer as it is now. */
