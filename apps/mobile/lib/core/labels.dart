@@ -96,42 +96,21 @@ const balanceTermsLabel = {
 
 /* ---------------------------------------------------------------- orders */
 
-const orderStageLabel = {
-  'awaiting_deposit': 'Awaiting deposit',
-  'in_production': 'In production',
-  'ready_to_ship': 'Ready to ship',
-  'shipped': 'Shipped',
-  'closed': 'Closed',
-  'cancelled': 'Cancelled',
+/// An order moves Confirmed → In production → Shipped → Done, one button at a time
+/// (packages/shared/src/workflows/order.ts).
+const orderStages = ['confirmed', 'in_production', 'shipped', 'done'];
+
+const orderStageLabel = {'confirmed': 'Confirmed', 'in_production': 'In production', 'shipped': 'Shipped', 'done': 'Done'};
+
+/// One line under each stage: what the order is waiting for.
+const orderStageHint = {
+  'confirmed': 'The customer accepted. Waiting for the deposit.',
+  'in_production': 'The deposit came in and the factory is making the goods.',
+  'shipped': 'The goods are on their way. Waiting for the balance.',
+  'done': 'Fully paid and delivered.',
 };
 
-const orderStageTone = {
-  'awaiting_deposit': Tone.warn,
-  'in_production': Tone.info,
-  'ready_to_ship': Tone.info,
-  'shipped': Tone.info,
-  'closed': Tone.ok,
-  'cancelled': Tone.neutral,
-};
-
-const teamLabel = {'sales': 'Sales', 'sourcing': 'Sourcing', 'accounts': 'Accounts', 'logistics': 'Logistics'};
-
-/// Headlines for a step the server refused (the server's own message is shown under it).
-const gateTitle = {
-  'deposit_first': "The customer's deposit comes first",
-  'inspect_first': 'Inspection comes first',
-  'balance_first': 'The balance comes first',
-  'note_required': 'Say why',
-  'required_step': "This step can't be skipped",
-  'dependents_done': 'A later step depends on this one',
-  'future_date': 'Not a future date',
-  'order_not_open': 'This order is closed',
-  'already_done': 'Already done',
-  'not_done': 'Still to do',
-};
-
-const factoryOrderStatusLabel = {'draft': 'Draft', 'sent': 'Sent to factory', 'confirmed': 'Confirmed by factory', 'cancelled': 'Cancelled'};
-const factoryOrderStatusTone = {'draft': Tone.neutral, 'sent': Tone.info, 'confirmed': Tone.ok, 'cancelled': Tone.outline};
+const orderStageTone = {'confirmed': Tone.warn, 'in_production': Tone.info, 'shipped': Tone.info, 'done': Tone.ok};
 
 const paymentKindLabel = {'deposit': 'Deposit', 'balance': 'Balance', 'other': 'Other'};
 
@@ -146,13 +125,6 @@ const paymentMethodLabel = {
 
 /// The customer's payment position on an order.
 const customerPaymentLabel = {'unpaid': 'Nothing received', 'deposit_paid': 'Deposit received', 'partly_paid': 'Partly paid', 'paid': 'Paid in full', 'overpaid': 'Overpaid'};
-
-const invoiceTypeLabel = {'proforma': 'Proforma invoice', 'commercial': 'Commercial invoice'};
-const invoiceStatusLabel = {'draft': 'Draft', 'issued': 'Issued', 'void': 'Void'};
-const invoiceStatusTone = {'draft': Tone.neutral, 'issued': Tone.ok, 'void': Tone.outline};
-
-const shipmentStatusLabel = {'planned': 'Planned', 'booked': 'Booked', 'departed': 'Departed', 'arrived': 'Arrived'};
-const shipmentStatusTone = {'planned': Tone.neutral, 'booked': Tone.info, 'departed': Tone.info, 'arrived': Tone.ok};
 
 /// Common countries for the customer form (ISO codes); any other code can be typed.
 const countryNames = {

@@ -25,7 +25,7 @@ class MoreScreen extends ConsumerWidget {
         );
     final onWeb = [
       'Factory prices and quotation editing',
-      'Payments, factory orders, invoices and shipments',
+      'Recording payments and correcting order dates',
       if (s.can('reports.view')) 'Reports',
       if (s.can('users.manage') || s.can('settings.manage')) 'Users, settings and the audit log',
     ];
@@ -61,7 +61,7 @@ class MoreScreen extends ConsumerWidget {
           ]),
         ),
         const Overline('On the web'),
-        WebNote('Use the web app for: ${onWeb.join('; ')}. The phone follows the same deals and orders, and ticks order steps.'),
+        WebNote('Use the web app for: ${onWeb.join('; ')}. The phone follows the same deals and orders, moves orders through their stages and opens their PDFs.'),
         const Overline('App'),
         Card(
           child: Padding(

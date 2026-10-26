@@ -1,0 +1,115 @@
+{
+  "id": "c39321c7-64e5-4dbc-ac2c-99f63ee1fd96",
+  "refNo": "SO-2026-0004",
+  "status": "open",
+  "stage": "shipped",
+  "stageSince": "2026-10-10",
+  "inquiry": {
+    "id": "43ea814c-68aa-4651-b4e6-6c749cef37bb",
+    "refNo": "RFQ-2026-0010",
+    "title": "Ball valve DN50, stainless",
+    "assigneeId": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+    "assignee": {
+      "id": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+      "name": "Sana"
+    }
+  },
+  "customer": {
+    "id": "25c4d0ba-d5da-41bf-bc28-26485db5a559",
+    "name": "Gulf Foods Trading LLC",
+    "country": "AE"
+  },
+  "orderedOn": "2026-09-02",
+  "shipBy": null,
+  "readyOn": null,
+  "shippedOn": "2026-10-10",
+  "blNo": "QDLOS240119",
+  "currency": "USD",
+  "total": "8502.00",
+  "depositPercent": 30,
+  "balanceTerms": "against_bl_copy",
+  "incoterm": "FOB",
+  "incotermPlace": "Qingdao",
+  "money": {
+    "total": "8502.00",
+    "deposit": "2550.60",
+    "received": "2550.60",
+    "bankCharges": "25.00",
+    "due": "5951.40",
+    "depositDue": "0.00",
+    "status": "deposit_paid"
+  },
+  "next": {
+    "to": "done",
+    "label": "Close the order",
+    "stage": "Done",
+    "hint": "Fully paid and delivered."
+  },
+  "back": {
+    "to": "in_production",
+    "label": "Back to In production"
+  },
+  "needs": {
+    "title": "Get the balance (USD 5,951.40)",
+    "due": "2026-10-24",
+    "late": true
+  },
+  "history": [
+    {
+      "id": "a2fe3b2c-9620-4b00-9ee0-026f5ad210ac",
+      "from": null,
+      "to": "confirmed",
+      "note": null,
+      "confirmed": false,
+      "by": {
+        "id": "f51fcdcc-607b-4e16-9514-b894513934cb",
+        "name": "Manager"
+      },
+      "at": "2026-09-02T09:00:00.000Z"
+    },
+    {
+      "id": "3ae6f05d-3d85-46ed-bf7b-f75834d154db",
+      "from": "confirmed",
+      "to": "in_production",
+      "note": null,
+      "confirmed": false,
+      "by": {
+        "id": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+        "name": "Sana"
+      },
+      "at": "2026-09-07T09:00:00.000Z"
+    },
+    {
+      "id": "03564871-3ba1-472d-beb1-e4286e7c9a0c",
+      "from": "in_production",
+      "to": "shipped",
+      "note": null,
+      "confirmed": false,
+      "by": {
+        "id": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+        "name": "Sana"
+      },
+      "at": "2026-10-10T09:00:00.000Z"
+    }
+  ],
+  "cancelled": null,
+  "documents": [
+    {
+      "kind": "quotation",
+      "label": "Quotation (accepted)",
+      "revisionId": "3d3e6911-a9fa-49d8-a165-20b201928a4d"
+    },
+    {
+      "kind": "proforma",
+      "label": "Proforma invoice"
+    },
+    {
+      "kind": "invoice",
+      "label": "Commercial invoice"
+    },
+    {
+      "kind": "packing-list",
+      "label": "Packing list"
+    }
+  ]
+}

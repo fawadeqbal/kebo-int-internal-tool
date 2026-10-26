@@ -39,7 +39,7 @@ class Session {
   List<String> get permissions => user.ls('permissions');
   bool can(String permission) => permissions.contains(permission);
 
-  /// Managers (and admins) see every deal and can assign, reopen and override steps.
+  /// Managers (and admins) see every deal and can assign, reopen and cancel orders.
   bool get isManager => can('inquiries.viewAll');
 }
 

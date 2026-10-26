@@ -8,6 +8,7 @@ import '../../core/labels.dart';
 import '../../core/refresh.dart';
 import '../../core/session.dart';
 import '../../theme/colors.dart';
+import '../../ui/docs.dart';
 import '../../ui/kit.dart';
 
 /// GET /api/inquiries/:id/quotation.
@@ -39,7 +40,7 @@ class QuotationScreen extends ConsumerWidget {
               gap12,
               const WebNote('Prices, terms and new revisions are edited on the web. Here you can follow the quotation and record the customer\'s answer.'),
               if (revisions.isEmpty) const EmptyState(icon: Icons.request_quote_outlined, title: 'No revisions yet'),
-              for (var i = 0; i < revisions.length; i++) RevisionCard(dealId: dealId, r: revisions[i], expanded: i == 0),
+              for (var i = 0; i < revisions.length; i++) RevisionCard(dealId: dealId, r: revisions[i], expanded: i == 0, quoteRef: q.m('quotation').s('refNo', 'Quotation')),
             ]),
           );
         },
@@ -49,10 +50,13 @@ class QuotationScreen extends ConsumerWidget {
 }
 
 class RevisionCard extends ConsumerStatefulWidget {
-  const RevisionCard({super.key, required this.dealId, required this.r, this.expanded = false});
+  const RevisionCard({super.key, required this.dealId, required this.r, this.expanded = false, this.quoteRef = 'Quotation'});
   final String dealId;
   final Json r;
   final bool expanded;
+
+  /// The quotation's number (Q-2026-0001), for the PDF's name.
+  final String quoteRef;
   @override
   ConsumerState<RevisionCard> createState() => _RevisionCardState();
 }
@@ -64,7 +68,7 @@ class _RevisionCardState extends ConsumerState<RevisionCard> {
     final r = widget.r;
     final (title, message, action) = switch (to) {
       'sent' => ('Mark R${r.i('number')} as sent?', 'The deal moves to Quoted and any older sent revision is replaced.', 'Mark as sent'),
-      'accepted' => ('Customer accepted R${r.i('number')}?', 'This makes the order and its checklist. Acceptance is final; cancelling later needs a manager.', 'Customer accepted'),
+      'accepted' => ('Customer accepted R${r.i('number')}?', 'This makes the order (Confirmed, waiting for the deposit). Acceptance is final; cancelling later needs a manager.', 'Customer accepted'),
       _ => ('Customer rejected R${r.i('number')}?', 'You can still make a new revision on the web.', 'Customer rejected'),
     };
     if (!await confirm(context, title: title, message: message, action: action, danger: to == 'rejected')) return;
@@ -134,6 +138,15 @@ class _RevisionCardState extends ConsumerState<RevisionCard> {
           ],
           if (r.sn('terms') != null) ...[gap8, Overline('Terms', padding: EdgeInsets.zero), gap4, Text(r.s('terms'), style: context.t.bodySmall)],
         ],
+        if (hasPdf(status)) ...[
+          gap12,
+          OutlinedButton.icon(
+            key: ValueKey('pdf-${r.s('id')}'),
+            onPressed: () => openPdf(context, kind: 'revisions', id: r.s('id'), fileName: 'Quotation ${widget.quoteRef}-R${r.i('number')}.pdf'),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: const Text('PDF to send or share'),
+          ),
+        ],
         if (canManage && status == 'draft') ...[
           gap16,
           BusyButton(label: 'Mark as sent', icon: Icons.send_rounded, onPressed: () => _move('sent')),
@@ -148,6 +161,9 @@ class _RevisionCardState extends ConsumerState<RevisionCard> {
     );
   }
 }
+
+/// Revisions the customer has seen (sent or accepted) have a PDF to send again or share.
+bool hasPdf(String status) => status == 'sent' || status == 'accepted';
 
 /// Lines and totals as on the printed quotation.
 class QuoteLines extends StatelessWidget {

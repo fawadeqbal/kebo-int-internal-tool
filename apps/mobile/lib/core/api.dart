@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,8 +24,9 @@ class ApiException implements Exception {
   /// The records it matched: `[{ id, label, detail }]`.
   List<Json> get matches => data?.l('matches') ?? const [];
 
-  /// An order step refused by a rule (deposit first, inspection first, a note needed…).
-  bool get gate => code != null && gateCodes.contains(code);
+  /// 409 with code "confirm": an order move with warnings (no deposit, money still due).
+  /// The message is the warnings; send the move again with `confirm: true` to go ahead.
+  bool get needsConfirm => code == 'confirm';
 
   String? field(String name) => fieldErrors[name];
 
@@ -31,21 +34,12 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// Codes the order checklist answers with when a step can't be changed yet.
-const gateCodes = {
-  'deposit_first',
-  'inspect_first',
-  'balance_first',
-  'note_required',
-  'required_step',
-  'dependents_done',
-  'future_date',
-  'order_not_open',
-  'already_done',
-  'not_done',
-  'unknown_step',
-  'stage_move',
-};
+/// A PDF from the server, with the name it gave (Content-Disposition) when it gave one.
+class PdfFile {
+  const PdfFile(this.bytes, {this.fileName});
+  final Uint8List bytes;
+  final String? fileName;
+}
 
 /// Talks to the Kebo API (`<server>/api/...`) with the bearer token.
 class Api {
@@ -74,7 +68,7 @@ class Api {
 
   Future<Json> get(String path, {Map<String, dynamic>? query}) async => _asMap(await _send(() => _dio.get(path, queryParameters: _clean(query))));
 
-  /// Endpoints that answer with a plain list (orders, factory orders, invoices, people).
+  /// Endpoints that answer with a plain list (orders, to-do, people).
   Future<List<Json>> getList(String path, {Map<String, dynamic>? query}) async => _asList(await _send(() => _dio.get(path, queryParameters: _clean(query))));
 
   Future<Json> post(String path, [Object? body]) async => _asMap(await _send(() => _dio.post(path, data: body ?? const {})));
@@ -111,6 +105,64 @@ class Api {
     } on DioException catch (e) {
       throw _error(e);
     }
+  }
+
+  /// A PDF made by the web app at `<server>/pdf/<kind>/<id>`, sent with this app's session as
+  /// `Authorization: Bearer`. Refusals become friendly messages; a 401 here never signs the person
+  /// out (the PDF server may simply not accept the app's session yet).
+  Future<PdfFile> getPdf(String path, {void Function(double)? onProgress}) async {
+    final Response<List<int>> res;
+    try {
+      res = await _dio.get<List<int>>(
+        path,
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveTimeout: const Duration(minutes: 2),
+          headers: {'Accept': 'application/pdf'},
+          validateStatus: (_) => true,
+        ),
+        onReceiveProgress: (a, b) => onProgress?.call(b > 0 ? a / b : 0),
+      );
+    } on DioException catch (e) {
+      throw _error(e);
+    }
+    final bytes = Uint8List.fromList(res.data ?? const []);
+    final status = res.statusCode ?? 0;
+    if (status != 200) throw pdfError(status, bytes);
+    if (!isPdf(bytes)) {
+      throw ApiException('The server answered, but not with a PDF. It may be older than the app: open the document on the web.', status: status);
+    }
+    return PdfFile(bytes, fileName: fileNameFrom(res.headers.value('content-disposition')));
+  }
+
+  /// A real PDF starts with `%PDF-`.
+  static bool isPdf(List<int> bytes) => bytes.length >= 5 && String.fromCharCodes(bytes.take(5)) == '%PDF-';
+
+  /// The PDF route answers in plain text; turn its refusals into words for the phone.
+  static ApiException pdfError(int status, List<int> body) {
+    var said = utf8.decode(body, allowMalformed: true).trim();
+    if (said.length > 300 || said.startsWith('<')) said = '';
+    final message = switch (status) {
+      401 => 'The server did not accept your sign-in for this PDF. Sign out and in again; if it keeps happening, this server cannot send PDFs to the app yet, so open it on the web.',
+      403 => 'You may not see this document.',
+      404 => 'This document was not found. The server may not make this kind of PDF yet.',
+      503 => said.isNotEmpty ? said : 'The server cannot make PDFs right now. Try again in a minute.',
+      _ => said.isNotEmpty ? 'The PDF could not be made: ${said.replaceFirst(RegExp(r'\.$'), '')}.' : 'The PDF could not be made ($status).',
+    };
+    return ApiException(message, status: status);
+  }
+
+  /// `attachment; filename="Quotation Q-1-R2.pdf"; filename*=UTF-8''Quotation%20Q-1-R2.pdf` → the name.
+  static String? fileNameFrom(String? disposition) {
+    if (disposition == null) return null;
+    final star = RegExp(r"filename\*=UTF-8''([^;]+)", caseSensitive: false).firstMatch(disposition);
+    if (star != null) {
+      try {
+        return Uri.decodeComponent(star.group(1)!.trim());
+      } catch (_) {}
+    }
+    final plain = RegExp(r'filename="?([^";]+)"?', caseSensitive: false).firstMatch(disposition);
+    return plain?.group(1)?.trim();
   }
 
   /// Download a file to the app's documents folder; returns its path.

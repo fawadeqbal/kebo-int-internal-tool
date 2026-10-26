@@ -22,6 +22,7 @@ void main() {
   test('push and notification links open the right screen', () {
     expect(appRoute('/deals/abc'), '/deals/abc');
     expect(appRoute('/orders/xyz'), '/orders/xyz');
+    expect(appRoute('https://rfq.fawadiqbal.dev/orders/196f4272-f93c-473a-a489-1d5b716b9600'), '/orders/196f4272-f93c-473a-a489-1d5b716b9600');
     expect(appRoute('https://kebo.example.com/deals/abc/quotation'), '/deals/abc/quotation');
     expect(appRoute('/inquiries/abc'), '/deals/abc');
     expect(appRoute('/settings'), isNull);
@@ -39,9 +40,12 @@ void main() {
     expect(dup.duplicate, isTrue);
     expect(dup.matches.single['label'], 'Al-Shifa Pharma Ltd');
 
-    final gate = Api.errorFromBody(409, {'error': "Wait for the customer's deposit before paying the factory.", 'code': 'deposit_first'});
-    expect(gate.gate, isTrue);
-    expect(gate.duplicate, isFalse);
+    final warn = Api.errorFromBody(409, {'error': 'The deposit (USD 2,411.64) has not been received yet.', 'code': 'confirm'});
+    expect(warn.needsConfirm, isTrue);
+    expect(warn.message, 'The deposit (USD 2,411.64) has not been received yet.');
+    expect(warn.duplicate, isFalse);
+    final refused = Api.errorFromBody(409, {'error': 'An order moves one stage at a time: from Confirmed it can go to In production.', 'code': 'not_next_or_previous'});
+    expect(refused.needsConfirm, isFalse);
 
     final invalid = Api.errorFromBody(422, {
       'error': 'Choose why the deal was lost',

@@ -59,7 +59,7 @@ class _Body extends StatelessWidget {
     final money = d.mn('money');
     final cur = money?.s('currency') ?? 'USD';
     final todo = d.l('todo');
-    final late = todo.where((t) => t.m('next').b('overdue')).length;
+    final late = todo.where((t) => t.m('needs').b('late')).length;
     final open = counts.i('new') + counts.i('sourcing') + counts.i('quoted');
 
     return ListView(
@@ -70,16 +70,16 @@ class _Body extends StatelessWidget {
         Text(
           todo.isEmpty
               ? (session.isManager ? "Here's how the whole team is doing." : 'Nothing waiting on your orders.')
-              : '${todo.length} order ${todo.length == 1 ? 'step' : 'steps'} to do${late > 0 ? ', $late late' : ''}.',
+              : '${todo.length} ${todo.length == 1 ? 'order needs' : 'orders need'} something${late > 0 ? ', $late late' : ''}.',
           style: context.t.bodySmall!.copyWith(color: late > 0 ? context.c.bad : null, fontWeight: late > 0 ? FontWeight.w600 : null),
         ),
         gap16,
         _ListCard(
           title: 'My to-do',
-          subtitle: 'The next step on each order, late first',
+          subtitle: 'What each of my orders needs now, late first',
           empty: 'Nothing to do on your orders.',
           rows: todo,
-          row: (r) => OrderRow(r, showProgress: false),
+          row: (r) => OrderRow(r),
           more: () => context.go('/orders'),
         ),
         StatGrid([
@@ -124,8 +124,14 @@ class _Body extends StatelessWidget {
           StatGrid([
             StatTile(label: 'Won this month', value: f.money(money.m('thisMonth')['won'], cur), tone: Tone.ok, icon: Icons.emoji_events_outlined),
             StatTile(label: 'Received this month', value: f.money(money.m('thisMonth')['received'], cur), icon: Icons.payments_outlined),
-            StatTile(label: 'To receive', value: f.money(money.m('now')['toReceive'], cur), hint: '${money.m('now').i('openOrders')} open orders', icon: Icons.account_balance_wallet_outlined),
-            StatTile(label: 'Owed to factories', value: f.money(money.m('now')['owedToFactories'], cur), icon: Icons.factory_outlined),
+            StatTile(label: 'To receive', value: f.money(money.m('now')['toReceive'], cur), hint: 'on open orders', icon: Icons.account_balance_wallet_outlined),
+            StatTile(
+              label: 'Open orders',
+              value: '${money.m('now').i('openOrders')}',
+              hint: [for (final s in ['confirmed', 'in_production', 'shipped']) '${money.m('now').m('ordersByStage').i(s)} ${orderStageLabel[s]!.toLowerCase()}'].join(' · '),
+              icon: Icons.local_shipping_outlined,
+              onTap: () => context.go('/orders'),
+            ),
           ]),
         ],
         if (d.l('workload').isNotEmpty)

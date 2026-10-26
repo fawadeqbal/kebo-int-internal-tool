@@ -1,0 +1,22 @@
+{
+  "currency": "USD",
+  "total": "8502.00",
+  "received": "2550.60",
+  "due": "5951.40",
+  "depositDue": "0.00",
+  "status": "deposit_paid",
+  "payments": [
+    {
+      "id": "1fc07e9e-7be7-4707-88d0-2b67bd9cb7cb",
+      "kind": "deposit",
+      "amount": "2525.60",
+      "bankCharges": "25.00",
+      "currency": "USD",
+      "paidOn": "2026-09-06",
+      "method": "bank_transfer",
+      "reference": "TT-DEMO-1",
+      "note": null,
+      "voided": null
+    }
+  ]
+}
