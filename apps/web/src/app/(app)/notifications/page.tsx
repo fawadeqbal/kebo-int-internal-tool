@@ -85,7 +85,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       />
       {items.length === 0 ? (
         <Card>
-          <EmptyState icon={Bell} title={onlyUnread ? "Nothing new" : "No notifications yet"} description="You are told here when a deal is assigned to you, a quotation is answered, a payment arrives or a step is due." />
+          <EmptyState icon={Bell} title={onlyUnread ? "Nothing new" : "No notifications yet"} description="You are told here when a deal is assigned to you, a quotation is answered, a payment arrives or an order needs something." />
         </Card>
       ) : (
         <div className="flex flex-col gap-5">

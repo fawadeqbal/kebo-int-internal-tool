@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, Printer } from "lucide-react";
+import { CheckCircle2, Download, Printer } from "lucide-react";
 import { can } from "@kebo/shared";
 import { Alert, buttonClass, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
@@ -49,6 +49,7 @@ function asDraft(r: RevisionView): RevisionDraft {
 }
 
 const printHref = (r: { id: string }) => `/print/revisions/${r.id}`;
+const pdfHref = (r: { id: string }) => `/pdf/revisions/${r.id}`;
 
 /**
  * The deal's quotation: the open draft (editable), the live revision waiting
@@ -120,7 +121,18 @@ export default async function QuotationPage({ params, searchParams }: { params: 
               </span>
             }
             description="Only drafts can change. When it is right, mark it as sent: from then on it is frozen."
-            actions={!manage ? <Link href={printHref(draft)} target="_blank" className={buttonClass("secondary", "sm")}><Printer aria-hidden /> Preview</Link> : undefined}
+            actions={
+              !manage ? (
+                <>
+                  <Link href={printHref(draft)} target="_blank" className={buttonClass("secondary", "sm")}>
+                    <Printer aria-hidden /> Preview
+                  </Link>
+                  <a href={pdfHref(draft)} className={buttonClass("secondary", "sm")}>
+                    <Download aria-hidden /> Download PDF
+                  </a>
+                </>
+              ) : undefined
+            }
           />
           <CardBody>
             {manage ? (
@@ -134,6 +146,7 @@ export default async function QuotationPage({ params, searchParams }: { params: 
                 deleteAction={deleteRevisionAction.bind(null, d.id, draft.id)}
                 moveAction={move(draft)}
                 printHref={printHref(draft)}
+                pdfHref={pdfHref(draft)}
                 today={today}
               />
             ) : (
@@ -162,9 +175,14 @@ export default async function QuotationPage({ params, searchParams }: { params: 
                     : undefined
             }
             actions={
-              <Link href={printHref(viewing)} target="_blank" className={buttonClass("secondary", "sm")}>
-                <Printer aria-hidden /> Print / PDF
-              </Link>
+              <>
+                <Link href={printHref(viewing)} target="_blank" className={buttonClass("secondary", "sm")}>
+                  <Printer aria-hidden /> View / Print
+                </Link>
+                <a href={pdfHref(viewing)} className={buttonClass("secondary", "sm")}>
+                  <Download aria-hidden /> Download PDF
+                </a>
+              </>
             }
           />
           <CardBody className="flex flex-col gap-5">
@@ -218,10 +236,14 @@ export default async function QuotationPage({ params, searchParams }: { params: 
                   <Td className="whitespace-nowrap">{date(r.validUntil)}</Td>
                   <Td className="whitespace-nowrap">{date(r.sentOn)}</Td>
                   <Td className="whitespace-nowrap">{date(r.answeredOn)}</Td>
-                  <Td className="text-right">
+                  <Td className="text-right whitespace-nowrap">
                     <Link href={printHref(r)} target="_blank" className="text-xs font-medium text-primary hover:underline">
-                      Print / PDF
+                      Print
                     </Link>
+                    <span className="text-muted"> · </span>
+                    <a href={pdfHref(r)} className="text-xs font-medium text-primary hover:underline" aria-label={`Download R${r.number} as PDF`}>
+                      PDF
+                    </a>
                   </Td>
                 </Tr>
               ))}

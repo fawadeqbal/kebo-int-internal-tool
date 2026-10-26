@@ -1,4 +1,4 @@
-import type { CustomerType, FactoryOrderStatus, InquiryStage, OrderStatus, Role, TaxTreatment } from "@kebo/shared";
+import type { CustomerType, InquiryStage, OrderStatus, Role, TaxTreatment } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
@@ -57,12 +57,11 @@ export interface Factory {
 }
 
 export interface FactoryRow extends Factory {
-  _count: { quotes: number; orders: number };
+  _count: { quotes: number };
 }
 
 export interface FactoryDetail extends Factory {
   quotes: { id: string; receivedOn: string; currency: string; inquiry: { id: string; refNo: string; title: string }; _count: { lines: number } }[];
-  orders: { id: string; refNo: string; status: FactoryOrderStatus; total: string; currency: string; order: { id: string; refNo: string } }[];
 }
 
 export interface UserRow {

@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
 import { documentTotals, fromMinor, settle, splitDeposit } from "@kebo/money";
-import { BALANCE_TERMS_LABEL } from "@kebo/shared";
+import { BALANCE_TERMS_LABEL, type BalanceTerms } from "@kebo/shared";
 import { NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
@@ -15,6 +15,12 @@ export type OrderDocumentKind = (typeof ORDER_DOCUMENTS)[number];
 
 const TITLE: Record<OrderDocumentKind, string> = { proforma: "Proforma invoice", invoice: "Commercial invoice", "packing-list": "Packing list" };
 const PREFIX: Record<OrderDocumentKind, string> = { proforma: "PI", invoice: "INV", "packing-list": "PL" };
+
+/** "30% deposit, balance against B/L copy": only the first letter of the terms is lowered, so "B/L" stays as written. */
+export function paymentTermsOf(depositPercent: number, balanceTerms: BalanceTerms): string {
+  const terms = BALANCE_TERMS_LABEL[balanceTerms];
+  return `${depositPercent > 0 ? `${depositPercent}% deposit, ` : ""}${depositPercent > 0 ? terms.charAt(0).toLowerCase() + terms.slice(1) : terms}`;
+}
 
 /**
  * The documents of an order, made from the order itself whenever they are
@@ -76,7 +82,7 @@ export class DocumentsService {
         incotermPlace: o.incotermPlace,
         quotation: `${rev.quotation.refNo} R${rev.number}`,
       },
-      paymentTerms: `${Number(o.depositPercent) > 0 ? `${Number(o.depositPercent)}% deposit, ` : ""}${BALANCE_TERMS_LABEL[o.balanceTerms].toLowerCase()}`,
+      paymentTerms: paymentTermsOf(Number(o.depositPercent), o.balanceTerms),
       currency: o.currency,
       showPrices: !goodsOnly,
       lines: lines.map((l) => ({

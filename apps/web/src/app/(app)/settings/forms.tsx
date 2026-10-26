@@ -57,7 +57,7 @@ export function SettingsGroupForm({ groupKey, values, action }: { groupKey: Sett
       {(s) => (
         <Card id={group.key} className="scroll-mt-20">
           <CardHeader title={group.title} description={group.description} />
-          <CardBody className={cn("grid gap-x-5 gap-y-4", group.key === "plan" ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2")}>
+          <CardBody className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
             {group.fields.map((f) => (
               <Control
                 key={f.name}
