@@ -1,6 +1,6 @@
 # Revamp plan
 
-Move from the single Next.js + Drizzle app to a pnpm/Turborepo monorepo with a NestJS API, Prisma, and shared packages, built around the new domain model (deal stages, quotation revisions, orders with a guided checklist, two-way payments).
+Move from the single Next.js + Drizzle app to a pnpm/Turborepo monorepo with a NestJS API, Prisma, and shared packages, built around the new domain model (deal stages, quotation revisions, orders in four stages, payments from customers).
 
 Production keeps running `main` until the switch. Each step ends with tests passing in CI.
 
@@ -14,6 +14,10 @@ Production keeps running `main` until the switch. Each step ends with tests pass
 | 6 | Legacy data import script (stages mapped, superseded revisions, orders created for accepted quotations); mobile app moved to the new API | Done (the app needs a new release before the switch) |
 | 7 | Switch-over: deploy, import, retire the old app — see [switch-over.md](switch-over.md) | Ready, to be run by the team (the old code is already out of the tree; it is in the git history) |
 
+## After launch: simpler orders
+
+The first version had a 12-step order checklist with gates, factory purchase orders, proforma and commercial invoice records, part-shipments and factory payments. The team found it too detailed, so an order is now four stages moved by one button (Confirmed → In production → Shipped → Done), with customer payments and documents made from the order. The tables of the detailed version are kept in the database (unused), so nothing recorded is lost; the code is in the git history.
+
 ## Data import mapping (step 6)
 
 | Old | New |
@@ -23,7 +27,7 @@ Production keeps running `main` until the switch. Each step ends with tests pass
 | query `completed` | `won` if a quotation was accepted, else `lost` (reason `other`, note kept) |
 | query `not_completed` | `lost`, free-text reason kept as the note |
 | quotations v1, v2… | one quotation with revisions; older sent versions → `superseded` |
-| accepted quotation | order with lines; checklist steps marked done from what exists (invoice → proforma sent, payments → deposit/balance, packing list → shipped) |
+| accepted quotation | order with lines; stage from what exists: completed → Done, a packing list → Shipped, payments reaching the deposit → In production, otherwise Confirmed (each in the order's history with a note) |
 | invoice payments | payments `in` against the order (deposit first, then balance) |
 | customers | customer + one primary contact; country to be filled in (unknown → asked on first edit) |
 
