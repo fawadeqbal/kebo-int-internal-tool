@@ -120,6 +120,8 @@ export class SourcingService {
         lines: lines.map(({ costMinor: _c, ...l }) => l),
         /** What the whole offer costs us in the selling currency (null when a rate is missing). */
         totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + (l.costMinor ?? 0), 0)),
+        /** Lines still without a price (a line priced in its parts does not count). */
+        unpriced: q.lines.filter((l) => Number(l.unitPrice) === 0 && !q.lines.some((p) => p.parentId === l.id)).length,
         /** Which of the customer's items it answers, and which it misses. */
         coverage: coverage(
           itemRefs,

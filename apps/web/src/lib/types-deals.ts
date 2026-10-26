@@ -1,4 +1,4 @@
-import type { BalanceTerms, Incoterm, InquiryChannel, LineType, LostReason, RevisionStatus } from "@kebo/shared";
+import type { AttachmentKind, BalanceTerms, Incoterm, InquiryChannel, LineType, LostReason, RevisionStatus } from "@kebo/shared";
 
 /** Response shapes for the deal-work screens: inquiry form, factory prices, quotation, reports. */
 
@@ -93,6 +93,21 @@ export interface FactoryQuoteLineView {
   costNote: string;
   /** One unit's landed cost in the selling currency; null when the exchange rate is missing. */
   unitCost: string | null;
+  /** The same product in other factories' offers (copied lines share it). */
+  productKey: string;
+  /** A quotation is priced from it: changing its price, quantity or place asks why. */
+  used: boolean;
+}
+
+/** A file kept with a factory offer: its quotation, catalogue, screenshots (internal). */
+export interface OfferFile {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  kind: AttachmentKind;
+  note: string | null;
+  uploadedOn: string;
 }
 
 export interface FactoryQuoteView {
@@ -111,8 +126,11 @@ export interface FactoryQuoteView {
   lines: FactoryQuoteLineView[];
   /** What the whole offer costs us in the selling currency (null when a rate is missing). */
   totalCost: string | null;
+  /** Lines still without a price (a line priced in its parts does not count). */
+  unpriced: number;
   /** Which of the customer's items it answers. */
   coverage: Coverage;
+  files: OfferFile[];
 }
 
 export interface SourcingOption extends FactoryQuoteLineView {
@@ -139,6 +157,8 @@ export interface SourcingView {
     cheapestLineId: string | null;
     options: SourcingOption[];
   }[];
+  /** Without the customer's list: the same products across offers (lines copied from each other). */
+  products: { key: string; description: string; quantity: string; unit: string; cheapestLineId: string | null; options: SourcingOption[] }[];
 }
 
 /* ---------------------------------------------------------------- quotation */

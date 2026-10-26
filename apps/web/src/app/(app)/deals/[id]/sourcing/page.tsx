@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { multiplyMinor, toMinor, formatMinor } from "@kebo/money";
-import { Alert, Badge, buttonClass, Card, CardBody, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, Badge, buttonClass, Card, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
@@ -9,7 +9,17 @@ import type { DealDetail } from "@/lib/types";
 import type { SalesSettings, SourcingView } from "@/lib/types-deals";
 import { FactoryQuotes } from "@/components/deals/sourcing-board";
 import { CoverageBadge } from "@/components/deals/revision-editor";
-import { removeFactoryQuoteAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { removeFileAction } from "../../actions";
+import {
+  addOfferLinesAction,
+  copyOfferLinesAction,
+  editOfferLineAction,
+  moveOfferLineAction,
+  removeFactoryQuoteAction,
+  removeOfferLineAction,
+  saveFactoryQuoteAction,
+  searchFactoriesAction,
+} from "./actions";
 
 export const metadata = { title: "Factory prices" };
 
@@ -30,7 +40,8 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
     api.get<{ sales: SalesSettings }>("/settings"),
   ]);
   const canEdit = d.allowed.source;
-  const cheapest = Math.min(...s.quotes.filter((q) => q.totalCost !== null && !q.coverage.missing.length).map((q) => Number(q.totalCost)));
+  // Only an offer that covers everything and has a price on every line can be "cheapest".
+  const cheapest = Math.min(...s.quotes.filter((q) => q.totalCost !== null && !q.coverage.missing.length && !q.unpriced && q.lines.length).map((q) => Number(q.totalCost)));
 
   return (
     <div className="flex flex-col gap-5">
@@ -48,7 +59,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
         </Alert>
       )}
 
-      {s.quotes.length > 0 && (
+      {s.quotes.some((q) => q.lines.length) && (
         <Card>
           <CardHeader
             title="Compare offers"
@@ -63,7 +74,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
             <THead>
               <tr>
                 <Th>Factory</Th>
-                <Th>Covers</Th>
+                {s.items.length > 0 && <Th>Covers</Th>}
                 <Th className="text-right">Lines</Th>
                 <Th className="text-right">Cost to us</Th>
                 <Th>Lead time</Th>
@@ -71,7 +82,8 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
               </tr>
             </THead>
             <tbody>
-              {[...s.quotes]
+              {s.quotes
+                .filter((q) => q.lines.length)
                 .sort((a, b) => a.coverage.missing.length - b.coverage.missing.length || (a.totalCost === null ? 1 : b.totalCost === null ? -1 : Number(a.totalCost) - Number(b.totalCost)))
                 .map((q) => (
                   <Tr key={q.id}>
@@ -81,10 +93,17 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                         {q.totalCost !== null && Number(q.totalCost) === cheapest && s.quotes.length > 1 && <Badge tone="ok">Cheapest complete</Badge>}
                       </span>
                       <span className="text-xs text-muted">received {date(q.receivedOn)}</span>
+                      {q.unpriced > 0 && (
+                        <span className="block text-xs font-medium text-warn">
+                          {q.unpriced} line{q.unpriced === 1 ? "" : "s"} without a price
+                        </span>
+                      )}
                     </Td>
-                    <Td>
-                      <CoverageBadge missing={q.coverage.missing} />
-                    </Td>
+                    {s.items.length > 0 && (
+                      <Td>
+                        <CoverageBadge missing={q.coverage.missing} />
+                      </Td>
+                    )}
                     <Td className="text-right tabular">{q.lines.length}</Td>
                     <Td className="text-right font-medium whitespace-nowrap tabular">{q.totalCost === null ? <span className="text-xs font-normal text-warn">No exchange rate</span> : money(q.totalCost, s.currency)}</Td>
                     <Td className="text-sm">{q.leadTime ?? <span className="text-muted">—</span>}</Td>
@@ -96,10 +115,34 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
         </Card>
       )}
 
-      {s.quotes.length > 0 && (
-        <Card>
-          <CardHeader title="Compare by item" description={`Each of the customer's items and the factory lines that answer it, cheapest first (your cost per unit in ${s.currency}).`} />
-          <CardBody className="flex flex-col gap-5">
+      <FactoryQuotes
+        dealId={d.id}
+        quotes={s.quotes}
+        items={s.items}
+        canEdit={canEdit}
+        today={todayIn(TZ)}
+        mainCurrency={s.currency}
+        rates={settings.sales.exchangeRates}
+        saveAction={saveFactoryQuoteAction.bind(null, d.id)}
+        removeAction={removeFactoryQuoteAction.bind(null, d.id)}
+        searchFactories={searchFactoriesAction}
+        lines={{
+          add: addOfferLinesAction.bind(null, d.id),
+          edit: editOfferLineAction.bind(null, d.id),
+          move: moveOfferLineAction.bind(null, d.id),
+          remove: removeOfferLineAction.bind(null, d.id),
+          copy: copyOfferLinesAction.bind(null, d.id),
+          removeFile: removeFileAction.bind(null, d.id),
+        }}
+      />
+
+      {s.items.length > 0 && s.quotes.some((q) => q.lines.length) && (
+        <details className="group rounded-xl border border-line bg-surface shadow-card">
+          <summary className="cursor-pointer list-none border-line px-4 py-3 group-open:border-b">
+            <span className="text-sm font-semibold">Compare by item</span>
+            <span className="ml-2 text-xs text-muted">each of the customer&apos;s items and the factory lines that answer it, cheapest first (your cost per unit in {s.currency})</span>
+          </summary>
+          <div className="flex flex-col gap-5 p-4">
             {s.items.map((it) => (
               <section key={it.id} aria-label={`${it.parentId ? "Part" : "Item"} ${it.no}`} className={cn(it.parentId && "ml-4 border-l-2 border-line pl-4 sm:ml-6")}>
                 <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
@@ -113,71 +156,130 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                   </span>
                 </div>
                 {it.options.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">{it.hasParts ? "No factory line answers it as a whole yet — see its parts below." : "No factory has answered this item yet."}</p>
+                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">
+                    {it.hasParts ? "No factory line answers it as a whole yet — see its parts below." : "No factory has answered this item yet."}
+                  </p>
                 ) : (
-                  <div className="rounded-lg border border-line">
-                    <Table>
-                      <THead>
-                        <tr>
-                          <Th>Factory line</Th>
-                          <Th className="text-right">Their price</Th>
-                          <Th className="text-right">Your cost / unit</Th>
-                          <Th className="hidden text-right sm:table-cell">For their quantity</Th>
-                        </tr>
-                      </THead>
-                      <tbody>
-                        {it.options.map((o) => (
-                          <Tr key={o.id}>
-                            <Td>
-                              <span className="flex flex-wrap items-center gap-1.5">
-                                <span className="font-medium">{o.factory.name}</span>
-                                {o.id === it.cheapestLineId && it.options.length > 1 && <Badge tone="ok">Cheapest</Badge>}
-                              </span>
-                              <span className="block text-xs text-muted">
-                                {o.no} {o.description.split("\n")[0]}
-                                {o.model ? ` · ${o.model}` : ""}
-                              </span>
-                              <span className="mt-0.5 block text-xs text-text-2">{o.costNote}</span>
-                            </Td>
-                            <Td className="text-right whitespace-nowrap tabular">
-                              {money(o.unitPrice, o.currency)}
-                              <span className="block text-xs text-muted">without tax</span>
-                            </Td>
-                            <Td className="text-right font-medium whitespace-nowrap tabular">
-                              {Number(o.unitPrice) === 0 ? (
-                                <span className="text-xs font-normal text-muted">Not priced on its own</span>
-                              ) : o.unitCost === null ? (
-                                <span className="text-xs font-normal text-warn">No exchange rate</span>
-                              ) : (
-                                money(o.unitCost, s.currency)
-                              )}
-                            </Td>
-                            <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">
-                              {o.unitCost === null ? "—" : `${formatMinor(multiplyMinor(toMinor(o.unitCost), o.quantity), s.currency)} (${qty(o.quantity)} ${o.unit})`}
-                            </Td>
-                          </Tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </div>
+                  <OptionsTable options={it.options} cheapestLineId={it.cheapestLineId} currency={s.currency} />
                 )}
               </section>
             ))}
-          </CardBody>
-        </Card>
+          </div>
+        </details>
       )}
 
-      <FactoryQuotes
-        quotes={s.quotes}
-        items={s.items}
-        canEdit={canEdit}
-        today={todayIn(TZ)}
-        mainCurrency={s.currency}
-        rates={settings.sales.exchangeRates}
-        saveAction={saveFactoryQuoteAction.bind(null, d.id)}
-        removeAction={removeFactoryQuoteAction.bind(null, d.id)}
-        searchFactories={searchFactoriesAction}
-      />
+      {s.items.length === 0 && s.products.length > 0 && <ProductMatrix view={s} />}
     </div>
+  );
+}
+
+/** The factory lines for one item or product, cheapest first. */
+function OptionsTable({ options, cheapestLineId, currency }: { options: SourcingView["items"][number]["options"]; cheapestLineId: string | null; currency: string }) {
+  return (
+    <div className="rounded-lg border border-line">
+      <Table>
+        <THead>
+          <tr>
+            <Th>Factory line</Th>
+            <Th className="text-right">Their price</Th>
+            <Th className="text-right">Your cost / unit</Th>
+            <Th className="hidden text-right sm:table-cell">For their quantity</Th>
+          </tr>
+        </THead>
+        <tbody>
+          {options.map((o) => (
+            <Tr key={o.id}>
+              <Td>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium">{o.factory.name}</span>
+                  {o.id === cheapestLineId && options.length > 1 && <Badge tone="ok">Cheapest</Badge>}
+                </span>
+                <span className="block text-xs text-muted">
+                  {o.no} {o.description.split("\n")[0]}
+                  {o.model ? ` · ${o.model}` : ""}
+                </span>
+                <span className="mt-0.5 block text-xs text-text-2">{o.costNote}</span>
+              </Td>
+              <Td className="text-right whitespace-nowrap tabular">
+                {money(o.unitPrice, o.currency)}
+                <span className="block text-xs text-muted">without tax</span>
+              </Td>
+              <Td className="text-right font-medium whitespace-nowrap tabular">
+                {Number(o.unitPrice) === 0 ? (
+                  <span className="text-xs font-normal text-muted">Not priced on its own</span>
+                ) : o.unitCost === null ? (
+                  <span className="text-xs font-normal text-warn">No exchange rate</span>
+                ) : (
+                  money(o.unitCost, currency)
+                )}
+              </Td>
+              <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">
+                {o.unitCost === null ? "—" : `${formatMinor(multiplyMinor(toMinor(o.unitCost), o.quantity), currency)} (${qty(o.quantity)} ${o.unit})`}
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
+    </div>
+  );
+}
+
+/**
+ * Lines copied from one offer to another, side by side: one row per product,
+ * one column per factory (its model and our cost per unit), cheapest marked.
+ */
+function ProductMatrix({ view }: { view: SourcingView }) {
+  const offers = view.quotes.filter((q) => view.products.some((p) => p.options.some((o) => o.quoteId === q.id)));
+  return (
+    <details className="group rounded-xl border border-line bg-surface shadow-card" open={view.products.length <= 40}>
+      <summary className="cursor-pointer list-none border-line px-4 py-3 group-open:border-b">
+        <span className="text-sm font-semibold">Compare product by product</span>
+        <span className="ml-2 text-xs text-muted">
+          {view.products.length} products in more than one offer · your cost per unit in {view.currency}, with tax
+        </span>
+      </summary>
+      <div className="overflow-x-auto">
+        <Table>
+          <THead>
+            <tr>
+              <Th>Product</Th>
+              <Th className="text-right">Qty</Th>
+              {offers.map((q) => (
+                <Th key={q.id} className="text-right">
+                  {q.factory.name}
+                </Th>
+              ))}
+            </tr>
+          </THead>
+          <tbody>
+            {view.products.map((p) => (
+              <Tr key={p.key}>
+                <Td className="max-w-80">
+                  <span className="line-clamp-2 text-sm">{p.description}</span>
+                </Td>
+                <Td className="text-right whitespace-nowrap tabular">
+                  {qty(p.quantity)} {p.unit}
+                </Td>
+                {offers.map((q) => {
+                  const o = p.options.find((x) => x.quoteId === q.id);
+                  return (
+                    <Td key={q.id} className={cn("text-right whitespace-nowrap tabular", o && o.id === p.cheapestLineId && "bg-ok-soft")}>
+                      {!o ? (
+                        <span className="text-xs text-muted">not offered</span>
+                      ) : (
+                        <>
+                          {Number(o.unitPrice) === 0 ? <span className="text-xs text-muted">no price</span> : o.unitCost === null ? "—" : money(o.unitCost, view.currency)}
+                          <span className="block text-xs text-muted">{o.model ?? ""}</span>
+                        </>
+                      )}
+                    </Td>
+                  );
+                })}
+              </Tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    </details>
   );
 }

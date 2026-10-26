@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!(file instanceof File) || file.size === 0) return Response.json({ error: "Choose a file to upload." }, { status: 400 });
   const body = new FormData();
   body.set("file", file, file.name);
-  for (const k of ["kind", "note"]) {
+  for (const k of ["kind", "note", "factoryQuoteId"]) {
     const v = form.get(k);
     if (typeof v === "string" && v.trim()) body.set(k, v.trim());
   }

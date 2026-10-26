@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { factoryQuoteInput } from "@kebo/shared";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { attempt, formBody, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
-import type { FactoryOption } from "@/lib/types-deals";
+import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
 
@@ -66,4 +66,45 @@ export async function removeFactoryQuoteAction(dealId: string, quoteId: string, 
   );
   if (r.ok) refresh(dealId);
   return r;
+}
+
+/* ---------------------------------------------------------------- the offer's lines, one change at a time */
+
+/** What a line change gives back to the line table: the offer numbered again, or why not. */
+export type OfferLineResult = { ok: true; offer: FactoryQuoteView } | { ok: false; message: string; reasonChoices?: string[] };
+
+async function lineCall(dealId: string, fn: () => Promise<FactoryQuoteView>): Promise<OfferLineResult> {
+  try {
+    const offer = await fn();
+    refresh(dealId);
+    return { ok: true, offer };
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 401) return { ok: false, message: "Your session ended. Please sign in again." };
+      const field = Object.values(e.body.fieldErrors ?? {}).find((v) => v?.length)?.[0];
+      return { ok: false, message: field ?? e.message, reasonChoices: e.code === "reason_needed" ? (e.body.choices ?? []) : undefined };
+    }
+    console.error("[offer lines]", e);
+    return { ok: false, message: "Something went wrong. Please try again." };
+  }
+}
+
+export async function addOfferLinesAction(dealId: string, quoteId: string, body: object) {
+  return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-quotes/${quoteId}/lines`, body));
+}
+
+export async function editOfferLineAction(dealId: string, lineId: string, body: object) {
+  return lineCall(dealId, () => api.patch<FactoryQuoteView>(`/factory-lines/${lineId}`, body));
+}
+
+export async function moveOfferLineAction(dealId: string, lineId: string, body: object) {
+  return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-lines/${lineId}/move`, body));
+}
+
+export async function removeOfferLineAction(dealId: string, lineId: string, reason?: string) {
+  return lineCall(dealId, () => api.delete<FactoryQuoteView>(`/factory-lines/${lineId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`));
+}
+
+export async function copyOfferLinesAction(dealId: string, quoteId: string, fromQuoteId: string) {
+  return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-quotes/${quoteId}/copy-lines`, { fromQuoteId }));
 }

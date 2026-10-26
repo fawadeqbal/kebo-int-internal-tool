@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { UserPlus, X } from "lucide-react";
 import { CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type InquiryChannel } from "@kebo/shared";
-import { Alert, Button, buttonClass, Card, CardBody, CardFooter, CardHeader, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Badge, Button, buttonClass, Card, CardBody, CardFooter, CardHeader, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CountrySelect } from "@/components/people/country-select";
@@ -14,11 +14,35 @@ import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } fr
 import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/deals/actions";
 import { CustomerPicker } from "./customer-picker";
 import { FileDrop, send, type Staged } from "./documents-panel";
-import { ItemTable, itemsPayload } from "./item-table";
+import { LineTable, type LineColumn } from "@/components/lines/line-table";
+import { localLineHandlers } from "@/components/lines/local-lines";
+import { rowKey } from "./form-bits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 const OTHER = "__other__";
+
+const ITEM_COLUMNS: LineColumn[] = [
+  { key: "description", label: "Description", width: "minmax(0,1fr)", input: "textarea", required: "Each item needs a description", placeholder: "What it is: size, material, standard…" },
+  { key: "model", label: "Model / part no.", width: "8rem", input: "text", maxLength: 120, placeholder: "Model" },
+  { key: "quantity", label: "Qty", width: "5rem", input: "number", align: "right", required: "Enter a quantity", placeholder: "Qty" },
+  { key: "unit", label: "Unit", width: "5rem", input: "text", list: "item-units", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
+  { key: "targetPrice", label: "Target price", width: "6.5rem", input: "number", align: "right", placeholder: "Target", phoneHidden: true },
+];
+
+/** Items with parts pointing at their item by position, as the API takes them. */
+function itemsPayload(items: DealFormValues["items"]) {
+  const at = new Map(items.map((it, n) => [it.key, n]));
+  return items.map((it) => ({
+    id: it.id,
+    partOf: it.parentKey ? (at.get(it.parentKey) ?? null) : null,
+    description: it.description,
+    model: it.model.trim() || null,
+    quantity: it.quantity.replace(/,/g, "").trim(),
+    unit: it.unit.trim() || "pcs",
+    targetPrice: it.targetPrice.replace(/,/g, "").trim() || null,
+  }));
+}
 
 /** The body the API's inquiry schema accepts. */
 function payload(v: DealFormValues, withAssignee: boolean) {
@@ -89,6 +113,22 @@ export function DealForm({
   }, [staged]);
   const [created, setCreated] = useState<{ id: string; failed: string[] } | null>(null);
   const set = <K extends keyof DealFormValues>(k: K, value: DealFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
+  const itemHandlers = localLineHandlers(
+    v.items,
+    (fn) => setV((s) => ({ ...s, items: fn(s.items) })),
+    (values, parentKey) => ({
+      id: null,
+      key: rowKey(),
+      parentKey,
+      description: values.description ?? "",
+      model: values.model ?? "",
+      quantity: values.quantity ?? "",
+      unit: values.unit || (parentKey ? "sets" : "pcs"),
+      targetPrice: values.targetPrice ?? "",
+      priced: false,
+    }),
+    (row, values) => ({ ...row, ...values }),
+  );
 
   const chooseCustomer = async (c: CustomerOption | null, known?: ContactOption[]) => {
     set("customer", c);
@@ -214,29 +254,54 @@ export function DealForm({
 
             <Card>
               <CardHeader
-                title="What they want"
-                description="One row per product. The factories may answer with their own models and breakdown — that is decided at factory prices."
+                title={mode === "create" ? "What the customer needs" : "Requirement"}
+                description="Their requirement as they sent it, with the URS. The lines are made at factory prices, as each factory offers them."
               />
-              <CardBody>
-                <ItemTable items={v.items} onChange={(items) => set("items", items)} error={s.errors?.items?.[0]} />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader title={mode === "create" ? "Requirements & URS" : "Requirements"} />
               <CardBody className="flex flex-col gap-4">
                 <Field
-                  label="Requirements"
+                  label="Requirement"
                   htmlFor="requirements"
-                  optional
-                  hint="Specs, standards, packing, destination port — anything the factories need to know"
+                  optional={v.items.length > 0}
+                  hint="What they want, specs, standards, packing, destination port — anything the factories need to know"
                   error={s.errors?.requirements}
                 >
-                  <Textarea id="requirements" rows={4} value={v.requirements} onChange={(e) => set("requirements", e.target.value)} />
+                  <Textarea id="requirements" rows={5} value={v.requirements} onChange={(e) => set("requirements", e.target.value)} />
                 </Field>
                 {mode === "create" && <FileDrop staged={staged} setStaged={setStaged} busy={uploading} />}
               </CardBody>
             </Card>
+
+            <Card>
+              <CardHeader
+                title="Their list of items (optional)"
+                description="Only if the customer sent a list. Factories may answer with their own models and breakdown; that is decided at factory prices."
+              />
+              <CardBody>
+                <LineTable
+                  rows={v.items.map((it) => ({
+                    key: it.key,
+                    parentKey: it.parentKey,
+                    values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
+                    badge: it.priced ? (
+                      <span className="ml-1 align-middle" title="A factory has priced this: changing it will ask why">
+                        <Badge tone="info">Priced</Badge>
+                      </span>
+                    ) : undefined,
+                  }))}
+                  columns={ITEM_COLUMNS}
+                  noun="item"
+                  error={s.errors?.items?.[0]}
+                  empty="No list: the requirement above is enough."
+                  {...itemHandlers}
+                />
+                <datalist id="item-units">
+                  {["pcs", "sets", "kg", "tons", "m", "m²", "m³", "rolls", "cartons", "pairs", "litres"].map((u) => (
+                    <option key={u} value={u} />
+                  ))}
+                </datalist>
+              </CardBody>
+            </Card>
+
 
             <Card>
               <CardHeader title="The deal" />

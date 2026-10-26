@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CornerDownRight, Lock, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CornerDownRight, Lock, Plus, Trash2 } from "lucide-react";
 import { costSummary, documentTotals, formatMinor, fromMinor, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, optionLetter, type BalanceTerms, type Incoterm } from "@kebo/shared";
 import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
@@ -9,12 +9,16 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { OfferLine, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
+import { LineTable, type LineColumn } from "@/components/lines/line-table";
+import { localLineHandlers } from "@/components/lines/local-lines";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 interface ChargeState {
   key: string;
+  /** Charges have no parts (the line table's rows always say so). */
+  parentKey: null;
   type: "service" | "charge";
   description: string;
   quantity: string;
@@ -68,6 +72,7 @@ function fromDraft(d: RevisionDraft): EditorState {
       prices: Object.fromEntries(o.prices.map((p) => [p.lineId, money2(Number(p.unitPrice))])),
       charges: o.charges.map((c, k) => ({
         key: `charge-${i}-${k}`,
+        parentKey: null,
         type: c.type,
         description: c.description,
         quantity: str(c.quantity),
@@ -161,6 +166,27 @@ export function RevisionEditor({
 
   const currency = /^[A-Za-z]{3}$/.test(s.currency.trim()) ? s.currency.trim().toUpperCase() : "—";
   const fmt = (minor: number) => formatMinor(minor, currency);
+  const amountOf = (v: string | undefined) => (valid(v ?? "") ? toMinor(numberText(v ?? "")) : 0);
+  const chargeColumns: LineColumn[] = [
+    { key: "description", label: "Charge", width: "minmax(0,1fr)", input: "textarea", required: "Each charge needs a description", placeholder: "e.g. Sea freight to Mombasa" },
+    { key: "quantity", label: "Qty", width: "4.5rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
+    { key: "unit", label: "Unit", width: "4.5rem", input: "text", initial: "lot", maxLength: 20 },
+    ...(showCosts
+      ? [
+          {
+            key: "unitCost",
+            label: "Our cost",
+            width: "6.5rem",
+            input: "number" as const,
+            align: "right" as const,
+            placeholder: "Cost",
+            format: (v: Record<string, string>) => (v.unitCost ? fmt(amountOf(v.unitCost)) : <span className="text-muted">—</span>),
+          },
+        ]
+      : []),
+    { key: "unitPrice", label: "Price", width: "7rem", input: "number", align: "right", placeholder: "0.00", required: "Enter a price", format: (v) => fmt(amountOf(v.unitPrice)) },
+    { key: "total", label: "Total", width: "7.5rem", align: "right", format: (v) => fmt(Math.round(amountOf(v.unitPrice) * (Number(numberText(v.quantity ?? "")) || 0))) },
+  ];
   const marginNumber = Number(numberText(margin));
   const marginOk = margin.trim() !== "" && Number.isFinite(marginNumber) && marginNumber >= 0 && marginNumber < 100;
   const opt = s.options[Math.min(active, s.options.length - 1)]!;
@@ -441,51 +467,40 @@ export function RevisionEditor({
                           </tr>
                         );
                       })}
-                      {opt.charges.map((c, k) => {
-                        const i = lines.length + k;
-                        const setCharge = (patch: Partial<ChargeState>) => setOption(at, (o) => ({ charges: o.charges.map((x) => (x.key === c.key ? { ...x, ...patch } : x)) }));
-                        return (
-                          <tr key={c.key} className="border-b border-line/70 align-top">
-                            <td className="py-2 text-muted tabular">{lines.length + k + 1}</td>
-                            <td className="py-1.5 pr-3">
-                              <Input aria-label={`Charge ${k + 1}`} className="h-8" value={c.description} placeholder="e.g. Sea freight to Mombasa" onChange={(e) => setCharge({ description: e.target.value })} />
-                            </td>
-                            <td className="py-1.5">
-                              <div className="flex justify-end gap-1">
-                                <Input aria-label={`Charge ${k + 1} quantity`} inputMode="decimal" className="h-8 w-14 text-right tabular" value={c.quantity} onChange={(e) => setCharge({ quantity: e.target.value })} />
-                                <Input aria-label={`Charge ${k + 1} unit`} className="h-8 w-14" value={c.unit} maxLength={20} onChange={(e) => setCharge({ unit: e.target.value })} />
-                              </div>
-                            </td>
-                            {showCosts && (
-                              <td className="py-1.5 pl-2">
-                                <Input aria-label={`Charge ${k + 1} cost`} inputMode="decimal" className="h-8 w-24 text-right tabular" value={c.unitCost} placeholder="Cost" onChange={(e) => setCharge({ unitCost: e.target.value })} />
-                              </td>
-                            )}
-                            <td className="py-1.5 pl-2">
-                              <Input aria-label={`Charge ${k + 1} price`} inputMode="decimal" className="h-8 text-right tabular" value={c.unitPrice} placeholder="0.00" onChange={(e) => setCharge({ unitPrice: e.target.value })} />
-                            </td>
-                            {showCosts && <td />}
-                            <td className="py-2 text-right whitespace-nowrap">
-                              <span className="font-semibold tabular">{fmt(totals.lines[i]?.lineTotal ?? 0)}</span>
-                              <Button size="icon-xs" variant="ghost" className="ml-1" aria-label={`Remove charge ${k + 1}`} onClick={() => setOption(at, (o) => ({ charges: o.charges.filter((x) => x.key !== c.key) }))}>
-                                <X aria-hidden />
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })}
                     </tbody>
                   </table>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => setOption(at, (o) => ({ charges: [...o.charges, { key: rowKey(), type: "charge", description: "", quantity: "1", unit: "lot", unitPrice: "", unitCost: "" }] }))}
-                  >
-                    <Plus aria-hidden /> Add a charge
-                  </Button>
-                  <span className="text-xs text-muted">Freight, inspection, insurance… The factory&apos;s lines cannot change here: edit the offer on Factory prices.</span>
-                </div>
+                <p className="text-xs text-muted">The factory&apos;s lines cannot change here: change the offer on Factory prices.</p>
+                <section aria-label="Charges" className="flex flex-col gap-1.5">
+                  <h4 className="text-sm font-medium">
+                    Charges <span className="text-xs font-normal text-muted">freight, inspection, insurance… our own price{showCosts ? ", and cost if known" : ""}</span>
+                  </h4>
+                  <LineTable
+                    flat
+                    noun="charge"
+                    rows={opt.charges.map((c) => ({
+                      key: c.key,
+                      parentKey: null,
+                      values: { description: c.description, quantity: c.quantity, unit: c.unit, unitCost: c.unitCost, unitPrice: c.unitPrice },
+                    }))}
+                    columns={chargeColumns}
+                    {...localLineHandlers(
+                      opt.charges,
+                      (fn) => setOption(at, (o) => ({ charges: fn(o.charges) })),
+                      (values) => ({
+                        key: rowKey(),
+                        parentKey: null,
+                        type: "charge" as const,
+                        description: values.description ?? "",
+                        quantity: values.quantity || "1",
+                        unit: values.unit || "lot",
+                        unitPrice: values.unitPrice ?? "",
+                        unitCost: values.unitCost ?? "",
+                      }),
+                      (row, values) => ({ ...row, ...values }),
+                    )}
+                  />
+                </section>
                 <ErrorText error={st.errors?.options} />
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
