@@ -89,17 +89,19 @@ describe("a whole deal through the API", () => {
     const s = await api(app, staff).get(`/inquiries/${inquiryId}/sourcing`).expect(200);
     const item = s.body.items.find((i: { id: string }) => i.id === itemId);
     expect(item.options[0].unitCost).toBe("100.00"); // CNY 628.32 + 13% tax = 710.00, at 7.1 = USD 100
-    expect(item.preferredLineId).toBe(item.options[0].id);
+    expect(s.body.quotes[0]).toMatchObject({ coverage: { covered: ["1"], missing: [] }, totalCost: "20000.00" });
   });
 
   it("drafts R1 from the cost plus the default margin, sends it, and the deal is Quoted", async () => {
     const draft = await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200);
     expect(draft.body.number).toBe(1);
-    expect(draft.body.lines[0]).toMatchObject({ unitCost: 100, unitPrice: 117.65 }); // 15% margin on the price
+    expect(draft.body.options).toHaveLength(1);
+    expect(draft.body.options[0].prices[0]).toMatchObject({ unitPrice: 117.65 }); // USD 100 cost, 15% margin on the price
     const r1 = await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft.body, incotermPlace: "Qingdao" }).expect(201);
     rev[1] = r1.body.id;
     expect(r1.body).toMatchObject({ status: "draft", total: "23530.00" });
-    expect(r1.body.costing).toMatchObject({ cost: "20000.00", marginPercent: 15 });
+    expect(r1.body.options[0]).toMatchObject({ letter: "A", status: "open", total: "23530.00" });
+    expect(r1.body.options[0].costing).toMatchObject({ cost: "20000.00", marginPercent: 15 });
     const sent = await api(app, staff).post(`/revisions/${rev[1]}/status`, { to: "sent" }).expect(200);
     expect(sent.body.status).toBe("sent");
     expect(sent.body.customerSnapshot.country).toBe("ZZ");
@@ -111,16 +113,17 @@ describe("a whole deal through the API", () => {
     const draft = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     expect(draft.number).toBe(2);
     // R1 was sent, so a new revision says why.
-    const asked = await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, discount: 530 }).expect(409);
+    const discounted = { ...draft, options: draft.options.map((o: Record<string, unknown>) => ({ ...o, discount: 530 })) };
+    const asked = await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, discounted).expect(409);
     expect(asked.body).toMatchObject({ code: "reason_needed", choices: expect.arrayContaining(["Customer asked for a discount"]) });
     const r2 = await api(app, staff)
-      .post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, discount: 530, lines: draft.lines, reason: "Customer asked for a discount" })
+      .post(`/inquiries/${inquiryId}/quotation/revisions`, { ...discounted, reason: "Customer asked for a discount" })
       .expect(201);
     rev[2] = r2.body.id;
     await api(app, staff).post(`/revisions/${rev[2]}/status`, { to: "sent" }).expect(200);
     const all = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation`).expect(200)).body;
     expect(all.revisions.map((r: { number: number; status: string }) => `R${r.number}:${r.status}`)).toEqual(["R2:sent", "R1:superseded"]);
-    expect(all.revisions[0].costing.marginPercent).toBeLessThan(15); // the discount comes off the profit
+    expect(all.revisions[0].options[0].costing.marginPercent).toBeLessThan(15); // the discount comes off the profit
   });
 
   it("records the customer's yes on R2 even with an R3 draft open: order made, deal won, draft discarded", async () => {

@@ -50,10 +50,10 @@ describe("money", () => {
       })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
-    const lines = draft.lines.map((l: Record<string, unknown>) => ({ ...l, unitPrice: 200 }));
+    const options = [{ ...draft.options[0], prices: draft.options[0].prices.map((p: Record<string, unknown>) => ({ ...p, unitPrice: 200 })) }];
     const r1 = (
       await api(app, sana)
-        .post(`/inquiries/${inquiry.id}/quotation/revisions`, { ...draft, lines })
+        .post(`/inquiries/${inquiry.id}/quotation/revisions`, { ...draft, options })
         .expect(201)
     ).body;
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "sent" }).expect(200);

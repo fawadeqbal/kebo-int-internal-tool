@@ -34,8 +34,9 @@ describe("orders: four stages", () => {
       .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Henan Agri ${tag}`, receivedOn: "2026-10-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Maize sheller", quantity: 100, unitPrice: 1420 }] })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
-    draft.lines.push({ type: "charge", description: "Sea freight to Lagos", quantity: 1, unitPrice: 1500 });
-    const r1 = (await api(app, sana).post(`/inquiries/${inquiry.id}/quotation/revisions`, { ...draft, discount: 100 }).expect(201)).body;
+    draft.options[0].charges.push({ type: "charge", description: "Sea freight to Lagos", quantity: 1, unitPrice: 1500 });
+    draft.options[0].discount = 100;
+    const r1 = (await api(app, sana).post(`/inquiries/${inquiry.id}/quotation/revisions`, draft).expect(201)).body;
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "sent" }).expect(200);
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "accepted" }).expect(200);
     orderId = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0].id;
@@ -115,14 +116,15 @@ describe("orders: four stages", () => {
     expect(goods).toMatchObject({ quantity: "100", receivedQty: "0", factory: { name: `Henan Agri ${tag}` } });
     expect(o.goods).toMatchObject({ lines: 1, received: 0, allReceived: false, packed: false });
     // Shipping now would warn about both.
+    // The order lines are the factory's lines (its wording), not the customer's request.
     const early = await move(sana, { to: "shipped" }).expect(409);
-    expect(early.body.error).toMatch(/Not everything has come in from the factory \(Maize sheller 5t\/h: 0 of 100 pcs\)\. The packing list is not filled in yet\./);
+    expect(early.body.error).toMatch(/Not everything has come in from the factory \(Maize sheller: 0 of 100 pcs\)\. The packing list is not filled in yet\./);
     await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 101 }] }).expect(400);
     await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: charge.id, receivedQty: 1 }] }).expect(400);
     await api(app, bilal).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 1 }] }).expect(404);
     const part = (await api(app, sana).put(`/orders/${orderId}/receipt`, { on: "2026-10-22", lines: [{ lineId: goods.id, receivedQty: "60" }] }).expect(200)).body;
     expect(part.lines.find((l: { id: string }) => l.id === goods.id)).toMatchObject({ receivedQty: "60", receivedOn: "2026-10-22" });
-    expect(part.goods.short).toEqual(["Maize sheller 5t/h: 60 of 100 pcs"]);
+    expect(part.goods.short).toEqual(["Maize sheller: 60 of 100 pcs"]);
     const all = (await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 100 }] }).expect(200)).body;
     expect(all.goods).toMatchObject({ received: 1, allReceived: true, short: [] });
     expect(all.needs.title).toBe("All goods are in: make the packing list");
