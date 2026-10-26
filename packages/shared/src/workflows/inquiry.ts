@@ -10,7 +10,6 @@ import type { InquiryStage, LostReason } from "../enums";
  */
 
 export const OPEN_STAGES: readonly InquiryStage[] = ["new", "sourcing", "quoted"];
-export const CLOSED_STAGES: readonly InquiryStage[] = ["won", "lost"];
 
 export const isOpen = (stage: InquiryStage) => OPEN_STAGES.includes(stage);
 

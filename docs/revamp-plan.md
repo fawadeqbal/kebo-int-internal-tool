@@ -16,7 +16,7 @@ Production keeps running `main` until the switch. Each step ends with tests pass
 
 ## After launch: simpler orders
 
-The first version had a 12-step order checklist with gates, factory purchase orders, proforma and commercial invoice records, part-shipments and factory payments. The team found it too detailed, so an order is now four stages moved by one button (Confirmed → In production → Shipped → Done), with customer payments and documents made from the order. The tables of the detailed version are kept in the database (unused), so nothing recorded is lost; the code is in the git history.
+The first version had a 12-step order checklist with gates, factory purchase orders, proforma and commercial invoice records, part-shipments and factory payments. The team found it too detailed, so an order is now four stages moved by one button (Confirmed → In production → Shipped → Done), with customer payments and documents made from the order. Then the order got two simple additions: what came in from the factory (per line) and the packing list before shipping. The detailed version's tables were removed (its shipments' packing details were moved onto the order lines first); its code is in the git history.
 
 ## Data import mapping (step 6)
 
@@ -27,6 +27,8 @@ The first version had a 12-step order checklist with gates, factory purchase ord
 | query `completed` | `won` if a quotation was accepted, else `lost` (reason `other`, note kept) |
 | query `not_completed` | `lost`, free-text reason kept as the note |
 | quotations v1, v2… | one quotation with revisions; older sent versions → `superseded` |
+| packing lists | the order's packing list: packages, weights and CBM added up per order line; container and marks from the latest |
+| invoices | not copied (their numbers stay in the old app's database); what was paid comes in as payments |
 | accepted quotation | order with lines; stage from what exists: completed → Done, a packing list → Shipped, payments reaching the deposit → In production, otherwise Confirmed (each in the order's history with a note) |
 | invoice payments | payments `in` against the order (deposit first, then balance) |
 | customers | customer + one primary contact; country to be filled in (unknown → asked on first edit) |
@@ -46,7 +48,7 @@ pnpm db:import-legacy --from postgres://…/qms             # the real thing
 
 - The old database is only read (one read-only snapshot). The import refuses to run if the new database already has inquiries, or users with the same emails.
 - Old ids become the new ids, and old numbers (RFQ, QUO, INV, PL) are kept; the counters continue after the highest imported numbers. Orders are numbered SO-… in order of acceptance. Later quotation versions become R2, R3… of the first version's number (their old number is kept in the audit log).
-- It also writes the five settings groups and the website-form system account, so the seed is not needed afterwards.
+- It also writes the four settings groups and the website-form system account, so the seed is not needed afterwards.
 - The report lists counts per table, totals checks (invoices, payments, quotations, orders) and every judgement call. Afterwards: fill in each customer's country (imported as `ZZ`; the report suggests one from the phone number), and tick or skip the open orders' remaining checklist steps.
 - Sessions, notifications and phone tokens are not copied: everyone signs in again. Uploaded files keep their storage keys, so the new app must use the same storage bucket.
 

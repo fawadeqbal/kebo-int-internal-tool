@@ -36,7 +36,6 @@ function serviceAccount(): ServiceAccount | null {
   return account;
 }
 
-export const pushEnabled = () => serviceAccount() !== null;
 
 const b64url = (v: string | Buffer) => Buffer.from(v).toString("base64url");
 

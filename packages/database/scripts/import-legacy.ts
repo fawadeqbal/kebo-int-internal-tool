@@ -634,111 +634,40 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     `one per accepted revision: ${statusCount.open} open, ${statusCount.closed} closed (old "completed" + paid in full + packing list), ${statusCount.cancelled} cancelled. Stage: closed → Done; a packing list → Shipped; payments reaching the deposit → In production; otherwise Confirmed (each step in the order's history with a note)`,
   );
 
-  /* ---- shipments (packing lists) */
+  /* ---- packing lists → each order's packing list (packages, weights, CBM per line; container and marks) */
   const deletedPls = old.packingLists.filter((p) => p.deleted_at);
-  for (const p of deletedPls) report.judge("Deleted packing lists skipped (the new shipments cannot be soft-deleted)", p.pl_no);
+  for (const p of deletedPls) report.judge("Deleted packing lists skipped", p.pl_no);
   const invoiceById = new Map(old.invoices.map((i) => [i.id, i]));
   const orderForInvoice = (i: OldInvoice) => {
     const o = orderOfRevision.get(i.quotation_id) ?? orderOfInquiry.get(i.query_id)?.id;
     if (!o) throw new Error(`Invoice ${i.invoice_no} belongs to no accepted quotation, so it has no order to go on.`);
     return o;
   };
-  const livePls = old.packingLists.filter((p) => !p.deleted_at);
-  await tx.shipment.createMany({
-    data: livePls.map((p) => ({
-      id: p.id,
-      refNo: p.pl_no,
-      orderId: orderForInvoice(invoiceById.get(p.invoice_id)!),
-      status: "departed" as const,
-      portOfLoading: p.port_of_loading,
-      portOfDischarge: p.port_of_discharge,
-      finalDestination: p.final_destination,
-      transport: p.transport,
-      containerNos: p.container_no,
-      sealNos: p.seal_no,
-      departedOn: toDbDate(p.pack_date),
-      marks: p.marks,
-      notes: p.notes,
-      customerSnapshot: json(p.customer_snapshot),
-      companySnapshot: json(p.company_snapshot),
-      createdById: p.created_by,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-    })),
-  });
-  if (livePls.length) report.judge("Shipments", `${livePls.length} packing lists → shipments with status departed and departed on = pack date (the old app kept no sailing date); the packing list's trade term went onto the order`);
+  const livePls = old.packingLists.filter((p) => !p.deleted_at).sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
   const invoiceItemById = new Map(old.invoiceItems.map((i) => [i.id, i]));
   const liveIds = new Set(livePls.map((p) => p.id));
-  const plItems = old.packingItems.filter((i) => liveIds.has(i.packing_list_id));
-  await tx.shipmentLine.createMany({
-    data: plItems.map((l) => {
-      const inv = l.invoice_item_id ? invoiceItemById.get(l.invoice_item_id) : undefined;
-      return {
-        id: l.id,
-        shipmentId: l.packing_list_id,
-        orderLineId: inv?.quotation_item_id ? (orderLineOfQuoteLine.get(inv.quotation_item_id) ?? null) : null,
-        description: l.description,
-        model: l.model,
-        hsCode: l.hs_code,
-        quantity: l.quantity,
-        unit: l.unit,
-        packages: l.packages,
-        packageType: l.package_type,
-        netWeightKg: l.net_weight,
-        grossWeightKg: l.gross_weight,
-        cbm: l.cbm,
-        sortOrder: l.sort_order,
-      };
-    }),
-  });
-
-  /* ---- invoices */
-  await tx.invoice.createMany({
-    data: old.invoices.map((i) => ({
-      id: i.id,
-      type: "commercial" as const,
-      number: i.invoice_no,
-      orderId: orderForInvoice(i),
-      shipmentId: packingByInvoice.get(i.id)?.[0]?.id ?? null,
-      status: i.status === "cancelled" ? ("void" as const) : ("issued" as const),
-      issueDate: toDbDate(i.issue_date),
-      dueDate: toDbDate(i.due_date),
-      currency: i.currency,
-      vatRate: i.tax_rate,
-      pricesIncludeVat: i.prices_include_vat,
-      subtotal: i.subtotal,
-      discount: i.discount,
-      vatAmount: i.tax_amount,
-      total: i.total,
-      notes: i.notes,
-      voidReason: i.status === "cancelled" ? (i.cancel_reason ?? "Cancelled in the old app.") : null,
-      customerSnapshot: json(i.customer_snapshot),
-      companySnapshot: json(i.company_snapshot),
-      createdById: i.created_by,
-      createdAt: i.created_at,
-      updatedAt: i.updated_at,
-    })),
-  });
-  await tx.invoiceLine.createMany({
-    data: old.invoiceItems.map((l) => ({
-      id: l.id,
-      invoiceId: l.invoice_id,
-      orderLineId: l.quotation_item_id ? (orderLineOfQuoteLine.get(l.quotation_item_id) ?? null) : null,
-      type: map.lineType(l.description),
-      description: l.description,
-      model: l.model,
-      hsCode: l.hs_code,
-      quantity: l.quantity,
-      unit: l.unit,
-      unitPrice: l.unit_price,
-      lineTotal: l.line_total,
-      sortOrder: l.sort_order,
-    })),
-  });
-  report.judge(
-    "Invoices",
-    "old invoices → commercial invoices (status issued; cancelled → void with the reason); paid/partly paid is no longer stored, it comes from the payments. No proforma invoices are created, but an issued invoice marks \"proforma sent\" done",
-  );
+  const packed = new Map<string, { packages: number; packageType: string | null; net: number; gross: number; cbm: number }>();
+  let unmatched = 0;
+  for (const l of old.packingItems.filter((i) => liveIds.has(i.packing_list_id))) {
+    const inv = l.invoice_item_id ? invoiceItemById.get(l.invoice_item_id) : undefined;
+    const lineId = inv?.quotation_item_id ? orderLineOfQuoteLine.get(inv.quotation_item_id) : undefined;
+    if (!lineId) {
+      unmatched++;
+      continue;
+    }
+    const t = packed.get(lineId) ?? { packages: 0, packageType: null, net: 0, gross: 0, cbm: 0 };
+    packed.set(lineId, { packages: t.packages + Number(l.packages ?? 0), packageType: t.packageType ?? l.package_type, net: t.net + Number(l.net_weight ?? 0), gross: t.gross + Number(l.gross_weight ?? 0), cbm: t.cbm + Number(l.cbm ?? 0) });
+  }
+  for (const [lineId, t] of packed) {
+    await tx.orderLine.update({ where: { id: lineId }, data: { packages: t.packages, packageType: t.packageType ?? "Carton", netWeightKg: t.net.toFixed(2), grossWeightKg: t.gross.toFixed(2), cbm: t.cbm.toFixed(3) } });
+  }
+  const plsOfOrder = groupBy(livePls, (p) => orderForInvoice(invoiceById.get(p.invoice_id)!));
+  for (const [orderId, pls] of plsOfOrder) {
+    const last = pls[pls.length - 1]!;
+    await tx.order.update({ where: { id: orderId }, data: { packedAt: pls[0]!.created_at, containerNo: last.container_no?.slice(0, 120) ?? null, shippingMarks: last.marks } });
+  }
+  if (livePls.length) report.judge("Packing lists", `${livePls.length} packing lists → the packing list of their order (packages, weights and CBM added up per order line; container and marks from the latest)${unmatched ? `; ${unmatched} packing line(s) matched no order line and were left out` : ""}`);
+  report.judge("Invoices", "old invoices are not copied: their numbers stay in the old app's database (kept at the switch-over); what was paid comes in as payments, and the new documents are made from each order");
 
   /* ---- payments in, per order: deposit first, then balance */
   const paymentsOfOrder = groupBy(
@@ -753,7 +682,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       .forEach(({ p, inv }, i) =>
         paymentRows.push({
           id: p.id,
-          direction: "in",
           kind: map.paymentKind(i),
           orderId,
           customerId: o.customerId,
@@ -798,15 +726,15 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   /* ---- counters: new numbers continue after the imported ones */
   const legacyCounters = Object.fromEntries(old.counters.map((c) => [c.key, c.value]));
   const counters = map.counterValues(
-    [...old.queries.map((q) => q.ref_no), ...old.quotations.map((q) => q.ref_no), ...old.invoices.map((i) => i.invoice_no)],
+    [...old.queries.map((q) => q.ref_no), ...old.quotations.map((q) => q.ref_no)],
     legacyCounters,
-    ["inquiry", "quotation", "commercialInvoice"],
+    ["inquiry", "quotation"],
   );
   for (const [key, value] of counters) {
     await tx.counter.upsert({ where: { key }, update: { value }, create: { key, value } });
   }
   const unused = old.counters.filter((c) => !counters.has(c.key));
-  if (unused.length) report.judge("Old counters not carried over", unused.map((c) => `${c.key}=${c.value} (no new document uses that prefix; shipments are numbered SH-…)`).join(", "));
+  if (unused.length) report.judge("Old counters not carried over", unused.map((c) => `${c.key}=${c.value} (no new document uses that prefix: an order's documents take its number)`).join(", "));
 
   /* ---- report: counts and totals */
   const c = {
@@ -828,11 +756,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     orders: await tx.order.count(),
     orderLines: await tx.orderLine.count(),
     orderStageChanges: await tx.orderStageChange.count(),
-    invoices: await tx.invoice.count(),
-    invoiceLines: await tx.invoiceLine.count(),
     payments: await tx.payment.count(),
-    shipments: await tx.shipment.count(),
-    shipmentLines: await tx.shipmentLine.count(),
+    packedOrders: await tx.order.count({ where: { packedAt: { not: null } } }),
     audit: await tx.auditLog.count(),
     settings: await tx.setting.count(),
     counters: await tx.counter.findMany({ orderBy: { key: "asc" } }),
@@ -859,11 +784,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "accepted quotations → orders", old: old.quotations.filter((q) => q.status === "accepted" && !q.deleted_at).length, new: c.orders },
     { what: "  → order_lines", old: "-", new: c.orderLines },
     { what: "  → order stage history", old: "-", new: `${c.orderStageChanges}` },
-    { what: "invoices → invoices (commercial)", old: old.invoices.length, new: c.invoices },
-    { what: "invoice_items → invoice_lines", old: old.invoiceItems.length, new: c.invoiceLines },
     { what: "payments → payments (in)", old: old.payments.length, new: c.payments },
-    { what: "packing_lists → shipments", old: old.packingLists.length, new: c.shipments },
-    { what: "packing_list_items → shipment_lines", old: old.packingItems.length, new: c.shipmentLines },
+    { what: "packing_lists → orders with a packing list", old: old.packingLists.filter((p) => !p.deleted_at).length, new: c.packedOrders },
     { what: "audit_logs → audit_logs (+ import entries)", old: old.auditLogs.length, new: c.audit },
     { what: "settings (one JSON) → settings groups", old: old.settings.length, new: c.settings },
     { what: "counters → counters", old: old.counters.length, new: c.counters.map((x) => `${x.key}=${x.value}`).join(", ") },
@@ -872,18 +794,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "device_tokens (skipped: phones sign in again)", old: Number(old.skipped.device_tokens), new: 0 },
   );
 
-  const newInv = await tx.invoice.findMany({ select: { total: true, status: true } });
-  const newPay = await tx.payment.findMany({ where: { direction: "in" }, select: { amount: true } });
+  const newPay = await tx.payment.findMany({ select: { amount: true } });
   const newRev = await tx.quotationRevision.findMany({ select: { total: true } });
   const newOrders = await tx.order.findMany({ select: { total: true } });
   const check = (what: string, oldMinor: number, newMinor: number) =>
     report.totals.push({ what, old: fromMinor(oldMinor), new: fromMinor(newMinor), ok: oldMinor === newMinor });
-  check("invoice totals (all)", sumMinor(old.invoices.map((i) => i.total)), sumMinor(newInv.map((i) => i.total)));
-  check(
-    "invoice totals (not cancelled / issued)",
-    sumMinor(old.invoices.filter((i) => i.status !== "cancelled").map((i) => i.total)),
-    sumMinor(newInv.filter((i) => i.status === "issued").map((i) => i.total)),
-  );
   check("payments", sumMinor(old.payments.map((p) => p.amount)), sumMinor(newPay.map((p) => p.amount)));
   check("old invoices' amount_paid vs new payments", sumMinor(old.invoices.map((i) => i.amount_paid)), sumMinor(newPay.map((p) => p.amount)));
   check("quotation totals (all versions)", sumMinor(old.quotations.map((q) => q.total)), sumMinor(newRev.map((r) => r.total)));

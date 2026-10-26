@@ -22,7 +22,7 @@ export class FactoriesService {
     const [rows, total] = await Promise.all([
       this.prisma.db.factory.findMany({
         where,
-        include: { _count: { select: { quotes: { where: { deletedAt: null } }, orders: true } } },
+        include: { _count: { select: { quotes: { where: { deletedAt: null } } } } },
         orderBy: { name: "asc" },
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
@@ -42,7 +42,6 @@ export class FactoriesService {
           orderBy: { receivedOn: "desc" },
           take: 50,
         },
-        orders: { select: { id: true, refNo: true, status: true, total: true, currency: true, order: { select: { id: true, refNo: true } } }, orderBy: { createdAt: "desc" }, take: 50 },
       },
     });
     if (!f) throw new NotFoundError("Factory");
@@ -73,7 +72,7 @@ export class FactoriesService {
     });
   }
 
-  /** Hidden from lists and pickers; its past prices and orders stay on their deals. */
+  /** Hidden from lists and pickers; its past prices stay on their deals. */
   async remove(user: SessionUser, id: string) {
     if (!can(user.role, "inquiries.updateAny")) throw new ForbiddenError("Only a manager can remove a factory.");
     const f = await this.get(id);

@@ -21,9 +21,6 @@ export const vatOnTop = (netMinor: Minor, rate: number): Minor => (rate > 0 ? ro
 /** The amount without VAT, under a rule. */
 export const netOf = (amountMinor: Minor, vat: VatRule): Minor => (vat.pricesIncludeVat ? amountMinor - vatInside(amountMinor, vat.rate) : amountMinor);
 
-/** The amount with VAT, under a rule. */
-export const grossOf = (amountMinor: Minor, vat: VatRule): Minor => (vat.pricesIncludeVat ? amountMinor : amountMinor + vatOnTop(amountMinor, vat.rate));
-
 export interface PricedLine {
   quantity: DecimalLike;
   unitPrice: DecimalLike;

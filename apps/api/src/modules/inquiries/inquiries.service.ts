@@ -368,7 +368,7 @@ export class InquiriesService {
 
   /* ---------------------------------------------------------------- files */
 
-  async upload(user: SessionUser, id: string, file: { originalname: string; mimetype: string; size: number; buffer: Buffer }, links: { milestoneId?: string | null; factoryQuoteId?: string | null; paymentId?: string | null } = {}) {
+  async upload(user: SessionUser, id: string, file: { originalname: string; mimetype: string; size: number; buffer: Buffer }) {
     await this.find(user, id);
     if (!this.storage.isAllowed(file.originalname)) throw new DomainError("This kind of file is not allowed. Use PDF, Office, images, CAD drawings or zip files.");
     if (file.size > this.storage.maxBytes) throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
@@ -378,7 +378,7 @@ export class InquiriesService {
     try {
       return await this.prisma.tx(async (tx) => {
         const row = await tx.attachment.create({
-          data: { inquiryId: id, fileName: name, mimeType: file.mimetype || "application/octet-stream", size: file.size, storageKey: key, uploadedById: user.id, ...links },
+          data: { inquiryId: id, fileName: name, mimeType: file.mimetype || "application/octet-stream", size: file.size, storageKey: key, uploadedById: user.id },
         });
         await this.audit.record(tx, { userId: user.id, action: "upload", entityType: "attachment", entityId: row.id, summary: `Uploaded ${name}` });
         return row;

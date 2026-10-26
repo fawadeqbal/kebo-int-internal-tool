@@ -3,7 +3,7 @@
 import { useEffect, useState, type ComponentProps } from "react";
 import { useFormStatus } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Printer } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { buttonClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
 
 /** Submit button that shows progress and blocks double submits. */
@@ -81,15 +81,6 @@ export function Toast() {
         ✕
       </button>
     </div>
-  );
-}
-
-export function PrintButton({ label = "Print / Save as PDF", size = "md", variant = "primary" }: { label?: string; size?: ButtonSize; variant?: ButtonVariant }) {
-  return (
-    <button type="button" onClick={() => window.print()} className={buttonClass(variant, size)}>
-      <Printer aria-hidden />
-      {label}
-    </button>
   );
 }
 

@@ -97,10 +97,3 @@ export function profitBy(lines: CostedSoldLine[], key: string, limit = 8) {
     .sort((a, b) => Number(b.costedRevenueMinor > 0) - Number(a.costedRevenueMinor > 0) || b.profitMinor - a.profitMinor || b.revenueMinor - a.revenueMinor)
     .slice(0, limit);
 }
-
-/** Cash profit of one order: received from the customer (incl. bank charges they bore) less paid out. */
-export function cashProfit(inMinor: Minor[], outMinor: Minor[]) {
-  const received = inMinor.reduce((s, a) => s + a, 0);
-  const paid = outMinor.reduce((s, a) => s + a, 0);
-  return { receivedMinor: received, paidOutMinor: paid, profitMinor: received - paid };
-}

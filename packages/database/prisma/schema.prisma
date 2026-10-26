@@ -127,39 +127,6 @@ enum OrderStage {
   @@map("order_stage")
 }
 
-enum MilestoneKey {
-  proforma_sent
-  customer_deposit
-  factory_order
-  factory_deposit
-  factory_confirmed
-  samples_approved
-  inspection_passed
-  customer_balance
-  factory_balance
-  shipped
-  documents_released
-  factory_vat_invoice
-}
-
-enum MilestoneStatus {
-  todo
-  done
-  skipped
-}
-
-enum FactoryOrderStatus {
-  draft
-  sent
-  confirmed
-  cancelled
-}
-
-enum PaymentDirection {
-  in
-  out
-}
-
 enum PaymentKind {
   deposit
   balance
@@ -175,71 +142,53 @@ enum PaymentMethod {
   other
 }
 
-enum InvoiceType {
-  proforma
-  commercial
-}
-
-enum InvoiceStatus {
-  draft
-  issued
-  void
-}
-
-enum ShipmentStatus {
-  planned
-  booked
-  departed
-  arrived
-}
-
 // ============================================================================
 // Platform: people, sign-in, settings, numbering, audit, notifications
 // ============================================================================
 
 model User {
-  id             String    @id @default(uuid()) @db.Uuid
-  name           String    @db.VarChar(120)
-  email          String    @unique @db.VarChar(254)
-  passwordHash   String    @map("password_hash")
-  role           Role      @default(staff)
-  isActive       Boolean   @default(true) @map("is_active")
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String    @db.VarChar(120)
+  email         String    @unique @db.VarChar(254)
+  passwordHash  String    @map("password_hash")
+  role          Role      @default(staff)
+  isActive      Boolean   @default(true) @map("is_active")
   /// Built-in account that records website inquiries; can never sign in.
-  isSystem       Boolean   @default(false) @map("is_system")
-  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz
-  failedLogins   Int       @default(0) @map("failed_logins")
-  lockedUntil    DateTime? @map("locked_until") @db.Timestamptz
+  isSystem      Boolean   @default(false) @map("is_system")
+  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamptz
+  failedLogins  Int       @default(0) @map("failed_logins")
+  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz
   /// Two-step sign-in: encrypted authenticator secret; on once totpEnabledAt is set.
-  totpSecret     String?   @map("totp_secret")
-  totpEnabledAt  DateTime? @map("totp_enabled_at") @db.Timestamptz
-  totpLastStep   Int?      @map("totp_last_step")
+  totpSecret    String?   @map("totp_secret")
+  totpEnabledAt DateTime? @map("totp_enabled_at") @db.Timestamptz
+  totpLastStep  Int?      @map("totp_last_step")
   /// sha256 hashes of unused recovery codes.
-  recoveryCodes  String[]  @default([]) @map("recovery_codes")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  recoveryCodes String[]  @default([]) @map("recovery_codes")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  sessions       Session[]
-  devices        DeviceToken[]
-  notifications  Notification[]
-  assignedDeals  Inquiry[]          @relation("InquiryAssignee")
-  createdDeals   Inquiry[]          @relation("InquiryCreator")
-  orderMoves     OrderStageChange[]
+  sessions      Session[]
+  devices       DeviceToken[]
+  notifications Notification[]
+  assignedDeals Inquiry[]          @relation("InquiryAssignee")
+  createdDeals  Inquiry[]          @relation("InquiryCreator")
+  orderMoves    OrderStageChange[]
 
   @@map("users")
 }
 
 /// One row per signed-in browser or phone; the token only carries this id, so sign-out and deactivation end sessions at once.
 model Session {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
-  userAgent  String?   @map("user_agent") @db.VarChar(300)
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt     DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz
+  userAgent      String?   @map("user_agent") @db.VarChar(300)
   /// Signed in, but the second step (authenticator code) is not done yet.
-  pendingTwoStep Boolean @default(false) @map("pending_two_step")
+  pendingTwoStep Boolean   @default(false) @map("pending_two_step")
 
   devices DeviceToken[]
 
@@ -387,9 +336,7 @@ model Factory {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  quotes   FactoryQuote[]
-  orders   FactoryOrder[]
-  payments Payment[]
+  quotes FactoryQuote[]
 
   @@index([name])
   @@map("factories")
@@ -446,15 +393,15 @@ model Inquiry {
 }
 
 model RequestedItem {
-  id          String  @id @default(uuid()) @db.Uuid
-  inquiryId   String  @map("inquiry_id") @db.Uuid
-  inquiry     Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  description String
-  model       String? @db.VarChar(120)
-  quantity    Decimal @db.Decimal(12, 2)
-  unit        String  @default("pcs") @db.VarChar(20)
-  targetPrice Decimal? @map("target_price") @db.Decimal(14, 2)
-  sortOrder   Int     @default(0) @map("sort_order")
+  id                     String            @id @default(uuid()) @db.Uuid
+  inquiryId              String            @map("inquiry_id") @db.Uuid
+  inquiry                Inquiry           @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  description            String
+  model                  String?           @db.VarChar(120)
+  quantity               Decimal           @db.Decimal(12, 2)
+  unit                   String            @default("pcs") @db.VarChar(20)
+  targetPrice            Decimal?          @map("target_price") @db.Decimal(14, 2)
+  sortOrder              Int               @default(0) @map("sort_order")
   /// The factory price line to quote from by default.
   preferredFactoryLineId String?           @map("preferred_factory_line_id") @db.Uuid
   preferredFactoryLine   FactoryQuoteLine? @relation("PreferredLine", fields: [preferredFactoryLineId], references: [id], onDelete: SetNull)
@@ -510,25 +457,18 @@ model InquiryNote {
 
 /// Files on a deal. Optionally tied to an order step (inspection report, payment slip, B/L copy).
 model Attachment {
-  id           String       @id @default(uuid()) @db.Uuid
-  inquiryId    String       @map("inquiry_id") @db.Uuid
-  inquiry      Inquiry      @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  milestoneId  String?      @map("milestone_id") @db.Uuid
-  milestone    Milestone?   @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
-  factoryQuoteId String?    @map("factory_quote_id") @db.Uuid
-  factoryQuote FactoryQuote? @relation(fields: [factoryQuoteId], references: [id], onDelete: SetNull)
-  paymentId    String?      @map("payment_id") @db.Uuid
-  payment      Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  fileName     String       @map("file_name") @db.VarChar(255)
-  mimeType     String       @map("mime_type") @db.VarChar(150)
+  id           String    @id @default(uuid()) @db.Uuid
+  inquiryId    String    @map("inquiry_id") @db.Uuid
+  inquiry      Inquiry   @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  fileName     String    @map("file_name") @db.VarChar(255)
+  mimeType     String    @map("mime_type") @db.VarChar(150)
   size         Int
-  storageKey   String       @map("storage_key")
-  uploadedById String       @map("uploaded_by") @db.Uuid
-  deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz
-  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  storageKey   String    @map("storage_key")
+  uploadedById String    @map("uploaded_by") @db.Uuid
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([inquiryId])
-  @@index([milestoneId])
   @@map("attachments")
 }
 
@@ -559,8 +499,7 @@ model FactoryQuote {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  lines       FactoryQuoteLine[]
-  attachments Attachment[]
+  lines FactoryQuoteLine[]
 
   @@index([inquiryId])
   @@index([factoryId])
@@ -584,9 +523,8 @@ model FactoryQuoteLine {
   rebateRate      Decimal        @default(0) @map("rebate_rate") @db.Decimal(5, 2)
   sortOrder       Int            @default(0) @map("sort_order")
 
-  preferredBy RequestedItem[]    @relation("PreferredLine")
+  preferredBy RequestedItem[] @relation("PreferredLine")
   quoteLines  QuoteLine[]
-  orderLines  FactoryOrderLine[]
 
   @@index([factoryQuoteId])
   @@map("factory_quote_lines")
@@ -681,51 +619,46 @@ model QuoteLine {
 // ============================================================================
 
 model Order {
-  id                 String            @id @default(uuid()) @db.Uuid
+  id             String            @id @default(uuid()) @db.Uuid
   /// SO-2026-0001
-  refNo              String            @unique @map("ref_no") @db.VarChar(30)
-  inquiryId          String            @map("inquiry_id") @db.Uuid
-  inquiry            Inquiry           @relation(fields: [inquiryId], references: [id])
-  revisionId         String            @unique @map("revision_id") @db.Uuid
-  revision           QuotationRevision @relation(fields: [revisionId], references: [id])
-  customerId         String            @map("customer_id") @db.Uuid
-  customer           Customer          @relation(fields: [customerId], references: [id])
-  status             OrderStatus       @default(open)
-  stage              OrderStage        @default(confirmed)
+  refNo          String            @unique @map("ref_no") @db.VarChar(30)
+  inquiryId      String            @map("inquiry_id") @db.Uuid
+  inquiry        Inquiry           @relation(fields: [inquiryId], references: [id])
+  revisionId     String            @unique @map("revision_id") @db.Uuid
+  revision       QuotationRevision @relation(fields: [revisionId], references: [id])
+  customerId     String            @map("customer_id") @db.Uuid
+  customer       Customer          @relation(fields: [customerId], references: [id])
+  status         OrderStatus       @default(open)
+  stage          OrderStage        @default(confirmed)
   /// When the order entered its current stage.
-  stageSince         DateTime          @default(now()) @map("stage_since") @db.Timestamptz
-  orderedOn          DateTime          @map("ordered_on") @db.Date
+  stageSince     DateTime          @default(now()) @map("stage_since") @db.Timestamptz
+  orderedOn      DateTime          @map("ordered_on") @db.Date
   /// Ship date promised to the customer.
-  shipBy             DateTime?         @map("ship_by") @db.Date
+  shipBy         DateTime?         @map("ship_by") @db.Date
   /// Ready date the factory confirmed.
-  readyOn            DateTime?         @map("ready_on") @db.Date
-  shippedOn          DateTime?         @map("shipped_on") @db.Date
-  blNo               String?           @map("bl_no") @db.VarChar(60)
+  readyOn        DateTime?         @map("ready_on") @db.Date
+  shippedOn      DateTime?         @map("shipped_on") @db.Date
+  blNo           String?           @map("bl_no") @db.VarChar(60)
   /// When the packing list was filled in (null: not yet).
-  packedAt           DateTime?         @map("packed_at") @db.Timestamptz
-  containerNo        String?           @map("container_no") @db.VarChar(120)
-  shippingMarks      String?           @map("shipping_marks")
-  currency           String            @db.Char(3)
-  total              Decimal           @db.Decimal(14, 2)
-  depositPercent     Decimal           @map("deposit_percent") @db.Decimal(5, 2)
-  balanceTerms       BalanceTerms      @map("balance_terms")
-  incoterm           Incoterm
-  incotermPlace      String?           @map("incoterm_place") @db.VarChar(80)
-  closedAt           DateTime?         @map("closed_at") @db.Timestamptz
-  cancelledAt        DateTime?         @map("cancelled_at") @db.Timestamptz
-  cancelReason       String?           @map("cancel_reason")
-  createdById        String            @map("created_by") @db.Uuid
-  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  packedAt       DateTime?         @map("packed_at") @db.Timestamptz
+  containerNo    String?           @map("container_no") @db.VarChar(120)
+  shippingMarks  String?           @map("shipping_marks")
+  currency       String            @db.Char(3)
+  total          Decimal           @db.Decimal(14, 2)
+  depositPercent Decimal           @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms   BalanceTerms      @map("balance_terms")
+  incoterm       Incoterm
+  incotermPlace  String?           @map("incoterm_place") @db.VarChar(80)
+  closedAt       DateTime?         @map("closed_at") @db.Timestamptz
+  cancelledAt    DateTime?         @map("cancelled_at") @db.Timestamptz
+  cancelReason   String?           @map("cancel_reason")
+  createdById    String            @map("created_by") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
-  lines         OrderLine[]
-  stageChanges  OrderStageChange[]
-  /// The detailed checklist, factory orders, invoices and shipments of the first version: kept, no longer used.
-  milestones    Milestone[]
-  factoryOrders FactoryOrder[]
-  payments      Payment[]
-  invoices      Invoice[]
-  shipments     Shipment[]
+  lines        OrderLine[]
+  stageChanges OrderStageChange[]
+  payments     Payment[]
 
   @@index([inquiryId])
   @@index([status])
@@ -736,21 +669,21 @@ model Order {
 
 /// The accepted lines, frozen; shipped and invoiced quantities are tracked against them.
 model OrderLine {
-  id          String    @id @default(uuid()) @db.Uuid
-  orderId     String    @map("order_id") @db.Uuid
-  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  quoteLineId String?   @map("quote_line_id") @db.Uuid
+  id          String     @id @default(uuid()) @db.Uuid
+  orderId     String     @map("order_id") @db.Uuid
+  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  quoteLineId String?    @map("quote_line_id") @db.Uuid
   quoteLine   QuoteLine? @relation(fields: [quoteLineId], references: [id], onDelete: SetNull)
-  type        LineType  @default(goods)
+  type        LineType   @default(goods)
   description String
-  model       String?   @db.VarChar(120)
-  hsCode      String?   @map("hs_code") @db.VarChar(20)
-  quantity    Decimal   @db.Decimal(12, 2)
-  unit        String    @default("pcs") @db.VarChar(20)
-  unitPrice   Decimal   @map("unit_price") @db.Decimal(14, 2)
-  lineTotal   Decimal   @map("line_total") @db.Decimal(14, 2)
-  unitCost    Decimal?  @map("unit_cost") @db.Decimal(14, 2)
-  sortOrder   Int       @default(0) @map("sort_order")
+  model       String?    @db.VarChar(120)
+  hsCode      String?    @map("hs_code") @db.VarChar(20)
+  quantity    Decimal    @db.Decimal(12, 2)
+  unit        String     @default("pcs") @db.VarChar(20)
+  unitPrice   Decimal    @map("unit_price") @db.Decimal(14, 2)
+  lineTotal   Decimal    @map("line_total") @db.Decimal(14, 2)
+  unitCost    Decimal?   @map("unit_cost") @db.Decimal(14, 2)
+  sortOrder   Int        @default(0) @map("sort_order")
 
   /// How many have come in from the factory so far (goods lines), and when last.
   receivedQty   Decimal   @default(0) @map("received_qty") @db.Decimal(12, 2)
@@ -761,10 +694,6 @@ model OrderLine {
   netWeightKg   Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
   grossWeightKg Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
   cbm           Decimal?  @db.Decimal(10, 3)
-
-  factoryLines  FactoryOrderLine[]
-  invoiceLines  InvoiceLine[]
-  shipmentLines ShipmentLine[]
 
   @@index([orderId])
   @@map("order_lines")
@@ -789,257 +718,37 @@ model OrderStageChange {
   @@map("order_stage_changes")
 }
 
-model Milestone {
-  id          String          @id @default(uuid()) @db.Uuid
-  orderId     String          @map("order_id") @db.Uuid
-  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  key         MilestoneKey
-  status      MilestoneStatus @default(todo)
-  sortOrder   Int             @map("sort_order")
-  doneOn      DateTime?       @map("done_on") @db.Date
-  doneById    String?         @map("done_by") @db.Uuid
-  /// A due date typed in, replacing the calculated one.
-  dueOverride DateTime?       @map("due_override") @db.Date
-  /// Someone other than the deal's handler owns this step.
-  assigneeId  String?         @map("assignee_id") @db.Uuid
-  note        String?
-  /// Done past a gate or skipped while required (a manager decided; note says why).
-  overridden  Boolean         @default(false)
-  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz
-
-  events      MilestoneEvent[]
-  attachments Attachment[]
-
-  @@unique([orderId, key])
-  @@map("milestones")
-}
-
-model MilestoneEvent {
-  id          String          @id @default(uuid()) @db.Uuid
-  milestoneId String          @map("milestone_id") @db.Uuid
-  milestone   Milestone       @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
-  action      String          @db.VarChar(20)
-  fromStatus  MilestoneStatus @map("from_status")
-  toStatus    MilestoneStatus @map("to_status")
-  on          DateTime?       @db.Date
-  note        String?
-  overridden  Boolean         @default(false)
-  byId        String          @map("by") @db.Uuid
-  at          DateTime        @default(now()) @db.Timestamptz
-
-  @@index([milestoneId])
-  @@map("milestone_events")
-}
-
-/// Kebo's purchase order to a factory, linked back to the customer order lines it supplies.
-model FactoryOrder {
-  id              String             @id @default(uuid()) @db.Uuid
-  /// PO-2026-0001
-  refNo           String             @unique @map("ref_no") @db.VarChar(30)
-  orderId         String             @map("order_id") @db.Uuid
-  order           Order              @relation(fields: [orderId], references: [id])
-  factoryId       String             @map("factory_id") @db.Uuid
-  factory         Factory            @relation(fields: [factoryId], references: [id])
-  status          FactoryOrderStatus @default(draft)
-  currency        String             @default("CNY") @db.Char(3)
-  pricesIncludeVat Boolean           @default(true) @map("prices_include_vat")
-  total           Decimal            @default(0) @db.Decimal(14, 2)
-  depositPercent  Decimal            @default(30) @map("deposit_percent") @db.Decimal(5, 2)
-  paymentTerms    String?            @map("payment_terms")
-  /// Ready date the factory confirmed.
-  readyOn         DateTime?          @map("ready_on") @db.Date
-  sentOn          DateTime?          @map("sent_on") @db.Date
-  confirmedOn     DateTime?          @map("confirmed_on") @db.Date
-  /// Their VAT invoice (fapiao) received.
-  vatInvoiceNo    String?            @map("vat_invoice_no") @db.VarChar(60)
-  vatInvoiceOn    DateTime?          @map("vat_invoice_on") @db.Date
-  notes           String?
-  createdById     String             @map("created_by") @db.Uuid
-  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz
-
-  lines    FactoryOrderLine[]
-  payments Payment[]
-
-  @@index([orderId])
-  @@index([factoryId])
-  @@map("factory_orders")
-}
-
-model FactoryOrderLine {
-  id                 String            @id @default(uuid()) @db.Uuid
-  factoryOrderId     String            @map("factory_order_id") @db.Uuid
-  factoryOrder       FactoryOrder      @relation(fields: [factoryOrderId], references: [id], onDelete: Cascade)
-  orderLineId        String?           @map("order_line_id") @db.Uuid
-  orderLine          OrderLine?        @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
-  factoryQuoteLineId String?           @map("factory_quote_line_id") @db.Uuid
-  factoryQuoteLine   FactoryQuoteLine? @relation(fields: [factoryQuoteLineId], references: [id], onDelete: SetNull)
-  description        String
-  model              String?           @db.VarChar(120)
-  quantity           Decimal           @db.Decimal(12, 2)
-  unit               String            @default("pcs") @db.VarChar(20)
-  unitPrice          Decimal           @map("unit_price") @db.Decimal(14, 2)
-  vatRate            Decimal           @default(13) @map("vat_rate") @db.Decimal(5, 2)
-  lineTotal          Decimal           @map("line_total") @db.Decimal(14, 2)
-  sortOrder          Int               @default(0) @map("sort_order")
-
-  @@index([factoryOrderId])
-  @@map("factory_order_lines")
-}
-
 // ============================================================================
 // Money: payments in (customer) and out (factory), invoices
 // ============================================================================
 
 model Payment {
-  id             String           @id @default(uuid()) @db.Uuid
-  direction      PaymentDirection
-  kind           PaymentKind
-  orderId        String           @map("order_id") @db.Uuid
-  order          Order            @relation(fields: [orderId], references: [id])
+  id           String        @id @default(uuid()) @db.Uuid
+  kind         PaymentKind
+  orderId      String        @map("order_id") @db.Uuid
+  order        Order         @relation(fields: [orderId], references: [id])
   /// Incoming: the customer who paid.
-  customerId     String?          @map("customer_id") @db.Uuid
-  customer       Customer?        @relation(fields: [customerId], references: [id])
-  /// Outgoing: the factory paid and for which factory order.
-  factoryId      String?          @map("factory_id") @db.Uuid
-  factory        Factory?         @relation(fields: [factoryId], references: [id])
-  factoryOrderId String?          @map("factory_order_id") @db.Uuid
-  factoryOrder   FactoryOrder?    @relation(fields: [factoryOrderId], references: [id])
-  /// What arrived (in) or was sent (out).
-  amount         Decimal          @db.Decimal(14, 2)
+  customerId   String?       @map("customer_id") @db.Uuid
+  customer     Customer?     @relation(fields: [customerId], references: [id])
+  /// What arrived from the customer.
+  amount       Decimal       @db.Decimal(14, 2)
   /// Taken by banks on the way; still counts towards settling the amount due.
-  bankCharges    Decimal          @default(0) @map("bank_charges") @db.Decimal(14, 2)
-  currency       String           @db.Char(3)
-  paidOn         DateTime         @map("paid_on") @db.Date
-  method         PaymentMethod    @default(bank_transfer)
-  reference      String?          @db.VarChar(120)
-  note           String?
-  recordedById   String           @map("recorded_by") @db.Uuid
-  voidedAt       DateTime?        @map("voided_at") @db.Timestamptz
-  voidReason     String?          @map("void_reason")
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
-
-  attachments Attachment[]
+  bankCharges  Decimal       @default(0) @map("bank_charges") @db.Decimal(14, 2)
+  currency     String        @db.Char(3)
+  paidOn       DateTime      @map("paid_on") @db.Date
+  method       PaymentMethod @default(bank_transfer)
+  reference    String?       @db.VarChar(120)
+  note         String?
+  recordedById String        @map("recorded_by") @db.Uuid
+  voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
+  voidReason   String?       @map("void_reason")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([orderId])
-  @@index([direction, paidOn])
+  @@index([paidOn])
   @@map("payments")
-}
-
-model Invoice {
-  id               String        @id @default(uuid()) @db.Uuid
-  type             InvoiceType
-  /// PI-2026-0001 / INV-2026-0001; given when issued, never reused.
-  number           String?       @unique @db.VarChar(30)
-  orderId          String        @map("order_id") @db.Uuid
-  order            Order         @relation(fields: [orderId], references: [id])
-  shipmentId       String?       @map("shipment_id") @db.Uuid
-  shipment         Shipment?     @relation(fields: [shipmentId], references: [id])
-  status           InvoiceStatus @default(draft)
-  issueDate        DateTime?     @map("issue_date") @db.Date
-  dueDate          DateTime?     @map("due_date") @db.Date
-  currency         String        @db.Char(3)
-  vatRate          Decimal       @default(0) @map("vat_rate") @db.Decimal(5, 2)
-  pricesIncludeVat Boolean       @default(false) @map("prices_include_vat")
-  subtotal         Decimal       @default(0) @db.Decimal(14, 2)
-  discount         Decimal       @default(0) @db.Decimal(14, 2)
-  vatAmount        Decimal       @default(0) @map("vat_amount") @db.Decimal(14, 2)
-  total            Decimal       @default(0) @db.Decimal(14, 2)
-  /// Proforma: the deposit asked for on it.
-  depositPercent   Decimal?      @map("deposit_percent") @db.Decimal(5, 2)
-  notes            String?
-  voidReason       String?       @map("void_reason")
-  customerSnapshot Json?         @map("customer_snapshot")
-  companySnapshot  Json?         @map("company_snapshot")
-  createdById      String        @map("created_by") @db.Uuid
-  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
-
-  lines InvoiceLine[]
-
-  @@index([orderId])
-  @@index([status, dueDate])
-  @@map("invoices")
-}
-
-model InvoiceLine {
-  id          String     @id @default(uuid()) @db.Uuid
-  invoiceId   String     @map("invoice_id") @db.Uuid
-  invoice     Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  orderLineId String?    @map("order_line_id") @db.Uuid
-  orderLine   OrderLine? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
-  type        LineType   @default(goods)
-  description String
-  model       String?    @db.VarChar(120)
-  hsCode      String?    @map("hs_code") @db.VarChar(20)
-  quantity    Decimal    @db.Decimal(12, 2)
-  unit        String     @default("pcs") @db.VarChar(20)
-  unitPrice   Decimal    @map("unit_price") @db.Decimal(14, 2)
-  lineTotal   Decimal    @map("line_total") @db.Decimal(14, 2)
-  sortOrder   Int        @default(0) @map("sort_order")
-
-  @@index([invoiceId])
-  @@map("invoice_lines")
 }
 
 // ============================================================================
 // Shipping: a shipment (one or more per order) and its packing list
 // ============================================================================
-
-model Shipment {
-  id               String         @id @default(uuid()) @db.Uuid
-  /// SH-2026-0001
-  refNo            String         @unique @map("ref_no") @db.VarChar(30)
-  orderId          String         @map("order_id") @db.Uuid
-  order            Order          @relation(fields: [orderId], references: [id])
-  status           ShipmentStatus @default(planned)
-  forwarder        String?        @db.VarChar(120)
-  portOfLoading    String?        @map("port_of_loading") @db.VarChar(120)
-  portOfDischarge  String?        @map("port_of_discharge") @db.VarChar(120)
-  finalDestination String?        @map("final_destination") @db.VarChar(160)
-  /// Vessel / voyage, flight or truck.
-  transport        String?        @db.VarChar(160)
-  containerNos     String?        @map("container_nos") @db.VarChar(200)
-  sealNos          String?        @map("seal_nos") @db.VarChar(120)
-  blNo             String?        @map("bl_no") @db.VarChar(60)
-  etd              DateTime?      @db.Date
-  eta              DateTime?      @db.Date
-  departedOn       DateTime?      @map("departed_on") @db.Date
-  /// Original B/L (or other documents of title) handed to the customer.
-  documentsReleasedOn DateTime?   @map("documents_released_on") @db.Date
-  marks            String?
-  notes            String?
-  customerSnapshot Json?          @map("customer_snapshot")
-  companySnapshot  Json?          @map("company_snapshot")
-  createdById      String         @map("created_by") @db.Uuid
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
-
-  lines    ShipmentLine[]
-  invoices Invoice[]
-
-  @@index([orderId])
-  @@map("shipments")
-}
-
-model ShipmentLine {
-  id          String    @id @default(uuid()) @db.Uuid
-  shipmentId  String    @map("shipment_id") @db.Uuid
-  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-  orderLineId String?   @map("order_line_id") @db.Uuid
-  orderLine   OrderLine? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
-  description String
-  model       String?   @db.VarChar(120)
-  hsCode      String?   @map("hs_code") @db.VarChar(20)
-  quantity    Decimal   @db.Decimal(12, 2)
-  unit        String    @default("pcs") @db.VarChar(20)
-  packages    Int       @default(1)
-  packageType String    @default("Carton") @map("package_type") @db.VarChar(40)
-  netWeightKg   Decimal @default(0) @map("net_weight_kg") @db.Decimal(12, 2)
-  grossWeightKg Decimal @default(0) @map("gross_weight_kg") @db.Decimal(12, 2)
-  cbm         Decimal   @default(0) @db.Decimal(12, 3)
-  sortOrder   Int       @default(0) @map("sort_order")
-
-  @@index([shipmentId])
-  @@map("shipment_lines")
-}

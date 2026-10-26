@@ -15,15 +15,13 @@ secrets/
 firebase-service-account*.json
 kebo-rfq-*.json
 credentials.txt
-server-check.txt
-portfolio/
+
+# local files the API stores without S3, and backups
 /storage/
-apps/mobile/android/app/google-services.json
+backups/
 
 # generated Prisma client
 packages/database/src/generated/
 
 # agent worktrees
 .claude/
-backups/
-secrets/

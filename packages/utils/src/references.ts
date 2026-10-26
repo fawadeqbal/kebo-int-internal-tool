@@ -1,16 +1,13 @@
 /**
  * Document numbers: PREFIX-YEAR-0001, sequential per prefix and year and never
  * reused (the database hands out the next value atomically; this only formats
- * and reads them).
+ * and reads them). An order's documents take its number (SO-2026-0005 →
+ * PI-2026-0005, INV-2026-0005, PL-2026-0005), so they need no counter.
  */
 export const DOCUMENT_PREFIX = {
   inquiry: "RFQ",
   quotation: "QUO",
   order: "SO",
-  factoryOrder: "PO",
-  proformaInvoice: "PI",
-  commercialInvoice: "INV",
-  shipment: "SH",
 } as const;
 
 export type DocumentKind = keyof typeof DOCUMENT_PREFIX;

@@ -27,7 +27,7 @@ export class PaymentsService {
 
   async forOrder(user: SessionUser, orderId: string) {
     const o = await this.orders.load(user, orderId);
-    const all = await this.prisma.db.payment.findMany({ where: { orderId, direction: "in" }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] });
+    const all = await this.prisma.db.payment.findMany({ where: { orderId }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] });
     const live = all.filter((p) => !p.voidedAt && p.currency === o.currency);
     const position = settle(decimalToMinor(o.total), live.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })), Number(o.depositPercent));
     return {
@@ -69,7 +69,6 @@ export class PaymentsService {
       if (toMinor(input.amount) + toMinor(input.bankCharges) > before.outstandingMinor) throw new DomainError(`That is more than is still due (${formatMinor(before.outstandingMinor, o.currency)}).`);
       await tx.payment.create({
         data: {
-          direction: "in",
           kind: input.kind,
           orderId,
           customerId: o.customerId,
@@ -84,7 +83,7 @@ export class PaymentsService {
         },
       });
       await this.audit.record(tx, { userId: user.id, action: "payment_in", entityType: "order", entityId: orderId, summary: `${o.refNo}: received ${o.currency} ${input.amount}${toMinor(input.bankCharges) ? ` (+${input.bankCharges} bank charges)` : ""}, ${input.reference ?? "no reference"}` });
-      return { type: "payment.recorded" as const, orderId, refNo: o.refNo, direction: "in" as const, amount: `${o.currency} ${input.amount}`, actorId: user.id, notify: [o.inquiry.assigneeId].filter((v): v is string => !!v) };
+      return { type: "payment.recorded" as const, orderId, refNo: o.refNo, amount: `${o.currency} ${input.amount}`, actorId: user.id, notify: [o.inquiry.assigneeId].filter((v): v is string => !!v) };
     });
     await this.events.publish(event);
     return this.forOrder(user, orderId);
