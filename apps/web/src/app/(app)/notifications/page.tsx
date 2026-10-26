@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 import { AlarmClock, BadgeDollarSign, Bell, CheckCheck, ClipboardList, FileText, Trophy, UserPlus, type LucideIcon } from "lucide-react";
 import { Card, cn, EmptyState, LinkTabs, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
@@ -12,23 +12,26 @@ import { markAllReadAction, openNotificationAction } from "./actions";
 export const metadata = { title: "Notifications" };
 
 /** A picture for each kind of notification (by the start of its type, e.g. "inquiry.created"). */
-function iconFor(type: string): LucideIcon {
-  if (type.startsWith("reminder") || type.includes("due") || type.includes("late")) return AlarmClock;
-  if (type.startsWith("payment")) return BadgeDollarSign;
-  if (type.includes("assigned")) return UserPlus;
-  if (type.includes("won")) return Trophy;
-  if (type.startsWith("revision") || type.startsWith("quotation")) return FileText;
-  if (type.startsWith("inquiry")) return ClipboardList;
-  return Bell;
+const ICONS: [test: (type: string) => boolean, icon: LucideIcon][] = [
+  [(t) => t.startsWith("reminder") || t.includes("due") || t.includes("late"), AlarmClock],
+  [(t) => t.startsWith("payment"), BadgeDollarSign],
+  [(t) => t.includes("assigned"), UserPlus],
+  [(t) => t.includes("won"), Trophy],
+  [(t) => t.startsWith("revision") || t.startsWith("quotation"), FileText],
+  [(t) => t.startsWith("inquiry"), ClipboardList],
+];
+
+function TypeIcon({ type }: { type: string }) {
+  const icon = ICONS.find(([test]) => test(type))?.[1] ?? Bell;
+  return createElement(icon, { className: "size-4", "aria-hidden": true });
 }
 
 function Row({ n }: { n: NotificationItem }) {
-  const Icon = iconFor(n.type);
   const unread = !n.readAt;
   const body: ReactNode = (
     <span className="flex w-full items-start gap-3 px-4 py-3 text-left">
       <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", unread ? "bg-primary-soft text-primary" : "bg-surface-2 text-muted")}>
-        <Icon className="size-4" aria-hidden />
+        <TypeIcon type={n.type} />
       </span>
       <span className="min-w-0 flex-1">
         <span className={cn("block text-sm", unread ? "font-semibold text-text" : "text-text-2")}>{n.title}</span>
