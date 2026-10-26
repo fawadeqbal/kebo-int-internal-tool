@@ -142,7 +142,7 @@ describe("money", () => {
   it("changes a customer payment only with a reason", async () => {
     const p = (await api(app, manager).get(`/orders/${orderId}/payments`).expect(200)).body.payments[0];
     const body = { kind: "deposit", amount: 650, currency: "USD", paidOn: today, reference: "TT-1" };
-    expect((await api(app, manager).patch(`/payments/${p.id}`, body).expect(422)).body.fieldErrors.reason).toBeDefined();
+    expect((await api(app, manager).patch(`/payments/${p.id}`, body).expect(409)).body.code).toBe("reason_needed");
     await api(app, sana)
       .patch(`/payments/${p.id}`, { ...body, reason: "Wrong amount" })
       .expect(403);
@@ -220,6 +220,12 @@ describe("money", () => {
           .expect(200)
       ).body.amount,
     ).toBe("180.00");
+    // The order's history shows expenses to managers only.
+    const actions = async (who: string) =>
+      ((await api(app, who).get(`/history?type=order&id=${orderId}`).expect(200)).body as { action: string }[]).map((h) => h.action);
+    expect(await actions(manager)).toContain("expense");
+    expect((await actions(sana)).filter((a) => a.startsWith("expense"))).toEqual([]);
+    expect(await actions(sana)).toContain("payment_out");
     const general = (await api(app, manager).get(`/expenses?kind=general&from=${today}&to=${today}`).expect(200)).body;
     expect(general.rows.map((r: { description: string }) => r.description)).toContain(`Office rent ${tag}`);
     expect(general.rows.every((r: { order: unknown }) => r.order === null)).toBe(true);

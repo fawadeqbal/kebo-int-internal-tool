@@ -9,6 +9,7 @@ import { Clock } from "../../common/time/clock.service";
 import { EventBus } from "../../common/events/event-bus";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "./orders.service";
+import { requireReason } from "../../common/audit/reason";
 
 /**
  * Money in from the customer against an order, in the order's currency. The
@@ -96,6 +97,7 @@ export class PaymentsService {
     const p = await this.prisma.db.payment.findUnique({ where: { id: paymentId } });
     if (!p) throw new NotFoundError("Payment");
     if (p.voidedAt) throw new DomainError("This payment was removed.");
+    const reason = requireReason(input.reason, "payment", "a recorded payment changes");
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${p.orderId}::uuid for update`;
       const o = await this.orders.load(user, p.orderId, tx);
@@ -115,7 +117,7 @@ export class PaymentsService {
         summary: `${o.refNo}: changed a payment from the customer`,
         oldValues: { amount: p.amount.toFixed(2), bankCharges: p.bankCharges.toFixed(2), paidOn: fromDbDate(p.paidOn), reference: p.reference },
         newValues: { amount: fromMinor(toMinor(input.amount)), bankCharges: fromMinor(toMinor(input.bankCharges)), paidOn: input.paidOn, reference: input.reference },
-        reason: input.reason,
+        reason,
       });
     });
     return this.forOrder(user, p.orderId);

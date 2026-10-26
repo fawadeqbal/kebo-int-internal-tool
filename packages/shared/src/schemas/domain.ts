@@ -302,8 +302,8 @@ export type PaymentInput = z.infer<typeof paymentInput>;
 
 export const voidPaymentInput = z.object({ reason: text(2000, "Say why this payment is being removed") });
 
-/** Changing a recorded payment says why (it is kept in the order's history). */
-export const editPaymentInput = paymentInput.extend({ reason: text(500, "Say why this payment is changed") });
+/** Changing a recorded payment says why (asked with code "reason_needed"; kept in the order's history). */
+export const editPaymentInput = paymentInput.extend({ reason: optionalText(500).optional() });
 export type EditPaymentInput = z.infer<typeof editPaymentInput>;
 
 /* ---------------------------------------------------------------- payment plan */

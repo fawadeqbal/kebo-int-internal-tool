@@ -347,14 +347,13 @@ export class MoneyService {
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     const { factoryName, ...data } = await this.factoryPaymentData(o, input);
     await this.prisma.tx(async (tx) => {
-      const p = await tx.factoryPayment.create({ data: { ...data, orderId, recordedById: user.id } });
+      await tx.factoryPayment.create({ data: { ...data, orderId, recordedById: user.id } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out",
         entityType: "order",
         entityId: orderId,
         summary: `${o.refNo}: paid ${factoryName} ${input.currency} ${data.amount}${input.reference ? ` (${input.reference})` : ""}`,
-        newValues: { factoryPaymentId: p.id },
       });
     });
     return this.forOrder(user, orderId);
@@ -448,10 +447,12 @@ export class MoneyService {
       for (const [key, f] of this.owedByFactory(o.lines)) {
         const paid = o.factoryPaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0);
         const left = f.owedMinor - paid;
+        // Only orders with something still to pay count, so "paid X of Y" is about those.
+        if (left <= 0) continue;
         const row = byFactory.get(key) ?? { factory: f.factory, currency: f.currency, owedMinor: 0, paidMinor: 0, orders: [] };
         row.owedMinor += f.owedMinor;
         row.paidMinor += paid;
-        if (left > 0) row.orders.push({ id: o.id, refNo: o.refNo, stage: o.stage, customer: o.customer.name, toPay: fromMinor(left) });
+        row.orders.push({ id: o.id, refNo: o.refNo, stage: o.stage, customer: o.customer.name, toPay: fromMinor(left) });
         byFactory.set(key, row);
       }
     }
