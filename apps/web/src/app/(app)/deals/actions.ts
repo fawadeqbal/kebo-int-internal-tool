@@ -95,6 +95,38 @@ export async function customerContactsAction(customerId: string): Promise<Contac
   }
 }
 
+/** A new inquiry, without leaving the page: the form then uploads the URS and documents and opens the deal. */
+export async function createDealAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post<{ id: string }>("/inquiries", formBody(form)));
+  if (!r.ok) return r;
+  const id = (r.data as { id: string }).id;
+  refresh(id);
+  return { ok: true, data: { id } };
+}
+
+export type QuickCustomer = { name: string; country: string; contact: string; email: string; phone: string; allowDuplicate?: boolean };
+export type QuickCustomerResult =
+  | { ok: true; customer: CustomerOption; contacts: ContactOption[] }
+  | { ok: false; message: string; errors?: Record<string, string[] | undefined>; matches?: { id: string; label: string; detail?: string }[] };
+
+/** "New customer" on the inquiry form: just a name, country and one contact. The rest is filled in on the customer page later. */
+export async function quickCustomerAction(v: QuickCustomer): Promise<QuickCustomerResult> {
+  const r = await attempt(null, () =>
+    api.post<{ id: string; name: string; country: string; contacts: (ContactOption & { isPrimary: boolean })[] }>("/customers", {
+      name: v.name,
+      country: v.country,
+      contacts: [{ name: v.contact.trim() || v.name, email: v.email.trim() || null, phone: v.phone.trim() || null, whatsapp: v.phone.trim() || null, isPrimary: true }],
+      allowDuplicate: !!v.allowDuplicate,
+    }),
+  );
+  if (!r.ok) return { ok: false, message: r.message ?? "Could not add the customer.", errors: r.errors, matches: r.matches };
+  const c = r.data as { id: string; name: string; country: string; contacts: ContactOption[] };
+  const contacts = c.contacts.map((x) => ({ id: x.id, name: x.name, email: x.email, phone: x.phone, whatsapp: x.whatsapp, isPrimary: x.isPrimary }));
+  const primary = contacts.find((x) => x.isPrimary) ?? contacts[0] ?? null;
+  revalidatePath("/customers");
+  return { ok: true, customer: { id: c.id, name: c.name, country: c.country, primaryContact: primary && { id: primary.id, name: primary.name } }, contacts };
+}
+
 /** Create or edit a deal (the form sends JSON in `payload`, with its line items). */
 export async function saveDealAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formBody(form);

@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole, SalesSettings } from "@/lib/types-deals";
 import { DealForm } from "@/components/deals/deal-form";
-import { customerContactsAction, saveDealAction, searchCustomersAction } from "../actions";
+import { createDealAction, customerContactsAction, quickCustomerAction, searchCustomersAction } from "../actions";
 
 export const metadata = { title: "New inquiry" };
 
@@ -34,7 +34,7 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
     requiredBy: "",
     assigneeId: "",
     items: [
-      { id: null, key: "item-0", description: "", model: "", quantity: "", unit: "pcs", targetPrice: "", parentId: null, priced: false },
+      { id: null, key: "item-0", description: "", model: "", quantity: "", unit: "pcs", targetPrice: "", parentKey: null, priced: false },
     ],
   };
   return (
@@ -43,17 +43,19 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
         backHref="/deals"
         backLabel="Deals"
         title="New inquiry"
-        description="Record what the customer asked for. Factory prices and the quotation come next."
+        description="What the customer asked for, with their URS. Factory prices and the quotation come next."
       />
       <DealForm
         mode="create"
-        action={saveDealAction.bind(null, null)}
+        action={createDealAction}
         initial={initial}
         initialContacts={preset?.contacts ?? []}
         categories={settings.sales.categories}
         people={people}
         meId={me.id}
         canAssignOthers={can(me.role, "inquiries.assign")}
+        canAddCustomer={can(me.role, "customers.manage")}
+        addCustomer={quickCustomerAction}
         searchCustomers={searchCustomersAction}
         loadContacts={customerContactsAction}
         cancelHref="/deals"
