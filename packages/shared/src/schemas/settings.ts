@@ -25,7 +25,10 @@ export const companySettings = z.object({
 export const salesSettings = z.object({
   currency: z.string().trim().toUpperCase().length(3).default("USD"),
   /** 1 unit of the main currency buys N of each other currency. */
-  exchangeRates: z.record(z.string(), z.number().positive()).default({ CNY: 7.1 }),
+  exchangeRates: z
+    .record(z.string().trim().regex(/^[A-Za-z]{3}$/, "Use three-letter currency codes"), z.coerce.number().positive())
+    .default({ CNY: 7.1 })
+    .transform((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.toUpperCase(), v]))),
   defaultMarginPercent: z.coerce.number().min(0).max(95).default(15),
   vatRate: z.coerce.number().min(0).max(100).default(0),
   pricesIncludeVat: z.boolean().default(false),

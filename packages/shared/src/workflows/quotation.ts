@@ -6,7 +6,9 @@ import type { RevisionStatus } from "../enums";
  * change is a new revision, so what the customer saw is never altered. When a
  * newer revision is sent, the previous sent one becomes "superseded", so it no
  * longer counts as waiting for a reply, in reminders or in quoted value.
- * Acceptance is final: changes after that belong to the order.
+ * Acceptance is final: changes after that belong to the order. If that order
+ * is cancelled, the accepted revision becomes "void" and the reopened deal can
+ * be quoted again.
  */
 
 export const REVISION_MOVES: Record<RevisionStatus, { to: RevisionStatus; label: string }[]> = {
@@ -20,6 +22,7 @@ export const REVISION_MOVES: Record<RevisionStatus, { to: RevisionStatus; label:
   rejected: [],
   expired: [],
   superseded: [],
+  void: [],
 };
 
 export const canMoveRevision = (from: RevisionStatus, to: RevisionStatus) => REVISION_MOVES[from].some((m) => m.to === to);
@@ -54,5 +57,14 @@ export function canStartRevision(revisions: RevisionRef[]): { ok: true } | { ok:
 export const supersededBy = (revisions: RevisionRef[], sentNumber: number): number[] =>
   revisions.filter((r) => r.number < sentNumber && r.status === "sent").map((r) => r.number);
 
-/** Answers (accept/reject/expire) apply only to the latest revision. */
-export const canAnswer = (revisions: RevisionRef[], number: number) => latestRevision(revisions)?.number === number;
+/**
+ * Answers (accept/reject/expire) apply to the newest revision the customer has
+ * seen. A draft started after it does not stop the customer's answer being
+ * recorded; accepting then discards that draft.
+ */
+export const canAnswer = (revisions: RevisionRef[], number: number) =>
+  latestRevision(revisions.filter((r) => r.status !== "draft"))?.number === number && revisions.find((r) => r.number === number)?.status === "sent";
+
+/** Drafts to discard when a revision is accepted. */
+export const draftsDiscardedBy = (revisions: RevisionRef[], acceptedNumber: number): number[] =>
+  revisions.filter((r) => r.status === "draft" && r.number > acceptedNumber).map((r) => r.number);

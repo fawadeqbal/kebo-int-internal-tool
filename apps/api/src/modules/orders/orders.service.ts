@@ -46,7 +46,7 @@ export class OrdersService {
   /* ---------------------------------------------------------------- reading */
 
   private facts(o: OrderRow): OrderFacts {
-    const paidIn = o.payments.filter((p) => p.direction === "in").map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
+    const paidIn = this.customerPayments(o).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
     return {
       status: o.status,
       orderedOn: fromDbDate(o.orderedOn),
@@ -58,6 +58,11 @@ export class OrdersService {
       balanceTerms: o.balanceTerms,
       customerSettledMinor: settle(decimalToMinor(o.total), paidIn).settledMinor,
     };
+  }
+
+  /** Money in from the customer, in the order's currency (other currencies need converting first and are not mixed in). */
+  private customerPayments(o: OrderRow) {
+    return o.payments.filter((p) => p.direction === "in" && p.currency === o.currency);
   }
 
   private states(o: OrderRow): MilestoneState[] {
@@ -76,7 +81,7 @@ export class OrdersService {
 
   private view(o: OrderRow, plan: OrderPlan) {
     const facts = this.facts(o);
-    const paidIn = o.payments.filter((p) => p.direction === "in");
+    const paidIn = this.customerPayments(o);
     const money = settle(facts.totalMinor, paidIn.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })), facts.depositPercent);
     return {
       id: o.id,
@@ -154,9 +159,10 @@ export class OrdersService {
     if (input.action === "done" && on > today) throw new GateError("A step cannot be marked done on a future date.", "future_date");
 
     await this.prisma.tx(async (tx) => {
+      // Lock the order row first, then read its steps: two people ticking steps at
+      // once are served one after the other, each seeing the other's change.
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
-      // Lock the order row so two people ticking steps at once see each other's change.
-      await tx.$queryRaw`select id from orders where id = ${o.id}::uuid for update`;
       const states = this.states(o);
       const reopening = input.action === "undo" && o.status === "closed";
       const check = checkStepAction(input.key, input.action, {

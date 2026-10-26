@@ -49,6 +49,7 @@
     "API_PORT",
     "CORS_ORIGINS",
     "COOKIE_SECURE",
-    "LOG_QUERIES"
+    "LOG_QUERIES",
+    "TRUST_PROXY"
   ]
 }

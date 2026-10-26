@@ -151,6 +151,11 @@ export function gatesFor(key: MilestoneKey, terms: BalanceTerms): Gate[] {
 
 const settled = (s: MilestoneState | undefined) => !!s && s.status !== "todo";
 
+/** Steps already done that were allowed only because `key` was settled (undoing `key` would break their gate). */
+export function doneDependents(key: MilestoneKey, terms: BalanceTerms, states: MilestoneState[]): MilestoneKey[] {
+  return planFor(terms).filter((k) => gatesFor(k, terms).some((g) => g.requires === key) && states.find((s) => s.key === k)?.status === "done");
+}
+
 /** The gates still closed for a step (empty = it can be done now). */
 export function openGates(key: MilestoneKey, terms: BalanceTerms, states: MilestoneState[]): Gate[] {
   return gatesFor(key, terms).filter((g) => !settled(states.find((s) => s.key === g.requires)));
@@ -335,7 +340,13 @@ export function checkStepAction(
   const current = ctx.states.find((s) => s.key === key);
   if (!current) return { ok: false, code: "unknown_step", message: "This step is not part of the order." };
   if (action === "undo") {
-    return current.status === "todo" ? { ok: false, code: "not_done", message: "This step is still to do." } : { ok: true, overridden: false };
+    if (current.status === "todo") return { ok: false, code: "not_done", message: "This step is still to do." };
+    const dependents = doneDependents(key, ctx.terms, ctx.states);
+    if (dependents.length === 0) return { ok: true, overridden: false };
+    if (!ctx.canOverride) {
+      return { ok: false, code: "dependents_done", message: `Undo "${STEPS[dependents[0]].doneTitle}" first: it was allowed because this step was done.` };
+    }
+    return ctx.note?.trim() ? { ok: true, overridden: true } : { ok: false, code: "note_required", message: "Write why this step is being undone while later steps stay done." };
   }
   if (current.status !== "todo") return { ok: false, code: "already_done", message: "This step is already done or skipped." };
 

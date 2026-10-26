@@ -76,6 +76,7 @@ export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   rejected: "Rejected",
   expired: "Expired",
   superseded: "Replaced by a newer revision",
+  void: "Order cancelled",
 };
 
 export const LINE_TYPE_LABEL: Record<LineType, string> = { goods: "Goods", service: "Service", charge: "Charge (freight, fees)" };
@@ -134,6 +135,7 @@ export const REVISION_STATUS_TONE: Record<RevisionStatus, Tone> = {
   rejected: "bad",
   expired: "warn",
   superseded: "neutral",
+  void: "neutral",
 };
 
 export const ORDER_STAGE_TONE: Record<OrderStage, Tone> = {

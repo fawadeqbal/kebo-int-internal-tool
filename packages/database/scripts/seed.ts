@@ -62,6 +62,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     return;
   }
   const today = todayIn(tz);
+  const year = Number(today.slice(0, 4));
   const bilal = await upsertUser("bilal@example.com", "Bilal", "staff", "Demo@12345");
   const sana = await upsertUser("sana@example.com", "Sana", "staff", "Demo@12345");
 
@@ -100,7 +101,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     const customer = customers[o.customer];
     const inquiry = await db.inquiry.create({
       data: {
-        refNo: await nextReference(db, "inquiry"),
+        refNo: await nextReference(db, "inquiry", year),
         customerId: customer.id,
         contactId: customer.contacts[0].id,
         channel: o.customer % 2 ? "whatsapp" : "website",
@@ -142,7 +143,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     }
     if (!o.revisions?.length) return;
 
-    const quotation = await db.quotation.create({ data: { refNo: await nextReference(db, "quotation"), inquiryId: inquiry.id } });
+    const quotation = await db.quotation.create({ data: { refNo: await nextReference(db, "quotation", year), inquiryId: inquiry.id } });
     let accepted: { id: string; total: number; lines: { id: string }[] } | null = null;
     for (const [n, status] of o.revisions.entries()) {
       const margin = 18 - n * 3; // each revision a little sharper
@@ -191,7 +192,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     const terms = o.order.terms ?? "before_shipment";
     const order = await db.order.create({
       data: {
-        refNo: await nextReference(db, "order"),
+        refNo: await nextReference(db, "order", year),
         inquiryId: inquiry.id,
         revisionId: accepted.id,
         customerId: customer.id,
@@ -224,7 +225,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     if (o.order.done.includes("factory_order")) {
       const fo = await db.factoryOrder.create({
         data: {
-          refNo: await nextReference(db, "factoryOrder"),
+          refNo: await nextReference(db, "factoryOrder", year),
           orderId: order.id,
           factoryId: factories[o.lines[0].factory].id,
           status: "confirmed",

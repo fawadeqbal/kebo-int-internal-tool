@@ -181,3 +181,52 @@ describe("settings", () => {
     expect(s.company.website).toBe("keboint.com");
   });
 });
+
+describe("review fixes", () => {
+  it("does not undo a step another done step depended on, unless a manager explains", async () => {
+    const { checkStepAction, initialStates } = await import("../src");
+    const states = initialStates({ depositPercent: 30, balanceTerms: "before_shipment" }).map((s) =>
+      s.key === "customer_deposit" || s.key === "factory_deposit" ? { ...s, status: "done" as const, doneOn: "2026-11-01" } : s,
+    );
+    const ctx = { terms: "before_shipment" as const, states, orderStatus: "open" as const, canOverride: false };
+    expect(checkStepAction("customer_deposit", "undo", ctx)).toMatchObject({ ok: false, code: "dependents_done" });
+    expect(checkStepAction("customer_deposit", "undo", { ...ctx, canOverride: true })).toMatchObject({ ok: false, code: "note_required" });
+    expect(checkStepAction("customer_deposit", "undo", { ...ctx, canOverride: true, note: "Deposit bounced" })).toEqual({ ok: true, overridden: true });
+    expect(checkStepAction("factory_deposit", "undo", ctx)).toEqual({ ok: true, overridden: false });
+  });
+
+  it("reads blank form fields as not given, never as 0", async () => {
+    const { revisionInput, quoteLineInput } = await import("../src");
+    const line = quoteLineInput.parse({ description: "Valve", quantity: "2", unitPrice: "10", unitCost: "", fxRate: "" });
+    expect(line.unitCost).toBeNull();
+    expect(line.fxRate).toBeNull();
+    expect(quoteLineInput.safeParse({ description: "Valve", quantity: "2", unitPrice: "" }).error?.issues[0].message).toBe("Enter a price");
+    const rev = revisionInput.parse({ validUntil: "2026-12-01", depositPercent: "", lines: [{ description: "Valve", quantity: 1, unitPrice: 5 }] });
+    expect(rev.depositPercent).toBe(30);
+  });
+
+  it("only accepts what the database columns can hold", async () => {
+    const { quoteLineInput, amount } = await import("../src");
+    expect(quoteLineInput.safeParse({ description: "x", quantity: "1.005", unitPrice: 1 }).success).toBe(false);
+    expect(quoteLineInput.safeParse({ description: "x", quantity: "0.001", unitPrice: 1 }).success).toBe(false);
+    expect(amount().safeParse(1e12).success).toBe(false);
+  });
+
+  it("records the customer's answer to the sent revision even when a newer draft exists", async () => {
+    const { canAnswer, draftsDiscardedBy, canStartRevision } = await import("../src");
+    const revs = [
+      { number: 1, status: "superseded" as const },
+      { number: 2, status: "sent" as const },
+      { number: 3, status: "draft" as const },
+    ];
+    expect(canAnswer(revs, 2)).toBe(true);
+    expect(canAnswer(revs, 1)).toBe(false);
+    expect(draftsDiscardedBy(revs, 2)).toEqual([3]);
+    expect(canStartRevision([{ number: 1, status: "void" }])).toEqual({ ok: true });
+  });
+
+  it("upper-cases exchange rate codes", async () => {
+    const { readSettings } = await import("../src");
+    expect(readSettings({ sales: { exchangeRates: { cny: "7.2" } } }).sales.exchangeRates).toEqual({ CNY: 7.2 });
+  });
+});

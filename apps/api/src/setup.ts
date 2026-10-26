@@ -7,6 +7,8 @@ import type { Env } from "./config/env";
 /** Everything main.ts and the tests share: prefix, security headers, CORS, errors, API docs. */
 export function configureApp(app: INestApplication, env: Env) {
   app.setGlobalPrefix("api");
+  // req.ip honours X-Forwarded-For only for the configured number of proxy hops.
+  (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set("trust proxy", env.TRUST_PROXY);
   app.use(helmet());
   app.enableCors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false, credentials: true });
   app.useGlobalFilters(new ErrorFilter());

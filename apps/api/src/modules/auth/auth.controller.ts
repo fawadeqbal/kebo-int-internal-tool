@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, Public } from "../../common/auth/decorators";
-import { SESSION_COOKIE } from "../../common/auth/tokens.service";
+import { SESSION_COOKIE, sessionCookieOptions } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { AuthService } from "./auth.service";
 
@@ -15,8 +15,8 @@ const loginInput = z.object({
   cookie: z.boolean().default(false),
 });
 
-/** The client's IP: the last X-Forwarded-For entry is the one our own proxy added, so it cannot be faked. */
-const clientIp = (req: Request) => (req.headers["x-forwarded-for"] as string | undefined)?.split(",").at(-1)?.trim() || req.socket.remoteAddress || "local";
+/** The client's IP. Express reads X-Forwarded-For only when TRUST_PROXY says a proxy is in front, so it cannot be faked. */
+const clientIp = (req: Request) => req.ip || req.socket.remoteAddress || "local";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -29,13 +29,7 @@ export class AuthController {
   async login(@Body(Validate(loginInput)) body: z.infer<typeof loginInput>, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.login(body.email, body.password, { ip: clientIp(req), userAgent: req.headers["user-agent"] });
     if (body.cookie) {
-      res.cookie(SESSION_COOKIE, result.token, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.COOKIE_SECURE === "true",
-        path: "/",
-        maxAge: result.expiresInSeconds * 1000,
-      });
+      res.cookie(SESSION_COOKIE, result.token, sessionCookieOptions());
     }
     return result;
   }

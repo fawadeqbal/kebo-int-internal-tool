@@ -1,4 +1,4 @@
-import { roundHalfAway, type Minor } from "./core";
+import { allocate, roundHalfAway, type Minor } from "./core";
 import { netOf, type VatRule } from "./totals";
 
 /**
@@ -74,21 +74,27 @@ export interface CostedLine {
   unitCostMinor: Minor | null;
 }
 
-/** The costing box on a quotation: cost, sales and profit of the lines that have a cost; lines without one are counted apart. */
-export function costSummary(lines: CostedLine[], vat?: VatRule) {
+/**
+ * The costing box on a quotation: cost, sales and profit of the lines that have
+ * a cost; lines without one are counted apart. The document discount is spread
+ * over all lines by amount (as on the invoice), so it lowers the profit shown.
+ */
+export function costSummary(lines: CostedLine[], vat?: VatRule, discountMinor: Minor = 0) {
+  const gross = lines.map((l) => roundHalfAway(l.unitPriceMinor * (Number(l.quantity) || 0)));
+  const subtotal = gross.reduce((s, g) => s + g, 0);
+  const shares = allocate(Math.min(Math.max(discountMinor, 0), Math.max(subtotal, 0)), gross);
   let cost = 0;
   let sales = 0;
   let uncosted = 0;
-  for (const l of lines) {
-    const q = Number(l.quantity) || 0;
+  lines.forEach((l, i) => {
     if (l.unitCostMinor === null) {
       uncosted += 1;
-      continue;
+      return;
     }
-    const price = vat ? netOf(l.unitPriceMinor, vat) : l.unitPriceMinor;
-    cost += roundHalfAway(l.unitCostMinor * q);
-    sales += roundHalfAway(price * q);
-  }
+    const afterDiscount = gross[i] - shares[i];
+    sales += vat ? netOf(afterDiscount, vat) : afterDiscount;
+    cost += roundHalfAway(l.unitCostMinor * (Number(l.quantity) || 0));
+  });
   return {
     costMinor: cost,
     salesMinor: sales,

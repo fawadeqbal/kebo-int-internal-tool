@@ -25,7 +25,9 @@ export class TokensService {
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(userId)
       .setIssuedAt()
-      .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
+      // The token lives as long as the longest possible session; the sessions row
+      // slides the 30-day idle expiry and enforces the 90-day cap on every request.
+      .setExpirationTime(`${SESSION_MAX_AGE_DAYS}d`)
       .sign(this.key);
   }
 
@@ -40,6 +42,15 @@ export class TokensService {
   }
 }
 
+/** The same cookie attributes wherever it is set or refreshed. */
+export const sessionCookieOptions = () => ({
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.COOKIE_SECURE === "true",
+  path: "/",
+  maxAge: SESSION_TTL_SECONDS * 1000,
+});
+
 /** The token from "Authorization: Bearer …" (mobile, server-to-server) or the session cookie (browser). */
 export function tokenFrom(headers: Record<string, string | string[] | undefined>): string | undefined {
   const auth = headers.authorization;
@@ -47,7 +58,13 @@ export function tokenFrom(headers: Record<string, string | string[] | undefined>
   const cookie = typeof headers.cookie === "string" ? headers.cookie : "";
   for (const part of cookie.split(";")) {
     const [name, ...rest] = part.trim().split("=");
-    if (name === SESSION_COOKIE) return decodeURIComponent(rest.join("="));
+    if (name === SESSION_COOKIE) {
+      try {
+        return decodeURIComponent(rest.join("="));
+      } catch {
+        return undefined; // a mangled cookie is simply "not signed in"
+      }
+    }
   }
   return undefined;
 }

@@ -60,6 +60,22 @@ describe("orders: the checklist through the API", () => {
     expect(undone.body.plan.next.key).toBe("customer_deposit");
   });
 
+  it("serves parallel clicks one at a time: exactly one succeeds", async () => {
+    const tries = await Promise.all(Array.from({ length: 5 }, () => api(app, sana).post(`/orders/${orderId}/steps`, { action: "done", key: "customer_deposit" })));
+    expect(tries.map((r) => r.status).sort()).toEqual([200, 409, 409, 409, 409]);
+    expect(tries.filter((r) => r.status === 409).every((r) => r.body.code === "already_done")).toBe(true);
+    await api(app, sana).post(`/orders/${orderId}/steps`, { action: "undo", key: "customer_deposit" }).expect(200);
+  });
+
+  it("will not undo the deposit while the factory payment that relied on it stands", async () => {
+    await api(app, sana).post(`/orders/${orderId}/steps`, { action: "done", key: "customer_deposit" }).expect(200);
+    await api(app, sana).post(`/orders/${orderId}/steps`, { action: "done", key: "factory_deposit" }).expect(200);
+    const res = await api(app, sana).post(`/orders/${orderId}/steps`, { action: "undo", key: "customer_deposit" }).expect(409);
+    expect(res.body.code).toBe("dependents_done");
+    await api(app, sana).post(`/orders/${orderId}/steps`, { action: "undo", key: "factory_deposit" }).expect(200);
+    await api(app, sana).post(`/orders/${orderId}/steps`, { action: "undo", key: "customer_deposit" }).expect(200);
+  });
+
   it("validates input with clear messages", async () => {
     const res = await api(app, sana).post(`/orders/${orderId}/steps`, { action: "finish", key: "nope" }).expect(422);
     expect(res.body.fieldErrors).toHaveProperty("action");

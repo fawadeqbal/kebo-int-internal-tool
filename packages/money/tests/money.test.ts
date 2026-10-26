@@ -44,6 +44,9 @@ describe("minor units", () => {
     expect(allocate(100, [1, 1, 1])).toEqual([34, 33, 33]);
     expect(allocate(-100, [1, 1, 1]).reduce((a, b) => a + b)).toBe(-100);
     expect(allocate(500, [0, 0])).toEqual([0, 500]);
+    expect(allocate(10.5, [1, 1]).reduce((a, b) => a + b)).toBe(11); // fractions are rounded, never loop
+    expect(allocate(7, [Infinity, 1])).toEqual([0, 7]);
+    expect(allocate(7, [Number.NaN, 2])).toEqual([0, 7]);
     const parts = allocate(210_000, [2_000_000, 100_000]);
     expect(parts).toEqual([200_000, 10_000]);
   });
@@ -114,6 +117,11 @@ describe("costing", () => {
     const vat = { rate: 13, pricesIncludeVat: true };
     expect(priceForMargin(85_00, 15, vat)).toBe(113_00);
     expect(marginPercent(113_00, 85_00, vat)).toBe(15);
+  });
+
+  it("takes the document discount off the costing box", () => {
+    // 10 × 10.00 at cost 8.00 with a 5.00 discount: sales 95.00, profit 15.00 → 15.8%
+    expect(costSummary([{ quantity: 10, unitPriceMinor: 10_00, unitCostMinor: 8_00 }], undefined, 5_00)).toMatchObject({ salesMinor: 95_00, profitMinor: 15_00, marginPercent: 15.8 });
   });
 
   it("sums the costing box and counts uncosted lines apart", () => {

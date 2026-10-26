@@ -80,6 +80,8 @@ enum RevisionStatus {
   rejected
   expired
   superseded
+  /// Accepted, but its order was later cancelled.
+  void
 }
 
 enum LineType {
@@ -422,7 +424,8 @@ model Inquiry {
   attachments   Attachment[]
   factoryQuotes FactoryQuote[]
   quotation     Quotation?
-  order         Order?
+  /// At most one order that is not cancelled (partial unique index in the integrity migration).
+  orders        Order[]
 
   @@index([stage])
   @@index([assigneeId])
@@ -670,7 +673,7 @@ model Order {
   id                 String            @id @default(uuid()) @db.Uuid
   /// SO-2026-0001
   refNo              String            @unique @map("ref_no") @db.VarChar(30)
-  inquiryId          String            @unique @map("inquiry_id") @db.Uuid
+  inquiryId          String            @map("inquiry_id") @db.Uuid
   inquiry            Inquiry           @relation(fields: [inquiryId], references: [id])
   revisionId         String            @unique @map("revision_id") @db.Uuid
   revision           QuotationRevision @relation(fields: [revisionId], references: [id])
@@ -702,6 +705,7 @@ model Order {
   invoices      Invoice[]
   shipments     Shipment[]
 
+  @@index([inquiryId])
   @@index([status])
   @@index([customerId])
   @@map("orders")

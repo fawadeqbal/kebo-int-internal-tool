@@ -44,7 +44,8 @@ export type TaxTreatment = (typeof TAX_TREATMENTS)[number];
 /* ---------------------------------------------------------------- quotations */
 
 /** Status of one revision (R1, R2…) of a quotation. */
-export const REVISION_STATUSES = values("draft", "sent", "accepted", "rejected", "expired", "superseded");
+/** "void": accepted, but the order made from it was later cancelled (the deal can be reopened and quoted again). */
+export const REVISION_STATUSES = values("draft", "sent", "accepted", "rejected", "expired", "superseded", "void");
 export type RevisionStatus = (typeof REVISION_STATUSES)[number];
 
 /** Goods are shipped (packing list, inspection); services and charges are not. */

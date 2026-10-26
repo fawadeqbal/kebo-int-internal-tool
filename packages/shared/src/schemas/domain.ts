@@ -14,7 +14,7 @@ import {
   REVISION_STATUSES,
   TAX_TREATMENTS,
 } from "../enums";
-import { amount, bool, currency, email, id, isoDate, listQuery, optionalDate, optionalId, optionalText, percent, phone, quantity, text } from "./common";
+import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, percentOr, phone, quantity, text } from "./common";
 
 /* ---------------------------------------------------------------- customers */
 
@@ -58,7 +58,7 @@ export const requestedItemInput = z.object({
   model: optionalText(120),
   quantity,
   unit: z.string().trim().max(20).default("pcs"),
-  targetPrice: amount().nullish(),
+  targetPrice: optionalAmount,
 });
 
 export const inquiryInput = z.object({
@@ -110,10 +110,10 @@ export const quoteLineInput = z.object({
   unit: z.string().trim().max(20).default("pcs"),
   unitPrice: amount("Enter a price"),
   /** Our cost for one unit in the quotation currency (internal, never printed). */
-  unitCost: amount().nullish(),
+  unitCost: optionalAmount,
   /** The factory price line the cost came from. */
   factoryQuoteLineId: optionalId,
-  fxRate: z.coerce.number().positive().nullish(),
+  fxRate: optionalRate,
 });
 export type QuoteLineInput = z.infer<typeof quoteLineInput>;
 
@@ -121,13 +121,13 @@ export const revisionInput = z.object({
   currency: currency.default("USD"),
   incoterm: z.enum(INCOTERMS).default("FOB"),
   incotermPlace: optionalText(80),
-  depositPercent: percent.default(30),
+  depositPercent: percentOr(30),
   balanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
   leadTime: optionalText(120),
   validUntil: isoDate(),
-  vatRate: percent.default(0),
+  vatRate: percentOr(0),
   pricesIncludeVat: bool.default(false),
-  discount: amount().default(0),
+  discount: amountOr(0),
   terms: optionalText(5000),
   notes: optionalText(5000),
   lines: z.array(quoteLineInput).min(1, "Add at least one line").max(300),
@@ -160,8 +160,8 @@ export const cancelOrderInput = z.object({ reason: text(2000, "Say why the order
 
 export const paymentInput = z.object({
   kind: z.enum(PAYMENT_KINDS),
-  amount: amount().refine((v) => v > 0, "The amount must be more than 0"),
-  bankCharges: amount().default(0),
+  amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+  bankCharges: amountOr(0),
   currency,
   paidOn: isoDate(),
   method: z.enum(PAYMENT_METHODS).default("bank_transfer"),

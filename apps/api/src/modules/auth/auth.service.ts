@@ -49,11 +49,12 @@ export class AuthService {
       throw new HttpException({ message: "Too many wrong passwords. This account is locked for a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
     }
     if (!ok) {
-      const failed = user.failedLogins + 1;
-      await this.prisma.db.user.update({
-        where: { id: user.id },
-        data: { failedLogins: failed >= MAX_FAILED ? 0 : failed, lockedUntil: failed >= MAX_FAILED ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null },
-      });
+      // One atomic statement, so parallel wrong passwords each count, and a failure never lifts a lock.
+      await this.prisma.db.$executeRaw`
+        update users set
+          failed_logins = case when failed_logins + 1 >= ${MAX_FAILED} then 0 else failed_logins + 1 end,
+          locked_until = case when failed_logins + 1 >= ${MAX_FAILED} then now() + make_interval(mins => ${LOCK_MINUTES}) else locked_until end
+        where id = ${user.id}::uuid`;
       throw wrong;
     }
     if (!user.isActive) throw new HttpException({ message: "This account is switched off. Ask an admin." }, HttpStatus.FORBIDDEN);

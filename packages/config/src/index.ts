@@ -58,6 +58,11 @@ export const serverEnvSchema = z.object({
   APP_TIME_ZONE: envField.timeZone("Asia/Shanghai"),
   API_PORT: envField.port(4000),
   CORS_ORIGINS: envField.list(),
+  /**
+   * How many reverse proxies (Caddy, a load balancer) sit in front of the API.
+   * Only then is X-Forwarded-For trusted for the client's IP; 0 = use the socket address.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

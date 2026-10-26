@@ -35,17 +35,59 @@ export const optionalId = z
   .transform((v) => (v ? v : null))
   .refine((v) => v === null || z.uuid().safeParse(v).success, "Choose a valid record");
 
-/** A decimal amount (money) as a non-negative number with at most 2 decimals. */
+/**
+ * Empty form fields ("", null) mean "not given", never 0: a blank cost is an
+ * uncosted line, a blank deposit takes the default, a blank price is an error.
+ */
+const blank = (v: unknown) => (v === "" || v === null || (typeof v === "string" && v.trim() === "") ? undefined : v);
+
+/** At most `places` decimals (what the database column can hold). */
+const decimals = (places: number) => (v: number) => Math.abs(Math.round(v * 10 ** places) - v * 10 ** places) < 1e-6;
+
+/** Money columns are NUMERIC(14,2): up to 999,999,999,999.99. Single amounts stay well below that so totals fit too. */
+export const MAX_AMOUNT = 9_999_999_999.99;
+
+/** A required money amount: non-negative, at most 2 decimals. */
 export const amount = (message = "Enter an amount") =>
+  z.preprocess(
+    blank,
+    z.coerce
+      .number({ message })
+      .min(0, "Cannot be negative")
+      .max(MAX_AMOUNT, "That amount is too large")
+      .refine(decimals(2), "Use at most 2 decimals"),
+  );
+
+/** A money amount where a blank field takes `fallback` (e.g. no discount = 0). */
+export const amountOr = (fallback: number) =>
+  z.preprocess(blank, z.coerce.number().min(0, "Cannot be negative").max(MAX_AMOUNT, "That amount is too large").refine(decimals(2), "Use at most 2 decimals").default(fallback));
+
+/** An optional money amount: blank → null. */
+export const optionalAmount = z.preprocess(
+  (v) => blank(v) ?? null,
+  z.coerce.number().min(0, "Cannot be negative").max(MAX_AMOUNT, "That amount is too large").refine(decimals(2), "Use at most 2 decimals").nullable(),
+);
+
+const percentNumber = z.coerce.number({ message: "Enter a percentage" }).min(0, "Cannot be negative").max(100, "Cannot be more than 100%").refine(decimals(2), "Use at most 2 decimals");
+
+/** A required percentage 0–100 with at most 2 decimals. */
+export const percent = z.preprocess(blank, percentNumber);
+
+/** A percentage where a blank field takes `fallback`. */
+export const percentOr = (fallback: number) => z.preprocess(blank, percentNumber.default(fallback));
+
+/** Quantities are NUMERIC(12,2): at least 0.01, at most 2 decimals. */
+export const quantity = z.preprocess(
+  blank,
   z.coerce
-    .number({ message })
-    .min(0, "Cannot be negative")
-    .max(1_000_000_000_000)
-    .refine((v) => Math.round(v * 100) === Math.round(v * 100 * 1e6) / 1e6, "Use at most 2 decimals");
+    .number({ message: "Enter a quantity" })
+    .min(0.01, "Quantity must be more than 0")
+    .max(10_000_000, "That quantity is too large")
+    .refine(decimals(2), "Use at most 2 decimals for the quantity"),
+);
 
-export const percent = z.coerce.number({ message: "Enter a percentage" }).min(0, "Cannot be negative").max(100, "Cannot be more than 100%");
-
-export const quantity = z.coerce.number({ message: "Enter a quantity" }).positive("Quantity must be more than 0").max(10_000_000);
+/** An optional positive rate (exchange rate): blank → null. */
+export const optionalRate = z.preprocess((v) => blank(v) ?? null, z.coerce.number().positive("Must be more than 0").max(1_000_000).refine(decimals(6), "Use at most 6 decimals").nullable());
 
 export const currency = z
   .string()

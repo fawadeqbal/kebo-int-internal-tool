@@ -96,15 +96,18 @@ export function roundHalfAway(n: number): number {
  * (largest-remainder method). Used to spread a document discount over its
  * lines, or a payment over several invoices.
  */
-export function allocate(total: Minor, weights: number[]): Minor[] {
-  if (weights.length === 0) return [];
-  const totalWeight = weights.reduce((s, w) => s + Math.max(w, 0), 0);
+export function allocate(totalInput: Minor, weightsInput: number[]): Minor[] {
+  if (weightsInput.length === 0) return [];
+  // Whole minor units and finite, non-negative weights only, so the loop below always ends.
+  const total = Math.round(totalInput);
+  const weights = weightsInput.map((w) => (Number.isFinite(w) && w > 0 ? w : 0));
+  const totalWeight = weights.reduce((s, w) => s + w, 0);
   if (totalWeight <= 0) {
     const even = weights.map(() => 0);
     even[even.length - 1] = total;
     return even;
   }
-  const raw = weights.map((w) => (total * Math.max(w, 0)) / totalWeight);
+  const raw = weights.map((w) => (total * w) / totalWeight);
   const parts = raw.map((r) => Math.trunc(r));
   let remainder = total - parts.reduce((s, p) => s + p, 0);
   const step = Math.sign(remainder);
