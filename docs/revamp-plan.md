@@ -7,12 +7,12 @@ Production keeps running `main` until the switch. Each step ends with tests pass
 | Step | Scope | Status |
 |---|---|---|
 | 1 | Monorepo; `config`, `utils`, `money`, `shared`, `ui` packages; Prisma schema and migrations; NestJS skeleton with auth, settings, orders checklist and "my to-do" | Done |
-| 2 | API: users (incl. two-step sign-in), customers + contacts, factories, inquiries (stages, hold, assign, notes, files), website form intake | Next |
-| 3 | API: factory quotes and costing, quotations with revisions and PDFs, acceptance → order (lines + checklist), factory orders | |
-| 4 | API: payments in/out, proforma and commercial invoices, shipments and packing lists, reports, reminders and notifications (worker) | |
-| 5 | `apps/web`: Next.js UI on `@kebo/ui`, calling the API | |
-| 6 | Legacy data import script (stages mapped, superseded revisions, orders created for accepted quotations); mobile app moved to the new API | |
-| 7 | Switch-over: deploy, import, retire `legacy/` | |
+| 2 | API: users (incl. two-step sign-in), customers + contacts, factories, inquiries (stages, hold, assign, notes, files), website form intake | Done |
+| 3 | API: factory quotes and costing, quotations with revisions and PDFs, acceptance → order (lines + checklist), factory orders | Done |
+| 4 | API: payments in/out, proforma and commercial invoices, shipments and packing lists, reports, reminders and notifications (worker) | Done |
+| 5 | `apps/web`: Next.js UI on `@kebo/ui`, calling the API; print pages and PDF download | Done |
+| 6 | Legacy data import script (stages mapped, superseded revisions, orders created for accepted quotations); mobile app moved to the new API | Done (the app needs a new release before the switch) |
+| 7 | Switch-over: deploy, import, retire `legacy/` — see [switch-over.md](switch-over.md) | Ready, to be run by the team |
 
 ## Data import mapping (step 6)
 
