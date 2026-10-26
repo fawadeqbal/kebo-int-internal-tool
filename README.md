@@ -1,6 +1,6 @@
 # Kebo deal tracker
 
-Internal tool for **Shandong Kebo International Trade Co., Ltd.** to run every RFQ from first message to closed order: sourcing from factories, quotations with revisions, the order checklist (deposit, factory order, production, inspection, balance, shipping, documents), and money in and out.
+Internal tool for **Shandong Kebo International Trade Co., Ltd.** to run every RFQ from first message to closed order: sourcing from factories, quotations with revisions, and orders in four simple stages (Confirmed → In production → Shipped → Done) with the money received and the documents (proforma, invoice, packing list) as PDFs.
 
 > **Status:** the rebuild is complete on `main`. The live server still runs the previous app until the switch-over in [docs/switch-over.md](docs/switch-over.md); the previous app's code is in the git history (before this cleanup), not in the tree.
 
@@ -14,7 +14,7 @@ packages/
   config/     tsconfig and ESLint presets, typed environment loader
   database/   Prisma schema, migrations, client, seed, and the import of the previous app's data
   money/      all money maths in integer minor units: totals, VAT, FX, margins, deposits, profit
-  shared/     the domain: statuses, labels, permissions, workflows, the order checklist and next-step engine, input schemas
+  shared/     the domain: statuses, labels, permissions, workflows (deal stages, quotation revisions, order stages), input schemas
   ui/         design system for the web app (tokens, components, status badges)
   utils/      dates, errors, ids, document numbers, amounts in words
 ```
@@ -26,7 +26,7 @@ Dependencies only point downwards: `utils` and `money` know nothing about the bu
 1. **Inquiry** (`RFQ-2026-0001`) — stage **New → Sourcing → Quoted → Won / Lost**. Moves happen by themselves (assigning someone, adding a factory price, sending or accepting the quotation); people only *mark as lost* (with a reason) or *put on hold*.
 2. **Factory prices** — one or more factory quotes per deal, in their currency, with VAT and export rebate, giving our landed cost.
 3. **Quotation** (`QUO-2026-0007`) — revisions R1, R2…; a revision is frozen once sent, sending a newer one marks the older *superseded*, acceptance is final.
-4. **Order** (`SO-2026-0001`) — created on acceptance with a 12-step checklist ordered by the payment terms. The API always answers *what is next, who, by when*, and enforces the gates: no factory payment before the customer's deposit, no shipping before inspection (and the balance, when it is due before shipment), no original documents before the balance. A manager can override with a written reason.
+4. **Order** (`SO-2026-0001`) — created on acceptance, then **Confirmed → In production → Shipped → Done**, one button at a time (or one stage back). Nothing blocks: a move with something off (no deposit yet, money still due) asks the person to confirm, and every move is kept in the order's history. Payments from the customer give *received* and *still due*. The proforma invoice (`PI-…`), commercial invoice (`INV-…`) and packing list (`PL-…`) are made from the order whenever they are opened, to print or download as PDF. Reminders nudge when an order waits too long for its deposit, the goods are past the factory's ready date, or the balance is still due after shipping.
 
 ## Develop
 

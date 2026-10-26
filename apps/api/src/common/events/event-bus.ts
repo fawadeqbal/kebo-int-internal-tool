@@ -1,5 +1,5 @@
 import { Global, Injectable, Logger, Module } from "@nestjs/common";
-import type { InquiryStage, MilestoneKey, RevisionStatus } from "@kebo/shared";
+import type { InquiryStage, OrderStage, RevisionStatus } from "@kebo/shared";
 
 /**
  * What happened, for anyone who wants to react (in-app notifications, emails,
@@ -12,7 +12,7 @@ export type DomainEvent =
   | { type: "inquiry.stageChanged"; inquiryId: string; refNo: string; title: string; from: InquiryStage; to: InquiryStage; actorId: string | null; notify: string[] }
   | { type: "revision.statusChanged"; inquiryId: string; refNo: string; revision: number; status: RevisionStatus; actorId: string; notify: string[] }
   | { type: "order.created"; orderId: string; refNo: string; inquiryId: string; actorId: string; notify: string[] }
-  | { type: "order.stepChanged"; orderId: string; refNo: string; key: MilestoneKey; action: string; actorId: string; notify: string[] }
+  | { type: "order.stageChanged"; orderId: string; refNo: string; from: OrderStage; to: OrderStage; actorId: string; notify: string[] }
   | { type: "payment.recorded"; orderId: string; refNo: string; direction: "in" | "out"; amount: string; actorId: string; notify: string[] };
 
 type Handler<E extends DomainEvent = DomainEvent> = (event: E) => Promise<void> | void;

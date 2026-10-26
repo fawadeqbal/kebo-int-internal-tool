@@ -561,16 +561,19 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     // Only packing lists of invoices that still stand count as goods that left.
     const shipments = invoices.flatMap((i) => packingByInvoice.get(i.id) ?? []);
     const totalMinor = toMinor(rev.total);
-    const milestones = map.inferMilestones({
+    const paymentFacts = payments.map(({ p, invoiceNo }) => ({ ref: `${p.reference ?? "payment"} on ${invoiceNo}`, on: p.paid_at, by: p.recorded_by, amountMinor: toMinor(p.amount) }));
+    const paidInFull = paymentFacts.reduce((sum, p) => sum + p.amountMinor, 0) >= totalMinor && totalMinor > 0;
+    const status = map.orderStatusFor({ legacyStatus: d.q.status, paidInFull, shipped: shipments.length > 0 });
+    const closedOn = d.q.completed_at ? dayOf(d.q.completed_at) : null;
+    const staged = map.inferStage({
+      status,
+      orderedOn: d.orderedOn!,
+      closedOn,
       depositPercent: terms.depositPercent,
-      balanceTerms: terms.balanceTerms,
       totalMinor,
-      invoices: invoices.map((i) => ({ ref: i.invoice_no, on: i.issue_date, by: i.created_by })),
-      payments: payments.map(({ p, invoiceNo }) => ({ ref: `${p.reference ?? "payment"} on ${invoiceNo}`, on: p.paid_at, by: p.recorded_by, amountMinor: toMinor(p.amount) })),
+      payments: paymentFacts,
       shipments: shipments.map((s) => ({ ref: s.pl_no, on: s.pack_date, by: s.created_by })),
     });
-    const paidInFull = milestones.find((m) => m.key === "customer_balance")?.status === "done";
-    const status = map.orderStatusFor({ legacyStatus: d.q.status, paidInFull, shipped: shipments.length > 0 });
     statusCount[status]++;
     const id = randomUUID();
     const refNo = await nextReference(tx, "order", Number(d.orderedOn!.slice(0, 4)));
@@ -582,6 +585,9 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         revisionId: rev.id,
         customerId: d.q.customer_id,
         status,
+        stage: staged.stage,
+        stageSince: toDbDate(staged.since),
+        shippedOn: staged.shippedOn ? toDbDate(staged.shippedOn) : null,
         orderedOn: toDbDate(d.orderedOn!),
         currency: rev.currency,
         total: rev.total,
@@ -619,29 +625,13 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       };
     });
     await tx.orderLine.createMany({ data: lineRows });
-    const msRows = milestones.map((m) => ({
-      id: randomUUID(),
-      orderId: id,
-      key: m.key,
-      status: m.status,
-      sortOrder: m.sortOrder,
-      doneOn: m.doneOn ? toDbDate(m.doneOn) : null,
-      doneById: m.doneById,
-      note: m.note,
-      overridden: m.overridden,
-      updatedAt: now,
-    }));
-    await tx.milestone.createMany({ data: msRows });
-    const events = msRows
-      .filter((m) => (m.status === "done" || m.status === "skipped") && m.doneById)
-      .map((m) => ({ id: randomUUID(), milestoneId: m.id, action: m.status === "done" ? "done" : "skip", fromStatus: "todo" as const, toStatus: m.status, on: m.doneOn, note: m.note, overridden: m.overridden, byId: m.doneById!, at: m.doneOn ?? now }));
-    if (events.length) await tx.milestoneEvent.createMany({ data: events });
-    const over = milestones.filter((m) => m.overridden).map((m) => m.key);
-    if (over.length) report.judge("Steps done before a step they normally wait for (marked overridden, note explains)", `${refNo} (${d.q.ref_no}): ${over.join(", ")}`);
+    await tx.orderStageChange.createMany({
+      data: staged.history.map((h, i) => ({ id: randomUUID(), orderId: id, fromStage: i === 0 ? null : staged.history[i - 1]!.to, toStage: h.to, note: h.note, at: toDbDate(h.on) })),
+    });
   }
   report.judge(
     "Orders",
-    `one per accepted revision: ${statusCount.open} open, ${statusCount.closed} closed (old "completed" + paid in full + packing list), ${statusCount.cancelled} cancelled. Only steps the old data proves are done; on orders that already shipped, the unrecorded steps before shipping are skipped with a note; factory balance, documents and VAT invoice stay to do on open orders`,
+    `one per accepted revision: ${statusCount.open} open, ${statusCount.closed} closed (old "completed" + paid in full + packing list), ${statusCount.cancelled} cancelled. Stage: closed → Done; a packing list → Shipped; payments reaching the deposit → In production; otherwise Confirmed (each step in the order's history with a note)`,
   );
 
   /* ---- shipments (packing lists) */
@@ -837,8 +827,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     quoteLines: await tx.quoteLine.count(),
     orders: await tx.order.count(),
     orderLines: await tx.orderLine.count(),
-    milestones: await tx.milestone.count(),
-    milestonesDone: await tx.milestone.count({ where: { status: "done" } }),
+    orderStageChanges: await tx.orderStageChange.count(),
     invoices: await tx.invoice.count(),
     invoiceLines: await tx.invoiceLine.count(),
     payments: await tx.payment.count(),
@@ -869,7 +858,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "quotation_items → quote_lines", old: old.quotationItems.length, new: c.quoteLines },
     { what: "accepted quotations → orders", old: old.quotations.filter((q) => q.status === "accepted" && !q.deleted_at).length, new: c.orders },
     { what: "  → order_lines", old: "-", new: c.orderLines },
-    { what: "  → milestones (done)", old: "-", new: `${c.milestones} (${c.milestonesDone} done)` },
+    { what: "  → order stage history", old: "-", new: `${c.orderStageChanges}` },
     { what: "invoices → invoices (commercial)", old: old.invoices.length, new: c.invoices },
     { what: "invoice_items → invoice_lines", old: old.invoiceItems.length, new: c.invoiceLines },
     { what: "payments → payments (in)", old: old.payments.length, new: c.payments },

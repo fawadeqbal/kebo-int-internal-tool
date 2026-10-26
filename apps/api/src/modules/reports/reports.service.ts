@@ -76,26 +76,23 @@ export class ReportsService {
       return rate ? convertMinor(minor, rate) : 0;
     };
     const monthStart = `${today.slice(0, 7)}-01`;
-    const [quoted, won, paidIn, paidOut, openOrders] = await Promise.all([
+    const [quoted, won, paidIn, openOrders] = await Promise.all([
       this.prisma.db.quotationRevision.findMany({ where: { deletedAt: null, status: { in: LIVE_QUOTED }, sentOn: { gte: day(monthStart) } }, select: { total: true, currency: true } }),
       this.prisma.db.order.findMany({ where: { status: { not: "cancelled" }, orderedOn: { gte: day(monthStart) } }, select: { total: true, currency: true } }),
       this.prisma.db.payment.findMany({ where: { voidedAt: null, direction: "in", paidOn: { gte: day(monthStart) } }, select: { amount: true, bankCharges: true, currency: true } }),
-      this.prisma.db.payment.findMany({ where: { voidedAt: null, direction: "out", paidOn: { gte: day(monthStart) } }, select: { amount: true, currency: true } }),
       this.prisma.db.order.findMany({
-        where: { status: "open" },
-        select: { total: true, currency: true, depositPercent: true, payments: { where: { voidedAt: null }, select: { direction: true, amount: true, bankCharges: true, currency: true, factoryOrderId: true } }, factoryOrders: { where: { status: { notIn: ["cancelled", "draft"] } }, select: { id: true, total: true, currency: true } } },
+        // Closed orders too: money still owed on them is still to receive.
+        where: { status: { in: ["open", "closed"] } },
+        select: { total: true, currency: true, stage: true, status: true, payments: { where: { voidedAt: null, direction: "in" }, select: { amount: true, bankCharges: true, currency: true } } },
       }),
     ]);
-    const sum = (rows: { total?: { toString(): string }; amount?: { toString(): string }; currency: string }[]) => rows.reduce((t, r) => t + toMain(decimalToMinor(r.total ?? r.amount), r.currency), 0);
+    const sum = (rows: { total: { toString(): string }; currency: string }[]) => rows.reduce((t, r) => t + toMain(decimalToMinor(r.total), r.currency), 0);
     let receivable = 0;
-    let payable = 0;
+    const byStage = { confirmed: 0, in_production: 0, shipped: 0 };
     for (const o of openOrders) {
-      const ins = o.payments.filter((p) => p.direction === "in" && p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
+      const ins = o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
       receivable += toMain(settle(decimalToMinor(o.total), ins).outstandingMinor, o.currency);
-      for (const fo of o.factoryOrders) {
-        const outs = o.payments.filter((p) => p.direction === "out" && p.factoryOrderId === fo.id).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
-        payable += toMain(settle(decimalToMinor(fo.total), outs).outstandingMinor, fo.currency);
-      }
+      if (o.status === "open" && o.stage in byStage) byStage[o.stage as keyof typeof byStage] += 1;
     }
     return {
       currency: main,
@@ -103,9 +100,8 @@ export class ReportsService {
         quoted: fromMinor(sum(quoted)),
         won: fromMinor(sum(won)),
         received: fromMinor(paidIn.reduce((t, p) => t + toMain(decimalToMinor(p.amount) + decimalToMinor(p.bankCharges), p.currency), 0)),
-        paidToFactories: fromMinor(sum(paidOut)),
       },
-      now: { toReceive: fromMinor(receivable), owedToFactories: fromMinor(payable), openOrders: openOrders.length },
+      now: { toReceive: fromMinor(receivable), openOrders: openOrders.filter((o) => o.status === "open").length, ordersByStage: byStage },
     };
   }
 

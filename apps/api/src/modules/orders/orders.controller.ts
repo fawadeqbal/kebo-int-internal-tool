@@ -1,46 +1,57 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { cancelOrderInput, orderDatesInput, stepActionInput, stepDueInput, type StepActionInput } from "@kebo/shared";
+import { cancelOrderInput, moveStageInput, ORDER_STAGES, orderDetailsInput, paymentInput, voidPaymentInput, type MoveStageInput, type OrderDetailsInput, type PaymentInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "./orders.service";
+import { DocumentsService, ORDER_DOCUMENTS, type OrderDocumentKind } from "./documents.service";
+import { PaymentsService } from "./payments.service";
 
+const flag = z.enum(["true", "false"]).optional().transform((v) => v === "true");
 const listQuery = z.object({
-  mine: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
-  overdue: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
+  mine: flag,
+  late: flag,
   status: z.enum(["open", "closed", "cancelled"]).optional(),
+  stage: z.enum(ORDER_STAGES).optional(),
 });
 
 @ApiTags("orders")
 @Controller("orders")
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly payments: PaymentsService,
+    private readonly documents: DocumentsService,
+  ) {}
 
-  /** Orders with their stage and next step. ?mine=true&overdue=true&status=open */
+  /** Orders with their stage, money due and what each needs now. ?status=open|closed|cancelled&stage=&mine=true&late=true */
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
-    return this.orders.list(user, { mine: q.mine, overdueOnly: q.overdue, status: q.status });
+    return this.orders.list(user, { mine: q.mine, status: q.status, stage: q.stage, lateOnly: q.late });
   }
 
-  /** The order, its money position and its full checklist with the next step. */
+  /** The order: stage, the next button, money, what it needs, history, documents. */
   @Get(":id")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.orders.get(user, id);
   }
 
-  /** { action: done|skip|undo, key, on?, note? } — returns the updated order and plan. */
-  @Post(":id/steps")
+  /**
+   * { to, confirm?, note?, readyOn?, shippedOn?, blNo? } — one stage forward or back.
+   * A move with warnings answers 409 { code: "confirm", error: the warnings }; send it again with confirm: true.
+   */
+  @Post(":id/stage")
   @HttpCode(200)
-  step(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(stepActionInput)) body: StepActionInput) {
-    return this.orders.applyStep(user, id, body);
+  move(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(moveStageInput)) body: MoveStageInput) {
+    return this.orders.moveStage(user, id, body);
   }
 
-  /** { key, due } — a typed due date for one step (null = back to the calculated one). */
-  @Patch(":id/steps/due")
-  due(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(stepDueInput)) body: z.infer<typeof stepDueInput>) {
-    return this.orders.setStepDue(user, id, body.key, body.due);
+  /** { shipBy, readyOn, shippedOn, blNo } */
+  @Patch(":id/details")
+  details(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderDetailsInput)) body: OrderDetailsInput) {
+    return this.orders.setDetails(user, id, body);
   }
 
   /** { reason } — managers only; the deal becomes lost (customer cancelled) and can be reopened. */
@@ -50,10 +61,35 @@ export class OrdersController {
     return this.orders.cancel(user, id, body.reason);
   }
 
-  /** { shipBy, readyOn } */
-  @Patch(":id/dates")
-  dates(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderDatesInput)) body: z.infer<typeof orderDatesInput>) {
-    return this.orders.setDates(user, id, body);
+  /** Money in from the customer, and the position (received, still due). */
+  @Get(":id/payments")
+  listPayments(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.payments.forOrder(user, id);
+  }
+
+  @Post(":id/payments")
+  @RequirePermissions("payments.record")
+  pay(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentInput)) body: PaymentInput) {
+    return this.payments.record(user, id, body);
+  }
+
+  /** proforma | invoice | packing-list — the data to print (the web turns it into a page and a PDF). */
+  @Get(":id/documents/:kind")
+  document(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
+    return this.documents.get(user, id, kind);
+  }
+}
+
+@ApiTags("orders")
+@Controller("payments")
+export class PaymentsController {
+  constructor(private readonly payments: PaymentsService) {}
+
+  /** { reason } — managers only; the payment stays visible, crossed out. */
+  @Post(":id/void")
+  @HttpCode(200)
+  void(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidPaymentInput)) body: z.infer<typeof voidPaymentInput>) {
+    return this.payments.void(user, id, body.reason);
   }
 }
 
@@ -62,7 +98,7 @@ export class OrdersController {
 export class MeController {
   constructor(private readonly orders: OrdersService) {}
 
-  /** My to-do: the next step of every open order I handle, late ones first. */
+  /** My to-do: what each open order I handle needs now, late ones first. */
   @Get("todo")
   todo(@CurrentUser() user: SessionUser) {
     return this.orders.todo(user);

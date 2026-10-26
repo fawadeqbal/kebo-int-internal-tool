@@ -117,6 +117,16 @@ enum OrderStatus {
   cancelled
 }
 
+/// Confirmed → In production → Shipped → Done, one button at a time (cancelled is the status).
+enum OrderStage {
+  confirmed
+  in_production
+  shipped
+  done
+
+  @@map("order_stage")
+}
+
 enum MilestoneKey {
   proforma_sent
   customer_deposit
@@ -213,6 +223,7 @@ model User {
   notifications  Notification[]
   assignedDeals  Inquiry[]          @relation("InquiryAssignee")
   createdDeals   Inquiry[]          @relation("InquiryCreator")
+  orderMoves     OrderStageChange[]
 
   @@map("users")
 }
@@ -680,11 +691,16 @@ model Order {
   customerId         String            @map("customer_id") @db.Uuid
   customer           Customer          @relation(fields: [customerId], references: [id])
   status             OrderStatus       @default(open)
+  stage              OrderStage        @default(confirmed)
+  /// When the order entered its current stage.
+  stageSince         DateTime          @default(now()) @map("stage_since") @db.Timestamptz
   orderedOn          DateTime          @map("ordered_on") @db.Date
   /// Ship date promised to the customer.
   shipBy             DateTime?         @map("ship_by") @db.Date
   /// Ready date the factory confirmed.
   readyOn            DateTime?         @map("ready_on") @db.Date
+  shippedOn          DateTime?         @map("shipped_on") @db.Date
+  blNo               String?           @map("bl_no") @db.VarChar(60)
   currency           String            @db.Char(3)
   total              Decimal           @db.Decimal(14, 2)
   depositPercent     Decimal           @map("deposit_percent") @db.Decimal(5, 2)
@@ -699,6 +715,8 @@ model Order {
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
   lines         OrderLine[]
+  stageChanges  OrderStageChange[]
+  /// The detailed checklist, factory orders, invoices and shipments of the first version: kept, no longer used.
   milestones    Milestone[]
   factoryOrders FactoryOrder[]
   payments      Payment[]
@@ -707,6 +725,7 @@ model Order {
 
   @@index([inquiryId])
   @@index([status])
+  @@index([stage])
   @@index([customerId])
   @@map("orders")
 }
@@ -738,6 +757,24 @@ model OrderLine {
 }
 
 /// One step of the order checklist (see @kebo/shared workflows/order).
+/// Every move of an order between stages, with who and why.
+model OrderStageChange {
+  id        String      @id @default(uuid()) @db.Uuid
+  orderId   String      @map("order_id") @db.Uuid
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStage OrderStage? @map("from_stage")
+  toStage   OrderStage  @map("to_stage")
+  note      String?
+  /// Moved although there was a warning (no deposit, money still due).
+  confirmed Boolean     @default(false)
+  byId      String?     @map("by") @db.Uuid
+  by        User?       @relation(fields: [byId], references: [id])
+  at        DateTime    @default(now()) @db.Timestamptz
+
+  @@index([orderId, at])
+  @@map("order_stage_changes")
+}
+
 model Milestone {
   id          String          @id @default(uuid()) @db.Uuid
   orderId     String          @map("order_id") @db.Uuid

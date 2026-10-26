@@ -1,19 +1,101 @@
-import type {
-  BalanceTerms,
-  FactoryOrderStatus,
-  Incoterm,
-  InvoiceStatus,
-  InvoiceType,
-  LineType,
-  PaymentKind,
-  PaymentMethod,
-  RevisionStatus,
-  ShipmentStatus,
-} from "@kebo/shared";
+import type { BalanceTerms, Incoterm, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus } from "@kebo/shared";
+import type { Person } from "./types";
 
-/** API response shapes for an order's factory orders, payments, invoices, shipments and the printed documents. */
+/** API response shapes for orders (four stages), their payments and the printed documents. Keep in step with apps/api/src/modules/orders. */
 
-/** Kebo's letterhead as it was when the document was sent or issued (the company settings). */
+/** What an open order needs from someone now, and by when (null when done or cancelled). */
+export interface OrderNeed {
+  title: string;
+  due: string;
+  late: boolean;
+}
+
+/** The one button: the stage it moves to and what it says. */
+export interface OrderNext {
+  to: OrderStage;
+  label: string;
+  stage: string;
+  hint: string;
+}
+
+/** A row of GET /orders (the board) and of GET /me/todo. */
+export interface OrderRow {
+  id: string;
+  refNo: string;
+  status: OrderStatus;
+  stage: OrderStage;
+  stageSince: string;
+  customer: { id: string; name: string; country: string };
+  inquiry: { id: string; refNo: string; title: string; assigneeId: string | null; assignee: Person | null };
+  orderedOn: string;
+  readyOn: string | null;
+  shippedOn: string | null;
+  currency: string;
+  total: string;
+  received: string;
+  due: string;
+  next: OrderNext | null;
+  needs: OrderNeed | null;
+}
+
+export type OrderDocumentKind = "proforma" | "invoice" | "packing-list";
+
+/** GET /orders/:id */
+export interface OrderView {
+  id: string;
+  refNo: string;
+  status: OrderStatus;
+  stage: OrderStage;
+  stageSince: string;
+  inquiry: { id: string; refNo: string; title: string; assigneeId: string | null; assignee: Person | null };
+  customer: { id: string; name: string; country: string };
+  orderedOn: string;
+  shipBy: string | null;
+  readyOn: string | null;
+  shippedOn: string | null;
+  blNo: string | null;
+  currency: string;
+  total: string;
+  depositPercent: number;
+  balanceTerms: BalanceTerms;
+  incoterm: Incoterm;
+  incotermPlace: string | null;
+  money: { total: string; deposit: string; received: string; bankCharges: string; due: string; depositDue: string; status: PaymentStatus };
+  next: OrderNext | null;
+  back: { to: OrderStage; label: string } | null;
+  needs: OrderNeed | null;
+  history: { id: string; from: OrderStage | null; to: OrderStage; note: string | null; confirmed: boolean; by: Person; at: string }[];
+  cancelled: { at: string; reason: string | null } | null;
+  documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
+}
+
+export type PaymentStatus = "unpaid" | "partly_paid" | "deposit_paid" | "paid" | "overpaid";
+
+/** GET /orders/:id/payments */
+export interface PaymentsView {
+  currency: string;
+  total: string;
+  received: string;
+  due: string;
+  depositDue: string;
+  status: PaymentStatus;
+  payments: {
+    id: string;
+    kind: PaymentKind;
+    amount: string;
+    bankCharges: string;
+    currency: string;
+    paidOn: string;
+    method: PaymentMethod;
+    reference: string | null;
+    note: string | null;
+    voided: { at: string; reason: string | null } | null;
+  }[];
+}
+
+/* ---------------------------------------------------------------- printed documents */
+
+/** Kebo's letterhead as it was when the document was sent (the company settings). */
 export interface CompanySnapshot {
   name: string;
   nameLocal?: string;
@@ -27,7 +109,7 @@ export interface CompanySnapshot {
   invoiceFooter?: string;
 }
 
-/** The customer as it was when the document was sent or issued. */
+/** The customer as it was when the document was sent. */
 export interface CustomerSnapshot {
   name: string;
   country: string;
@@ -36,107 +118,48 @@ export interface CustomerSnapshot {
   contact: { name: string; email: string | null; phone: string | null } | null;
 }
 
-/* ---------------------------------------------------------------- factory orders */
-
-export interface FactoryOrderLine {
-  id: string;
-  orderLineId: string | null;
-  factoryQuoteLineId: string | null;
-  description: string;
-  model: string | null;
-  quantity: string;
-  unit: string;
-  unitPrice: string;
-  vatRate: number;
-  lineTotal: string;
-  sortOrder: number;
-}
-
-export interface FactoryOrder {
-  id: string;
-  refNo: string;
-  status: FactoryOrderStatus;
-  factory: { id: string; name: string };
-  currency: string;
-  pricesIncludeVat: boolean;
-  total: string;
-  depositPercent: number;
-  deposit: string;
-  paid: string;
-  outstanding: string;
-  paymentStatus: string;
-  paymentTerms: string | null;
-  readyOn: string | null;
-  sentOn: string | null;
-  confirmedOn: string | null;
-  vatInvoiceNo: string | null;
-  vatInvoiceOn: string | null;
-  notes: string | null;
-  lines: FactoryOrderLine[];
-  payments: {
+/** GET /orders/:id/documents/:kind — made from the order whenever it is opened. */
+export interface OrderDocument {
+  kind: OrderDocumentKind;
+  title: string;
+  number: string;
+  date: string;
+  company: CompanySnapshot;
+  customer: CustomerSnapshot;
+  order: {
     id: string;
-    kind: PaymentKind;
-    amount: string;
-    bankCharges: string;
-    paidOn: string;
-    reference: string | null;
-    voided: boolean;
-  }[];
-}
-
-/** One line of a factory order as the form edits and the API takes it. */
-export interface FactoryOrderLineInput {
-  orderLineId: string | null;
-  factoryQuoteLineId: string | null;
-  description: string;
-  model: string | null;
-  quantity: number;
-  unit: string;
-  unitPrice: number;
-  vatRate: number;
-}
-
-export interface FactoryOrderDrafts {
-  groups: { factory: { id: string; name: string }; currency: string; pricesIncludeVat: boolean; lines: FactoryOrderLineInput[] }[];
-  unsourced: { orderLineId: string; description: string }[];
-}
-
-export interface FactoryDetail {
-  id: string;
-  name: string;
-  contactPerson: string | null;
-  phone: string | null;
-  wechat: string | null;
-  email: string | null;
-  address: string | null;
+    refNo: string;
+    stage: OrderStage;
+    status: OrderStatus;
+    orderedOn: string;
+    shipBy: string | null;
+    readyOn: string | null;
+    shippedOn: string | null;
+    blNo: string | null;
+    incoterm: Incoterm;
+    incotermPlace: string | null;
+    quotation: string;
+  };
+  paymentTerms: string;
+  currency: string;
+  showPrices: boolean;
+  lines: { type: LineType; description: string; model: string | null; hsCode: string | null; quantity: string; unit: string; unitPrice: string | null; lineTotal: string | null }[];
+  totals: {
+    subtotal: string;
+    discount: string;
+    vatRate: number;
+    pricesIncludeVat: boolean;
+    vat: string;
+    total: string;
+    deposit: string;
+    depositPercent: number;
+    received: string;
+    due: string;
+  } | null;
+  terms: string | null;
   bankDetails: string | null;
+  footer: string | null;
 }
-
-/* ---------------------------------------------------------------- payments */
-
-export interface Payment {
-  id: string;
-  direction: "in" | "out";
-  kind: PaymentKind;
-  amount: string;
-  bankCharges: string;
-  currency: string;
-  paidOn: string;
-  method: PaymentMethod;
-  reference: string | null;
-  note: string | null;
-  factory: { id: string; name: string } | null;
-  factoryOrder: { id: string; refNo: string } | null;
-  voided: { at: string; reason: string | null } | null;
-}
-
-export interface PaymentsView {
-  currency: string;
-  customer: { due: string; received: string; bankCharges: string; outstanding: string; depositOutstanding: string; status: string };
-  payments: Payment[];
-}
-
-/* ---------------------------------------------------------------- invoices */
 
 export interface DocLine {
   id: string;
@@ -150,104 +173,7 @@ export interface DocLine {
   lineTotal: string;
 }
 
-export interface Invoice {
-  id: string;
-  type: InvoiceType;
-  number: string | null;
-  orderId: string;
-  shipmentId: string | null;
-  status: InvoiceStatus;
-  issueDate: string | null;
-  dueDate: string | null;
-  currency: string;
-  vatRate: number;
-  pricesIncludeVat: boolean;
-  subtotal: string;
-  discount: string;
-  vatAmount: string;
-  total: string;
-  depositPercent: number | null;
-  deposit: string | null;
-  notes: string | null;
-  voidReason: string | null;
-  customerSnapshot: CustomerSnapshot | null;
-  companySnapshot: CompanySnapshot | null;
-  createdAt: string;
-  lines: DocLine[];
-}
-
-export interface InvoiceDoc extends Invoice {
-  order: { id: string; refNo: string; incoterm: Incoterm; incotermPlace: string | null; balanceTerms: BalanceTerms };
-}
-
-/* ---------------------------------------------------------------- shipments */
-
-export interface ShipmentLine {
-  id: string;
-  orderLineId: string | null;
-  description: string;
-  model: string | null;
-  hsCode: string | null;
-  quantity: string;
-  unit: string;
-  packages: number;
-  packageType: string;
-  netWeightKg: string;
-  grossWeightKg: string;
-  cbm: string;
-  sortOrder: number;
-}
-
-export interface Shipment {
-  id: string;
-  refNo: string;
-  orderId: string;
-  status: ShipmentStatus;
-  forwarder: string | null;
-  portOfLoading: string | null;
-  portOfDischarge: string | null;
-  finalDestination: string | null;
-  transport: string | null;
-  containerNos: string | null;
-  sealNos: string | null;
-  blNo: string | null;
-  etd: string | null;
-  eta: string | null;
-  departedOn: string | null;
-  documentsReleasedOn: string | null;
-  marks: string | null;
-  notes: string | null;
-  customerSnapshot: CustomerSnapshot | null;
-  companySnapshot: CompanySnapshot | null;
-  createdAt: string;
-  lines: ShipmentLine[];
-  invoices: { id: string; number: string | null; status: InvoiceStatus }[];
-  totals: { packages: number; netKg: number; grossKg: number; cbm: number };
-}
-
-export interface ShipmentDoc extends Shipment {
-  order: { id: string; refNo: string; incoterm: Incoterm; incotermPlace: string | null };
-}
-
-export interface ShipmentsView {
-  remaining: { orderLineId: string; description: string; unit: string; ordered: number; packed: number; left: number }[];
-  shipments: Shipment[];
-}
-
-/** One packed line as the form edits and the API takes it. */
-export interface ShipmentLineInput {
-  orderLineId: string;
-  description: string;
-  quantity: number;
-  packages: number;
-  packageType: string;
-  netWeightKg: number;
-  grossWeightKg: number;
-  cbm: number;
-}
-
-/* ---------------------------------------------------------------- quotation revisions (printing) */
-
+/** GET /revisions/:id (printing a quotation). */
 export interface RevisionDoc {
   quotation: { id: string; refNo: string; inquiryId: string };
   id: string;
@@ -275,7 +201,7 @@ export interface RevisionDoc {
   lines: DocLine[];
 }
 
-/** For documents not yet sent/issued (no snapshot yet): the customer as it is now. */
+/** For documents not yet sent (no snapshot yet): the customer as it is now. */
 export interface CustomerNow {
   id: string;
   name: string;

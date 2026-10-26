@@ -1,0 +1,103 @@
+{
+  "id": "196f4272-f93c-473a-a489-1d5b716b9600",
+  "refNo": "SO-2026-0001",
+  "status": "open",
+  "stage": "in_production",
+  "stageSince": "2026-10-12",
+  "inquiry": {
+    "id": "1905c650-0924-4239-a5a9-2d5be4e45cd2",
+    "refNo": "RFQ-2026-0007",
+    "title": "Capsule filling machine NJP-1200 + 1 more",
+    "assigneeId": "89900580-e548-4b50-94af-0c7345d5497f",
+    "assignee": {
+      "id": "89900580-e548-4b50-94af-0c7345d5497f",
+      "name": "Bilal"
+    }
+  },
+  "customer": {
+    "id": "f1b2cd77-f8bf-4862-9a7b-38b08e1673df",
+    "name": "Al-Shifa Pharma Ltd",
+    "country": "NG"
+  },
+  "orderedOn": "2026-10-07",
+  "shipBy": null,
+  "readyOn": "2026-10-22",
+  "shippedOn": null,
+  "blNo": null,
+  "currency": "USD",
+  "total": "43413.42",
+  "depositPercent": 30,
+  "balanceTerms": "before_shipment",
+  "incoterm": "FOB",
+  "incotermPlace": "Qingdao",
+  "money": {
+    "total": "43413.42",
+    "deposit": "13024.03",
+    "received": "13024.03",
+    "bankCharges": "25.00",
+    "due": "30389.39",
+    "depositDue": "0.00",
+    "status": "deposit_paid"
+  },
+  "next": {
+    "to": "shipped",
+    "label": "Mark as shipped",
+    "stage": "Shipped",
+    "hint": "The goods are on their way. Waiting for the balance."
+  },
+  "back": {
+    "to": "confirmed",
+    "label": "Back to Confirmed"
+  },
+  "needs": {
+    "title": "Goods due from the factory",
+    "due": "2026-10-22",
+    "late": true
+  },
+  "history": [
+    {
+      "id": "9d513b24-4884-4448-89cb-f22e1a64a7f7",
+      "from": null,
+      "to": "confirmed",
+      "note": null,
+      "confirmed": false,
+      "by": {
+        "id": "f51fcdcc-607b-4e16-9514-b894513934cb",
+        "name": "Manager"
+      },
+      "at": "2026-10-07T09:00:00.000Z"
+    },
+    {
+      "id": "5f094162-436d-4572-bc48-2a1d59a308fa",
+      "from": "confirmed",
+      "to": "in_production",
+      "note": null,
+      "confirmed": false,
+      "by": {
+        "id": "89900580-e548-4b50-94af-0c7345d5497f",
+        "name": "Bilal"
+      },
+      "at": "2026-10-12T09:00:00.000Z"
+    }
+  ],
+  "cancelled": null,
+  "documents": [
+    {
+      "kind": "quotation",
+      "label": "Quotation (accepted)",
+      "revisionId": "d7faf17e-3ee0-47e5-81de-9d21c544528b"
+    },
+    {
+      "kind": "proforma",
+      "label": "Proforma invoice"
+    },
+    {
+      "kind": "invoice",
+      "label": "Commercial invoice"
+    },
+    {
+      "kind": "packing-list",
+      "label": "Packing list"
+    }
+  ]
+}

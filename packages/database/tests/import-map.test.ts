@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { planFor } from "@kebo/shared";
 import {
   acceptanceDate,
   counterValues,
   countryHintFromPhone,
   depositPercentFromTerms,
-  inferMilestones,
+  inferStage,
   lineType,
   mapChannel,
   mapHistoryStage,
@@ -18,7 +17,7 @@ import {
   parseIncoterm,
   paymentKind,
   type LegacyVersion,
-  type MilestoneFacts,
+  type OrderStageFacts,
   type StageFacts,
 } from "../scripts/import-legacy/map";
 
@@ -178,69 +177,32 @@ describe("terms", () => {
   });
 });
 
-describe("milestones", () => {
-  const base: MilestoneFacts = { depositPercent: 30, balanceTerms: "before_shipment", totalMinor: 100_000_00, invoices: [], payments: [], shipments: [] };
-  const status = (ms: ReturnType<typeof inferMilestones>) => Object.fromEntries(ms.map((m) => [m.key, m.status]));
+describe("order stage", () => {
+  const base: OrderStageFacts = { status: "open", orderedOn: "2026-06-01", closedOn: null, depositPercent: 30, totalMinor: 100_000_00, payments: [], shipments: [] };
+  const pay = (on: string, amountMinor: number) => ({ ref: "TT", on, by: "acc", amountMinor });
 
-  it("all 12 steps in plan order, all to do without evidence", () => {
-    const ms = inferMilestones(base);
-    expect(ms.map((m) => m.key)).toEqual(planFor("before_shipment"));
-    expect(ms.map((m) => m.sortOrder)).toEqual([...Array(12).keys()]);
-    expect(ms.every((m) => m.status === "todo" && !m.overridden)).toBe(true);
+  it("Confirmed while nothing was paid or shipped", () => {
+    expect(inferStage(base)).toEqual({ stage: "confirmed", since: "2026-06-01", shippedOn: null, history: [expect.objectContaining({ to: "confirmed", on: "2026-06-01" })] });
   });
 
-  it("an issued invoice → proforma sent, on the earliest issue date", () => {
-    const ms = inferMilestones({ ...base, invoices: [{ ref: "INV-2", on: "2026-06-02", by: "u2" }, { ref: "INV-1", on: "2026-06-01", by: "u1" }] });
-    expect(ms.find((m) => m.key === "proforma_sent")).toMatchObject({ status: "done", doneOn: "2026-06-01", doneById: "u1" });
+  it("In production from the day payments reach the deposit", () => {
+    expect(inferStage({ ...base, payments: [pay("2026-06-05", 20_000_00)] }).stage).toBe("confirmed");
+    const s = inferStage({ ...base, payments: [pay("2026-06-09", 10_000_00), pay("2026-06-05", 20_000_00)] });
+    expect(s).toMatchObject({ stage: "in_production", since: "2026-06-09" });
+    expect(s.history.map((h) => h.to)).toEqual(["confirmed", "in_production"]);
   });
 
-  it("payments reaching the deposit share, then the total", () => {
-    const pay = (on: string, amountMinor: number) => ({ ref: on, on, by: "acc", amountMinor });
-    const partial = inferMilestones({ ...base, payments: [pay("2026-06-05", 20_000_00)] });
-    expect(status(partial).customer_deposit).toBe("todo");
-
-    const deposit = inferMilestones({ ...base, payments: [pay("2026-06-05", 20_000_00), pay("2026-06-09", 10_000_00)] });
-    expect(deposit.find((m) => m.key === "customer_deposit")).toMatchObject({ status: "done", doneOn: "2026-06-09" });
-    expect(status(deposit).customer_balance).toBe("todo");
-
-    const full = inferMilestones({ ...base, payments: [pay("2026-06-05", 100_000_00)] });
-    expect(full.find((m) => m.key === "customer_deposit")).toMatchObject({ status: "done", doneOn: "2026-06-05" });
-    expect(full.find((m) => m.key === "customer_balance")).toMatchObject({ status: "done", doneOn: "2026-06-05" });
+  it("Shipped from the first packing list, even when the deposit was never recorded (money stays owed)", () => {
+    const s = inferStage({ ...base, shipments: [{ ref: "PL-2", on: "2026-07-09", by: "log" }, { ref: "PL-1", on: "2026-07-01", by: "log" }] });
+    expect(s).toMatchObject({ stage: "shipped", since: "2026-07-01", shippedOn: "2026-07-01" });
+    expect(s.history.map((h) => [h.to, h.on])).toEqual([["confirmed", "2026-06-01"], ["in_production", "2026-07-01"], ["shipped", "2026-07-01"]]);
+    expect(s.history[1]!.note).toMatch(/no deposit was recorded/);
   });
 
-  it("a 0% deposit leaves the deposit step skipped", () => {
-    const ms = inferMilestones({ ...base, depositPercent: 0, payments: [{ ref: "p", on: "2026-06-05", by: "a", amountMinor: 100_000_00 }] });
-    expect(status(ms).customer_deposit).toBe("skipped");
-    expect(status(ms).customer_balance).toBe("done");
-  });
-
-  it("a packing list → shipped; the unrecorded steps before shipping are skipped, not left months late", () => {
-    const ms = inferMilestones({ ...base, shipments: [{ ref: "PL-1", on: "2026-07-01", by: "log" }] });
-    const shipped = ms.find((m) => m.key === "shipped")!;
-    expect(shipped).toMatchObject({ status: "done", doneOn: "2026-07-01", overridden: true });
-    expect(shipped.note).not.toMatch(/inspection_passed/); // skipped settles that gate
-    expect(shipped.note).toMatch(/customer_balance/); // money still owed is never assumed
-    for (const key of ["proforma_sent", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"])
-      expect(ms.find((m) => m.key === key)).toMatchObject({ status: "skipped", doneOn: null, doneById: "log", note: expect.stringMatching(/PL-1/) });
-    // Skipping a required step (factory order) counts as an override; an optional one (samples) does not.
-    expect(ms.find((m) => m.key === "factory_order")!.overridden).toBe(true);
-    expect(ms.find((m) => m.key === "samples_approved")!.overridden).toBe(false);
-    // Money is never assumed: the deposit and balance stay to do when nothing was paid.
-    expect(status(ms)).toMatchObject({ customer_deposit: "todo", customer_balance: "todo", factory_balance: "todo", documents_released: "todo", factory_vat_invoice: "todo" });
-  });
-
-  it("without a shipment nothing is skipped", () => {
-    expect(inferMilestones(base).some((m) => m.status === "skipped")).toBe(false);
-  });
-
-  it("nothing else is ever marked done", () => {
-    const ms = inferMilestones({
-      ...base,
-      invoices: [{ ref: "INV", on: "2026-06-01", by: "u" }],
-      payments: [{ ref: "p", on: "2026-06-05", by: "a", amountMinor: 100_000_00 }],
-      shipments: [{ ref: "PL", on: "2026-07-01", by: "l" }],
-    });
-    expect(ms.filter((m) => m.status === "done").map((m) => m.key).sort()).toEqual(["customer_balance", "customer_deposit", "proforma_sent", "shipped"]);
+  it("Done when the old deal was completed (and the order closed)", () => {
+    const s = inferStage({ ...base, status: "closed", closedOn: "2026-08-01", payments: [pay("2026-06-05", 100_000_00)], shipments: [{ ref: "PL-1", on: "2026-07-01", by: "log" }] });
+    expect(s).toMatchObject({ stage: "done", since: "2026-08-01", shippedOn: "2026-07-01" });
+    expect(s.history.map((h) => h.to)).toEqual(["confirmed", "in_production", "shipped", "done"]);
   });
 
   it("order status", () => {
@@ -293,7 +255,7 @@ describe("settings", () => {
     notifyDailySummary: true,
   };
 
-  it("maps the single old JSON into the five groups", () => {
+  it("maps the single old JSON into the four groups", () => {
     const { values, dropped, problems } = mapSettings(old);
     expect(problems).toEqual([]);
     expect(values.company).toMatchObject({ name: "Kebo", nameLocal: "科波", address: "Jining", taxNo: "TAX1", bankDetails: "Bank", invoiceFooter: "Thanks", website: "www.keboint.com" });
@@ -308,7 +270,7 @@ describe("settings", () => {
     });
     expect(values.reminders).toMatchObject({ newDays: 2, sourcingDays: 9, dueSoonDays: 4 });
     expect(values.notifications).toEqual({ emails: ["boss@keboint.com"], newInquiry: false, dealWonOrLost: true, paymentReceived: false, dailySummary: true });
-    expect(values.plan.proformaDays).toBe(1);
+    expect(values.reminders.depositDays).toBe(7);
     expect(dropped.sort()).toEqual(["invoicePaymentDays", "notifyQuotation"]);
   });
 

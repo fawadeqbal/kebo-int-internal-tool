@@ -1,6 +1,6 @@
 // The app's own API layer (Api + KeboRepository) against a running Kebo API.
 //
-//   KEBO_API_URL=http://localhost:4104 flutter test test/api_integration_test.dart
+//   KEBO_API_URL=http://localhost:4202 flutter test test/api_integration_test.dart
 //
 // Uses the demo logins (bilal@example.com = staff, manager@example.com = manager).
 // Skipped when KEBO_API_URL is not set.
@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kebo_rfq/core/api.dart';
+import 'package:kebo_rfq/core/format.dart' as f;
 import 'package:kebo_rfq/core/json.dart';
 import 'package:kebo_rfq/core/repository.dart';
 
@@ -39,8 +40,8 @@ void main() {
       expect(me.s('id'), staffId);
       expect(me.s('email'), 'bilal@example.com');
       expect(me.s('role'), 'staff');
-      expect(me.ls('permissions'), containsAll(['inquiries.create', 'milestones.update']));
-      expect(me.ls('permissions'), isNot(contains('milestones.override')));
+      expect(me.ls('permissions'), containsAll(['inquiries.create', 'orders.update']));
+      expect(me.ls('permissions'), isNot(contains('payments.record')));
 
       // A wrong password is the server's own message, not a crash.
       final wrong = KeboRepository(Api(baseUrl: _url!));
@@ -102,35 +103,89 @@ void main() {
       expect((await manager.reopen(id, note: 'Back on')).s('stage'), 'sourcing');
     });
 
-    test('lists my orders and opens one with its checklist', () async {
-      final orders = await staff.orders(mine: true);
-      expect(orders, isNotEmpty);
-      final o = await staff.order(orders.first.s('id'));
-      final steps = o.m('plan').l('steps');
-      expect(steps, hasLength(12));
-      expect(steps.first.keys, containsAll(['key', 'title', 'doneTitle', 'status', 'due', 'overdue', 'hint', 'blockedBy']));
-      expect(o.m('plan').mn('next'), isNotNull);
+    test('lists orders by stage, each with what it needs now', () async {
+      final open = await staff.orders(mine: true);
+      expect(open, isNotEmpty);
+      for (final o in open) {
+        expect(['confirmed', 'in_production', 'shipped'], contains(o.s('stage')));
+        expect(o.s('status'), 'open');
+        expect(o.m('needs').keys, containsAll(['title', 'due', 'late']));
+        expect(o.m('next').s('label'), isNotEmpty);
+      }
+      final making = await staff.orders(mine: true, stage: 'in_production');
+      expect(making, isNotEmpty, reason: 'the demo data has an order of Bilal\'s in production');
+      expect(making.every((o) => o.s('stage') == 'in_production'), isTrue);
+      final done = await manager.orders(status: 'closed');
+      expect(done, isNotEmpty);
+      expect(done.every((o) => o.s('stage') == 'done' && o.mn('needs') == null && o.mn('next') == null), isTrue);
+      final late = await manager.orders(late: true);
+      expect(late.every((o) => o.m('needs').b('late')), isTrue);
     });
 
-    test('marks a step done, then undoes it', () async {
-      final orders = await staff.orders(mine: true);
-      final id = orders.first.s('id');
-      final before = await staff.order(id);
-      final step = before.m('plan').l('steps').firstWhere((s) => s.s('status') == 'todo' && s.mn('blockedBy') == null);
-      final key = step.s('key');
+    test('opens an order: stage, the one button, money, history, documents; shipping unpaid warns', () async {
+      final id = (await staff.orders(mine: true, stage: 'in_production')).first.s('id');
+      final o = await staff.order(id);
+      expect(o.s('refNo'), startsWith('SO-'));
+      expect(o.s('stage'), 'in_production');
+      expect(o.m('next'), {'to': 'shipped', 'label': 'Mark as shipped', 'stage': 'Shipped', 'hint': isA<String>()});
+      expect(o.m('back'), {'to': 'confirmed', 'label': 'Back to Confirmed'});
+      expect(o.m('money').keys, containsAll(['total', 'deposit', 'received', 'due', 'depositDue', 'status']));
+      expect(o.l('history').last.s('to'), 'in_production');
+      expect(o.l('documents').map((d) => d.s('kind')), ['quotation', 'proforma', 'invoice', 'packing-list']);
+      expect(o.l('documents').first.s('revisionId'), isNotEmpty);
 
-      final done = await staff.step(id, 'done', key);
-      final doneStep = done.m('plan').l('steps').firstWhere((s) => s.s('key') == key);
-      expect(doneStep.s('status'), 'done');
-      expect(doneStep.sn('doneOn'), isNotNull);
-      expect(done.m('plan').i('done'), before.m('plan').i('done') + 1);
-
-      final undone = await staff.step(id, 'undo', key);
-      expect(undone.m('plan').l('steps').firstWhere((s) => s.s('key') == key).s('status'), 'todo');
-      expect(undone.m('plan').i('done'), before.m('plan').i('done'));
+      // Balance before shipment, money still due: the server asks to confirm, and nothing moves.
+      if (o.s('balanceTerms') == 'before_shipment' && f.toCents(o.m('money')['due']) > 0) {
+        try {
+          await staff.moveOrder(id, 'shipped', blNo: 'TEST-$tag');
+          fail('expected a 409 confirm');
+        } on ApiException catch (e) {
+          expect(e.status, 409);
+          expect(e.needsConfirm, isTrue);
+          expect(e.message, contains('the terms say the balance is paid before shipping'));
+        }
+        expect((await staff.order(id)).s('stage'), 'in_production');
+      }
     });
 
-    test('from quotation to order, and the deposit gate: staff cannot pay the factory first', () async {
+    test('reads the payments of an order (read-only on the phone)', () async {
+      final id = (await staff.orders(mine: true, stage: 'in_production')).first.s('id');
+      final p = await staff.payments(id);
+      expect(p.keys, containsAll(['currency', 'total', 'received', 'due', 'depositDue', 'status', 'payments']));
+      expect(p.l('payments'), isNotEmpty);
+      final first = p.l('payments').first;
+      expect(first.keys, containsAll(['kind', 'amount', 'bankCharges', 'currency', 'paidOn', 'method', 'reference', 'voided']));
+      final o = await staff.order(id);
+      expect(p['received'], o.m('money')['received']);
+      expect(p['due'], o.m('money')['due']);
+      // Recording payments is for accounts, on the web.
+      await expectLater(
+        staff.api.post('/api/orders/$id/payments', {'kind': 'balance', 'amount': '1', 'currency': o.s('currency'), 'paidOn': f.today()}),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
+      );
+    });
+
+    test('gets the data of each document of an order', () async {
+      final o = await staff.order((await staff.orders(mine: true, stage: 'in_production')).first.s('id'));
+      final n = o.s('refNo').replaceFirst('SO-', '');
+      final pi = await staff.orderDocument(o.s('id'), 'proforma');
+      expect(pi, containsPair('title', 'Proforma invoice'));
+      expect(pi.s('number'), 'PI-$n');
+      expect(pi.b('showPrices'), isTrue);
+      expect(pi.m('totals')['total'], o.s('total'));
+      final inv = await staff.orderDocument(o.s('id'), 'invoice');
+      expect(inv.s('number'), 'INV-$n');
+      expect(inv.m('totals')['due'], o.m('money')['due']);
+      final pl = await staff.orderDocument(o.s('id'), 'packing-list');
+      expect(pl.s('number'), 'PL-$n');
+      expect(pl.b('showPrices'), isFalse);
+      expect(pl.mn('totals'), isNull);
+      expect(pl.l('lines').every((l) => l.s('type') == 'goods' && l['unitPrice'] == null), isTrue);
+      // The PDFs are made by the web app at the same server.
+      expect(KeboRepository.pdfPath('proforma', o.s('id')), '/pdf/proforma/${o.s('id')}');
+    });
+
+    test('from quotation to order, then forward with "go ahead anyway" and back', () async {
       // A fresh deal for a known customer…
       final customers = await staff.customers(q: 'Al-Shifa');
       final deal = await staff.createDeal({
@@ -139,64 +194,82 @@ void main() {
         'category': 'Machinery',
         'assigneeId': staffId,
         'items': [
-          {'description': 'Gate test machine $tag', 'quantity': '2', 'unit': 'set'},
+          {'description': 'Stage test machine $tag', 'quantity': '2', 'unit': 'set'},
         ],
       });
       final dealId = deal.s('id');
       // …priced on the web (here: the same API calls the web makes)…
       final draft = await staff.api.get('/api/inquiries/$dealId/quotation/draft');
       final lines = [for (final l in draft.l('lines')) {...l, 'unitPrice': 1500}];
-      final rev = await staff.api.post('/api/inquiries/$dealId/quotation/revisions', {...draft, 'lines': lines});
+      final rev = await staff.api.post('/api/inquiries/$dealId/quotation/revisions', {...draft, 'lines': lines, 'depositPercent': 30});
 
       // …then the phone: mark as sent, customer accepted.
       expect((await staff.revisionStatus(rev.s('id'), 'sent')).s('status'), 'sent');
-      final q = await staff.quotation(dealId);
-      expect(q.l('revisions').first.s('status'), 'sent');
-      expect((await staff.deal(dealId)).s('stage'), 'quoted');
       expect((await staff.revisionStatus(rev.s('id'), 'accepted')).s('status'), 'accepted');
-
-      final won = await staff.deal(dealId);
-      expect(won.s('stage'), 'won');
-      final orderId = won.l('orders').single.s('id');
+      final orderId = (await staff.deal(dealId)).l('orders').single.s('id');
       final order = await staff.order(orderId);
-      expect(order.s('refNo'), startsWith('SO-'));
-      expect(order.m('plan').m('next').s('key'), 'proforma_sent');
+      expect(order.s('stage'), 'confirmed');
+      expect(order.m('next').s('label'), 'Start production');
+      expect(order.mn('back'), isNull);
+      expect(order.m('needs').s('title'), startsWith('Get the deposit'));
+      expect(order.l('documents').first.s('revisionId'), rev.s('id'));
 
-      // Paying the factory before the customer's deposit: refused with a clear reason.
+      // No deposit yet: the server warns (409 "confirm") and nothing moves…
       try {
-        await staff.step(orderId, 'done', 'factory_deposit');
-        fail('expected a 409 deposit_first');
+        await staff.moveOrder(orderId, 'in_production', readyOn: '2099-12-01');
+        fail('expected a 409 confirm');
       } on ApiException catch (e) {
         expect(e.status, 409);
-        expect(e.code, 'deposit_first');
-        expect(e.gate, isTrue);
-        expect(e.message, "Wait for the customer's deposit before paying the factory.");
+        expect(e.needsConfirm, isTrue);
+        expect(e.message, matches(RegExp(r'deposit .* has not been received')));
       }
-      // Staff cannot skip a required step either.
-      await expectLater(staff.step(orderId, 'skip', 'customer_deposit'), throwsA(isA<ApiException>().having((e) => e.code, 'code', 'required_step')));
-      // A manager may go past the gate, but only with a note.
-      await expectLater(manager.step(orderId, 'done', 'factory_deposit'), throwsA(isA<ApiException>().having((e) => e.code, 'code', 'note_required')));
+      expect((await staff.order(orderId)).s('stage'), 'confirmed');
 
-      // Read-only order tabs answer for a new order too.
-      expect((await staff.payments(orderId)).l('payments'), isEmpty);
-      expect(await staff.factoryOrders(orderId), isEmpty);
-      expect(await staff.invoices(orderId), isEmpty);
-      expect((await staff.shipments(orderId)).l('shipments'), isEmpty);
+      // …"Go ahead anyway" sends it again with confirm: true and a note.
+      final moved = await staff.moveOrder(orderId, 'in_production', confirm: true, readyOn: '2099-12-01', note: 'Customer sent the bank slip ($tag)');
+      expect(moved.s('stage'), 'in_production');
+      expect(moved.s('readyOn'), '2099-12-01');
+      expect(moved.m('back').s('to'), 'confirmed');
+      expect(moved.m('needs'), {'title': 'Goods due from the factory', 'due': '2099-12-01', 'late': false});
+      final h = moved.l('history').last;
+      expect([h.s('from'), h.s('to'), h.b('confirmed'), h.s('note')], ['confirmed', 'in_production', true, 'Customer sent the bank slip ($tag)']);
+      expect(h.m('by').s('name'), 'Bilal');
+
+      // One stage at a time.
+      await expectLater(
+        staff.moveOrder(orderId, 'done'),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 'not_next_or_previous').having((e) => e.needsConfirm, 'needsConfirm', isFalse)),
+      );
+
+      // Back one stage: never asks.
+      final back = await staff.moveOrder(orderId, 'confirmed', note: 'Pressed by mistake');
+      expect(back.s('stage'), 'confirmed');
+      expect(back.l('history').last.s('from'), 'in_production');
+
+      // Nothing received yet on the new order.
+      final p = await staff.payments(orderId);
+      expect(p.l('payments'), isEmpty);
+      expect(p['due'], order.s('total'));
     });
 
-    test('dashboard: my to-do lists the next order steps, late first', () async {
+    test('dashboard: my to-do says what each order needs, late first', () async {
       final d = await staff.dashboard();
       expect(d.keys, containsAll(['counts', 'todo', 'myDeals']));
       final todo = d.l('todo');
       expect(todo, isNotEmpty);
       for (final t in todo) {
-        expect(t.m('next').s('title'), isNotEmpty);
+        expect(t.m('needs').s('title'), isNotEmpty);
+        expect(t.m('needs').s('due'), matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
       }
-      final lateFlags = [for (final t in todo) t.m('next').b('overdue')];
+      final lateFlags = [for (final t in todo) t.m('needs').b('late')];
       final firstOnTime = lateFlags.indexOf(false);
-      if (firstOnTime >= 0) expect(lateFlags.skip(firstOnTime), everyElement(isFalse), reason: 'late steps come first');
+      if (firstOnTime >= 0) expect(lateFlags.skip(firstOnTime), everyElement(isFalse), reason: 'late ones come first');
+      expect((await staff.todo()).map((t) => t.s('id')), containsAll(todo.map((t) => t.s('id'))));
       expect(d.mn('money'), isNull, reason: 'money is for managers');
-      expect((await manager.dashboard()).l('newDeals'), isA<List<Json>>());
+      final m = await manager.dashboard();
+      expect(m.m('money').m('now').keys, containsAll(['toReceive', 'openOrders', 'ordersByStage']));
+      expect(m.m('money').m('now').m('ordersByStage').keys, containsAll(['confirmed', 'in_production', 'shipped']));
+      expect(m.l('newDeals'), isA<List<Json>>());
     });
 
     test('customers: search, open, and the duplicate warning with "save anyway"', () async {

@@ -3,10 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../core/doc_files.dart';
 import '../core/format.dart' as f;
 import '../core/repository.dart';
 import '../core/session.dart';
@@ -53,7 +53,7 @@ Future<void> shareFile(Uint8List bytes, String fileName, String mime) =>
 /// Hand the file to another app on the phone (PDF reader, Excel, AutoCAD viewer…).
 Future<void> openWithOtherApp(BuildContext context, Uint8List bytes, String fileName, String mime) async {
   try {
-    final dir = await getTemporaryDirectory();
+    final dir = await documentsTempDir();
     final safe = fileName.replaceAll(RegExp(r'[^\w.\- ]+'), '_');
     final path = '${dir.path}/$safe';
     await XFile.fromData(bytes, name: safe).saveTo(path);
@@ -68,6 +68,15 @@ Future<void> openWithOtherApp(BuildContext context, Uint8List bytes, String file
 Future<void> openViewer(BuildContext context, {required String path, required String fileName, String mime = '', num? size}) {
   return Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
     builder: (_) => FileViewerScreen(path: path, fileName: fileName, mime: mime, size: size),
+  ));
+}
+
+/// A document's PDF made by the web app (`<server>/pdf/<kind>/<id>`, see [KeboRepository.pdfPath]),
+/// downloaded with the app's session, kept in the phone's temporary folder and shown in the
+/// in-app viewer with Share (WhatsApp, email…) and Open in another app.
+Future<void> openPdf(BuildContext context, {required String kind, required String id, required String fileName}) {
+  return Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
+    builder: (_) => FileViewerScreen(path: KeboRepository.pdfPath(kind, id), fileName: fileName, mime: 'application/pdf', pdf: (kind: kind, id: id)),
   ));
 }
 
@@ -98,11 +107,14 @@ Future<void> quickFileAction(BuildContext context, WidgetRef ref, {required Stri
 /* ---------------------------------------------------------------- viewer */
 
 class FileViewerScreen extends ConsumerStatefulWidget {
-  const FileViewerScreen({super.key, required this.path, required this.fileName, this.mime = '', this.size});
+  const FileViewerScreen({super.key, required this.path, required this.fileName, this.mime = '', this.size, this.pdf});
   final String path;
   final String fileName;
   final String mime;
   final num? size;
+
+  /// A PDF made by the web app: downloaded with [KeboRepository.pdf] instead of [path].
+  final ({String kind, String id})? pdf;
   @override
   ConsumerState<FileViewerScreen> createState() => _FileViewerScreenState();
 }
@@ -117,6 +129,9 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
   TapDownDetails? _tap;
 
   late final ViewKind _kind = viewKind(widget.mime, widget.fileName);
+
+  /// The server's name for a PDF, once it has sent one.
+  late String _name = widget.fileName;
 
   @override
   void initState() {
@@ -136,10 +151,24 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
       _bytes = null;
       _progress = 0;
     });
+    void progress(double p) {
+      if (mounted) setState(() => _progress = p);
+    }
+
     try {
-      final bytes = await ref.read(apiProvider).getBytes(widget.path, onProgress: (p) {
-        if (mounted) setState(() => _progress = p);
-      });
+      final pdf = widget.pdf;
+      if (pdf != null) {
+        final file = await ref.read(repoProvider).pdf(pdf.kind, pdf.id, onProgress: progress);
+        final name = file.fileName ?? widget.fileName;
+        if (mounted) {
+          setState(() {
+            _name = name;
+            _bytes = file.bytes;
+          });
+        }
+        return;
+      }
+      final bytes = await ref.read(apiProvider).getBytes(widget.path, onProgress: progress);
       if (mounted) setState(() => _bytes = bytes);
     } catch (e) {
       if (mounted) setState(() => _error = e);
@@ -169,7 +198,7 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
         backgroundColor: dark ? Colors.black : null,
         foregroundColor: fg,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: fg)),
+          Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: fg)),
           if (_kind == ViewKind.pdf && _pages != null)
             Text('Page ${_page ?? 1} of $_pages', style: context.t.bodySmall!.copyWith(color: dark ? Colors.white70 : null))
           else if (widget.size != null)
@@ -178,12 +207,12 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
         actions: bytes == null
             ? null
             : [
-                IconButton(tooltip: 'Save to phone', icon: const Icon(Icons.download_rounded), onPressed: () => saveToPhone(context, bytes, widget.fileName, widget.mime)),
-                IconButton(tooltip: 'Share', icon: const Icon(Icons.ios_share_rounded), onPressed: () => shareFile(bytes, widget.fileName, widget.mime)),
+                IconButton(tooltip: 'Save to phone', icon: const Icon(Icons.download_rounded), onPressed: () => saveToPhone(context, bytes, _name, widget.mime)),
+                IconButton(tooltip: 'Share', icon: const Icon(Icons.ios_share_rounded), onPressed: () => shareFile(bytes, _name, widget.mime)),
                 if (!kIsWeb)
                   PopupMenuButton<String>(
                     iconColor: fg,
-                    onSelected: (_) => openWithOtherApp(context, bytes, widget.fileName, widget.mime),
+                    onSelected: (_) => openWithOtherApp(context, bytes, _name, widget.mime),
                     itemBuilder: (_) => const [PopupMenuItem(value: 'open', child: ListTile(dense: true, leading: Icon(Icons.open_in_new_rounded), title: Text('Open in another app')))],
                   ),
               ],
@@ -201,7 +230,7 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
               : switch (_kind) {
                   ViewKind.pdf => PdfViewer.data(
                       bytes,
-                      sourceName: widget.fileName,
+                      sourceName: _name,
                       params: PdfViewerParams(
                         backgroundColor: context.c.surface3,
                         margin: 10,
@@ -223,7 +252,7 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
                         ),
                       ),
                     ),
-                  ViewKind.other => _OtherFile(name: widget.fileName, size: bytes.length, onSave: () => saveToPhone(context, bytes, widget.fileName, widget.mime), onShare: () => shareFile(bytes, widget.fileName, widget.mime), onOpen: kIsWeb ? null : () => openWithOtherApp(context, bytes, widget.fileName, widget.mime)),
+                  ViewKind.other => _OtherFile(name: _name, size: bytes.length, onSave: () => saveToPhone(context, bytes, _name, widget.mime), onShare: () => shareFile(bytes, _name, widget.mime), onOpen: kIsWeb ? null : () => openWithOtherApp(context, bytes, _name, widget.mime)),
                 },
     );
   }

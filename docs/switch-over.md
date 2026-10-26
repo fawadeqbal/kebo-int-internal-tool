@@ -64,7 +64,7 @@ docker compose up -d web worker
 
 Add a site block for the test address to `/opt/global-proxy/Caddyfile` from `deploy/Caddyfile.site` (replace `__DOMAIN__` with `desk.fawadiqbal.dev`), `docker exec global-caddy caddy validate --config /etc/caddy/Caddyfile`, then `docker exec global-caddy caddy reload --config /etc/caddy/Caddyfile`.
 
-Sign in with your usual email and password (two-step codes keep working because AUTH_SECRET is the same). Check: dashboard, a won deal and its order checklist, a quotation PDF, a customer, the reports.
+Sign in with your usual email and password (two-step codes keep working because AUTH_SECRET is the same). Check: dashboard, a won deal and its order (stage, money, documents), a quotation PDF and an invoice PDF, a customer, the reports.
 
 ## 6. The switch (about 10 minutes)
 
@@ -89,4 +89,4 @@ Sign in with your usual email and password (two-step codes keep working because 
 - Keep the old stack stopped (not removed) for a few weeks; then `docker compose -p kebo-rfq down` (volumes stay until you remove them).
 - **Mobile app**: the old app calls `/api/v1/...`, which the new API does not have. Ship the updated app before the switch, or tell the team to use the web app on phones until it is out.
 - Backups: `/opt/kebo-desk/backups` (nightly database dump + files), same as before.
-- **First morning**: the reminder worker runs within the hour and finds the real backlog on imported open orders (deposits not received, documents not released, factory VAT invoices). Each person gets one summary of their late steps, and managers one summary of steps more than the escalation days late (Settings → reminders), not one message per step. Ask each handler to open *Orders → Mine* in the first days and tick or skip (with a note) what already happened. Steps before shipping on orders that already shipped were skipped by the import, with a note saying so.
+- **First morning**: the reminder worker runs within the hour and finds the real backlog on imported open orders (deposits not received, balances still due after shipping). Each person gets one summary of their orders that need them, and managers one summary of orders more than the escalation days late (Settings → reminders), not one message per order. Ask each handler to open *Orders → Mine* in the first days and move each order to the stage it is really at.

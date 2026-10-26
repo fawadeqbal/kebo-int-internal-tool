@@ -1,11 +1,8 @@
 import type {
   BalanceTerms,
   CustomerType,
-  FactoryOrderStatus,
   InquiryChannel,
   InquiryStage,
-  InvoiceStatus,
-  InvoiceType,
   LineType,
   LostReason,
   OrderStage,
@@ -14,9 +11,7 @@ import type {
   Priority,
   RevisionStatus,
   Role,
-  ShipmentStatus,
   TaxTreatment,
-  Team,
 } from "./enums";
 
 /** The words people see, in one place, so anything can be renamed without touching logic. */
@@ -92,21 +87,18 @@ export const BALANCE_TERMS_LABEL: Record<BalanceTerms, string> = {
 };
 
 export const ORDER_STAGE_LABEL: Record<OrderStage, string> = {
-  awaiting_deposit: "Awaiting deposit",
+  confirmed: "Confirmed",
   in_production: "In production",
-  ready_to_ship: "Ready to ship",
   shipped: "Shipped",
-  closed: "Closed",
-  cancelled: "Cancelled",
+  done: "Done",
 };
 
-export const TEAM_LABEL: Record<Team, string> = { sales: "Sales", sourcing: "Sourcing", accounts: "Accounts", logistics: "Logistics" };
-
-export const FACTORY_ORDER_STATUS_LABEL: Record<FactoryOrderStatus, string> = {
-  draft: "Draft",
-  sent: "Sent to factory",
-  confirmed: "Confirmed by factory",
-  cancelled: "Cancelled",
+/** One line under each stage: what the order is waiting for. */
+export const ORDER_STAGE_HINT: Record<OrderStage, string> = {
+  confirmed: "The customer accepted. Waiting for the deposit.",
+  in_production: "The deposit came in and the factory is making the goods.",
+  shipped: "The goods are on their way. Waiting for the balance.",
+  done: "Fully paid and delivered.",
 };
 
 export const PAYMENT_KIND_LABEL: Record<PaymentKind, string> = { deposit: "Deposit", balance: "Balance", other: "Other" };
@@ -119,12 +111,6 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   online: "Online payment",
   other: "Other",
 };
-
-export const INVOICE_TYPE_LABEL: Record<InvoiceType, string> = { proforma: "Proforma invoice", commercial: "Commercial invoice" };
-
-export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = { draft: "Draft", issued: "Issued", void: "Void" };
-
-export const SHIPMENT_STATUS_LABEL: Record<ShipmentStatus, string> = { planned: "Planned", booked: "Booked", departed: "Departed", arrived: "Arrived" };
 
 /** Badge colours by meaning; the UI maps tones to its palette. Colour is never the only signal. */
 export type Tone = "neutral" | "info" | "ok" | "warn" | "bad";
@@ -142,12 +128,10 @@ export const REVISION_STATUS_TONE: Record<RevisionStatus, Tone> = {
 };
 
 export const ORDER_STAGE_TONE: Record<OrderStage, Tone> = {
-  awaiting_deposit: "warn",
+  confirmed: "warn",
   in_production: "info",
-  ready_to_ship: "info",
   shipped: "info",
-  closed: "ok",
-  cancelled: "neutral",
+  done: "ok",
 };
 
 export const PRIORITY_TONE: Record<Priority, Tone> = { low: "neutral", normal: "neutral", high: "warn", urgent: "bad" };

@@ -8,14 +8,14 @@ import { SETTING_GROUPS } from "./groups";
 
 export const metadata = { title: "Settings" };
 
-/** Company details, sales defaults, reminders, order plan timings and email notifications; each group saves on its own. */
+/** Company details, sales defaults, reminders and email notifications; each group saves on its own. */
 export default async function SettingsPage() {
   await requirePermission("settings.manage");
   const settings = await api.get<Settings>("/settings");
   return (
     <div>
       <PageHeader title="Settings" description="How the whole team works. Each section saves on its own; changes apply to new quotations and orders, not ones already made." />
-      <div className="grid items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="lg:sticky lg:top-20">
           <ul className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible [scrollbar-width:none]">
             {SETTING_GROUPS.map((g) => (

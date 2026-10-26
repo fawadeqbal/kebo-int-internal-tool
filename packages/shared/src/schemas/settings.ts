@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { BALANCE_TERMS, INCOTERMS } from "../enums";
-import { DEFAULT_PLAN_SETTINGS } from "../workflows/order";
+import { DEFAULT_ORDER_REMINDER_DAYS } from "../workflows/order";
 
 /**
  * Everything an admin can change, grouped. Each group is stored as one JSON
@@ -45,25 +45,16 @@ export const reminderSettings = z.object({
   newDays: days(1, 90),
   /** Remind when a deal has been Sourcing this long without a quotation. */
   sourcingDays: days(5, 180),
-  /** "Due soon" window for quotation validity, invoices and order steps. */
+  /** "Due soon" window for quotation validity and needed-by dates. */
   dueSoonDays: days(3, 60),
-  /** Tell the manager when an order step is this many days late. */
+  /** Orders: still Confirmed without the deposit after this many days. */
+  depositDays: days(DEFAULT_ORDER_REMINDER_DAYS.depositDays, 180),
+  /** Orders: In production this long when the factory gave no ready date. */
+  productionDays: days(DEFAULT_ORDER_REMINDER_DAYS.productionDays, 365),
+  /** Orders: Shipped with money still due this many days after the ship date. */
+  balanceDays: days(DEFAULT_ORDER_REMINDER_DAYS.balanceDays, 365),
+  /** Tell the managers when an order is this many days late. */
   escalateAfterDays: days(3, 60),
-});
-
-export const planSettings = z.object({
-  proformaDays: days(DEFAULT_PLAN_SETTINGS.proformaDays),
-  depositDays: days(DEFAULT_PLAN_SETTINGS.depositDays),
-  factoryOrderDays: days(DEFAULT_PLAN_SETTINGS.factoryOrderDays),
-  factoryDepositDays: days(DEFAULT_PLAN_SETTINGS.factoryDepositDays),
-  factoryConfirmDays: days(DEFAULT_PLAN_SETTINGS.factoryConfirmDays),
-  samplesDays: days(DEFAULT_PLAN_SETTINGS.samplesDays),
-  inspectionLeadDays: days(DEFAULT_PLAN_SETTINGS.inspectionLeadDays),
-  factoryBalanceLeadDays: days(DEFAULT_PLAN_SETTINGS.factoryBalanceLeadDays),
-  balanceAfterShipDays: days(DEFAULT_PLAN_SETTINGS.balanceAfterShipDays),
-  balanceAfterArrivalDays: days(DEFAULT_PLAN_SETTINGS.balanceAfterArrivalDays),
-  documentsDays: days(DEFAULT_PLAN_SETTINGS.documentsDays),
-  vatInvoiceDays: days(DEFAULT_PLAN_SETTINGS.vatInvoiceDays),
 });
 
 export const notificationSettings = z.object({
@@ -78,7 +69,6 @@ export const SETTINGS = {
   company: companySettings,
   sales: salesSettings,
   reminders: reminderSettings,
-  plan: planSettings,
   notifications: notificationSettings,
 } as const;
 
@@ -86,7 +76,7 @@ export type SettingsKey = keyof typeof SETTINGS;
 export type Settings = { [K in SettingsKey]: z.infer<(typeof SETTINGS)[K]> };
 
 /** Read stored values (possibly partial or old) into complete settings. */
-export function readSettings(stored: Partial<Record<SettingsKey, unknown>>): Settings {
+export function readSettings(stored: Partial<Record<string, unknown>>): Settings {
   const out = {} as Record<SettingsKey, unknown>;
   for (const key of Object.keys(SETTINGS) as SettingsKey[]) {
     const parsed = SETTINGS[key].safeParse(stored[key] ?? {});

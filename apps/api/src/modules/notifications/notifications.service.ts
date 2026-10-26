@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, REVISION_STATUS_LABEL, STEPS } from "@kebo/shared";
+import { INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, ORDER_STAGE_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { ENV, type Env } from "../../config/env";
@@ -90,8 +90,8 @@ export class NotificationsService implements OnModuleInit {
     this.bus.on("inquiry.assigned", (e) => this.inquiryAssigned(e));
     this.bus.on("inquiry.stageChanged", (e) => this.stageChanged(e));
     this.bus.on("revision.statusChanged", (e) => this.revisionChanged(e));
-    this.bus.on("order.created", (e) => this.notify(e.notify, { type: "order.created", title: `Order ${e.refNo} confirmed — next: send the proforma invoice`, link: links.order(e.orderId) }, e.actorId).then(() => undefined));
-    this.bus.on("order.stepChanged", (e) => this.notify(e.notify, { type: "order.step", title: `${e.refNo}: ${e.action === "undo" ? "undone" : e.action === "skip" ? "skipped" : "done"} — ${STEPS[e.key].doneTitle}`, link: links.order(e.orderId) }, e.actorId).then(() => undefined));
+    this.bus.on("order.created", (e) => this.notify(e.notify, { type: "order.created", title: `Order ${e.refNo} confirmed — send the proforma invoice and wait for the deposit`, link: links.order(e.orderId) }, e.actorId).then(() => undefined));
+    this.bus.on("order.stageChanged", (e) => this.notify(e.notify, { type: "order.stage", title: `${e.refNo}: ${ORDER_STAGE_LABEL[e.from]} → ${ORDER_STAGE_LABEL[e.to]}`, link: links.order(e.orderId) }, e.actorId).then(() => undefined));
     this.bus.on("payment.recorded", (e) => this.paymentRecorded(e));
   }
 

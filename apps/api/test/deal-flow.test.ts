@@ -133,9 +133,9 @@ describe("a whole deal through the API", () => {
     expect(deal.stage).toBe("won");
     expect(deal.orders).toHaveLength(1);
     const order = (await api(app, staff).get(`/orders/${deal.orders[0].id}`).expect(200)).body;
-    expect(order).toMatchObject({ total: "23000.00", depositPercent: 30, balanceTerms: "before_shipment", stage: "awaiting_deposit" });
-    expect(order.plan.next).toMatchObject({ key: "proforma_sent" });
-    expect(order.plan.steps.find((s: { key: string }) => s.key === "customer_deposit").hint).toBe("30% deposit: USD 6,900.00");
+    expect(order).toMatchObject({ total: "23000.00", depositPercent: 30, balanceTerms: "before_shipment", stage: "confirmed", next: { to: "in_production" } });
+    expect(order.money.deposit).toBe("6900.00");
+    expect(order.needs.title).toBe("Get the deposit (USD 6,900.00)");
     // Acceptance is final.
     const after = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation`).expect(200)).body;
     expect(after.canStartRevision).toBe(false);

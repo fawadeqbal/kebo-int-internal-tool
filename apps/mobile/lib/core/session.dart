@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'doc_files.dart';
 import 'json.dart';
 import 'push.dart';
 import 'repository.dart';
@@ -39,7 +40,7 @@ class Session {
   List<String> get permissions => user.ls('permissions');
   bool can(String permission) => permissions.contains(permission);
 
-  /// Managers (and admins) see every deal and can assign, reopen and override steps.
+  /// Managers (and admins) see every deal and can assign, reopen and cancel orders.
   bool get isManager => can('inquiries.viewAll');
 }
 
@@ -135,6 +136,7 @@ class SessionController extends Notifier<Session> {
   Future<void> _signedOut(String? message) async {
     _api.token = null;
     unawaited(Push.forget());
+    unawaited(clearDocumentFiles());
     try {
       await _storage.delete(key: _tokenKey);
     } catch (_) {}

@@ -21,15 +21,11 @@ export const PERMISSIONS = [
   "quotations.manage",
   /** Factories, their prices, our costs and margins (never shown to customers). */
   "sourcing.manage",
+  /** Cancel orders. */
   "orders.manage",
-  /** Mark milestones done on deals the person handles. */
-  "milestones.update",
-  /** Go past a gate (e.g. pay the factory before the customer's deposit arrived). */
-  "milestones.override",
-  "factoryOrders.manage",
+  /** Move an order to its next stage (or back) and fill in its dates, on deals the person handles. */
+  "orders.update",
   "payments.record",
-  "invoices.manage",
-  "shipments.manage",
   "users.manage",
   "settings.manage",
   "audit.view",
@@ -45,9 +41,7 @@ const STAFF: readonly Permission[] = [
   "customers.manage",
   "quotations.manage",
   "sourcing.manage",
-  "milestones.update",
-  "factoryOrders.manage",
-  "shipments.manage",
+  "orders.update",
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
