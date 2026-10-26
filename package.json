@@ -2,10 +2,12 @@
   "name": "kebo",
   "private": true,
   "packageManager": "pnpm@10.18.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@kebo/api --filter=@kebo/web",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
@@ -13,7 +15,8 @@
     "db:migrate": "pnpm --filter @kebo/database db:migrate",
     "db:deploy": "pnpm --filter @kebo/database db:deploy",
     "db:seed": "pnpm --filter @kebo/database db:seed",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "dev:packages": "turbo run dev --filter=./packages/*"
   },
   "devDependencies": {
     "prettier": "3.9.10",

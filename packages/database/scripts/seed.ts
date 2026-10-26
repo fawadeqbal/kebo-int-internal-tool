@@ -5,7 +5,7 @@
  *   pnpm db:seed            accounts + settings (safe to run again)
  *   pnpm db:seed --demo     plus sample customers, factories and deals
  */
-import "dotenv/config";
+import "./env";
 import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, splitDeposit, unitCostMinor, priceForMargin, toMinor } from "@kebo/money";
 import { initialStates, readSettings, SETTINGS, type BalanceTerms, type MilestoneKey, type SettingsKey } from "@kebo/shared";

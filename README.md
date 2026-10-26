@@ -2,7 +2,7 @@
 
 Internal tool for **Shandong Kebo International Trade Co., Ltd.** to run every RFQ from first message to closed order: sourcing from factories, quotations with revisions, the order checklist (deposit, factory order, production, inspection, balance, shipping, documents), and money in and out.
 
-> **Status: rebuild in progress** on the `revamp/monorepo` branch. Production still runs the previous app from `main`; its code is kept in [`legacy/`](legacy/) and is ported module by module. See [docs/revamp-plan.md](docs/revamp-plan.md).
+> **Status:** the rebuild is complete on `main`. The live server still runs the previous app until the switch-over in [docs/switch-over.md](docs/switch-over.md); the previous app's code is in the git history (before this cleanup), not in the tree.
 
 ## Layout
 
@@ -12,12 +12,11 @@ apps/
   mobile/     Flutter app
 packages/
   config/     tsconfig and ESLint presets, typed environment loader
-  database/   Prisma schema, migrations, client, seed (+ legacy import, coming)
+  database/   Prisma schema, migrations, client, seed, and the import of the previous app's data
   money/      all money maths in integer minor units: totals, VAT, FX, margins, deposits, profit
   shared/     the domain: statuses, labels, permissions, workflows, the order checklist and next-step engine, input schemas
   ui/         design system for the web app (tokens, components, status badges)
   utils/      dates, errors, ids, document numbers, amounts in words
-legacy/       the previous Next.js + Drizzle app, unchanged, until everything is ported
 ```
 
 Dependencies only point downwards: `utils` and `money` know nothing about the business; `shared` holds the business rules as pure functions; `database` stores them; `api` enforces them; `ui`/`web` show them.
@@ -31,15 +30,20 @@ Dependencies only point downwards: `utils` and `money` know nothing about the bu
 
 ## Develop
 
+Needs Node 22+, Docker (for PostgreSQL) and Git. First time:
+
 ```bash
-corepack enable                                   # pnpm, pinned in package.json
+corepack enable                                   # pnpm, pinned in package.json (or: npm i -g pnpm@10.18.0)
 pnpm install
 docker compose -f docker-compose.dev.yml up -d    # PostgreSQL on localhost:5433
-cp .env.example .env && cp .env packages/database/.env
+cp .env.example .env                              # one .env at the root; the API and database scripts read it
 pnpm build                                        # builds the packages (and generates the Prisma client)
-pnpm db:deploy && pnpm db:seed --demo             # schema + sample deals (demo logins: Demo@12345)
-pnpm --filter @kebo/api dev                       # http://localhost:4000/api, docs at /api/docs
+pnpm db:deploy && pnpm db:seed --demo             # schema + sample deals
+pnpm dev                                          # API http://localhost:4000/api (docs /api/docs) + web http://localhost:3000
 ```
+
+Sign in at http://localhost:3000 with admin@example.com / Admin@12345, manager@example.com / Manager@12345, staff@example.com / Staff@12345, or the demo staff bilal@example.com / sana@example.com (Demo@12345).
+Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up -d`) and run `pnpm dev`. After changing code in `packages/`, run `pnpm build` (the API and web pick it up).
 
 | Command | |
 |---|---|

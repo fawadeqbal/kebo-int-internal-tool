@@ -12,7 +12,7 @@ Production keeps running `main` until the switch. Each step ends with tests pass
 | 4 | API: payments in/out, proforma and commercial invoices, shipments and packing lists, reports, reminders and notifications (worker) | Done |
 | 5 | `apps/web`: Next.js UI on `@kebo/ui`, calling the API; print pages and PDF download | Done |
 | 6 | Legacy data import script (stages mapped, superseded revisions, orders created for accepted quotations); mobile app moved to the new API | Done (the app needs a new release before the switch) |
-| 7 | Switch-over: deploy, import, retire `legacy/` — see [switch-over.md](switch-over.md) | Ready, to be run by the team |
+| 7 | Switch-over: deploy, import, retire the old app — see [switch-over.md](switch-over.md) | Ready, to be run by the team (the old code is already out of the tree; it is in the git history) |
 
 ## Data import mapping (step 6)
 

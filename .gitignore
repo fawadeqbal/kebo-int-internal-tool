@@ -18,7 +18,6 @@ credentials.txt
 server-check.txt
 portfolio/
 /storage/
-legacy/storage/
 apps/mobile/android/app/google-services.json
 
 # generated Prisma client

@@ -1,3 +1,4 @@
+import "./load-env";
 import "reflect-metadata";
 import { Logger, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
