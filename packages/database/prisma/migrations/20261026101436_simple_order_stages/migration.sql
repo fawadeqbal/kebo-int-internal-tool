@@ -54,7 +54,8 @@ UPDATE "orders" o SET "stage_since" = COALESCE(
   CASE o."stage"
     WHEN 'done' THEN o."closed_at"
     WHEN 'shipped' THEN o."shipped_on"::timestamptz
-    WHEN 'in_production' THEN (SELECT min(m."done_on")::timestamptz FROM "milestones" m WHERE m."order_id" = o."id" AND m."status" = 'done')
+    WHEN 'in_production' THEN (SELECT min(m."done_on")::timestamptz FROM "milestones" m WHERE m."order_id" = o."id" AND m."status" = 'done'
+      AND m."key" IN ('customer_deposit', 'factory_order', 'factory_deposit', 'factory_confirmed', 'samples_approved', 'inspection_passed'))
     ELSE o."ordered_on"::timestamptz
   END, o."created_at");
 

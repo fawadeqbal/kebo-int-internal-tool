@@ -261,7 +261,8 @@ export class OrdersService {
 
   /** "My to-do": what each open order I handle needs, late ones first, then by date. */
   async todo(user: SessionUser) {
-    const items = (await this.list(user, { mine: true })).filter((i) => i.needs);
+    // Closed orders appear only while money is still owed on them.
+    const items = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed" }))].filter((i) => i.needs);
     return items.sort((a, b) => Number(b.needs!.late) - Number(a.needs!.late) || a.needs!.due.localeCompare(b.needs!.due));
   }
 
@@ -284,12 +285,16 @@ export class OrdersService {
       const m = this.moneyOf(o);
       const check = checkMove(o.stage, input.to, o.status, m);
       if (!check.ok) throw new GateError(check.message, check.code);
+      if (check.warnings.some((w) => w.code === "money_due") && !can(user.role, "orders.manage")) {
+        throw new GateError(`${check.warnings.find((w) => w.code === "money_due")!.message} Record the payment first, or ask a manager to close it.`, "manager_needed");
+      }
       if (check.warnings.length && !input.confirm) throw new GateError(check.warnings.map((w) => w.message).join(" "), "confirm");
       const forward = input.to === nextStage(o.stage);
       const data: Prisma.OrderUpdateInput = { stage: input.to, stageSince: new Date() };
       if (input.to === "in_production" && input.readyOn) data.readyOn = toDbDate(input.readyOn);
       if (input.to === "shipped" && forward) {
-        data.shippedOn = toDbDate(input.shippedOn ?? today);
+        // Shipped again after a move back: keep the real ship date unless a new one is given.
+        data.shippedOn = input.shippedOn ? toDbDate(input.shippedOn) : (o.shippedOn ?? toDbDate(today));
         if (input.blNo) data.blNo = input.blNo;
       }
       if (input.to === "done") Object.assign(data, { status: "closed", closedAt: new Date() });
@@ -317,14 +322,21 @@ export class OrdersService {
     return this.get(user, id);
   }
 
-  /** Dates and the B/L number, editable at any stage. */
+  /** Dates and the B/L number, editable at any stage. Only the fields sent change; an empty one is cleared. */
   async setDetails(user: SessionUser, id: string, input: OrderDetailsInput) {
     if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     if (input.shippedOn && input.shippedOn > this.clock.today()) throw new DomainError("The ship date cannot be in the future.");
     await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
+      if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+      const data: Prisma.OrderUpdateInput = {};
+      if (input.shipBy !== undefined) data.shipBy = toDbDateOrNull(input.shipBy);
+      if (input.readyOn !== undefined) data.readyOn = toDbDateOrNull(input.readyOn);
+      if (input.shippedOn !== undefined) data.shippedOn = toDbDateOrNull(input.shippedOn);
+      if (input.blNo !== undefined) data.blNo = input.blNo;
       const before = { shipBy: fromDbDateOrNull(o.shipBy), readyOn: fromDbDateOrNull(o.readyOn), shippedOn: fromDbDateOrNull(o.shippedOn), blNo: o.blNo };
-      await tx.order.update({ where: { id: o.id }, data: { shipBy: toDbDateOrNull(input.shipBy), readyOn: toDbDateOrNull(input.readyOn), shippedOn: toDbDateOrNull(input.shippedOn), blNo: input.blNo } });
+      await tx.order.update({ where: { id: o.id }, data });
       await this.audit.record(tx, { userId: user.id, action: "update", entityType: "order", entityId: o.id, summary: `${o.refNo}: dates and B/L changed`, oldValues: before, newValues: input });
     });
     return this.get(user, id);

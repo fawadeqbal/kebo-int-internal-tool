@@ -81,8 +81,9 @@ export class ReportsService {
       this.prisma.db.order.findMany({ where: { status: { not: "cancelled" }, orderedOn: { gte: day(monthStart) } }, select: { total: true, currency: true } }),
       this.prisma.db.payment.findMany({ where: { voidedAt: null, direction: "in", paidOn: { gte: day(monthStart) } }, select: { amount: true, bankCharges: true, currency: true } }),
       this.prisma.db.order.findMany({
-        where: { status: "open" },
-        select: { total: true, currency: true, stage: true, payments: { where: { voidedAt: null, direction: "in" }, select: { amount: true, bankCharges: true, currency: true } } },
+        // Closed orders too: money still owed on them is still to receive.
+        where: { status: { in: ["open", "closed"] } },
+        select: { total: true, currency: true, stage: true, status: true, payments: { where: { voidedAt: null, direction: "in" }, select: { amount: true, bankCharges: true, currency: true } } },
       }),
     ]);
     const sum = (rows: { total: { toString(): string }; currency: string }[]) => rows.reduce((t, r) => t + toMain(decimalToMinor(r.total), r.currency), 0);
@@ -91,7 +92,7 @@ export class ReportsService {
     for (const o of openOrders) {
       const ins = o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
       receivable += toMain(settle(decimalToMinor(o.total), ins).outstandingMinor, o.currency);
-      if (o.stage in byStage) byStage[o.stage as keyof typeof byStage] += 1;
+      if (o.status === "open" && o.stage in byStage) byStage[o.stage as keyof typeof byStage] += 1;
     }
     return {
       currency: main,
@@ -100,7 +101,7 @@ export class ReportsService {
         won: fromMinor(sum(won)),
         received: fromMinor(paidIn.reduce((t, p) => t + toMain(decimalToMinor(p.amount) + decimalToMinor(p.bankCharges), p.currency), 0)),
       },
-      now: { toReceive: fromMinor(receivable), openOrders: openOrders.length, ordersByStage: byStage },
+      now: { toReceive: fromMinor(receivable), openOrders: openOrders.filter((o) => o.status === "open").length, ordersByStage: byStage },
     };
   }
 

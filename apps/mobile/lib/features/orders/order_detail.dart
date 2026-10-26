@@ -240,7 +240,7 @@ Future<void> advanceOrder(BuildContext context, WidgetRef ref, Json o) async {
   if (to == 'in_production') {
     extras = await askProductionStart(context, readyOn: o.sn('readyOn'));
   } else if (to == 'shipped') {
-    extras = await askShipped(context, blNo: o.sn('blNo'));
+    extras = await askShipped(context, blNo: o.sn('blNo'), shippedOn: o.sn('shippedOn'));
   }
   if (extras == null || !context.mounted) return;
   await sendMove(context, ref, o.s('id'), to, extras);
@@ -400,8 +400,9 @@ Future<StageExtras?> askProductionStart(BuildContext context, {String? readyOn})
 }
 
 /// To Shipped: the ship date (today unless changed) and the B/L number.
-Future<StageExtras?> askShipped(BuildContext context, {String? blNo}) {
-  var shipped = f.today();
+Future<StageExtras?> askShipped(BuildContext context, {String? blNo, String? shippedOn}) {
+  // Shipped again after a move back: start from the real ship date, not today.
+  var shipped = shippedOn ?? f.today();
   String? error;
   final bl = TextEditingController(text: blNo ?? '');
   final note = TextEditingController();

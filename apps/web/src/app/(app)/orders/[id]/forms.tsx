@@ -27,6 +27,7 @@ export function StageActions({
   action,
   today,
   readyOn,
+  shippedOn,
   blNo,
 }: {
   next: OrderNext | null;
@@ -34,6 +35,8 @@ export function StageActions({
   action: Action;
   today: string;
   readyOn: string | null;
+  /** Kept when shipping again after a move back. */
+  shippedOn: string | null;
   blNo: string | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -79,7 +82,7 @@ export function StageActions({
               {next.to === "shipped" && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Shipped on" htmlFor="move-shippedOn" error={s.errors?.shippedOn}>
-                    <Input id="move-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? today} />
+                    <Input id="move-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? shippedOn ?? today} />
                   </Field>
                   <Field label="B/L number" htmlFor="move-blNo" optional hint="Bill of lading, if you have it" error={s.errors?.blNo}>
                     <Input id="move-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? blNo ?? ""} />

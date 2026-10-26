@@ -207,8 +207,8 @@ export const moveStageInput = z.object({
 });
 export type MoveStageInput = z.infer<typeof moveStageInput>;
 
-/** The order's dates and B/L, editable at any time. */
-export const orderDetailsInput = z.object({ shipBy: optionalDate, readyOn: optionalDate, shippedOn: optionalDate, blNo: optionalText(60) });
+/** The order's dates and B/L, editable at any time. Only the fields sent change (empty clears one). */
+export const orderDetailsInput = z.object({ shipBy: optionalDate.optional(), readyOn: optionalDate.optional(), shippedOn: optionalDate.optional(), blNo: optionalText(60).optional() });
 export type OrderDetailsInput = z.infer<typeof orderDetailsInput>;
 
 export const cancelOrderInput = z.object({ reason: text(2000, "Say why the order is cancelled") });

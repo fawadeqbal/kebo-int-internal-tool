@@ -73,12 +73,18 @@ describe("order stages", () => {
     const base: OrderFacts = { ...money, stage: "confirmed", status: "open", stageSince: "2026-10-01", readyOn: null, shippedOn: null };
     expect(orderNeeds(base, "2026-10-05")).toEqual({ title: "Get the deposit (USD 3,000.00)", due: "2026-10-08", late: false });
     expect(orderNeeds(base, "2026-10-09")!.late).toBe(true);
-    expect(orderNeeds({ ...base, receivedMinor: 3_000_00 }, "2026-10-09")).toMatchObject({ title: "Deposit is in: start production", late: false });
+    expect(orderNeeds({ ...base, receivedMinor: 3_000_00 }, "2026-10-05")).toMatchObject({ title: "Deposit is in: start production", late: false });
+    expect(orderNeeds({ ...base, receivedMinor: 3_000_00 }, "2026-10-09")).toMatchObject({ late: true }); // never waits forever
+    expect(orderNeeds({ ...base, depositPercent: 0 }, "2026-10-09")).toEqual({ title: "Start production (no deposit on these terms)", due: "2026-10-08", late: true });
     expect(orderNeeds({ ...base, stage: "in_production", readyOn: "2026-11-01" }, "2026-11-02")).toEqual({ title: "Goods due from the factory", due: "2026-11-01", late: true });
     expect(orderNeeds({ ...base, stage: "in_production" }, "2026-10-09")).toMatchObject({ title: "Ask the factory for the ready date", due: "2026-11-15" });
     expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 3_000_00 }, "2026-11-04")).toEqual({ title: "Get the balance (USD 7,000.00)", due: "2026-11-03", late: true });
-    expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 10_000_00 }, "2026-11-04")).toMatchObject({ title: "Paid in full: close the order", late: false });
-    expect(orderNeeds({ ...base, stage: "done", status: "closed" }, "2026-11-04")).toBeNull();
+    expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 10_000_00 }, "2026-11-02")).toMatchObject({ title: "Paid in full: close the order", late: false });
+    expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 10_000_00 }, "2026-11-04")!.late).toBe(true);
+    expect(orderNeeds({ ...base, stage: "done", status: "closed", receivedMinor: 10_000_00 }, "2026-11-04")).toBeNull();
+    // Closed with money still owed is still chased.
+    expect(orderNeeds({ ...base, stage: "done", status: "closed", shippedOn: "2026-10-20", receivedMinor: 9_000_00 }, "2026-11-04")).toEqual({ title: "Get the balance (USD 1,000.00) — the order is closed", due: "2026-11-03", late: true });
+    expect(orderNeeds({ ...base, status: "cancelled" }, "2026-11-04")).toBeNull();
   });
 });
 

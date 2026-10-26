@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'doc_files.dart';
 import 'json.dart';
 import 'push.dart';
 import 'repository.dart';
@@ -135,6 +136,7 @@ class SessionController extends Notifier<Session> {
   Future<void> _signedOut(String? message) async {
     _api.token = null;
     unawaited(Push.forget());
+    unawaited(clearDocumentFiles());
     try {
       await _storage.delete(key: _tokenKey);
     } catch (_) {}

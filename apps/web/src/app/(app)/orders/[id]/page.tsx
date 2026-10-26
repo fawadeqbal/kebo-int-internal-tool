@@ -136,7 +136,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               )}
               {o.stage === "done" && <p className="text-sm text-muted">Closed. Nothing more to do on this order.</p>}
               {canMove ? (
-                <StageActions key={o.stage} next={o.next} back={o.back} action={moveStageAction.bind(null, o.id)} today={now} readyOn={o.readyOn} blNo={o.blNo} />
+                <StageActions key={o.stage} next={o.next} back={o.back} action={moveStageAction.bind(null, o.id)} today={now} readyOn={o.readyOn} shippedOn={o.shippedOn} blNo={o.blNo} />
               ) : (
                 open && o.next && <p className="text-sm text-muted">The person handling the deal moves this order on.</p>
               )}

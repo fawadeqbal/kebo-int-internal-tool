@@ -158,6 +158,26 @@ describe("orders: four stages", () => {
     expect(Number(after.due)).toBeGreaterThan(0);
   });
 
+  it("keeps chasing money on a closed order, and only a manager may close one with money due", async () => {
+    // The payment removed above left money owed on a Done order: it stays on Sana's to-do.
+    const todo = (await api(app, sana).get("/me/todo").expect(200)).body;
+    expect(todo.find((t: { id: string }) => t.id === orderId)?.needs.title).toMatch(/^Get the balance \(USD .*\) — the order is closed$/);
+    await move(sana, { to: "shipped" }).expect(200);
+    const staffClose = await move(sana, { to: "done", confirm: true }).expect(409);
+    expect(staffClose.body).toMatchObject({ code: "manager_needed", error: expect.stringMatching(/still due .* ask a manager/) });
+    expect((await move(manager, { to: "done" }).expect(409)).body.code).toBe("confirm");
+    expect((await api(app, manager).post(`/orders/${orderId}/stage`, { to: "done", confirm: true, note: "Customer pays the rest with the next order" }).expect(200)).body.status).toBe("closed");
+  });
+
+  it("changes only the details sent, and keeps the real ship date when shipping again", async () => {
+    await move(manager, { to: "shipped" }).expect(200);
+    const d = (await api(app, sana).patch(`/orders/${orderId}/details`, { shipBy: "2026-12-20" }).expect(200)).body;
+    expect(d).toMatchObject({ shipBy: "2026-12-20", shippedOn: "2026-10-24", blNo: "QDLOS-77" });
+    expect((await api(app, sana).patch(`/orders/${orderId}/details`, { blNo: "" }).expect(200)).body.blNo).toBeNull();
+    await move(sana, { to: "in_production" }).expect(200);
+    expect((await move(sana, { to: "shipped", confirm: true }).expect(200)).body.shippedOn).toBe("2026-10-24");
+  });
+
   it("lists my to-do: what each order needs, late first", async () => {
     const todo = (await api(app, bilal).get("/me/todo").expect(200)).body;
     expect(todo.length).toBeGreaterThan(0);

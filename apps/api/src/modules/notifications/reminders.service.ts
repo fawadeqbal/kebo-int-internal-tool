@@ -93,7 +93,8 @@ export class RemindersService {
     // 5. Orders that sit too long in a stage (no deposit, past the ready date, balance still due):
     //    the handler, then the managers once it is late enough. Orders on hold deals are left alone.
     const orders = await this.prisma.db.order.findMany({
-      where: { status: "open", inquiry: { onHold: false } },
+      // Closed orders too: one closed with money still owed keeps being chased (orderNeeds decides).
+      where: { status: { in: ["open", "closed"] }, inquiry: { onHold: false } },
       include: { payments: { where: { voidedAt: null, direction: "in" } }, inquiry: { select: { id: true, assigneeId: true } } },
     });
     // Collected first and sent per person: a few one by one, many as one summary,

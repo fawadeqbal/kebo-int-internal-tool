@@ -3,10 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../core/doc_files.dart';
 import '../core/format.dart' as f;
 import '../core/repository.dart';
 import '../core/session.dart';
@@ -53,7 +53,7 @@ Future<void> shareFile(Uint8List bytes, String fileName, String mime) =>
 /// Hand the file to another app on the phone (PDF reader, Excel, AutoCAD viewer…).
 Future<void> openWithOtherApp(BuildContext context, Uint8List bytes, String fileName, String mime) async {
   try {
-    final dir = await getTemporaryDirectory();
+    final dir = await documentsTempDir();
     final safe = fileName.replaceAll(RegExp(r'[^\w.\- ]+'), '_');
     final path = '${dir.path}/$safe';
     await XFile.fromData(bytes, name: safe).saveTo(path);
@@ -78,19 +78,6 @@ Future<void> openPdf(BuildContext context, {required String kind, required Strin
   return Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
     builder: (_) => FileViewerScreen(path: KeboRepository.pdfPath(kind, id), fileName: fileName, mime: 'application/pdf', pdf: (kind: kind, id: id)),
   ));
-}
-
-/// Keep a downloaded PDF in the temporary folder (the phone clears it when space is needed).
-Future<String?> keepInTemp(Uint8List bytes, String fileName) async {
-  if (kIsWeb) return null;
-  try {
-    final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/${fileName.replaceAll(RegExp(r'[^\w.\- ]+'), '_')}';
-    await XFile.fromData(bytes, name: fileName).saveTo(path);
-    return path;
-  } catch (_) {
-    return null;
-  }
 }
 
 /// A deal's file (GET /api/files/:id).
@@ -173,7 +160,6 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
       if (pdf != null) {
         final file = await ref.read(repoProvider).pdf(pdf.kind, pdf.id, onProgress: progress);
         final name = file.fileName ?? widget.fileName;
-        await keepInTemp(file.bytes, name);
         if (mounted) {
           setState(() {
             _name = name;

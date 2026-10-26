@@ -104,21 +104,23 @@ export interface OrderNeed {
 }
 
 export function orderNeeds(o: OrderFacts, today: ISODate, days: OrderReminderDays = DEFAULT_ORDER_REMINDER_DAYS): OrderNeed | null {
-  if (o.status !== "open") return null;
   const due = dueOf(o);
   const need = (title: string, by: ISODate): OrderNeed => ({ title, due: by, late: by < today });
+  const balanceBy = addDays(o.shippedOn ?? o.stageSince, days.balanceDays);
+  if (o.status === "cancelled") return null;
+  // Closed with money still owed (closed anyway, or a payment removed later): keep chasing it.
+  if (o.status === "closed") return due > 0 ? need(`Get the balance (${formatMinor(due, o.currency)}) — the order is closed`, balanceBy) : null;
   switch (o.stage) {
     case "confirmed": {
       const deposit = depositOf(o);
       if (deposit > 0 && o.receivedMinor < deposit) return need(`Get the deposit (${formatMinor(deposit - o.receivedMinor, o.currency)})`, addDays(o.stageSince, days.depositDays));
-      return need("Deposit is in: start production", today);
+      return need(deposit > 0 ? "Deposit is in: start production" : "Start production (no deposit on these terms)", addDays(o.stageSince, days.depositDays));
     }
     case "in_production":
       return o.readyOn ? need(`Goods due from the factory`, o.readyOn) : need("Ask the factory for the ready date", addDays(o.stageSince, days.productionDays));
     case "shipped":
-      if (due > 0) return need(`Get the balance (${formatMinor(due, o.currency)})`, addDays(o.shippedOn ?? o.stageSince, days.balanceDays));
-      return need("Paid in full: close the order", today);
+      return need(due > 0 ? `Get the balance (${formatMinor(due, o.currency)})` : "Paid in full: close the order", balanceBy);
     case "done":
-      return null;
+      return due > 0 ? need(`Get the balance (${formatMinor(due, o.currency)})`, balanceBy) : null;
   }
 }
