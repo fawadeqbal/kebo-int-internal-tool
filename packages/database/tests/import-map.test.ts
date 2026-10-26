@@ -214,12 +214,19 @@ describe("milestones", () => {
     expect(status(ms).customer_balance).toBe("done");
   });
 
-  it("a packing list → shipped, overridden when steps it waits for were never recorded", () => {
+  it("a packing list → shipped; the unrecorded steps before shipping are skipped, not left months late", () => {
     const ms = inferMilestones({ ...base, shipments: [{ ref: "PL-1", on: "2026-07-01", by: "log" }] });
     const shipped = ms.find((m) => m.key === "shipped")!;
     expect(shipped).toMatchObject({ status: "done", doneOn: "2026-07-01", overridden: true });
-    expect(shipped.note).toMatch(/inspection_passed/);
-    expect(shipped.note).toMatch(/customer_balance/);
+    expect(shipped.note).not.toMatch(/inspection_passed/); // skipped settles that gate
+    expect(shipped.note).toMatch(/customer_balance/); // money still owed is never assumed
+    for (const key of ["proforma_sent", "customer_deposit", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"])
+      expect(ms.find((m) => m.key === key)).toMatchObject({ status: "skipped", doneOn: null, doneById: "log", note: expect.stringMatching(/PL-1/) });
+    expect(status(ms)).toMatchObject({ customer_balance: "todo", factory_balance: "todo", documents_released: "todo", factory_vat_invoice: "todo" });
+  });
+
+  it("without a shipment nothing is skipped", () => {
+    expect(inferMilestones(base).some((m) => m.status === "skipped")).toBe(false);
   });
 
   it("nothing else is ever marked done", () => {

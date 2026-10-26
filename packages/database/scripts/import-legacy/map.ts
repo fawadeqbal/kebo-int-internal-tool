@@ -288,13 +288,16 @@ export interface InferredMilestone extends MilestoneState {
   overridden: boolean;
 }
 
+const BEFORE_SHIPPING: MilestoneKey[] = ["proforma_sent", "customer_deposit", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"];
+
 const byDate = <T extends { on: ISODate }>(xs: T[]) => [...xs].sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
 
 /**
  * The 12 steps from initialStates, marked done where the old data proves it:
  * an issued invoice → proforma sent; payments reaching the deposit share →
  * deposit received; payments reaching the total → balance received; a packing
- * list → shipped. Everything else stays to do (the old app did not track it).
+ * list → shipped. When the goods shipped, the unrecorded steps before shipping are
+ * skipped (with a note); everything else stays to do (the old app did not track it).
  */
 export function inferMilestones(f: MilestoneFacts): InferredMilestone[] {
   const done = new Map<MilestoneKey, { on: ISODate; by: string; note: string }>();
@@ -319,6 +322,16 @@ export function inferMilestones(f: MilestoneFacts): InferredMilestone[] {
       ? { ...s, status: "done", doneOn: d.on, sortOrder: i, doneById: d.by, note: d.note, overridden: false }
       : { ...s, sortOrder: i, doneById: null, note: null, overridden: false };
   });
+  // Goods that already left: the steps before shipping happened, the old app just never recorded them.
+  // They are marked skipped (not done: there is no date or proof) so they do not show as months late.
+  // Money and documents after shipping stay to do — those are worth checking.
+  if (shipment) {
+    for (const s of states) {
+      if (s.status === "todo" && BEFORE_SHIPPING.includes(s.key)) {
+        Object.assign(s, { status: "skipped", doneById: shipment.by, note: `Imported: the goods shipped (${shipment.ref}, ${shipment.on}); the old app did not record this step.` });
+      }
+    }
+  }
   for (const s of states) {
     if (s.status !== "done") continue;
     const gates = openGates(s.key, f.balanceTerms, states);

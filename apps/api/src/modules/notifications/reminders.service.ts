@@ -95,6 +95,11 @@ export class RemindersService {
       where: { status: "open", inquiry: { onHold: false } },
       include: { milestones: true, payments: { where: { voidedAt: null, direction: "in" } }, inquiry: { select: { id: true, assigneeId: true } } },
     });
+    // Late steps are collected first and sent per person: a few one by one, many as one summary,
+    // so a backlog (e.g. right after the import of old orders) does not bury people every morning.
+    type Late = { orderId: string; refNo: string; key: string; title: string; due: string; hint: string | null; lateBy: number };
+    const lateFor = new Map<string, Late[]>();
+    const escalated: Late[] = [];
     for (const o of orders) {
       const plan = orderPlan(
         {
@@ -113,11 +118,9 @@ export class RemindersService {
       );
       for (const st of plan.steps.filter((x) => x.overdue)) {
         const owner = o.milestones.find((m) => m.key === st.key)?.assigneeId ?? o.inquiry.assigneeId;
-        const lateBy = daysBetween(st.due!, today);
-        await note([owner], { type: "reminder.step", title: `${o.refNo}: "${st.title}" was due ${st.due}`, body: st.hint, link: links.order(o.id), dedupeKey: `step:${o.id}:${st.key}:${today}` });
-        if (lateBy >= s.reminders.escalateAfterDays) {
-          await note(managers, { type: "reminder.stepEscalated", title: `${o.refNo}: "${st.title}" is ${lateBy} days late`, body: st.hint, link: links.order(o.id), dedupeKey: `step-esc:${o.id}:${st.key}:${today}` });
-        }
+        const late: Late = { orderId: o.id, refNo: o.refNo, key: st.key, title: st.title, due: st.due!, hint: st.hint ?? null, lateBy: daysBetween(st.due!, today) };
+        if (owner) lateFor.set(owner, [...(lateFor.get(owner) ?? []), late]);
+        if (late.lateBy >= s.reminders.escalateAfterDays) escalated.push(late);
       }
       // 6. Money the customer still owes after the balance was due.
       const balance = o.milestones.find((m) => m.key === "customer_balance");
@@ -128,6 +131,28 @@ export class RemindersService {
           await note(managers, { type: "reminder.balance", title: `${o.refNo}: ${formatMinor(pos.outstandingMinor, o.currency)} still to receive`, link: links.order(o.id), dedupeKey: `balance:${o.id}:${today}` });
         }
       }
+    }
+
+    const oldestFirst = (a: Late, b: Late) => b.lateBy - a.lateBy;
+    const listOf = (items: Late[]) => items.slice(0, 8).map((x) => `${x.refNo}: ${x.title} — ${x.lateBy} day(s) late`).join("\n") + (items.length > 8 ? `\n…and ${items.length - 8} more` : "");
+    for (const [owner, items] of lateFor) {
+      items.sort(oldestFirst);
+      if (items.length <= 3) {
+        for (const x of items) await note([owner], { type: "reminder.step", title: `${x.refNo}: "${x.title}" was due ${x.due}`, body: x.hint, link: links.order(x.orderId), dedupeKey: `step:${x.orderId}:${x.key}:${today}` });
+      } else {
+        const x = items[0]!;
+        await note([owner], { type: "reminder.step", title: `${items.length} of your order steps are late — the oldest, ${x.refNo} "${x.title}", was due ${x.due}`, body: listOf(items), link: "/orders?view=mine", dedupeKey: `steps:${owner}:${today}` });
+      }
+    }
+    if (escalated.length) {
+      escalated.sort(oldestFirst);
+      const x = escalated[0]!;
+      await note(
+        managers,
+        escalated.length === 1
+          ? { type: "reminder.stepEscalated", title: `${x.refNo}: "${x.title}" is ${x.lateBy} days late`, body: x.hint, link: links.order(x.orderId), dedupeKey: `step-esc:${today}` }
+          : { type: "reminder.stepEscalated", title: `${escalated.length} order steps are ${s.reminders.escalateAfterDays}+ days late — the oldest, ${x.refNo} "${x.title}", by ${x.lateBy} days`, body: listOf(escalated), link: "/orders", dedupeKey: `step-esc:${today}` },
+      );
     }
 
     // 7. The morning summary email, once a day (the counter row is the "already sent" mark).

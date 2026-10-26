@@ -83,11 +83,23 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
   }, [open]);
   return (
     <div ref={ref} className="relative">
-      <button type="button" aria-label={label} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((o) => !o)} className="flex rounded-full">
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((o) => !o)}
+        className="flex rounded-full"
+      >
         {trigger}
       </button>
       {open && (
-        <div role="menu" className={cn("absolute top-full right-0 z-50 mt-2 min-w-44 animate-in rounded-xl border border-line bg-surface p-1 shadow-pop", className)}
+        <div
+          role="menu"
+          className={cn(
+            "absolute top-full right-0 z-50 mt-2 min-w-44 animate-in rounded-xl border border-line bg-surface p-1 shadow-pop",
+            className,
+          )}
           // Close after a choice, but not for a form button: removing the form before it submits cancels the submit (Sign out).
           onClick={(e) => !(e.target as HTMLElement).closest("form") && setOpen(false)}
         >
@@ -98,7 +110,8 @@ function Menu({ trigger, label, children, className }: { trigger: ReactNode; lab
   );
 }
 
-const menuItem = "flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm text-text-2 hover:bg-surface-2 hover:text-text [&_svg]:size-4 [&_svg]:text-muted";
+const menuItem =
+  "flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm text-text-2 hover:bg-surface-2 hover:text-text [&_svg]:size-4 [&_svg]:text-muted";
 
 /* ------------------------------------------------------------------ Theme */
 
@@ -116,8 +129,9 @@ function ThemeMenu() {
     let saved: Mode = "system";
     try {
       saved = (localStorage.getItem("theme") as Mode) || "system";
-    } catch {}
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the saved choice once on mount
+    } catch {
+      // storage blocked: keep the default
+    }
     setMode(saved);
     setDark(document.documentElement.classList.contains("dark"));
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -125,7 +139,9 @@ function ThemeMenu() {
       let m: Mode = "system";
       try {
         m = (localStorage.getItem("theme") as Mode) || "system";
-      } catch {}
+      } catch {
+        // storage blocked: keep the default
+      }
       if (m === "system") {
         applyTheme("system");
         setDark(mq.matches);
@@ -137,7 +153,9 @@ function ThemeMenu() {
   const choose = (m: Mode) => {
     try {
       localStorage.setItem("theme", m);
-    } catch {}
+    } catch {
+      // storage blocked: keep the default
+    }
     setMode(m);
     applyTheme(m);
     setDark(document.documentElement.classList.contains("dark"));
@@ -148,9 +166,19 @@ function ThemeMenu() {
     ["system", "System", Monitor],
   ];
   return (
-    <Menu label="Theme" trigger={<span className={buttonClass("ghost", "icon-sm")}>{dark ? <Moon aria-hidden /> : <Sun aria-hidden />}</span>}>
+    <Menu
+      label="Theme"
+      trigger={<span className={buttonClass("ghost", "icon-sm")}>{dark ? <Moon aria-hidden /> : <Sun aria-hidden />}</span>}
+    >
       {options.map(([m, label, Icon]) => (
-        <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} onClick={() => choose(m)} className={cn(menuItem, mode === m && "font-medium text-primary [&_svg]:text-primary")}>
+        <button
+          key={m}
+          type="button"
+          role="menuitemradio"
+          aria-checked={mode === m}
+          onClick={() => choose(m)}
+          className={cn(menuItem, mode === m && "font-medium text-primary [&_svg]:text-primary")}
+        >
           <Icon aria-hidden />
           {label}
         </button>
@@ -190,7 +218,6 @@ function SidebarContent({ groups, companyName, roleLabel }: { groups: NavGroup[]
   return (
     <>
       <Link href="/dashboard" className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line px-4">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
         <img src="/brand/kebo-logo-96.png" alt="" width={32} height={32} className="size-8 shrink-0" />
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold text-text">{companyName}</span>
@@ -218,7 +245,10 @@ function SidebarContent({ groups, companyName, roleLabel }: { groups: NavGroup[]
                       <Icon className="size-4 shrink-0" aria-hidden />
                       <span className="flex-1 truncate">{item.label}</span>
                       {!!item.badge && (
-                        <span className="rounded-full bg-warn-soft px-1.5 text-[11px] font-semibold text-warn tabular" aria-label={`${item.badge} unread`}>
+                        <span
+                          className="rounded-full bg-warn-soft px-1.5 text-[11px] font-semibold text-warn tabular"
+                          aria-label={`${item.badge} unread`}
+                        >
                           {item.badge > 99 ? "99+" : item.badge}
                         </span>
                       )}
@@ -269,12 +299,18 @@ export function AppShell({
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className={cn("relative flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px]", active ? "font-medium text-primary" : "text-muted")}
+        className={cn(
+          "relative flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px]",
+          active ? "font-medium text-primary" : "text-muted",
+        )}
       >
         <Icon className="size-[22px]" strokeWidth={active ? 2.25 : 1.75} aria-hidden />
         {label}
         {!!badge && (
-          <span className="absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-bad-solid px-1 text-center text-[10px] leading-4 font-semibold text-white" aria-label={`${badge} unread`}>
+          <span
+            className="absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-bad-solid px-1 text-center text-[10px] leading-4 font-semibold text-white"
+            aria-label={`${badge} unread`}
+          >
             {badge > 9 ? "9+" : badge}
           </span>
         )}
@@ -284,7 +320,10 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh lg:pl-60">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-pop">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-pop"
+      >
         Skip to content
       </a>
 
@@ -298,7 +337,11 @@ export function AppShell({
         <div className="no-print fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} aria-hidden />
           <aside className="absolute inset-y-0 left-0 flex w-64 animate-slide-in flex-col border-r border-line bg-surface shadow-pop">
-            <button className="absolute top-3.5 right-3 rounded-md p-1.5 text-muted hover:bg-surface-2" onClick={() => setOpen(false)} aria-label="Close menu">
+            <button
+              className="absolute top-3.5 right-3 rounded-md p-1.5 text-muted hover:bg-surface-2"
+              onClick={() => setOpen(false)}
+              aria-label="Close menu"
+            >
               <X className="size-4" />
             </button>
             <SidebarContent groups={groups} companyName={companyName} roleLabel={user.role} />
@@ -307,7 +350,13 @@ export function AppShell({
       )}
 
       <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-bg/80 px-4 backdrop-blur-md sm:px-6">
-        <button type="button" className={cn(buttonClass("ghost", "icon-sm"), "lg:hidden")} onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open}>
+        <button
+          type="button"
+          className={cn(buttonClass("ghost", "icon-sm"), "lg:hidden")}
+          onClick={() => setOpen(true)}
+          aria-label="Open menu"
+          aria-expanded={open}
+        >
           <MenuIcon aria-hidden />
         </button>
         <form action="/deals" role="search" className="relative w-full max-w-sm">
@@ -333,7 +382,11 @@ export function AppShell({
               <Plus aria-hidden /> New inquiry
             </Link>
           )}
-          <Link href="/notifications" className={cn(buttonClass("ghost", "icon-sm"), "relative hidden lg:inline-flex")} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
+          <Link
+            href="/notifications"
+            className={cn(buttonClass("ghost", "icon-sm"), "relative hidden lg:inline-flex")}
+            aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
+          >
             <Bell aria-hidden />
             {!!unread && <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-bad-solid ring-2 ring-bg" aria-hidden />}
           </Link>
@@ -347,7 +400,10 @@ export function AppShell({
       </main>
 
       {/* Phone: bottom tab bar, thumb-reachable, with the main action in the middle */}
-      <nav aria-label="Quick" className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <nav
+        aria-label="Quick"
+        className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+      >
         {tab("/dashboard", "Home", LayoutDashboard)}
         {tab("/deals", "Inquiries", ClipboardList)}
         {canCreate ? (
@@ -364,7 +420,12 @@ export function AppShell({
           tab("/customers", "Customers", Building2)
         )}
         {tab("/notifications", "Alerts", Bell, unread)}
-        <button type="button" onClick={() => setOpen(true)} aria-expanded={open} className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px] text-muted">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={open}
+          className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px] text-muted"
+        >
           <MenuIcon className="size-[22px]" strokeWidth={1.75} aria-hidden />
           Menu
         </button>

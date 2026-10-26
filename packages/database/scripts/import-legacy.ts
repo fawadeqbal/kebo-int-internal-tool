@@ -632,15 +632,15 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     }));
     await tx.milestone.createMany({ data: msRows });
     const events = msRows
-      .filter((m) => m.status === "done")
-      .map((m) => ({ id: randomUUID(), milestoneId: m.id, action: "done", fromStatus: "todo" as const, toStatus: "done" as const, on: m.doneOn, note: m.note, overridden: m.overridden, byId: m.doneById!, at: m.doneOn ?? now }));
+      .filter((m) => (m.status === "done" || m.status === "skipped") && m.doneById)
+      .map((m) => ({ id: randomUUID(), milestoneId: m.id, action: m.status === "done" ? "done" : "skip", fromStatus: "todo" as const, toStatus: m.status, on: m.doneOn, note: m.note, overridden: m.overridden, byId: m.doneById!, at: m.doneOn ?? now }));
     if (events.length) await tx.milestoneEvent.createMany({ data: events });
     const over = milestones.filter((m) => m.overridden).map((m) => m.key);
     if (over.length) report.judge("Steps done before a step they normally wait for (marked overridden, note explains)", `${refNo} (${d.q.ref_no}): ${over.join(", ")}`);
   }
   report.judge(
     "Orders",
-    `one per accepted revision: ${statusCount.open} open, ${statusCount.closed} closed (old "completed" + paid in full + packing list), ${statusCount.cancelled} cancelled. Only steps the old data proves are done; the factory steps, samples, inspection, documents and VAT invoice stay to do on open orders`,
+    `one per accepted revision: ${statusCount.open} open, ${statusCount.closed} closed (old "completed" + paid in full + packing list), ${statusCount.cancelled} cancelled. Only steps the old data proves are done; on orders that already shipped, the unrecorded steps before shipping are skipped with a note; factory balance, documents and VAT invoice stay to do on open orders`,
   );
 
   /* ---- shipments (packing lists) */
