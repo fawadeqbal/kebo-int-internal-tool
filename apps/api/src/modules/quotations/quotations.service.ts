@@ -10,6 +10,7 @@ import {
   draftsDiscardedBy,
   isEditable,
   latestRevision,
+  numberLines,
   supersededBy,
   type RevisionInput,
   type RevisionStatus,
@@ -26,11 +27,12 @@ import { InquiriesService } from "../inquiries/inquiries.service";
 import { StagesService } from "../inquiries/stages.service";
 import { SourcingService } from "../sourcing/sourcing.service";
 import { OrdersService } from "../orders/orders.service";
+import { requireReason } from "../../common/audit/reason";
 
 /** NUMERIC(14,2) can hold up to this; totals above it are refused with a clear message. */
 const MAX_TOTAL_MINOR = 999_999_999_999_99;
 
-const revisionInclude = { lines: { orderBy: { sortOrder: "asc" } } } satisfies Prisma.QuotationRevisionInclude;
+const revisionInclude = { lines: { orderBy: { sortOrder: "asc" }, include: { requestedItem: { select: { parentId: true } } } } } satisfies Prisma.QuotationRevisionInclude;
 type RevisionRow = Prisma.QuotationRevisionGetPayload<{ include: typeof revisionInclude }>;
 
 /** The letterhead frozen on a document when it is sent (the stamp image is not copied: documents print the current one). */
@@ -74,6 +76,7 @@ export class QuotationsService {
   /* ---------------------------------------------------------------- reading */
 
   private view(user: SessionUser, r: RevisionRow) {
+    const numbers = numberLines(r.lines.map((l) => ({ id: l.id, requestedItemId: l.requestedItemId, parentItemId: l.requestedItem?.parentId ?? null })));
     const seeCosts = can(user.role, "sourcing.manage");
     const costing = seeCosts
       ? costSummary(
@@ -102,8 +105,10 @@ export class QuotationsService {
       customerSnapshot: r.customerSnapshot,
       companySnapshot: r.companySnapshot,
       createdAt: r.createdAt,
-      lines: r.lines.map((l) => ({
+      lines: r.lines.map((l, i) => ({
         id: l.id,
+        /** "1", "2", "2.1" (a part of item 2). */
+        no: numbers[i],
         requestedItemId: l.requestedItemId,
         type: l.type,
         description: l.description,
@@ -274,9 +279,12 @@ export class QuotationsService {
       const max = await tx.quotationRevision.aggregate({ where: { quotationId: q.id }, _max: { number: true } });
       const number = (max._max.number ?? 0) + 1;
       const latest = latestRevision(q.revisions);
+      // A new revision after the customer has seen one says why it changed.
+      const seen = q.revisions.find((r) => r.status !== "draft");
+      const reason = seen ? requireReason(input.reason, "newRevision", "the quotation changes after the customer has seen it") : input.reason;
       const { lines, header } = await this.rows(tx, user, inquiryId, input, latest ?? undefined);
       const rev = await tx.quotationRevision.create({ data: { ...header, quotationId: q.id, number, createdById: user.id, lines: { create: lines } } });
-      await this.audit.record(tx, { userId: user.id, action: "create", entityType: "quotation", entityId: rev.id, summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} — ${input.currency} ${header.total}` });
+      await this.audit.record(tx, { userId: user.id, action: "create", entityType: "quotation", entityId: rev.id, summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} — ${input.currency} ${header.total}`, reason });
       return rev.id;
     });
     return this.revision(user, id);
@@ -334,7 +342,7 @@ export class QuotationsService {
    * superseded, the deal moves to Quoted. Then: accepted (order created, deal
    * Won), rejected, or expired — only on the newest sent revision.
    */
-  async move(user: SessionUser, revisionId: string, to: Exclude<RevisionStatus, "draft" | "superseded" | "void">, on: ISODate | null) {
+  async move(user: SessionUser, revisionId: string, to: Exclude<RevisionStatus, "draft" | "superseded" | "void">, on: ISODate | null, reasonInput?: string | null) {
     this.assertCan(user);
     const today = this.clock.today();
     const day = on ?? today;
@@ -348,6 +356,7 @@ export class QuotationsService {
       const { r, inquiry } = await this.loadRevision(user, revisionId, tx);
       await this.inquiries.findWorkable(user, inquiry.id, tx);
       if (!canMoveRevision(r.status, to)) throw new GateError(`A ${r.status} revision cannot be marked ${to}.`, "revision_move");
+      const reason = to === "rejected" || to === "expired" ? requireReason(reasonInput, "quoteAnswer", `the quotation is ${to}`) : reasonInput;
       const all = await tx.quotationRevision.findMany({ where: { quotationId: r.quotationId, deletedAt: null }, select: { id: true, number: true, status: true } });
       const refs = all.map((x) => ({ number: x.number, status: x.status }));
 
@@ -375,7 +384,7 @@ export class QuotationsService {
           if (moved) events.push(moved);
         }
       }
-      await this.audit.record(tx, { userId: user.id, action: "status_change", entityType: "quotation", entityId: r.id, summary: `${r.quotation.refNo} R${r.number}: ${r.status} → ${to}`, oldValues: { status: r.status }, newValues: { status: to } });
+      await this.audit.record(tx, { userId: user.id, action: "status_change", entityType: "quotation", entityId: r.id, summary: `${r.quotation.refNo} R${r.number}: ${r.status} → ${to}`, oldValues: { status: r.status }, newValues: { status: to }, reason });
       events.unshift({
         type: "revision.statusChanged",
         inquiryId: inquiry.id,

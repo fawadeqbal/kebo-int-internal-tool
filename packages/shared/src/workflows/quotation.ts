@@ -84,6 +84,14 @@ export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceT
  * after it as 3.1, 3.2. `parentKey` names the line a part belongs to; a part
  * whose item is not on the document (or comes later) is numbered on its own.
  */
+/**
+ * Numbers for document lines that follow the deal's items: a line for a part
+ * of an item is numbered under the line for that item ("2.1").
+ */
+export function numberLines(lines: { id: string; requestedItemId: string | null; parentItemId: string | null }[]): string[] {
+  return lineNumbers(lines.map((l) => ({ key: l.id, parentKey: l.parentItemId ? (lines.find((x) => x.requestedItemId === l.parentItemId)?.id ?? null) : null })));
+}
+
 export function lineNumbers(lines: { key: string; parentKey?: string | null }[]): string[] {
   const numberOf = new Map<string, string>();
   const partsOf = new Map<string, number>();

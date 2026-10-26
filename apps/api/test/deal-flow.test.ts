@@ -110,8 +110,11 @@ describe("a whole deal through the API", () => {
     await api(app, staff).put(`/revisions/${rev[1]}`, (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`)).body).expect(400);
     const draft = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     expect(draft.number).toBe(2);
+    // R1 was sent, so a new revision says why.
+    const asked = await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, discount: 530 }).expect(409);
+    expect(asked.body).toMatchObject({ code: "reason_needed", choices: expect.arrayContaining(["Customer asked for a discount"]) });
     const r2 = await api(app, staff)
-      .post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, discount: 530, lines: draft.lines })
+      .post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, discount: 530, lines: draft.lines, reason: "Customer asked for a discount" })
       .expect(201);
     rev[2] = r2.body.id;
     await api(app, staff).post(`/revisions/${rev[2]}/status`, { to: "sent" }).expect(200);
@@ -122,7 +125,7 @@ describe("a whole deal through the API", () => {
 
   it("records the customer's yes on R2 even with an R3 draft open: order made, deal won, draft discarded", async () => {
     const draft = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
-    rev[3] = (await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, draft).expect(201)).body.id;
+    rev[3] = (await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, reason: "Terms changed" }).expect(201)).body.id;
     await api(app, staff).post(`/revisions/${rev[1]}/status`, { to: "accepted" }).expect(409); // superseded: no answer possible
     const accepted = await api(app, staff).post(`/revisions/${rev[2]}/status`, { to: "accepted" }).expect(200);
     expect(accepted.body.status).toBe("accepted");

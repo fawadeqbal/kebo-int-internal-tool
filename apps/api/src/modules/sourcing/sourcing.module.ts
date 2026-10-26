@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { factoryQuoteInput, preferredLinesInput, type FactoryQuoteInput } from "@kebo/shared";
@@ -35,8 +35,8 @@ class SourcingController {
   @Delete("factory-quotes/:id")
   @HttpCode(200)
   @RequirePermissions("sourcing.manage")
-  async remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
-    await this.sourcing.remove(user, id);
+  async remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Query("reason") reason?: string) {
+    await this.sourcing.remove(user, id, reason?.slice(0, 500));
     return { ok: true };
   }
 
@@ -45,7 +45,7 @@ class SourcingController {
   @HttpCode(200)
   @RequirePermissions("sourcing.manage")
   choose(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(preferredLinesInput)) body: z.infer<typeof preferredLinesInput>) {
-    return this.sourcing.choose(user, id, body.choices);
+    return this.sourcing.choose(user, id, body.choices, body.reason ?? undefined);
   }
 }
 

@@ -58,7 +58,7 @@ class QuotationsController {
   @HttpCode(200)
   @RequirePermissions("quotations.manage")
   move(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(revisionMoveInput)) body: z.infer<typeof revisionMoveInput>) {
-    return this.quotations.move(user, id, body.to, body.on);
+    return this.quotations.move(user, id, body.to, body.on, body.reason);
   }
 }
 

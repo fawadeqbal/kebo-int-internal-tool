@@ -7,6 +7,7 @@ import {
   depositOf,
   dueOf,
   nextStage,
+  numberLines,
   orderNeeds,
   ORDER_STAGE_HINT,
   ORDER_STAGE_LABEL,
@@ -28,6 +29,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
+import { requireReason } from "../../common/audit/reason";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -40,13 +42,26 @@ const orderInclude = {
   lines: {
     orderBy: { sortOrder: "asc" },
     // The factory each line was quoted from (through the quotation line and the factory's price).
-    include: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } } } } },
+    include: {
+      quoteLine: {
+        select: {
+          requestedItemId: true,
+          requestedItem: { select: { parentId: true } },
+          factoryQuoteLine: { select: { factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } },
+        },
+      },
+    },
   },
   customer: { select: { id: true, name: true, country: true } },
   inquiry: { select: { id: true, refNo: true, title: true, assigneeId: true, assignee: { select: { id: true, name: true } } } },
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
+
+/** "1", "2", "2.1" for an order's lines (parts of an item under that item). */
+export function orderLineNumbers(lines: { id: string; quoteLine: { requestedItemId: string | null; requestedItem: { parentId: string | null } | null } | null }[]) {
+  return numberLines(lines.map((l) => ({ id: l.id, requestedItemId: l.quoteLine?.requestedItemId ?? null, parentItemId: l.quoteLine?.requestedItem?.parentId ?? null })));
+}
 
 const qty = (d: { toString(): string }) => Number(d.toString());
 const trimQty = (d: { toString(): string }) => String(qty(d));
@@ -136,7 +151,7 @@ export class OrdersService {
       if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
       await tx.order.update({ where: { id }, data: { status: "cancelled", cancelledAt: new Date(), cancelReason: reason } });
       await tx.quotationRevision.update({ where: { id: o.revisionId }, data: { status: "void" } });
-      await this.audit.record(tx, { userId: user.id, action: "cancel", entityType: "order", entityId: id, summary: `Cancelled order ${o.refNo}: ${reason}` });
+      await this.audit.record(tx, { userId: user.id, action: "cancel", entityType: "order", entityId: id, summary: `Cancelled order ${o.refNo}`, reason, oldValues: { status: o.status }, newValues: { status: "cancelled" } });
       const inquiry = await tx.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId } });
       const moved = await this.stages.after(tx, inquiry, "order_cancelled", user.id);
       return moved ? [moved] : [];
@@ -189,6 +204,7 @@ export class OrdersService {
     const days = (await this.settings.get()).reminders;
     const history = await this.prisma.db.orderStageChange.findMany({ where: { orderId: o.id }, orderBy: { at: "asc" }, include: { by: { select: { id: true, name: true } } } });
     const back = o.status === "cancelled" ? null : previousStage(o.stage);
+    const numbers = orderLineNumbers(o.lines);
     return {
       id: o.id,
       refNo: o.refNo,
@@ -219,8 +235,9 @@ export class OrdersService {
         depositDue: fromMinor(m.position.depositOutstandingMinor),
         status: m.position.status,
       },
-      lines: o.lines.map((l) => ({
+      lines: o.lines.map((l, i) => ({
         id: l.id,
+        no: numbers[i],
         type: l.type,
         description: l.description,
         model: l.model,
@@ -349,6 +366,12 @@ export class OrdersService {
       }
       if (check.warnings.length && !input.confirm) throw new GateError(check.warnings.map((w) => w.message).join(" "), "confirm");
       const forward = input.to === nextStage(o.stage);
+      const given = input.reason?.trim() || input.note;
+      const reason = !forward
+        ? requireReason(given, "orderBack", "the order moves back")
+        : input.to === "done" && check.warnings.some((w) => w.code === "money_due")
+          ? requireReason(given, "closeWithDue", "the order closes with money still due")
+          : given;
       const data: Prisma.OrderUpdateInput = { stage: input.to, stageSince: new Date() };
       if (input.to === "in_production" && input.readyOn) data.readyOn = toDbDate(input.readyOn);
       if (input.to === "shipped" && forward) {
@@ -359,13 +382,16 @@ export class OrdersService {
       if (input.to === "done") Object.assign(data, { status: "closed", closedAt: new Date() });
       if (o.stage === "done" && !forward) Object.assign(data, { status: "open", closedAt: null });
       await tx.order.update({ where: { id: o.id }, data });
-      await tx.orderStageChange.create({ data: { orderId: o.id, fromStage: o.stage, toStage: input.to, note: input.note, confirmed: check.warnings.length > 0, byId: user.id } });
+      await tx.orderStageChange.create({ data: { orderId: o.id, fromStage: o.stage, toStage: input.to, note: input.note ?? (reason || null), confirmed: check.warnings.length > 0, byId: user.id } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "stage_change",
         entityType: "order",
         entityId: o.id,
         summary: `${o.refNo}: ${ORDER_STAGE_LABEL[o.stage]} → ${ORDER_STAGE_LABEL[input.to]}${check.warnings.length ? ` (went ahead: ${check.warnings.map((w) => w.message).join(" ")})` : ""}${input.note ? ` — ${input.note}` : ""}`,
+        oldValues: { stage: o.stage },
+        newValues: { stage: input.to },
+        reason,
       });
       return {
         type: "order.stageChanged",
@@ -448,9 +474,14 @@ export class OrdersService {
       if (input.blNo !== undefined) data.blNo = input.blNo;
       if (input.documentTitle !== undefined) data.documentTitle = input.documentTitle;
       if (input.portOfDischarge !== undefined) data.portOfDischarge = input.portOfDischarge;
+      // Once shipped, the ship date and B/L are on the customer's documents: changing them says why.
+      const shippedFacts =
+        (o.stage === "shipped" || o.stage === "done") &&
+        ((input.shippedOn !== undefined && input.shippedOn !== fromDbDateOrNull(o.shippedOn) && o.shippedOn !== null) || (input.blNo !== undefined && (input.blNo ?? null) !== o.blNo && o.blNo !== null));
+      const reason = shippedFacts ? requireReason(input.reason, "shipping", "the ship date or B/L changes after shipping") : input.reason;
       const before = { shipBy: fromDbDateOrNull(o.shipBy), readyOn: fromDbDateOrNull(o.readyOn), shippedOn: fromDbDateOrNull(o.shippedOn), blNo: o.blNo, documentTitle: o.documentTitle, portOfDischarge: o.portOfDischarge };
       await tx.order.update({ where: { id: o.id }, data });
-      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "order", entityId: o.id, summary: `${o.refNo}: dates and B/L changed`, oldValues: before, newValues: input });
+      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "order", entityId: o.id, summary: `${o.refNo}: dates and B/L changed`, oldValues: before, newValues: { ...input, reason: undefined }, reason });
     });
     return this.get(user, id);
   }
