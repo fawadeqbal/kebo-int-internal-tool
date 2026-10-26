@@ -33,3 +33,20 @@ jobs:
       - name: Migrations apply cleanly and the demo seed runs
         run: pnpm db:deploy && pnpm db:seed --demo
       - run: pnpm turbo run typecheck lint test
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      # The tests that call a running API are skipped here (no KEBO_API_URL); widget and unit tests run.
+      - run: flutter test
