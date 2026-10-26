@@ -1,23 +1,25 @@
 node_modules
-.next
 dist
-.env
-.env.local
-/storage/
+.next
+.turbo
+coverage
 *.tsbuildinfo
 next-env.d.ts
 
-# local secrets and notes
+# env and secrets (never in git)
+.env
 .env.*
 !.env.example
-server-check.txt
-
-# portfolio screenshots (large images, kept out of git)
-portfolio/
-
-# Server keys (Firebase service account etc.), never in git
 secrets/
-firebase-service-account*.json
 *firebase-adminsdk*.json
-# Google Cloud key downloads (kebo-rfq-<id>.json)
+firebase-service-account*.json
 kebo-rfq-*.json
+credentials.txt
+server-check.txt
+portfolio/
+/storage/
+legacy/storage/
+apps/mobile/android/app/google-services.json
+
+# generated Prisma client
+packages/database/src/generated/
