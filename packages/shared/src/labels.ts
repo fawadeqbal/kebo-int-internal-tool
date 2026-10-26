@@ -2,6 +2,7 @@ import type {
   AttachmentKind,
   BalanceTerms,
   CustomerType,
+  ExpenseCategory,
   InquiryChannel,
   InquiryStage,
   LineType,
@@ -98,6 +99,21 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: "Cash",
   cheque: "Cheque",
   online: "Online payment",
+  other: "Other",
+};
+
+export const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
+  freight: "Sea / air freight",
+  inland_transport: "Inland transport",
+  inspection: "Inspection",
+  customs: "Customs & documents",
+  bank_charges: "Bank charges",
+  commission: "Commission",
+  samples: "Samples",
+  travel: "Travel",
+  office: "Office",
+  salaries: "Salaries",
+  rent: "Rent",
   other: "Other",
 };
 

@@ -68,13 +68,23 @@ export class HistoryService {
 
   async list(user: SessionUser, q: HistoryQuery) {
     const scope = (await this.scope(user, q)).filter((s) => s.ids.length);
+    // Expenses are for managers only; payments to factories for people who see costs.
+    const hidden = [
+      ...(can(user.role, "expenses.manage") ? [] : ["expense"]),
+      ...(can(user.role, "sourcing.manage") ? [] : ["payment_out"]),
+    ];
     const rows = await this.prisma.db.auditLog.findMany({
-      where: { OR: scope.map((s) => ({ entityType: s.entityType, entityId: { in: s.ids } })) },
+      where: {
+        OR: scope.map((s) => ({ entityType: s.entityType, entityId: { in: s.ids } })),
+        ...(hidden.length ? { NOT: hidden.map((h) => ({ action: { startsWith: h } })) } : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: 300,
     });
     const ids = [...new Set(rows.map((r) => r.userId).filter((v): v is string => !!v))];
-    const people = new Map((await this.prisma.db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })).map((u) => [u.id, u]));
+    const people = new Map(
+      (await this.prisma.db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })).map((u) => [u.id, u]),
+    );
     return rows.map((r) => ({
       id: r.id,
       at: r.createdAt,

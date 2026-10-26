@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   canStartRevision,
+  defaultPlan,
+  planStatus,
   checkManualMove,
   checkMove,
   orderNeeds,
@@ -233,3 +235,28 @@ describe("reasons", () => {
   });
 });
 
+
+describe("payment plan", () => {
+  it("starts from the terms: deposit dated, balance dated later", () => {
+    expect(defaultPlan(10_000_00, 30, "2026-10-01", 7)).toEqual([
+      { label: "Deposit 30%", amountMinor: 3_000_00, dueOn: "2026-10-08" },
+      { label: "Balance", amountMinor: 7_000_00, dueOn: null },
+    ]);
+    expect(defaultPlan(10_000_00, 0, "2026-10-01", 7)).toHaveLength(1);
+  });
+
+  it("pays the earliest instalment first and says where each stands", () => {
+    const plan = [
+      { label: "Deposit", amountMinor: 3_000_00, dueOn: "2026-10-08" },
+      { label: "Second", amountMinor: 3_000_00, dueOn: "2026-10-20" },
+      { label: "Balance", amountMinor: 4_000_00, dueOn: "2026-12-01" },
+    ];
+    const s = planStatus(plan, 4_000_00, "2026-10-21", 3);
+    expect(s.map((i) => [i.status, i.paidMinor, i.openMinor])).toEqual([
+      ["paid", 3_000_00, 0],
+      ["late", 1_000_00, 2_000_00],
+      ["open", 0, 4_000_00],
+    ]);
+    expect(planStatus(plan, 0, "2026-10-06", 3)[0]!.status).toBe("due_soon");
+  });
+});

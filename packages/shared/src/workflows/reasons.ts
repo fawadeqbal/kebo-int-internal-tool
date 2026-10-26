@@ -20,6 +20,8 @@ export const REASON_CHOICES = {
   customerDetails: ["Company renamed", "Spelling fixed", "Wrong country"],
   factoryDetails: ["Factory renamed", "Spelling fixed", "Another person handles this factory"],
   settings: ["New exchange rate", "New company policy", "Mistake fixed"],
+  plan: ["Customer asked for more time", "Agreed a new schedule", "Order changed", "Mistake fixed"],
+  payment: ["Wrong amount", "Wrong date", "Wrong order or factory", "Wrong exchange rate", "Mistake fixed"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type ReasonKind = keyof typeof REASON_CHOICES;

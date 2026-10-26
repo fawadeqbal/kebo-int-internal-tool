@@ -26,6 +26,8 @@ export const PERMISSIONS = [
   /** Move an order to its next stage (or back) and fill in its dates, on deals the person handles. */
   "orders.update",
   "payments.record",
+  /** Expenses, what factories were paid and profit & loss (managers and the super admin). */
+  "expenses.manage",
   "users.manage",
   "settings.manage",
   "audit.view",

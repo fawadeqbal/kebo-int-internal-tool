@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Factory,
   Bell,
+  Banknote,
   BarChart3,
   Building2,
   ClipboardList,
@@ -48,6 +49,7 @@ const ICONS = {
   factories: Factory,
   quotations: FileText,
   reports: BarChart3,
+  money: Banknote,
   notifications: Bell,
   users: Users,
   settings: Settings,

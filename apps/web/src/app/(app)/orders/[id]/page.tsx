@@ -15,7 +15,11 @@ import { Badge, buttonClass, Card, CardBody, CardHeader, cn, OrderStageBadge, Pa
 import { api } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
 import { date, dateTime, money } from "@/lib/format";
-import type { DealDetail, HistoryEntry } from "@/lib/types";
+import type { DealDetail, HistoryEntry, Person } from "@/lib/types";
+import type { OrderMoney } from "@/lib/types-money";
+import { EditCustomerPayment, PaymentPlan } from "@/components/money/forms";
+import { editPaymentAction, savePlanAction } from "../../money/actions";
+import { FactoriesCard, ProfitCard } from "./money-cards";
 import { HistoryList } from "@/components/common/history-list";
 import type { OrderView, PaymentsView, PaymentStatus } from "@/lib/types-orders";
 import { optional } from "@/components/print/data";
@@ -100,10 +104,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const me = await requireUser();
   const o = await load(() => api.get<OrderView>(`/orders/${id}`));
-  const [p, deal, history] = await Promise.all([
+  const [p, deal, history, m, people, settings] = await Promise.all([
     api.get<PaymentsView>(`/orders/${id}/payments`),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
     api.get<HistoryEntry[]>("/history", { type: "order", id }),
+    api.get<OrderMoney>(`/orders/${id}/money`),
+    api.get<Person[]>("/users/people"),
+    api.get<{ sales: { currency: string } }>("/settings"),
   ]);
   const open = o.status !== "cancelled";
   const canMove = can(me.role, "orders.update") && open;
@@ -292,6 +299,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 ))}
               </dl>
 
+              <PaymentPlan plan={m.plan} currency={o.currency} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} />
+
               {p.payments.length === 0 ? (
                 <p className="text-sm text-muted">
                   No payments yet.{" "}
@@ -329,9 +338,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                           </p>
                         )}
                       </div>
-                      {canManage && !x.voided && (
-                        <div className="w-full sm:w-auto">
-                          <VoidPayment action={voidPaymentAction.bind(null, o.id, x.id)} />
+                      {(canManage || canPay) && !x.voided && (
+                        <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
+                          {canPay && <EditCustomerPayment action={editPaymentAction.bind(null, o.id, x.id, o.currency)} payment={x} currency={o.currency} today={now} />}
+                          {canManage && <VoidPayment action={voidPaymentAction.bind(null, o.id, x.id)} />}
                         </div>
                       )}
                     </li>
@@ -349,6 +359,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               )}
             </CardBody>
           </Card>
+
+          {m.factories && <FactoriesCard m={m} people={people} today={now} />}
+          {m.expenses && <ProfitCard m={m} people={people} today={now} mainCurrency={settings.sales.currency} />}
 
           <Card>
             <CardHeader title="Documents" description="Made from the order whenever you open them, so they are always up to date." />

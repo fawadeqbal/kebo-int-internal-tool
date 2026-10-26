@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
 import { settle } from "@kebo/money";
-import { orderNeeds } from "@kebo/shared";
+import { instalmentSentence, orderNeeds, planStatus } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -98,6 +98,7 @@ export class RemindersService {
       where: { status: { in: ["open", "closed"] }, inquiry: { onHold: false } },
       include: {
         payments: { where: { voidedAt: null } },
+        planItems: { orderBy: { sortOrder: "asc" } },
         inquiry: { select: { id: true, assigneeId: true } },
         lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } },
       },
@@ -155,6 +156,17 @@ export class RemindersService {
           ? { type: "reminder.orderEscalated", title: `${x.refNo}: ${x.title} — ${x.lateBy} days late`, link: links.order(x.orderId), dedupeKey: `order-esc:${today}` }
           : { type: "reminder.orderEscalated", title: `${escalated.length} orders are late — the oldest, ${x.refNo}: ${x.title}, by ${x.lateBy} days`, body: listOf(escalated), link: "/orders", dedupeKey: `order-esc:${today}` },
       );
+    }
+
+    // 6. The customer's instalments: a heads-up to the handler when one is due soon, and the handler
+    //    and managers once when it becomes late (the order reminders above keep chasing after that).
+    for (const o of orders) {
+      const received = settle(decimalToMinor(o.total), o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }))).settledMinor;
+      const plan = planStatus(o.planItems.map((p) => ({ id: p.id, label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })), received, today, s.reminders.dueSoonDays);
+      for (const p of plan) {
+        if (p.status === "due_soon") await note([o.inquiry.assigneeId ?? managers[0]], { type: "reminder.instalment", title: `${o.refNo}: ${instalmentSentence(p.label, p.openMinor, o.currency, p.dueOn)} — remind the customer`, link: links.order(o.id), dedupeKey: `plan-soon:${p.id}:${p.dueOn}` });
+        if (p.status === "late") await note([o.inquiry.assigneeId, ...managers], { type: "reminder.instalmentLate", title: `${o.refNo}: ${instalmentSentence(p.label, p.openMinor, o.currency, p.dueOn)} — not paid yet`, link: links.order(o.id), dedupeKey: `plan-late:${p.id}:${p.dueOn}` });
+      }
     }
 
     // 7. The morning summary email, once a day (the counter row is the "already sent" mark).

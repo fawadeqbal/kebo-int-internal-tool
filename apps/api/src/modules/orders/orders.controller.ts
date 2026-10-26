@@ -3,6 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
   cancelOrderInput,
+  editPaymentInput,
   moveStageInput,
   ORDER_STAGES,
   orderDetailsInput,
@@ -10,6 +11,7 @@ import {
   paymentInput,
   receiptInput,
   voidPaymentInput,
+  type EditPaymentInput,
   type MoveStageInput,
   type OrderDetailsInput,
   type PackingInput,
@@ -110,6 +112,12 @@ export class OrdersController {
 @Controller("payments")
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
+
+  /** The payment's fields plus { reason } (always asked): a recorded payment changed. */
+  @Patch(":id")
+  edit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(editPaymentInput)) body: EditPaymentInput) {
+    return this.payments.edit(user, id, body);
+  }
 
   /** { reason } — managers only; the payment stays visible, crossed out. */
   @Post(":id/void")

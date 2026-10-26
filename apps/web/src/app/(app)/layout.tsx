@@ -20,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ];
   const trade: NavItem[] = [
     ...(has("sourcing.manage") ? [{ href: "/factories", label: "Factories", icon: "factories" } as NavItem] : []),
+    ...(has("sourcing.manage") ? [{ href: "/money", label: "Money", icon: "money" } as NavItem] : []),
     ...(has("reports.view") ? [{ href: "/reports", label: "Reports", icon: "reports" } as NavItem] : []),
   ];
   const admin: NavItem[] = [
