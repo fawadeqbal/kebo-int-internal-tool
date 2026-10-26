@@ -558,7 +558,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     const terms = revisionTerms.get(rev.id)!;
     const invoices = (invoicesOfQuery.get(d.q.id) ?? []).filter((i) => i.status !== "cancelled");
     const payments = (invoicesOfQuery.get(d.q.id) ?? []).flatMap((i) => (paymentsOfInvoice.get(i.id) ?? []).map((p) => ({ p, invoiceNo: i.invoice_no })));
-    const shipments = (invoicesOfQuery.get(d.q.id) ?? []).flatMap((i) => packingByInvoice.get(i.id) ?? []);
+    // Only packing lists of invoices that still stand count as goods that left.
+    const shipments = invoices.flatMap((i) => packingByInvoice.get(i.id) ?? []);
     const totalMinor = toMinor(rev.total);
     const milestones = map.inferMilestones({
       depositPercent: terms.depositPercent,

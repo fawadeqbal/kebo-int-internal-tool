@@ -24,6 +24,7 @@ import {
   type Settings,
   type SettingsKey,
   type TaxTreatment,
+  STEPS,
 } from "@kebo/shared";
 import { DOCUMENT_PREFIX, parseReference, type DocumentKind, type ISODate } from "@kebo/utils";
 
@@ -288,7 +289,8 @@ export interface InferredMilestone extends MilestoneState {
   overridden: boolean;
 }
 
-const BEFORE_SHIPPING: MilestoneKey[] = ["proforma_sent", "customer_deposit", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"];
+// Not the customer's deposit: money is never assumed (what is still owed shows on the balance step).
+const BEFORE_SHIPPING: MilestoneKey[] = ["proforma_sent", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"];
 
 const byDate = <T extends { on: ISODate }>(xs: T[]) => [...xs].sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
 
@@ -328,7 +330,8 @@ export function inferMilestones(f: MilestoneFacts): InferredMilestone[] {
   if (shipment) {
     for (const s of states) {
       if (s.status === "todo" && BEFORE_SHIPPING.includes(s.key)) {
-        Object.assign(s, { status: "skipped", doneById: shipment.by, note: `Imported: the goods shipped (${shipment.ref}, ${shipment.on}); the old app did not record this step.` });
+        // Skipping a required step is a manager's override under the normal rules, so it is marked as one.
+        Object.assign(s, { status: "skipped", doneById: shipment.by, overridden: !STEPS[s.key].optional, note: `Imported: the goods shipped (${shipment.ref}, ${shipment.on}); the old app did not record this step.` });
       }
     }
   }

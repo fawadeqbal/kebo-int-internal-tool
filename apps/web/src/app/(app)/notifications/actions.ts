@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { attempt, type ActionState } from "@/lib/actions";
+import { localPath } from "@/lib/paths";
 
 /** Only paths inside the app (no open redirects). */
-const safeLink = (link: string | null) => (link && link.startsWith("/") && !link.startsWith("//") ? link : "/notifications");
+const safeLink = (link: string | null) => localPath(link, "/notifications");
 
 export async function markAllReadAction(_prev: ActionState, _form: FormData): Promise<ActionState> {
   const r = await attempt(null, () => api.post("/notifications/read", { ids: "all" }), "All caught up.");

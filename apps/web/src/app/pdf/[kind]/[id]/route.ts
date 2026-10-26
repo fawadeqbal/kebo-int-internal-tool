@@ -30,14 +30,18 @@ const KINDS = {
   },
 } as const;
 
+/** At most this many Chromiums at once; more requests are told to try again (each one is ~100 MB). */
+const MAX_RENDERS = 3;
+let rendering = 0;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const FOOTER = `<div style="width:100%;padding:0 14mm;font-family:Helvetica,Arial,sans-serif;font-size:7.5px;color:#64748b;display:flex;justify-content:space-between">
   <span class="title"></span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`;
 
-export async function GET(req: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await params;
-  if (!(kind in KINDS) || !UUID.test(id)) return new Response("Not found", { status: 404 });
+  if (!Object.hasOwn(KINDS, kind) || !UUID.test(id)) return new Response("Not found", { status: 404 });
   const session = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!session) return new Response("Sign in first", { status: 401 });
 
@@ -56,15 +60,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       { status: 503 },
     );
 
-  // Render the page from this same server (PDF_ORIGIN when the public address cannot be reached from inside).
-  const origin = (process.env.PDF_ORIGIN ?? new URL(req.url).origin).replace(/\/$/, "");
+  if (rendering >= MAX_RENDERS) return new Response("Busy making other PDFs — please try again in a few seconds.", { status: 503, headers: { "retry-after": "5" } });
+
+  // Render the page from this same server, never from an address taken from the request
+  // (behind the proxy that is the public https address, or whatever Host the caller sent).
+  const origin = (process.env.PDF_ORIGIN ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`).replace(/\/$/, "");
   const target = `${origin}/print/${kind}/${id}`;
-  const browser = await puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage", "--font-render-hinting=none"],
-  });
+  rendering++;
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
   try {
+    browser = await puppeteer.launch({
+      executablePath,
+      headless: true,
+      args: ["--no-sandbox", "--disable-dev-shm-usage", "--font-render-hinting=none"],
+    });
     await browser.setCookie({
       name: SESSION_COOKIE,
       value: session,
@@ -96,6 +105,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       },
     });
   } finally {
-    await browser.close();
+    rendering--;
+    await browser?.close();
   }
 }

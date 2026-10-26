@@ -72,17 +72,19 @@ export class CustomersService {
   }
 
   async get(user: SessionUser, id: string) {
+    const mine = can(user.role, "inquiries.viewAll") ? null : { OR: [{ assigneeId: user.id }, { createdById: user.id }] };
     const c = await this.prisma.db.customer.findFirst({
       where: { id, deletedAt: null, ...customerAccess(user) },
       include: {
         contacts: { where: { deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
         inquiries: {
-          where: { deletedAt: null, ...(can(user.role, "inquiries.viewAll") ? {} : { OR: [{ assigneeId: user.id }, { createdById: user.id }] }) },
+          where: { deletedAt: null, ...(mine ?? {}) },
           select: { id: true, refNo: true, title: true, stage: true, onHold: true, createdAt: true, assignee: { select: { id: true, name: true } } },
           orderBy: { createdAt: "desc" },
           take: 100,
         },
-        orders: { select: { id: true, refNo: true, status: true, total: true, currency: true, orderedOn: true }, orderBy: { orderedOn: "desc" }, take: 100 },
+        // Staff see only the orders of deals they handle or created, like everywhere else.
+        orders: { where: mine ? { inquiry: mine } : {}, select: { id: true, refNo: true, status: true, total: true, currency: true, orderedOn: true }, orderBy: { orderedOn: "desc" }, take: 100 },
       },
     });
     if (!c) throw new NotFoundError("Customer");

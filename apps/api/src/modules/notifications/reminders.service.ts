@@ -136,12 +136,15 @@ export class RemindersService {
     const oldestFirst = (a: Late, b: Late) => b.lateBy - a.lateBy;
     const listOf = (items: Late[]) => items.slice(0, 8).map((x) => `${x.refNo}: ${x.title} — ${x.lateBy} day(s) late`).join("\n") + (items.length > 8 ? `\n…and ${items.length - 8} more` : "");
     for (const [owner, items] of lateFor) {
+      // Once a day per person: the first run decides (one by one, or one summary); later runs that day add nothing.
+      const day = `step:${today}:${owner}`;
+      if (await this.prisma.db.notification.count({ where: { userId: owner, dedupeKey: { startsWith: day } } })) continue;
       items.sort(oldestFirst);
       if (items.length <= 3) {
-        for (const x of items) await note([owner], { type: "reminder.step", title: `${x.refNo}: "${x.title}" was due ${x.due}`, body: x.hint, link: links.order(x.orderId), dedupeKey: `step:${x.orderId}:${x.key}:${today}` });
+        for (const x of items) await note([owner], { type: "reminder.step", title: `${x.refNo}: "${x.title}" was due ${x.due}`, body: x.hint, link: links.order(x.orderId), dedupeKey: `${day}:${x.orderId}:${x.key}` });
       } else {
         const x = items[0]!;
-        await note([owner], { type: "reminder.step", title: `${items.length} of your order steps are late — the oldest, ${x.refNo} "${x.title}", was due ${x.due}`, body: listOf(items), link: "/orders?view=mine", dedupeKey: `steps:${owner}:${today}` });
+        await note([owner], { type: "reminder.step", title: `${items.length} of your order steps are late — the oldest, ${x.refNo} "${x.title}", was due ${x.due}`, body: listOf(items), link: "/orders?view=mine", dedupeKey: day });
       }
     }
     if (escalated.length) {

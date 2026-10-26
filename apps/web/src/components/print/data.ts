@@ -1,6 +1,7 @@
 import "server-only";
 import { api, ApiError } from "@/lib/api";
 import type { CompanySnapshot, CustomerNow, CustomerSnapshot } from "@/lib/types-orders";
+import { localPath } from "@/lib/paths";
 
 /**
  * Sent and issued documents carry the letterhead and customer as they were
@@ -30,7 +31,7 @@ export async function customerOr(
 
 /** Where a print page's Back goes: a same-site path from ?back=, else the given default. */
 export function backTo(back: string | undefined, fallback: string) {
-  return back && back.startsWith("/") && !back.startsWith("//") ? back : fallback;
+  return localPath(back, fallback);
 }
 
 /** Optional reads (e.g. factory details for people who may not see factories) fall back to nothing. */

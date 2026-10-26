@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull } from "@kebo/database";
-import { can, openGates, type ShipmentInput } from "@kebo/shared";
-import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { can, checkStepAction, type ShipmentInput } from "@kebo/shared";
+import { DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -176,19 +176,28 @@ export class ShipmentsService {
     const events = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = (select order_id from shipments where id = ${id}::uuid) for update`;
       const { s, order } = await this.find(user, id, tx);
-      const order_ = ["planned", "booked", "departed", "arrived"];
-      if (order_.indexOf(to) <= order_.indexOf(s.status)) throw new DomainError(`This shipment is already ${s.status}.`);
+      // planned → booked → departed → arrived; booking may be skipped, departing may not.
+      const from: Record<typeof to, string[]> = { booked: ["planned"], departed: ["planned", "booked"], arrived: ["departed"] };
+      if (!from[to].includes(s.status)) throw new DomainError(s.status === to ? `This shipment is already ${to}.` : `A ${s.status} shipment cannot be marked ${to}.`);
       if (to === "departed" && s.lines.length === 0) throw new DomainError("Pack at least one line before the goods leave.");
+      const states = order.milestones.map((m) => ({ key: m.key, status: m.status, doneOn: null, dueOverride: null }));
+      let overridden = false;
+      if (to === "departed" && states.find((m) => m.key === "shipped")?.status === "todo") {
+        // Every departure, not only the last, waits for what shipping waits for (inspection; the balance on
+        // balance-before-shipment terms). A manager may go ahead only with a reason they write.
+        const check = checkStepAction("shipped", "done", { terms: order.balanceTerms, states, orderStatus: order.status, canOverride: can(user.role, "milestones.override"), note });
+        if (!check.ok) throw new GateError(check.message, check.code);
+        overridden = check.overridden;
+      }
       await tx.shipment.update({ where: { id }, data: { status: to, ...(to === "departed" ? { departedOn: toDbDate(day) } : {}) } });
-      await this.audit.record(tx, { userId: user.id, action: "status_change", entityType: "shipment", entityId: id, summary: `${order.refNo}: shipment ${s.refNo} ${to}${note ? ` — ${note}` : ""}` });
+      await this.audit.record(tx, { userId: user.id, action: "status_change", entityType: "shipment", entityId: id, summary: `${order.refNo}: shipment ${s.refNo} ${to}${overridden ? " (manager override)" : ""}${note ? ` — ${note}` : ""}` });
       if (to !== "departed") return [];
       // Shipped when nothing is left unpacked and every shipment holding goods has left.
       const left = (await this.remaining(tx, s.orderId)).some((r) => r.left > 0);
       const waiting = await tx.shipment.count({ where: { orderId: s.orderId, id: { not: id }, status: { in: ["planned", "booked"] } } });
       if (left || waiting) return [];
       // The B/L number is kept as the step's note, but it is not a manager's reason to go past a gate: only what the person wrote is.
-      const gated = openGates("shipped", order.balanceTerms, order.milestones.map((m) => ({ key: m.key, status: m.status, doneOn: null, dueOverride: null }))).length > 0;
-      const e = await this.orders.stepInTx(tx, user, s.orderId, { action: "done", key: "shipped", on: day, note: note ?? (gated || !s.blNo ? null : `B/L ${s.blNo}`) }, { ifTodo: true });
+      const e = await this.orders.stepInTx(tx, user, s.orderId, { action: "done", key: "shipped", on: day, note: note ?? (overridden || !s.blNo ? null : `B/L ${s.blNo}`) }, { ifTodo: true });
       return e ? ([e] as DomainEvent[]) : [];
     });
     await this.events.publish(...events);

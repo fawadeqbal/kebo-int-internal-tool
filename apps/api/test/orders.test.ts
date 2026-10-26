@@ -23,6 +23,17 @@ describe("orders: the checklist through the API", () => {
     await app?.close();
   });
 
+  it("shows staff only their own orders on a customer's page", async () => {
+    const order = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body;
+    await api(app, bilal).get(`/orders/${orderId}`).expect(404);
+    // Bilal starts a deal for the same customer: he may now open the customer, but still not Sana's order.
+    await api(app, bilal).post("/inquiries", { customerId: order.customer.id, category: "Machinery", items: [{ description: "Access test", quantity: 1 }] }).expect(201);
+    const asBilal = (await api(app, bilal).get(`/customers/${order.customer.id}`).expect(200)).body;
+    expect(asBilal.orders.map((o: { id: string }) => o.id)).not.toContain(orderId);
+    const asManager = (await api(app, manager).get(`/customers/${order.customer.id}`).expect(200)).body;
+    expect(asManager.orders.map((o: { id: string }) => o.id)).toContain(orderId);
+  });
+
   it("refuses requests without a session", async () => {
     await api(app).get("/orders").expect(401);
     const bad = await api(app).post("/auth/login", { email: "sana@example.com", password: "wrong" }).expect(401);

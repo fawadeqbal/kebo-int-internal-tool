@@ -220,9 +220,13 @@ describe("milestones", () => {
     expect(shipped).toMatchObject({ status: "done", doneOn: "2026-07-01", overridden: true });
     expect(shipped.note).not.toMatch(/inspection_passed/); // skipped settles that gate
     expect(shipped.note).toMatch(/customer_balance/); // money still owed is never assumed
-    for (const key of ["proforma_sent", "customer_deposit", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"])
+    for (const key of ["proforma_sent", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"])
       expect(ms.find((m) => m.key === key)).toMatchObject({ status: "skipped", doneOn: null, doneById: "log", note: expect.stringMatching(/PL-1/) });
-    expect(status(ms)).toMatchObject({ customer_balance: "todo", factory_balance: "todo", documents_released: "todo", factory_vat_invoice: "todo" });
+    // Skipping a required step (factory order) counts as an override; an optional one (samples) does not.
+    expect(ms.find((m) => m.key === "factory_order")!.overridden).toBe(true);
+    expect(ms.find((m) => m.key === "samples_approved")!.overridden).toBe(false);
+    // Money is never assumed: the deposit and balance stay to do when nothing was paid.
+    expect(status(ms)).toMatchObject({ customer_deposit: "todo", customer_balance: "todo", factory_balance: "todo", documents_released: "todo", factory_vat_invoice: "todo" });
   });
 
   it("without a shipment nothing is skipped", () => {

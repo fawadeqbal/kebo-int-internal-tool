@@ -95,15 +95,16 @@ describe("fulfilment: from accepted order to closed", () => {
     const s1 = (await api(app, staff).post(`/orders/${orderId}/shipments`, { blNo: "BL-1", lines: [{ ...draft.lines[0], quantity: 60 }] }).expect(201)).body;
     await api(app, staff).post(`/orders/${orderId}/shipments`, { lines: [{ ...draft.lines[0], quantity: 50 }] }).expect(400); // only 40 left
     const s2 = (await api(app, staff).post(`/orders/${orderId}/shipments`, { blNo: "BL-2", lines: [{ ...draft.lines[0], quantity: 40, packages: 4 }] }).expect(201)).body;
-    await api(app, staff).post(`/shipments/${s1.id}/status`, { to: "departed" }).expect(200); // not the last: no step yet
-    const blocked = await api(app, staff).post(`/shipments/${s2.id}/status`, { to: "departed" }).expect(409);
+    // Every part-shipment waits for inspection (and here the balance), not only the last one.
+    const blocked = await api(app, staff).post(`/shipments/${s1.id}/status`, { to: "departed" }).expect(409);
     expect(blocked.body.code).toBe("inspect_first");
+    await api(app, staff).post(`/shipments/${s1.id}/status`, { to: "arrived" }).expect(400); // cannot arrive without leaving
     // A manager goes past the gate only with a reason they write: the shipment's B/L number is not one.
     const unexplained = await api(app, manager).post(`/shipments/${s2.id}/status`, { to: "departed" }).expect(409);
     expect(unexplained.body.code).toBe("note_required");
     await api(app, staff).post(`/orders/${orderId}/steps`, { action: "skip", key: "inspection_passed", note: "Customer waived" }).expect(200);
     await api(app, staff).post(`/orders/${orderId}/steps`, { action: "skip", key: "samples_approved" }).expect(200);
-    const blocked2 = await api(app, staff).post(`/shipments/${s2.id}/status`, { to: "departed" }).expect(409);
+    const blocked2 = await api(app, staff).post(`/shipments/${s1.id}/status`, { to: "departed" }).expect(409);
     expect(blocked2.body.code).toBe("balance_first");
 
     // The balance arrives; the factory is paid in full; now the goods can go.
@@ -112,6 +113,8 @@ describe("fulfilment: from accepted order to closed", () => {
     expect((await step("customer_balance")).status).toBe("done");
     await api(app, manager).post(`/orders/${orderId}/payments/out`, { kind: "balance", amount: "99400", currency: "CNY", paidOn: "2026-10-25", factoryOrderId: foId }).expect(201);
     expect((await step("factory_balance")).status).toBe("done");
+    await api(app, staff).post(`/shipments/${s1.id}/status`, { to: "departed" }).expect(200); // not the last: no step yet
+    expect((await step("shipped")).status).toBe("todo");
     await api(app, staff).post(`/shipments/${s2.id}/status`, { to: "departed" }).expect(200);
     expect((await step("shipped")).status).toBe("done");
 

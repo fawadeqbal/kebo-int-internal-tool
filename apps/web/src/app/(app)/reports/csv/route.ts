@@ -5,8 +5,8 @@ import type { ReportView } from "@/lib/types-deals";
 /** The report's tables as one CSV file (the API checks the person may see reports). */
 const cell = (v: string | number | null | undefined) => {
   const s = v === null || v === undefined ? "" : String(v);
-  // Quote when needed; neutralise spreadsheet formulas.
-  const safe = /^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s) ? `'${s}` : s;
+  // Quote when needed; neutralise spreadsheet formulas. Only a plain number may start with "-".
+  const safe = typeof v !== "number" && /^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s) ? `'${s}` : s;
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 /** Byte order mark, so Excel opens the file as UTF-8. */

@@ -4,10 +4,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { apiFetch, SESSION_COOKIE } from "@/lib/api";
 import type { ActionState } from "@/lib/actions";
+import { localPath } from "@/lib/paths";
 
 const cookieOptions = (maxAge: number) => ({ httpOnly: true, sameSite: "lax" as const, secure: process.env.COOKIE_SECURE === "true", path: "/", maxAge });
 /** Only same-site paths after sign-in (no open redirects). */
-const safeNext = (v: unknown) => (typeof v === "string" && v.startsWith("/") && !v.startsWith("//") ? v : "/dashboard");
+const safeNext = (v: unknown) => localPath(v, "/dashboard");
 
 export async function loginAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const email = String(form.get("email") ?? "");
