@@ -2,17 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   canStartRevision,
   checkManualMove,
-  checkStepAction,
-  initialStates,
-  orderPlan,
-  planFor,
+  checkMove,
+  orderNeeds,
   stageAfter,
   supersededBy,
   can,
   inquiryInput,
   revisionInput,
   stageMoveInput,
-  type MilestoneState,
   type OrderFacts,
 } from "../src";
 
@@ -47,109 +44,50 @@ describe("quotation revisions", () => {
   });
 });
 
-describe("order plan", () => {
-  const facts: OrderFacts = {
-    status: "open",
-    orderedOn: "2026-11-02",
-    shipBy: "2026-12-20",
-    readyOn: null,
-    currency: "USD",
-    totalMinor: 10_000_00,
-    depositPercent: 30,
-    balanceTerms: "before_shipment",
-  };
-  const done = (states: MilestoneState[], key: MilestoneState["key"], on: string): MilestoneState[] =>
-    states.map((s) => (s.key === key ? { ...s, status: "done", doneOn: on } : s));
+describe("order stages", () => {
+  const money = { totalMinor: 10_000_00, receivedMinor: 0, depositPercent: 30, currency: "USD", balanceTerms: "before_shipment" as const };
 
-  it("orders the steps by the payment terms", () => {
-    const before = planFor("before_shipment");
-    expect(before.indexOf("customer_balance")).toBeLessThan(before.indexOf("shipped"));
-    const blCopy = planFor("against_bl_copy");
-    expect(blCopy.indexOf("shipped")).toBeLessThan(blCopy.indexOf("customer_balance"));
+  it("moves one stage at a time, forward or back", () => {
+    expect(checkMove("confirmed", "in_production", "open", money)).toMatchObject({ ok: true });
+    expect(checkMove("in_production", "confirmed", "open", money)).toEqual({ ok: true, warnings: [] });
+    expect(checkMove("confirmed", "shipped", "open", money)).toMatchObject({ ok: false, code: "not_next_or_previous" });
+    expect(checkMove("shipped", "shipped", "open", money)).toMatchObject({ ok: false, code: "same_stage" });
+    expect(checkMove("confirmed", "in_production", "cancelled", money)).toMatchObject({ ok: false, code: "order_not_open" });
   });
 
-  it("starts with the proforma and asks for the exact deposit", () => {
-    const plan = orderPlan(facts, initialStates(facts), "2026-11-02");
-    expect(plan.stage).toBe("awaiting_deposit");
-    expect(plan.next?.key).toBe("proforma_sent");
-    expect(plan.next?.due).toBe("2026-11-03");
-    const deposit = plan.steps.find((s) => s.key === "customer_deposit")!;
-    expect(deposit.hint).toBe("30% deposit: USD 3,000.00");
-    expect(deposit.due).toBe("2026-11-08"); // proforma due + 5 days, while the proforma is not sent yet
+  it("warns (never blocks) when money is missing", () => {
+    const noDeposit = checkMove("confirmed", "in_production", "open", money);
+    expect(noDeposit.ok && noDeposit.warnings.map((w) => w.code)).toEqual(["no_deposit"]);
+    expect(noDeposit.ok && noDeposit.warnings[0]!.message).toMatch(/3,000\.00/);
+    const deposit = checkMove("confirmed", "in_production", "open", { ...money, receivedMinor: 3_000_00 });
+    expect(deposit.ok && deposit.warnings).toEqual([]);
+    const ship = checkMove("in_production", "shipped", "open", { ...money, receivedMinor: 3_000_00 });
+    expect(ship.ok && ship.warnings.map((w) => w.code)).toEqual(["balance_before_shipping"]);
+    const shipLater = checkMove("in_production", "shipped", "open", { ...money, receivedMinor: 3_000_00, balanceTerms: "against_bl_copy" });
+    expect(shipLater.ok && shipLater.warnings).toEqual([]);
+    const close = checkMove("shipped", "done", "open", { ...money, receivedMinor: 9_000_00 });
+    expect(close.ok && close.warnings.map((w) => w.message)).toEqual(["USD 1,000.00 is still due from the customer."]);
   });
 
-  it("works due dates from what really happened, and flags late steps", () => {
-    let states = initialStates(facts);
-    states = done(states, "proforma_sent", "2026-11-10"); // a week late
-    const plan = orderPlan(facts, states, "2026-11-20");
-    const deposit = plan.steps.find((s) => s.key === "customer_deposit")!;
-    expect(deposit.due).toBe("2026-11-15");
-    expect(deposit.overdue).toBe(true);
-    expect(plan.next?.key).toBe("customer_deposit");
-    expect(plan.overdue).toBeGreaterThanOrEqual(1);
-  });
-
-  it("never asks for the documents before the goods have shipped", () => {
-    const plan = orderPlan(facts, initialStates(facts), "2026-11-02");
-    const due = (k: string) => plan.steps.find((s) => s.key === k)!.due!;
-    expect(due("documents_released") > due("shipped")).toBe(true);
-    expect(due("documents_released") >= due("customer_balance")).toBe(true);
-  });
-
-  it("skips the deposit step for 0% deposit terms", () => {
-    const noDeposit = { ...facts, depositPercent: 0 };
-    const states = initialStates(noDeposit);
-    expect(states.find((s) => s.key === "customer_deposit")?.status).toBe("skipped");
-    const plan = orderPlan(noDeposit, done(states, "proforma_sent", "2026-11-03"), "2026-11-03");
-    expect(plan.next?.key).toBe("factory_order");
-    expect(plan.stage).toBe("in_production");
-  });
-
-  it("keeps money in before money out unless a manager overrides with a note", () => {
-    const states = initialStates(facts);
-    const ctx = { terms: facts.balanceTerms, states, orderStatus: "open" as const, canOverride: false };
-    expect(checkStepAction("factory_deposit", "done", ctx)).toMatchObject({ ok: false, code: "deposit_first" });
-    expect(checkStepAction("factory_deposit", "done", { ...ctx, canOverride: true })).toMatchObject({ ok: false, code: "note_required" });
-    expect(checkStepAction("factory_deposit", "done", { ...ctx, canOverride: true, note: "Long-time customer, deposit on the way" })).toEqual({
-      ok: true,
-      overridden: true,
-    });
-  });
-
-  it("lets optional steps be skipped but not required ones", () => {
-    const ctx = { terms: facts.balanceTerms, states: initialStates(facts), orderStatus: "open" as const, canOverride: false };
-    expect(checkStepAction("samples_approved", "skip", ctx)).toEqual({ ok: true, overridden: false });
-    expect(checkStepAction("customer_deposit", "skip", ctx)).toMatchObject({ ok: false, code: "required_step" });
-  });
-
-  it("does not release documents before the balance, except under a letter of credit", () => {
-    const states = initialStates(facts);
-    const ctx = { states, orderStatus: "open" as const, canOverride: false };
-    expect(checkStepAction("documents_released", "done", { ...ctx, terms: "before_shipment" })).toMatchObject({ ok: false, code: "balance_first" });
-    expect(checkStepAction("documents_released", "done", { ...ctx, terms: "letter_of_credit" })).toMatchObject({ ok: true });
-  });
-
-  it("reaches ready to ship, shipped and closed", () => {
-    let states = initialStates(facts);
-    for (const k of ["proforma_sent", "customer_deposit", "factory_order", "factory_deposit", "factory_confirmed"] as const) states = done(states, k, "2026-11-10");
-    states = states.map((s) => (s.key === "samples_approved" || s.key === "inspection_passed" || s.key === "factory_vat_invoice" ? { ...s, status: "skipped" } : s));
-    expect(orderPlan(facts, states, "2026-11-10").stage).toBe("ready_to_ship");
-    for (const k of ["customer_balance", "factory_balance", "shipped"] as const) states = done(states, k, "2026-12-18");
-    expect(orderPlan(facts, states, "2026-12-18").stage).toBe("shipped");
-    states = done(states, "documents_released", "2026-12-19");
-    const plan = orderPlan(facts, states, "2026-12-19");
-    expect(plan.complete).toBe(true);
-    expect(plan.stage).toBe("closed");
-    expect(plan.next).toBeNull();
+  it("says what each open order needs, and when it is late", () => {
+    const base: OrderFacts = { ...money, stage: "confirmed", status: "open", stageSince: "2026-10-01", readyOn: null, shippedOn: null };
+    expect(orderNeeds(base, "2026-10-05")).toEqual({ title: "Get the deposit (USD 3,000.00)", due: "2026-10-08", late: false });
+    expect(orderNeeds(base, "2026-10-09")!.late).toBe(true);
+    expect(orderNeeds({ ...base, receivedMinor: 3_000_00 }, "2026-10-09")).toMatchObject({ title: "Deposit is in: start production", late: false });
+    expect(orderNeeds({ ...base, stage: "in_production", readyOn: "2026-11-01" }, "2026-11-02")).toEqual({ title: "Goods due from the factory", due: "2026-11-01", late: true });
+    expect(orderNeeds({ ...base, stage: "in_production" }, "2026-10-09")).toMatchObject({ title: "Ask the factory for the ready date", due: "2026-11-15" });
+    expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 3_000_00 }, "2026-11-04")).toEqual({ title: "Get the balance (USD 7,000.00)", due: "2026-11-03", late: true });
+    expect(orderNeeds({ ...base, stage: "shipped", shippedOn: "2026-10-20", receivedMinor: 10_000_00 }, "2026-11-04")).toMatchObject({ title: "Paid in full: close the order", late: false });
+    expect(orderNeeds({ ...base, stage: "done", status: "closed" }, "2026-11-04")).toBeNull();
   });
 });
 
 describe("permissions", () => {
-  it("lets staff tick steps but not override gates or record payments", () => {
-    expect(can("staff", "milestones.update")).toBe(true);
-    expect(can("staff", "milestones.override")).toBe(false);
+  it("lets staff move their orders but not record payments or cancel", () => {
+    expect(can("staff", "orders.update")).toBe(true);
     expect(can("staff", "payments.record")).toBe(false);
-    expect(can("manager", "milestones.override")).toBe(true);
+    expect(can("staff", "orders.manage")).toBe(false);
+    expect(can("manager", "payments.record")).toBe(true);
     expect(can("manager", "users.manage")).toBe(false);
     expect(can("admin", "users.manage")).toBe(true);
   });
@@ -184,24 +122,12 @@ describe("settings", () => {
     const s = readSettings({ sales: { defaultDepositPercent: 50 }, plan: "garbage" });
     expect(s.sales.defaultDepositPercent).toBe(50);
     expect(s.sales.currency).toBe("USD");
-    expect(s.plan.depositDays).toBe(5);
+    expect(s.reminders.depositDays).toBe(7);
     expect(s.company.website).toBe("keboint.com");
   });
 });
 
 describe("review fixes", () => {
-  it("does not undo a step another done step depended on, unless a manager explains", async () => {
-    const { checkStepAction, initialStates } = await import("../src");
-    const states = initialStates({ depositPercent: 30, balanceTerms: "before_shipment" }).map((s) =>
-      s.key === "customer_deposit" || s.key === "factory_deposit" ? { ...s, status: "done" as const, doneOn: "2026-11-01" } : s,
-    );
-    const ctx = { terms: "before_shipment" as const, states, orderStatus: "open" as const, canOverride: false };
-    expect(checkStepAction("customer_deposit", "undo", ctx)).toMatchObject({ ok: false, code: "dependents_done" });
-    expect(checkStepAction("customer_deposit", "undo", { ...ctx, canOverride: true })).toMatchObject({ ok: false, code: "note_required" });
-    expect(checkStepAction("customer_deposit", "undo", { ...ctx, canOverride: true, note: "Deposit bounced" })).toEqual({ ok: true, overridden: true });
-    expect(checkStepAction("factory_deposit", "undo", ctx)).toEqual({ ok: true, overridden: false });
-  });
-
   it("reads blank form fields as not given, never as 0", async () => {
     const { revisionInput, quoteLineInput } = await import("../src");
     const line = quoteLineInput.parse({ description: "Valve", quantity: "2", unitPrice: "10", unitCost: "", fxRate: "" });

@@ -8,7 +8,7 @@
 import "./env";
 import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, splitDeposit, unitCostMinor, priceForMargin, toMinor } from "@kebo/money";
-import { initialStates, readSettings, SETTINGS, type BalanceTerms, type MilestoneKey, type SettingsKey } from "@kebo/shared";
+import { readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
 import { addDays, todayIn } from "@kebo/utils";
 import { createPrismaClient, nextReference, toDbDate, type PrismaClient } from "../src";
 
@@ -95,7 +95,8 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     daysAgo: number;
     revisions?: ("sent" | "superseded" | "accepted" | "rejected")[];
     lostReason?: "price_too_high";
-    order?: { done: MilestoneKey[]; terms?: BalanceTerms; shipInDays?: number };
+    /** The order and how far it got: its stage, what the customer paid, and dates relative to the order day. */
+    order?: { stage: OrderStage; paid: "none" | "deposit" | "full"; terms?: BalanceTerms; readyInDays?: number; shippedAfterDays?: number };
   }) {
     const created = addDays(today, -o.daysAgo);
     const customer = customers[o.customer];
@@ -190,14 +191,22 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
 
     const orderedOn = addDays(created, 6);
     const terms = o.order.terms ?? "before_shipment";
+    const shippedOn = o.order.shippedAfterDays === undefined ? null : addDays(orderedOn, o.order.shippedAfterDays);
+    const stageSince = o.order.stage === "confirmed" ? orderedOn : o.order.stage === "in_production" ? addDays(orderedOn, 5) : o.order.stage === "shipped" ? shippedOn! : addDays(shippedOn ?? orderedOn, 10);
     const order = await db.order.create({
       data: {
         refNo: await nextReference(db, "order", year),
         inquiryId: inquiry.id,
         revisionId: accepted.id,
         customerId: customer.id,
+        status: o.order.stage === "done" ? "closed" : "open",
+        stage: o.order.stage,
+        stageSince: new Date(`${stageSince}T09:00:00Z`),
+        closedAt: o.order.stage === "done" ? new Date(`${stageSince}T09:00:00Z`) : null,
         orderedOn: toDbDate(orderedOn),
-        shipBy: toDbDate(addDays(orderedOn, o.order.shipInDays ?? 45)),
+        readyOn: o.order.readyInDays === undefined ? null : toDbDate(addDays(orderedOn, o.order.readyInDays)),
+        shippedOn: shippedOn ? toDbDate(shippedOn) : null,
+        blNo: shippedOn ? `QDLOS${blSerial++}` : null,
         currency: "USD",
         total: fromMinor(accepted.total),
         depositPercent: 30,
@@ -223,46 +232,26 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
         },
       },
     });
-    const states = initialStates({ depositPercent: 30, balanceTerms: terms });
-    let day = orderedOn;
-    for (const [i, s] of states.entries()) {
-      const done = o.order.done.includes(s.key);
-      if (done) day = addDays(day, 2);
-      await db.milestone.create({
-        data: { orderId: order.id, key: s.key, sortOrder: i, status: done ? "done" : s.status, doneOn: done ? toDbDate(day) : null, doneById: done ? people.manager.id : null },
-      });
+    // Its history: each stage it went through, in order.
+    const flow: OrderStage[] = ["confirmed", "in_production", "shipped", "done"];
+    for (const [i, st] of flow.slice(0, flow.indexOf(o.order.stage) + 1).entries()) {
+      const at = st === "confirmed" ? orderedOn : st === "in_production" ? addDays(orderedOn, 5) : st === "shipped" ? shippedOn! : stageSince;
+      await db.orderStageChange.create({ data: { orderId: order.id, fromStage: i === 0 ? null : flow[i - 1], toStage: st, byId: i === 0 ? people.manager.id : o.assignee ?? people.manager.id, at: new Date(`${at}T09:00:00Z`) } });
     }
-    const { deposit } = splitDeposit(accepted.total, 30);
-    if (o.order.done.includes("customer_deposit")) {
+    const { deposit, balance } = splitDeposit(accepted.total, 30);
+    if (o.order.paid !== "none") {
       await db.payment.create({
         data: { direction: "in", kind: "deposit", orderId: order.id, customerId: customer.id, amount: fromMinor(deposit - 2500), bankCharges: "25.00", currency: "USD", paidOn: toDbDate(addDays(orderedOn, 4)), reference: "TT-DEMO-1", recordedById: people.manager.id },
       });
     }
-    if (o.order.done.includes("factory_order")) {
-      const fo = await db.factoryOrder.create({
-        data: {
-          refNo: await nextReference(db, "factoryOrder", year),
-          orderId: order.id,
-          factoryId: factories[o.lines[0].factory].id,
-          status: "confirmed",
-          currency: "CNY",
-          total: fromMinor(toMinor(o.lines[0].factoryPrice) * o.lines[0].quantity),
-          sentOn: toDbDate(addDays(orderedOn, 6)),
-          confirmedOn: toDbDate(addDays(orderedOn, 7)),
-          createdById: people.manager.id,
-          lines: { create: { description: o.lines[0].description, quantity: o.lines[0].quantity, unitPrice: o.lines[0].factoryPrice, lineTotal: fromMinor(toMinor(o.lines[0].factoryPrice) * o.lines[0].quantity) } },
-        },
+    if (o.order.paid === "full") {
+      await db.payment.create({
+        data: { direction: "in", kind: "balance", orderId: order.id, customerId: customer.id, amount: fromMinor(balance), currency: "USD", paidOn: toDbDate(addDays(shippedOn ?? orderedOn, 3)), reference: "TT-DEMO-2", recordedById: people.manager.id },
       });
-      if (o.order.done.includes("factory_deposit")) {
-        await db.payment.create({
-          data: { direction: "out", kind: "deposit", orderId: order.id, factoryId: fo.factoryId, factoryOrderId: fo.id, amount: fromMinor(Math.round(toMinor(fo.total.toString()) * 0.3)), currency: "CNY", paidOn: toDbDate(addDays(orderedOn, 8)), recordedById: people.manager.id },
-        });
-      }
     }
-    if (o.order.done.length === states.length) await db.order.update({ where: { id: order.id }, data: { status: "closed", closedAt: new Date() } });
   }
 
-  const all: MilestoneKey[] = initialStates({ depositPercent: 30, balanceTerms: "before_shipment" }).map((s) => s.key);
+  let blSerial = 240_118;
   await deal({ customer: 0, stage: "new", category: "Machinery", daysAgo: 0, lines: [{ description: "Rotary tablet press, 35 stations", quantity: 1, factoryPrice: 0, factory: 0 }] });
   await deal({ customer: 3, stage: "new", category: "Chemicals", daysAgo: 3, lines: [{ description: "Urea 46% granular", quantity: 50, unit: "ton", factoryPrice: 0, factory: 2 }] });
   await deal({ customer: 1, assignee: bilal.id, stage: "sourcing", category: "Machinery", daysAgo: 2, lines: [{ description: "Gate valve DN100 PN16", quantity: 120, factoryPrice: 410, factory: 1 }] });
@@ -271,20 +260,25 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
   await deal({ customer: 1, assignee: sana.id, stage: "lost", lostReason: "price_too_high", category: "Packaging", daysAgo: 20, revisions: ["rejected"], lines: [{ description: "Shrink film 25 micron", quantity: 10, unit: "ton", factoryPrice: 11000, factory: 2 }] });
   await deal({
     customer: 0, assignee: bilal.id, stage: "won", category: "Machinery", daysAgo: 25, revisions: ["superseded", "accepted"],
-    order: { done: ["proforma_sent", "customer_deposit", "factory_order", "factory_deposit"] },
+    order: { stage: "in_production", paid: "deposit", readyInDays: 15 },
     lines: [{ description: "Capsule filling machine NJP-1200", quantity: 2, factoryPrice: 125000, factory: 0 }, { description: "Spare parts kit", quantity: 2, factoryPrice: 6000, factory: 0 }],
   });
   await deal({
     customer: 2, assignee: sana.id, stage: "won", category: "Machinery", daysAgo: 30, revisions: ["accepted"],
-    order: { done: ["proforma_sent"], terms: "against_bl_copy", shipInDays: 30 },
+    order: { stage: "confirmed", paid: "none", terms: "against_bl_copy" },
     lines: [{ description: "Butterfly valve DN200", quantity: 60, factoryPrice: 780, factory: 1 }],
   });
   await deal({
     customer: 3, assignee: bilal.id, stage: "won", category: "Packaging", daysAgo: 90, revisions: ["accepted"],
-    order: { done: all, shipInDays: 30 },
+    order: { stage: "done", paid: "full", shippedAfterDays: 35 },
     lines: [{ description: "Woven PP bags 50kg", quantity: 100000, factoryPrice: 1.15, factory: 2 }],
   });
-  console.log("[seed] demo data created: 4 customers, 3 factories, 9 deals (2 orders in progress, 1 closed)");
+  await deal({
+    customer: 1, assignee: sana.id, stage: "won", category: "Machinery", daysAgo: 60, revisions: ["accepted"],
+    order: { stage: "shipped", paid: "deposit", terms: "against_bl_copy", shippedAfterDays: 38 },
+    lines: [{ description: "Ball valve DN50, stainless", quantity: 300, factoryPrice: 165, factory: 1 }],
+  });
+  console.log("[seed] demo data created: 4 customers, 3 factories, 10 deals (orders: 1 confirmed, 1 in production, 1 shipped, 1 done)");
   console.log("[seed] demo people bilal@example.com / sana@example.com, password Demo@12345");
 }
 

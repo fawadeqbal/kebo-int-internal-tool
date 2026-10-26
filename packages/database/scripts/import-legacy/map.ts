@@ -6,8 +6,6 @@
  */
 import { splitDeposit, type Minor } from "@kebo/money";
 import {
-  initialStates,
-  openGates,
   SETTINGS,
   type BalanceTerms,
   type Incoterm,
@@ -15,8 +13,7 @@ import {
   type InquiryStage,
   type LineType,
   type LostReason,
-  type MilestoneKey,
-  type MilestoneState,
+  type OrderStage,
   type OrderStatus,
   type PaymentKind,
   type PaymentMethod,
@@ -24,7 +21,6 @@ import {
   type Settings,
   type SettingsKey,
   type TaxTreatment,
-  STEPS,
 } from "@kebo/shared";
 import { DOCUMENT_PREFIX, parseReference, type DocumentKind, type ISODate } from "@kebo/utils";
 
@@ -269,81 +265,60 @@ export interface Evidence {
   by: string;
 }
 
-export interface MilestoneFacts {
+export interface OrderStageFacts {
+  status: OrderStatus;
+  orderedOn: ISODate;
+  /** When the old deal was completed (closed orders). */
+  closedOn: ISODate | null;
   depositPercent: number;
-  balanceTerms: BalanceTerms;
   totalMinor: Minor;
-  /** Issued (not cancelled) invoices. */
-  invoices: Evidence[];
   /** Customer payments. */
   payments: (Evidence & { amountMinor: Minor })[];
-  /** Packing lists (not deleted). */
+  /** Packing lists of invoices that still stand. */
   shipments: Evidence[];
 }
 
-export interface InferredMilestone extends MilestoneState {
-  sortOrder: number;
-  doneById: string | null;
-  note: string | null;
-  /** Done although a step it waits for is still to do (allowed only because the old data shows it happened). */
-  overridden: boolean;
+export interface InferredStage {
+  stage: OrderStage;
+  /** When the order entered that stage, as best the old data shows. */
+  since: ISODate;
+  shippedOn: ISODate | null;
+  /** Each stage it went through, with the day and why we think so. */
+  history: { to: OrderStage; on: ISODate; note: string }[];
 }
-
-// Not the customer's deposit: money is never assumed (what is still owed shows on the balance step).
-const BEFORE_SHIPPING: MilestoneKey[] = ["proforma_sent", "factory_order", "factory_deposit", "factory_confirmed", "samples_approved", "inspection_passed"];
 
 const byDate = <T extends { on: ISODate }>(xs: T[]) => [...xs].sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
 
 /**
- * The 12 steps from initialStates, marked done where the old data proves it:
- * an issued invoice → proforma sent; payments reaching the deposit share →
- * deposit received; payments reaching the total → balance received; a packing
- * list → shipped. When the goods shipped, the unrecorded steps before shipping are
- * skipped (with a note); everything else stays to do (the old app did not track it).
+ * Where an old order stands among Confirmed → In production → Shipped → Done:
+ * closed in the old app → Done; a packing list → Shipped; payments reaching the
+ * deposit → In production; otherwise Confirmed. Money is never assumed: what is
+ * still owed shows on the order, whatever its stage.
  */
-export function inferMilestones(f: MilestoneFacts): InferredMilestone[] {
-  const done = new Map<MilestoneKey, { on: ISODate; by: string; note: string }>();
-  const invoice = byDate(f.invoices)[0];
-  if (invoice) done.set("proforma_sent", { on: invoice.on, by: invoice.by, note: `Imported: invoice ${invoice.ref} was issued in the old app.` });
-
+export function inferStage(f: OrderStageFacts): InferredStage {
   const { deposit } = splitDeposit(f.totalMinor, f.depositPercent);
   let paid = 0;
+  let depositOn: ISODate | null = null;
   for (const p of byDate(f.payments)) {
     paid += p.amountMinor;
-    if (deposit > 0 && !done.has("customer_deposit") && paid >= deposit)
-      done.set("customer_deposit", { on: p.on, by: p.by, note: `Imported: payments reached the ${f.depositPercent}% deposit with ${p.ref}.` });
-    if (f.totalMinor > 0 && !done.has("customer_balance") && paid >= f.totalMinor)
-      done.set("customer_balance", { on: p.on, by: p.by, note: `Imported: paid in full with ${p.ref}.` });
+    if (!depositOn && paid >= deposit && paid > 0) depositOn = p.on;
   }
   const shipment = byDate(f.shipments)[0];
-  if (shipment) done.set("shipped", { on: shipment.on, by: shipment.by, note: `Imported: packing list ${shipment.ref} (pack date).` });
+  const shippedOn = shipment?.on ?? null;
+  const stage: OrderStage = f.status === "closed" ? "done" : shipment ? "shipped" : depositOn ? "in_production" : "confirmed";
 
-  const states: InferredMilestone[] = initialStates({ depositPercent: f.depositPercent, balanceTerms: f.balanceTerms }).map((s, i) => {
-    const d = done.get(s.key);
-    return d && s.status === "todo"
-      ? { ...s, status: "done", doneOn: d.on, sortOrder: i, doneById: d.by, note: d.note, overridden: false }
-      : { ...s, sortOrder: i, doneById: null, note: null, overridden: false };
-  });
-  // Goods that already left: the steps before shipping happened, the old app just never recorded them.
-  // They are marked skipped (not done: there is no date or proof) so they do not show as months late.
-  // Money and documents after shipping stay to do — those are worth checking.
-  if (shipment) {
-    for (const s of states) {
-      if (s.status === "todo" && BEFORE_SHIPPING.includes(s.key)) {
-        // Skipping a required step is a manager's override under the normal rules, so it is marked as one.
-        Object.assign(s, { status: "skipped", doneById: shipment.by, overridden: !STEPS[s.key].optional, note: `Imported: the goods shipped (${shipment.ref}, ${shipment.on}); the old app did not record this step.` });
-      }
-    }
+  const history: InferredStage["history"] = [{ to: "confirmed", on: f.orderedOn, note: "Imported: the quotation was accepted in the old app." }];
+  const reached = (s: OrderStage) => ["confirmed", "in_production", "shipped", "done"].indexOf(stage) >= ["confirmed", "in_production", "shipped", "done"].indexOf(s);
+  if (reached("in_production")) {
+    history.push(
+      depositOn
+        ? { to: "in_production", on: depositOn, note: `Imported: payments reached the ${f.depositPercent}% deposit.` }
+        : { to: "in_production", on: shippedOn ?? f.closedOn ?? f.orderedOn, note: "Imported: no deposit was recorded in the old app; production is assumed because the order went further." },
+    );
   }
-  for (const s of states) {
-    if (s.status !== "done") continue;
-    const gates = openGates(s.key, f.balanceTerms, states);
-    if (gates.length) {
-      s.overridden = true;
-      s.note = `${s.note} Done before: ${gates.map((g) => g.requires).join(", ")} (not recorded in the old app).`;
-    }
-  }
-  return states;
+  if (reached("shipped") && shipment) history.push({ to: "shipped", on: shipment.on, note: `Imported: packing list ${shipment.ref} (pack date).` });
+  if (reached("done")) history.push({ to: "done", on: f.closedOn ?? shippedOn ?? f.orderedOn, note: "Imported: the deal was completed in the old app." });
+  return { stage, since: history[history.length - 1]!.on, shippedOn, history };
 }
 
 /**
@@ -427,7 +402,6 @@ export function mapSettings(old: Record<string, unknown> | null | undefined): Se
       categories: o.categories,
     }),
     reminders: pick({ newDays: o.reminderPendingDays, sourcingDays: o.reminderProcessingDays, dueSoonDays: o.reminderDueSoonDays }),
-    plan: {},
     notifications: pick({
       emails: o.notifyEmails,
       newInquiry: o.notifyNewQuery,

@@ -1,8 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
-import { formatMinor, settle } from "@kebo/money";
-import { orderPlan } from "@kebo/shared";
-import { addDays, daysBetween } from "@kebo/utils";
+import { settle } from "@kebo/money";
+import { orderNeeds } from "@kebo/shared";
+import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -90,61 +90,53 @@ export class RemindersService {
       }
     }
 
-    // 5. Order steps past their due date: the handler, then the managers once it is late enough.
+    // 5. Orders that sit too long in a stage (no deposit, past the ready date, balance still due):
+    //    the handler, then the managers once it is late enough. Orders on hold deals are left alone.
     const orders = await this.prisma.db.order.findMany({
       where: { status: "open", inquiry: { onHold: false } },
-      include: { milestones: true, payments: { where: { voidedAt: null, direction: "in" } }, inquiry: { select: { id: true, assigneeId: true } } },
+      include: { payments: { where: { voidedAt: null, direction: "in" } }, inquiry: { select: { id: true, assigneeId: true } } },
     });
-    // Late steps are collected first and sent per person: a few one by one, many as one summary,
+    // Collected first and sent per person: a few one by one, many as one summary,
     // so a backlog (e.g. right after the import of old orders) does not bury people every morning.
-    type Late = { orderId: string; refNo: string; key: string; title: string; due: string; hint: string | null; lateBy: number };
+    type Late = { orderId: string; refNo: string; title: string; due: string; lateBy: number };
     const lateFor = new Map<string, Late[]>();
     const escalated: Late[] = [];
     for (const o of orders) {
-      const plan = orderPlan(
+      const received = settle(decimalToMinor(o.total), o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }))).settledMinor;
+      const need = orderNeeds(
         {
+          stage: o.stage,
           status: o.status,
-          orderedOn: fromDbDate(o.orderedOn),
-          shipBy: fromDbDateOrNull(o.shipBy),
-          readyOn: fromDbDateOrNull(o.readyOn),
           currency: o.currency,
           totalMinor: decimalToMinor(o.total),
+          receivedMinor: received,
           depositPercent: Number(o.depositPercent),
-          balanceTerms: o.balanceTerms,
+          stageSince: dateIn(o.stageSince, this.clock.timeZone),
+          readyOn: fromDbDateOrNull(o.readyOn),
+          shippedOn: fromDbDateOrNull(o.shippedOn),
         },
-        o.milestones.map((m) => ({ key: m.key, status: m.status, doneOn: fromDbDateOrNull(m.doneOn), dueOverride: fromDbDateOrNull(m.dueOverride) })),
         today,
-        s.plan,
+        s.reminders,
       );
-      for (const st of plan.steps.filter((x) => x.overdue)) {
-        const owner = o.milestones.find((m) => m.key === st.key)?.assigneeId ?? o.inquiry.assigneeId;
-        const late: Late = { orderId: o.id, refNo: o.refNo, key: st.key, title: st.title, due: st.due!, hint: st.hint ?? null, lateBy: daysBetween(st.due!, today) };
-        if (owner) lateFor.set(owner, [...(lateFor.get(owner) ?? []), late]);
-        if (late.lateBy >= s.reminders.escalateAfterDays) escalated.push(late);
-      }
-      // 6. Money the customer still owes after the balance was due.
-      const balance = o.milestones.find((m) => m.key === "customer_balance");
-      const balanceStep = plan.steps.find((x) => x.key === "customer_balance");
-      if (balance?.status === "todo" && balanceStep?.overdue) {
-        const pos = settle(decimalToMinor(o.total), o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })), Number(o.depositPercent));
-        if (pos.outstandingMinor > 0) {
-          await note(managers, { type: "reminder.balance", title: `${o.refNo}: ${formatMinor(pos.outstandingMinor, o.currency)} still to receive`, link: links.order(o.id), dedupeKey: `balance:${o.id}:${today}` });
-        }
-      }
+      if (!need?.late) continue;
+      const late: Late = { orderId: o.id, refNo: o.refNo, title: need.title, due: need.due, lateBy: daysBetween(need.due, today) };
+      const owner = o.inquiry.assigneeId;
+      if (owner) lateFor.set(owner, [...(lateFor.get(owner) ?? []), late]);
+      if (!owner || late.lateBy >= s.reminders.escalateAfterDays) escalated.push(late);
     }
 
     const oldestFirst = (a: Late, b: Late) => b.lateBy - a.lateBy;
     const listOf = (items: Late[]) => items.slice(0, 8).map((x) => `${x.refNo}: ${x.title} — ${x.lateBy} day(s) late`).join("\n") + (items.length > 8 ? `\n…and ${items.length - 8} more` : "");
     for (const [owner, items] of lateFor) {
       // Once a day per person: the first run decides (one by one, or one summary); later runs that day add nothing.
-      const day = `step:${today}:${owner}`;
+      const day = `order:${today}:${owner}`;
       if (await this.prisma.db.notification.count({ where: { userId: owner, dedupeKey: { startsWith: day } } })) continue;
       items.sort(oldestFirst);
       if (items.length <= 3) {
-        for (const x of items) await note([owner], { type: "reminder.step", title: `${x.refNo}: "${x.title}" was due ${x.due}`, body: x.hint, link: links.order(x.orderId), dedupeKey: `${day}:${x.orderId}:${x.key}` });
+        for (const x of items) await note([owner], { type: "reminder.order", title: `${x.refNo}: ${x.title} (since ${x.due})`, link: links.order(x.orderId), dedupeKey: `${day}:${x.orderId}` });
       } else {
         const x = items[0]!;
-        await note([owner], { type: "reminder.step", title: `${items.length} of your order steps are late — the oldest, ${x.refNo} "${x.title}", was due ${x.due}`, body: listOf(items), link: "/orders?view=mine", dedupeKey: day });
+        await note([owner], { type: "reminder.order", title: `${items.length} of your orders need you — the oldest, ${x.refNo}: ${x.title}`, body: listOf(items), link: "/orders?view=mine", dedupeKey: day });
       }
     }
     if (escalated.length) {
@@ -153,8 +145,8 @@ export class RemindersService {
       await note(
         managers,
         escalated.length === 1
-          ? { type: "reminder.stepEscalated", title: `${x.refNo}: "${x.title}" is ${x.lateBy} days late`, body: x.hint, link: links.order(x.orderId), dedupeKey: `step-esc:${today}` }
-          : { type: "reminder.stepEscalated", title: `${escalated.length} order steps are ${s.reminders.escalateAfterDays}+ days late — the oldest, ${x.refNo} "${x.title}", by ${x.lateBy} days`, body: listOf(escalated), link: "/orders", dedupeKey: `step-esc:${today}` },
+          ? { type: "reminder.orderEscalated", title: `${x.refNo}: ${x.title} — ${x.lateBy} days late`, link: links.order(x.orderId), dedupeKey: `order-esc:${today}` }
+          : { type: "reminder.orderEscalated", title: `${escalated.length} orders are late — the oldest, ${x.refNo}: ${x.title}, by ${x.lateBy} days`, body: listOf(escalated), link: "/orders", dedupeKey: `order-esc:${today}` },
       );
     }
 

@@ -24,7 +24,8 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     const mine = (await api(app, staff).get("/dashboard").expect(200)).body;
     expect(mine.money).toBeNull();
     expect(mine.todo.length).toBeGreaterThan(0);
-    expect(mine.todo[0]).toHaveProperty("next.title");
+    expect(mine.todo[0]).toHaveProperty("needs.title");
+    expect(mine.todo[0].needs.late).toBe(true); // Bilal's goods are past the factory's ready date
     const all = (await api(app, manager).get("/dashboard").expect(200)).body;
     expect(all.money.currency).toBe("USD");
     expect(Number(all.money.now.toReceive)).toBeGreaterThan(0);
@@ -52,15 +53,15 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     expect((await api(app, manager).get("/notifications").expect(200)).body.unread).toBe(0);
   });
 
-  it("runs reminders once a day per item: late order steps reach the handler and escalate", async () => {
+  it("runs reminders once a day: orders waiting too long reach the handler", async () => {
     const first = (await api(app, admin).post("/admin/reminders/run").expect(200)).body;
     const again = (await api(app, admin).post("/admin/reminders/run").expect(200)).body;
     expect(again.sent).toBe(0); // same day: nothing twice
     expect(first.sent).toBeGreaterThanOrEqual(0);
     const prisma = app.get(PrismaService);
     const bilal = await prisma.db.user.findUniqueOrThrow({ where: { email: "bilal@example.com" } });
-    const step = await prisma.db.notification.findFirst({ where: { userId: bilal.id, type: "reminder.step" } });
-    expect(step?.title).toMatch(/was due/);
+    const late = await prisma.db.notification.findFirst({ where: { userId: bilal.id, type: "reminder.order" } });
+    expect(late?.title).toMatch(/Goods due from the factory|Get the|orders need you/);
     await api(app, staff).post("/admin/reminders/run").expect(403);
   });
 

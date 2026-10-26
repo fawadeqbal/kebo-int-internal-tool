@@ -64,35 +64,9 @@ export type BalanceTerms = (typeof BALANCE_TERMS)[number];
 export const ORDER_STATUSES = values("open", "closed", "cancelled");
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-/** Where an open order is, worked out from its milestones (never set by hand). */
-export const ORDER_STAGES = values("awaiting_deposit", "in_production", "ready_to_ship", "shipped", "closed", "cancelled");
+/** An order moves through four stages, one button at a time (cancelled is its status, not a stage). */
+export const ORDER_STAGES = values("confirmed", "in_production", "shipped", "done");
 export type OrderStage = (typeof ORDER_STAGES)[number];
-
-export const MILESTONE_KEYS = values(
-  "proforma_sent",
-  "customer_deposit",
-  "factory_order",
-  "factory_deposit",
-  "factory_confirmed",
-  "samples_approved",
-  "inspection_passed",
-  "customer_balance",
-  "factory_balance",
-  "shipped",
-  "documents_released",
-  "factory_vat_invoice",
-);
-export type MilestoneKey = (typeof MILESTONE_KEYS)[number];
-
-export const MILESTONE_STATUSES = values("todo", "done", "skipped");
-export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
-
-/** Who usually does a step (shown as a hint; the deal's handler owns it unless reassigned). */
-export const TEAMS = values("sales", "sourcing", "accounts", "logistics");
-export type Team = (typeof TEAMS)[number];
-
-export const FACTORY_ORDER_STATUSES = values("draft", "sent", "confirmed", "cancelled");
-export type FactoryOrderStatus = (typeof FACTORY_ORDER_STATUSES)[number];
 
 /* ---------------------------------------------------------------- money */
 
@@ -104,17 +78,6 @@ export type PaymentKind = (typeof PAYMENT_KINDS)[number];
 
 export const PAYMENT_METHODS = values("bank_transfer", "letter_of_credit", "cash", "cheque", "online", "other");
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
-
-export const INVOICE_TYPES = values("proforma", "commercial");
-export type InvoiceType = (typeof INVOICE_TYPES)[number];
-
-export const INVOICE_STATUSES = values("draft", "issued", "void");
-export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
-
-/* ---------------------------------------------------------------- shipping */
-
-export const SHIPMENT_STATUSES = values("planned", "booked", "departed", "arrived");
-export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
 
 export const ENUMS = {
   Role: ROLES,
@@ -129,14 +92,8 @@ export const ENUMS = {
   Incoterm: INCOTERMS,
   BalanceTerms: BALANCE_TERMS,
   OrderStatus: ORDER_STATUSES,
-  MilestoneKey: MILESTONE_KEYS,
-  MilestoneStatus: MILESTONE_STATUSES,
-  Team: TEAMS,
-  FactoryOrderStatus: FACTORY_ORDER_STATUSES,
+  OrderStage: ORDER_STAGES,
   PaymentDirection: PAYMENT_DIRECTIONS,
   PaymentKind: PAYMENT_KINDS,
   PaymentMethod: PAYMENT_METHODS,
-  InvoiceType: INVOICE_TYPES,
-  InvoiceStatus: INVOICE_STATUSES,
-  ShipmentStatus: SHIPMENT_STATUSES,
 } as const;
