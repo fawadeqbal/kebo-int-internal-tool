@@ -63,6 +63,7 @@ describe("factory offer lines, one change at a time", () => {
     let o: Offer = (await api(app, sana).post(`/factory-quotes/${offerA}/lines`, { lines: [{ description: "Bottling line", quantity: 1, unit: "set", unitPrice: 0 }] }).expect(201)).body;
     const line = o.lines[0]!.id;
     o = (await api(app, sana).post(`/factory-quotes/${offerA}/lines`, { lines: [{ description: "Shrink wrapper", quantity: 1, unit: "set", unitPrice: 60000 }], afterId: line }).expect(201)).body;
+    expect(shape(o)).toEqual(["1 Bottling line", "2 Shrink wrapper"]);
     // Parts under the line (pasted), placed under it even though "Shrink wrapper" comes after.
     o = (
       await api(app, sana)
@@ -123,6 +124,7 @@ describe("factory offer lines, one change at a time", () => {
     // This factory's own model and price.
     const blow = b.lines.find((l) => l.description === "Blow moulder")!;
     b = (await api(app, sana).patch(`/factory-lines/${blow.id}`, { model: "ZJ-BM6", unitPrice: 495000 }).expect(200)).body;
+    expect(b.lines.find((l) => l.id === blow.id)).toMatchObject({ model: "ZJ-BM6", unitPrice: "495000.00" });
     const s = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body;
     const product = s.products.find((p: { description: string }) => p.description === "Blow moulder");
     expect(product.options.map((o: { model: string }) => o.model)).toEqual(["ZJ-BM6", "CPET-6"]);
