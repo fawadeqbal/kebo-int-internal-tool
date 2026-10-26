@@ -1,26 +1,13 @@
 import type { ReactNode } from "react";
-import { toMinor } from "@kebo/money";
-import { amountInWords } from "@kebo/utils";
 import { cn } from "@kebo/ui";
-import { money, qty } from "@/lib/format";
-import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
+import type { CompanySnapshot } from "@/lib/types-orders";
 
 /**
- * The building blocks of Kebo's printed documents (quotation, proforma and
- * commercial invoices, packing list, report): an A4 sheet on white
+ * The building blocks of the printed sales report (the customer documents use
+ * kebo-doc.tsx): an A4 sheet on white
  * paper in the keboint.com brand, with the letterhead from the document's
  * company snapshot. Always light, whatever the app theme.
  */
-
-const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
-export const countryName = (code: string | null | undefined) => {
-  if (!code || code === "ZZ") return "";
-  try {
-    return regionNames.of(code) ?? code;
-  } catch {
-    return code;
-  }
-};
 
 /** One A4 page (more when it flows over), with a watermark for drafts and void documents. */
 export function Sheet({ watermark, children }: { watermark?: string | null; children: ReactNode }) {
@@ -79,70 +66,6 @@ export function Letterhead({
   );
 }
 
-function Box({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
-  return (
-    <section className={cn("rounded-md border border-kebo-line", className)}>
-      <h2 className="rounded-t-md bg-kebo-light px-3 py-1 text-[7.5pt] font-semibold tracking-[0.08em] text-kebo-deep uppercase">
-        {title}
-      </h2>
-      <div className="px-3 py-2">{children}</div>
-    </section>
-  );
-}
-
-/** The party the document is for (customer or factory). */
-export function PartyBox({ title, party }: { title: string; party: { name: string; lines: (string | null | undefined)[] } }) {
-  return (
-    <Box title={title}>
-      <p className="text-[10pt] font-semibold">{party.name}</p>
-      {party.lines.filter(Boolean).map((l, i) => (
-        <p key={i} className="whitespace-pre-line text-[#334155]">
-          {l}
-        </p>
-      ))}
-    </Box>
-  );
-}
-
-export const customerLines = (c: CustomerSnapshot) => {
-  // Snapshots imported from the old system may lack any of these.
-  const attn = c.contact ? [c.contact.name, c.contact.phone, c.contact.email].filter(Boolean).join(" · ") : "";
-  return {
-    name: c.name || "—",
-    lines: [c.address, countryName(c.country), c.taxNo && `Tax ID ${c.taxNo}`, attn && `Attn: ${attn}`],
-  };
-};
-
-/** Label/value pairs in a box (terms, shipping details…). */
-export function FactsBox({
-  title,
-  items,
-  className,
-}: {
-  title: string;
-  items: { label: string; value: ReactNode | null | undefined }[];
-  className?: string;
-}) {
-  return (
-    <Box title={title} className={className}>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-        {items
-          .filter((i) => i.value !== null && i.value !== undefined && i.value !== "")
-          .map((i) => (
-            <div key={i.label} className="contents">
-              <dt className="text-[#64748b]">{i.label}</dt>
-              <dd className="font-medium">{i.value}</dd>
-            </div>
-          ))}
-      </dl>
-    </Box>
-  );
-}
-
-export function Columns({ children, cols = 2 }: { children: ReactNode; cols?: 2 | 3 }) {
-  return <div className={cn("mt-4 grid gap-3", cols === 3 ? "grid-cols-3" : "grid-cols-2")}>{children}</div>;
-}
-
 export interface Column<T> {
   label: string;
   className?: string;
@@ -184,103 +107,3 @@ export function LinesTable<T>({ rows, columns, foot }: { rows: T[]; columns: Col
   );
 }
 
-/** Description with model and HS code under it. */
-export function Describe({ description, model, hsCode }: { description: string; model?: string | null; hsCode?: string | null }) {
-  return (
-    <>
-      <span className="font-medium whitespace-pre-line">{description}</span>
-      {(model || hsCode) && (
-        <span className="block text-[8pt] text-[#64748b]">
-          {[model && `Model ${model}`, hsCode && `HS ${hsCode}`].filter(Boolean).join(" · ")}
-        </span>
-      )}
-    </>
-  );
-}
-
-export const num = (v: string | number) => <span className="tabular">{qty(v)}</span>;
-
-/** Subtotal, discount, VAT… and the total, with the total in words. */
-export function Totals({
-  rows,
-  total,
-  currency,
-  totalLabel = "Total",
-  extra,
-}: {
-  rows: { label: string; value: string | null }[];
-  total: string;
-  currency: string;
-  totalLabel?: string;
-  extra?: ReactNode;
-}) {
-  return (
-    <div className="mt-3 flex items-start justify-between gap-6 break-inside-avoid">
-      <div className="min-w-0 flex-1 rounded-md bg-kebo-paper px-3 py-2 text-[8.5pt]">
-        <span className="text-[#64748b]">Amount in words: </span>
-        <span className="font-medium">{amountInWords(toMinor(total), currency)}</span>
-      </div>
-      <div className="w-[78mm] shrink-0">
-        <dl className="text-[9pt]">
-          {rows
-            .filter((r) => r.value !== null)
-            .map((r) => (
-              <div key={r.label} className="flex justify-between gap-4 border-b border-kebo-line px-2 py-1">
-                <dt className="text-[#475569]">{r.label}</dt>
-                <dd className="tabular">{r.value}</dd>
-              </div>
-            ))}
-          <div className="mt-1 flex justify-between gap-4 rounded-md bg-kebo px-2 py-1.5 text-[10.5pt] font-bold text-white">
-            <dt>{totalLabel}</dt>
-            <dd className="tabular">{money(total, currency)}</dd>
-          </div>
-        </dl>
-        {extra}
-      </div>
-    </div>
-  );
-}
-
-/** A titled block of free text (terms, notes, bank details, marks). */
-export function TextBlock({
-  title,
-  children,
-  mono,
-  className,
-}: {
-  title: string;
-  children: ReactNode;
-  mono?: boolean;
-  className?: string;
-}) {
-  if (children === null || children === undefined || children === "") return null;
-  return (
-    <section className={cn("mt-4 break-inside-avoid", className)}>
-      <h2 className="mb-1 text-[7.5pt] font-semibold tracking-[0.08em] text-kebo-deep uppercase">{title}</h2>
-      <div className={cn("whitespace-pre-line text-[#334155]", mono && "font-mono text-[8.5pt]")}>{children}</div>
-    </section>
-  );
-}
-
-/** Signature lines and the footer text. */
-export function SignOff({ left, right, footer }: { left: string; right?: string; footer?: string | null }) {
-  return (
-    <footer className="mt-8 break-inside-avoid">
-      <div className="grid grid-cols-2 gap-10">
-        <div>
-          <div className="h-14" />
-          <p className="border-t border-[#94a3b8] pt-1 text-[8pt] text-[#475569]">{left}</p>
-        </div>
-        {right ? (
-          <div>
-            <div className="h-14" />
-            <p className="border-t border-[#94a3b8] pt-1 text-[8pt] text-[#475569]">{right}</p>
-          </div>
-        ) : (
-          <div />
-        )}
-      </div>
-      {footer && <p className="mt-6 border-t border-kebo-line pt-2 text-center text-[8pt] text-[#64748b]">{footer}</p>}
-    </footer>
-  );
-}

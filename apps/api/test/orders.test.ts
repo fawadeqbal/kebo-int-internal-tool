@@ -195,6 +195,9 @@ describe("orders: four stages", () => {
     expect(paymentSentenceOf(30, "against_bl_copy")).toBe("Our usual payment is made by 30% Advance deposit and 70% against B/L copy.");
     expect(paymentSentenceOf(0, "letter_of_credit")).toBe("Payment: Letter of credit.");
     expect(pi.company).toMatchObject({ nameLocal: "山东科波国际贸易有限公司", taxNo: "91370811MAK4PH5B1N" }); // Kebo's details until changed in Settings
+    // For the internal copy: every payment, and each line's cost for people who may see costs (staff source, so they do).
+    expect(pi.payments).toEqual(expect.arrayContaining([expect.objectContaining({ kind: expect.any(String), amount: expect.any(String), paidOn: expect.any(String) })]));
+    expect(pi.lines[0].unitCost).toEqual(expect.any(String));
     // The heading over the lines and the port of discharge, set on the order.
     await api(app, sana).patch(`/orders/${orderId}/details`, { documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria" }).expect(200);
     const pi2 = (await api(app, sana).get(`/orders/${orderId}/documents/proforma`).expect(200)).body;

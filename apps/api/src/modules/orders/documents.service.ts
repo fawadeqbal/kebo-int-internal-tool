@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
 import { documentTotals, fromMinor, settle, splitDeposit } from "@kebo/money";
-import { BALANCE_TERMS_LABEL, type BalanceTerms } from "@kebo/shared";
+import { BALANCE_TERMS_LABEL, can, paymentSentenceOf, type BalanceTerms } from "@kebo/shared";
 import { NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
@@ -22,14 +22,8 @@ export function paymentTermsOf(depositPercent: number, balanceTerms: BalanceTerm
   return `${depositPercent > 0 ? `${depositPercent}% deposit, ` : ""}${depositPercent > 0 ? terms.charAt(0).toLowerCase() + terms.slice(1) : terms}`;
 }
 
-/** "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
-export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceTerms): string {
-  const rest = BALANCE_TERMS_LABEL[balanceTerms];
-  const lower = rest.charAt(0).toLowerCase() + rest.slice(1);
-  if (depositPercent <= 0) return `Payment: ${rest}.`;
-  if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
-  return `Our usual payment is made by ${depositPercent}% Advance deposit and ${100 - depositPercent}% ${lower.replace(/^balance /, "")}.`;
-}
+/** Kebo's payment sentence (shared with the web for quotations). */
+export { paymentSentenceOf };
 
 /**
  * The documents of an order, made from the order itself whenever they are
@@ -77,13 +71,14 @@ export class DocumentsService {
     const shippedOn = fromDbDateOrNull(o.shippedOn);
     const goodsOnly = kind === "packing-list";
     const lines = o.lines.filter((l) => !goodsOnly || l.type === "goods");
+    const seeCosts = can(user.role, "sourcing.manage");
 
     return {
       kind,
       title: TITLE[kind],
       number: o.refNo.replace(/^[A-Z]+-/, `${PREFIX[kind]}-`),
       date: kind === "proforma" ? fromDbDate(o.orderedOn) : (shippedOn ?? this.clock.today()),
-      company: companySnapshot(settings),
+      company: { ...companySnapshot(settings), stamp: settings.company.stamp || null },
       customer: await this.customerOf(o.customerId, o.inquiry.contactId, rev.customerSnapshot as Partial<Awaited<ReturnType<typeof customerSnapshot>>> | null),
       order: {
         id: o.id,
@@ -118,6 +113,8 @@ export class DocumentsService {
         unit: l.unit,
         unitPrice: goodsOnly ? null : l.unitPrice.toFixed(2),
         lineTotal: goodsOnly ? null : l.lineTotal.toFixed(2),
+        /** The internal copy only, for people who may see factory costs (sales currency, per unit). */
+        unitCost: goodsOnly || !seeCosts ? null : (l.unitCost?.toFixed(2) ?? null),
         // Packing list only: what the packing list form recorded (null until filled in).
         packing: goodsOnly ? { packages: l.packages, packageType: l.packageType, netWeightKg: l.netWeightKg?.toFixed(2) ?? null, grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null, cbm: l.cbm?.toFixed(3) ?? null } : null,
       })),
@@ -150,6 +147,11 @@ export class DocumentsService {
           },
       terms: kind === "packing-list" ? null : rev.terms,
       bankDetails: kind === "packing-list" ? null : settings.company.bankDetails || null,
+      /** The internal copy: every payment received (the customer's copy shows only the total). */
+      payments: goodsOnly
+        ? []
+        : o.payments.map((p) => ({ paidOn: fromDbDate(p.paidOn), kind: p.kind, amount: p.amount.toFixed(2), bankCharges: p.bankCharges.toFixed(2), currency: p.currency, reference: p.reference })),
+      notes: kind === "packing-list" ? null : rev.notes,
       footer: settings.company.invoiceFooter || null,
     };
   }

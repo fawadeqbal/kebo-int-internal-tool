@@ -1,4 +1,5 @@
-import type { RevisionStatus } from "../enums";
+import type { BalanceTerms, RevisionStatus } from "../enums";
+import { BALANCE_TERMS_LABEL } from "../labels";
 
 /**
  * A deal has one quotation (QUO-2026-0007) with revisions R1, R2… Only the
@@ -68,3 +69,12 @@ export const canAnswer = (revisions: RevisionRef[], number: number) =>
 /** Drafts to discard when a revision is accepted. */
 export const draftsDiscardedBy = (revisions: RevisionRef[], acceptedNumber: number): number[] =>
   revisions.filter((r) => r.status === "draft" && r.number > acceptedNumber).map((r) => r.number);
+
+/** The payment terms as Kebo writes them on its documents: "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
+export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceTerms): string {
+  const rest = BALANCE_TERMS_LABEL[balanceTerms];
+  const lower = rest.charAt(0).toLowerCase() + rest.slice(1);
+  if (depositPercent <= 0) return `Payment: ${rest}.`;
+  if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
+  return `Our usual payment is made by ${depositPercent}% Advance deposit and ${100 - depositPercent}% ${lower.replace(/^balance /, "")}.`;
+}

@@ -1,203 +1,202 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { toMinor } from "@kebo/money";
-import { amountInWords } from "@kebo/utils";
+import { PAYMENT_KIND_LABEL, type PaymentKind } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { load } from "@/lib/session";
-import { date, money, qty } from "@/lib/format";
 import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
-import { Columns, customerLines, Describe, FactsBox, Letterhead, LinesTable, num, PartyBox, Sheet, SignOff, TextBlock, Totals } from "@/components/print/doc";
 import { PrintToolbar } from "@/components/print/toolbar";
-import { KeboProforma } from "@/components/print/kebo-proforma";
 import { backTo, customerOr } from "@/components/print/data";
+import { docDate, docMoney, docQty, docWords, InternalTable, KeboDoc, labelled, marginOf, portBullets, textBullets, type DocColumn } from "@/components/print/kebo-doc";
+
+/** The print page for the customer's or the internal copy, keeping where Back goes. */
+const copyHref = (path: string, back: string | undefined, internal: boolean) => `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
+
+const KINDS: readonly OrderDocumentKind[] = ["proforma", "invoice", "packing-list"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Weights with up to 2 decimals and volume with up to 3; blank when not recorded. */
 const kg = (v: string | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
 const m3 = (v: string | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 }));
 
-const KINDS: readonly OrderDocumentKind[] = ["proforma", "invoice", "packing-list"];
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE", invoice: "COMMERCIAL  INVOICE", "packing-list": "PACKING  LIST" };
+const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", invoice: "Invoice.NO.", "packing-list": "Packing List NO." };
 
 async function getDoc(id: string, kind: string) {
   if (!KINDS.includes(kind as OrderDocumentKind) || !UUID.test(id)) notFound();
   return load(() => api.get<OrderDocument>(`/orders/${id}/documents/${kind}`));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string; kind: string }> }): Promise<Metadata> {
-  const { id, kind } = await params;
+export async function generateMetadata({ params, searchParams }: { params: Promise<{ id: string; kind: string }>; searchParams: Promise<{ copy?: string }> }): Promise<Metadata> {
+  const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   const d = await getDoc(id, kind);
-  return { title: `${d.title} ${d.number}` };
+  return { title: `${d.title} ${d.number}${sp.copy === "internal" && d.kind !== "packing-list" ? " (internal)" : ""}` };
 }
 
+type Line = OrderDocument["lines"][number];
+
 /**
- * An order's documents, made from the order itself (GET /orders/:id/documents/:kind):
- *  - proforma: Kebo's own layout (components/print/kebo-proforma.tsx);
- *  - invoice: the whole order, with what was received and the balance due;
- *  - packing-list: the goods only, without prices.
+ * An order's documents, made from the order itself (GET /orders/:id/documents/:kind),
+ * all in Kebo's own layout (components/print/kebo-doc.tsx):
+ *  - proforma: the whole order, asking for the deposit, with Kebo's bank details;
+ *  - invoice: the whole order once shipped, with the shipment details and the bank details;
+ *  - packing-list: the goods only, with packages, weights and volume.
+ * The customer's copy shows the items and one total; ?copy=internal adds unit prices,
+ * amounts, costs and margin, and every payment.
  */
-export default async function OrderDocumentPrint({ params, searchParams }: { params: Promise<{ id: string; kind: string }>; searchParams: Promise<{ back?: string }> }) {
+export default async function OrderDocumentPrint({ params, searchParams }: { params: Promise<{ id: string; kind: string }>; searchParams: Promise<{ back?: string; copy?: string }> }) {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   const d = await getDoc(id, kind);
   // Customer snapshots imported from the old system may be empty: then the customer as it is now.
   const customer = await customerOr(d.customer, async () => ({ customerId: (await api.get<{ customer: { id: string } }>(`/orders/${id}`)).customer.id })).catch(() => d.customer);
-  // The proforma is laid out exactly like the one Kebo makes in Word.
-  if (d.kind === "proforma")
-    return (
-      <>
-        <PrintToolbar title={`${d.title} ${d.number}`} backHref={backTo(sp.back, `/orders/${d.order.id}`)} pdfHref={`/pdf/${d.kind}/${d.order.id}`} />
-        <KeboProforma doc={{ ...d, customer }} customerCountry={customer.country} />
-      </>
-    );
+  const o = d.order;
   const c = d.currency;
   const t = d.totals;
-  const o = d.order;
-  const incoterm = `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
-  const invoice = d.kind === "invoice";
-  const vat = t && t.vatRate > 0 ? `${t.pricesIncludeVat ? "Incl. " : ""}VAT ${t.vatRate}%` : null;
-  const cancelled = o.status === "cancelled";
-  const totalUnits = d.lines.reduce((s, l) => s + Number(l.quantity), 0);
-  // Packing list: the figures recorded on the order (blank until filled in, so a draft can be completed by hand).
-  const pk = d.kind === "packing-list" ? d.packing : null;
-  const draft = d.kind === "packing-list" && !pk?.done;
+  const packing = d.kind === "packing-list";
+  const internal = !packing && sp.copy === "internal";
+  const costs = internal && d.lines.some((l) => l.unitCost != null);
+
+  const toolbar = (
+    <PrintToolbar
+      title={`${d.title} ${d.number}`}
+      backHref={backTo(sp.back, `/orders/${o.id}`)}
+      pdfHref={`/pdf/${d.kind}/${o.id}${internal ? "?copy=internal" : ""}`}
+      copies={packing ? undefined : { current: internal ? "internal" : "customer", customer: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, false), internal: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, true) }}
+    />
+  );
+
+  const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (_l, i) => i + 1 };
+  const description: DocColumn<Line> = {
+    label: packing ? "Description of Goods" : "Equipment Description",
+    render: (l) => (
+      <>
+        {l.description}
+        {l.model ? `\nModel: ${l.model}` : ""}
+        {packing && l.hsCode ? `\nHS Code: ${l.hsCode}` : ""}
+      </>
+    ),
+  };
+  const qty: DocColumn<Line> = { label: "Qty.", width: internal ? 58 : 71.4, render: (l) => docQty(l.quantity, l.unit) };
+
+  const columns: DocColumn<Line>[] = packing
+    ? [
+        no,
+        description,
+        { label: "Qty.", width: 58, render: (l) => docQty(l.quantity, l.unit) },
+        { label: "Packages", width: 82, wrap: true, render: (l) => (l.packing?.packages ? `${l.packing.packages} ${l.packing.packageType ?? ""}`.trim() : "") },
+        { label: "N.W. (kg)", width: 52, align: "right", render: (l) => kg(l.packing?.netWeightKg) },
+        { label: "G.W. (kg)", width: 52, align: "right", render: (l) => kg(l.packing?.grossWeightKg) },
+        { label: "CBM", width: 42, align: "right", render: (l) => m3(l.packing?.cbm) },
+      ]
+    : internal
+      ? [
+          no,
+          description,
+          qty,
+          ...(costs
+            ? ([
+                { label: "Unit cost", width: 62, align: "right", render: (l) => (l.unitCost != null ? docMoney(l.unitCost, c) : "") },
+                { label: "Margin", width: 42, align: "right", render: (l) => marginOf(l.unitPrice ?? 0, l.unitCost) },
+              ] satisfies DocColumn<Line>[])
+            : []),
+          { label: "Unit price", width: 66, align: "right", render: (l) => docMoney(l.unitPrice ?? 0, c) },
+          { label: "Amount", width: 74, align: "right", render: (l) => docMoney(l.lineTotal ?? 0, c) },
+        ]
+      : [no, description, qty];
+
+  // Subtotal, discount and tax: on the customer's copy only when they change the total.
+  const sums =
+    t && (internal || Number(t.discount) || t.vatRate > 0)
+      ? [
+          { label: "Subtotal", value: docMoney(t.subtotal, c) },
+          ...(Number(t.discount) ? [{ label: "Discount", value: docMoney(-Number(t.discount), c) }] : []),
+          ...(t.vatRate > 0 ? [{ label: `Tax ${t.vatRate}%${t.pricesIncludeVat ? " (included)" : ""}`, value: docMoney(t.vat, c) }] : []),
+        ]
+      : [];
+
+  const ports = portBullets(o.incoterm, o.incotermPlace, o.portOfDischarge);
+  const pk = d.packing;
+  const bullets = packing
+    ? [
+        pk?.containerNo ? labelled("Container No.:", pk.containerNo) : null,
+        pk?.shippingMarks ? labelled("Shipping marks:", `\n${pk.shippingMarks}`) : null,
+        o.blNo ? labelled("B/L No.:", o.blNo) : null,
+        o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn)) : null,
+        ...ports,
+        "Country of origin: China",
+      ]
+    : d.kind === "invoice"
+      ? [d.paymentSentence, o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn)) : null, o.blNo ? labelled("B/L No.:", o.blNo) : null, ...ports, "Country of origin: China", ...textBullets(d.terms), ...textBullets(d.notes)]
+      : [d.paymentSentence, o.leadTime ? `Delivery: ${o.leadTime}` : null, ...textBullets(d.terms), ...textBullets(d.notes), ...ports];
+
+  const packingTotals =
+    packing && pk ? (
+      <tr style={{ fontWeight: 700, fontSize: "11pt", lineHeight: "13.8pt" }}>
+        <td colSpan={3} style={{ border: "0.5pt solid #000", padding: "0 5.6pt" }}>
+          Total :
+          <span style={{ display: "inline-block", width: "24pt" }} />
+          {d.lines.length} item{d.lines.length === 1 ? "" : "s"}
+          {pk.totals.packages > 0 ? `, ${pk.totals.packages} packages` : ""}
+        </td>
+        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt" }}>{pk.totals.packages || ""}</td>
+        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>{Number(pk.totals.netWeightKg) ? kg(pk.totals.netWeightKg) : ""}</td>
+        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>{Number(pk.totals.grossWeightKg) ? kg(pk.totals.grossWeightKg) : ""}</td>
+        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>{Number(pk.totals.cbm) ? m3(pk.totals.cbm) : ""}</td>
+      </tr>
+    ) : null;
+
+  const internalPart =
+    internal && t ? (
+      <>
+        <InternalTable
+          title="Money (internal)"
+          rows={[
+            ["Order total", docMoney(t.total, c)],
+            [`Deposit (${t.depositPercent}%)`, docMoney(t.deposit, c)],
+            ["Received so far", docMoney(t.received, c)],
+            ["Still due", docMoney(t.due, c)],
+            ...(costs
+              ? [
+                  ["Factory cost (lines with a cost)", docMoney(d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0), c)],
+                  ["Margin on those lines", marginOf(d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.lineTotal ?? 0) : 0), 0), d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0)) || "—"],
+                ]
+              : []),
+          ]}
+        />
+        <InternalTable
+          title="Payments received (internal)"
+          head={["Date", "For", "Reference", "Bank charges", "Amount"]}
+          rows={
+            d.payments.length
+              ? d.payments.map((p) => [docDate(p.paidOn), PAYMENT_KIND_LABEL[p.kind as PaymentKind] ?? p.kind, p.reference ?? "", docMoney(p.bankCharges, p.currency), docMoney(p.amount, p.currency)])
+              : [["No payments yet", "", "", "", ""]]
+          }
+        />
+      </>
+    ) : null;
 
   return (
     <>
-      <PrintToolbar title={`${d.title} ${d.number}`} backHref={backTo(sp.back, `/orders/${o.id}`)} pdfHref={`/pdf/${d.kind}/${o.id}`} />
-      <Sheet watermark={cancelled ? "CANCELLED" : null}>
-        <Letterhead
-          company={d.company}
-          title={d.title}
-          number={d.number}
-          meta={[
-            { label: "Date", value: date(d.date) },
-            { label: "Our order", value: o.refNo },
-            { label: "Quotation", value: o.quotation },
-            ...(o.blNo ? [{ label: "B/L number", value: o.blNo }] : []),
-          ]}
-        />
-        <Columns>
-          <PartyBox title={invoice ? "Sold to (consignee)" : "Consignee"} party={customerLines(customer)} />
-          <FactsBox
-            title="Shipment and terms"
-            items={[
-              { label: "Incoterm", value: `${incoterm} (Incoterms® 2020)` },
-              { label: "Payment", value: d.kind === "packing-list" ? null : d.paymentTerms },
-              { label: "Currency", value: d.kind === "packing-list" ? null : c },
-              { label: "Country of origin", value: "China" },
-              { label: "Shipped on", value: o.shippedOn ? date(o.shippedOn) : null },
-              { label: "B/L number", value: o.blNo },
-            ]}
-          />
-        </Columns>
-        {d.showPrices && t ? (
-          <>
-            <LinesTable
-              rows={d.lines}
-              columns={[
-                { label: "No.", className: "w-8 text-[#64748b]", render: (_l, i) => i + 1 },
-                { label: "Description", render: (l) => <Describe description={l.description} model={l.model} hsCode={l.hsCode} /> },
-                { label: "Qty", className: "w-16 text-right", render: (l) => num(l.quantity) },
-                { label: "Unit", className: "w-12", render: (l) => l.unit },
-                { label: "Unit price", className: "w-28 text-right tabular whitespace-nowrap", render: (l) => money(l.unitPrice, c) },
-                { label: "Amount", className: "w-32 text-right tabular whitespace-nowrap font-medium", render: (l) => money(l.lineTotal, c) },
-              ]}
-            />
-            <Totals
-              currency={c}
-              total={t.total}
-              totalLabel={`Total ${incoterm}`}
-              rows={[
-                { label: "Subtotal", value: money(t.subtotal, c) },
-                { label: "Discount", value: Number(t.discount) ? `− ${money(t.discount, c)}` : null },
-                { label: vat ?? "VAT", value: vat ? money(t.vat, c) : null },
-              ]}
-              extra={
-                invoice ? (
-                  <dl className="mt-2 text-[9pt]">
-                    <div className="flex justify-between gap-4 border-b border-kebo-line px-2 py-1">
-                      <dt className="text-[#475569]">Received with thanks</dt>
-                      <dd className="tabular">{Number(t.received) ? `− ${money(t.received, c)}` : money(0, c)}</dd>
-                    </div>
-                    <div className="mt-1 rounded-md border-2 border-kebo-gold px-2 py-1.5">
-                      <div className="flex items-baseline justify-between gap-3 text-[10pt] font-bold whitespace-nowrap">
-                        <dt>Balance due</dt>
-                        <dd className="tabular">{money(t.due, c)}</dd>
-                      </div>
-                      <p className="mt-0.5 text-[7.5pt] text-[#475569]">{Number(t.due) > 0 ? amountInWords(toMinor(t.due), c) : "Paid in full. Thank you."}</p>
-                    </div>
-                  </dl>
-                ) : null
-              }
-            />
-          </>
-        ) : (
-          <>
-            {draft && (
-              <p className="mt-4 rounded-md border border-dashed border-[#d97706]/60 bg-[#fffbeb] px-3 py-2 text-[9pt] text-[#92400e]">
-                <span className="font-semibold">Draft — packing list not filled in.</span> Packages, weights and volume are added on the order before shipping.
-              </p>
-            )}
-            <LinesTable
-              rows={d.lines}
-              columns={[
-                { label: "No.", className: "w-7 text-[#64748b]", render: (_l, i) => i + 1 },
-                { label: "Description of goods", render: (l) => <Describe description={l.description} model={l.model} hsCode={l.hsCode} /> },
-                { label: "Quantity", className: "w-20 text-right whitespace-nowrap", render: (l) => <>{num(l.quantity)} {l.unit}</> },
-                { label: "Pkgs", className: "w-12 text-right tabular", render: (l) => (l.packing?.packages != null ? qty(l.packing.packages) : "") },
-                { label: "Type", className: "w-20", render: (l) => (l.packing?.packages ? (l.packing.packageType ?? "") : "") },
-                { label: "Net kg", className: "w-16 text-right tabular whitespace-nowrap", render: (l) => kg(l.packing?.netWeightKg) },
-                { label: "Gross kg", className: "w-16 text-right tabular whitespace-nowrap", render: (l) => kg(l.packing?.grossWeightKg) },
-                { label: "CBM", className: "w-14 text-right tabular whitespace-nowrap", render: (l) => m3(l.packing?.cbm) },
-              ]}
-              foot={
-                pk &&
-                pk.totals.packages > 0 && (
-                  <tr className="border-t-2 border-kebo-deep font-semibold">
-                    <td className="px-2 py-1.5" />
-                    <td className="px-2 py-1.5">Total</td>
-                    <td className="px-2 py-1.5 text-right whitespace-nowrap tabular">{qty(totalUnits)}</td>
-                    <td className="px-2 py-1.5 text-right tabular">{qty(pk.totals.packages)}</td>
-                    <td className="px-2 py-1.5" />
-                    <td className="px-2 py-1.5 text-right tabular whitespace-nowrap">{kg(pk.totals.netWeightKg)}</td>
-                    <td className="px-2 py-1.5 text-right tabular whitespace-nowrap">{kg(pk.totals.grossWeightKg)}</td>
-                    <td className="px-2 py-1.5 text-right tabular whitespace-nowrap">{m3(pk.totals.cbm)}</td>
-                  </tr>
-                )
-              }
-            />
-            <p className="mt-3 rounded-md bg-kebo-paper px-3 py-2 text-[8.5pt]">
-              <span className="text-[#64748b]">Total: </span>
-              <span className="font-medium">
-                {d.lines.length} line{d.lines.length === 1 ? "" : "s"}, {qty(totalUnits)} units
-                {pk && pk.totals.packages > 0 && <>, {qty(pk.totals.packages)} package{pk.totals.packages === 1 ? "" : "s"}</>}
-                {pk && Number(pk.totals.grossWeightKg) > 0 && <>, gross weight {kg(pk.totals.grossWeightKg)} kg</>}
-                {pk && Number(pk.totals.cbm) > 0 && <>, {m3(pk.totals.cbm)} m³</>}
-              </span>
-            </p>
-            <div className="grid grid-cols-2 gap-6">
-              <TextBlock title="Shipping marks" className="rounded-md border border-dashed border-[#94a3b8] p-3">
-                {pk?.shippingMarks ? <span className="font-medium text-kebo-ink">{pk.shippingMarks}</span> : <span className="text-[#94a3b8]">{" \n \n "}</span>}
-              </TextBlock>
-              <TextBlock title="Container" className="rounded-md border border-dashed border-[#94a3b8] p-3">
-                {pk?.containerNo ? <span className="font-medium text-kebo-ink">Container no. {pk.containerNo}</span> : <span className="text-[#94a3b8]">{"Container no.:\nSeal no.:"}</span>}
-              </TextBlock>
-            </div>
-          </>
-        )}
-        {invoice && d.bankDetails && (
-          <section className="mt-5 break-inside-avoid rounded-md border border-kebo-line bg-kebo-paper px-3 py-2">
-            <h2 className="mb-1 text-[7.5pt] font-semibold tracking-[0.08em] text-kebo-deep uppercase">Pay by bank transfer to</h2>
-            <p className="font-mono text-[8.5pt] whitespace-pre-line">{d.bankDetails}</p>
-            <p className="mt-1 text-[8pt] text-[#475569]">Please quote {d.number} with your payment. Bank charges outside China are for the buyer&apos;s account.</p>
-          </section>
-        )}
-        <TextBlock title="Terms and conditions">{d.terms}</TextBlock>
-        <SignOff
-          left={`For and on behalf of ${d.company.name}`}
-
-          footer={d.kind === "packing-list" ? null : d.footer}
-        />
-      </Sheet>
+      {toolbar}
+      <KeboDoc
+        company={d.company}
+        customer={customer}
+        title={TITLE[d.kind]}
+        numberLabel={NUMBER_LABEL[d.kind]}
+        number={d.number}
+        date={d.date}
+        meta={d.kind === "proforma" ? [] : [{ label: "Order NO.", value: o.refNo }]}
+        heading={o.documentTitle}
+        columns={columns}
+        rows={d.lines}
+        sums={sums}
+        total={t ? { label: `Total ${o.incoterm} Price :`, words: docWords(t.total, c), amount: docMoney(t.total, c) } : null}
+        foot={packingTotals}
+        boxTitle={packing ? "Shipping details:" : "Payment terms:"}
+        bullets={bullets.filter(Boolean)}
+        bank={packing ? null : d.bankDetails}
+        internal={internalPart}
+        watermark={o.status === "cancelled" ? "CANCELLED" : packing && !pk?.done ? "DRAFT" : null}
+      />
     </>
   );
 }

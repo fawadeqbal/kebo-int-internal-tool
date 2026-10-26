@@ -88,6 +88,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   let target: Target;
   try {
     target = await KINDS[kind].target(id, session, new URL(req.url));
+    // Priced documents: the internal copy (every price, cost and payment) when asked for.
+    if (kind !== "report" && kind !== "packing-list" && new URL(req.url).searchParams.get("copy") === "internal") {
+      target = { name: `${target.name} (internal)`, path: `${target.path}?copy=internal` };
+    }
   } catch (e) {
     if (e instanceof ApiError) return new Response(e.status === 404 ? "Not found" : e.message, { status: e.status === 422 ? 404 : e.status });
     throw e;
@@ -127,8 +131,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     }
     await page.evaluate(() => document.fonts.ready);
     const pdf = await page.pdf(
-      kind === "proforma"
-        ? // Kebo's own proforma layout: its page margins, no footer (as the Word original).
+      kind !== "report"
+        ? // Kebo's own document layout: its page margins, no footer (as the Word original).
           { format: "A4", printBackground: true, margin: { top: "40pt", right: "21.2pt", bottom: "40pt", left: "14.2pt" } }
         : {
             format: "A4",
