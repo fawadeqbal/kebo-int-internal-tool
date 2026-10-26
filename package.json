@@ -14,8 +14,8 @@
     "db:generate": "pnpm --filter @kebo/database db:generate",
     "db:migrate": "pnpm --filter @kebo/database db:migrate",
     "db:deploy": "pnpm --filter @kebo/database db:deploy",
-    "db:seed": "pnpm --filter @kebo/database db:seed",
-    "db:reset": "pnpm --filter @kebo/database db:reset",
+    "db:seed": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:seed",
+    "db:reset": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:reset",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "dev:packages": "turbo run dev --filter=./packages/*"
   },
