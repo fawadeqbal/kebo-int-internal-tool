@@ -363,14 +363,14 @@ export function AppShell({
         </button>
         <form action="/deals" role="search" className="relative w-full max-w-sm">
           <label htmlFor="global-search" className="sr-only">
-            Search inquiries
+            Search deals
           </label>
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
           <input
             id="global-search"
             name="q"
             type="search"
-            placeholder="Search inquiries…"
+            placeholder="Search deals…"
             className="h-8 w-full rounded-lg border border-line bg-surface pr-10 pl-9 text-sm text-text shadow-card transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
           />
           <input type="hidden" name="status" value="all" />
@@ -407,7 +407,7 @@ export function AppShell({
         className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
         {tab("/dashboard", "Home", LayoutDashboard)}
-        {tab("/deals", "Inquiries", ClipboardList)}
+        {tab("/deals", "Deals", ClipboardList)}
         {canCreate ? (
           <div className="flex flex-1 items-start justify-center">
             <Link

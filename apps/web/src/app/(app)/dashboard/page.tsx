@@ -74,7 +74,7 @@ export default async function DashboardPage() {
         <Stat label="Order steps to do" value={d.todo.length} hint={`${d.todo.filter((t) => t.next?.overdue).length} late`} href="/orders?view=mine" tone={d.todo.some((t) => t.next?.overdue) ? "bad" : undefined} />
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <CardHeader title="My to-do" description="The next step of each order you handle, late ones first" />
           <CardBody>
