@@ -19,6 +19,7 @@ export class ApiError extends Error {
       code?: string;
       fieldErrors?: Record<string, string[] | undefined>;
       matches?: { id: string; label: string; detail?: string }[];
+      choices?: string[];
     } = {},
   ) {
     super(message);

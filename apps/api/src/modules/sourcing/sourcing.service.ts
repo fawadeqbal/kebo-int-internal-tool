@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
 import { convertMinor, fxRate, withTaxMinor, fromMinor } from "@kebo/money";
-import { can, taxSentence, type FactoryQuoteInput } from "@kebo/shared";
+import { can, lineNumbers, taxSentence, type FactoryQuoteInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -85,17 +85,22 @@ export class SourcingService {
         }),
       };
     });
+    const numbers = lineNumbers(items.map((it) => ({ key: it.id, parentKey: it.parentId })));
     const allLines = priced.flatMap((q) => q.lines.map((l) => ({ ...l, factory: q.factory, quoteId: q.id, currency: q.currency })));
     return {
       currency: sales.currency,
       missingRates: [...new Set(priced.filter((q) => q.fxRate === null).map((q) => q.currency))],
       quotes: priced,
-      items: items.map((it) => {
+      items: items.map((it, n) => {
         const options = allLines
           .filter((l) => l.requestedItemId === it.id)
           .sort((a, b) => (a.unitCost === null ? 1 : b.unitCost === null ? -1 : Number(a.unitCost) - Number(b.unitCost)));
         return {
           id: it.id,
+          /** "2", "2.1" (a part of item 2). */
+          no: numbers[n],
+          parentId: it.parentId,
+          hasParts: items.some((p) => p.parentId === it.id),
           description: it.description,
           model: it.model,
           quantity: it.quantity.toString(),
@@ -118,7 +123,7 @@ export class SourcingService {
     const name = input.newFactoryName!.trim().replace(/\s+/g, " ");
     const known = await tx.factory.findFirst({ where: { deletedAt: null, name: { equals: name, mode: "insensitive" } } });
     if (known) return known;
-    const f = await tx.factory.create({ data: { name, createdById: user.id } });
+    const f = await tx.factory.create({ data: { name, createdById: user.id, ownerId: user.id } });
     await this.audit.record(tx, {
       userId: user.id,
       action: "create",

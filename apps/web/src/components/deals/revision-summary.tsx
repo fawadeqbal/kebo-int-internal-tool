@@ -33,7 +33,7 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
           <tbody>
             {r.lines.map((l, i) => (
               <Tr key={l.id}>
-                <Td className="text-muted tabular">{i + 1}</Td>
+                <Td className="text-muted tabular">{l.no ?? i + 1}</Td>
                 <Td className="min-w-52">
                   <span className="block max-w-[28rem] text-sm whitespace-pre-line">{l.description}</span>
                   <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">

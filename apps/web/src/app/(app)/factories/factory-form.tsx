@@ -1,16 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { buttonClass, Card, CardBody, CardFooter, CardHeader, Field, Input, Textarea } from "@kebo/ui";
+import { buttonClass, Card, CardBody, CardFooter, CardHeader, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
+import type { Person } from "@/lib/types";
 import type { Factory } from "@/lib/types-people";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** A factory's details. After an error the typed values stay (s.values), otherwise the saved ones show. */
-export function FactoryForm({ action, factory, cancelHref }: { action: Action; factory: Factory | null; cancelHref: string }) {
+export function FactoryForm({
+  action,
+  factory,
+  cancelHref,
+  people,
+  meId,
+}: {
+  action: Action;
+  factory: Factory | null;
+  cancelHref: string;
+  people: Person[];
+  meId: string;
+}) {
   return (
     <ActionForm action={action}>
       {(s) => {
@@ -27,6 +40,28 @@ export function FactoryForm({ action, factory, cancelHref }: { action: Action; f
                 hint="As it appears on their quotations and contracts"
               >
                 <Input id="name" name="name" defaultValue={val("name")} autoFocus={!factory} aria-invalid={!!s.errors?.name} />
+              </Field>
+              <Field
+                label="Looked after by"
+                htmlFor="ownerId"
+                optional
+                error={s.errors?.ownerId}
+                className="sm:col-span-2"
+                hint="The person in our team who talks to this factory and pays it"
+              >
+                <Select
+                  id="ownerId"
+                  name="ownerId"
+                  defaultValue={s.values?.ownerId ?? (factory ? (factory.ownerId ?? "") : meId)}
+                  className="sm:max-w-80"
+                >
+                  <option value="">Nobody yet</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.id === meId ? `${p.name} (me)` : p.name}
+                    </option>
+                  ))}
+                </Select>
               </Field>
               <Field label="Contact person" htmlFor="contactPerson" optional error={s.errors?.contactPerson}>
                 <Input id="contactPerson" name="contactPerson" defaultValue={val("contactPerson")} />

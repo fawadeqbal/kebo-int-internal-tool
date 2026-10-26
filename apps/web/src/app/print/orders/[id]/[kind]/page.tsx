@@ -101,7 +101,7 @@ export default async function OrderDocumentPrint({
     />
   );
 
-  const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (_l, i) => i + 1 };
+  const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<Line> = {
     label: packing ? "Description of Goods" : "Equipment Description",
     render: (l) => (

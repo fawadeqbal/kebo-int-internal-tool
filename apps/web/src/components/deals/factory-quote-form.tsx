@@ -96,7 +96,8 @@ function initialState(quote: FactoryQuoteView | null, items: Item[], today: stri
     moq: "",
     paymentTerms: "",
     notes: "",
-    lines: items.map((it) => lineFromItem(it)),
+    // An item quoted in parts is priced part by part.
+    lines: items.filter((it) => !it.hasParts).map((it) => lineFromItem(it)),
   };
 }
 
@@ -417,9 +418,9 @@ export function FactoryQuoteForm({
                         </label>
                         <Select id={`fq-item-${l.key}`} compact value={l.requestedItemId} onChange={(e) => linkItem(i, e.target.value)}>
                           <option value="">Not linked to a requested item</option>
-                          {items.map((it, n) => (
+                          {items.map((it) => (
                             <option key={it.id} value={it.id}>
-                              For item {n + 1}: {it.description.split("\n")[0].slice(0, 60)}
+                              {it.parentId ? "For part" : "For item"} {it.no}: {it.description.split("\n")[0].slice(0, 60)}
                             </option>
                           ))}
                         </Select>

@@ -8,6 +8,8 @@ export type ActionState = {
   code?: string;
   errors?: Record<string, string[] | undefined>;
   matches?: { id: string; label: string; detail?: string }[];
+  /** code "reason_needed": quick reasons to choose from (the form asks "Why?" and sends again with `reason`). */
+  choices?: string[];
   /** The values typed, so a form keeps them after an error. */
   values?: Record<string, string>;
   data?: unknown;
@@ -24,12 +26,20 @@ export function formBody(form: FormData): Record<string, unknown> {
   const values = formValues(form);
   if (values.payload) {
     try {
-      return JSON.parse(values.payload) as Record<string, unknown>;
+      const body = JSON.parse(values.payload) as Record<string, unknown>;
+      // The "Why?" box sits outside the JSON: its answer goes along with it.
+      return values.reason?.trim() ? { ...body, reason: values.reason.trim() } : body;
     } catch {
       return {};
     }
   }
   return values;
+}
+
+/** The answer to "Why?" (see ActionForm), if the person gave one. */
+export function reasonOf(form: FormData): string | undefined {
+  const r = form.get("reason");
+  return typeof r === "string" && r.trim() ? r.trim().slice(0, 500) : undefined;
 }
 
 /** Run an API call for a form; API errors become messages and field errors instead of crashing the page. */
@@ -45,6 +55,7 @@ export async function attempt(form: FormData | null, fn: () => Promise<unknown>,
         code: e.code,
         errors: e.body.fieldErrors,
         matches: e.body.matches,
+        choices: e.body.choices,
         values: form ? formValues(form) : undefined,
       };
     }

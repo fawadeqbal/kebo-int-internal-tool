@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
-import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 
@@ -13,7 +13,7 @@ export async function moveStageAction(id: string, _prev: ActionState, form: Form
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.post(`/inquiries/${id}/stage`, { to: v.to, lostReason: v.lostReason || null, note: v.note || null }),
+    () => api.post(`/inquiries/${id}/stage`, { to: v.to, lostReason: v.lostReason || null, note: v.note || null, reason: reasonOf(form) }),
     "Stage updated.",
   );
   if (r.ok) refresh(id);
@@ -24,7 +24,7 @@ export async function holdAction(id: string, _prev: ActionState, form: FormData)
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.post(`/inquiries/${id}/hold`, { onHold: v.onHold === "true", note: v.note || null }),
+    () => api.post(`/inquiries/${id}/hold`, { onHold: v.onHold === "true", note: v.note || null, reason: reasonOf(form) }),
     v.onHold === "true" ? "On hold." : "Resumed.",
   );
   if (r.ok) refresh(id);
@@ -33,7 +33,11 @@ export async function holdAction(id: string, _prev: ActionState, form: FormData)
 
 export async function assignAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${id}/assign`, { assigneeId: v.assigneeId || null }), "Assignment saved.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${id}/assign`, { assigneeId: v.assigneeId || null, reason: reasonOf(form) }),
+    "Assignment saved.",
+  );
   if (r.ok) refresh(id);
   return r;
 }
@@ -45,18 +49,16 @@ export async function noteAction(id: string, _prev: ActionState, form: FormData)
   return r;
 }
 
-export async function uploadAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a file to upload." };
-  const body = new FormData();
-  body.set("file", file, file.name);
-  const r = await attempt(null, () => api.upload(`/inquiries/${id}/files`, body), `Uploaded ${file.name}.`);
-  if (r.ok) refresh(id);
+export async function removeFileAction(dealId: string, fileId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
+  const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
+  if (r.ok) refresh(dealId);
   return r;
 }
 
-export async function removeFileAction(dealId: string, fileId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
+/** What a file is (URS, drawing…) and its note. */
+export async function describeFileAction(dealId: string, fileId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(form, () => api.patch(`/files/${fileId}`, { kind: v.kind, note: v.note?.trim() || null }), "Saved.");
   if (r.ok) refresh(dealId);
   return r;
 }

@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
 import { date } from "@/lib/format";
 import type { FactoryDetail } from "@/lib/types-people";
+import type { HistoryEntry } from "@/lib/types";
+import { HistoryList } from "@/components/common/history-list";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeFactoryAction } from "../actions";
 
@@ -14,6 +16,7 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const me = await requirePermission("sourcing.manage");
   const f = await load(() => api.get<FactoryDetail>(`/factories/${id}`));
+  const history = await api.get<HistoryEntry[]>("/history", { type: "factory", id });
   const canRemove = can(me.role, "inquiries.updateAny");
   return (
     <div>
@@ -21,7 +24,9 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
         backHref="/factories"
         backLabel="Factories"
         title={f.name}
-        description={f.contactPerson ?? undefined}
+        description={[f.owner ? `Looked after by ${f.owner.name}` : "Nobody looks after it yet", f.contactPerson]
+          .filter(Boolean)
+          .join(" · ")}
         actions={
           <ButtonLink href={`/factories/${f.id}/edit`} size="sm">
             Edit factory
@@ -70,6 +75,7 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
               <DetailList
                 columns={1}
                 items={[
+                  { label: "Looked after by", value: f.owner?.name ?? "Nobody yet" },
                   { label: "Contact person", value: f.contactPerson },
                   {
                     label: "Phone",
@@ -94,6 +100,12 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
                   { label: "Added", value: date(f.createdAt) },
                 ]}
               />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="History" description="Changes to this factory, with the reason when one was asked" />
+            <CardBody>
+              <HistoryList entries={history} />
             </CardBody>
           </Card>
           {canRemove && (

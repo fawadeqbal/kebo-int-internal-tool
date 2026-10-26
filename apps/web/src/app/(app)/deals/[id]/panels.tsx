@@ -127,20 +127,24 @@ export function AssignPanel({
       </ActionForm>
     );
   return (
-    <ActionForm action={action} className="flex items-end gap-2">
-      <Field label="Handled by" htmlFor="assigneeId" className="flex-1">
-        <Select id="assigneeId" name="assigneeId" defaultValue={current ?? ""}>
-          <option value="">Nobody</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <SubmitButton size="sm" variant="secondary" pendingText="Saving…">
-        Save
-      </SubmitButton>
+    <ActionForm action={action} className="flex flex-wrap items-end gap-2">
+      {(s) => (
+        <>
+          <Field label="Handled by" htmlFor="assigneeId" className="flex-1">
+            <Select id="assigneeId" name="assigneeId" defaultValue={s.values?.assigneeId ?? current ?? ""}>
+              <option value="">Nobody</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <SubmitButton size="sm" variant="secondary" pendingText="Saving…">
+            Save
+          </SubmitButton>
+        </>
+      )}
     </ActionForm>
   );
 }
@@ -159,22 +163,6 @@ export function NoteForm({ action }: { action: Action }) {
           </div>
         </>
       )}
-    </ActionForm>
-  );
-}
-
-export function UploadForm({ action }: { action: Action }) {
-  return (
-    <ActionForm action={action} resetOnSuccess className="flex flex-wrap items-center gap-2">
-      <input
-        type="file"
-        name="file"
-        aria-label="File"
-        className="text-sm file:mr-2 file:rounded-md file:border file:border-line file:bg-surface file:px-2 file:py-1 file:text-sm"
-      />
-      <SubmitButton size="sm" variant="secondary" pendingText="Uploading…">
-        Upload
-      </SubmitButton>
     </ActionForm>
   );
 }

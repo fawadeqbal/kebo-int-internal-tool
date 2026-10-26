@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
-import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 
 const refresh = (orderId: string) => {
   revalidatePath(`/orders/${orderId}`);
@@ -23,6 +23,7 @@ export async function moveStageAction(orderId: string, _prev: ActionState, form:
     readyOn: v.readyOn || null,
     shippedOn: v.shippedOn || null,
     blNo: v.blNo?.trim() || null,
+    reason: reasonOf(form),
   };
   const r = await attempt(form, () => api.post(`/orders/${orderId}/stage`, body), "Order moved.");
   if (r.ok) refresh(orderId);
@@ -42,6 +43,7 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
         blNo: v.blNo?.trim() || null,
         documentTitle: v.documentTitle?.trim() || null,
         portOfDischarge: v.portOfDischarge?.trim() || null,
+        reason: reasonOf(form),
       }),
     "Details saved.",
   );
@@ -106,19 +108,6 @@ export async function cancelOrderAction(orderId: string, _prev: ActionState, for
 export async function orderNoteAction(orderId: string, dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const r = await attempt(form, () => api.post(`/inquiries/${dealId}/notes`, { body: v.body }));
-  if (r.ok) {
-    revalidatePath(`/orders/${orderId}`);
-    revalidatePath(`/deals/${dealId}`);
-  }
-  return r;
-}
-
-export async function orderUploadAction(orderId: string, dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a file to upload." };
-  const body = new FormData();
-  body.set("file", file, file.name);
-  const r = await attempt(null, () => api.upload(`/inquiries/${dealId}/files`, body), `Uploaded ${file.name}.`);
   if (r.ok) {
     revalidatePath(`/orders/${orderId}`);
     revalidatePath(`/deals/${dealId}`);

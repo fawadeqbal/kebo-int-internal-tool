@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { multiplyMinor, toMinor, formatMinor } from "@kebo/money";
-import { Alert, Badge, Card, CardBody, CardHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, Badge, Card, CardBody, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
 import { money, qty } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { SalesSettings, SourcingView } from "@/lib/types-deals";
-import { ChoosePrice, FactoryQuotes } from "@/components/deals/sourcing-board";
-import { choosePriceAction, removeFactoryQuoteAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { ChoosePrice, FactoryQuotes, SplitItem } from "@/components/deals/sourcing-board";
+import { choosePriceAction, removeFactoryQuoteAction, saveFactoryQuoteAction, searchFactoriesAction, splitItemAction } from "./actions";
 
 export const metadata = { title: "Factory prices" };
 
@@ -29,7 +29,9 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
   ]);
   const canEdit = d.allowed.source;
   const choose = choosePriceAction.bind(null, d.id);
-  const priced = s.items.filter((i) => i.options.some((o) => o.unitCost !== null)).length;
+  // An item quoted in parts is priced through its parts.
+  const priceable = s.items.filter((i) => !i.hasParts);
+  const priced = priceable.filter((i) => i.options.some((o) => o.unitCost !== null)).length;
 
   return (
     <div className="flex flex-col gap-5">
@@ -50,7 +52,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
       <Card>
         <CardHeader
           title="Compare by item"
-          description={`Your cost per unit in ${s.currency}: the factory price plus its tax. ${priced} of ${s.items.length} item${s.items.length === 1 ? "" : "s"} priced.`}
+          description={`Your cost per unit in ${s.currency}: the factory price plus its tax. ${priced} of ${priceable.length} line${priceable.length === 1 ? "" : "s"} priced. When a factory quotes an item as separate parts, split it: each part is priced and quoted on its own line (3.1, 3.2).`}
           actions={
             priced > 0 ? (
               <Link href={`/deals/${d.id}/quotation`} className="text-sm font-medium text-primary hover:underline">
@@ -60,23 +62,33 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
           }
         />
         <CardBody className="flex flex-col gap-5">
-          {s.items.map((it, n) => {
+          {s.items.map((it) => {
             const preferred = it.preferredLineId ?? null;
             return (
-              <section key={it.id} aria-label={`Item ${n + 1}`}>
+              <section
+                key={it.id}
+                aria-label={`${it.parentId ? "Part" : "Item"} ${it.no}`}
+                className={cn(it.parentId && "ml-4 border-l-2 border-line pl-4 sm:ml-6")}
+              >
                 <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="min-w-0 text-sm font-semibold">
-                    <span className="mr-1.5 text-muted">{n + 1}.</span>
+                    <span className="mr-1.5 text-muted tabular">{it.no}</span>
                     <span className="whitespace-pre-line">{it.description}</span>
                     {it.model && <span className="ml-2 text-xs font-normal text-muted">{it.model}</span>}
                   </h3>
-                  <span className="text-sm text-muted tabular">
-                    {qty(it.quantity)} {it.unit}
-                  </span>
+                  {canEdit && !it.parentId ? (
+                    <SplitItem action={splitItemAction.bind(null, d.id, it.id)} itemNo={it.no} hasParts={it.hasParts} unit={it.unit}>
+                      {qty(it.quantity)} {it.unit}
+                    </SplitItem>
+                  ) : (
+                    <span className="text-sm text-muted tabular">
+                      {qty(it.quantity)} {it.unit}
+                    </span>
+                  )}
                 </div>
                 {it.options.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">
-                    No factory price for this item yet.
+                    {it.hasParts ? "Quoted in parts: price each part below." : "No factory price for this item yet."}
                   </p>
                 ) : (
                   <div className="rounded-lg border border-line">

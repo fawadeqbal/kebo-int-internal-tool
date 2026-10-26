@@ -22,6 +22,8 @@ import { load, requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import type { CustomerDetail } from "@/lib/types-people";
+import type { HistoryEntry } from "@/lib/types";
+import { HistoryList } from "@/components/common/history-list";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeCustomerAction } from "../actions";
 
@@ -39,6 +41,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const me = await requireUser();
   const c = await load(() => api.get<CustomerDetail>(`/customers/${id}`));
+  const history = await api.get<HistoryEntry[]>("/history", { type: "customer", id });
   const canEdit = can(me.role, "customers.manage");
   const openOrders = c.orders.filter((o) => o.status === "open").length;
   const openDeals = c.inquiries.filter((d) => ["new", "sourcing", "quoted"].includes(d.stage)).length;
@@ -244,6 +247,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   { label: "Added", value: date(c.createdAt) },
                 ]}
               />
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader title="History" description="Changes to this customer, with the reason when one was asked" />
+            <CardBody>
+              <HistoryList entries={history} />
             </CardBody>
           </Card>
 

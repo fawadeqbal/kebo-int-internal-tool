@@ -70,8 +70,10 @@ export default async function QuotationPage({
   const quoter = can(me.role, "quotations.manage");
   const manage = quoter && d.allowed.quote;
   const showCosts = can(me.role, "sourcing.manage");
-  const startValues =
+  const itemNumbers = Object.fromEntries(d.items.map((it) => [it.id, it.no]));
+  const draftValues =
     manage && q.canStartRevision ? await api.get<RevisionDraft>(`/inquiries/${id}/quotation/draft`).catch(() => null) : null;
+  const startValues = draftValues && { ...draftValues, itemNumbers };
   const today = todayIn(TZ);
 
   const draft = q.revisions.find((r) => r.status === "draft") ?? null;
@@ -154,7 +156,7 @@ export default async function QuotationPage({
               <DraftPanel
                 key={draft.id}
                 number={draft.number}
-                initial={asDraft(draft)}
+                initial={{ ...asDraft(draft), itemNumbers }}
                 showCosts={showCosts}
                 defaultMargin={settings.sales.defaultMarginPercent}
                 saveAction={updateRevisionAction.bind(null, d.id, draft.id)}

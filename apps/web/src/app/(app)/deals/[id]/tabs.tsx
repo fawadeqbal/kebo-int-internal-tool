@@ -10,6 +10,7 @@ export function DealTabs({ id, source, orderId }: { id: string; source: boolean;
     { href: base, label: "Overview" },
     ...(source ? [{ href: `${base}/sourcing`, label: "Factory prices" }] : []),
     { href: `${base}/quotation`, label: "Quotation" },
+    { href: `${base}/history`, label: "History" },
     ...(orderId ? [{ href: `/orders/${orderId}`, label: "Order →" }] : []),
   ];
   return (

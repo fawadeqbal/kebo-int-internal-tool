@@ -15,18 +15,20 @@ import { Badge, buttonClass, Card, CardBody, CardHeader, cn, OrderStageBadge, Pa
 import { api } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
 import { date, dateTime, money } from "@/lib/format";
-import type { DealDetail } from "@/lib/types";
+import type { DealDetail, HistoryEntry } from "@/lib/types";
+import { HistoryList } from "@/components/common/history-list";
 import type { OrderView, PaymentsView, PaymentStatus } from "@/lib/types-orders";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
-import { NoteForm, RemoveFile, UploadForm } from "../../deals/[id]/panels";
+import { NoteForm } from "../../deals/[id]/panels";
+import { describeFileAction } from "../../deals/actions";
+import { DocumentsPanel } from "@/components/deals/documents-panel";
 import {
   cancelOrderAction,
   detailsAction,
   moveStageAction,
   orderNoteAction,
   orderRemoveFileAction,
-  orderUploadAction,
   packingAction,
   paymentAction,
   receiptAction,
@@ -48,8 +50,6 @@ const PAY_STATUS: Record<PaymentStatus, { label: string; tone: "neutral" | "warn
   paid: { label: "Paid in full", tone: "ok" },
   overpaid: { label: "Overpaid", tone: "warn" },
 };
-
-const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
 /** The four stages as a bar, each with the day the order got there. */
 function StageBar({ o }: { o: OrderView }) {
@@ -100,9 +100,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const me = await requireUser();
   const o = await load(() => api.get<OrderView>(`/orders/${id}`));
-  const [p, deal] = await Promise.all([
+  const [p, deal, history] = await Promise.all([
     api.get<PaymentsView>(`/orders/${id}/payments`),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
+    api.get<HistoryEntry[]>("/history", { type: "order", id }),
   ]);
   const open = o.status !== "cancelled";
   const canMove = can(me.role, "orders.update") && open;
@@ -119,6 +120,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     .filter((l) => l.type === "goods")
     .map((l) => ({
       id: l.id,
+      no: l.no,
       description: l.description,
       model: l.model,
       quantity: l.quantity,
@@ -389,7 +391,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
           {deal && (
             <Card>
-              <CardHeader title="Notes and files" description={`Shared with deal ${deal.refNo}`} />
+              <CardHeader title="Notes, URS & documents" description={`Shared with deal ${deal.refNo}`} />
               <CardBody className="flex flex-col gap-4">
                 <NoteForm action={orderNoteAction.bind(null, o.id, deal.id)} />
                 {deal.notes.length > 0 && (
@@ -405,24 +407,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   </ul>
                 )}
                 <div className="flex flex-col gap-3 border-t border-line pt-4">
-                  <UploadForm action={orderUploadAction.bind(null, o.id, deal.id)} />
-                  {deal.attachments.length > 0 && (
-                    <ul className="divide-y divide-line">
-                      {deal.attachments.map((f) => (
-                        <li key={f.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 py-2">
-                          <a href={`/files/${f.id}`} className="min-w-0 truncate text-sm font-medium hover:text-primary">
-                            {f.fileName}
-                          </a>
-                          <span className="shrink-0 text-xs text-muted">
-                            {size(f.size)} · {name(f.uploadedById)} · {date(f.createdAt)}{" "}
-                            {(f.uploadedById === me.id || can(me.role, "inquiries.updateAny")) && (
-                              <RemoveFile action={orderRemoveFileAction.bind(null, o.id, deal.id, f.id)} name={f.fileName} />
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <h3 className="text-sm font-semibold">URS & documents</h3>
+                  <DocumentsPanel
+                    dealId={deal.id}
+                    canUpload={open}
+                    files={deal.attachments.map((f) => ({
+                      ...f,
+                      uploadedBy: name(f.uploadedById),
+                      when: date(f.createdAt),
+                      canChange: f.uploadedById === me.id || deal.canWork,
+                      describe: describeFileAction.bind(null, deal.id, f.id),
+                      remove: orderRemoveFileAction.bind(null, o.id, deal.id, f.id),
+                    }))}
+                  />
                 </div>
               </CardBody>
             </Card>
@@ -461,30 +458,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </Card>
 
           <Card>
-            <CardHeader title="History" description="Every move, newest first" />
+            <CardHeader title="History" description="Every change, newest first, with the reason when one was asked" />
             <CardBody>
-              <ol className="flex flex-col gap-3">
-                {[...o.history].reverse().map((h) => (
-                  <li key={h.id} className="text-sm">
-                    <p className="font-medium">
-                      {h.from
-                        ? `${ORDER_STAGE_LABEL[h.from]} → ${ORDER_STAGE_LABEL[h.to]}`
-                        : `Order ${ORDER_STAGE_LABEL[h.to].toLowerCase()}`}
-                    </p>
-                    {h.confirmed && (
-                      <p className="mt-0.5">
-                        <Badge tone="warn">
-                          <AlertTriangle aria-hidden /> Went ahead despite a warning
-                        </Badge>
-                      </p>
-                    )}
-                    {h.note && <p className="text-xs whitespace-pre-line text-text-2">{h.note}</p>}
-                    <p className="text-xs text-muted">
-                      {h.by?.name ?? "System"} · {dateTime(h.at)}
-                    </p>
-                  </li>
-                ))}
-              </ol>
+              <HistoryList entries={history} />
             </CardBody>
           </Card>
 

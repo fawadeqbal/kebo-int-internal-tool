@@ -62,7 +62,7 @@ export default async function QuotationPrint({
   const internal = sp.copy === "internal";
   const costs = internal && r.lines.some((l) => l.unitCost != null);
 
-  const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (_l, i) => i + 1 };
+  const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<DocLine> = {
     label: "Equipment Description",
     render: (l) => `${l.description}${l.model ? `\nModel: ${l.model}` : ""}`,

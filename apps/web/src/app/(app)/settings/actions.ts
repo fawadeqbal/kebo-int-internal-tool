@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { SettingsKey } from "@kebo/shared";
 import { api } from "@/lib/api";
-import { attempt, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import { SETTING_GROUPS } from "./groups";
 
 const lines = (v: string | undefined, splitCommas = false) =>
@@ -56,6 +56,7 @@ export async function saveSettingsAction(key: SettingsKey, _prev: ActionState, f
     }
   }
   if (Object.keys(errors).length) return { ok: false, message: "Some values need fixing.", errors, values: v };
+  body.reason = reasonOf(form);
   const r = await attempt(form, () => api.put(`/settings/${key}`, body), `${group.title} saved.`);
   if (!r.ok && r.errors) r.errors = Object.fromEntries(Object.entries(r.errors).map(([k, ms]) => [k, ms?.map(plain)]));
   if (!r.ok && r.message) r.message = plain(r.message);

@@ -59,6 +59,9 @@ export interface Factory {
   address: string | null;
   bankDetails: string | null;
   notes: string | null;
+  /** The person in our team who looks after this factory. */
+  ownerId: string | null;
+  owner: { id: string; name: string } | null;
   createdAt: string;
 }
 

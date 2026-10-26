@@ -33,7 +33,9 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
     priority: "normal",
     requiredBy: "",
     assigneeId: "",
-    items: [{ id: null, key: "item-0", description: "", model: "", quantity: "", unit: "pcs", targetPrice: "" }],
+    items: [
+      { id: null, key: "item-0", description: "", model: "", quantity: "", unit: "pcs", targetPrice: "", parentId: null, priced: false },
+    ],
   };
   return (
     <div className="mx-auto max-w-4xl">

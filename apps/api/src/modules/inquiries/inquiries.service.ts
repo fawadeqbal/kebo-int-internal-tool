@@ -715,8 +715,8 @@ export class InquiriesService {
     const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null } });
     if (!a) throw new NotFoundError("File");
     const i = await this.find(user, a.inquiryId);
-    if (!(can(user.role, "inquiries.updateAny") || a.uploadedById === user.id))
-      throw new ForbiddenError("Only the uploader or a manager can remove this file.");
+    if (!(canWorkOn(user, i) || a.uploadedById === user.id))
+      throw new ForbiddenError("Only the uploader, the person handling the deal or a manager can remove this file.");
     await this.prisma.tx(async (tx) => {
       await tx.attachment.update({ where: { id: attachmentId }, data: { deletedAt: new Date() } });
       await this.audit.record(tx, {

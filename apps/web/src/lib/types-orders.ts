@@ -94,6 +94,8 @@ export interface LinePacking {
 /** A line of GET /orders/:id: goods (received from the factory, packed) or a charge. */
 export interface OrderLineView {
   id: string;
+  /** "1", "2", "2.1" (a part of item 2). */
+  no: string;
   type: LineType;
   description: string;
   model: string | null;
@@ -209,6 +211,8 @@ export interface OrderDocument {
   currency: string;
   showPrices: boolean;
   lines: {
+    /** "1", "2", "2.1" */
+    no: string;
     type: LineType;
     description: string;
     model: string | null;
@@ -247,6 +251,8 @@ export interface OrderDocument {
 
 export interface DocLine {
   id: string;
+  /** "1", "2", "2.1" */
+  no: string;
   type: LineType;
   description: string;
   model: string | null;

@@ -286,9 +286,11 @@ describe("lines, reasons and history", () => {
         .expect(201)
     ).body;
     expect(f.ownerId).toBe(me);
-    const mine = (await api(app, sana).get(`/factories?mine=true&q=${tag}`).expect(200)).body.rows;
+    const mine = (await api(app, sana).get(`/factories?mine=true&q=Owned Works ${tag}`).expect(200)).body.rows;
     expect(mine.map((r: { id: string; owner: { id: string } }) => [r.id, r.owner.id])).toEqual([[f.id, me]]);
-    expect((await api(app, bilal).get(`/factories?mine=true&q=${tag}`).expect(200)).body.rows).toHaveLength(0);
+    expect((await api(app, bilal).get(`/factories?mine=true&q=Owned Works ${tag}`).expect(200)).body.rows).toHaveLength(0);
+    // A factory first added while entering its prices is looked after by whoever added it.
+    expect((await api(app, sana).get(`/factories?mine=true&q=Zhangjiagang Fill ${tag}`).expect(200)).body.rows).toHaveLength(1);
     // Handing it to someone else (or renaming it) says why; adding a phone does not.
     await api(app, sana).put(`/factories/${f.id}`, { name: f.name, ownerId: me, phone: "+86 512 5555" }).expect(200);
     expect((await api(app, sana).put(`/factories/${f.id}`, { name: f.name, ownerId: bilalId }).expect(409)).body.code).toBe(

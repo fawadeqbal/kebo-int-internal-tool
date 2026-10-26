@@ -297,7 +297,11 @@ export function RevisionEditor({
                     <li key={l.key} className="rounded-lg border border-line p-3">
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-muted">Line {i + 1}</span>
+                          <span className="text-xs font-medium text-muted">
+                            {l.requestedItemId && initial.itemNumbers?.[l.requestedItemId]
+                              ? `${initial.itemNumbers[l.requestedItemId]!.includes(".") ? "Part" : "Item"} ${initial.itemNumbers[l.requestedItemId]}`
+                              : `Line ${i + 1}`}
+                          </span>
                           <label htmlFor={`type-${l.key}`} className="sr-only">
                             Line type
                           </label>

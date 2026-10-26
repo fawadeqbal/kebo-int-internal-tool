@@ -51,6 +51,8 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
       quantity: it.quantity,
       unit: it.unit,
       targetPrice: it.targetPrice ?? "",
+      parentId: it.parentId,
+      priced: it.priced,
     })),
   };
   return (
