@@ -144,7 +144,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     if (!o.revisions?.length) return;
 
     const quotation = await db.quotation.create({ data: { refNo: await nextReference(db, "quotation", year), inquiryId: inquiry.id } });
-    let accepted: { id: string; total: number; lines: { id: string }[] } | null = null;
+    let accepted: { id: string; total: number; lines: Awaited<ReturnType<typeof db.quoteLine.findMany>> } | null = null;
     for (const [n, status] of o.revisions.entries()) {
       const margin = 18 - n * 3; // each revision a little sharper
       const lines = o.lines.map((l, i) => {
@@ -205,6 +205,22 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
         incoterm: "FOB",
         incotermPlace: "Qingdao",
         createdById: people.manager.id,
+        // The accepted lines, frozen on the order (as the API does on acceptance).
+        lines: {
+          create: accepted.lines.map((l) => ({
+            quoteLineId: l.id,
+            type: l.type,
+            description: l.description,
+            model: l.model,
+            hsCode: l.hsCode,
+            quantity: l.quantity,
+            unit: l.unit,
+            unitPrice: l.unitPrice,
+            lineTotal: l.lineTotal,
+            unitCost: l.unitCost,
+            sortOrder: l.sortOrder,
+          })),
+        },
       },
     });
     const states = initialStates({ depositPercent: 30, balanceTerms: terms });

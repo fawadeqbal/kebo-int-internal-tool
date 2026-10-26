@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull } from "@kebo/database";
-import { can, type ShipmentInput } from "@kebo/shared";
+import { can, openGates, type ShipmentInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -186,7 +186,9 @@ export class ShipmentsService {
       const left = (await this.remaining(tx, s.orderId)).some((r) => r.left > 0);
       const waiting = await tx.shipment.count({ where: { orderId: s.orderId, id: { not: id }, status: { in: ["planned", "booked"] } } });
       if (left || waiting) return [];
-      const e = await this.orders.stepInTx(tx, user, s.orderId, { action: "done", key: "shipped", on: day, note: note ?? (s.blNo ? `B/L ${s.blNo}` : null) }, { ifTodo: true });
+      // The B/L number is kept as the step's note, but it is not a manager's reason to go past a gate: only what the person wrote is.
+      const gated = openGates("shipped", order.balanceTerms, order.milestones.map((m) => ({ key: m.key, status: m.status, doneOn: null, dueOverride: null }))).length > 0;
+      const e = await this.orders.stepInTx(tx, user, s.orderId, { action: "done", key: "shipped", on: day, note: note ?? (gated || !s.blNo ? null : `B/L ${s.blNo}`) }, { ifTodo: true });
       return e ? ([e] as DomainEvent[]) : [];
     });
     await this.events.publish(...events);

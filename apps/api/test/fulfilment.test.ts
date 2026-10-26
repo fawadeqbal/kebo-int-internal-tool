@@ -98,6 +98,9 @@ describe("fulfilment: from accepted order to closed", () => {
     await api(app, staff).post(`/shipments/${s1.id}/status`, { to: "departed" }).expect(200); // not the last: no step yet
     const blocked = await api(app, staff).post(`/shipments/${s2.id}/status`, { to: "departed" }).expect(409);
     expect(blocked.body.code).toBe("inspect_first");
+    // A manager goes past the gate only with a reason they write: the shipment's B/L number is not one.
+    const unexplained = await api(app, manager).post(`/shipments/${s2.id}/status`, { to: "departed" }).expect(409);
+    expect(unexplained.body.code).toBe("note_required");
     await api(app, staff).post(`/orders/${orderId}/steps`, { action: "skip", key: "inspection_passed", note: "Customer waived" }).expect(200);
     await api(app, staff).post(`/orders/${orderId}/steps`, { action: "skip", key: "samples_approved" }).expect(200);
     const blocked2 = await api(app, staff).post(`/shipments/${s2.id}/status`, { to: "departed" }).expect(409);

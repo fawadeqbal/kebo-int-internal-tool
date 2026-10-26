@@ -13,6 +13,11 @@ The web app shows data and collects input. **Every rule lives in the API** (`app
 - **Look**: components from `@kebo/ui` (Card, CardHeader, CardBody, PageHeader, Field, Input, Select, Textarea, Table/THead/Th/Tr/Td, Badge, StageBadge, RevisionBadge, OrderStageBadge, EmptyState, LinkTabs, DetailList, Alert, ButtonLink, buttonClass…) and `@kebo/ui/client` (SubmitButton, ConfirmSubmit, PrintButton). Words from `@kebo/shared` labels (`INQUIRY_STAGE_LABEL`, `BALANCE_TERMS_LABEL`…). Money with `money(amount, currency)` and dates with `date()` from `@/lib/format`.
 - **Writing**: plain business words, say what to do next, no jargon. Buttons say what they do ("Record the payment", not "Submit").
 
+## Printed documents and PDFs
+
+- `/print/revisions/:id` (quotation), `/print/invoices/:id` (proforma / commercial), `/print/shipments/:id` (packing list), `/print/factory-orders/:id` (purchase order): server-rendered A4 pages outside the app shell, built from `src/components/print/*`. Letterhead and customer come from the document's snapshots (taken when it was sent or issued; drafts use today's settings and customer) and drafts carry a DRAFT watermark. `?back=/path` sets where the toolbar's Back goes.
+- `/pdf/:kind/:id` renders the same page with headless Chromium (`puppeteer-core`), with the person's session cookie, on A4 with page numbers. Chromium is found by `src/app/pdf/chromium.ts`: `CHROME_PATH` first (set it in production, e.g. `/usr/bin/chromium`), then the usual system paths, then a Playwright download (`PLAYWRIGHT_BROWSERS_PATH`, `~/.cache/ms-playwright`). If the server cannot reach itself at the public address, set `PDF_ORIGIN` (e.g. `http://localhost:3000`). Without Chromium the route answers 503 and people can still use Print → Save as PDF.
+
 ## Run it
 
 ```bash
