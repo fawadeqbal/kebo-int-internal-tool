@@ -1,0 +1,18 @@
+# Kebo deal desk. The API answers under /api (website form: /api/public/inquiries; mobile app: /api/...);
+# everything else is the web app.
+__DOMAIN__ {
+	encode zstd gzip
+	request_body {
+		max_size 30MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	handle /api/* {
+		reverse_proxy kebo-desk-api:4000
+	}
+	handle {
+		reverse_proxy kebo-desk-web:3000
+	}
+}

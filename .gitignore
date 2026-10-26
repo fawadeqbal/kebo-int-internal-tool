@@ -26,3 +26,5 @@ packages/database/src/generated/
 
 # agent worktrees
 .claude/
+backups/
+secrets/
