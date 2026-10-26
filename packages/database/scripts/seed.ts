@@ -7,7 +7,7 @@
  */
 import "./env";
 import bcrypt from "bcryptjs";
-import { documentTotals, fromMinor, splitDeposit, unitCostMinor, priceForMargin, toMinor } from "@kebo/money";
+import { documentTotals, fromMinor, splitDeposit, withTaxMinor, priceForMargin, toMinor } from "@kebo/money";
 import { readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
 import { addDays, todayIn } from "@kebo/utils";
 import { createPrismaClient, nextReference, toDbDate, type PrismaClient } from "../src";
@@ -53,10 +53,8 @@ function assertLocal() {
   }
 }
 
-type Line = { description: string; model?: string; hsCode?: string; quantity: number; unit?: string; factoryPrice: number; factory: number; type?: "goods" | "charge" };
+type Line = { description: string; model?: string; quantity: number; unit?: string; factoryPrice: number; factory: number; type?: "goods" | "charge" };
 
-/** Demo export rebate rates by HS code (remembered in hs_codes, as the app does). */
-const REBATE_BY_HS: Record<string, number> = { "8479.89": 13, "8422.40": 13, "8481.80": 13, "3917.23": 13, "6305.33": 13, "3920.10": 9, "3102.10": 0 };
 
 async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seedBase>>) {
   assertLocal();
@@ -85,7 +83,6 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
   const factories = await Promise.all(
     ["Jinan Pharma Machinery", "Wenzhou Valve Works", "Qingdao Packaging Co."].map((name) => db.factory.create({ data: { name, createdById: people.manager.id } })),
   );
-  await db.hsCode.createMany({ data: Object.entries(REBATE_BY_HS).map(([code, rebateRate]) => ({ code, rebateRate, updatedById: people.manager.id })) });
   const settings = readSettings({});
   const rate = settings.sales.exchangeRates.CNY ?? 7.1;
 
@@ -128,7 +125,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     }
     if (o.stage === "new") return;
 
-    // Factory prices (CNY, without tax; 13% is added on top) for each goods line.
+    // Factory prices (CNY, without tax; each item's 13% tax is added on top) for each goods line.
     const costByLine = new Map<number, { lineId: string; costMinor: number }>();
     for (const [i, l] of o.lines.entries()) {
       if (l.type === "charge") continue;
@@ -139,12 +136,11 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
           receivedOn: toDbDate(addDays(created, 2)),
           currency: "CNY",
           createdById: o.assignee ?? people.staff.id,
-          vatRate: 13, // added on top of the price
-          lines: { create: { requestedItemId: inquiry.items[i]?.id, description: l.description, hsCode: l.hsCode ?? null, quantity: l.quantity, unit: l.unit ?? "pcs", unitPrice: l.factoryPrice, rebateRate: l.hsCode ? (REBATE_BY_HS[l.hsCode] ?? 13) : 0 } },
+          lines: { create: { requestedItemId: inquiry.items[i]?.id, description: l.description, quantity: l.quantity, unit: l.unit ?? "pcs", unitPrice: l.factoryPrice, taxRate: 13 } },
         },
         include: { lines: true },
       });
-      const costCny = unitCostMinor({ unitPriceMinor: toMinor(l.factoryPrice), vatRate: Number(fq.vatRate), pricesIncludeVat: false, rebateRate: Number(fq.lines[0].rebateRate) });
+      const costCny = withTaxMinor(toMinor(l.factoryPrice), Number(fq.lines[0].taxRate));
       costByLine.set(i, { lineId: fq.lines[0].id, costMinor: Math.round(costCny / rate) });
     }
     if (!o.revisions?.length) return;
@@ -177,7 +173,6 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
               type: x.l.type ?? "goods",
               description: x.l.description,
               model: x.l.model,
-              hsCode: x.l.type === "charge" ? null : (x.l.hsCode ?? null),
               quantity: x.l.quantity,
               unit: x.l.unit ?? "pcs",
               unitPrice: fromMinor(x.unitPrice),
@@ -213,8 +208,6 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
         readyOn: o.order.readyInDays === undefined ? null : toDbDate(addDays(orderedOn, o.order.readyInDays)),
         shippedOn: shippedOn ? toDbDate(shippedOn) : null,
         blNo: shippedOn ? `QDLOS${blSerial++}` : null,
-        // The finished order already has the factory's VAT invoice; the rebate is still to be filed.
-        vatInvoiceReceivedOn: shippedOn && o.order.stage === "done" ? toDbDate(addDays(shippedOn, 10)) : null,
         currency: "USD",
         total: fromMinor(accepted.total),
         depositPercent: 30,
@@ -229,7 +222,6 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
             type: l.type,
             description: l.description,
             model: l.model,
-            hsCode: l.hsCode,
             quantity: l.quantity,
             unit: l.unit,
             unitPrice: l.unitPrice,
@@ -265,31 +257,31 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
   }
 
   let blSerial = 240_118;
-  await deal({ customer: 0, stage: "new", category: "Machinery", daysAgo: 0, lines: [{ description: "Rotary tablet press, 35 stations", hsCode: "8479.89", quantity: 1, factoryPrice: 0, factory: 0 }] });
-  await deal({ customer: 3, stage: "new", category: "Chemicals", daysAgo: 3, lines: [{ description: "Urea 46% granular", hsCode: "3102.10", quantity: 50, unit: "ton", factoryPrice: 0, factory: 2 }] });
-  await deal({ customer: 1, assignee: bilal.id, stage: "sourcing", category: "Machinery", daysAgo: 2, lines: [{ description: "Gate valve DN100 PN16", hsCode: "8481.80", quantity: 120, factoryPrice: 410, factory: 1 }] });
-  await deal({ customer: 2, assignee: sana.id, stage: "quoted", category: "Building materials", daysAgo: 8, revisions: ["sent"], lines: [{ description: "PVC pipe 110mm, 6m", hsCode: "3917.23", quantity: 800, factoryPrice: 58, factory: 2 }] });
-  await deal({ customer: 0, assignee: bilal.id, stage: "quoted", category: "Machinery", daysAgo: 12, revisions: ["superseded", "sent"], lines: [{ description: "Blister packing machine DPP-260", hsCode: "8422.40", quantity: 1, factoryPrice: 98000, factory: 0 }, { description: "Sea freight to Lagos", quantity: 1, factoryPrice: 2400, factory: 0, type: "charge" }] });
-  await deal({ customer: 1, assignee: sana.id, stage: "lost", lostReason: "price_too_high", category: "Packaging", daysAgo: 20, revisions: ["rejected"], lines: [{ description: "Shrink film 25 micron", hsCode: "3920.10", quantity: 10, unit: "ton", factoryPrice: 11000, factory: 2 }] });
+  await deal({ customer: 0, stage: "new", category: "Machinery", daysAgo: 0, lines: [{ description: "Rotary tablet press, 35 stations", quantity: 1, factoryPrice: 0, factory: 0 }] });
+  await deal({ customer: 3, stage: "new", category: "Chemicals", daysAgo: 3, lines: [{ description: "Urea 46% granular", quantity: 50, unit: "ton", factoryPrice: 0, factory: 2 }] });
+  await deal({ customer: 1, assignee: bilal.id, stage: "sourcing", category: "Machinery", daysAgo: 2, lines: [{ description: "Gate valve DN100 PN16", quantity: 120, factoryPrice: 410, factory: 1 }] });
+  await deal({ customer: 2, assignee: sana.id, stage: "quoted", category: "Building materials", daysAgo: 8, revisions: ["sent"], lines: [{ description: "PVC pipe 110mm, 6m", quantity: 800, factoryPrice: 58, factory: 2 }] });
+  await deal({ customer: 0, assignee: bilal.id, stage: "quoted", category: "Machinery", daysAgo: 12, revisions: ["superseded", "sent"], lines: [{ description: "Blister packing machine DPP-260", quantity: 1, factoryPrice: 98000, factory: 0 }, { description: "Sea freight to Lagos", quantity: 1, factoryPrice: 2400, factory: 0, type: "charge" }] });
+  await deal({ customer: 1, assignee: sana.id, stage: "lost", lostReason: "price_too_high", category: "Packaging", daysAgo: 20, revisions: ["rejected"], lines: [{ description: "Shrink film 25 micron", quantity: 10, unit: "ton", factoryPrice: 11000, factory: 2 }] });
   await deal({
     customer: 0, assignee: bilal.id, stage: "won", category: "Machinery", daysAgo: 25, revisions: ["superseded", "accepted"],
     order: { stage: "in_production", paid: "deposit", readyInDays: 15 },
-    lines: [{ description: "Capsule filling machine NJP-1200", hsCode: "8479.89", quantity: 2, factoryPrice: 125000, factory: 0 }, { description: "Spare parts kit", quantity: 2, factoryPrice: 6000, factory: 0 }],
+    lines: [{ description: "Capsule filling machine NJP-1200", quantity: 2, factoryPrice: 125000, factory: 0 }, { description: "Spare parts kit", quantity: 2, factoryPrice: 6000, factory: 0 }],
   });
   await deal({
     customer: 2, assignee: sana.id, stage: "won", category: "Machinery", daysAgo: 30, revisions: ["accepted"],
     order: { stage: "confirmed", paid: "none", terms: "against_bl_copy" },
-    lines: [{ description: "Butterfly valve DN200", hsCode: "8481.80", quantity: 60, factoryPrice: 780, factory: 1 }],
+    lines: [{ description: "Butterfly valve DN200", quantity: 60, factoryPrice: 780, factory: 1 }],
   });
   await deal({
     customer: 3, assignee: bilal.id, stage: "won", category: "Packaging", daysAgo: 90, revisions: ["accepted"],
     order: { stage: "done", paid: "full", shippedAfterDays: 35 },
-    lines: [{ description: "Woven PP bags 50kg", hsCode: "6305.33", quantity: 100000, factoryPrice: 1.15, factory: 2 }],
+    lines: [{ description: "Woven PP bags 50kg", quantity: 100000, factoryPrice: 1.15, factory: 2 }],
   });
   await deal({
     customer: 1, assignee: sana.id, stage: "won", category: "Machinery", daysAgo: 60, revisions: ["accepted"],
     order: { stage: "shipped", paid: "deposit", terms: "against_bl_copy", shippedAfterDays: 38 },
-    lines: [{ description: "Ball valve DN50, stainless", hsCode: "8481.80", quantity: 300, factoryPrice: 165, factory: 1 }],
+    lines: [{ description: "Ball valve DN50, stainless", quantity: 300, factoryPrice: 165, factory: 1 }],
   });
   console.log("[seed] demo data created: 4 customers, 3 factories, 10 deals (orders: 1 confirmed, 1 in production, 1 shipped, 1 done)");
   console.log("[seed] demo people bilal@example.com / sana@example.com, password Demo@12345");

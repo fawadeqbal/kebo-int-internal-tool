@@ -420,10 +420,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   });
 
   /* ---- factory prices: always without tax now, with one tax % per quote added on top */
-  const supplierVat = new Map(old.suppliers.map((s) => [s.id, Number(s.default_vat_rate)]));
   const quoteIncludesVat = new Map(old.supplierQuotes.map((s) => [s.id, s.prices_include_vat]));
-  const lineVat = new Map<string, number>();
-  for (const l of old.supplierQuoteItems) lineVat.set(l.supplier_quote_id, Math.max(lineVat.get(l.supplier_quote_id) ?? 0, Number(l.vat_rate)));
   await tx.factoryQuote.createMany({
     data: old.supplierQuotes.map((s) => ({
       id: s.id,
@@ -433,8 +430,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       receivedOn: toDbDate(s.quoted_on),
       validUntil: s.valid_until ? toDbDate(s.valid_until) : null,
       currency: s.currency,
-      // The old app kept VAT per line; the quote takes the highest.
-      vatRate: lineVat.get(s.id) ?? supplierVat.get(s.supplier_id) ?? 13,
       priceBasis: s.price_basis,
       leadTime: s.lead_time,
       paymentTerms: s.payment_terms,
@@ -456,12 +451,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       unit: l.unit,
       // Prices entered with tax are stored without it (same cost).
       unitPrice: quoteIncludesVat.get(l.supplier_quote_id) && Number(l.vat_rate) > 0 ? (Math.round((Number(l.unit_price) / (1 + Number(l.vat_rate) / 100)) * 100) / 100).toFixed(2) : l.unit_price,
-      // The old app had no export rebate: none until an HS code and its rate are added.
-      rebateRate: 0,
+      // Tax on top of the item's price, as the old app had it per line.
+      taxRate: Number(l.vat_rate) || 0,
       sortOrder: l.sort_order,
     })),
   });
-  if (old.supplierQuoteItems.length) report.judge("Export rebate", `the old app had none: ${old.supplierQuoteItems.length} factory price lines start at 0% (add the HS code and rate when a deal is worked on)`);
   for (const i of old.queryItems.filter((x) => x.chosen_offer_item_id)) {
     await tx.requestedItem.update({ where: { id: i.id }, data: { preferredFactoryLineId: i.chosen_offer_item_id } });
   }
@@ -497,11 +491,9 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         depositPercent,
         balanceTerms,
         validUntil: toDbDate(v.due_date),
-        vatRate: v.tax_rate,
-        pricesIncludeVat: v.prices_include_vat,
+        // Sales carry no tax; an old version with tax keeps its total (reported below).
         subtotal: v.subtotal,
         discount: v.discount,
-        vatAmount: v.tax_amount,
         total: v.total,
         terms: v.terms,
         notes: v.notes,
@@ -519,6 +511,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   }
   await tx.quotation.createMany({ data: quotationRows });
   await tx.quotationRevision.createMany({ data: revisionRows });
+  for (const v of old.quotations.filter((q) => Number(q.tax_amount) !== 0)) report.judge("Quotations with tax (sales carry no tax now; the total is kept)", `${v.ref_no} v${v.version}: tax ${v.tax_amount}`);
   if (depositDefaulted)
     report.judge("Deposit %", `${depositDefaulted} quotation versions whose terms do not state an "N% advance/deposit" → ${settings.values.sales.defaultDepositPercent}%`);
   report.judge("Payment terms", "old quotations had no balance-terms field → before_shipment on every revision and order (deposit % read from the terms text, e.g. \"30% advance\")");
@@ -533,7 +526,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       type: map.lineType(l.description),
       description: l.description,
       model: l.model,
-      hsCode: l.hs_code,
       quantity: l.quantity,
       unit: l.unit,
       unitPrice: l.unit_price,
@@ -618,8 +610,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         type: map.lineType(l.description),
         description: l.description,
         model: l.model,
-        hsCode: l.hs_code,
-        quantity: l.quantity,
+          quantity: l.quantity,
         unit: l.unit,
         unitPrice: l.unit_price,
         lineTotal: l.line_total,

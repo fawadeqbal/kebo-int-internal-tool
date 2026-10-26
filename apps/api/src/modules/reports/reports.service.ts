@@ -147,7 +147,7 @@ export class ReportsService {
       this.prisma.db.inquiry.findMany({ where: { ...closed, stage: { in: ["won", "lost"] } }, select: { stage: true, createdAt: true, closedAt: true, assigneeId: true } }),
       this.prisma.db.order.findMany({
         where: { status: { not: "cancelled" }, orderedOn: { gte: day(r.from), lte: day(r.to) }, ...(staffId ? { inquiry: { assigneeId: staffId } } : {}) },
-        include: { lines: true, revision: { select: { discount: true, vatRate: true, pricesIncludeVat: true } }, customer: { select: { name: true } }, inquiry: { select: { category: true, assignee: { select: { name: true } } } } },
+        include: { lines: true, revision: { select: { discount: true } }, customer: { select: { name: true } }, inquiry: { select: { category: true, assignee: { select: { name: true } } } } },
       }),
       this.prisma.db.user.findMany({ where: { isSystem: false }, select: { id: true, name: true } }),
     ]);
@@ -158,8 +158,6 @@ export class ReportsService {
       costDocLines({
         id: o.id,
         discountMinor: toMain(decimalToMinor(o.revision.discount), o.currency),
-        vatRate: Number(o.revision.vatRate),
-        pricesIncludeVat: o.revision.pricesIncludeVat,
         lines: o.lines.map((l) => ({
           docId: o.id,
           lineTotalMinor: toMain(decimalToMinor(l.lineTotal), o.currency),

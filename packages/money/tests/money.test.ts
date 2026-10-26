@@ -18,8 +18,7 @@ import {
   settle,
   splitDeposit,
   toMinor,
-  unitCostMinor,
-  vatInside,
+  withTaxMinor,
 } from "../src";
 
 describe("minor units", () => {
@@ -59,14 +58,9 @@ describe("minor units", () => {
 describe("document totals", () => {
   const items = [{ quantity: 2, unitPrice: 565 }];
 
-  it("adds VAT on top", () => {
-    const t = documentTotals(items, 30, { rate: 13, pricesIncludeVat: false });
-    expect([t.subtotal, t.discount, t.vat, t.total, t.net]).toEqual([113000, 3000, 14300, 124300, 110000]);
-  });
-
-  it("shows the VAT inside the total when prices include it", () => {
-    const t = documentTotals(items, 30, { rate: 13, pricesIncludeVat: true });
-    expect([t.subtotal, t.discount, t.vat, t.total, t.net]).toEqual([113000, 3000, 12655, 110000, 97345]);
+  it("is the subtotal less the discount (sales carry no tax)", () => {
+    const t = documentTotals(items, 30);
+    expect([t.subtotal, t.discount, t.total]).toEqual([113000, 3000, 110000]);
   });
 
   it("keeps the discount between zero and the subtotal and spreads it over the lines", () => {
@@ -78,9 +72,8 @@ describe("document totals", () => {
         { quantity: 1, unitPrice: "150000" },
       ],
       50000,
-      { rate: 18, pricesIncludeVat: false },
     );
-    expect(t.total).toBe(1_250_800_000);
+    expect(t.total).toBe(1_060_000_000);
     expect(t.lines.reduce((s, l) => s + l.discountShare, 0)).toBe(t.discount);
   });
 
@@ -99,29 +92,22 @@ describe("costing", () => {
     expect(() => convertMinor(1, 0)).toThrow();
   });
 
-  it("costs a factory price with VAT and the export rebate", () => {
-    expect(unitCostMinor({ unitPriceMinor: 113_00, vatRate: 13, pricesIncludeVat: true })).toBe(113_00);
-    expect(unitCostMinor({ unitPriceMinor: 100_00, vatRate: 13, pricesIncludeVat: false })).toBe(113_00);
-    // 13% VAT, 13% rebate: the whole VAT comes back
-    expect(unitCostMinor({ unitPriceMinor: 113_00, vatRate: 13, pricesIncludeVat: true, rebateRate: 13 })).toBe(100_00);
-    // 9% rebate on 13% VAT: 4% of the net price stays a cost
-    expect(unitCostMinor({ unitPriceMinor: 113_00, vatRate: 13, pricesIncludeVat: true, rebateRate: 9 })).toBe(104_00);
-    expect(vatInside(113_00, 13)).toBe(13_00);
+  it("adds a factory price's tax on top", () => {
+    expect(withTaxMinor(100_00, 13)).toBe(113_00);
+    expect(withTaxMinor(100_00, 0)).toBe(100_00);
+    expect(withTaxMinor(1_15, 13)).toBe(1_30); // 1.2995 → 1.30
   });
 
-  it("works margins both ways on the selling price, without our VAT", () => {
+  it("works margins both ways on the selling price", () => {
     expect(priceForMargin(85_00, 15)).toBe(100_00);
     expect(marginPercent(100_00, 85_00)).toBe(15);
     expect(marginPercent(0, 85_00)).toBeNull();
     expect(marginPercent(80_00, 85_00)).toBe(-6.3);
-    const vat = { rate: 13, pricesIncludeVat: true };
-    expect(priceForMargin(85_00, 15, vat)).toBe(113_00);
-    expect(marginPercent(113_00, 85_00, vat)).toBe(15);
   });
 
   it("takes the document discount off the costing box", () => {
     // 10 × 10.00 at cost 8.00 with a 5.00 discount: sales 95.00, profit 15.00 → 15.8%
-    expect(costSummary([{ quantity: 10, unitPriceMinor: 10_00, unitCostMinor: 8_00 }], undefined, 5_00)).toMatchObject({ salesMinor: 95_00, profitMinor: 15_00, marginPercent: 15.8 });
+    expect(costSummary([{ quantity: 10, unitPriceMinor: 10_00, unitCostMinor: 8_00 }], 5_00)).toMatchObject({ salesMinor: 95_00, profitMinor: 15_00, marginPercent: 15.8 });
   });
 
   it("sums the costing box and counts uncosted lines apart", () => {
@@ -162,8 +148,6 @@ describe("profit", () => {
   const a = {
     id: "a",
     discountMinor: 2_100_00,
-    vatRate: 0,
-    pricesIncludeVat: false,
     lines: [
       { docId: "a", lineTotalMinor: 20_000_00, quantity: 2, unitCostMinor: 8_000_00, keys: { customer: "Al-Shifa", factory: "Jinan" } },
       { docId: "a", lineTotalMinor: 1_000_00, quantity: 1, unitCostMinor: null, keys: { customer: "Al-Shifa", factory: "—" } },
@@ -172,8 +156,6 @@ describe("profit", () => {
   const b = {
     id: "b",
     discountMinor: 0,
-    vatRate: 0,
-    pricesIncludeVat: false,
     lines: [{ docId: "b", lineTotalMinor: 5_000_00, quantity: 1, unitCostMinor: 4_900_00, keys: { customer: "Gulf Foods", factory: "Wenzhou" } }],
   };
 
@@ -188,12 +170,6 @@ describe("profit", () => {
       marginPercent: 11.1,
       coveragePercent: 95,
     });
-  });
-
-  it("takes our VAT out of revenue when prices include it", () => {
-    const [l] = costDocLines({ ...b, vatRate: 13, pricesIncludeVat: true, lines: [{ ...b.lines[0], lineTotalMinor: 113_00, unitCostMinor: 90_00 }] });
-    expect(l.revenueMinor).toBe(100_00);
-    expect(l.profitMinor).toBe(10_00);
   });
 
   it("groups by any key", () => {
