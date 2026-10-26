@@ -22,7 +22,11 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
         backLabel="Factories"
         title={f.name}
         description={f.contactPerson ?? undefined}
-        actions={<ButtonLink href={`/factories/${f.id}/edit`} size="sm">Edit factory</ButtonLink>}
+        actions={
+          <ButtonLink href={`/factories/${f.id}/edit`} size="sm">
+            Edit factory
+          </ButtonLink>
+        }
       />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -67,9 +71,23 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
                 columns={1}
                 items={[
                   { label: "Contact person", value: f.contactPerson },
-                  { label: "Phone", value: f.phone && <a href={`tel:${f.phone}`} className="hover:underline">{f.phone}</a> },
+                  {
+                    label: "Phone",
+                    value: f.phone && (
+                      <a href={`tel:${f.phone}`} className="hover:underline">
+                        {f.phone}
+                      </a>
+                    ),
+                  },
                   { label: "WeChat", value: f.wechat },
-                  { label: "Email", value: f.email && <a href={`mailto:${f.email}`} className="break-all hover:underline">{f.email}</a> },
+                  {
+                    label: "Email",
+                    value: f.email && (
+                      <a href={`mailto:${f.email}`} className="break-all hover:underline">
+                        {f.email}
+                      </a>
+                    ),
+                  },
                   { label: "Address", value: f.address && <span className="whitespace-pre-line">{f.address}</span> },
                   { label: "Bank details", value: f.bankDetails && <span className="whitespace-pre-line">{f.bankDetails}</span> },
                   { label: "Notes", value: f.notes && <span className="whitespace-pre-line">{f.notes}</span>, hidden: !f.notes },
@@ -82,7 +100,13 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
             <Card>
               <CardHeader title="Remove factory" description="Hides it from lists and pickers. Its past prices stay on their deals." />
               <CardBody>
-                <ConfirmAction action={removeFactoryAction.bind(null, f.id)} confirm={`Remove ${f.name}? It will no longer appear in lists and pickers.`} label="Remove this factory" pendingText="Removing…" variant="danger-ghost" />
+                <ConfirmAction
+                  action={removeFactoryAction.bind(null, f.id)}
+                  confirm={`Remove ${f.name}? It will no longer appear in lists and pickers.`}
+                  label="Remove this factory"
+                  pendingText="Removing…"
+                  variant="danger-ghost"
+                />
               </CardBody>
             </Card>
           )}

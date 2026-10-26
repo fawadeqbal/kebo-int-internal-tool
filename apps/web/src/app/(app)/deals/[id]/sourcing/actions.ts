@@ -38,9 +38,21 @@ function locateLineErrors(body: Record<string, unknown>, r: ActionState): Action
 }
 
 /** Add (quoteId null) or edit one factory's prices; JSON in `payload`. */
-export async function saveFactoryQuoteAction(dealId: string, quoteId: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function saveFactoryQuoteAction(
+  dealId: string,
+  quoteId: string | null,
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
   const body = formBody(form);
-  const r = locateLineErrors(body, await attempt(form, () => (quoteId ? api.put(`/factory-quotes/${quoteId}`, body) : api.post(`/inquiries/${dealId}/factory-quotes`, body)), quoteId ? "Factory prices saved." : "Factory prices added."));
+  const r = locateLineErrors(
+    body,
+    await attempt(
+      form,
+      () => (quoteId ? api.put(`/factory-quotes/${quoteId}`, body) : api.post(`/inquiries/${dealId}/factory-quotes`, body)),
+      quoteId ? "Factory prices saved." : "Factory prices added.",
+    ),
+  );
   if (r.ok) refresh(dealId);
   return r;
 }
@@ -54,7 +66,11 @@ export async function removeFactoryQuoteAction(dealId: string, quoteId: string, 
 /** Which factory price an item is quoted from (lineId empty = none). */
 export async function choosePriceAction(dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${dealId}/preferred-prices`, { choices: { [v.itemId]: v.lineId || null } }), "The quotation will use this price.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${dealId}/preferred-prices`, { choices: { [v.itemId]: v.lineId || null } }),
+    "The quotation will use this price.",
+  );
   if (r.ok) refresh(dealId);
   return r;
 }

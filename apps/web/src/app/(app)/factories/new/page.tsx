@@ -9,7 +9,12 @@ export default async function NewFactoryPage() {
   await requirePermission("sourcing.manage");
   return (
     <div className="max-w-3xl">
-      <PageHeader backHref="/factories" backLabel="Factories" title="New factory" description="Only the name is needed now; add the rest when you have it." />
+      <PageHeader
+        backHref="/factories"
+        backLabel="Factories"
+        title="New factory"
+        description="Only the name is needed now; add the rest when you have it."
+      />
       <FactoryForm action={saveFactoryAction.bind(null, null)} factory={null} cancelHref="/factories" />
     </div>
   );

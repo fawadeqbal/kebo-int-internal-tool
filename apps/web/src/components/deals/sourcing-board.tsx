@@ -80,15 +80,38 @@ export function FactoryQuotes({
         {editing === "new" && (
           <div className="rounded-xl border border-primary/30 bg-primary-soft/20 p-4">
             <h3 className="mb-3 text-sm font-semibold">New factory offer</h3>
-            <FactoryQuoteForm action={saveAction.bind(null, null)} quote={null} items={items} today={today} mainCurrency={mainCurrency} rates={rates} searchFactories={searchFactories} onDone={() => setEditing(null)} />
+            <FactoryQuoteForm
+              action={saveAction.bind(null, null)}
+              quote={null}
+              items={items}
+              today={today}
+              mainCurrency={mainCurrency}
+              rates={rates}
+              searchFactories={searchFactories}
+              onDone={() => setEditing(null)}
+            />
           </div>
         )}
-        {quotes.length === 0 && editing !== "new" && <EmptyState title="No factory prices yet" description="Ask two or three factories, then record each offer here to compare them." />}
+        {quotes.length === 0 && editing !== "new" && (
+          <EmptyState
+            title="No factory prices yet"
+            description="Ask two or three factories, then record each offer here to compare them."
+          />
+        )}
         {quotes.map((q) =>
           editing === q.id ? (
             <div key={q.id} className="rounded-xl border border-primary/30 bg-primary-soft/20 p-4">
               <h3 className="mb-3 text-sm font-semibold">Edit the offer from {q.factory.name}</h3>
-              <FactoryQuoteForm action={saveAction.bind(null, q.id)} quote={q} items={items} today={today} mainCurrency={mainCurrency} rates={rates} searchFactories={searchFactories} onDone={() => setEditing(null)} />
+              <FactoryQuoteForm
+                action={saveAction.bind(null, q.id)}
+                quote={q}
+                items={items}
+                today={today}
+                mainCurrency={mainCurrency}
+                rates={rates}
+                searchFactories={searchFactories}
+                onDone={() => setEditing(null)}
+              />
             </div>
           ) : (
             <article key={q.id} className="rounded-xl border border-line">
@@ -110,7 +133,12 @@ export function FactoryQuotes({
                       Edit
                     </Button>
                     <ActionForm action={removeAction.bind(null, q.id)} showSuccess={false} className="inline-flex">
-                      <ConfirmSubmit size="xs" variant="danger-ghost" pendingText="Removing…" message={`Remove the offer from ${q.factory.name}? Items quoted from it will need another price.`}>
+                      <ConfirmSubmit
+                        size="xs"
+                        variant="danger-ghost"
+                        pendingText="Removing…"
+                        message={`Remove the offer from ${q.factory.name}? Items quoted from it will need another price.`}
+                      >
                         Remove
                       </ConfirmSubmit>
                     </ActionForm>
@@ -154,7 +182,13 @@ export function FactoryQuotes({
                         {qtyText(l.quantity)} {l.unit}
                       </Td>
                       <Td className="text-right whitespace-nowrap tabular">{amount(l.unitPrice, q.currency)}</Td>
-                      <Td className="text-right font-medium whitespace-nowrap tabular">{l.unitCost === null ? <span className="text-xs font-normal text-warn">No rate</span> : amount(l.unitCost, mainCurrency)}</Td>
+                      <Td className="text-right font-medium whitespace-nowrap tabular">
+                        {l.unitCost === null ? (
+                          <span className="text-xs font-normal text-warn">No rate</span>
+                        ) : (
+                          amount(l.unitCost, mainCurrency)
+                        )}
+                      </Td>
                     </Tr>
                   ))}
                 </tbody>

@@ -22,17 +22,28 @@ const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ??
 export default async function SourcingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requirePermission("sourcing.manage");
-  const [d, s, settings] = await Promise.all([load(() => api.get<DealDetail>(`/inquiries/${id}`)), load(() => api.get<SourcingView>(`/inquiries/${id}/sourcing`)), api.get<{ sales: SalesSettings }>("/settings")]);
+  const [d, s, settings] = await Promise.all([
+    load(() => api.get<DealDetail>(`/inquiries/${id}`)),
+    load(() => api.get<SourcingView>(`/inquiries/${id}/sourcing`)),
+    api.get<{ sales: SalesSettings }>("/settings"),
+  ]);
   const canEdit = d.allowed.source;
   const choose = choosePriceAction.bind(null, d.id);
   const priced = s.items.filter((i) => i.options.some((o) => o.unitCost !== null)).length;
 
   return (
     <div className="flex flex-col gap-5">
-      {!canEdit && <Alert tone="info">{d.stage === "won" || d.stage === "lost" ? "This deal is closed, so its factory prices can no longer change." : "Only the person handling this deal (or a manager) can change its factory prices."}</Alert>}
+      {!canEdit && (
+        <Alert tone="info">
+          {d.stage === "won" || d.stage === "lost"
+            ? "This deal is closed, so its factory prices can no longer change."
+            : "Only the person handling this deal (or a manager) can change its factory prices."}
+        </Alert>
+      )}
       {s.missingRates.length > 0 && (
         <Alert tone="warning">
-          There is no exchange rate for {s.missingRates.join(", ")} in Settings, so those prices cannot be turned into {s.currency} and are left out of the comparison. Ask an admin to add the rate (1 {s.currency} = ? {s.missingRates[0]}).
+          There is no exchange rate for {s.missingRates.join(", ")} in Settings, so those prices cannot be turned into {s.currency} and are
+          left out of the comparison. Ask an admin to add the rate (1 {s.currency} = ? {s.missingRates[0]}).
         </Alert>
       )}
 
@@ -64,7 +75,9 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                   </span>
                 </div>
                 {it.options.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">No factory price for this item yet.</p>
+                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">
+                    No factory price for this item yet.
+                  </p>
                 ) : (
                   <div className="rounded-lg border border-line">
                     <Table>
@@ -73,7 +86,9 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                           <Th>Factory</Th>
                           <Th className="text-right">Their price</Th>
                           <Th className="text-right">Your cost / unit</Th>
-                          <Th className="hidden text-right sm:table-cell">For {qty(it.quantity)} {it.unit}</Th>
+                          <Th className="hidden text-right sm:table-cell">
+                            For {qty(it.quantity)} {it.unit}
+                          </Th>
                           <Th className="relative text-right">
                             <span className="sr-only">Choice</span>
                           </Th>
@@ -94,9 +109,23 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                               {money(o.unitPrice, o.currency)}
                               <span className="block text-xs text-muted">without tax</span>
                             </Td>
-                            <Td className="text-right font-medium whitespace-nowrap tabular">{o.unitCost === null ? <span className="text-xs font-normal text-warn">No exchange rate</span> : money(o.unitCost, s.currency)}</Td>
-                            <Td className="hidden text-right whitespace-nowrap sm:table-cell text-text-2 tabular">{o.unitCost === null ? "—" : formatMinor(multiplyMinor(toMinor(o.unitCost), it.quantity), s.currency)}</Td>
-                            <Td className="text-right">{canEdit ? <ChoosePrice action={choose} itemId={it.id} lineId={o.id} chosen={o.id === preferred} /> : o.id === preferred ? <Badge tone="primary">Quoting from this</Badge> : null}</Td>
+                            <Td className="text-right font-medium whitespace-nowrap tabular">
+                              {o.unitCost === null ? (
+                                <span className="text-xs font-normal text-warn">No exchange rate</span>
+                              ) : (
+                                money(o.unitCost, s.currency)
+                              )}
+                            </Td>
+                            <Td className="hidden text-right whitespace-nowrap sm:table-cell text-text-2 tabular">
+                              {o.unitCost === null ? "—" : formatMinor(multiplyMinor(toMinor(o.unitCost), it.quantity), s.currency)}
+                            </Td>
+                            <Td className="text-right">
+                              {canEdit ? (
+                                <ChoosePrice action={choose} itemId={it.id} lineId={o.id} chosen={o.id === preferred} />
+                              ) : o.id === preferred ? (
+                                <Badge tone="primary">Quoting from this</Badge>
+                              ) : null}
+                            </Td>
                           </Tr>
                         ))}
                       </tbody>

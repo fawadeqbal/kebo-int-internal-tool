@@ -34,7 +34,15 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.patch(`/orders/${orderId}/details`, { shipBy: v.shipBy || null, readyOn: v.readyOn || null, shippedOn: v.shippedOn || null, blNo: v.blNo?.trim() || null, documentTitle: v.documentTitle?.trim() || null, portOfDischarge: v.portOfDischarge?.trim() || null }),
+    () =>
+      api.patch(`/orders/${orderId}/details`, {
+        shipBy: v.shipBy || null,
+        readyOn: v.readyOn || null,
+        shippedOn: v.shippedOn || null,
+        blNo: v.blNo?.trim() || null,
+        documentTitle: v.documentTitle?.trim() || null,
+        portOfDischarge: v.portOfDischarge?.trim() || null,
+      }),
     "Details saved.",
   );
   if (r.ok) refresh(orderId);
@@ -45,7 +53,11 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
 export async function receiptAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formBody(form);
   const all = formValues(form).all === "true";
-  const r = await attempt(form, () => api.put(`/orders/${orderId}/receipt`, body), all ? "All goods marked as received." : "Saved what came in.");
+  const r = await attempt(
+    form,
+    () => api.put(`/orders/${orderId}/receipt`, body),
+    all ? "All goods marked as received." : "Saved what came in.",
+  );
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -114,7 +126,13 @@ export async function orderUploadAction(orderId: string, dealId: string, _prev: 
   return r;
 }
 
-export async function orderRemoveFileAction(orderId: string, dealId: string, fileId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
+export async function orderRemoveFileAction(
+  orderId: string,
+  dealId: string,
+  fileId: string,
+  _prev: ActionState,
+  _form: FormData,
+): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
   if (r.ok) {
     revalidatePath(`/orders/${orderId}`);

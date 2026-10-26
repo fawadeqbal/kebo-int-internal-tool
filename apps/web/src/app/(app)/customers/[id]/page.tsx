@@ -1,7 +1,22 @@
 import Link from "next/link";
 import { Mail, MessageCircle, Phone, Star } from "lucide-react";
 import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
-import { Badge, ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, PageHeader, StageBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  CardBody,
+  CardHeader,
+  DetailList,
+  EmptyState,
+  PageHeader,
+  StageBadge,
+  Table,
+  Td,
+  Th,
+  THead,
+  Tr,
+} from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
@@ -41,21 +56,43 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         }
         description={
           <>
-            {c.country === UNKNOWN_COUNTRY ? <span className="text-warn">Country not set</span> : countryName(c.country)} · {openDeals} open deal{openDeals === 1 ? "" : "s"} · {openOrders} open order{openOrders === 1 ? "" : "s"}
+            {c.country === UNKNOWN_COUNTRY ? <span className="text-warn">Country not set</span> : countryName(c.country)} · {openDeals} open
+            deal{openDeals === 1 ? "" : "s"} · {openOrders} open order{openOrders === 1 ? "" : "s"}
           </>
         }
-        actions={canEdit && <ButtonLink href={`/customers/${c.id}/edit`} size="sm">Edit customer</ButtonLink>}
+        actions={
+          canEdit && (
+            <ButtonLink href={`/customers/${c.id}/edit`} size="sm">
+              Edit customer
+            </ButtonLink>
+          )
+        }
       />
       {c.country === UNKNOWN_COUNTRY && (
         <p className="mb-4 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-sm">
-          This customer&apos;s country is not set yet. {canEdit ? <Link href={`/customers/${c.id}/edit`} className="font-medium underline">Add it</Link> : "Ask someone to add it"} — it decides shipping.
+          This customer&apos;s country is not set yet.{" "}
+          {canEdit ? (
+            <Link href={`/customers/${c.id}/edit`} className="font-medium underline">
+              Add it
+            </Link>
+          ) : (
+            "Ask someone to add it"
+          )}{" "}
+          — it decides shipping.
         </p>
       )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-5">
           <Card>
-            <CardHeader title="Deals" description={can(me.role, "inquiries.viewAll") ? "Every inquiry from this customer, newest first" : "Their inquiries that you handle or created"} />
+            <CardHeader
+              title="Deals"
+              description={
+                can(me.role, "inquiries.viewAll")
+                  ? "Every inquiry from this customer, newest first"
+                  : "Their inquiries that you handle or created"
+              }
+            />
             {c.inquiries.length === 0 ? (
               <EmptyState title="No deals yet" description="Inquiries from this customer will show here." className="py-8" />
             ) : (
@@ -190,7 +227,15 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               <DetailList
                 columns={1}
                 items={[
-                  { label: "Country", value: c.country === UNKNOWN_COUNTRY ? <span className="text-warn">Not known yet</span> : `${countryName(c.country)} (${c.country})` },
+                  {
+                    label: "Country",
+                    value:
+                      c.country === UNKNOWN_COUNTRY ? (
+                        <span className="text-warn">Not known yet</span>
+                      ) : (
+                        `${countryName(c.country)} (${c.country})`
+                      ),
+                  },
                   { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, hidden: !c.address },
                   { label: "Currency they pay in", value: c.defaultCurrency },
                   { label: "Business license number", value: c.taxNo, hidden: !c.taxNo },
@@ -204,9 +249,18 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
           {can(me.role, "customers.delete") && (
             <Card>
-              <CardHeader title="Remove customer" description="Hides them from lists and pickers. Past deals and orders keep their name. Not possible while an order is open." />
+              <CardHeader
+                title="Remove customer"
+                description="Hides them from lists and pickers. Past deals and orders keep their name. Not possible while an order is open."
+              />
               <CardBody>
-                <ConfirmAction action={removeCustomerAction.bind(null, c.id)} confirm={`Remove ${c.name}? They will no longer appear in lists.`} label="Remove this customer" pendingText="Removing…" variant="danger-ghost" />
+                <ConfirmAction
+                  action={removeCustomerAction.bind(null, c.id)}
+                  confirm={`Remove ${c.name}? They will no longer appear in lists.`}
+                  label="Remove this customer"
+                  pendingText="Removing…"
+                  variant="danger-ghost"
+                />
               </CardBody>
             </Card>
           )}

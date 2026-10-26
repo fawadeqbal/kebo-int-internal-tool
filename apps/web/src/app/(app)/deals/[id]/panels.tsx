@@ -19,13 +19,23 @@ export function StagePanel({ stage, action, canReopen }: { stage: InquiryStage; 
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         {moves.map((m) => (
-          <Button key={m.to} size="sm" variant={m.to === "lost" ? "danger-ghost" : "secondary"} onClick={() => setTo(to === m.to ? null : m.to)} aria-pressed={to === m.to}>
+          <Button
+            key={m.to}
+            size="sm"
+            variant={m.to === "lost" ? "danger-ghost" : "secondary"}
+            onClick={() => setTo(to === m.to ? null : m.to)}
+            aria-pressed={to === m.to}
+          >
             {m.label}
           </Button>
         ))}
       </div>
       {to && (
-        <ActionForm action={action} onDone={() => setTo(null)} className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2/60 p-3">
+        <ActionForm
+          action={action}
+          onDone={() => setTo(null)}
+          className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2/60 p-3"
+        >
           {(s) => (
             <>
               <input type="hidden" name="to" value={to} />
@@ -74,10 +84,18 @@ export function HoldPanel({ onHold, action }: { onHold: boolean; action: Action 
     <ActionForm action={action} onDone={() => setOpen(false)} className="flex flex-col gap-3">
       <input type="hidden" name="onHold" value={onHold ? "false" : "true"} />
       <Field label={onHold ? "Note" : "What are we waiting for?"} optional={onHold} htmlFor="hold-note">
-        <Textarea id="hold-note" name="note" rows={2} className="min-h-0" placeholder={onHold ? "" : "e.g. new drawings from the customer"} />
+        <Textarea
+          id="hold-note"
+          name="note"
+          rows={2}
+          className="min-h-0"
+          placeholder={onHold ? "" : "e.g. new drawings from the customer"}
+        />
       </Field>
       <div className="flex gap-2">
-        <SubmitButton size="sm" pendingText="Saving…">{onHold ? "Resume" : "Put on hold"}</SubmitButton>
+        <SubmitButton size="sm" pendingText="Saving…">
+          {onHold ? "Resume" : "Put on hold"}
+        </SubmitButton>
         <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
           Cancel
         </Button>
@@ -86,7 +104,19 @@ export function HoldPanel({ onHold, action }: { onHold: boolean; action: Action 
   );
 }
 
-export function AssignPanel({ action, people, current, canAssignOthers, meId }: { action: Action; people: { id: string; name: string }[]; current: string | null; canAssignOthers: boolean; meId: string }) {
+export function AssignPanel({
+  action,
+  people,
+  current,
+  canAssignOthers,
+  meId,
+}: {
+  action: Action;
+  people: { id: string; name: string }[];
+  current: string | null;
+  canAssignOthers: boolean;
+  meId: string;
+}) {
   if (!canAssignOthers)
     return current ? null : (
       <ActionForm action={action}>
@@ -136,7 +166,12 @@ export function NoteForm({ action }: { action: Action }) {
 export function UploadForm({ action }: { action: Action }) {
   return (
     <ActionForm action={action} resetOnSuccess className="flex flex-wrap items-center gap-2">
-      <input type="file" name="file" aria-label="File" className="text-sm file:mr-2 file:rounded-md file:border file:border-line file:bg-surface file:px-2 file:py-1 file:text-sm" />
+      <input
+        type="file"
+        name="file"
+        aria-label="File"
+        className="text-sm file:mr-2 file:rounded-md file:border file:border-line file:bg-surface file:px-2 file:py-1 file:text-sm"
+      />
       <SubmitButton size="sm" variant="secondary" pendingText="Uploading…">
         Upload
       </SubmitButton>
@@ -147,7 +182,12 @@ export function UploadForm({ action }: { action: Action }) {
 export function RemoveFile({ action, name }: { action: Action; name: string }) {
   return (
     <ActionForm action={action} showSuccess={false} className="inline">
-      <button type="submit" className="text-xs text-muted hover:text-bad" aria-label={`Remove ${name}`} onClick={(e) => !confirm(`Remove ${name}?`) && e.preventDefault()}>
+      <button
+        type="submit"
+        className="text-xs text-muted hover:text-bad"
+        aria-label={`Remove ${name}`}
+        onClick={(e) => !confirm(`Remove ${name}?`) && e.preventDefault()}
+      >
         Remove
       </button>
     </ActionForm>

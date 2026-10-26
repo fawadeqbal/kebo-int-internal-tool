@@ -13,7 +13,12 @@ export default async function EditFactoryPage({ params }: { params: Promise<{ id
   const f = await load(() => api.get<FactoryDetail>(`/factories/${id}`));
   return (
     <div className="max-w-3xl">
-      <PageHeader backHref={`/factories/${f.id}`} backLabel={f.name} title={`Edit ${f.name}`} description="Changes apply to new prices and orders; past ones keep what was agreed." />
+      <PageHeader
+        backHref={`/factories/${f.id}`}
+        backLabel={f.name}
+        title={`Edit ${f.name}`}
+        description="Changes apply to new prices and orders; past ones keep what was agreed."
+      />
       <FactoryForm action={saveFactoryAction.bind(null, f.id)} factory={f} cancelHref={`/factories/${f.id}`} />
     </div>
   );

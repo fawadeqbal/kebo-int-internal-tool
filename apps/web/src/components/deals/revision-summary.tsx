@@ -45,7 +45,9 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
                   {qty(l.quantity)} {l.unit}
                 </Td>
                 <Td className="text-right whitespace-nowrap tabular">{money(l.unitPrice, r.currency)}</Td>
-                {showCosts && <Td className="text-right whitespace-nowrap text-text-2 tabular">{l.unitCost ? money(l.unitCost, r.currency) : "—"}</Td>}
+                {showCosts && (
+                  <Td className="text-right whitespace-nowrap text-text-2 tabular">{l.unitCost ? money(l.unitCost, r.currency) : "—"}</Td>
+                )}
                 <Td className="text-right font-medium whitespace-nowrap tabular">{money(l.lineTotal, r.currency)}</Td>
               </Tr>
             ))}
@@ -74,7 +76,16 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
               <dd className="tabular">{money(r.total, r.currency)}</dd>
             </div>
           </dl>
-          {r.costing && <CostingBox currency={r.currency} cost={r.costing.costMinor} sales={r.costing.salesMinor} profit={r.costing.profitMinor} margin={r.costing.marginPercent} uncosted={r.costing.uncostedLines} />}
+          {r.costing && (
+            <CostingBox
+              currency={r.currency}
+              cost={r.costing.costMinor}
+              sales={r.costing.salesMinor}
+              profit={r.costing.profitMinor}
+              margin={r.costing.marginPercent}
+              uncosted={r.costing.uncostedLines}
+            />
+          )}
         </div>
       </div>
     </div>

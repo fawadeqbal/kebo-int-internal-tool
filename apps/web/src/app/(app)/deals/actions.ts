@@ -11,14 +11,22 @@ const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
 
 export async function moveStageAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${id}/stage`, { to: v.to, lostReason: v.lostReason || null, note: v.note || null }), "Stage updated.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${id}/stage`, { to: v.to, lostReason: v.lostReason || null, note: v.note || null }),
+    "Stage updated.",
+  );
   if (r.ok) refresh(id);
   return r;
 }
 
 export async function holdAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${id}/hold`, { onHold: v.onHold === "true", note: v.note || null }), v.onHold === "true" ? "On hold." : "Resumed.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${id}/hold`, { onHold: v.onHold === "true", note: v.note || null }),
+    v.onHold === "true" ? "On hold." : "Resumed.",
+  );
   if (r.ok) refresh(id);
   return r;
 }
@@ -57,7 +65,12 @@ export async function removeFileAction(dealId: string, fileId: string, _prev: Ac
 export async function searchCustomersAction(q: string): Promise<CustomerOption[]> {
   try {
     const res = await api.get<Paged<CustomerOption>>("/customers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
-    return res.rows.map((c) => ({ id: c.id, name: c.name, country: c.country, primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name } }));
+    return res.rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      country: c.country,
+      primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name },
+    }));
   } catch {
     return [];
   }
@@ -67,7 +80,14 @@ export async function searchCustomersAction(q: string): Promise<CustomerOption[]
 export async function customerContactsAction(customerId: string): Promise<ContactOption[]> {
   try {
     const c = await api.get<{ contacts: ContactOption[] }>(`/customers/${customerId}`);
-    return c.contacts.map((x) => ({ id: x.id, name: x.name, email: x.email, phone: x.phone, whatsapp: x.whatsapp, isPrimary: x.isPrimary }));
+    return c.contacts.map((x) => ({
+      id: x.id,
+      name: x.name,
+      email: x.email,
+      phone: x.phone,
+      whatsapp: x.whatsapp,
+      isPrimary: x.isPrimary,
+    }));
   } catch {
     return [];
   }
@@ -76,7 +96,9 @@ export async function customerContactsAction(customerId: string): Promise<Contac
 /** Create or edit a deal (the form sends JSON in `payload`, with its line items). */
 export async function saveDealAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formBody(form);
-  const r = await attempt(form, () => (id ? api.put<{ id: string }>(`/inquiries/${id}`, body) : api.post<{ id: string }>("/inquiries", body)));
+  const r = await attempt(form, () =>
+    id ? api.put<{ id: string }>(`/inquiries/${id}`, body) : api.post<{ id: string }>("/inquiries", body),
+  );
   if (!r.ok) return r;
   const newId = id ?? (r.data as { id: string }).id;
   refresh(newId);

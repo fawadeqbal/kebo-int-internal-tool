@@ -119,14 +119,22 @@ export class SourcingService {
     const known = await tx.factory.findFirst({ where: { deletedAt: null, name: { equals: name, mode: "insensitive" } } });
     if (known) return known;
     const f = await tx.factory.create({ data: { name, createdById: user.id } });
-    await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: f.id, summary: `Added factory ${f.name}` });
+    await this.audit.record(tx, {
+      userId: user.id,
+      action: "create",
+      entityType: "factory",
+      entityId: f.id,
+      summary: `Added factory ${f.name}`,
+    });
     return f;
   }
 
   /** Lines keep their ids (quotation lines and preferences point at them). Item links must be this deal's items. */
   private async writeLines(tx: Tx, quoteId: string, inquiryId: string, lines: FactoryQuoteInput["lines"]) {
     const own = new Set((await tx.requestedItem.findMany({ where: { inquiryId }, select: { id: true } })).map((r) => r.id));
-    const existing = new Set((await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId }, select: { id: true } })).map((r) => r.id));
+    const existing = new Set(
+      (await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId }, select: { id: true } })).map((r) => r.id),
+    );
     const keep = lines.map((l) => l.id).filter((id): id is string => !!id && existing.has(id));
     const dropped = [...existing].filter((id) => !keep.includes(id));
     if (dropped.length) {
@@ -134,8 +142,18 @@ export class SourcingService {
       await tx.factoryQuoteLine.deleteMany({ where: { id: { in: dropped } } });
     }
     for (const [n, l] of lines.entries()) {
-      if (l.requestedItemId && !own.has(l.requestedItemId)) throw new DomainError("A price is linked to an item that is not on this deal. Reload and try again.");
-      const row = { requestedItemId: l.requestedItemId, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit, unitPrice: l.unitPrice, taxRate: l.taxRate, sortOrder: n };
+      if (l.requestedItemId && !own.has(l.requestedItemId))
+        throw new DomainError("A price is linked to an item that is not on this deal. Reload and try again.");
+      const row = {
+        requestedItemId: l.requestedItemId,
+        description: l.description,
+        model: l.model,
+        quantity: l.quantity,
+        unit: l.unit,
+        unitPrice: l.unitPrice,
+        taxRate: l.taxRate,
+        sortOrder: n,
+      };
       if (l.id && existing.has(l.id)) await tx.factoryQuoteLine.update({ where: { id: l.id }, data: row });
       else await tx.factoryQuoteLine.create({ data: { ...row, factoryQuoteId: quoteId } });
     }
@@ -169,7 +187,13 @@ export class SourcingService {
       const factory = await this.factoryFor(tx, user, input);
       const q = await tx.factoryQuote.create({ data: { ...this.header(input), inquiryId, factoryId: factory.id, createdById: user.id } });
       await this.writeLines(tx, q.id, inquiryId, input.lines);
-      await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory_quote", entityId: q.id, summary: `${inquiry.refNo}: prices from ${factory.name} (${input.lines.length} lines, ${input.currency})` });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "create",
+        entityType: "factory_quote",
+        entityId: q.id,
+        summary: `${inquiry.refNo}: prices from ${factory.name} (${input.lines.length} lines, ${input.currency})`,
+      });
       const moved = await this.stages.after(tx, inquiry, "factory_price_added", user.id);
       if (moved) events.push(moved);
       return q;
@@ -205,10 +229,18 @@ export class SourcingService {
       for (const [id, l] of used) {
         const next = input.lines.find((x) => x.id === id);
         if (!next) changes.push(`removed ${l.description}`);
-        else if (Number(next.unitPrice) !== Number(l.unitPrice) || Number(next.taxRate) !== Number(l.taxRate) || Number(next.quantity) !== Number(l.quantity))
-          changes.push(`${l.description}: ${l.unitPrice.toFixed(2)} → ${Number(next.unitPrice).toFixed(2)}${Number(next.taxRate) !== Number(l.taxRate) ? `, tax ${Number(l.taxRate)}% → ${Number(next.taxRate)}%` : ""}${Number(next.quantity) !== Number(l.quantity) ? `, qty ${l.quantity.toString()} → ${next.quantity}` : ""}`);
+        else if (
+          Number(next.unitPrice) !== Number(l.unitPrice) ||
+          Number(next.taxRate) !== Number(l.taxRate) ||
+          Number(next.quantity) !== Number(l.quantity)
+        )
+          changes.push(
+            `${l.description}: ${l.unitPrice.toFixed(2)} → ${Number(next.unitPrice).toFixed(2)}${Number(next.taxRate) !== Number(l.taxRate) ? `, tax ${Number(l.taxRate)}% → ${Number(next.taxRate)}%` : ""}${Number(next.quantity) !== Number(l.quantity) ? `, qty ${l.quantity.toString()} → ${next.quantity}` : ""}`,
+          );
       }
-      const reason = changes.length ? requireReason(input.reason, "factoryPrice", "you are changing prices a quotation uses") : input.reason;
+      const reason = changes.length
+        ? requireReason(input.reason, "factoryPrice", "you are changing prices a quotation uses")
+        : input.reason;
       const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input), factoryId: factory.id } });
       await this.writeLines(tx, quoteId, q.inquiryId, input.lines);
       await this.audit.record(tx, {
@@ -228,11 +260,20 @@ export class SourcingService {
     this.assertCan(user);
     await this.prisma.tx(async (tx) => {
       const { inquiry } = await this.findQuote(user, quoteId, tx);
-      const reason = (await this.usedLines(tx, quoteId)).size ? requireReason(reasonInput, "factoryPrice", "you are removing prices a quotation uses") : reasonInput;
+      const reason = (await this.usedLines(tx, quoteId)).size
+        ? requireReason(reasonInput, "factoryPrice", "you are removing prices a quotation uses")
+        : reasonInput;
       const lineIds = (await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId }, select: { id: true } })).map((l) => l.id);
       await tx.requestedItem.updateMany({ where: { preferredFactoryLineId: { in: lineIds } }, data: { preferredFactoryLineId: null } });
       await tx.factoryQuote.update({ where: { id: quoteId }, data: { deletedAt: new Date() } });
-      await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "factory_quote", entityId: quoteId, summary: `${inquiry.refNo}: removed factory prices`, reason });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "delete",
+        entityType: "factory_quote",
+        entityId: quoteId,
+        summary: `${inquiry.refNo}: removed factory prices`,
+        reason,
+      });
     });
   }
 
@@ -241,22 +282,40 @@ export class SourcingService {
     this.assertCan(user);
     await this.prisma.tx(async (tx) => {
       const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
-      const rows = await tx.requestedItem.findMany({ where: { inquiryId }, select: { id: true, description: true, preferredFactoryLineId: true } });
+      const rows = await tx.requestedItem.findMany({
+        where: { inquiryId },
+        select: { id: true, description: true, preferredFactoryLineId: true },
+      });
       const items = new Set(rows.map((r) => r.id));
       // Once a quotation exists, switching an item to another factory's price needs a reason.
       const quoted = await tx.quotationRevision.count({ where: { quotation: { inquiryId }, deletedAt: null } });
       const switched = rows.filter((r) => r.preferredFactoryLineId && r.id in choices && choices[r.id] !== r.preferredFactoryLineId);
-      const reason = quoted && switched.length ? requireReason(reasonInput, "factoryChoice", "you are changing which factory an item is quoted from") : reasonInput;
+      const reason =
+        quoted && switched.length
+          ? requireReason(reasonInput, "factoryChoice", "you are changing which factory an item is quoted from")
+          : reasonInput;
       const lineIds = Object.values(choices).filter((v): v is string => !!v);
       const valid = new Set(
-        (await tx.factoryQuoteLine.findMany({ where: { id: { in: lineIds }, factoryQuote: { inquiryId, deletedAt: null } }, select: { id: true } })).map((l) => l.id),
+        (
+          await tx.factoryQuoteLine.findMany({
+            where: { id: { in: lineIds }, factoryQuote: { inquiryId, deletedAt: null } },
+            select: { id: true },
+          })
+        ).map((l) => l.id),
       );
       for (const [itemId, lineId] of Object.entries(choices)) {
         if (!items.has(itemId)) continue;
         if (lineId && !valid.has(lineId)) throw new DomainError("One of the chosen prices is no longer on this deal. Reload the page.");
         await tx.requestedItem.update({ where: { id: itemId }, data: { preferredFactoryLineId: lineId } });
       }
-      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "inquiry", entityId: inquiryId, summary: `${inquiry.refNo}: chose the factory prices to quote from${switched.length ? ` (changed: ${switched.map((r) => r.description).join(", ")})` : ""}`, reason });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "update",
+        entityType: "inquiry",
+        entityId: inquiryId,
+        summary: `${inquiry.refNo}: chose the factory prices to quote from${switched.length ? ` (changed: ${switched.map((r) => r.description).join(", ")})` : ""}`,
+        reason,
+      });
     });
     return this.forInquiry(user, inquiryId);
   }

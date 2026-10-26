@@ -16,22 +16,35 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   const keep = { q: sp.q };
   return (
     <div>
-      <PageHeader title="Factories" description="The suppliers we source from. Prices and costs here are never shown to customers." actions={
+      <PageHeader
+        title="Factories"
+        description="The suppliers we source from. Prices and costs here are never shown to customers."
+        actions={
           <ButtonLink href="/factories/new" variant="primary">
             New factory
           </ButtonLink>
-        } />
+        }
+      />
       <Card className="overflow-hidden p-0">
         <FilterBar>
           <form className="flex flex-1 flex-wrap items-center gap-2">
-            <SearchField defaultValue={sp.q} placeholder="Search factory or contact person…" clearHref="/factories" className="min-w-56 flex-1 sm:max-w-80" />
+            <SearchField
+              defaultValue={sp.q}
+              placeholder="Search factory or contact person…"
+              clearHref="/factories"
+              className="min-w-56 flex-1 sm:max-w-80"
+            />
           </form>
         </FilterBar>
         {data.rows.length === 0 ? (
           <EmptyState
             icon={FactoryIcon}
             title={sp.q ? `No factory matches "${sp.q}"` : "No factories yet"}
-            description={sp.q ? "Try part of the name, or add it as a new factory." : "Factories are added here, or when you record a factory's prices on a deal."}
+            description={
+              sp.q
+                ? "Try part of the name, or add it as a new factory."
+                : "Factories are added here, or when you record a factory's prices on a deal."
+            }
             action={<ButtonLink href="/factories/new">New factory</ButtonLink>}
           />
         ) : (
@@ -56,7 +69,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                     {f.contactPerson || f.phone || f.wechat || f.email ? (
                       <>
                         <span className="block text-sm">{f.contactPerson ?? "—"}</span>
-                        <span className="block max-w-60 truncate text-xs text-muted">{[f.phone, f.wechat && `WeChat ${f.wechat}`, f.email].filter(Boolean).join(" · ")}</span>
+                        <span className="block max-w-60 truncate text-xs text-muted">
+                          {[f.phone, f.wechat && `WeChat ${f.wechat}`, f.email].filter(Boolean).join(" · ")}
+                        </span>
                       </>
                     ) : (
                       <span className="text-xs text-muted">No contact details</span>
@@ -68,7 +83,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
             </tbody>
           </Table>
         )}
-        {data.total > data.pageSize && <Pagination base="/factories" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />}
+        {data.total > data.pageSize && (
+          <Pagination base="/factories" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
+        )}
       </Card>
     </div>
   );

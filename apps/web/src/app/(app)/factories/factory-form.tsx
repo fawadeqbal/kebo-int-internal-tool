@@ -19,7 +19,13 @@ export function FactoryForm({ action, factory, cancelHref }: { action: Action; f
           <Card>
             <CardHeader title="Factory" description="Shared by the whole team; never shown to customers" />
             <CardBody className="grid gap-4 sm:grid-cols-2">
-              <Field label="Factory name" htmlFor="name" error={s.errors?.name} className="sm:col-span-2" hint="As it appears on their quotations and contracts">
+              <Field
+                label="Factory name"
+                htmlFor="name"
+                error={s.errors?.name}
+                className="sm:col-span-2"
+                hint="As it appears on their quotations and contracts"
+              >
                 <Input id="name" name="name" defaultValue={val("name")} autoFocus={!factory} aria-invalid={!!s.errors?.name} />
               </Field>
               <Field label="Contact person" htmlFor="contactPerson" optional error={s.errors?.contactPerson}>
@@ -37,10 +43,24 @@ export function FactoryForm({ action, factory, cancelHref }: { action: Action; f
               <Field label="Address" htmlFor="address" optional error={s.errors?.address} className="sm:col-span-2">
                 <Textarea id="address" name="address" rows={2} className="min-h-0" defaultValue={val("address")} />
               </Field>
-              <Field label="Bank details" htmlFor="bankDetails" optional error={s.errors?.bankDetails} className="sm:col-span-2" hint="Account name, bank, account number, for paying them">
+              <Field
+                label="Bank details"
+                htmlFor="bankDetails"
+                optional
+                error={s.errors?.bankDetails}
+                className="sm:col-span-2"
+                hint="Account name, bank, account number, for paying them"
+              >
                 <Textarea id="bankDetails" name="bankDetails" rows={3} defaultValue={val("bankDetails")} />
               </Field>
-              <Field label="Notes" htmlFor="notes" optional error={s.errors?.notes} className="sm:col-span-2" hint="What they are good at, lead times, minimum orders…">
+              <Field
+                label="Notes"
+                htmlFor="notes"
+                optional
+                error={s.errors?.notes}
+                className="sm:col-span-2"
+                hint="What they are good at, lead times, minimum orders…"
+              >
                 <Textarea id="notes" name="notes" rows={3} defaultValue={val("notes")} />
               </Field>
             </CardBody>

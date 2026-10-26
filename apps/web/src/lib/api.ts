@@ -14,7 +14,12 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    public readonly body: { error?: string; code?: string; fieldErrors?: Record<string, string[] | undefined>; matches?: { id: string; label: string; detail?: string }[] } = {},
+    public readonly body: {
+      error?: string;
+      code?: string;
+      fieldErrors?: Record<string, string[] | undefined>;
+      matches?: { id: string; label: string; detail?: string }[];
+    } = {},
   ) {
     super(message);
     this.name = "ApiError";

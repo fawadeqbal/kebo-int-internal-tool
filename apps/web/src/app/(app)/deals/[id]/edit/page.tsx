@@ -13,13 +13,28 @@ export const metadata = { title: "Edit inquiry" };
 export default async function EditDealPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
-  const [d, settings] = await Promise.all([load(() => api.get<DealDetail>(`/inquiries/${id}`)), api.get<{ sales: SalesSettings }>("/settings")]);
-  if (!d.allowed.edit) return <Alert tone="warning">{d.stage === "won" || d.stage === "lost" ? "This deal is closed. Reopen it to change the details." : "Only the person handling this deal or a manager can change it."}</Alert>;
+  const [d, settings] = await Promise.all([
+    load(() => api.get<DealDetail>(`/inquiries/${id}`)),
+    api.get<{ sales: SalesSettings }>("/settings"),
+  ]);
+  if (!d.allowed.edit)
+    return (
+      <Alert tone="warning">
+        {d.stage === "won" || d.stage === "lost"
+          ? "This deal is closed. Reopen it to change the details."
+          : "Only the person handling this deal or a manager can change it."}
+      </Alert>
+    );
 
   const primary = d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0] ?? null;
   const sent = d.quotation?.revisions.some((r) => r.status !== "draft");
   const initial: DealFormValues = {
-    customer: { id: d.customer.id, name: d.customer.name, country: d.customer.country, primaryContact: primary && { id: primary.id, name: primary.name } },
+    customer: {
+      id: d.customer.id,
+      name: d.customer.name,
+      country: d.customer.country,
+      primaryContact: primary && { id: primary.id, name: primary.name },
+    },
     contactId: d.contactId ?? "",
     channel: d.channel,
     category: d.category,
@@ -28,12 +43,23 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
     priority: d.priority,
     requiredBy: d.requiredBy ?? "",
     assigneeId: d.assignee?.id ?? "",
-    items: d.items.map((it) => ({ id: it.id, key: it.id, description: it.description, model: it.model ?? "", quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice ?? "" })),
+    items: d.items.map((it) => ({
+      id: it.id,
+      key: it.id,
+      description: it.description,
+      model: it.model ?? "",
+      quantity: it.quantity,
+      unit: it.unit,
+      targetPrice: it.targetPrice ?? "",
+    })),
   };
   return (
     <div className="max-w-4xl">
       <h2 className="mb-1 text-base font-semibold">Edit the inquiry</h2>
-      <p className="mb-4 text-sm text-muted">Factory prices stay linked to the items you keep; prices for a removed item are no longer compared. Who handles the deal is changed on the Overview tab.</p>
+      <p className="mb-4 text-sm text-muted">
+        Factory prices stay linked to the items you keep; prices for a removed item are no longer compared. Who handles the deal is changed
+        on the Overview tab.
+      </p>
       <DealForm
         mode="edit"
         action={saveDealAction.bind(null, d.id)}

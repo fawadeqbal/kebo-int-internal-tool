@@ -66,7 +66,15 @@ export interface OrderView {
   next: OrderNext | null;
   back: { to: OrderStage; label: string } | null;
   needs: OrderNeed | null;
-  history: { id: string; from: OrderStage | null; to: OrderStage; note: string | null; confirmed: boolean; /** Null for moves the system made (e.g. stages set when the order checklist was replaced). */ by: Person | null; at: string }[];
+  history: {
+    id: string;
+    from: OrderStage | null;
+    to: OrderStage;
+    note: string | null;
+    confirmed: boolean;
+    /** Null for moves the system made (e.g. stages set when the order checklist was replaced). */ by: Person | null;
+    at: string;
+  }[];
   /** Null `at` on orders cancelled before the date was kept (migrated data). */
   cancelled: { at: string | null; reason: string | null } | null;
   lines: OrderLineView[];
@@ -214,7 +222,12 @@ export interface OrderDocument {
     packing: LinePacking | null;
   }[];
   /** Packing list only: whether it is filled in, the container, the marks and the totals. */
-  packing: { done: boolean; containerNo: string | null; shippingMarks: string | null; totals: { packages: number; netWeightKg: string; grossWeightKg: string; cbm: string } } | null;
+  packing: {
+    done: boolean;
+    containerNo: string | null;
+    shippingMarks: string | null;
+    totals: { packages: number; netWeightKg: string; grossWeightKg: string; cbm: string };
+  } | null;
   totals: {
     subtotal: string;
     discount: string;

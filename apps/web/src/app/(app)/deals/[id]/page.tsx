@@ -20,8 +20,18 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
   const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts[0];
 
   const timeline = [
-    ...d.stageChanges.map((s) => ({ at: s.changedAt, text: `${s.fromStage ? `${INQUIRY_STAGE_LABEL[s.fromStage]} → ` : ""}${INQUIRY_STAGE_LABEL[s.toStage]}${s.cause !== "manual" && s.cause !== "created" ? ` (${s.cause.replace(/_/g, " ")})` : ""}${s.lostReason ? ` — ${LOST_REASON_LABEL[s.lostReason]}` : ""}`, who: name(s.changedById), note: s.note })),
-    ...d.assignments.map((a) => ({ at: a.assignedAt, text: a.assigneeId ? `Assigned to ${name(a.assigneeId)}` : "Unassigned", who: name(a.assignedById), note: null })),
+    ...d.stageChanges.map((s) => ({
+      at: s.changedAt,
+      text: `${s.fromStage ? `${INQUIRY_STAGE_LABEL[s.fromStage]} → ` : ""}${INQUIRY_STAGE_LABEL[s.toStage]}${s.cause !== "manual" && s.cause !== "created" ? ` (${s.cause.replace(/_/g, " ")})` : ""}${s.lostReason ? ` — ${LOST_REASON_LABEL[s.lostReason]}` : ""}`,
+      who: name(s.changedById),
+      note: s.note,
+    })),
+    ...d.assignments.map((a) => ({
+      at: a.assignedAt,
+      text: a.assigneeId ? `Assigned to ${name(a.assigneeId)}` : "Unassigned",
+      who: name(a.assignedById),
+      note: null,
+    })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
   return (
@@ -79,7 +89,9 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
                     </a>
                     <span className="shrink-0 text-xs text-muted">
                       {size(f.size)} · {name(f.uploadedById)} · {date(f.createdAt)}{" "}
-                      {(f.uploadedById === me.id || can(me.role, "inquiries.updateAny")) && <RemoveFile action={removeFileAction.bind(null, d.id, f.id)} name={f.fileName} />}
+                      {(f.uploadedById === me.id || can(me.role, "inquiries.updateAny")) && (
+                        <RemoveFile action={removeFileAction.bind(null, d.id, f.id)} name={f.fileName} />
+                      )}
                     </span>
                   </li>
                 ))}
@@ -96,10 +108,33 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
             <DetailList
               columns={1}
               items={[
-                { label: "Company", value: <Link href={`/customers/${d.customer.id}`} className="hover:underline">{d.customer.name}</Link> },
+                {
+                  label: "Company",
+                  value: (
+                    <Link href={`/customers/${d.customer.id}`} className="hover:underline">
+                      {d.customer.name}
+                    </Link>
+                  ),
+                },
                 { label: "Contact", value: contact?.name, hidden: !contact },
-                { label: "Email", value: contact?.email && <a href={`mailto:${contact.email}`} className="hover:underline">{contact.email}</a>, hidden: !contact?.email },
-                { label: "WhatsApp", value: (contact?.whatsapp ?? contact?.phone) && <a href={`https://wa.me/${(contact?.whatsapp ?? contact?.phone ?? "").replace(/\D/g, "")}`} className="hover:underline">{contact?.whatsapp ?? contact?.phone}</a>, hidden: !(contact?.whatsapp ?? contact?.phone) },
+                {
+                  label: "Email",
+                  value: contact?.email && (
+                    <a href={`mailto:${contact.email}`} className="hover:underline">
+                      {contact.email}
+                    </a>
+                  ),
+                  hidden: !contact?.email,
+                },
+                {
+                  label: "WhatsApp",
+                  value: (contact?.whatsapp ?? contact?.phone) && (
+                    <a href={`https://wa.me/${(contact?.whatsapp ?? contact?.phone ?? "").replace(/\D/g, "")}`} className="hover:underline">
+                      {contact?.whatsapp ?? contact?.phone}
+                    </a>
+                  ),
+                  hidden: !(contact?.whatsapp ?? contact?.phone),
+                },
               ]}
             />
           </CardBody>
@@ -107,7 +142,17 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
         <Card>
           <CardHeader title="Handled by" description={d.assignee ? d.assignee.name : "Nobody yet"} />
           <CardBody>
-            {d.allowed.assign ? <AssignPanel action={assignAction.bind(null, d.id)} people={people} current={d.assignee?.id ?? null} canAssignOthers={can(me.role, "inquiries.assign")} meId={me.id} /> : <p className="text-sm text-muted">Only a manager can reassign.</p>}
+            {d.allowed.assign ? (
+              <AssignPanel
+                action={assignAction.bind(null, d.id)}
+                people={people}
+                current={d.assignee?.id ?? null}
+                canAssignOthers={can(me.role, "inquiries.assign")}
+                meId={me.id}
+              />
+            ) : (
+              <p className="text-sm text-muted">Only a manager can reassign.</p>
+            )}
           </CardBody>
         </Card>
         {d.canWork && (

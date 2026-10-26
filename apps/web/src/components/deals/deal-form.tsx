@@ -75,9 +75,12 @@ export function DealForm({
 }) {
   const [v, setV] = useState<DealFormValues>(initial);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
-  const [otherCategory, setOtherCategory] = useState(() => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()));
+  const [otherCategory, setOtherCategory] = useState(
+    () => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()),
+  );
   const set = <K extends keyof DealFormValues>(k: K, value: DealFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
-  const setItem = (i: number, patch: Partial<DealFormItem>) => setV((s) => ({ ...s, items: s.items.map((it, n) => (n === i ? { ...it, ...patch } : it)) }));
+  const setItem = (i: number, patch: Partial<DealFormItem>) =>
+    setV((s) => ({ ...s, items: s.items.map((it, n) => (n === i ? { ...it, ...patch } : it)) }));
 
   const chooseCustomer = async (c: CustomerOption | null) => {
     set("customer", c);
@@ -102,9 +105,22 @@ export function DealForm({
               <CardHeader title="Customer" description="Who is asking, and how they reached us" />
               <CardBody className="grid gap-4 md:grid-cols-2">
                 <Field label="Customer" htmlFor="customer" error={s.errors?.customerId} className="md:col-span-2">
-                  <CustomerPicker value={v.customer} onChange={chooseCustomer} search={searchCustomers} error={s.errors?.customerId} disabled={!!customerLocked} disabledReason={customerLocked} />
+                  <CustomerPicker
+                    value={v.customer}
+                    onChange={chooseCustomer}
+                    search={searchCustomers}
+                    error={s.errors?.customerId}
+                    disabled={!!customerLocked}
+                    disabledReason={customerLocked}
+                  />
                 </Field>
-                <Field label="Contact person" htmlFor="contactId" optional error={s.errors?.contactId} hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}>
+                <Field
+                  label="Contact person"
+                  htmlFor="contactId"
+                  optional
+                  error={s.errors?.contactId}
+                  hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}
+                >
                   <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
                     <option value="">{v.customer ? "Not specified" : "Choose the customer first"}</option>
                     {contacts.map((c) => (
@@ -154,10 +170,25 @@ export function DealForm({
                     ))}
                     <option value={OTHER}>Another category…</option>
                   </Select>
-                  {otherCategory && <Input aria-label="Category name" placeholder="Type the category" value={v.category} onChange={(e) => set("category", e.target.value)} maxLength={120} autoFocus />}
+                  {otherCategory && (
+                    <Input
+                      aria-label="Category name"
+                      placeholder="Type the category"
+                      value={v.category}
+                      onChange={(e) => set("category", e.target.value)}
+                      maxLength={120}
+                      autoFocus
+                    />
+                  )}
                 </Field>
                 <Field label="Title" htmlFor="title" optional hint="Leave empty to name it after the items" error={s.errors?.title}>
-                  <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} placeholder="e.g. Gate valves for Jebel Ali project" />
+                  <Input
+                    id="title"
+                    value={v.title}
+                    onChange={(e) => set("title", e.target.value)}
+                    maxLength={200}
+                    placeholder="e.g. Gate valves for Jebel Ali project"
+                  />
                 </Field>
                 <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
                   <Select id="priority" value={v.priority} onChange={(e) => set("priority", e.target.value)}>
@@ -168,11 +199,23 @@ export function DealForm({
                     ))}
                   </Select>
                 </Field>
-                <Field label="Needed by" htmlFor="requiredBy" optional hint="When the customer wants our offer" error={s.errors?.requiredBy}>
+                <Field
+                  label="Needed by"
+                  htmlFor="requiredBy"
+                  optional
+                  hint="When the customer wants our offer"
+                  error={s.errors?.requiredBy}
+                >
                   <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
                 </Field>
                 {people && (
-                  <Field label="Handled by" htmlFor="assigneeId" optional hint={canAssignOthers ? "Assigning someone starts sourcing" : "Take it yourself, or leave it for a manager to assign"} error={s.errors?.assigneeId}>
+                  <Field
+                    label="Handled by"
+                    htmlFor="assigneeId"
+                    optional
+                    hint={canAssignOthers ? "Assigning someone starts sourcing" : "Take it yourself, or leave it for a manager to assign"}
+                    error={s.errors?.assigneeId}
+                  >
                     <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
                       <option value="">Nobody yet</option>
                       {assignable.map((p) => (
@@ -183,7 +226,14 @@ export function DealForm({
                     </Select>
                   </Field>
                 )}
-                <Field label="Requirements" htmlFor="requirements" optional hint="Specs, standards, packing, destination port — anything the factories need to know" error={s.errors?.requirements} className="md:col-span-2">
+                <Field
+                  label="Requirements"
+                  htmlFor="requirements"
+                  optional
+                  hint="Specs, standards, packing, destination port — anything the factories need to know"
+                  error={s.errors?.requirements}
+                  className="md:col-span-2"
+                >
                   <Textarea id="requirements" rows={4} value={v.requirements} onChange={(e) => set("requirements", e.target.value)} />
                 </Field>
               </CardBody>
@@ -208,23 +258,54 @@ export function DealForm({
                       <div className="grid gap-3 sm:grid-cols-6">
                         <div className="sm:col-span-6">
                           <MiniLabel htmlFor={`desc-${it.key}`}>Description</MiniLabel>
-                          <Textarea id={`desc-${it.key}`} rows={2} className="min-h-0" value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="What it is, size, material, standard…" />
+                          <Textarea
+                            id={`desc-${it.key}`}
+                            rows={2}
+                            className="min-h-0"
+                            value={it.description}
+                            onChange={(e) => setItem(i, { description: e.target.value })}
+                            placeholder="What it is, size, material, standard…"
+                          />
                         </div>
                         <div className="sm:col-span-2">
                           <MiniLabel htmlFor={`model-${it.key}`}>Model / part no.</MiniLabel>
-                          <Input id={`model-${it.key}`} value={it.model} onChange={(e) => setItem(i, { model: e.target.value })} maxLength={120} />
+                          <Input
+                            id={`model-${it.key}`}
+                            value={it.model}
+                            onChange={(e) => setItem(i, { model: e.target.value })}
+                            maxLength={120}
+                          />
                         </div>
                         <div>
                           <MiniLabel htmlFor={`qty-${it.key}`}>Quantity</MiniLabel>
-                          <Input id={`qty-${it.key}`} inputMode="decimal" value={it.quantity} onChange={(e) => setItem(i, { quantity: e.target.value })} className="tabular" />
+                          <Input
+                            id={`qty-${it.key}`}
+                            inputMode="decimal"
+                            value={it.quantity}
+                            onChange={(e) => setItem(i, { quantity: e.target.value })}
+                            className="tabular"
+                          />
                         </div>
                         <div>
                           <MiniLabel htmlFor={`unit-${it.key}`}>Unit</MiniLabel>
-                          <Input id={`unit-${it.key}`} value={it.unit} onChange={(e) => setItem(i, { unit: e.target.value })} maxLength={20} list="units" />
+                          <Input
+                            id={`unit-${it.key}`}
+                            value={it.unit}
+                            onChange={(e) => setItem(i, { unit: e.target.value })}
+                            maxLength={20}
+                            list="units"
+                          />
                         </div>
                         <div className="sm:col-span-2">
                           <MiniLabel htmlFor={`target-${it.key}`}>Target price (optional)</MiniLabel>
-                          <Input id={`target-${it.key}`} inputMode="decimal" value={it.targetPrice} onChange={(e) => setItem(i, { targetPrice: e.target.value })} className="tabular" placeholder="Customer's budget per unit" />
+                          <Input
+                            id={`target-${it.key}`}
+                            inputMode="decimal"
+                            value={it.targetPrice}
+                            onChange={(e) => setItem(i, { targetPrice: e.target.value })}
+                            className="tabular"
+                            placeholder="Customer's budget per unit"
+                          />
                         </div>
                       </div>
                     </li>

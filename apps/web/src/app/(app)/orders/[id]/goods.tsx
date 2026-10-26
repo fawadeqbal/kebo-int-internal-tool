@@ -60,10 +60,19 @@ export function GoodsReceipt({ lines, canEdit, action, today }: { lines: GoodsLi
                 {n(got)} / {n(of)} {l.unit}
               </p>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuemin={0} aria-valuemax={of} aria-valuenow={got} aria-label={`${head(l.description)}: ${n(got)} of ${n(of)} ${l.unit} received`}>
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-surface-3"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={of}
+              aria-valuenow={got}
+              aria-label={`${head(l.description)}: ${n(got)} of ${n(of)} ${l.unit} received`}
+            >
               <div className={cn("h-full rounded-full", done ? "bg-ok" : "bg-primary")} style={{ width: `${pct}%` }} />
             </div>
-            <p className="text-xs text-muted">{got > 0 && l.receivedOn ? `${done ? "All in" : "Last came in"} on ${l.receivedOn}` : "Nothing in yet"}</p>
+            <p className="text-xs text-muted">
+              {got > 0 && l.receivedOn ? `${done ? "All in" : "Last came in"} on ${l.receivedOn}` : "Nothing in yet"}
+            </p>
             {input?.(l, i)}
           </li>
         );
@@ -164,7 +173,13 @@ interface PackRow {
 }
 
 const COLS = "grid grid-cols-6 gap-x-2 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_5.5rem_5.5rem_4.5rem] sm:items-center";
-const FIELDS: { key: Exclude<keyof PackRow, "lineId">; label: string; short: string; span: string; mode: "numeric" | "decimal" | "text" }[] = [
+const FIELDS: {
+  key: Exclude<keyof PackRow, "lineId">;
+  label: string;
+  short: string;
+  span: string;
+  mode: "numeric" | "decimal" | "text";
+}[] = [
   { key: "packages", label: "Packages", short: "Pkgs", span: "col-span-2", mode: "numeric" },
   { key: "packageType", label: "Package type", short: "Type", span: "col-span-4", mode: "text" },
   { key: "netWeightKg", label: "Net kg", short: "Net kg", span: "col-span-2", mode: "decimal" },
@@ -244,7 +259,17 @@ export function PackingList({
     );
   if (!canEdit)
     return <p className="text-sm text-muted">{totals.packages > 0 ? `Started, not complete: ${summary}.` : "Not filled in yet."}</p>;
-  return <PackingForm lines={lines} containerNo={containerNo} shippingMarks={shippingMarks} packed={packed} action={action} close={() => setEditing(false)} started={totals.packages > 0} />;
+  return (
+    <PackingForm
+      lines={lines}
+      containerNo={containerNo}
+      shippingMarks={shippingMarks}
+      packed={packed}
+      action={action}
+      close={() => setEditing(false)}
+      started={totals.packages > 0}
+    />
+  );
 }
 
 function PackingForm({
@@ -278,7 +303,12 @@ function PackingForm({
   const [marks, setMarks] = useState(shippingMarks ?? "");
   const set = (i: number, k: keyof PackRow, v: string) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   const payload = JSON.stringify({ containerNo: container, shippingMarks: marks, lines: rows });
-  const total = { packages: sum(rows, "packages"), net: sum(rows, "netWeightKg"), gross: sum(rows, "grossWeightKg"), cbm: sum(rows, "cbm") };
+  const total = {
+    packages: sum(rows, "packages"),
+    net: sum(rows, "netWeightKg"),
+    gross: sum(rows, "grossWeightKg"),
+    cbm: sum(rows, "cbm"),
+  };
   const missing = rows.filter((r) => !(Number(r.packages) > 0)).length;
 
   return (
@@ -295,7 +325,10 @@ function PackingForm({
           ))}
         </div>
         {lines.map((l, i) => (
-          <fieldset key={l.id} className={cn(COLS, "rounded-lg border border-line p-2 sm:border-0 sm:border-t sm:rounded-none sm:px-1 sm:py-1.5")}>
+          <fieldset
+            key={l.id}
+            className={cn(COLS, "rounded-lg border border-line p-2 sm:border-0 sm:border-t sm:rounded-none sm:px-1 sm:py-1.5")}
+          >
             <legend className="sr-only">{head(l.description)}</legend>
             <p className="col-span-6 min-w-0 text-sm sm:col-span-1">
               <span className="block truncate font-medium" title={head(l.description)}>
@@ -331,12 +364,19 @@ function PackingForm({
           <span className="text-right">{n(total.cbm, 3)}</span>
         </div>
         <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm tabular sm:hidden">
-          <span className="font-medium">Total:</span> {n(total.packages, 0)} packages · net {n(total.net)} kg · gross {n(total.gross)} kg · {n(total.cbm, 3)} m³
+          <span className="font-medium">Total:</span> {n(total.packages, 0)} packages · net {n(total.net)} kg · gross {n(total.gross)} kg ·{" "}
+          {n(total.cbm, 3)} m³
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Container number" htmlFor="pk-container" optional>
-          <Input id="pk-container" maxLength={120} value={container} onChange={(e) => setContainer(e.target.value)} placeholder="e.g. TGHU 123456-7" />
+          <Input
+            id="pk-container"
+            maxLength={120}
+            value={container}
+            onChange={(e) => setContainer(e.target.value)}
+            placeholder="e.g. TGHU 123456-7"
+          />
         </Field>
         <Field label="Shipping marks" htmlFor="pk-marks" optional hint="As printed on the cartons">
           <Textarea id="pk-marks" rows={2} className="min-h-0" maxLength={2000} value={marks} onChange={(e) => setMarks(e.target.value)} />
@@ -351,7 +391,13 @@ function PackingForm({
             Cancel
           </Button>
         )}
-        {missing > 0 && <span className="text-xs text-muted">{missing === rows.length ? "Fill in the packages for each line." : `${missing} line${missing === 1 ? "" : "s"} still without packages.`}</span>}
+        {missing > 0 && (
+          <span className="text-xs text-muted">
+            {missing === rows.length
+              ? "Fill in the packages for each line."
+              : `${missing} line${missing === 1 ? "" : "s"} still without packages.`}
+          </span>
+        )}
       </div>
     </ActionForm>
   );
