@@ -22,7 +22,13 @@ export function defaultPlan(totalMinor: Minor, depositPercent: number, orderedOn
 
 export type InstalmentStatus = "paid" | "part_paid" | "late" | "due_soon" | "open";
 
-export const INSTALMENT_STATUS_LABEL: Record<InstalmentStatus, string> = { paid: "Paid", part_paid: "Part paid", late: "Late", due_soon: "Due soon", open: "Not due yet" };
+export const INSTALMENT_STATUS_LABEL: Record<InstalmentStatus, string> = {
+  paid: "Paid",
+  part_paid: "Part paid",
+  late: "Late",
+  due_soon: "Due soon",
+  open: "Not due yet",
+};
 
 /**
  * Each instalment with what is paid on it (money received pays the earliest
@@ -31,10 +37,19 @@ export const INSTALMENT_STATUS_LABEL: Record<InstalmentStatus, string> = { paid:
 export function planStatus<T extends PlanItem>(items: T[], settledMinor: Minor, today: ISODate, dueSoonDays: number) {
   return payInstalments(items, settledMinor).map(({ item, paidMinor, openMinor }) => {
     const status: InstalmentStatus =
-      openMinor <= 0 ? "paid" : item.dueOn && item.dueOn < today ? "late" : item.dueOn && item.dueOn <= addDays(today, dueSoonDays) ? "due_soon" : paidMinor > 0 ? "part_paid" : "open";
+      openMinor <= 0
+        ? "paid"
+        : item.dueOn && item.dueOn < today
+          ? "late"
+          : item.dueOn && item.dueOn <= addDays(today, dueSoonDays)
+            ? "due_soon"
+            : paidMinor > 0
+              ? "part_paid"
+              : "open";
     return { ...item, paidMinor, openMinor: Math.max(openMinor, 0), status };
   });
 }
 
 /** "Deposit 30%: USD 3,000.00 is late (due 1 Nov)" for reminders. */
-export const instalmentSentence = (label: string, openMinor: Minor, currency: string, dueOn: ISODate | null) => `${label}: ${formatMinor(openMinor, currency)}${dueOn ? ` due ${dueOn}` : ""}`;
+export const instalmentSentence = (label: string, openMinor: Minor, currency: string, dueOn: ISODate | null) =>
+  `${label}: ${formatMinor(openMinor, currency)}${dueOn ? ` due ${dueOn}` : ""}`;

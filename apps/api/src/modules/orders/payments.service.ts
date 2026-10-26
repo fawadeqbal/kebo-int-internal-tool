@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, toDbDate } from "@kebo/database";
 import { formatMinor, fromMinor, settle, toMinor } from "@kebo/money";
-import { can, type PaymentInput } from "@kebo/shared";
+import { can, type EditPaymentInput, type PaymentInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -89,6 +89,38 @@ export class PaymentsService {
     return this.forOrder(user, orderId);
   }
 
+  /** A payment typed wrong (amount, date, reference): changed with a reason, kept in the order's history. */
+  async edit(user: SessionUser, paymentId: string, input: EditPaymentInput) {
+    if (!can(user.role, "payments.record")) throw new ForbiddenError("Only accounts (managers) can change payments.");
+    if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
+    const p = await this.prisma.db.payment.findUnique({ where: { id: paymentId } });
+    if (!p) throw new NotFoundError("Payment");
+    if (p.voidedAt) throw new DomainError("This payment was removed.");
+    await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${p.orderId}::uuid for update`;
+      const o = await this.orders.load(user, p.orderId, tx);
+      if (input.currency !== o.currency) throw new DomainError(`This order is in ${o.currency}. Record the payment in ${o.currency}.`);
+      const others = settle(
+        decimalToMinor(o.total),
+        o.payments.filter((x) => x.id !== p.id && x.currency === o.currency).map((x) => ({ amountMinor: decimalToMinor(x.amount), bankChargesMinor: decimalToMinor(x.bankCharges) })),
+        Number(o.depositPercent),
+      );
+      if (toMinor(input.amount) + toMinor(input.bankCharges) > others.outstandingMinor) throw new DomainError(`That is more than is still due (${formatMinor(others.outstandingMinor, o.currency)}).`);
+      await tx.payment.update({ where: { id: p.id }, data: { kind: input.kind, amount: input.amount, bankCharges: input.bankCharges, paidOn: toDbDate(input.paidOn), method: input.method, reference: input.reference, note: input.note } });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "payment_edit",
+        entityType: "order",
+        entityId: o.id,
+        summary: `${o.refNo}: changed a payment from the customer`,
+        oldValues: { amount: p.amount.toFixed(2), bankCharges: p.bankCharges.toFixed(2), paidOn: fromDbDate(p.paidOn), reference: p.reference },
+        newValues: { amount: fromMinor(toMinor(input.amount)), bankCharges: fromMinor(toMinor(input.bankCharges)), paidOn: input.paidOn, reference: input.reference },
+        reason: input.reason,
+      });
+    });
+    return this.forOrder(user, p.orderId);
+  }
+
   /** A payment recorded by mistake. It stays visible, crossed out. */
   async void(user: SessionUser, paymentId: string, reason: string) {
     if (!can(user.role, "orders.manage")) throw new ForbiddenError("Only a manager can remove a payment.");
@@ -98,7 +130,7 @@ export class PaymentsService {
     if (p.voidedAt) throw new DomainError("This payment was already removed.");
     await this.prisma.tx(async (tx) => {
       await tx.payment.update({ where: { id: paymentId }, data: { voidedAt: new Date(), voidReason: reason } });
-      await this.audit.record(tx, { userId: user.id, action: "payment_void", entityType: "order", entityId: o.id, summary: `${o.refNo}: removed payment of ${p.currency} ${p.amount.toFixed(2)} — ${reason}` });
+      await this.audit.record(tx, { userId: user.id, action: "payment_void", entityType: "order", entityId: o.id, summary: `${o.refNo}: removed payment of ${p.currency} ${p.amount.toFixed(2)}`, reason });
     });
     return this.forOrder(user, o.id);
   }

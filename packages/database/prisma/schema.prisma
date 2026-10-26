@@ -738,16 +738,14 @@ model OrderStageChange {
 /// The customer's instalments for an order (deposit, balance, or more). They add
 /// up to the order total; money received pays the earliest first.
 model PaymentPlanItem {
-  id         String    @id @default(uuid()) @db.Uuid
-  orderId    String    @map("order_id") @db.Uuid
-  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  label      String    @db.VarChar(80)
-  amount     Decimal   @db.Decimal(14, 2)
+  id        String    @id @default(uuid()) @db.Uuid
+  orderId   String    @map("order_id") @db.Uuid
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  label     String    @db.VarChar(80)
+  amount    Decimal   @db.Decimal(14, 2)
   /// Null until known (a balance before shipment is dated when the ship date is).
-  dueOn      DateTime? @map("due_on") @db.Date
-  sortOrder  Int       @default(0) @map("sort_order")
-  /// The day the last reminder went out, so it is not sent twice a day.
-  remindedOn DateTime? @map("reminded_on") @db.Date
+  dueOn     DateTime? @map("due_on") @db.Date
+  sortOrder Int       @default(0) @map("sort_order")
 
   @@index([orderId])
   @@index([dueOn])

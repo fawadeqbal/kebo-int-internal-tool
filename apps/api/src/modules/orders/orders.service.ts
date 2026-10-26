@@ -4,6 +4,7 @@ import { fromMinor, settle } from "@kebo/money";
 import {
   can,
   checkMove,
+  defaultPlan,
   depositOf,
   dueOf,
   nextStage,
@@ -21,7 +22,7 @@ import {
   type PackingInput,
   type ReceiptInput,
 } from "@kebo/shared";
-import { dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
+import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -133,6 +134,10 @@ export class OrdersService {
         stageChanges: { create: { toStage: "confirmed", byId: actorId, note: `${rev.quotation.refNo} R${rev.number} accepted` } },
       },
     });
+    // The customer's payment plan starts from the terms (deposit dated, balance dated when the ship date is known).
+    const days = (await this.settings.get()).reminders;
+    const plan = defaultPlan(decimalToMinor(rev.total), Number(rev.depositPercent), acceptedOn, days.depositDays);
+    await tx.paymentPlanItem.createMany({ data: plan.map((p, i) => ({ orderId: order.id, label: p.label, amount: fromMinor(p.amountMinor), dueOn: toDbDateOrNull(p.dueOn), sortOrder: i })) });
     await this.audit.record(tx, { userId: actorId, action: "create", entityType: "order", entityId: order.id, summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} (${rev.currency} ${rev.total.toString()})` });
     const event: DomainEvent = { type: "order.created", orderId: order.id, refNo, inquiryId: inquiry.id, actorId, notify: [inquiry.assigneeId, inquiry.createdById].filter((v): v is string => !!v) };
     return { order, event };
@@ -382,6 +387,7 @@ export class OrdersService {
       if (input.to === "done") Object.assign(data, { status: "closed", closedAt: new Date() });
       if (o.stage === "done" && !forward) Object.assign(data, { status: "open", closedAt: null });
       await tx.order.update({ where: { id: o.id }, data });
+      await this.datePlan(tx, o, input.to, forward, input.readyOn ?? null, data.shippedOn instanceof Date ? fromDbDate(data.shippedOn) : null);
       await tx.orderStageChange.create({ data: { orderId: o.id, fromStage: o.stage, toStage: input.to, note: input.note ?? (reason || null), confirmed: check.warnings.length > 0, byId: user.id } });
       await this.audit.record(tx, {
         userId: user.id,
@@ -405,6 +411,19 @@ export class OrdersService {
     });
     await this.events.publish(event);
     return this.get(user, id);
+  }
+
+  /**
+   * Instalments with no date yet get one once it is known: a balance "before
+   * shipment" is due by the ready date; other balances some days after the ship
+   * date (the balance reminder). Dates someone set are never changed.
+   */
+  private async datePlan(tx: Tx, o: OrderRow, to: OrderStage, forward: boolean, readyOn: ISODate | null, shippedOn: ISODate | null) {
+    if (!forward) return;
+    let due: ISODate | null = null;
+    if (to === "in_production" && readyOn && o.balanceTerms === "before_shipment") due = readyOn;
+    if (to === "shipped" && shippedOn) due = o.balanceTerms === "before_shipment" ? shippedOn : addDays(shippedOn, (await this.settings.get()).reminders.balanceDays);
+    if (due) await tx.paymentPlanItem.updateMany({ where: { orderId: o.id, dueOn: null }, data: { dueOn: toDbDate(due) } });
   }
 
   /* ---------------------------------------------------------------- goods */

@@ -8,7 +8,6 @@ CREATE TABLE "payment_plan_items" (
     "amount" DECIMAL(14,2) NOT NULL,
     "due_on" DATE,
     "sort_order" INTEGER NOT NULL DEFAULT 0,
-    "reminded_on" DATE,
 
     CONSTRAINT "payment_plan_items_pkey" PRIMARY KEY ("id")
 );
