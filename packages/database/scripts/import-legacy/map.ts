@@ -20,7 +20,6 @@ import {
   type RevisionStatus,
   type Settings,
   type SettingsKey,
-  type TaxTreatment,
 } from "@kebo/shared";
 import { DOCUMENT_PREFIX, parseReference, type DocumentKind, type ISODate } from "@kebo/utils";
 
@@ -69,15 +68,6 @@ export const isServiceLine = (description: string) =>
 export const lineType = (description: string): LineType => (isServiceLine(description) ? "charge" : "goods");
 
 /* ---------------------------------------------------------------- parties */
-
-/**
- * The old customers had a VAT-exempt flag; the new ones have a tax treatment.
- * Exempt → zero-rated export. Not exempt only meant VAT when the old app had a
- * VAT rate set; with a 0% rate nobody was ever charged VAT, so they stay export.
- */
-export function mapTaxTreatment(vatExempt: boolean, legacyVatRate: number): TaxTreatment {
-  return !vatExempt && legacyVatRate > 0 ? "domestic_vat" : "export_zero_rated";
-}
 
 /** Placeholder country for customers the old app had none for (the app asks for it on first edit). */
 export const UNKNOWN_COUNTRY = "ZZ";
@@ -367,7 +357,7 @@ export interface SettingsMapping {
 
 const OLD_KEYS_USED = new Set([
   "companyName", "companyNameLocal", "companyAddress", "companyPhone", "companyEmail", "companyEmail2", "companyTaxNo", "companyWebsite",
-  "bankDetails", "invoiceFooter", "currency", "exchangeRates", "defaultMarginPercent", "vatRate", "defaultTaxRate", "pricesIncludeVat",
+  "bankDetails", "invoiceFooter", "currency", "exchangeRates", "defaultMarginPercent",
   "quotationValidityDays", "defaultQuotationTerms", "categories", "reminderPendingDays", "reminderProcessingDays", "reminderDueSoonDays",
   "notifyEmails", "notifyNewQuery", "notifyClosed", "notifyPayment", "notifyDailySummary",
 ]);
@@ -376,7 +366,6 @@ const OLD_KEYS_USED = new Set([
 export function mapSettings(old: Record<string, unknown> | null | undefined): SettingsMapping {
   const o = old ?? {};
   const pick = (entries: Record<string, unknown>) => Object.fromEntries(Object.entries(entries).filter(([, v]) => v !== undefined && v !== null));
-  const vatRate = o.vatRate ?? o.defaultTaxRate;
   const raw: Record<SettingsKey, Record<string, unknown>> = {
     company: pick({
       name: o.companyName,
@@ -394,8 +383,6 @@ export function mapSettings(old: Record<string, unknown> | null | undefined): Se
       currency: o.currency,
       exchangeRates: o.exchangeRates,
       defaultMarginPercent: o.defaultMarginPercent,
-      vatRate,
-      pricesIncludeVat: o.pricesIncludeVat,
       quotationValidityDays: o.quotationValidityDays,
       defaultTerms: o.defaultQuotationTerms,
       defaultDepositPercent: depositPercentFromTerms(typeof o.defaultQuotationTerms === "string" ? o.defaultQuotationTerms : null),

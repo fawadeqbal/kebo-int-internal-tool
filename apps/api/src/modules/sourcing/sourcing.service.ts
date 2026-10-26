@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
 import { convertMinor, fxRate, unitCostMinor, fromMinor } from "@kebo/money";
-import { can, type FactoryQuoteInput } from "@kebo/shared";
+import { can, costSentence, effectiveRebate, type FactoryQuoteInput, type HsCodeInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -13,9 +13,13 @@ import { StagesService } from "../inquiries/stages.service";
 
 /**
  * Factory prices for a deal (internal: never shown to customers). Each line's
- * landed unit cost is worked out in the selling currency: the factory price,
- * plus VAT when quoted without it, less the export VAT rebate, converted at
- * today's rate. The quotation starts from these costs plus the default margin.
+ * landed unit cost is worked out in the selling currency: the factory price
+ * (always without tax) plus its tax %, less the export rebate for the product's
+ * HS code, converted at today's rate. The quotation starts from
+ * these costs plus the default margin.
+ *
+ * Rebate rates are remembered per HS code: the first price with a code saves its
+ * rate, later prices start from it, and the list can be corrected in one place.
  */
 @Injectable()
 export class SourcingService {
@@ -54,7 +58,8 @@ export class SourcingService {
         receivedOn: fromDbDate(q.receivedOn),
         validUntil: fromDbDateOrNull(q.validUntil),
         currency: q.currency,
-        pricesIncludeVat: q.pricesIncludeVat,
+        /** Tax % added on top of these prices (they are without tax). */
+        vatRate: Number(q.vatRate),
         priceBasis: q.priceBasis,
         leadTime: q.leadTime,
         moq: q.moq,
@@ -63,7 +68,10 @@ export class SourcingService {
         /** null when the exchange rate for this currency is missing in Settings. */
         fxRate: rate,
         lines: q.lines.map((l) => {
-          const costInFactoryCurrency = unitCostMinor({ unitPriceMinor: decimalToMinor(l.unitPrice), vatRate: Number(l.vatRate), pricesIncludeVat: q.pricesIncludeVat, rebateRate: Number(l.rebateRate) });
+          const vatRate = Number(q.vatRate);
+          const rebateRate = Number(l.rebateRate);
+          const unitPriceMinor = decimalToMinor(l.unitPrice);
+          const costInFactoryCurrency = unitCostMinor({ unitPriceMinor, vatRate, pricesIncludeVat: false, rebateRate });
           const cost = rate ? convertMinor(costInFactoryCurrency, rate) : null;
           return {
             id: l.id,
@@ -73,8 +81,12 @@ export class SourcingService {
             quantity: l.quantity.toString(),
             unit: l.unit,
             unitPrice: l.unitPrice.toFixed(2),
-            vatRate: Number(l.vatRate),
-            rebateRate: Number(l.rebateRate),
+            hsCode: l.hsCode,
+            rebateRate,
+            /** The rebate that really comes back (never more than the tax). */
+            rebateBack: effectiveRebate(rebateRate, vatRate),
+            /** e.g. "CNY 100.00 + 13% tax = CNY 113.00 · 13% rebate back · your cost CNY 100.00" (in the factory's currency). */
+            costNote: costSentence({ unitPriceMinor, vatRate, rebateRate, costMinor: costInFactoryCurrency, currency: q.currency }),
             /** One unit's landed cost in the selling currency. */
             unitCost: cost === null ? null : fromMinor(cost),
           };
@@ -105,7 +117,7 @@ export class SourcingService {
   }
 
   /** An existing factory, a known one with the same name, or a new one. */
-  private async factoryFor(tx: Tx, user: SessionUser, input: FactoryQuoteInput, lines: FactoryQuoteInput["lines"]) {
+  private async factoryFor(tx: Tx, user: SessionUser, input: FactoryQuoteInput) {
     if (input.factoryId) {
       const f = await tx.factory.findFirst({ where: { id: input.factoryId, deletedAt: null } });
       if (!f) throw new DomainError("That factory was removed. Choose another one.");
@@ -114,13 +126,13 @@ export class SourcingService {
     const name = input.newFactoryName!.trim().replace(/\s+/g, " ");
     const known = await tx.factory.findFirst({ where: { deletedAt: null, name: { equals: name, mode: "insensitive" } } });
     if (known) return known;
-    const f = await tx.factory.create({ data: { name, defaultVatRate: lines[0]?.vatRate ?? 13, pricesIncludeVat: input.pricesIncludeVat, createdById: user.id } });
+    const f = await tx.factory.create({ data: { name, createdById: user.id } });
     await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: f.id, summary: `Added factory ${f.name}` });
     return f;
   }
 
   /** Lines keep their ids (quotation lines and preferences point at them). Item links must be this deal's items. */
-  private async writeLines(tx: Tx, quoteId: string, inquiryId: string, lines: FactoryQuoteInput["lines"]) {
+  private async writeLines(tx: Tx, user: SessionUser, quoteId: string, inquiryId: string, lines: FactoryQuoteInput["lines"]) {
     const own = new Set((await tx.requestedItem.findMany({ where: { inquiryId }, select: { id: true } })).map((r) => r.id));
     const existing = new Set((await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId }, select: { id: true } })).map((r) => r.id));
     const keep = lines.map((l) => l.id).filter((id): id is string => !!id && existing.has(id));
@@ -131,7 +143,7 @@ export class SourcingService {
     }
     for (const [n, l] of lines.entries()) {
       if (l.requestedItemId && !own.has(l.requestedItemId)) throw new DomainError("A price is linked to an item that is not on this deal. Reload and try again.");
-      const row = { requestedItemId: l.requestedItemId, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit, unitPrice: l.unitPrice, vatRate: l.vatRate, rebateRate: l.rebateRate, sortOrder: n };
+      const row = { requestedItemId: l.requestedItemId, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit, unitPrice: l.unitPrice, hsCode: l.hsCode ?? null, rebateRate: l.rebateRate, sortOrder: n };
       if (l.id && existing.has(l.id)) await tx.factoryQuoteLine.update({ where: { id: l.id }, data: row });
       else await tx.factoryQuoteLine.create({ data: { ...row, factoryQuoteId: quoteId } });
     }
@@ -140,6 +152,11 @@ export class SourcingService {
       update requested_items ri set preferred_factory_line_id = l.id
         from factory_quote_lines l
        where l.factory_quote_id = ${quoteId}::uuid and l.requested_item_id = ri.id and ri.preferred_factory_line_id is null`;
+    // Remember each HS code's rebate for the next price.
+    const remembered = new Map(lines.filter((l) => l.hsCode).map((l) => [l.hsCode!, l.rebateRate]));
+    for (const [code, rebateRate] of remembered) {
+      await tx.hsCode.upsert({ where: { code }, create: { code, rebateRate, updatedById: user.id }, update: { rebateRate, updatedById: user.id } });
+    }
   }
 
   private header(input: FactoryQuoteInput) {
@@ -148,7 +165,7 @@ export class SourcingService {
       receivedOn: toDbDate(input.receivedOn),
       validUntil: toDbDateOrNull(input.validUntil),
       currency: input.currency,
-      pricesIncludeVat: input.pricesIncludeVat,
+      vatRate: input.vatRate,
       priceBasis: input.priceBasis,
       leadTime: input.leadTime,
       moq: input.moq,
@@ -163,9 +180,9 @@ export class SourcingService {
     const quote = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${inquiryId}::uuid for update`;
       const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
-      const factory = await this.factoryFor(tx, user, input, input.lines);
+      const factory = await this.factoryFor(tx, user, input);
       const q = await tx.factoryQuote.create({ data: { ...this.header(input), inquiryId, factoryId: factory.id, createdById: user.id } });
-      await this.writeLines(tx, q.id, inquiryId, input.lines);
+      await this.writeLines(tx, user, q.id, inquiryId, input.lines);
       await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory_quote", entityId: q.id, summary: `${inquiry.refNo}: prices from ${factory.name} (${input.lines.length} lines, ${input.currency})` });
       const moved = await this.stages.after(tx, inquiry, "factory_price_added", user.id);
       if (moved) events.push(moved);
@@ -186,9 +203,9 @@ export class SourcingService {
     this.assertCan(user);
     return this.prisma.tx(async (tx) => {
       const { q, inquiry } = await this.findQuote(user, quoteId, tx);
-      const factory = await this.factoryFor(tx, user, input, input.lines);
+      const factory = await this.factoryFor(tx, user, input);
       const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input), factoryId: factory.id } });
-      await this.writeLines(tx, quoteId, q.inquiryId, input.lines);
+      await this.writeLines(tx, user, quoteId, q.inquiryId, input.lines);
       await this.audit.record(tx, { userId: user.id, action: "update", entityType: "factory_quote", entityId: quoteId, summary: `${inquiry.refNo}: edited prices from ${factory.name}` });
       return updated;
     });
@@ -224,5 +241,61 @@ export class SourcingService {
       await this.audit.record(tx, { userId: user.id, action: "update", entityType: "inquiry", entityId: inquiryId, summary: `${inquiry.refNo}: chose the factory prices to quote from` });
     });
     return this.forInquiry(user, inquiryId);
+  }
+
+  /* ------------------------------------------------- export rebate by HS code */
+
+  /** The remembered rebate rates, optionally filtered by code or description. */
+  async hsCodes(user: SessionUser, q?: string) {
+    this.assertCan(user);
+    const term = q?.trim();
+    const rows = await this.prisma.db.hsCode.findMany({
+      where: term ? { OR: [{ code: { startsWith: term.replace(/\s+/g, "") } }, { description: { contains: term, mode: "insensitive" } }] } : {},
+      orderBy: { code: "asc" },
+      take: 500,
+    });
+    const ids = [...new Set(rows.map((r) => r.updatedById).filter((v): v is string => !!v))];
+    const people = new Map((await this.prisma.db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })).map((u) => [u.id, u]));
+    return rows.map((r) => ({ code: r.code, rebateRate: Number(r.rebateRate), description: r.description, updatedAt: r.updatedAt.toISOString(), updatedBy: (r.updatedById && people.get(r.updatedById)) || null }));
+  }
+
+  /** One HS code's remembered rebate, or null the first time it is used. */
+  async hsCode(user: SessionUser, code: string) {
+    this.assertCan(user);
+    const r = await this.prisma.db.hsCode.findUnique({ where: { code: code.replace(/\s+/g, "") } });
+    return r ? { code: r.code, rebateRate: Number(r.rebateRate), description: r.description } : null;
+  }
+
+  /** Set an HS code's rebate (e.g. when the official rate changes). Prices already entered keep theirs. */
+  async saveHsCode(user: SessionUser, code: string, input: HsCodeInput) {
+    this.assertCan(user);
+    const clean = code.replace(/\s+/g, "");
+    if (!/^[0-9.]{2,20}$/.test(clean)) throw new DomainError("Use digits only for the HS code, e.g. 8437.80");
+    return this.prisma.tx(async (tx) => {
+      const before = await tx.hsCode.findUnique({ where: { code: clean } });
+      const row = await tx.hsCode.upsert({
+        where: { code: clean },
+        create: { code: clean, rebateRate: input.rebateRate, description: input.description, updatedById: user.id },
+        update: { rebateRate: input.rebateRate, description: input.description, updatedById: user.id },
+      });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: before ? "update" : "create",
+        entityType: "hs_code",
+        entityId: null,
+        summary: `Export rebate for HS ${clean}: ${before ? `${Number(before.rebateRate)}% → ` : ""}${input.rebateRate}%`,
+      });
+      return { code: row.code, rebateRate: Number(row.rebateRate), description: row.description };
+    });
+  }
+
+  async removeHsCode(user: SessionUser, code: string) {
+    this.assertCan(user);
+    await this.prisma.tx(async (tx) => {
+      const r = await tx.hsCode.findUnique({ where: { code } });
+      if (!r) throw new NotFoundError("HS code");
+      await tx.hsCode.delete({ where: { code } });
+      await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "hs_code", entityId: null, summary: `Removed the export rebate for HS ${code}` });
+    });
   }
 }

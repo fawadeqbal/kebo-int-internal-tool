@@ -11,7 +11,6 @@ import type {
   Priority,
   RevisionStatus,
   Role,
-  TaxTreatment,
 } from "./enums";
 
 /** The words people see, in one place, so anything can be renamed without touching logic. */
@@ -53,11 +52,6 @@ export const LOST_REASON_LABEL: Record<LostReason, string> = {
 export const UNKNOWN_COUNTRY = "ZZ";
 
 export const CUSTOMER_TYPE_LABEL: Record<CustomerType, string> = { company: "Company", individual: "Individual" };
-
-export const TAX_TREATMENT_LABEL: Record<TaxTreatment, string> = {
-  export_zero_rated: "Export (no VAT)",
-  domestic_vat: "Domestic (VAT)",
-};
 
 export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   draft: "Draft",

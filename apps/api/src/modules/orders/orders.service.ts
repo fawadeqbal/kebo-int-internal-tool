@@ -8,6 +8,9 @@ import {
   dueOf,
   nextStage,
   orderNeeds,
+  rebateMinor,
+  rebateNeeds,
+  REBATE_FILING_DAYS,
   ORDER_STAGE_HINT,
   ORDER_STAGE_LABEL,
   previousStage,
@@ -17,10 +20,11 @@ import {
   type OrderFacts,
   type OrderGoods,
   type OrderStage,
+  type OrderTaxInput,
   type PackingInput,
   type ReceiptInput,
 } from "@kebo/shared";
-import { dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
+import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -39,8 +43,16 @@ const orderInclude = {
   payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
   lines: {
     orderBy: { sortOrder: "asc" },
-    // The factory each line was quoted from (through the quotation line and the factory's price).
-    include: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } } } } },
+    // The factory price each line was quoted from (through the quotation line): its factory, and what the rebate is worked out from.
+    include: {
+      quoteLine: {
+        select: {
+          factoryQuoteLine: {
+            select: { unitPrice: true, rebateRate: true, factoryQuote: { select: { vatRate: true, currency: true, factory: { select: { id: true, name: true } } } } },
+          },
+        },
+      },
+    },
   },
   customer: { select: { id: true, name: true, country: true } },
   inquiry: { select: { id: true, refNo: true, title: true, assigneeId: true, assignee: { select: { id: true, name: true } } } },
@@ -61,6 +73,42 @@ export function goodsOf(lines: { type: string; description: string; quantity: { 
     received: goods.length - short.length,
     packed: packedAt !== null,
   };
+}
+
+type RebateLine = {
+  type: string;
+  quantity: { toString(): string };
+  quoteLine: { factoryQuoteLine: { unitPrice: Prisma.Decimal; rebateRate: Prisma.Decimal; factoryQuote: { vatRate: Prisma.Decimal; currency: string } } | null } | null;
+};
+
+/** The export rebate expected on an order, per factory currency (from the factory prices its lines were quoted from). */
+export function rebateOf(lines: RebateLine[]): { currency: string; amountMinor: number }[] {
+  const by = new Map<string, number>();
+  for (const l of lines) {
+    const f = l.quoteLine?.factoryQuoteLine;
+    if (l.type !== "goods" || !f) continue;
+    const amount = rebateMinor({
+      unitPriceMinor: decimalToMinor(f.unitPrice),
+      quantity: qty(l.quantity),
+      vatRate: Number(f.factoryQuote.vatRate),
+      rebateRate: Number(f.rebateRate),
+    });
+    if (amount > 0) by.set(f.factoryQuote.currency, (by.get(f.factoryQuote.currency) ?? 0) + amount);
+  }
+  return [...by].map(([currency, amountMinor]) => ({ currency, amountMinor }));
+}
+
+/** What the rebate paperwork needs now (shipped orders with a rebate, not yet filed). */
+export function taxNeedOf(o: { status: string; shippedOn: Date | null; vatInvoiceReceivedOn: Date | null; rebateFiledOn: Date | null; lines: RebateLine[] }, today: ISODate) {
+  if (o.status === "cancelled") return null;
+  return rebateNeeds({ shippedOn: fromDbDateOrNull(o.shippedOn), rebate: rebateOf(o.lines), vatInvoiceReceivedOn: fromDbDateOrNull(o.vatInvoiceReceivedOn), rebateFiledOn: fromDbDateOrNull(o.rebateFiledOn) }, today);
+}
+
+/** The order's own need first; the rebate's when there is none, or when only the rebate is late. */
+export function pickNeed<A extends { late: boolean }, B extends { late: boolean }>(order: A | null, tax: B | null): A | B | null {
+  if (!order) return tax;
+  if (tax?.late && !order.late) return tax;
+  return order;
 }
 
 /**
@@ -255,10 +303,25 @@ export class OrdersService {
       })(),
       next: this.nextOf(o),
       back: back ? { to: back, label: `Back to ${ORDER_STAGE_LABEL[back]}` } : null,
-      needs: orderNeeds(this.facts(o), this.clock.today(), days),
+      needs: pickNeed(orderNeeds(this.facts(o), this.clock.today(), days), taxNeedOf(o, this.clock.today())),
+      tax: this.taxOf(o),
       history: history.map((h) => ({ id: h.id, from: h.fromStage, to: h.toStage, note: h.note, confirmed: h.confirmed, by: h.by, at: h.at })),
       cancelled: o.status === "cancelled" ? { at: o.cancelledAt, reason: o.cancelReason } : null,
       documents: this.documentsOf(o),
+    };
+  }
+
+  /** The export rebate on this order: how much, and the paperwork (factory's VAT invoice, filing within 90 days of shipping). */
+  private taxOf(o: OrderRow) {
+    const rebate = rebateOf(o.lines);
+    const shippedOn = fromDbDateOrNull(o.shippedOn);
+    return {
+      rebate: rebate.map((r) => ({ currency: r.currency, amount: fromMinor(r.amountMinor) })),
+      vatInvoiceReceivedOn: fromDbDateOrNull(o.vatInvoiceReceivedOn),
+      rebateFiledOn: fromDbDateOrNull(o.rebateFiledOn),
+      /** File the rebate by this date (90 days after shipping); null until shipped. */
+      deadline: shippedOn ? addDays(shippedOn, REBATE_FILING_DAYS) : null,
+      needs: taxNeedOf(o, this.clock.today()),
     };
   }
 
@@ -312,7 +375,7 @@ export class OrdersService {
         received: fromMinor(m.receivedMinor),
         due: fromMinor(dueOf(m)),
         next: this.nextOf(o),
-        needs: orderNeeds(this.facts(o), today, days),
+        needs: pickNeed(orderNeeds(this.facts(o), today, days), taxNeedOf(o, today)),
       };
     });
     return filter.lateOnly ? items.filter((i) => i.needs?.late) : items;
@@ -449,6 +512,29 @@ export class OrdersService {
       const before = { shipBy: fromDbDateOrNull(o.shipBy), readyOn: fromDbDateOrNull(o.readyOn), shippedOn: fromDbDateOrNull(o.shippedOn), blNo: o.blNo };
       await tx.order.update({ where: { id: o.id }, data });
       await this.audit.record(tx, { userId: user.id, action: "update", entityType: "order", entityId: o.id, summary: `${o.refNo}: dates and B/L changed`, oldValues: before, newValues: input });
+    });
+    return this.get(user, id);
+  }
+
+  /** The rebate paperwork: when the factory's special VAT invoice came in, and when the rebate was filed. Only the fields sent change. */
+  async setTax(user: SessionUser, id: string, input: OrderTaxInput) {
+    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    const today = this.clock.today();
+    if ((input.vatInvoiceReceivedOn && input.vatInvoiceReceivedOn > today) || (input.rebateFiledOn && input.rebateFiledOn > today)) throw new DomainError("The date cannot be in the future.");
+    await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+      const o = await this.load(user, id, tx);
+      if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+      const data: Prisma.OrderUpdateInput = {};
+      if (input.vatInvoiceReceivedOn !== undefined) data.vatInvoiceReceivedOn = toDbDateOrNull(input.vatInvoiceReceivedOn);
+      if (input.rebateFiledOn !== undefined) data.rebateFiledOn = toDbDateOrNull(input.rebateFiledOn);
+      const before = { vatInvoiceReceivedOn: fromDbDateOrNull(o.vatInvoiceReceivedOn), rebateFiledOn: fromDbDateOrNull(o.rebateFiledOn) };
+      await tx.order.update({ where: { id: o.id }, data });
+      const said = [
+        input.vatInvoiceReceivedOn !== undefined ? (input.vatInvoiceReceivedOn ? `VAT invoice received ${input.vatInvoiceReceivedOn}` : "VAT invoice not received") : null,
+        input.rebateFiledOn !== undefined ? (input.rebateFiledOn ? `rebate filed ${input.rebateFiledOn}` : "rebate not filed") : null,
+      ].filter(Boolean);
+      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "order", entityId: o.id, summary: `${o.refNo}: ${said.join(", ") || "tax paperwork unchanged"}`, oldValues: before, newValues: input });
     });
     return this.get(user, id);
   }

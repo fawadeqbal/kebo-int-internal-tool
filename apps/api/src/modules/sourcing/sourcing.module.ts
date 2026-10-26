@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { factoryQuoteInput, preferredLinesInput, type FactoryQuoteInput } from "@kebo/shared";
+import { factoryQuoteInput, hsCodeInput, preferredLinesInput, type FactoryQuoteInput, type HsCodeInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -46,6 +46,34 @@ class SourcingController {
   @RequirePermissions("sourcing.manage")
   choose(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(preferredLinesInput)) body: z.infer<typeof preferredLinesInput>) {
     return this.sourcing.choose(user, id, body.choices);
+  }
+
+  /** Export rebate rates remembered per HS code. */
+  @Get("hs-codes")
+  @RequirePermissions("sourcing.manage")
+  hsCodes(@CurrentUser() user: SessionUser, @Query("q") q?: string) {
+    return this.sourcing.hsCodes(user, q);
+  }
+
+  /** One HS code's rebate; { code: null } the first time it is used. */
+  @Get("hs-codes/:code")
+  @RequirePermissions("sourcing.manage")
+  async hsCode(@CurrentUser() user: SessionUser, @Param("code") code: string) {
+    return (await this.sourcing.hsCode(user, code)) ?? { code: null };
+  }
+
+  @Put("hs-codes/:code")
+  @RequirePermissions("sourcing.manage")
+  saveHsCode(@CurrentUser() user: SessionUser, @Param("code") code: string, @Body(Validate(hsCodeInput)) body: HsCodeInput) {
+    return this.sourcing.saveHsCode(user, code, body);
+  }
+
+  @Delete("hs-codes/:code")
+  @HttpCode(200)
+  @RequirePermissions("sourcing.manage")
+  async removeHsCode(@CurrentUser() user: SessionUser, @Param("code") code: string) {
+    await this.sourcing.removeHsCode(user, code);
+    return { ok: true };
   }
 }
 

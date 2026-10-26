@@ -67,7 +67,7 @@ export class FactoriesService {
     await this.assertUniqueName(input.name, id);
     return this.prisma.tx(async (tx) => {
       const f = await tx.factory.update({ where: { id }, data: input });
-      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "factory", entityId: id, summary: `Edited factory ${f.name}`, oldValues: { name: before.name, defaultVatRate: before.defaultVatRate.toString() }, newValues: { name: input.name, defaultVatRate: input.defaultVatRate } });
+      await this.audit.record(tx, { userId: user.id, action: "update", entityType: "factory", entityId: id, summary: `Edited factory ${f.name}`, oldValues: { name: before.name }, newValues: { name: input.name } });
       return f;
     });
   }

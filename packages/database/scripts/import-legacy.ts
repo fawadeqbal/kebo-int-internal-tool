@@ -155,7 +155,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   const now = new Date();
   const legacySettings = (old.settings.find((s) => s.key === "app")?.value ?? {}) as Record<string, unknown>;
   const settings = map.mapSettings(legacySettings);
-  const legacyVat = Number(legacySettings.vatRate ?? legacySettings.defaultTaxRate ?? 0);
 
   /* ---- people */
   await tx.user.createMany({
@@ -207,7 +206,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       country: map.UNKNOWN_COUNTRY,
       address: c.address,
       taxNo: c.tax_no,
-      taxTreatment: map.mapTaxTreatment(c.vat_exempt, legacyVat),
       defaultCurrency: settings.values.sales.currency,
       notes: c.notes,
       createdById: c.created_by,
@@ -234,7 +232,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   }
   const individuals = old.customers.filter((c) => !c.company_name?.trim());
   for (const c of individuals) report.judge("Customers with no company name → type individual, named after the contact", c.contact_person);
-  if (legacyVat > 0) report.judge("Tax treatment", `old VAT rate ${legacyVat}%: VAT-exempt customers → export_zero_rated, the rest → domestic_vat`);
 
   /* ---- factories */
   await tx.factory.createMany({
@@ -246,8 +243,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       wechat: s.wechat,
       email: s.email,
       address: s.address,
-      defaultVatRate: s.default_vat_rate,
-      pricesIncludeVat: s.prices_include_vat,
       bankDetails: s.bank_details,
       notes: s.notes,
       createdById: s.created_by,
@@ -424,7 +419,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     })),
   });
 
-  /* ---- factory prices */
+  /* ---- factory prices: always without tax now, with one tax % per quote added on top */
+  const supplierVat = new Map(old.suppliers.map((s) => [s.id, Number(s.default_vat_rate)]));
+  const quoteIncludesVat = new Map(old.supplierQuotes.map((s) => [s.id, s.prices_include_vat]));
+  const lineVat = new Map<string, number>();
+  for (const l of old.supplierQuoteItems) lineVat.set(l.supplier_quote_id, Math.max(lineVat.get(l.supplier_quote_id) ?? 0, Number(l.vat_rate)));
   await tx.factoryQuote.createMany({
     data: old.supplierQuotes.map((s) => ({
       id: s.id,
@@ -434,7 +433,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       receivedOn: toDbDate(s.quoted_on),
       validUntil: s.valid_until ? toDbDate(s.valid_until) : null,
       currency: s.currency,
-      pricesIncludeVat: s.prices_include_vat,
+      // The old app kept VAT per line; the quote takes the highest.
+      vatRate: lineVat.get(s.id) ?? supplierVat.get(s.supplier_id) ?? 13,
       priceBasis: s.price_basis,
       leadTime: s.lead_time,
       paymentTerms: s.payment_terms,
@@ -454,11 +454,14 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       model: l.model,
       quantity: l.quantity,
       unit: l.unit,
-      unitPrice: l.unit_price,
-      vatRate: l.vat_rate,
+      // Prices entered with tax are stored without it (same cost).
+      unitPrice: quoteIncludesVat.get(l.supplier_quote_id) && Number(l.vat_rate) > 0 ? (Math.round((Number(l.unit_price) / (1 + Number(l.vat_rate) / 100)) * 100) / 100).toFixed(2) : l.unit_price,
+      // The old app had no export rebate: none until an HS code and its rate are added.
+      rebateRate: 0,
       sortOrder: l.sort_order,
     })),
   });
+  if (old.supplierQuoteItems.length) report.judge("Export rebate", `the old app had none: ${old.supplierQuoteItems.length} factory price lines start at 0% (add the HS code and rate when a deal is worked on)`);
   for (const i of old.queryItems.filter((x) => x.chosen_offer_item_id)) {
     await tx.requestedItem.update({ where: { id: i.id }, data: { preferredFactoryLineId: i.chosen_offer_item_id } });
   }

@@ -8,7 +8,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { SettingsService } from "../settings/settings.service";
 import { links, NotificationsService } from "./notifications.service";
-import { goodsOf } from "../orders/orders.service";
+import { goodsOf, taxNeedOf } from "../orders/orders.service";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -96,11 +96,24 @@ export class RemindersService {
     const orders = await this.prisma.db.order.findMany({
       // Closed orders too: one closed with money still owed keeps being chased (orderNeeds decides).
       where: { status: { in: ["open", "closed"] }, inquiry: { onHold: false } },
-      include: { payments: { where: { voidedAt: null } }, inquiry: { select: { id: true, assigneeId: true } }, lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } } },
+      include: {
+        payments: { where: { voidedAt: null } },
+        inquiry: { select: { id: true, assigneeId: true } },
+        lines: {
+          select: {
+            type: true,
+            description: true,
+            quantity: true,
+            receivedQty: true,
+            unit: true,
+            quoteLine: { select: { factoryQuoteLine: { select: { unitPrice: true, rebateRate: true, factoryQuote: { select: { vatRate: true, currency: true } } } } } },
+          },
+        },
+      },
     });
     // Collected first and sent per person: a few one by one, many as one summary,
     // so a backlog (e.g. right after the import of old orders) does not bury people every morning.
-    type Late = { orderId: string; refNo: string; title: string; due: string; lateBy: number };
+    type Late = { orderId: string; refNo: string; kind: "order" | "tax"; title: string; due: string; lateBy: number };
     const lateFor = new Map<string, Late[]>();
     const escalated: Late[] = [];
     for (const o of orders) {
@@ -121,11 +134,14 @@ export class RemindersService {
         today,
         s.reminders,
       );
-      if (!need?.late) continue;
-      const late: Late = { orderId: o.id, refNo: o.refNo, title: need.title, due: need.due, lateBy: daysBetween(need.due, today) };
-      const owner = o.inquiry.assigneeId;
-      if (owner) lateFor.set(owner, [...(lateFor.get(owner) ?? []), late]);
-      if (!owner || late.lateBy >= s.reminders.escalateAfterDays) escalated.push(late);
+      // The order's own need and, once shipped, the export rebate paperwork (VAT invoice, then filing within 90 days).
+      for (const [kind, n] of [["order", need], ["tax", taxNeedOf(o, today)]] as const) {
+        if (!n?.late) continue;
+        const late: Late = { orderId: o.id, refNo: o.refNo, kind, title: n.title, due: n.due, lateBy: daysBetween(n.due, today) };
+        const owner = o.inquiry.assigneeId;
+        if (owner) lateFor.set(owner, [...(lateFor.get(owner) ?? []), late]);
+        if (!owner || late.lateBy >= s.reminders.escalateAfterDays) escalated.push(late);
+      }
     }
 
     const oldestFirst = (a: Late, b: Late) => b.lateBy - a.lateBy;
@@ -136,7 +152,7 @@ export class RemindersService {
       if (await this.prisma.db.notification.count({ where: { userId: owner, dedupeKey: { startsWith: day } } })) continue;
       items.sort(oldestFirst);
       if (items.length <= 3) {
-        for (const x of items) await note([owner], { type: "reminder.order", title: `${x.refNo}: ${x.title} (since ${x.due})`, link: links.order(x.orderId), dedupeKey: `${day}:${x.orderId}` });
+        for (const x of items) await note([owner], { type: "reminder.order", title: `${x.refNo}: ${x.title} (since ${x.due})`, link: links.order(x.orderId), dedupeKey: `${day}:${x.orderId}${x.kind === "tax" ? ":tax" : ""}` });
       } else {
         const x = items[0]!;
         await note([owner], { type: "reminder.order", title: `${items.length} of your orders need you — the oldest, ${x.refNo}: ${x.title}`, body: listOf(items), link: "/orders?view=mine", dedupeKey: day });

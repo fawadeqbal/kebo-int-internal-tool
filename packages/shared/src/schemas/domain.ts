@@ -12,9 +12,9 @@ import {
   PAYMENT_METHODS,
   PRIORITIES,
   REVISION_STATUSES,
-  TAX_TREATMENTS,
 } from "../enums";
 import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, percentOr, phone, quantity, text } from "./common";
+import { DEFAULT_FACTORY_VAT } from "../workflows/tax";
 
 /* ---------------------------------------------------------------- customers */
 
@@ -41,7 +41,6 @@ export const customerInput = z.object({
     .regex(/^[A-Z]{2}$/, "Choose a country"),
   address: optionalText(500),
   taxNo: optionalText(60),
-  taxTreatment: z.enum(TAX_TREATMENTS).default("export_zero_rated"),
   defaultCurrency: currency.default("USD"),
   notes: optionalText(5000),
   contacts: z.array(contactInput).min(1, "Add at least one contact").max(20),
@@ -57,8 +56,6 @@ export const factoryInput = z.object({
   wechat: optionalText(80),
   email,
   address: optionalText(500),
-  defaultVatRate: percentOr(13),
-  pricesIncludeVat: bool.default(true),
   bankDetails: optionalText(1000),
   notes: optionalText(5000),
 });
@@ -121,9 +118,10 @@ export const factoryQuoteLineInput = z.object({
   model: optionalText(120),
   quantity,
   unit: z.string().trim().max(20).default("pcs"),
-  unitPrice: amount("Enter the factory's price"),
-  vatRate: percentOr(13),
-  rebateRate: percentOr(0),
+  unitPrice: amount("Enter the factory's price, including its VAT"),
+  /** Customs code of the product; its rebate rate is remembered by this code. */
+  hsCode: z.string().trim().max(20).regex(/^[0-9.\s]*$/, "Use digits only, e.g. 8437.80").transform((v) => v.replace(/\s+/g, "") || null).nullish(),
+  rebateRate: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number({ message: "Choose the export rebate for this item" }).min(0, "Cannot be negative").max(100, "Cannot be more than 100%")),
 });
 
 export const factoryQuoteInput = z
@@ -135,7 +133,8 @@ export const factoryQuoteInput = z
     receivedOn: isoDate(),
     validUntil: optionalDate,
     currency: currency.default("CNY"),
-    pricesIncludeVat: bool.default(true),
+    /** Tax % added on top of these prices (prices are always without tax). */
+    vatRate: percentOr(DEFAULT_FACTORY_VAT),
     priceBasis: optionalText(60),
     leadTime: optionalText(120),
     moq: optionalText(60),
@@ -175,8 +174,8 @@ export const revisionInput = z.object({
   balanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
   leadTime: optionalText(120),
   validUntil: isoDate(),
+  /** VAT on the sale: 0 for exports (the default from the customer's country), 13 for a customer in China. */
   vatRate: percentOr(0),
-  pricesIncludeVat: bool.default(false),
   discount: amountOr(0),
   terms: optionalText(5000),
   notes: optionalText(5000),
@@ -247,6 +246,10 @@ export const packingInput = z.object({
 });
 export type PackingInput = z.infer<typeof packingInput>;
 
+/** The export rebate paperwork of an order (only the fields sent change; empty clears). */
+export const orderTaxInput = z.object({ vatInvoiceReceivedOn: optionalDate.optional(), rebateFiledOn: optionalDate.optional() });
+export type OrderTaxInput = z.infer<typeof orderTaxInput>;
+
 export const cancelOrderInput = z.object({ reason: text(2000, "Say why the order is cancelled") });
 
 /* ---------------------------------------------------------------- payments */
@@ -264,3 +267,12 @@ export const paymentInput = z.object({
 export type PaymentInput = z.infer<typeof paymentInput>;
 
 export const voidPaymentInput = z.object({ reason: text(2000, "Say why this payment is being removed") });
+
+/* ---------------------------------------------------------------- tax */
+
+/** An HS code's export rebate rate (remembered from factory prices; editable in Settings). */
+export const hsCodeInput = z.object({
+  rebateRate: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number({ message: "Choose the export rebate" }).min(0, "Cannot be negative").max(100, "Cannot be more than 100%")),
+  description: optionalText(200),
+});
+export type HsCodeInput = z.infer<typeof hsCodeInput>;
