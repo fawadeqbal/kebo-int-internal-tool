@@ -38,20 +38,39 @@ export const depositOf = (m: OrderMoney): Minor => (m.depositPercent > 0 ? split
 export const dueOf = (m: OrderMoney): Minor => Math.max(m.totalMinor - m.receivedMinor, 0);
 
 export interface StageWarning {
-  code: "no_deposit" | "balance_before_shipping" | "money_due";
+  code: "no_deposit" | "balance_before_shipping" | "money_due" | "not_received" | "no_packing_list";
   message: string;
 }
+
+/** The goods side of an order: what came in from the factory, and whether the packing list is made. */
+export interface OrderGoods {
+  /** Goods lines still short, e.g. "Maize sheller: 60 of 100 pcs". */
+  short: string[];
+  /** Goods lines in total and how many came in complete. */
+  lines: number;
+  received: number;
+  packed: boolean;
+}
+
+export type MoveFacts = OrderMoney & { currency: string; balanceTerms: BalanceTerms; goods?: OrderGoods };
 
 /**
  * Things worth a second look before moving forward. Moving back never warns.
  * The person may still go ahead: they confirm, and the move is recorded.
  */
-export function stageWarnings(to: OrderStage, m: OrderMoney & { currency: string; balanceTerms: BalanceTerms }): StageWarning[] {
+export function stageWarnings(to: OrderStage, m: MoveFacts): StageWarning[] {
   const due = dueOf(m);
   const deposit = depositOf(m);
   const out: StageWarning[] = [];
   if (to === "in_production" && deposit > 0 && m.receivedMinor < deposit) {
     out.push({ code: "no_deposit", message: `The deposit (${formatMinor(deposit, m.currency)}) has not been received yet.` });
+  }
+  if (to === "shipped" && m.goods && m.goods.short.length) {
+    const list = m.goods.short.slice(0, 3).join("; ") + (m.goods.short.length > 3 ? `; and ${m.goods.short.length - 3} more` : "");
+    out.push({ code: "not_received", message: `Not everything has come in from the factory (${list}).` });
+  }
+  if (to === "shipped" && m.goods && m.goods.lines > 0 && !m.goods.packed) {
+    out.push({ code: "no_packing_list", message: "The packing list is not filled in yet." });
   }
   if (to === "shipped" && m.balanceTerms === "before_shipment" && due > 0) {
     out.push({ code: "balance_before_shipping", message: `${formatMinor(due, m.currency)} is still due, and the terms say the balance is paid before shipping.` });
@@ -65,7 +84,7 @@ export function stageWarnings(to: OrderStage, m: OrderMoney & { currency: string
 export type MoveCheck = { ok: true; warnings: StageWarning[] } | { ok: false; code: "order_not_open" | "not_next_or_previous" | "same_stage"; message: string };
 
 /** Whether an order may move to a stage: only one step forward or back, and only while it is not cancelled. */
-export function checkMove(from: OrderStage, to: OrderStage, status: OrderStatus, money: OrderMoney & { currency: string; balanceTerms: BalanceTerms }): MoveCheck {
+export function checkMove(from: OrderStage, to: OrderStage, status: OrderStatus, money: MoveFacts): MoveCheck {
   if (status === "cancelled") return { ok: false, code: "order_not_open", message: "This order is cancelled." };
   if (from === to) return { ok: false, code: "same_stage", message: `This order is already ${ORDER_STAGE_LABEL[to]}.` };
   if (to === nextStage(from)) return { ok: true, warnings: stageWarnings(to, money) };
@@ -94,6 +113,7 @@ export interface OrderFacts extends OrderMoney {
   /** Expected ready date from the factory, if known. */
   readyOn: ISODate | null;
   shippedOn: ISODate | null;
+  goods?: OrderGoods;
 }
 
 /** What an open order needs from someone now, and by when. Null when nothing (done or cancelled). */
@@ -116,8 +136,13 @@ export function orderNeeds(o: OrderFacts, today: ISODate, days: OrderReminderDay
       if (deposit > 0 && o.receivedMinor < deposit) return need(`Get the deposit (${formatMinor(deposit - o.receivedMinor, o.currency)})`, addDays(o.stageSince, days.depositDays));
       return need(deposit > 0 ? "Deposit is in: start production" : "Start production (no deposit on these terms)", addDays(o.stageSince, days.depositDays));
     }
-    case "in_production":
-      return o.readyOn ? need(`Goods due from the factory`, o.readyOn) : need("Ask the factory for the ready date", addDays(o.stageSince, days.productionDays));
+    case "in_production": {
+      const by = o.readyOn ?? addDays(o.stageSince, days.productionDays);
+      const g = o.goods;
+      if (g && g.lines > 0 && g.received === g.lines) return need(g.packed ? "Packed and ready: mark as shipped" : "All goods are in: make the packing list", o.readyOn ?? by);
+      if (g && g.received > 0) return need(`Goods coming in from the factory (${g.received} of ${g.lines} items complete)`, by);
+      return o.readyOn ? need("Goods due from the factory", o.readyOn) : need("Ask the factory for the ready date", by);
+    }
     case "shipped":
       return need(due > 0 ? `Get the balance (${formatMinor(due, o.currency)})` : "Paid in full: close the order", balanceBy);
     case "done":

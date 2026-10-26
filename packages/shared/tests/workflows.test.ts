@@ -69,6 +69,34 @@ describe("order stages", () => {
     expect(close.ok && close.warnings.map((w) => w.message)).toEqual(["USD 1,000.00 is still due from the customer."]);
   });
 
+  it("warns before shipping when goods are missing or not packed", () => {
+    const goods = { short: ["Maize sheller: 60 of 100 pcs"], lines: 2, received: 1, packed: false };
+    const ship = checkMove("in_production", "shipped", "open", { ...money, receivedMinor: 10_000_00, goods });
+    expect(ship.ok && ship.warnings.map((w) => w.code)).toEqual(["not_received", "no_packing_list"]);
+    expect(ship.ok && ship.warnings[0]!.message).toBe("Not everything has come in from the factory (Maize sheller: 60 of 100 pcs).");
+    const ready = checkMove("in_production", "shipped", "open", { ...money, receivedMinor: 10_000_00, goods: { short: [], lines: 2, received: 2, packed: true } });
+    expect(ready.ok && ready.warnings).toEqual([]);
+  });
+
+  it("guides production: goods coming in, then the packing list, then shipping", () => {
+    const base: OrderFacts = { ...money, receivedMinor: 3_000_00, stage: "in_production", status: "open", stageSince: "2026-10-01", readyOn: "2026-11-01", shippedOn: null };
+    expect(orderNeeds({ ...base, goods: { short: ["x"], lines: 2, received: 0, packed: false } }, "2026-10-20")!.title).toBe("Goods due from the factory");
+    expect(orderNeeds({ ...base, goods: { short: ["x"], lines: 2, received: 1, packed: false } }, "2026-10-20")!.title).toBe("Goods coming in from the factory (1 of 2 items complete)");
+    expect(orderNeeds({ ...base, goods: { short: [], lines: 2, received: 2, packed: false } }, "2026-10-20")!.title).toBe("All goods are in: make the packing list");
+    expect(orderNeeds({ ...base, goods: { short: [], lines: 2, received: 2, packed: true } }, "2026-11-02")).toEqual({ title: "Packed and ready: mark as shipped", due: "2026-11-01", late: true });
+  });
+
+  it("reads received quantities and packing lines from forms", async () => {
+    const { receiptInput, packingInput } = await import("../src");
+    const lineId = "6f1c3a52-6c55-4d34-9d7c-1f1f4f4f4f4f";
+    expect(receiptInput.parse({ lines: [{ lineId, receivedQty: "0.29" }] }).lines[0]!.receivedQty).toBe(0.29);
+    expect(receiptInput.parse({ lines: [{ lineId, receivedQty: "" }] }).lines[0]!.receivedQty).toBe(0);
+    expect(receiptInput.safeParse({ lines: [{ lineId, receivedQty: "-1" }] }).success).toBe(false);
+    const p = packingInput.parse({ lines: [{ lineId, packages: "12", packageType: "", netWeightKg: "", grossWeightKg: "130.5", cbm: "1.2" }] });
+    expect(p.lines[0]).toEqual({ lineId, packages: 12, packageType: "Carton", netWeightKg: null, grossWeightKg: 130.5, cbm: 1.2 });
+    expect(packingInput.safeParse({ lines: [{ lineId, packages: "1.5" }] }).success).toBe(false);
+  });
+
   it("says what each open order needs, and when it is late", () => {
     const base: OrderFacts = { ...money, stage: "confirmed", status: "open", stageSince: "2026-10-01", readyOn: null, shippedOn: null };
     expect(orderNeeds(base, "2026-10-05")).toEqual({ title: "Get the deposit (USD 3,000.00)", due: "2026-10-08", late: false });

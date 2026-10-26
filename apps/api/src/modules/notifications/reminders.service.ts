@@ -8,6 +8,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { SettingsService } from "../settings/settings.service";
 import { links, NotificationsService } from "./notifications.service";
+import { goodsOf } from "../orders/orders.service";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -95,7 +96,7 @@ export class RemindersService {
     const orders = await this.prisma.db.order.findMany({
       // Closed orders too: one closed with money still owed keeps being chased (orderNeeds decides).
       where: { status: { in: ["open", "closed"] }, inquiry: { onHold: false } },
-      include: { payments: { where: { voidedAt: null, direction: "in" } }, inquiry: { select: { id: true, assigneeId: true } } },
+      include: { payments: { where: { voidedAt: null, direction: "in" } }, inquiry: { select: { id: true, assigneeId: true } }, lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } } },
     });
     // Collected first and sent per person: a few one by one, many as one summary,
     // so a backlog (e.g. right after the import of old orders) does not bury people every morning.
@@ -115,6 +116,7 @@ export class RemindersService {
           stageSince: dateIn(o.stageSince, this.clock.timeZone),
           readyOn: fromDbDateOrNull(o.readyOn),
           shippedOn: fromDbDateOrNull(o.shippedOn),
+          goods: goodsOf(o.lines, o.packedAt),
         },
         today,
         s.reminders,

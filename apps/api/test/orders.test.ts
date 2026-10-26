@@ -104,9 +104,42 @@ describe("orders: four stages", () => {
     expect((await order()).money).toMatchObject({ received: deposit.toFixed(2), depositDue: "0.00" });
   });
 
+  it("tracks what came in from the factory, line by line", async () => {
+    const o = await order();
+    const goods = o.lines.find((l: { type: string }) => l.type === "goods");
+    const charge = o.lines.find((l: { type: string }) => l.type === "charge");
+    expect(goods).toMatchObject({ quantity: "100", receivedQty: "0", factory: { name: `Henan Agri ${tag}` } });
+    expect(o.goods).toMatchObject({ lines: 1, received: 0, allReceived: false, packed: false });
+    // Shipping now would warn about both.
+    const early = await move(sana, { to: "shipped" }).expect(409);
+    expect(early.body.error).toMatch(/Not everything has come in from the factory \(Maize sheller 5t\/h: 0 of 100 pcs\)\. The packing list is not filled in yet\./);
+    await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 101 }] }).expect(400);
+    await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: charge.id, receivedQty: 1 }] }).expect(400);
+    await api(app, bilal).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 1 }] }).expect(404);
+    const part = (await api(app, sana).put(`/orders/${orderId}/receipt`, { on: "2026-10-22", lines: [{ lineId: goods.id, receivedQty: "60" }] }).expect(200)).body;
+    expect(part.lines.find((l: { id: string }) => l.id === goods.id)).toMatchObject({ receivedQty: "60", receivedOn: "2026-10-22" });
+    expect(part.goods.short).toEqual(["Maize sheller 5t/h: 60 of 100 pcs"]);
+    const all = (await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 100 }] }).expect(200)).body;
+    expect(all.goods).toMatchObject({ received: 1, allReceived: true, short: [] });
+    expect(all.needs.title).toBe("All goods are in: make the packing list");
+  });
+
+  it("makes the packing list before shipping", async () => {
+    const goods = (await order()).lines.find((l: { type: string }) => l.type === "goods");
+    await api(app, sana).put(`/orders/${orderId}/packing`, { lines: [{ lineId: goods.id, packages: 10, netWeightKg: 1300, grossWeightKg: 1200 }] }).expect(400); // net > gross
+    const packed = (await api(app, sana)
+      .put(`/orders/${orderId}/packing`, { containerNo: "TGHU 123456-7", shippingMarks: "KANO AGRO\nLAGOS", lines: [{ lineId: goods.id, packages: "10", packageType: "Wooden case", netWeightKg: "1100", grossWeightKg: "1250.5", cbm: "8.4" }] })
+      .expect(200)).body;
+    expect(packed.goods).toMatchObject({ packed: true, containerNo: "TGHU 123456-7", totals: { packages: 10, grossWeightKg: "1250.50", cbm: "8.400" } });
+    expect(packed.needs.title).toBe("Packed and ready: mark as shipped");
+    const pl = (await api(app, sana).get(`/orders/${orderId}/documents/packing-list`).expect(200)).body;
+    expect(pl.lines[0].packing).toEqual({ packages: 10, packageType: "Wooden case", netWeightKg: "1100.00", grossWeightKg: "1250.50", cbm: "8.400" });
+    expect(pl.packing).toMatchObject({ done: true, containerNo: "TGHU 123456-7", shippingMarks: "KANO AGRO\nLAGOS", totals: { packages: 10 } });
+  });
+
   it("warns before shipping with the balance unpaid (balance before shipment), then records the ship date and B/L", async () => {
     const warned = await move(sana, { to: "shipped", blNo: "QDLOS-77" }).expect(409);
-    expect(warned.body.error).toMatch(/still due, and the terms say the balance is paid before shipping/);
+    expect(warned.body.error).toMatch(/^USD [\d,.]+ is still due, and the terms say the balance is paid before shipping\.$/); // only the money now: goods are in and packed
     await move(sana, { to: "shipped", confirm: true, shippedOn: "2099-01-01" }).expect(400); // no future dates
     const shipped = (await move(sana, { to: "shipped", confirm: true, shippedOn: "2026-10-24", blNo: "QDLOS-77" }).expect(200)).body;
     expect(shipped).toMatchObject({ stage: "shipped", shippedOn: "2026-10-24", blNo: "QDLOS-77", next: { to: "done", label: "Close the order" } });

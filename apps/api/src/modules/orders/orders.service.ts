@@ -15,7 +15,10 @@ import {
   type MoveStageInput,
   type OrderDetailsInput,
   type OrderFacts,
+  type OrderGoods,
   type OrderStage,
+  type PackingInput,
+  type ReceiptInput,
 } from "@kebo/shared";
 import { dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -34,11 +37,31 @@ export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
 
 const orderInclude = {
   payments: { where: { voidedAt: null, direction: "in" }, orderBy: { paidOn: "asc" } },
+  lines: {
+    orderBy: { sortOrder: "asc" },
+    // The factory each line was quoted from (through the quotation line and the factory's price).
+    include: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } } } } },
+  },
   customer: { select: { id: true, name: true, country: true } },
   inquiry: { select: { id: true, refNo: true, title: true, assigneeId: true, assignee: { select: { id: true, name: true } } } },
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
+
+const qty = (d: { toString(): string }) => Number(d.toString());
+const trimQty = (d: { toString(): string }) => String(qty(d));
+
+/** What came in from the factory and whether the packing list is made, for the rules in @kebo/shared. */
+export function goodsOf(lines: { type: string; description: string; quantity: { toString(): string }; receivedQty: { toString(): string }; unit: string }[], packedAt: Date | null): OrderGoods {
+  const goods = lines.filter((l) => l.type === "goods");
+  const short = goods.filter((l) => qty(l.receivedQty) < qty(l.quantity));
+  return {
+    short: short.map((l) => `${l.description.split("\n")[0]!.slice(0, 60)}: ${trimQty(l.receivedQty)} of ${trimQty(l.quantity)} ${l.unit}`),
+    lines: goods.length,
+    received: goods.length - short.length,
+    packed: packedAt !== null,
+  };
+}
 
 /**
  * An order is Confirmed → In production → Shipped → Done, moved one button at
@@ -152,6 +175,7 @@ export class OrdersService {
       stageSince: dateIn(o.stageSince, this.clock.timeZone),
       readyOn: fromDbDateOrNull(o.readyOn),
       shippedOn: fromDbDateOrNull(o.shippedOn),
+      goods: goodsOf(o.lines, o.packedAt),
     };
   }
 
@@ -194,6 +218,41 @@ export class OrdersService {
         depositDue: fromMinor(m.position.depositOutstandingMinor),
         status: m.position.status,
       },
+      lines: o.lines.map((l) => ({
+        id: l.id,
+        type: l.type,
+        description: l.description,
+        model: l.model,
+        quantity: trimQty(l.quantity),
+        unit: l.unit,
+        unitPrice: l.unitPrice.toFixed(2),
+        lineTotal: l.lineTotal.toFixed(2),
+        factory: l.quoteLine?.factoryQuoteLine?.factoryQuote.factory ?? null,
+        receivedQty: trimQty(l.receivedQty),
+        receivedOn: fromDbDateOrNull(l.receivedOn),
+        packing: { packages: l.packages, packageType: l.packageType, netWeightKg: l.netWeightKg?.toFixed(2) ?? null, grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null, cbm: l.cbm?.toFixed(3) ?? null },
+      })),
+      goods: (() => {
+        const g = goodsOf(o.lines, o.packedAt);
+        const goodsLines = o.lines.filter((l) => l.type === "goods");
+        const sum = (f: (l: (typeof goodsLines)[number]) => number) => goodsLines.reduce((t, l) => t + f(l), 0);
+        return {
+          lines: g.lines,
+          received: g.received,
+          allReceived: g.lines > 0 && g.received === g.lines,
+          short: g.short,
+          packed: g.packed,
+          packedAt: o.packedAt,
+          containerNo: o.containerNo,
+          shippingMarks: o.shippingMarks,
+          totals: {
+            packages: sum((l) => l.packages ?? 0),
+            netWeightKg: sum((l) => Number(l.netWeightKg ?? 0)).toFixed(2),
+            grossWeightKg: sum((l) => Number(l.grossWeightKg ?? 0)).toFixed(2),
+            cbm: sum((l) => Number(l.cbm ?? 0)).toFixed(3),
+          },
+        };
+      })(),
       next: this.nextOf(o),
       back: back ? { to: back, label: `Back to ${ORDER_STAGE_LABEL[back]}` } : null,
       needs: orderNeeds(this.facts(o), this.clock.today(), days),
@@ -283,7 +342,7 @@ export class OrdersService {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
       const m = this.moneyOf(o);
-      const check = checkMove(o.stage, input.to, o.status, m);
+      const check = checkMove(o.stage, input.to, o.status, { ...m, goods: goodsOf(o.lines, o.packedAt) });
       if (!check.ok) throw new GateError(check.message, check.code);
       if (check.warnings.some((w) => w.code === "money_due") && !can(user.role, "orders.manage")) {
         throw new GateError(`${check.warnings.find((w) => w.code === "money_due")!.message} Record the payment first, or ask a manager to close it.`, "manager_needed");
@@ -319,6 +378,58 @@ export class OrdersService {
       } satisfies DomainEvent;
     });
     await this.events.publish(event);
+    return this.get(user, id);
+  }
+
+  /* ---------------------------------------------------------------- goods */
+
+  /** The goods lines of an order the person may change (not cancelled), locked for this transaction. */
+  private async goodsLinesFor(tx: Tx, user: SessionUser, id: string, lineIds: string[]) {
+    await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+    const o = await this.load(user, id, tx);
+    if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+    const byId = new Map(o.lines.filter((l) => l.type === "goods").map((l) => [l.id, l]));
+    for (const lineId of lineIds) if (!byId.has(lineId)) throw new DomainError("Only the goods lines of this order can be received or packed.");
+    if (new Set(lineIds).size !== lineIds.length) throw new DomainError("Each line can appear only once.");
+    return { o, byId };
+  }
+
+  /** How many of each goods line came in from the factory so far (totals, not additions). */
+  async recordReceipt(user: SessionUser, id: string, input: ReceiptInput) {
+    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    const today = this.clock.today();
+    const on = input.on ?? today;
+    if (on > today) throw new DomainError("The date cannot be in the future.");
+    await this.prisma.tx(async (tx) => {
+      const { o, byId } = await this.goodsLinesFor(tx, user, id, input.lines.map((l) => l.lineId));
+      const changes: string[] = [];
+      for (const r of input.lines) {
+        const line = byId.get(r.lineId)!;
+        if (r.receivedQty > qty(line.quantity)) throw new DomainError(`${line.description.split("\n")[0]}: ${r.receivedQty} is more than the ${trimQty(line.quantity)} ${line.unit} ordered.`);
+        if (r.receivedQty === qty(line.receivedQty)) continue;
+        await tx.orderLine.update({ where: { id: line.id }, data: { receivedQty: r.receivedQty, receivedOn: r.receivedQty > 0 ? toDbDate(on) : null } });
+        changes.push(`${line.description.split("\n")[0]!.slice(0, 40)} ${trimQty(line.receivedQty)} → ${r.receivedQty}`);
+      }
+      if (changes.length) await this.audit.record(tx, { userId: user.id, action: "goods_received", entityType: "order", entityId: o.id, summary: `${o.refNo}: received from the factory (${on}): ${changes.join("; ")}` });
+    });
+    return this.get(user, id);
+  }
+
+  /** The packing list: packages, weights and volume per goods line, the container and the shipping marks. */
+  async savePacking(user: SessionUser, id: string, input: PackingInput) {
+    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    await this.prisma.tx(async (tx) => {
+      const { o, byId } = await this.goodsLinesFor(tx, user, id, input.lines.map((l) => l.lineId));
+      for (const p of input.lines) {
+        if (p.netWeightKg !== null && p.grossWeightKg !== null && p.netWeightKg > p.grossWeightKg) throw new DomainError(`${byId.get(p.lineId)!.description.split("\n")[0]}: the net weight cannot be more than the gross weight.`);
+        await tx.orderLine.update({ where: { id: p.lineId }, data: { packages: p.packages, packageType: p.packageType, netWeightKg: p.netWeightKg, grossWeightKg: p.grossWeightKg, cbm: p.cbm } });
+      }
+      // Made once every goods line has its packages counted.
+      const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
+      const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
+      await tx.order.update({ where: { id: o.id }, data: { containerNo: input.containerNo, shippingMarks: input.shippingMarks, packedAt: complete ? (o.packedAt ?? new Date()) : null } });
+      await this.audit.record(tx, { userId: user.id, action: "packing_list", entityType: "order", entityId: o.id, summary: `${o.refNo}: packing list ${complete ? "saved" : "saved (not complete: some lines have no packages)"}` });
+    });
     return this.get(user, id);
   }
 

@@ -228,8 +228,13 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
             lineTotal: l.lineTotal,
             unitCost: l.unitCost,
             sortOrder: l.sortOrder,
+            // Goods that already left came in from the factory and were packed.
+            ...(shippedOn && l.type === "goods"
+              ? { receivedQty: l.quantity, receivedOn: toDbDate(addDays(shippedOn, -5)), packages: Math.max(1, Math.ceil(Number(l.quantity) / 50)), packageType: "Carton", netWeightKg: "480.00", grossWeightKg: "512.50", cbm: "2.400" }
+              : {}),
           })),
         },
+        ...(shippedOn ? { packedAt: new Date(`${addDays(shippedOn, -2)}T09:00:00Z`), containerNo: "TGHU 882741-3", shippingMarks: `${customer.name.toUpperCase()}\nMADE IN CHINA` } : {}),
       },
     });
     // Its history: each stage it went through, in order.
