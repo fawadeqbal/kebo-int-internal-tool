@@ -36,7 +36,7 @@ class KeboRepository {
   /// `{ today, counts, todo, myDeals, newDeals, expiringQuotes, money?, workload? }`.
   Future<Json> dashboard() => api.get('/api/dashboard');
 
-  /// The next step of every open order I handle, late ones first.
+  /// What each open order I handle needs now (`needs: { title, due, late }`), late ones first.
   Future<List<Json>> todo() => api.getList('/api/me/todo');
 
   /* ---------------------------------------------------------------- deals */
@@ -87,28 +87,44 @@ class KeboRepository {
 
   /* ---------------------------------------------------------------- orders */
 
-  /// Open orders by default, each with its stage, next step and progress.
-  Future<List<Json>> orders({bool mine = false, bool overdue = false, String? status}) =>
-      api.getList('/api/orders', query: {if (mine) 'mine': 'true', if (overdue) 'overdue': 'true', 'status': status});
+  /// Orders with their stage, money due and what each needs now (`needs: { title, due, late }`).
+  /// [status]: open (Confirmed, In production, Shipped; the default) | closed (Done) | cancelled.
+  /// [stage]: confirmed | in_production | shipped | done.
+  Future<List<Json>> orders({bool mine = false, bool late = false, String? status, String? stage}) =>
+      api.getList('/api/orders', query: {if (mine) 'mine': 'true', if (late) 'late': 'true', 'status': status, 'stage': stage});
 
-  /// The order, its money position and its checklist (`plan.steps`, `plan.next`).
+  /// The order: `stage`, `next` (the one button), `back`, `money`, `needs`, `history`, `documents`.
   Future<Json> order(String id) => api.get('/api/orders/$id');
 
-  /// `{ action: done|skip|undo, key, on?, note? }`. Returns the updated order.
-  Future<Json> step(String orderId, String action, String key, {String? on, String? note}) => api.post('/api/orders/$orderId/steps', {
-        'action': action,
-        'key': key,
-        'on': ?on,
-        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
-      });
+  /// One stage forward or back: `{ to, confirm?, note?, readyOn?, shippedOn?, blNo? }`. Returns the order.
+  /// A move with warnings throws an [ApiException] with code "confirm" (see [ApiException.needsConfirm]):
+  /// show the warnings and send it again with [confirm] true.
+  Future<Json> moveOrder(String orderId, String to, {bool confirm = false, String? note, String? readyOn, String? shippedOn, String? blNo}) {
+    String? clean(String? v) => v == null || v.trim().isEmpty ? null : v.trim();
+    return api.post('/api/orders/$orderId/stage', {
+      'to': to,
+      if (confirm) 'confirm': true,
+      'note': ?clean(note),
+      'readyOn': ?clean(readyOn),
+      'shippedOn': ?clean(shippedOn),
+      'blNo': ?clean(blNo),
+    });
+  }
 
-  /// `{ currency, customer: {...}, payments: [...] }`.
+  /// Money in from the customer: `{ currency, total, received, due, depositDue, status, payments: [...] }`.
   Future<Json> payments(String orderId) => api.get('/api/orders/$orderId/payments');
-  Future<List<Json>> factoryOrders(String orderId) => api.getList('/api/orders/$orderId/factory-orders');
-  Future<List<Json>> invoices(String orderId) => api.getList('/api/orders/$orderId/invoices');
 
-  /// `{ remaining: [...], shipments: [...] }`.
-  Future<Json> shipments(String orderId) => api.get('/api/orders/$orderId/shipments');
+  /// The data printed on an order's document: [kind] proforma | invoice | packing-list.
+  Future<Json> orderDocument(String orderId, String kind) => api.get('/api/orders/$orderId/documents/$kind');
+
+  /* ---------------------------------------------------------------- PDFs */
+
+  /// Where the web app makes a document's PDF. [kind]: revisions (id = revision id) or
+  /// proforma | invoice | packing-list (id = order id). Same server as the API.
+  static String pdfPath(String kind, String id) => '/pdf/$kind/$id';
+
+  /// The PDF itself, downloaded with this app's session (bearer).
+  Future<PdfFile> pdf(String kind, String id, {void Function(double)? onProgress}) => api.getPdf(pdfPath(kind, id), onProgress: onProgress);
 
   /* ---------------------------------------------------------------- customers */
 

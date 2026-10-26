@@ -1,0 +1,122 @@
+[
+  {
+    "id": "21ba792c-41fc-4d81-8666-192662338da5",
+    "refNo": "SO-2026-0002",
+    "status": "open",
+    "stage": "confirmed",
+    "stageSince": "2026-10-02",
+    "customer": {
+      "id": "42e3d1b4-2ab8-4655-bbe5-f00c181c6d27",
+      "name": "Karachi Builders",
+      "country": "PK"
+    },
+    "inquiry": {
+      "id": "b097337e-9458-453a-8720-e4e088d0a268",
+      "refNo": "RFQ-2026-0008",
+      "title": "Butterfly valve DN200",
+      "assigneeId": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+      "assignee": {
+        "id": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+        "name": "Sana"
+      }
+    },
+    "orderedOn": "2026-10-02",
+    "readyOn": null,
+    "shippedOn": null,
+    "currency": "USD",
+    "total": "8038.80",
+    "received": "0.00",
+    "due": "8038.80",
+    "next": {
+      "to": "in_production",
+      "label": "Start production",
+      "stage": "In production",
+      "hint": "The deposit came in and the factory is making the goods."
+    },
+    "needs": {
+      "title": "Get the deposit (USD 2,411.64)",
+      "due": "2026-10-09",
+      "late": true
+    }
+  },
+  {
+    "id": "c39321c7-64e5-4dbc-ac2c-99f63ee1fd96",
+    "refNo": "SO-2026-0004",
+    "status": "open",
+    "stage": "shipped",
+    "stageSince": "2026-10-10",
+    "customer": {
+      "id": "25c4d0ba-d5da-41bf-bc28-26485db5a559",
+      "name": "Gulf Foods Trading LLC",
+      "country": "AE"
+    },
+    "inquiry": {
+      "id": "43ea814c-68aa-4651-b4e6-6c749cef37bb",
+      "refNo": "RFQ-2026-0010",
+      "title": "Ball valve DN50, stainless",
+      "assigneeId": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+      "assignee": {
+        "id": "45b341f2-966e-46f7-bc4a-9c31f9502d05",
+        "name": "Sana"
+      }
+    },
+    "orderedOn": "2026-09-02",
+    "readyOn": null,
+    "shippedOn": "2026-10-10",
+    "currency": "USD",
+    "total": "8502.00",
+    "received": "2550.60",
+    "due": "5951.40",
+    "next": {
+      "to": "done",
+      "label": "Close the order",
+      "stage": "Done",
+      "hint": "Fully paid and delivered."
+    },
+    "needs": {
+      "title": "Get the balance (USD 5,951.40)",
+      "due": "2026-10-24",
+      "late": true
+    }
+  },
+  {
+    "id": "196f4272-f93c-473a-a489-1d5b716b9600",
+    "refNo": "SO-2026-0001",
+    "status": "open",
+    "stage": "in_production",
+    "stageSince": "2026-10-12",
+    "customer": {
+      "id": "f1b2cd77-f8bf-4862-9a7b-38b08e1673df",
+      "name": "Al-Shifa Pharma Ltd",
+      "country": "NG"
+    },
+    "inquiry": {
+      "id": "1905c650-0924-4239-a5a9-2d5be4e45cd2",
+      "refNo": "RFQ-2026-0007",
+      "title": "Capsule filling machine NJP-1200 + 1 more",
+      "assigneeId": "89900580-e548-4b50-94af-0c7345d5497f",
+      "assignee": {
+        "id": "89900580-e548-4b50-94af-0c7345d5497f",
+        "name": "Bilal"
+      }
+    },
+    "orderedOn": "2026-10-07",
+    "readyOn": "2026-10-22",
+    "shippedOn": null,
+    "currency": "USD",
+    "total": "43413.42",
+    "received": "13024.03",
+    "due": "30389.39",
+    "next": {
+      "to": "shipped",
+      "label": "Mark as shipped",
+      "stage": "Shipped",
+      "hint": "The goods are on their way. Waiting for the balance."
+    },
+    "needs": {
+      "title": "Goods due from the factory",
+      "due": "2026-10-22",
+      "late": true
+    }
+  }
+]
