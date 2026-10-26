@@ -1,5 +1,58 @@
 # Switching from the old app to the new stack
 
+## Fresh start (no old data) — the chosen way
+
+The new app starts empty with its own accounts; the old app's data is not moved. Run on the server (`145.241.156.60`):
+
+```bash
+# 1. The code, next to the old app (do not touch /opt/kebo-rfq).
+git clone https://github.com/fawadeqbal/kebo-int-internal-tool /opt/kebo-desk
+cd /opt/kebo-desk && mkdir -p secrets backups
+cp /opt/kebo-rfq/secrets/firebase.json secrets/ 2>/dev/null || true   # phone push, if it was set up
+```
+
+`/opt/kebo-desk/.env` (new secrets; copy only the SMTP lines from `/opt/kebo-rfq/.env`):
+
+```bash
+POSTGRES_PASSWORD=<openssl rand -hex 24>
+MINIO_ROOT_PASSWORD=<openssl rand -hex 24>
+AUTH_SECRET=<openssl rand -hex 32>
+APP_URL=https://rfq.fawadiqbal.dev
+SMTP_HOST=... SMTP_PORT=... SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM=...
+COMPOSE_FILE=docker-compose.yml:deploy/compose.shared-proxy.yml
+```
+
+```bash
+# 2. Build and start everything (the API applies the migrations when it starts).
+docker compose up -d --build
+docker compose logs api | tail -5          # "API on http://localhost:4000/api"
+
+# 3. The starting accounts — use your real emails and strong passwords.
+docker compose exec \
+  -e SEED_ADMIN_EMAIL=you@example.com     -e SEED_ADMIN_PASSWORD='…' \
+  -e SEED_MANAGER_EMAIL=boss@example.com  -e SEED_MANAGER_PASSWORD='…' \
+  -e SEED_STAFF_EMAIL=staff@example.com   -e SEED_STAFF_PASSWORD='…' \
+  api sh -c "cd packages/database && npx tsx scripts/seed.ts"
+
+# 4. Point rfq.fawadiqbal.dev at the new app: in /opt/global-proxy/Caddyfile replace the
+#    old rfq.fawadiqbal.dev block with deploy/Caddyfile.site (__DOMAIN__ → rfq.fawadiqbal.dev), then
+docker exec global-caddy caddy validate --config /etc/caddy/Caddyfile
+docker exec global-caddy caddy reload --config /etc/caddy/Caddyfile
+
+# 5. Stop the old app (stopped, not removed).
+docker compose -p kebo-rfq stop
+```
+
+Then open https://rfq.fawadiqbal.dev, sign in as the admin, and in **Settings → Company** check the details and upload the company stamp. Add the team in **Users**. Try one deal end to end and download its PDFs.
+
+**Undo**: put the old `rfq.fawadiqbal.dev` block back in the Caddyfile, reload Caddy, `docker compose -p kebo-rfq start`.
+
+**Updates later**: `cd /opt/kebo-desk && git pull && docker compose up -d --build` (migrations apply on start).
+
+## Moving the old data instead (not used)
+
+The steps below import the old app's data; kept for reference.
+
 The new stack (`kebo-desk`) runs beside the old one (`kebo-rfq`) on the same server until you switch, so you can try it with a copy of the real data first. Nothing here changes the old app until step 6, and step 6 can be undone in a minute.
 
 Server: `145.241.156.60`, shared Caddy `global-caddy` on network `global-proxy`. Old app: `/opt/kebo-rfq`, domain `rfq.fawadiqbal.dev`.
