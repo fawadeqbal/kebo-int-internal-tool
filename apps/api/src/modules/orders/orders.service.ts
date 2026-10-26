@@ -331,7 +331,6 @@ export class OrdersService {
   private documentsOf(o: OrderRow) {
     const docs = [
       { kind: "proforma", label: "Proforma invoice" },
-      { kind: "invoice", label: "Commercial invoice" },
       { kind: "packing-list", label: "Packing list" },
     ];
     return [{ kind: "quotation", label: "Quotation (accepted)", revisionId: o.revisionId }, ...docs];

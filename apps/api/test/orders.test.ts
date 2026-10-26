@@ -52,7 +52,7 @@ describe("orders: four stages", () => {
     expect(Number(o.money.deposit)).toBeCloseTo(Number(o.total) * 0.3, 2);
     expect(o.money).toMatchObject({ received: "0.00", due: o.total, status: "unpaid" });
     expect(o.history).toEqual([expect.objectContaining({ from: null, to: "confirmed" })]);
-    expect(o.documents.map((d: { kind: string }) => d.kind)).toEqual(["quotation", "proforma", "invoice", "packing-list"]);
+    expect(o.documents.map((d: { kind: string }) => d.kind)).toEqual(["quotation", "proforma", "packing-list"]);
   });
 
   it("refuses without a session, and shows staff only their own orders", async () => {
@@ -202,9 +202,10 @@ describe("orders: four stages", () => {
     await api(app, sana).patch(`/orders/${orderId}/details`, { documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria" }).expect(200);
     const pi2 = (await api(app, sana).get(`/orders/${orderId}/documents/proforma`).expect(200)).body;
     expect(pi2.order).toMatchObject({ documentTitle: "Complete maize shelling line", portOfDischarge: "Lagos, Nigeria", incoterm: expect.any(String) });
-    const inv = (await api(app, sana).get(`/orders/${orderId}/documents/invoice`).expect(200)).body;
-    expect(inv).toMatchObject({ title: "Commercial invoice", number: o.refNo.replace("SO-", "INV-"), date: "2026-10-24", totals: { received: o.total, due: "0.00" } });
-    expect(inv.order.blNo).toBe("QDLOS-77");
+    // The proforma is the one invoice: once shipped it carries the B/L, and it knows what was received.
+    expect(pi.order.blNo).toBe("QDLOS-77");
+    expect(pi.totals).toMatchObject({ received: o.total, due: "0.00" });
+    await api(app, sana).get(`/orders/${orderId}/documents/invoice`).expect(422); // no commercial invoice any more
     const pl = (await api(app, sana).get(`/orders/${orderId}/documents/packing-list`).expect(200)).body;
     expect(pl).toMatchObject({ title: "Packing list", showPrices: false, totals: null, bankDetails: null });
     expect(pl.lines).toEqual([expect.objectContaining({ description: expect.stringMatching(/Maize sheller/), quantity: "100", unitPrice: null })]); // goods only

@@ -68,7 +68,6 @@ void main() {
       Json doc(String kind, [String? rev]) => {'kind': kind, 'revisionId': ?rev};
       expect(documentPdf(order, doc('quotation', 'rev-9')), (kind: 'revisions', id: 'rev-9', fileName: 'Quotation for SO-2026-0001.pdf'));
       expect(documentPdf(order, doc('proforma')), (kind: 'proforma', id: orderId, fileName: 'Proforma invoice PI-2026-0001.pdf'));
-      expect(documentPdf(order, doc('invoice')), (kind: 'invoice', id: orderId, fileName: 'Commercial invoice INV-2026-0001.pdf'));
       expect(documentPdf(order, doc('packing-list')), (kind: 'packing-list', id: orderId, fileName: 'Packing list PL-2026-0001.pdf'));
     });
 
@@ -92,7 +91,7 @@ void main() {
 
     test('a page instead of a PDF (an older server sends its sign-in page) is refused', () async {
       serve((_) => textAnswer(200, '<!DOCTYPE html><html><body>Sign in</body></html>', type: 'text/html'));
-      await expectLater(repo.pdf('invoice', orderId), throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('not with a PDF'))));
+      await expectLater(repo.pdf('proforma', orderId), throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('not with a PDF'))));
     });
   });
 

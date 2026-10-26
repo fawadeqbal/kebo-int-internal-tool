@@ -10,11 +10,11 @@ import { SettingsService } from "../settings/settings.service";
 import { companySnapshot, customerSnapshot } from "../quotations/quotations.service";
 import { OrdersService } from "./orders.service";
 
-export const ORDER_DOCUMENTS = ["proforma", "invoice", "packing-list"] as const;
+export const ORDER_DOCUMENTS = ["proforma", "packing-list"] as const;
 export type OrderDocumentKind = (typeof ORDER_DOCUMENTS)[number];
 
-const TITLE: Record<OrderDocumentKind, string> = { proforma: "Proforma invoice", invoice: "Commercial invoice", "packing-list": "Packing list" };
-const PREFIX: Record<OrderDocumentKind, string> = { proforma: "PI", invoice: "INV", "packing-list": "PL" };
+const TITLE: Record<OrderDocumentKind, string> = { proforma: "Proforma invoice", "packing-list": "Packing list" };
+const PREFIX: Record<OrderDocumentKind, string> = { proforma: "PI", "packing-list": "PL" };
 
 /** "30% deposit, balance against B/L copy": only the first letter of the terms is lowered, so "B/L" stays as written. */
 export function paymentTermsOf(depositPercent: number, balanceTerms: BalanceTerms): string {
@@ -28,9 +28,8 @@ export { paymentSentenceOf };
 /**
  * The documents of an order, made from the order itself whenever they are
  * opened: nothing to create, issue or keep in step. Their numbers follow the
- * order's (SO-2026-0005 → PI-2026-0005, INV-2026-0005, PL-2026-0005).
- *  - Proforma invoice: the whole order, asking for the deposit (dated the order day).
- *  - Commercial invoice: the whole order, with what was received and what is due (dated the ship date).
+ * order's (SO-2026-0005 → PI-2026-0005, PL-2026-0005).
+ *  - Proforma invoice: the whole order, the one invoice Kebo sends (dated the order day).
  *  - Packing list: the goods, without prices (dated the ship date).
  */
 @Injectable()

@@ -4,8 +4,7 @@ import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
 
 /**
- * Every Kebo document — quotation, proforma invoice, commercial invoice and
- * packing list — in one layout, the one the team makes in Word
+ * Every Kebo document — quotation, proforma invoice and packing list — in one layout, the one the team makes in Word
  * (PI_FOR_LIQUID_SYRUP_COMPLETE_LINE): centred letterhead in Times, the
  * customer on the left and the document details on the right, a table with a
  * light-blue header, the total in words, then the terms, the bank details and

@@ -38,7 +38,7 @@ export interface OrderRow {
   needs: OrderNeed | null;
 }
 
-export type OrderDocumentKind = "proforma" | "invoice" | "packing-list";
+export type OrderDocumentKind = "proforma" | "packing-list";
 
 /** GET /orders/:id */
 export interface OrderView {

@@ -104,10 +104,6 @@
       "label": "Proforma invoice"
     },
     {
-      "kind": "invoice",
-      "label": "Commercial invoice"
-    },
-    {
       "kind": "packing-list",
       "label": "Packing list"
     }
