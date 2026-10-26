@@ -64,20 +64,24 @@ export function KeboProforma({ doc, customerCountry }: { doc: OrderDocument; cus
   const { company: co, customer, order: o, totals: t, currency } = doc;
   const cancelled = o.status === "cancelled";
   const address = [customer.address?.trim(), !customer.address?.trim() && customerCountry ? countryName(customerCountry) : null].filter(Boolean).join("\n");
+  // The Incoterm place is where the goods are loaded for EXW/FCA/FAS/FOB, and where they go for the C and D terms.
+  const placeIsLoading = ["EXW", "FCA", "FAS", "FOB"].includes(o.incoterm);
+  const loading = placeIsLoading ? o.incotermPlace : null;
+  const discharge = o.portOfDischarge ?? (placeIsLoading ? null : o.incotermPlace);
   const bullets: ReactNode[] = [
     doc.paymentSentence,
     o.leadTime ? `Delivery: ${o.leadTime}` : null,
     ...termLines(doc.terms),
-    o.incotermPlace ? (
+    loading ? (
       <>
         Port of loading:<span style={{ display: "inline-block", width: "30pt" }} />
-        {o.incotermPlace}
+        {loading}
       </>
     ) : null,
-    o.portOfDischarge ? (
+    discharge ? (
       <>
         Port of discharge:<span style={{ display: "inline-block", width: "6pt" }} />
-        {o.portOfDischarge}
+        {discharge}
       </>
     ) : null,
   ].filter(Boolean);
