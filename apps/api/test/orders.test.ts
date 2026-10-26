@@ -87,8 +87,12 @@ describe("orders: four stages", () => {
     expect(moved.needs).toMatchObject({ title: "Goods due from the factory", due: "2026-12-01" });
   });
 
-  it("moves back one stage without questions, and forward again", async () => {
-    expect((await move(sana, { to: "confirmed" }).expect(200)).body.stage).toBe("confirmed");
+  it("moves back one stage once told why, and forward again", async () => {
+    const asked = (await move(sana, { to: "confirmed" }).expect(409)).body;
+    expect(asked).toMatchObject({ code: "reason_needed", choices: expect.arrayContaining(["Moved forward by mistake"]) });
+    const back = (await move(sana, { to: "confirmed", reason: "Moved forward by mistake" }).expect(200)).body;
+    expect(back.stage).toBe("confirmed");
+    expect(back.history.at(-1)).toMatchObject({ from: "in_production", to: "confirmed", note: "Moved forward by mistake" });
     expect((await move(sana, { to: "in_production", confirm: true }).expect(200)).body.stage).toBe("in_production");
   });
 
@@ -210,19 +214,22 @@ describe("orders: four stages", () => {
     // The payment removed above left money owed on a Done order: it stays on Sana's to-do.
     const todo = (await api(app, sana).get("/me/todo").expect(200)).body;
     expect(todo.find((t: { id: string }) => t.id === orderId)?.needs.title).toMatch(/^Get the balance \(USD .*\) — the order is closed$/);
-    await move(sana, { to: "shipped" }).expect(200);
+    await move(sana, { to: "shipped", reason: "Customer claim" }).expect(200);
     const staffClose = await move(sana, { to: "done", confirm: true }).expect(409);
     expect(staffClose.body).toMatchObject({ code: "manager_needed", error: expect.stringMatching(/still due .* ask a manager/) });
     expect((await move(manager, { to: "done" }).expect(409)).body.code).toBe("confirm");
+    expect((await move(manager, { to: "done", confirm: true }).expect(409)).body).toMatchObject({ code: "reason_needed", choices: expect.arrayContaining(["Written off"]) });
     expect((await api(app, manager).post(`/orders/${orderId}/stage`, { to: "done", confirm: true, note: "Customer pays the rest with the next order" }).expect(200)).body.status).toBe("closed");
   });
 
   it("changes only the details sent, and keeps the real ship date when shipping again", async () => {
-    await move(manager, { to: "shipped" }).expect(200);
+    await move(manager, { to: "shipped", reason: "Customer claim" }).expect(200);
     const d = (await api(app, sana).patch(`/orders/${orderId}/details`, { shipBy: "2026-12-20" }).expect(200)).body;
     expect(d).toMatchObject({ shipBy: "2026-12-20", shippedOn: "2026-10-24", blNo: "QDLOS-77" });
-    expect((await api(app, sana).patch(`/orders/${orderId}/details`, { blNo: "" }).expect(200)).body.blNo).toBeNull();
-    await move(sana, { to: "in_production" }).expect(200);
+    // The B/L is on the customer's papers once shipped: changing it says why.
+    expect((await api(app, sana).patch(`/orders/${orderId}/details`, { blNo: "" }).expect(409)).body.code).toBe("reason_needed");
+    expect((await api(app, sana).patch(`/orders/${orderId}/details`, { blNo: "", reason: "B/L number corrected" }).expect(200)).body.blNo).toBeNull();
+    await move(sana, { to: "in_production", reason: "Goods not ready after all" }).expect(200);
     expect((await move(sana, { to: "shipped", confirm: true }).expect(200)).body.shippedOn).toBe("2026-10-24");
   });
 

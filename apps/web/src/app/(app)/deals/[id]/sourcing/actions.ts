@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { factoryQuoteInput } from "@kebo/shared";
 import { api } from "@/lib/api";
-import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
 import type { FactoryOption } from "@/lib/types-deals";
 
@@ -38,15 +38,43 @@ function locateLineErrors(body: Record<string, unknown>, r: ActionState): Action
 }
 
 /** Add (quoteId null) or edit one factory's prices; JSON in `payload`. */
-export async function saveFactoryQuoteAction(dealId: string, quoteId: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function saveFactoryQuoteAction(
+  dealId: string,
+  quoteId: string | null,
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
   const body = formBody(form);
-  const r = locateLineErrors(body, await attempt(form, () => (quoteId ? api.put(`/factory-quotes/${quoteId}`, body) : api.post(`/inquiries/${dealId}/factory-quotes`, body)), quoteId ? "Factory prices saved." : "Factory prices added."));
+  const r = locateLineErrors(
+    body,
+    await attempt(
+      form,
+      () => (quoteId ? api.put(`/factory-quotes/${quoteId}`, body) : api.post(`/inquiries/${dealId}/factory-quotes`, body)),
+      quoteId ? "Factory prices saved." : "Factory prices added.",
+    ),
+  );
   if (r.ok) refresh(dealId);
   return r;
 }
 
-export async function removeFactoryQuoteAction(dealId: string, quoteId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/factory-quotes/${quoteId}`), "Factory prices removed.");
+export async function removeFactoryQuoteAction(dealId: string, quoteId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const reason = reasonOf(form);
+  const r = await attempt(
+    form,
+    () => api.delete(`/factory-quotes/${quoteId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`),
+    "Factory prices removed.",
+  );
+  if (r.ok) refresh(dealId);
+  return r;
+}
+
+/** The factory quotes an item as separate parts: payload { parts: [{ description, model, quantity, unit }] }. */
+export async function splitItemAction(dealId: string, itemId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${dealId}/items/${itemId}/parts`, formBody(form)),
+    "Parts added. Price each part below.",
+  );
   if (r.ok) refresh(dealId);
   return r;
 }
@@ -54,7 +82,11 @@ export async function removeFactoryQuoteAction(dealId: string, quoteId: string, 
 /** Which factory price an item is quoted from (lineId empty = none). */
 export async function choosePriceAction(dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${dealId}/preferred-prices`, { choices: { [v.itemId]: v.lineId || null } }), "The quotation will use this price.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${dealId}/preferred-prices`, { choices: { [v.itemId]: v.lineId || null }, reason: reasonOf(form) }),
+    "The quotation will use this price.",
+  );
   if (r.ok) refresh(dealId);
   return r;
 }

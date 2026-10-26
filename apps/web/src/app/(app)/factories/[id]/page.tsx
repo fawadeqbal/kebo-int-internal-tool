@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
 import { date } from "@/lib/format";
 import type { FactoryDetail } from "@/lib/types-people";
+import type { HistoryEntry } from "@/lib/types";
+import { HistoryList } from "@/components/common/history-list";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeFactoryAction } from "../actions";
 
@@ -14,6 +16,7 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const me = await requirePermission("sourcing.manage");
   const f = await load(() => api.get<FactoryDetail>(`/factories/${id}`));
+  const history = await api.get<HistoryEntry[]>("/history", { type: "factory", id });
   const canRemove = can(me.role, "inquiries.updateAny");
   return (
     <div>
@@ -21,8 +24,14 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
         backHref="/factories"
         backLabel="Factories"
         title={f.name}
-        description={f.contactPerson ?? undefined}
-        actions={<ButtonLink href={`/factories/${f.id}/edit`} size="sm">Edit factory</ButtonLink>}
+        description={[f.owner ? `Looked after by ${f.owner.name}` : "Nobody looks after it yet", f.contactPerson]
+          .filter(Boolean)
+          .join(" · ")}
+        actions={
+          <ButtonLink href={`/factories/${f.id}/edit`} size="sm">
+            Edit factory
+          </ButtonLink>
+        }
       />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-5">
@@ -66,10 +75,25 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
               <DetailList
                 columns={1}
                 items={[
+                  { label: "Looked after by", value: f.owner?.name ?? "Nobody yet" },
                   { label: "Contact person", value: f.contactPerson },
-                  { label: "Phone", value: f.phone && <a href={`tel:${f.phone}`} className="hover:underline">{f.phone}</a> },
+                  {
+                    label: "Phone",
+                    value: f.phone && (
+                      <a href={`tel:${f.phone}`} className="hover:underline">
+                        {f.phone}
+                      </a>
+                    ),
+                  },
                   { label: "WeChat", value: f.wechat },
-                  { label: "Email", value: f.email && <a href={`mailto:${f.email}`} className="break-all hover:underline">{f.email}</a> },
+                  {
+                    label: "Email",
+                    value: f.email && (
+                      <a href={`mailto:${f.email}`} className="break-all hover:underline">
+                        {f.email}
+                      </a>
+                    ),
+                  },
                   { label: "Address", value: f.address && <span className="whitespace-pre-line">{f.address}</span> },
                   { label: "Bank details", value: f.bankDetails && <span className="whitespace-pre-line">{f.bankDetails}</span> },
                   { label: "Notes", value: f.notes && <span className="whitespace-pre-line">{f.notes}</span>, hidden: !f.notes },
@@ -78,11 +102,23 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
               />
             </CardBody>
           </Card>
+          <Card>
+            <CardHeader title="History" description="Changes to this factory, with the reason when one was asked" />
+            <CardBody>
+              <HistoryList entries={history} />
+            </CardBody>
+          </Card>
           {canRemove && (
             <Card>
               <CardHeader title="Remove factory" description="Hides it from lists and pickers. Its past prices stay on their deals." />
               <CardBody>
-                <ConfirmAction action={removeFactoryAction.bind(null, f.id)} confirm={`Remove ${f.name}? It will no longer appear in lists and pickers.`} label="Remove this factory" pendingText="Removing…" variant="danger-ghost" />
+                <ConfirmAction
+                  action={removeFactoryAction.bind(null, f.id)}
+                  confirm={`Remove ${f.name}? It will no longer appear in lists and pickers.`}
+                  label="Remove this factory"
+                  pendingText="Removing…"
+                  variant="danger-ghost"
+                />
               </CardBody>
             </Card>
           )}

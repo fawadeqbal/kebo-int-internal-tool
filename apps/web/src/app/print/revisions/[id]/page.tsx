@@ -6,12 +6,30 @@ import type { DealDetail } from "@/lib/types";
 import type { CompanySnapshot, DocLine, RevisionDoc } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo, companyOr, customerOr } from "@/components/print/data";
-import { docDate, docMoney, docQty, docWords, InternalTable, KeboDoc, marginOf, portBullets, textBullets, type DocColumn } from "@/components/print/kebo-doc";
+import {
+  docDate,
+  docMoney,
+  docQty,
+  docWords,
+  InternalTable,
+  KeboDoc,
+  marginOf,
+  portBullets,
+  textBullets,
+  type DocColumn,
+} from "@/components/print/kebo-doc";
 
-const copyHref = (id: string, back: string | undefined, internal: boolean) => `/print/revisions/${id}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
+const copyHref = (id: string, back: string | undefined, internal: boolean) =>
+  `/print/revisions/${id}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
 const numberOf = (r: RevisionDoc) => `${r.quotation.refNo}-R${r.number}`;
 
-export async function generateMetadata({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ copy?: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ copy?: string }>;
+}): Promise<Metadata> {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const r = await load(() => api.get<RevisionDoc>(`/revisions/${id}`));
   return { title: `Quotation ${numberOf(r)}${sp.copy === "internal" ? " (internal)" : ""}` };
@@ -22,7 +40,13 @@ export async function generateMetadata({ params, searchParams }: { params: Promi
  * customer's copy shows the items and one total; ?copy=internal adds unit
  * prices, amounts and, for people who may see them, costs and margin.
  */
-export default async function QuotationPrint({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ back?: string; copy?: string }> }) {
+export default async function QuotationPrint({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ back?: string; copy?: string }>;
+}) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const r = await load(() => api.get<RevisionDoc>(`/revisions/${id}`));
   const [company, customer, now] = await Promise.all([
@@ -38,8 +62,11 @@ export default async function QuotationPrint({ params, searchParams }: { params:
   const internal = sp.copy === "internal";
   const costs = internal && r.lines.some((l) => l.unitCost != null);
 
-  const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (_l, i) => i + 1 };
-  const description: DocColumn<DocLine> = { label: "Equipment Description", render: (l) => `${l.description}${l.model ? `\nModel: ${l.model}` : ""}` };
+  const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
+  const description: DocColumn<DocLine> = {
+    label: "Equipment Description",
+    render: (l) => `${l.description}${l.model ? `\nModel: ${l.model}` : ""}`,
+  };
   const columns: DocColumn<DocLine>[] = internal
     ? [
         no,
@@ -71,7 +98,11 @@ export default async function QuotationPrint({ params, searchParams }: { params:
         title={`Quotation ${numberOf(r)}`}
         backHref={backTo(sp.back, `/deals/${r.quotation.inquiryId}/quotation`)}
         pdfHref={`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`}
-        copies={{ current: internal ? "internal" : "customer", customer: copyHref(r.id, sp.back, false), internal: copyHref(r.id, sp.back, true) }}
+        copies={{
+          current: internal ? "internal" : "customer",
+          customer: copyHref(r.id, sp.back, false),
+          internal: copyHref(r.id, sp.back, true),
+        }}
       />
       <KeboDoc
         company={{ ...company, stamp: now.stamp ?? null }}

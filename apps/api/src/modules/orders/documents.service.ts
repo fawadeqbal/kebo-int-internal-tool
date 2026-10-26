@@ -8,7 +8,7 @@ import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { companySnapshot, customerSnapshot } from "../quotations/quotations.service";
-import { OrdersService } from "./orders.service";
+import { orderLineNumbers, OrdersService } from "./orders.service";
 
 export const ORDER_DOCUMENTS = ["proforma", "packing-list"] as const;
 export type OrderDocumentKind = (typeof ORDER_DOCUMENTS)[number];
@@ -55,7 +55,7 @@ export class DocumentsService {
     const o = await this.prisma.db.order.findUniqueOrThrow({
       where: { id: orderId },
       include: {
-        lines: { orderBy: { sortOrder: "asc" } },
+        lines: { orderBy: { sortOrder: "asc" }, include: { quoteLine: { select: { requestedItemId: true, requestedItem: { select: { parentId: true } } } } } },
         revision: { include: { quotation: { select: { refNo: true } } } },
         payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
         inquiry: { select: { contactId: true } },
@@ -69,6 +69,7 @@ export class DocumentsService {
     const shippedOn = fromDbDateOrNull(o.shippedOn);
     const goodsOnly = kind === "packing-list";
     const lines = o.lines.filter((l) => !goodsOnly || l.type === "goods");
+    const numbers = orderLineNumbers(lines);
     const seeCosts = can(user.role, "sourcing.manage");
 
     return {
@@ -102,7 +103,9 @@ export class DocumentsService {
       paymentSentence: paymentSentenceOf(Number(o.depositPercent), o.balanceTerms),
       currency: o.currency,
       showPrices: !goodsOnly,
-      lines: lines.map((l) => ({
+      lines: lines.map((l, i) => ({
+        /** "1", "2", "2.1" (a part of item 2). */
+        no: numbers[i],
         type: l.type,
         description: l.description,
         model: l.model,

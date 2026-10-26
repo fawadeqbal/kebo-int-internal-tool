@@ -51,6 +51,10 @@ export interface DealFormItem {
   quantity: string;
   unit: string;
   targetPrice: string;
+  /** A part of another (saved) item: that item's id. Parts are numbered under it ("2.1"). */
+  parentId: string | null;
+  /** A factory has priced it: changing or removing it asks why. */
+  priced: boolean;
 }
 
 export interface DealFormValues {
@@ -113,6 +117,11 @@ export interface SourcingView {
   quotes: FactoryQuoteView[];
   items: {
     id: string;
+    /** "2", "2.1" (a part of item 2). */
+    no: string;
+    parentId: string | null;
+    /** Split into parts: the parts are priced, not the item itself. */
+    hasParts: boolean;
     description: string;
     model: string | null;
     quantity: string;
@@ -127,6 +136,8 @@ export interface SourcingView {
 
 export interface QuoteLineView {
   id: string;
+  /** "1", "2", "2.1" */
+  no: string;
   requestedItemId: string | null;
   type: LineType;
   description: string;
@@ -188,6 +199,8 @@ export interface QuotationView {
 /** GET …/quotation/draft: the starting values of the next revision (the API's revision input). */
 export interface RevisionDraft {
   number: number;
+  /** The deal's item numbers ("2", "2.1") by item id, to label each line (screen only, not sent). */
+  itemNumbers?: Record<string, string>;
   currency: string;
   incoterm: Incoterm;
   incotermPlace: string | null;

@@ -5,6 +5,7 @@ import { DomainError, DuplicateError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import type { SessionUser } from "../../common/auth/session-user";
+import { requireReason } from "../../common/audit/reason";
 
 /** Staff see the customers on deals they handle or created, and customers they added; managers see all. */
 export function customerAccess(user: SessionUser): Prisma.CustomerWhereInput {
@@ -162,6 +163,11 @@ export class CustomersService {
     }
     const known = new Set(existing.contacts.map((c) => c.id));
     const rows = this.contactRows(input);
+    // The name and country are on every quotation and invoice: changing them says why.
+    const reason =
+      existing.name !== input.name || existing.country !== input.country
+        ? requireReason(input.reason, "customerDetails", existing.name !== input.name ? "the customer's name changes" : "the customer's country changes")
+        : input.reason;
     return this.prisma.tx(async (tx) => {
       // Clear the primary flag first so the one-primary index never sees two at once.
       await tx.contact.updateMany({ where: { customerId: id }, data: { isPrimary: false } });
@@ -180,6 +186,7 @@ export class CustomersService {
         summary: `Edited customer ${updated.name}`,
         oldValues: { type: existing.type, name: existing.name, country: existing.country, address: existing.address, taxNo: existing.taxNo, regNo: existing.regNo, defaultCurrency: existing.defaultCurrency, notes: existing.notes },
         newValues: this.fields(input),
+        reason,
       });
       return updated;
     });

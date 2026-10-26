@@ -37,7 +37,15 @@ export interface CustomerDetail {
   createdAt: string;
   updatedAt: string;
   contacts: Contact[];
-  inquiries: { id: string; refNo: string; title: string; stage: InquiryStage; onHold: boolean; createdAt: string; assignee: Person | null }[];
+  inquiries: {
+    id: string;
+    refNo: string;
+    title: string;
+    stage: InquiryStage;
+    onHold: boolean;
+    createdAt: string;
+    assignee: Person | null;
+  }[];
   orders: { id: string; refNo: string; status: OrderStatus; total: string; currency: string; orderedOn: string }[];
 }
 
@@ -51,6 +59,9 @@ export interface Factory {
   address: string | null;
   bankDetails: string | null;
   notes: string | null;
+  /** The person in our team who looks after this factory. */
+  ownerId: string | null;
+  owner: { id: string; name: string } | null;
   createdAt: string;
 }
 
@@ -59,7 +70,13 @@ export interface FactoryRow extends Factory {
 }
 
 export interface FactoryDetail extends Factory {
-  quotes: { id: string; receivedOn: string; currency: string; inquiry: { id: string; refNo: string; title: string }; _count: { lines: number } }[];
+  quotes: {
+    id: string;
+    receivedOn: string;
+    currency: string;
+    inquiry: { id: string; refNo: string; title: string };
+    _count: { lines: number };
+  }[];
 }
 
 export interface UserRow {

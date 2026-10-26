@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
-import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 
 const refresh = (orderId: string) => {
   revalidatePath(`/orders/${orderId}`);
@@ -23,6 +23,7 @@ export async function moveStageAction(orderId: string, _prev: ActionState, form:
     readyOn: v.readyOn || null,
     shippedOn: v.shippedOn || null,
     blNo: v.blNo?.trim() || null,
+    reason: reasonOf(form),
   };
   const r = await attempt(form, () => api.post(`/orders/${orderId}/stage`, body), "Order moved.");
   if (r.ok) refresh(orderId);
@@ -34,7 +35,16 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.patch(`/orders/${orderId}/details`, { shipBy: v.shipBy || null, readyOn: v.readyOn || null, shippedOn: v.shippedOn || null, blNo: v.blNo?.trim() || null, documentTitle: v.documentTitle?.trim() || null, portOfDischarge: v.portOfDischarge?.trim() || null }),
+    () =>
+      api.patch(`/orders/${orderId}/details`, {
+        shipBy: v.shipBy || null,
+        readyOn: v.readyOn || null,
+        shippedOn: v.shippedOn || null,
+        blNo: v.blNo?.trim() || null,
+        documentTitle: v.documentTitle?.trim() || null,
+        portOfDischarge: v.portOfDischarge?.trim() || null,
+        reason: reasonOf(form),
+      }),
     "Details saved.",
   );
   if (r.ok) refresh(orderId);
@@ -45,7 +55,11 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
 export async function receiptAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formBody(form);
   const all = formValues(form).all === "true";
-  const r = await attempt(form, () => api.put(`/orders/${orderId}/receipt`, body), all ? "All goods marked as received." : "Saved what came in.");
+  const r = await attempt(
+    form,
+    () => api.put(`/orders/${orderId}/receipt`, body),
+    all ? "All goods marked as received." : "Saved what came in.",
+  );
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -101,20 +115,13 @@ export async function orderNoteAction(orderId: string, dealId: string, _prev: Ac
   return r;
 }
 
-export async function orderUploadAction(orderId: string, dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a file to upload." };
-  const body = new FormData();
-  body.set("file", file, file.name);
-  const r = await attempt(null, () => api.upload(`/inquiries/${dealId}/files`, body), `Uploaded ${file.name}.`);
-  if (r.ok) {
-    revalidatePath(`/orders/${orderId}`);
-    revalidatePath(`/deals/${dealId}`);
-  }
-  return r;
-}
-
-export async function orderRemoveFileAction(orderId: string, dealId: string, fileId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
+export async function orderRemoveFileAction(
+  orderId: string,
+  dealId: string,
+  fileId: string,
+  _prev: ActionState,
+  _form: FormData,
+): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
   if (r.ok) {
     revalidatePath(`/orders/${orderId}`);

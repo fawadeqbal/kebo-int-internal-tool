@@ -10,6 +10,8 @@ export interface AuditEntry {
   summary: string;
   oldValues?: Record<string, unknown>;
   newValues?: Record<string, unknown>;
+  /** Why it was changed (see ./reason.ts). */
+  reason?: string | null;
 }
 
 /** Writes the audit trail inside the caller's transaction, so the change and its record are saved together. */
@@ -25,6 +27,7 @@ export class AuditService {
         summary: e.summary,
         oldValues: (e.oldValues ?? undefined) as Prisma.InputJsonValue | undefined,
         newValues: (e.newValues ?? undefined) as Prisma.InputJsonValue | undefined,
+        reason: e.reason?.trim() || null,
       },
     });
   }

@@ -1,4 +1,5 @@
 import type {
+  AttachmentKind,
   BalanceTerms,
   CustomerType,
   InquiryChannel,
@@ -62,6 +63,8 @@ export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   superseded: "Replaced by a newer revision",
   void: "Order cancelled",
 };
+
+export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = { urs: "URS", drawing: "Drawing", photo: "Photo", specification: "Specification", other: "Other" };
 
 export const LINE_TYPE_LABEL: Record<LineType, string> = { goods: "Goods", service: "Service", charge: "Charge (freight, fees)" };
 

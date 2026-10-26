@@ -6,17 +6,32 @@ import { load } from "@/lib/session";
 import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo, customerOr } from "@/components/print/data";
-import { docDate, docMoney, docQty, docWords, InternalTable, KeboDoc, labelled, marginOf, portBullets, textBullets, type DocColumn } from "@/components/print/kebo-doc";
+import {
+  docDate,
+  docMoney,
+  docQty,
+  docWords,
+  InternalTable,
+  KeboDoc,
+  labelled,
+  marginOf,
+  portBullets,
+  textBullets,
+  type DocColumn,
+} from "@/components/print/kebo-doc";
 
 /** The print page for the customer's or the internal copy, keeping where Back goes. */
-const copyHref = (path: string, back: string | undefined, internal: boolean) => `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
+const copyHref = (path: string, back: string | undefined, internal: boolean) =>
+  `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
 
 const KINDS: readonly OrderDocumentKind[] = ["proforma", "packing-list"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Weights with up to 2 decimals and volume with up to 3; blank when not recorded. */
-const kg = (v: string | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
-const m3 = (v: string | null | undefined) => (v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 }));
+const kg = (v: string | null | undefined) =>
+  v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const m3 = (v: string | null | undefined) =>
+  v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 
 const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE", "packing-list": "PACKING  LIST" };
 const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", "packing-list": "Packing List NO." };
@@ -26,7 +41,13 @@ async function getDoc(id: string, kind: string) {
   return load(() => api.get<OrderDocument>(`/orders/${id}/documents/${kind}`));
 }
 
-export async function generateMetadata({ params, searchParams }: { params: Promise<{ id: string; kind: string }>; searchParams: Promise<{ copy?: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string; kind: string }>;
+  searchParams: Promise<{ copy?: string }>;
+}): Promise<Metadata> {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   const d = await getDoc(id, kind);
   return { title: `${d.title} ${d.number}${sp.copy === "internal" && d.kind !== "packing-list" ? " (internal)" : ""}` };
@@ -43,11 +64,19 @@ type Line = OrderDocument["lines"][number];
  * The customer's copy shows the items and one total; ?copy=internal adds unit prices,
  * amounts, costs and margin, and every payment.
  */
-export default async function OrderDocumentPrint({ params, searchParams }: { params: Promise<{ id: string; kind: string }>; searchParams: Promise<{ back?: string; copy?: string }> }) {
+export default async function OrderDocumentPrint({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string; kind: string }>;
+  searchParams: Promise<{ back?: string; copy?: string }>;
+}) {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   const d = await getDoc(id, kind);
   // Customer snapshots imported from the old system may be empty: then the customer as it is now.
-  const customer = await customerOr(d.customer, async () => ({ customerId: (await api.get<{ customer: { id: string } }>(`/orders/${id}`)).customer.id })).catch(() => d.customer);
+  const customer = await customerOr(d.customer, async () => ({
+    customerId: (await api.get<{ customer: { id: string } }>(`/orders/${id}`)).customer.id,
+  })).catch(() => d.customer);
   const o = d.order;
   const c = d.currency;
   const t = d.totals;
@@ -60,11 +89,19 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
       title={`${d.title} ${d.number}`}
       backHref={backTo(sp.back, `/orders/${o.id}`)}
       pdfHref={`/pdf/${d.kind}/${o.id}${internal ? "?copy=internal" : ""}`}
-      copies={packing ? undefined : { current: internal ? "internal" : "customer", customer: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, false), internal: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, true) }}
+      copies={
+        packing
+          ? undefined
+          : {
+              current: internal ? "internal" : "customer",
+              customer: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, false),
+              internal: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, true),
+            }
+      }
     />
   );
 
-  const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (_l, i) => i + 1 };
+  const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<Line> = {
     label: packing ? "Description of Goods" : "Equipment Description",
     render: (l) => (
@@ -81,7 +118,12 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
         no,
         description,
         { label: "Qty.", width: 58, render: (l) => docQty(l.quantity, l.unit) },
-        { label: "Packages", width: 82, wrap: true, render: (l) => (l.packing?.packages ? `${l.packing.packages} ${l.packing.packageType ?? ""}`.trim() : "") },
+        {
+          label: "Packages",
+          width: 82,
+          wrap: true,
+          render: (l) => (l.packing?.packages ? `${l.packing.packages} ${l.packing.packageType ?? ""}`.trim() : ""),
+        },
         { label: "N.W. (kg)", width: 52, align: "right", render: (l) => kg(l.packing?.netWeightKg) },
         { label: "G.W. (kg)", width: 52, align: "right", render: (l) => kg(l.packing?.grossWeightKg) },
         { label: "CBM", width: 42, align: "right", render: (l) => m3(l.packing?.cbm) },
@@ -142,9 +184,15 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
           {pk.totals.packages > 0 ? `, ${pk.totals.packages} packages` : ""}
         </td>
         <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt" }}>{pk.totals.packages || ""}</td>
-        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>{Number(pk.totals.netWeightKg) ? kg(pk.totals.netWeightKg) : ""}</td>
-        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>{Number(pk.totals.grossWeightKg) ? kg(pk.totals.grossWeightKg) : ""}</td>
-        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>{Number(pk.totals.cbm) ? m3(pk.totals.cbm) : ""}</td>
+        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>
+          {Number(pk.totals.netWeightKg) ? kg(pk.totals.netWeightKg) : ""}
+        </td>
+        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>
+          {Number(pk.totals.grossWeightKg) ? kg(pk.totals.grossWeightKg) : ""}
+        </td>
+        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>
+          {Number(pk.totals.cbm) ? m3(pk.totals.cbm) : ""}
+        </td>
       </tr>
     ) : null;
 
@@ -160,8 +208,20 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
             ["Still due", docMoney(t.due, c)],
             ...(costs
               ? [
-                  ["Factory cost (lines with a cost)", docMoney(d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0), c)],
-                  ["Margin on those lines", marginOf(d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.lineTotal ?? 0) : 0), 0), d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0)) || "—"],
+                  [
+                    "Factory cost (lines with a cost)",
+                    docMoney(
+                      d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0),
+                      c,
+                    ),
+                  ],
+                  [
+                    "Margin on those lines",
+                    marginOf(
+                      d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.lineTotal ?? 0) : 0), 0),
+                      d.lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.unitCost) * Number(l.quantity) : 0), 0),
+                    ) || "—",
+                  ],
                 ]
               : []),
           ]}
@@ -171,7 +231,13 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
           head={["Date", "For", "Reference", "Bank charges", "Amount"]}
           rows={
             d.payments.length
-              ? d.payments.map((p) => [docDate(p.paidOn), PAYMENT_KIND_LABEL[p.kind as PaymentKind] ?? p.kind, p.reference ?? "", docMoney(p.bankCharges, p.currency), docMoney(p.amount, p.currency)])
+              ? d.payments.map((p) => [
+                  docDate(p.paidOn),
+                  PAYMENT_KIND_LABEL[p.kind as PaymentKind] ?? p.kind,
+                  p.reference ?? "",
+                  docMoney(p.bankCharges, p.currency),
+                  docMoney(p.amount, p.currency),
+                ])
               : [["No payments yet", "", "", "", ""]]
           }
         />

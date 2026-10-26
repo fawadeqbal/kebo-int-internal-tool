@@ -10,7 +10,10 @@ export function DealTabs({ id, source, orderId }: { id: string; source: boolean;
     { href: base, label: "Overview" },
     ...(source ? [{ href: `${base}/sourcing`, label: "Factory prices" }] : []),
     { href: `${base}/quotation`, label: "Quotation" },
+    { href: `${base}/history`, label: "History" },
     ...(orderId ? [{ href: `/orders/${orderId}`, label: "Order →" }] : []),
   ];
-  return <LinkTabs label="Deal sections" tabs={tabs.map((t) => ({ ...t, active: t.href === base ? path === base : path.startsWith(t.href) }))} />;
+  return (
+    <LinkTabs label="Deal sections" tabs={tabs.map((t) => ({ ...t, active: t.href === base ? path === base : path.startsWith(t.href) }))} />
+  );
 }

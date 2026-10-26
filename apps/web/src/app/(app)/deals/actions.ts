@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
-import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 
@@ -11,21 +11,33 @@ const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
 
 export async function moveStageAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${id}/stage`, { to: v.to, lostReason: v.lostReason || null, note: v.note || null }), "Stage updated.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${id}/stage`, { to: v.to, lostReason: v.lostReason || null, note: v.note || null, reason: reasonOf(form) }),
+    "Stage updated.",
+  );
   if (r.ok) refresh(id);
   return r;
 }
 
 export async function holdAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${id}/hold`, { onHold: v.onHold === "true", note: v.note || null }), v.onHold === "true" ? "On hold." : "Resumed.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${id}/hold`, { onHold: v.onHold === "true", note: v.note || null, reason: reasonOf(form) }),
+    v.onHold === "true" ? "On hold." : "Resumed.",
+  );
   if (r.ok) refresh(id);
   return r;
 }
 
 export async function assignAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${id}/assign`, { assigneeId: v.assigneeId || null }), "Assignment saved.");
+  const r = await attempt(
+    form,
+    () => api.post(`/inquiries/${id}/assign`, { assigneeId: v.assigneeId || null, reason: reasonOf(form) }),
+    "Assignment saved.",
+  );
   if (r.ok) refresh(id);
   return r;
 }
@@ -37,18 +49,16 @@ export async function noteAction(id: string, _prev: ActionState, form: FormData)
   return r;
 }
 
-export async function uploadAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a file to upload." };
-  const body = new FormData();
-  body.set("file", file, file.name);
-  const r = await attempt(null, () => api.upload(`/inquiries/${id}/files`, body), `Uploaded ${file.name}.`);
-  if (r.ok) refresh(id);
+export async function removeFileAction(dealId: string, fileId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
+  const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
+  if (r.ok) refresh(dealId);
   return r;
 }
 
-export async function removeFileAction(dealId: string, fileId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
+/** What a file is (URS, drawing…) and its note. */
+export async function describeFileAction(dealId: string, fileId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(form, () => api.patch(`/files/${fileId}`, { kind: v.kind, note: v.note?.trim() || null }), "Saved.");
   if (r.ok) refresh(dealId);
   return r;
 }
@@ -57,7 +67,12 @@ export async function removeFileAction(dealId: string, fileId: string, _prev: Ac
 export async function searchCustomersAction(q: string): Promise<CustomerOption[]> {
   try {
     const res = await api.get<Paged<CustomerOption>>("/customers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
-    return res.rows.map((c) => ({ id: c.id, name: c.name, country: c.country, primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name } }));
+    return res.rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      country: c.country,
+      primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name },
+    }));
   } catch {
     return [];
   }
@@ -67,7 +82,14 @@ export async function searchCustomersAction(q: string): Promise<CustomerOption[]
 export async function customerContactsAction(customerId: string): Promise<ContactOption[]> {
   try {
     const c = await api.get<{ contacts: ContactOption[] }>(`/customers/${customerId}`);
-    return c.contacts.map((x) => ({ id: x.id, name: x.name, email: x.email, phone: x.phone, whatsapp: x.whatsapp, isPrimary: x.isPrimary }));
+    return c.contacts.map((x) => ({
+      id: x.id,
+      name: x.name,
+      email: x.email,
+      phone: x.phone,
+      whatsapp: x.whatsapp,
+      isPrimary: x.isPrimary,
+    }));
   } catch {
     return [];
   }
@@ -76,7 +98,9 @@ export async function customerContactsAction(customerId: string): Promise<Contac
 /** Create or edit a deal (the form sends JSON in `payload`, with its line items). */
 export async function saveDealAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formBody(form);
-  const r = await attempt(form, () => (id ? api.put<{ id: string }>(`/inquiries/${id}`, body) : api.post<{ id: string }>("/inquiries", body)));
+  const r = await attempt(form, () =>
+    id ? api.put<{ id: string }>(`/inquiries/${id}`, body) : api.post<{ id: string }>("/inquiries", body),
+  );
   if (!r.ok) return r;
   const newId = id ?? (r.data as { id: string }).id;
   refresh(newId);

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
-import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
+import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
 
 const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
@@ -39,7 +39,11 @@ const DONE: Record<string, string> = {
 /** Sent, or the customer's answer (accepted creates the order). */
 export async function moveRevisionAction(dealId: string, revisionId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null }), DONE[v.to] ?? "Saved.");
+  const r = await attempt(
+    form,
+    () => api.post(`/revisions/${revisionId}/status`, { to: v.to, on: v.on || null, reason: reasonOf(form) }),
+    DONE[v.to] ?? "Saved.",
+  );
   if (!r.ok) return r;
   refresh(dealId);
   if (v.to === "accepted") {

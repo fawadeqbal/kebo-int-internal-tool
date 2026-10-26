@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { customerInput, factoryInput, listQuery, type CustomerInput, type FactoryInput, type ListQuery } from "@kebo/shared";
+import { customerInput, factoryInput, listQuery, type CustomerInput, type FactoryInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -9,6 +9,8 @@ import { CustomersService } from "./customers.service";
 import { FactoriesService } from "./factories.service";
 
 const customerList = listQuery.extend({ country: z.string().trim().toUpperCase().length(2).optional() });
+/** ?mine=true: the factories I look after. */
+const factoryList = listQuery.extend({ mine: z.enum(["true", "false"]).optional().transform((v) => v === "true") });
 
 @ApiTags("customers")
 @Controller("customers")
@@ -54,8 +56,8 @@ class FactoriesController {
 
   @Get()
   @RequirePermissions("sourcing.manage")
-  list(@Query(Validate(listQuery)) q: ListQuery) {
-    return this.factories.list(q);
+  list(@CurrentUser() user: SessionUser, @Query(Validate(factoryList)) q: z.infer<typeof factoryList>) {
+    return this.factories.list(user, q);
   }
 
   @Get(":id")

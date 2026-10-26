@@ -33,7 +33,7 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
           <tbody>
             {r.lines.map((l, i) => (
               <Tr key={l.id}>
-                <Td className="text-muted tabular">{i + 1}</Td>
+                <Td className="text-muted tabular">{l.no ?? i + 1}</Td>
                 <Td className="min-w-52">
                   <span className="block max-w-[28rem] text-sm whitespace-pre-line">{l.description}</span>
                   <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
@@ -45,7 +45,9 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
                   {qty(l.quantity)} {l.unit}
                 </Td>
                 <Td className="text-right whitespace-nowrap tabular">{money(l.unitPrice, r.currency)}</Td>
-                {showCosts && <Td className="text-right whitespace-nowrap text-text-2 tabular">{l.unitCost ? money(l.unitCost, r.currency) : "—"}</Td>}
+                {showCosts && (
+                  <Td className="text-right whitespace-nowrap text-text-2 tabular">{l.unitCost ? money(l.unitCost, r.currency) : "—"}</Td>
+                )}
                 <Td className="text-right font-medium whitespace-nowrap tabular">{money(l.lineTotal, r.currency)}</Td>
               </Tr>
             ))}
@@ -74,7 +76,16 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
               <dd className="tabular">{money(r.total, r.currency)}</dd>
             </div>
           </dl>
-          {r.costing && <CostingBox currency={r.currency} cost={r.costing.costMinor} sales={r.costing.salesMinor} profit={r.costing.profitMinor} margin={r.costing.marginPercent} uncosted={r.costing.uncostedLines} />}
+          {r.costing && (
+            <CostingBox
+              currency={r.currency}
+              cost={r.costing.costMinor}
+              sales={r.costing.salesMinor}
+              profit={r.costing.profitMinor}
+              margin={r.costing.marginPercent}
+              uncosted={r.costing.uncostedLines}
+            />
+          )}
         </div>
       </div>
     </div>

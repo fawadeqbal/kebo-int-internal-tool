@@ -25,3 +25,6 @@ packages/database/src/generated/
 
 # agent worktrees
 .claude/
+
+# Files uploaded while running the API locally or in tests
+apps/api/storage/

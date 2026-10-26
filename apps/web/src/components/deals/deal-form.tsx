@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Plus } from "lucide-react";
-import { CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, type InquiryChannel } from "@kebo/shared";
-import { Button, buttonClass, Card, CardBody, CardFooter, CardHeader, Field, Input, Select, Textarea } from "@kebo/ui";
+import { CornerDownRight, Plus } from "lucide-react";
+import { CHANNEL_LABEL, INQUIRY_CHANNELS, lineNumbers, PRIORITIES, PRIORITY_LABEL, type InquiryChannel } from "@kebo/shared";
+import { Badge, Button, buttonClass, Card, CardBody, CardFooter, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -16,7 +16,33 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 const OTHER = "__other__";
 
-const emptyItem = (): DealFormItem => ({ id: null, key: rowKey(), description: "", model: "", quantity: "", unit: "pcs", targetPrice: "" });
+const emptyItem = (parentId: string | null = null): DealFormItem => ({
+  id: null,
+  key: rowKey(),
+  description: "",
+  model: "",
+  quantity: "",
+  unit: parentId ? "sets" : "pcs",
+  targetPrice: "",
+  parentId,
+  priced: false,
+});
+
+/** Items with each item's parts right after it (the order the API keeps). */
+function grouped(items: DealFormItem[]) {
+  const tops = items.filter((it) => !it.parentId);
+  return tops.flatMap((t) => [t, ...items.filter((p) => p.parentId && p.parentId === t.id)]);
+}
+
+/** Moves an item among its siblings (items among items, parts among the parts of the same item). */
+function moveAmongSiblings(items: DealFormItem[], key: string, by: -1 | 1) {
+  const it = items.find((x) => x.key === key)!;
+  const siblings = items.filter((x) => (x.parentId ?? null) === (it.parentId ?? null));
+  const i = siblings.indexOf(it);
+  const moved = move(siblings, i, i + by);
+  const others = items.filter((x) => !siblings.includes(x));
+  return grouped([...(it.parentId ? others : moved), ...(it.parentId ? moved : others)]);
+}
 
 /** The body the API's inquiry schema accepts. */
 function payload(v: DealFormValues, withAssignee: boolean) {
@@ -32,6 +58,7 @@ function payload(v: DealFormValues, withAssignee: boolean) {
     ...(withAssignee ? { assigneeId: v.assigneeId || null } : {}),
     items: v.items.map((it) => ({
       id: it.id,
+      parentId: it.parentId,
       description: it.description,
       model: it.model.trim() || null,
       quantity: numberText(it.quantity),
@@ -75,9 +102,15 @@ export function DealForm({
 }) {
   const [v, setV] = useState<DealFormValues>(initial);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
-  const [otherCategory, setOtherCategory] = useState(() => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()));
+  const [otherCategory, setOtherCategory] = useState(
+    () => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()),
+  );
   const set = <K extends keyof DealFormValues>(k: K, value: DealFormValues[K]) => setV((s) => ({ ...s, [k]: value }));
-  const setItem = (i: number, patch: Partial<DealFormItem>) => setV((s) => ({ ...s, items: s.items.map((it, n) => (n === i ? { ...it, ...patch } : it)) }));
+  const numbers = lineNumbers(
+    v.items.map((it) => ({ key: it.key, parentKey: it.parentId ? (v.items.find((p) => p.id === it.parentId)?.key ?? null) : null })),
+  );
+  const setItem = (i: number, patch: Partial<DealFormItem>) =>
+    setV((s) => ({ ...s, items: s.items.map((it, n) => (n === i ? { ...it, ...patch } : it)) }));
 
   const chooseCustomer = async (c: CustomerOption | null) => {
     set("customer", c);
@@ -102,9 +135,22 @@ export function DealForm({
               <CardHeader title="Customer" description="Who is asking, and how they reached us" />
               <CardBody className="grid gap-4 md:grid-cols-2">
                 <Field label="Customer" htmlFor="customer" error={s.errors?.customerId} className="md:col-span-2">
-                  <CustomerPicker value={v.customer} onChange={chooseCustomer} search={searchCustomers} error={s.errors?.customerId} disabled={!!customerLocked} disabledReason={customerLocked} />
+                  <CustomerPicker
+                    value={v.customer}
+                    onChange={chooseCustomer}
+                    search={searchCustomers}
+                    error={s.errors?.customerId}
+                    disabled={!!customerLocked}
+                    disabledReason={customerLocked}
+                  />
                 </Field>
-                <Field label="Contact person" htmlFor="contactId" optional error={s.errors?.contactId} hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}>
+                <Field
+                  label="Contact person"
+                  htmlFor="contactId"
+                  optional
+                  error={s.errors?.contactId}
+                  hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}
+                >
                   <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
                     <option value="">{v.customer ? "Not specified" : "Choose the customer first"}</option>
                     {contacts.map((c) => (
@@ -154,10 +200,25 @@ export function DealForm({
                     ))}
                     <option value={OTHER}>Another category…</option>
                   </Select>
-                  {otherCategory && <Input aria-label="Category name" placeholder="Type the category" value={v.category} onChange={(e) => set("category", e.target.value)} maxLength={120} autoFocus />}
+                  {otherCategory && (
+                    <Input
+                      aria-label="Category name"
+                      placeholder="Type the category"
+                      value={v.category}
+                      onChange={(e) => set("category", e.target.value)}
+                      maxLength={120}
+                      autoFocus
+                    />
+                  )}
                 </Field>
                 <Field label="Title" htmlFor="title" optional hint="Leave empty to name it after the items" error={s.errors?.title}>
-                  <Input id="title" value={v.title} onChange={(e) => set("title", e.target.value)} maxLength={200} placeholder="e.g. Gate valves for Jebel Ali project" />
+                  <Input
+                    id="title"
+                    value={v.title}
+                    onChange={(e) => set("title", e.target.value)}
+                    maxLength={200}
+                    placeholder="e.g. Gate valves for Jebel Ali project"
+                  />
                 </Field>
                 <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
                   <Select id="priority" value={v.priority} onChange={(e) => set("priority", e.target.value)}>
@@ -168,11 +229,23 @@ export function DealForm({
                     ))}
                   </Select>
                 </Field>
-                <Field label="Needed by" htmlFor="requiredBy" optional hint="When the customer wants our offer" error={s.errors?.requiredBy}>
+                <Field
+                  label="Needed by"
+                  htmlFor="requiredBy"
+                  optional
+                  hint="When the customer wants our offer"
+                  error={s.errors?.requiredBy}
+                >
                   <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
                 </Field>
                 {people && (
-                  <Field label="Handled by" htmlFor="assigneeId" optional hint={canAssignOthers ? "Assigning someone starts sourcing" : "Take it yourself, or leave it for a manager to assign"} error={s.errors?.assigneeId}>
+                  <Field
+                    label="Handled by"
+                    htmlFor="assigneeId"
+                    optional
+                    hint={canAssignOthers ? "Assigning someone starts sourcing" : "Take it yourself, or leave it for a manager to assign"}
+                    error={s.errors?.assigneeId}
+                  >
                     <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
                       <option value="">Nobody yet</option>
                       {assignable.map((p) => (
@@ -183,7 +256,14 @@ export function DealForm({
                     </Select>
                   </Field>
                 )}
-                <Field label="Requirements" htmlFor="requirements" optional hint="Specs, standards, packing, destination port — anything the factories need to know" error={s.errors?.requirements} className="md:col-span-2">
+                <Field
+                  label="Requirements"
+                  htmlFor="requirements"
+                  optional
+                  hint="Specs, standards, packing, destination port — anything the factories need to know"
+                  error={s.errors?.requirements}
+                  className="md:col-span-2"
+                >
                   <Textarea id="requirements" rows={4} value={v.requirements} onChange={(e) => set("requirements", e.target.value)} />
                 </Field>
               </CardBody>
@@ -193,42 +273,111 @@ export function DealForm({
               <CardHeader title="Items" description="One line per product the customer wants priced" />
               <CardBody className="flex flex-col gap-3">
                 <ol className="flex flex-col gap-3">
-                  {v.items.map((it, i) => (
-                    <li key={it.key} className="rounded-lg border border-line p-3">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-muted">Item {i + 1}</span>
-                        <RowButtons
-                          index={i}
-                          count={v.items.length}
-                          label={`item ${i + 1}`}
-                          onMove={(to) => setV((st) => ({ ...st, items: move(st.items, i, to) }))}
-                          onRemove={() => setV((st) => ({ ...st, items: st.items.filter((_, n) => n !== i) }))}
-                        />
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-6">
-                        <div className="sm:col-span-6">
-                          <MiniLabel htmlFor={`desc-${it.key}`}>Description</MiniLabel>
-                          <Textarea id={`desc-${it.key}`} rows={2} className="min-h-0" value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} placeholder="What it is, size, material, standard…" />
+                  {v.items.map((it, i) => {
+                    const no = numbers[i];
+                    const siblings = v.items.filter((x) => (x.parentId ?? null) === (it.parentId ?? null));
+                    const parts = it.id ? v.items.filter((p) => p.parentId === it.id) : [];
+                    return (
+                      <li key={it.key} className={cn("rounded-lg border border-line p-3", it.parentId && "ml-5 border-dashed sm:ml-8")}>
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 text-xs font-medium text-muted">
+                            {it.parentId && <CornerDownRight className="size-3.5" aria-hidden />}
+                            {it.parentId ? `Part ${no}` : `Item ${no}`}
+                            {parts.length > 0 && (
+                              <span className="font-normal">
+                                · quoted in {parts.length} part{parts.length === 1 ? "" : "s"}
+                              </span>
+                            )}
+                            {it.priced && (
+                              <span title="A factory has priced this: changing it will ask why">
+                                <Badge tone="info">Priced</Badge>
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            {!it.parentId && it.id && (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => setV((st) => ({ ...st, items: grouped([...st.items, emptyItem(it.id)]) }))}
+                                title="When a factory quotes this item as separate parts"
+                              >
+                                <Plus aria-hidden /> Add a part
+                              </Button>
+                            )}
+                            <RowButtons
+                              index={siblings.indexOf(it)}
+                              count={siblings.length}
+                              minRows={it.parentId ? 0 : 1}
+                              label={`${it.parentId ? "part" : "item"} ${no}`}
+                              onMove={(to) =>
+                                setV((st) => ({ ...st, items: moveAmongSiblings(st.items, it.key, to < siblings.indexOf(it) ? -1 : 1) }))
+                              }
+                              onRemove={() =>
+                                setV((st) => ({
+                                  ...st,
+                                  items: st.items.filter((x) => x.key !== it.key && !(it.id && x.parentId === it.id)),
+                                }))
+                              }
+                            />
+                          </span>
                         </div>
-                        <div className="sm:col-span-2">
-                          <MiniLabel htmlFor={`model-${it.key}`}>Model / part no.</MiniLabel>
-                          <Input id={`model-${it.key}`} value={it.model} onChange={(e) => setItem(i, { model: e.target.value })} maxLength={120} />
+                        <div className="grid gap-3 sm:grid-cols-6">
+                          <div className="sm:col-span-6">
+                            <MiniLabel htmlFor={`desc-${it.key}`}>Description</MiniLabel>
+                            <Textarea
+                              id={`desc-${it.key}`}
+                              rows={2}
+                              className="min-h-0"
+                              value={it.description}
+                              onChange={(e) => setItem(i, { description: e.target.value })}
+                              placeholder="What it is, size, material, standard…"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <MiniLabel htmlFor={`model-${it.key}`}>Model / part no.</MiniLabel>
+                            <Input
+                              id={`model-${it.key}`}
+                              value={it.model}
+                              onChange={(e) => setItem(i, { model: e.target.value })}
+                              maxLength={120}
+                            />
+                          </div>
+                          <div>
+                            <MiniLabel htmlFor={`qty-${it.key}`}>Quantity</MiniLabel>
+                            <Input
+                              id={`qty-${it.key}`}
+                              inputMode="decimal"
+                              value={it.quantity}
+                              onChange={(e) => setItem(i, { quantity: e.target.value })}
+                              className="tabular"
+                            />
+                          </div>
+                          <div>
+                            <MiniLabel htmlFor={`unit-${it.key}`}>Unit</MiniLabel>
+                            <Input
+                              id={`unit-${it.key}`}
+                              value={it.unit}
+                              onChange={(e) => setItem(i, { unit: e.target.value })}
+                              maxLength={20}
+                              list="units"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <MiniLabel htmlFor={`target-${it.key}`}>Target price (optional)</MiniLabel>
+                            <Input
+                              id={`target-${it.key}`}
+                              inputMode="decimal"
+                              value={it.targetPrice}
+                              onChange={(e) => setItem(i, { targetPrice: e.target.value })}
+                              className="tabular"
+                              placeholder="Customer's budget per unit"
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <MiniLabel htmlFor={`qty-${it.key}`}>Quantity</MiniLabel>
-                          <Input id={`qty-${it.key}`} inputMode="decimal" value={it.quantity} onChange={(e) => setItem(i, { quantity: e.target.value })} className="tabular" />
-                        </div>
-                        <div>
-                          <MiniLabel htmlFor={`unit-${it.key}`}>Unit</MiniLabel>
-                          <Input id={`unit-${it.key}`} value={it.unit} onChange={(e) => setItem(i, { unit: e.target.value })} maxLength={20} list="units" />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <MiniLabel htmlFor={`target-${it.key}`}>Target price (optional)</MiniLabel>
-                          <Input id={`target-${it.key}`} inputMode="decimal" value={it.targetPrice} onChange={(e) => setItem(i, { targetPrice: e.target.value })} className="tabular" placeholder="Customer's budget per unit" />
-                        </div>
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ol>
                 <datalist id="units">
                   {["pcs", "sets", "kg", "tons", "m", "m²", "m³", "rolls", "cartons", "pairs", "litres"].map((u) => (

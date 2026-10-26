@@ -78,3 +78,36 @@ export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceT
   if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
   return `Our usual payment is made by ${depositPercent}% Advance deposit and ${100 - depositPercent}% ${lower.replace(/^balance /, "")}.`;
 }
+
+/**
+ * Line numbers as on Kebo's documents: 1, 2, 3, and a part of an item right
+ * after it as 3.1, 3.2. `parentKey` names the line a part belongs to; a part
+ * whose item is not on the document (or comes later) is numbered on its own.
+ */
+/**
+ * Numbers for document lines that follow the deal's items: a line for a part
+ * of an item is numbered under the line for that item ("2.1").
+ */
+export function numberLines(lines: { id: string; requestedItemId: string | null; parentItemId: string | null }[]): string[] {
+  return lineNumbers(lines.map((l) => ({ key: l.id, parentKey: l.parentItemId ? (lines.find((x) => x.requestedItemId === l.parentItemId)?.id ?? null) : null })));
+}
+
+export function lineNumbers(lines: { key: string; parentKey?: string | null }[]): string[] {
+  const numberOf = new Map<string, string>();
+  const partsOf = new Map<string, number>();
+  let top = 0;
+  return lines.map((l) => {
+    const parent = l.parentKey ? numberOf.get(l.parentKey) : undefined;
+    let no: string;
+    if (parent && !parent.includes(".")) {
+      const k = (partsOf.get(l.parentKey!) ?? 0) + 1;
+      partsOf.set(l.parentKey!, k);
+      no = `${parent}.${k}`;
+    } else {
+      top += 1;
+      no = String(top);
+    }
+    numberOf.set(l.key, no);
+    return no;
+  });
+}

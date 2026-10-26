@@ -52,15 +52,28 @@ const pdfHref = (r: { id: string }) => `/pdf/revisions/${r.id}`;
  * The deal's quotation: the open draft (editable), the live revision waiting
  * for the customer's answer, and every revision sent so far.
  */
-export default async function QuotationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ r?: string }> }) {
+export default async function QuotationPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ r?: string }>;
+}) {
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
-  const [d, q, settings] = await Promise.all([load(() => api.get<DealDetail>(`/inquiries/${id}`)), load(() => api.get<QuotationView>(`/inquiries/${id}/quotation`)), api.get<{ sales: SalesSettings }>("/settings")]);
+  const [d, q, settings] = await Promise.all([
+    load(() => api.get<DealDetail>(`/inquiries/${id}`)),
+    load(() => api.get<QuotationView>(`/inquiries/${id}/quotation`)),
+    api.get<{ sales: SalesSettings }>("/settings"),
+  ]);
   const quoter = can(me.role, "quotations.manage");
   const manage = quoter && d.allowed.quote;
   const showCosts = can(me.role, "sourcing.manage");
-  const startValues = manage && q.canStartRevision ? await api.get<RevisionDraft>(`/inquiries/${id}/quotation/draft`).catch(() => null) : null;
+  const itemNumbers = Object.fromEntries(d.items.map((it) => [it.id, it.no]));
+  const draftValues =
+    manage && q.canStartRevision ? await api.get<RevisionDraft>(`/inquiries/${id}/quotation/draft`).catch(() => null) : null;
+  const startValues = draftValues && { ...draftValues, itemNumbers };
   const today = todayIn(TZ);
 
   const draft = q.revisions.find((r) => r.status === "draft") ?? null;
@@ -86,12 +99,16 @@ export default async function QuotationPage({ params, searchParams }: { params: 
   return (
     <div className="flex flex-col gap-5">
       {accepted && order && (
-        <section aria-label="Order created" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4">
+        <section
+          aria-label="Order created"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4"
+        >
           <p className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="size-5 shrink-0 text-ok" aria-hidden />
             <span>
               The customer accepted R{accepted.number}
-              {accepted.answeredOn ? ` on ${date(accepted.answeredOn)}` : ""}. <span className="font-medium">Order {order.refNo}</span> was created ({money(order.total, order.currency)}) — the work continues there.
+              {accepted.answeredOn ? ` on ${date(accepted.answeredOn)}` : ""}. <span className="font-medium">Order {order.refNo}</span> was
+              created ({money(order.total, order.currency)}) — the work continues there.
             </span>
           </p>
           <ButtonLink href={`/orders/${order.id}`} variant="primary" size="sm">
@@ -102,7 +119,10 @@ export default async function QuotationPage({ params, searchParams }: { params: 
 
       {q.revisions.length === 0 && (
         <Card>
-          <CardHeader title="No quotation yet" description="The first revision (R1) starts from the factory prices chosen on the Factory prices tab, plus the default margin." />
+          <CardHeader
+            title="No quotation yet"
+            description="The first revision (R1) starts from the factory prices chosen on the Factory prices tab, plus the default margin."
+          />
           <CardBody className="flex flex-col gap-3">
             {quoter ? start : <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this deal makes the quotation."}</p>}
           </CardBody>
@@ -136,7 +156,7 @@ export default async function QuotationPage({ params, searchParams }: { params: 
               <DraftPanel
                 key={draft.id}
                 number={draft.number}
-                initial={asDraft(draft)}
+                initial={{ ...asDraft(draft), itemNumbers }}
                 showCosts={showCosts}
                 defaultMargin={settings.sales.defaultMarginPercent}
                 saveAction={updateRevisionAction.bind(null, d.id, draft.id)}
@@ -187,10 +207,18 @@ export default async function QuotationPage({ params, searchParams }: { params: 
               <div className="rounded-lg border border-primary/25 bg-primary-soft/40 p-3">
                 <p className="mb-2 text-sm font-medium">What did the customer say about R{viewing.number}?</p>
                 <AnswerPanel number={viewing.number} action={move(viewing)} today={today} />
-                {draft && <p className="mt-2 text-xs text-muted">Accepting R{viewing.number} discards the R{draft.number} draft.</p>}
+                {draft && (
+                  <p className="mt-2 text-xs text-muted">
+                    Accepting R{viewing.number} discards the R{draft.number} draft.
+                  </p>
+                )}
               </div>
             )}
-            {viewing.status === "superseded" && <Alert tone="info">R{viewing.number} was replaced by a newer revision; the customer&apos;s answer is recorded on the newest one.</Alert>}
+            {viewing.status === "superseded" && (
+              <Alert tone="info">
+                R{viewing.number} was replaced by a newer revision; the customer&apos;s answer is recorded on the newest one.
+              </Alert>
+            )}
             <RevisionSummary r={viewing} />
           </CardBody>
         </Card>
@@ -198,7 +226,10 @@ export default async function QuotationPage({ params, searchParams }: { params: 
 
       {q.revisions.length > 0 && (
         <Card>
-          <CardHeader title="Revisions" description={q.quotation ? `${q.quotation.refNo} · the newest one is the one that counts` : undefined} />
+          <CardHeader
+            title="Revisions"
+            description={q.quotation ? `${q.quotation.refNo} · the newest one is the one that counts` : undefined}
+          />
           {quoter && <div className="border-b border-line px-4 py-3">{start}</div>}
           <Table>
             <THead>
@@ -221,7 +252,11 @@ export default async function QuotationPage({ params, searchParams }: { params: 
                     {r.status === "draft" ? (
                       `R${r.number}`
                     ) : (
-                      <Link href={`/deals/${d.id}/quotation?r=${r.number}`} className="hover:text-primary" aria-current={viewing?.id === r.id ? "true" : undefined}>
+                      <Link
+                        href={`/deals/${d.id}/quotation?r=${r.number}`}
+                        className="hover:text-primary"
+                        aria-current={viewing?.id === r.id ? "true" : undefined}
+                      >
                         R{r.number}
                       </Link>
                     )}
@@ -238,7 +273,11 @@ export default async function QuotationPage({ params, searchParams }: { params: 
                       Print
                     </Link>
                     <span className="text-muted"> · </span>
-                    <a href={pdfHref(r)} className="text-xs font-medium text-primary hover:underline" aria-label={`Download R${r.number} as PDF`}>
+                    <a
+                      href={pdfHref(r)}
+                      className="text-xs font-medium text-primary hover:underline"
+                      aria-label={`Download R${r.number} as PDF`}
+                    >
                       PDF
                     </a>
                   </Td>
