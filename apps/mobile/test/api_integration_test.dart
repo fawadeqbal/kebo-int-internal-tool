@@ -252,6 +252,85 @@ void main() {
       expect(p['due'], order.s('total'));
     });
 
+    test('goods from the factory: a partial receipt, then all received; more than ordered is refused', () async {
+      // The demo order in production: its goods lines with the factory they were quoted from.
+      final demo = await staff.order((await staff.orders(mine: true, stage: 'in_production')).first.s('id'));
+      final demoGoods = demo.l('lines').where((l) => l.s('type') == 'goods').toList();
+      expect(demoGoods, isNotEmpty);
+      expect(demoGoods.first.keys, containsAll(['description', 'quantity', 'unit', 'factory', 'receivedQty', 'receivedOn', 'packing']));
+      expect(demo.m('goods').keys, containsAll(['lines', 'received', 'allReceived', 'short', 'packed', 'totals']));
+
+      // A fresh order (two goods lines) in production, so the demo data stays as it is.
+      final deal = await staff.createDeal({
+        'customerId': (await staff.customers(q: 'Al-Shifa')).l('rows').first.s('id'),
+        'channel': 'email',
+        'category': 'Machinery',
+        'assigneeId': staffId,
+        'items': [
+          {'description': 'Receiving test press $tag', 'quantity': '100', 'unit': 'pcs'},
+          {'description': 'Receiving test dies $tag', 'quantity': '4', 'unit': 'set'},
+        ],
+      });
+      final dealId = deal.s('id');
+      final draft = await staff.api.get('/api/inquiries/$dealId/quotation/draft');
+      final rev = await staff.api.post('/api/inquiries/$dealId/quotation/revisions', {
+        ...draft,
+        'lines': [for (final l in draft.l('lines')) {...l, 'unitPrice': 100}],
+        'depositPercent': 0,
+      });
+      await staff.revisionStatus(rev.s('id'), 'sent');
+      await staff.revisionStatus(rev.s('id'), 'accepted');
+      final orderId = (await staff.deal(dealId)).l('orders').single.s('id');
+      final started = await staff.moveOrder(orderId, 'in_production', confirm: true, readyOn: '2099-12-01');
+      final lines = started.l('lines').where((l) => l.s('type') == 'goods').toList();
+      expect(lines.map((l) => [l.s('quantity'), l.s('receivedQty'), l.sn('receivedOn')]), [
+        ['100', '0', null],
+        ['4', '0', null],
+      ]);
+      expect(started.m('goods'), containsPair('allReceived', false));
+      final press = lines[0].s('id'), dies = lines[1].s('id');
+
+      // 60 of the 100 presses came in yesterday.
+      final yesterday = f.isoDate(DateTime.now().subtract(const Duration(days: 1)));
+      final part = await staff.recordReceipt(orderId, {press: 60}, on: yesterday);
+      final p = part.l('lines').firstWhere((l) => l.s('id') == press);
+      expect([p.s('receivedQty'), p.s('receivedOn')], ['60', yesterday]);
+      expect(part.m('goods').i('received'), 0);
+      expect(part.m('goods').ls('short'), ['Receiving test press $tag: 60 of 100 pcs', 'Receiving test dies $tag: 0 of 4 set']);
+      expect((await staff.order(orderId)).l('lines').firstWhere((l) => l.s('id') == press).s('receivedQty'), '60');
+
+      // More than ordered: a 400 with the reason, and nothing changes.
+      await expectLater(
+        staff.recordReceipt(orderId, {press: 101}),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 400).having((e) => e.message, 'message', contains('more than the 100 pcs ordered'))),
+      );
+      expect((await staff.order(orderId)).l('lines').firstWhere((l) => l.s('id') == press).s('receivedQty'), '60');
+
+      // "All received": every line in full, today.
+      final all = await staff.recordReceipt(orderId, {press: 100, dies: 4}, on: f.today());
+      expect(all.m('goods'), containsPair('allReceived', true));
+      expect(all.m('goods').i('received'), 2);
+      expect(all.m('goods').ls('short'), isEmpty);
+      expect(all.l('lines').where((l) => l.s('type') == 'goods').map((l) => [l.s('receivedQty'), l.s('receivedOn')]), [
+        ['100', f.today()],
+        ['4', f.today()],
+      ]);
+      expect(all.m('needs').s('title'), 'All goods are in: make the packing list');
+
+      // Shipping now warns about the packing list, no longer about the goods.
+      try {
+        await staff.moveOrder(orderId, 'shipped');
+        fail('expected a 409 confirm');
+      } on ApiException catch (e) {
+        expect(e.needsConfirm, isTrue);
+        expect(e.message, contains('The packing list is not filled in yet.'));
+        expect(e.message, isNot(contains('Not everything has come in')));
+      }
+
+      // Back to Confirmed, so the demo order stays the first one in production for the other tests.
+      expect((await staff.moveOrder(orderId, 'confirmed', note: 'Test order ($tag)')).s('stage'), 'confirmed');
+    });
+
     test('dashboard: my to-do says what each order needs, late first', () async {
       final d = await staff.dashboard();
       expect(d.keys, containsAll(['counts', 'todo', 'myDeals']));

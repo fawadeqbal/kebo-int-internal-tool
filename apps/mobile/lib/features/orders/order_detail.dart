@@ -11,6 +11,7 @@ import '../../core/session.dart';
 import '../../theme/colors.dart';
 import '../../ui/docs.dart';
 import '../../ui/kit.dart';
+import 'goods.dart';
 
 /// GET /api/orders/:id.
 final orderProvider = FutureProvider.autoDispose.family<Json, String>((ref, id) {
@@ -48,6 +49,7 @@ class OrderDetailScreen extends ConsumerWidget {
             OrderStageBar(stage: o.s('stage'), history: o.l('history'), cancelled: o.s('status') == 'cancelled'),
             gap12,
             _StageCard(o: o),
+            GoodsCard(o: o),
             _MoneyCard(o: o),
             _DetailsCard(o: o),
             _DocumentsCard(o: o),
@@ -66,11 +68,12 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deal = o.m('inquiry');
+    final dealId = deal.sn('id');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(o.m('customer').s('name'), style: context.t.titleLarge),
+      Text(o.m('customer').s('name', 'Customer'), style: context.t.titleLarge),
       gap4,
       InkWell(
-        onTap: () => context.push('/deals/${deal.s('id')}'),
+        onTap: dealId == null ? null : () => context.push('/deals/$dealId'),
         child: Text('${deal.s('refNo')} · ${deal.s('title')}', style: context.t.bodySmall!.copyWith(color: context.c.primary)),
       ),
     ]);
@@ -290,7 +293,7 @@ Future<bool> sendMove(BuildContext context, WidgetRef ref, String orderId, Strin
           message: e.message,
           warning: true,
           action: 'Go ahead anyway',
-          noteHint: 'Why go ahead? e.g. the customer sent the bank slip (optional)',
+          noteHint: 'Why go ahead? (optional)',
           initialNote: x.note,
         ),
       );
@@ -315,6 +318,27 @@ Future<bool> sendMove(BuildContext context, WidgetRef ref, String orderId, Strin
   }
 }
 
+/// The sentences of a server warning: split after a full stop that ends a sentence (not one
+/// inside brackets, e.g. a goods line "No. 5 pump: 0 of 2 pcs").
+List<String> warningLines(String message) {
+  final out = <String>[];
+  var depth = 0;
+  var start = 0;
+  for (var i = 0; i < message.length; i++) {
+    final ch = message[i];
+    if (ch == '(') depth++;
+    if (ch == ')' && depth > 0) depth--;
+    final endsSentence = ch == '.' && depth == 0 && i + 2 < message.length && message[i + 1] == ' ' && RegExp('[A-Z]').hasMatch(message[i + 2]);
+    if (endsSentence) {
+      out.add(message.substring(start, i + 1).trim());
+      start = i + 2;
+    }
+  }
+  final rest = message.substring(start).trim();
+  if (rest.isNotEmpty) out.add(rest);
+  return out;
+}
+
 /// A short dialog with an optional note. Returns the note ('' for none), or null when cancelled.
 /// With [warning], it is the server's warning before a move ("Go ahead anyway").
 class NoteDialog extends StatefulWidget {
@@ -332,6 +356,25 @@ class NoteDialog extends StatefulWidget {
 class _NoteDialogState extends State<NoteDialog> {
   late final _note = TextEditingController(text: widget.initialNote ?? '');
 
+  /// The server's warnings come as one text ("Not everything has come in… The packing list is
+  /// not filled in yet. USD … is still due…"): several are shown one per line, as a list.
+  List<Widget> _message(BuildContext context) {
+    final style = context.t.bodyMedium!.copyWith(color: widget.warning ? context.c.text : context.c.text2);
+    final lines = widget.warning ? warningLines(widget.message) : [widget.message];
+    if (lines.length < 2) return [Text(widget.message, style: style)];
+    return [
+      for (var i = 0; i < lines.length; i++)
+        Padding(
+          key: ValueKey('warning-$i'),
+          padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.only(top: 7, right: 8), child: Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: context.c.warn))),
+            Expanded(child: Text(lines[i], style: style)),
+          ]),
+        ),
+    ];
+  }
+
   @override
   void dispose() {
     _note.dispose();
@@ -346,7 +389,7 @@ class _NoteDialogState extends State<NoteDialog> {
       title: Text(widget.title),
       content: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(widget.message, style: context.t.bodyMedium!.copyWith(color: widget.warning ? c.text : c.text2)),
+          ..._message(context),
           gap16,
           TextField(
             key: const ValueKey('note'),
@@ -513,10 +556,10 @@ class _DetailsCard extends StatelessWidget {
       title: 'Details',
       child: kv([
         ('Ordered', f.date(o.sn('orderedOn'))),
-        if (o.sn('shipBy') != null) ('Ship by', f.date(o.s('shipBy'))),
-        ('Ready (factory)', o.sn('readyOn') == null ? 'Not known yet' : f.date(o.s('readyOn'))),
-        ('Shipped', o.sn('shippedOn') == null ? 'Not yet' : f.date(o.s('shippedOn'))),
-        ('B/L', o.s('blNo', '—')),
+        if (o.sn('shipBy') case final shipBy?) ('Ship by', f.date(shipBy)),
+        ('Ready (factory)', switch (o.sn('readyOn')) { final d? => f.date(d), null => 'Not known yet' }),
+        ('Shipped', switch (o.sn('shippedOn')) { final d? => f.date(d), null => 'Not yet' }),
+        ('B/L', o.sn('blNo') ?? '—'),
         ('Incoterm', incoterm.isEmpty ? '—' : incoterm),
         ('Handled by', o.m('inquiry').mn('assignee')?.s('name') ?? 'Not assigned'),
       ]),
@@ -590,7 +633,8 @@ class _HistoryCard extends StatelessWidget {
                 Expanded(child: Text(historyTitle(h), style: context.t.bodyMedium!.copyWith(fontWeight: FontWeight.w600))),
                 if (h.b('confirmed')) const ToneBadge('Went ahead', tone: Tone.warn),
               ]),
-              Text('${h.m('by').s('name', 'Someone')} · ${f.dateTime(h.sn('at'))}', style: context.t.bodySmall),
+              // `by` is null for moves the system made (orders from before the four stages).
+              Text('${h.mn('by')?.sn('name') ?? 'System'} · ${f.dateTime(h.sn('at'))}', style: context.t.bodySmall),
               if (h.sn('note') != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text(h.s('note'), style: context.t.bodySmall!.copyWith(color: context.c.text2))),
             ]),
           ),
