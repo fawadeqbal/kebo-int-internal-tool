@@ -1,4 +1,4 @@
-import type { CustomerType, InquiryStage, OrderStatus, Role, TaxTreatment } from "@kebo/shared";
+import type { CustomerType, InquiryStage, OrderStatus, Role } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
@@ -31,7 +31,7 @@ export interface CustomerDetail {
   country: string;
   address: string | null;
   taxNo: string | null;
-  taxTreatment: TaxTreatment;
+  regNo: string | null;
   defaultCurrency: string;
   notes: string | null;
   createdAt: string;
@@ -49,8 +49,6 @@ export interface Factory {
   wechat: string | null;
   email: string | null;
   address: string | null;
-  defaultVatRate: string;
-  pricesIncludeVat: boolean;
   bankDetails: string | null;
   notes: string | null;
   createdAt: string;

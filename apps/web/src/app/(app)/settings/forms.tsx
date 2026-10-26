@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { SettingsKey } from "@kebo/shared";
 import { Card, CardBody, CardFooter, CardHeader, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -9,8 +10,46 @@ import { SETTING_GROUPS, toFormText, type SettingField } from "./groups";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
+/** An image kept in the settings as a data URL (the company stamp): choose, preview, remove. */
+function ImageControl({ f, text, error }: { f: SettingField; text: string; error?: string[] }) {
+  const id = `set-${f.name}`;
+  const [value, setValue] = useState(text);
+  const [problem, setProblem] = useState<string | null>(null);
+  const choose = (file: File | undefined) => {
+    setProblem(null);
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return setProblem("Choose a PNG or JPEG image.");
+    if (file.size > 300 * 1024) return setProblem("This image is over 300 KB. Use a smaller scan.");
+    const reader = new FileReader();
+    reader.onload = () => setValue(String(reader.result));
+    reader.readAsDataURL(file);
+  };
+  return (
+    <Field label={f.label} htmlFor={id} hint={f.hint} error={problem ? [problem] : error} className={cn(f.wide && "sm:col-span-2")}>
+      <div className="flex flex-wrap items-center gap-4">
+        <input type="hidden" name={f.name} value={value} />
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a data URL kept in the settings
+          <img src={value} alt="" className="size-24 rounded-md border border-line bg-white object-contain p-1" />
+        ) : (
+          <div className="flex size-24 items-center justify-center rounded-md border border-dashed border-line text-xs text-muted">No stamp</div>
+        )}
+        <div className="flex flex-col gap-2">
+          <input id={id} type="file" accept="image/png,image/jpeg,image/webp" className="text-sm" onChange={(e) => choose(e.target.files?.[0])} />
+          {value && (
+            <button type="button" className="self-start text-sm text-bad underline-offset-2 hover:underline" onClick={() => setValue("")}>
+              Remove the stamp
+            </button>
+          )}
+        </div>
+      </div>
+    </Field>
+  );
+}
+
 function Control({ f, text, checked, error }: { f: SettingField; text: string; checked: boolean; error?: string[] }) {
   const id = `set-${f.name}`;
+  if (f.kind === "image") return <ImageControl key={text.length} f={f} text={text} error={error} />;
   if (f.kind === "bool")
     return (
       <div className={cn("flex items-start gap-2.5", f.wide && "sm:col-span-2")}>

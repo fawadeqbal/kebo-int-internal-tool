@@ -125,7 +125,8 @@ class CustomerDetailScreen extends ConsumerWidget {
                 child: kv([
                   ('Currency', c.s('defaultCurrency', 'USD')),
                   ('Address', c.s('address', '—')),
-                  ('Tax / Reg. no.', c.s('taxNo', '—')),
+                  ('Business license no.', c.s('taxNo', '—')),
+                  ('Reg. number', c.s('regNo', '—')),
                   ('Customer since', f.date(c.s('createdAt'))),
                 ]),
               ),
@@ -204,6 +205,7 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
   final _otherCountry = TextEditingController();
   final _address = TextEditingController();
   final _taxNo = TextEditingController();
+  final _regNo = TextEditingController();
   final _notes = TextEditingController();
   final _contacts = <ContactDraft>[ContactDraft()];
   bool _sameWhatsApp = true;
@@ -211,7 +213,7 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
 
   @override
   void dispose() {
-    for (final c in [_name, _otherCountry, _address, _taxNo, _notes]) {
+    for (final c in [_name, _otherCountry, _address, _taxNo, _regNo, _notes]) {
       c.dispose();
     }
     for (final c in _contacts) {
@@ -228,6 +230,7 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
         'country': _countryValue,
         if (_address.text.trim().isNotEmpty) 'address': _address.text.trim(),
         if (_taxNo.text.trim().isNotEmpty) 'taxNo': _taxNo.text.trim(),
+        if (_regNo.text.trim().isNotEmpty) 'regNo': _regNo.text.trim(),
         if (_notes.text.trim().isNotEmpty) 'notes': _notes.text.trim(),
         'contacts': [
           for (var i = 0; i < _contacts.length; i++)
@@ -343,7 +346,8 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
           subtitle: 'Optional',
           child: Column(children: [
             Field(label: 'Address', controller: _address, optional: true, maxLines: 3, error: e?.field('address')),
-            Field(label: 'Tax / Reg. no.', controller: _taxNo, optional: true, error: e?.field('taxNo')),
+            Field(label: 'Business license no.', controller: _taxNo, optional: true, error: e?.field('taxNo')),
+            Field(label: 'Reg. number', controller: _regNo, optional: true, error: e?.field('regNo')),
             Field(label: 'Notes', controller: _notes, optional: true, maxLines: 4, error: e?.field('notes')),
           ]),
         ),

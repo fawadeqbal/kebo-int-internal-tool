@@ -8,7 +8,7 @@ import { money, qty } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { SalesSettings, SourcingView } from "@/lib/types-deals";
 import { ChoosePrice, FactoryQuotes } from "@/components/deals/sourcing-board";
-import { choosePriceAction, removeFactoryQuoteAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { choosePriceAction, lookupHsCodeAction, removeFactoryQuoteAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 
 export const metadata = { title: "Factory prices" };
 
@@ -39,7 +39,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
       <Card>
         <CardHeader
           title="Compare by item"
-          description={`Landed cost per unit in ${s.currency}: the factory price with VAT, less the export rebate. ${priced} of ${s.items.length} item${s.items.length === 1 ? "" : "s"} priced.`}
+          description={`Your cost per unit in ${s.currency}: the factory price plus its tax, less the export rebate. ${priced} of ${s.items.length} item${s.items.length === 1 ? "" : "s"} priced.`}
           actions={
             priced > 0 ? (
               <Link href={`/deals/${d.id}/quotation`} className="text-sm font-medium text-primary hover:underline">
@@ -72,7 +72,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                         <tr>
                           <Th>Factory</Th>
                           <Th className="text-right">Their price</Th>
-                          <Th className="text-right">Landed / unit</Th>
+                          <Th className="text-right">Your cost / unit</Th>
                           <Th className="hidden text-right sm:table-cell">For {qty(it.quantity)} {it.unit}</Th>
                           <Th className="relative text-right">
                             <span className="sr-only">Choice</span>
@@ -88,12 +88,11 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                                 {o.id === it.cheapestLineId && it.options.length > 1 && <Badge tone="ok">Cheapest</Badge>}
                               </span>
                               {o.model && <span className="block text-xs text-muted">{o.model}</span>}
+                              <span className="mt-0.5 block text-xs text-text-2">{o.costNote}</span>
                             </Td>
                             <Td className="text-right whitespace-nowrap tabular">
                               {money(o.unitPrice, o.currency)}
-                              <span className="block text-xs text-muted">
-                                VAT {o.vatRate}%{o.rebateRate ? ` · rebate ${o.rebateRate}%` : ""}
-                              </span>
+                              <span className="block text-xs text-muted">without tax</span>
                             </Td>
                             <Td className="text-right font-medium whitespace-nowrap tabular">{o.unitCost === null ? <span className="text-xs font-normal text-warn">No exchange rate</span> : money(o.unitCost, s.currency)}</Td>
                             <Td className="hidden text-right whitespace-nowrap sm:table-cell text-text-2 tabular">{o.unitCost === null ? "—" : formatMinor(multiplyMinor(toMinor(o.unitCost), it.quantity), s.currency)}</Td>
@@ -120,6 +119,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
         saveAction={saveFactoryQuoteAction.bind(null, d.id)}
         removeAction={removeFactoryQuoteAction.bind(null, d.id)}
         searchFactories={searchFactoriesAction}
+        lookupHsCode={lookupHsCodeAction}
       />
     </div>
   );

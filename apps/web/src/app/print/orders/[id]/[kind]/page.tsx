@@ -8,6 +8,7 @@ import { date, money, qty } from "@/lib/format";
 import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
 import { Columns, customerLines, Describe, FactsBox, Letterhead, LinesTable, num, PartyBox, Sheet, SignOff, TextBlock, Totals } from "@/components/print/doc";
 import { PrintToolbar } from "@/components/print/toolbar";
+import { KeboProforma } from "@/components/print/kebo-proforma";
 import { backTo, customerOr } from "@/components/print/data";
 
 /** Weights with up to 2 decimals and volume with up to 3; blank when not recorded. */
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 /**
  * An order's documents, made from the order itself (GET /orders/:id/documents/:kind):
- *  - proforma: the whole order, asking for the deposit, with Kebo's bank details;
+ *  - proforma: Kebo's own layout (components/print/kebo-proforma.tsx);
  *  - invoice: the whole order, with what was received and the balance due;
  *  - packing-list: the goods only, without prices.
  */
@@ -39,11 +40,18 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
   const d = await getDoc(id, kind);
   // Customer snapshots imported from the old system may be empty: then the customer as it is now.
   const customer = await customerOr(d.customer, async () => ({ customerId: (await api.get<{ customer: { id: string } }>(`/orders/${id}`)).customer.id })).catch(() => d.customer);
+  // The proforma is laid out exactly like the one Kebo makes in Word.
+  if (d.kind === "proforma")
+    return (
+      <>
+        <PrintToolbar title={`${d.title} ${d.number}`} backHref={backTo(sp.back, `/orders/${d.order.id}`)} pdfHref={`/pdf/${d.kind}/${d.order.id}`} />
+        <KeboProforma doc={{ ...d, customer }} customerCountry={customer.country} />
+      </>
+    );
   const c = d.currency;
   const t = d.totals;
   const o = d.order;
   const incoterm = `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
-  const proforma = d.kind === "proforma";
   const invoice = d.kind === "invoice";
   const vat = t && t.vatRate > 0 ? `${t.pricesIncludeVat ? "Incl. " : ""}VAT ${t.vatRate}%` : null;
   const cancelled = o.status === "cancelled";
@@ -64,21 +72,20 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
             { label: "Date", value: date(d.date) },
             { label: "Our order", value: o.refNo },
             { label: "Quotation", value: o.quotation },
-            ...(!proforma && o.blNo ? [{ label: "B/L number", value: o.blNo }] : []),
+            ...(o.blNo ? [{ label: "B/L number", value: o.blNo }] : []),
           ]}
         />
         <Columns>
-          <PartyBox title={proforma ? "Bill to" : invoice ? "Sold to (consignee)" : "Consignee"} party={customerLines(customer)} />
+          <PartyBox title={invoice ? "Sold to (consignee)" : "Consignee"} party={customerLines(customer)} />
           <FactsBox
-            title={proforma ? "Terms" : "Shipment and terms"}
+            title="Shipment and terms"
             items={[
               { label: "Incoterm", value: `${incoterm} (Incoterms® 2020)` },
               { label: "Payment", value: d.kind === "packing-list" ? null : d.paymentTerms },
               { label: "Currency", value: d.kind === "packing-list" ? null : c },
-              { label: "Country of origin", value: proforma ? null : "China" },
-              { label: "Ship by", value: proforma && o.shipBy ? date(o.shipBy) : null },
-              { label: "Shipped on", value: !proforma && o.shippedOn ? date(o.shippedOn) : null },
-              { label: "B/L number", value: !proforma ? o.blNo : null },
+              { label: "Country of origin", value: "China" },
+              { label: "Shipped on", value: o.shippedOn ? date(o.shippedOn) : null },
+              { label: "B/L number", value: o.blNo },
             ]}
           />
         </Columns>
@@ -105,15 +112,7 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
                 { label: vat ?? "VAT", value: vat ? money(t.vat, c) : null },
               ]}
               extra={
-                proforma && Number(t.deposit) > 0 ? (
-                  <div className="mt-2 rounded-md border-2 border-kebo-gold px-2 py-1.5">
-                    <div className="flex items-baseline justify-between gap-3 text-[10pt] font-bold whitespace-nowrap">
-                      <span>Deposit to pay ({t.depositPercent}%)</span>
-                      <span className="tabular">{money(t.deposit, c)}</span>
-                    </div>
-                    <p className="mt-0.5 text-[7.5pt] text-[#475569]">{amountInWords(toMinor(t.deposit), c)}</p>
-                  </div>
-                ) : invoice ? (
+                invoice ? (
                   <dl className="mt-2 text-[9pt]">
                     <div className="flex justify-between gap-4 border-b border-kebo-line px-2 py-1">
                       <dt className="text-[#475569]">Received with thanks</dt>
@@ -185,7 +184,7 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
             </div>
           </>
         )}
-        {(proforma || invoice) && d.bankDetails && (
+        {invoice && d.bankDetails && (
           <section className="mt-5 break-inside-avoid rounded-md border border-kebo-line bg-kebo-paper px-3 py-2">
             <h2 className="mb-1 text-[7.5pt] font-semibold tracking-[0.08em] text-kebo-deep uppercase">Pay by bank transfer to</h2>
             <p className="font-mono text-[8.5pt] whitespace-pre-line">{d.bankDetails}</p>
@@ -195,7 +194,7 @@ export default async function OrderDocumentPrint({ params, searchParams }: { par
         <TextBlock title="Terms and conditions">{d.terms}</TextBlock>
         <SignOff
           left={`For and on behalf of ${d.company.name}`}
-          right={proforma ? "Confirmed by the buyer (signature, stamp and date)" : undefined}
+
           footer={d.kind === "packing-list" ? null : d.footer}
         />
       </Sheet>

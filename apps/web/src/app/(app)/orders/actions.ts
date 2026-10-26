@@ -34,7 +34,7 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.patch(`/orders/${orderId}/details`, { shipBy: v.shipBy || null, readyOn: v.readyOn || null, shippedOn: v.shippedOn || null, blNo: v.blNo?.trim() || null }),
+    () => api.patch(`/orders/${orderId}/details`, { shipBy: v.shipBy || null, readyOn: v.readyOn || null, shippedOn: v.shippedOn || null, blNo: v.blNo?.trim() || null, documentTitle: v.documentTitle?.trim() || null, portOfDischarge: v.portOfDischarge?.trim() || null }),
     "Details saved.",
   );
   if (r.ok) refresh(orderId);
@@ -53,6 +53,15 @@ export async function receiptAction(orderId: string, _prev: ActionState, form: F
 /** The packing list: payload { containerNo, shippingMarks, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] }. */
 export async function packingAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.put(`/orders/${orderId}/packing`, formBody(form)), "Packing list saved.");
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
+/** The export rebate paperwork: one date at a time (the factory's VAT invoice received, the rebate filed); empty clears it. */
+export async function orderTaxAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  if (v.field !== "vatInvoiceReceivedOn" && v.field !== "rebateFiledOn") return { ok: false, message: "Something went wrong. Please try again." };
+  const r = await attempt(form, () => api.patch(`/orders/${orderId}/tax`, { [v.field]: v.value || null }), "Saved.");
   if (r.ok) refresh(orderId);
   return r;
 }

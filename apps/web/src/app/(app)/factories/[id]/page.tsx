@@ -21,7 +21,7 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
         backHref="/factories"
         backLabel="Factories"
         title={f.name}
-        description={[f.contactPerson, `VAT ${Number(f.defaultVatRate)}% ${f.pricesIncludeVat ? "included in their prices" : "added on top"}`].filter(Boolean).join(" · ")}
+        description={f.contactPerson ?? undefined}
         actions={<ButtonLink href={`/factories/${f.id}/edit`} size="sm">Edit factory</ButtonLink>}
       />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -71,7 +71,6 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
                   { label: "WeChat", value: f.wechat },
                   { label: "Email", value: f.email && <a href={`mailto:${f.email}`} className="break-all hover:underline">{f.email}</a> },
                   { label: "Address", value: f.address && <span className="whitespace-pre-line">{f.address}</span> },
-                  { label: "VAT on their prices", value: `${Number(f.defaultVatRate)}%, ${f.pricesIncludeVat ? "included" : "added on top"}` },
                   { label: "Bank details", value: f.bankDetails && <span className="whitespace-pre-line">{f.bankDetails}</span> },
                   { label: "Notes", value: f.notes && <span className="whitespace-pre-line">{f.notes}</span>, hidden: !f.notes },
                   { label: "Added", value: date(f.createdAt) },

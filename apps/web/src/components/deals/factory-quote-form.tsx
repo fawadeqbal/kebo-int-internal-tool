@@ -3,14 +3,23 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Factory, Loader2, Plus } from "lucide-react";
 import { convertMinor, formatMinor, fxRate, toMinor, unitCostMinor } from "@kebo/money";
-import { Button, Checkbox, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
+import { costSentence, DEFAULT_FACTORY_VAT, REBATE_CHOICES, TAX_CHOICES } from "@kebo/shared";
+import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { PercentChoice } from "@/components/common/percent-choice";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOption, FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 import { ErrorText, MiniLabel, move, numberText, RowButtons, rowKey } from "./form-bits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
+
+/** The export rebate remembered for an HS code: null the first time, undefined when it cannot be checked. */
+export type HsLookup = (code: string) => Promise<{ rebateRate: number; description: string | null } | null | undefined>;
+
+const TAX_OPTIONS = TAX_CHOICES.map((value) => ({ value }));
+const REBATE_OPTIONS = REBATE_CHOICES.map((value) => ({ value }));
+const cleanHs = (v: string) => v.replace(/\s+/g, "");
 
 interface LineState {
   key: string;
@@ -21,15 +30,20 @@ interface LineState {
   quantity: string;
   unit: string;
   unitPrice: string;
-  vatRate: string;
+  hsCode: string;
   rebateRate: string;
+  /** The HS code last looked up, and what was found (client only). */
+  hsChecked: string;
+  hsKnown: { rebateRate: number; description: string | null } | null;
+  hsNew: boolean;
 }
 
 interface QuoteState {
   factory: { id: string | null; name: string } | null;
   reference: string;
   currency: string;
-  pricesIncludeVat: boolean;
+  /** Tax % added on top of the prices (they are without tax). */
+  vatRate: string;
   receivedOn: string;
   validUntil: string;
   priceBasis: string;
@@ -43,7 +57,9 @@ interface QuoteState {
 type Item = SourcingView["items"][number];
 
 // Keys of the first rows are fixed (from the item), so the server and browser render the same ids.
-const lineFromItem = (it: Item, vatRate = "13"): LineState => ({
+const blankHs = { hsChecked: "", hsKnown: null, hsNew: false };
+
+const lineFromItem = (it: Item): LineState => ({
   key: `item-${it.id}`,
   id: null,
   requestedItemId: it.id,
@@ -52,8 +68,9 @@ const lineFromItem = (it: Item, vatRate = "13"): LineState => ({
   quantity: it.quantity,
   unit: it.unit,
   unitPrice: "",
-  vatRate,
-  rebateRate: "0",
+  hsCode: "",
+  rebateRate: "",
+  ...blankHs,
 });
 
 function initialState(quote: FactoryQuoteView | null, items: Item[], today: string): QuoteState {
@@ -62,7 +79,7 @@ function initialState(quote: FactoryQuoteView | null, items: Item[], today: stri
       factory: { id: quote.factory.id, name: quote.factory.name },
       reference: quote.reference ?? "",
       currency: quote.currency,
-      pricesIncludeVat: quote.pricesIncludeVat,
+      vatRate: String(quote.vatRate),
       receivedOn: quote.receivedOn,
       validUntil: quote.validUntil ?? "",
       priceBasis: quote.priceBasis ?? "",
@@ -79,15 +96,18 @@ function initialState(quote: FactoryQuoteView | null, items: Item[], today: stri
         quantity: l.quantity,
         unit: l.unit,
         unitPrice: l.unitPrice,
-        vatRate: String(l.vatRate),
+        hsCode: l.hsCode ?? "",
         rebateRate: String(l.rebateRate),
+        ...blankHs,
+        // A saved code is not looked up again unless it changes.
+        hsChecked: l.hsCode ?? "",
       })),
     };
   return {
     factory: null,
     reference: "",
     currency: "CNY",
-    pricesIncludeVat: true,
+    vatRate: String(DEFAULT_FACTORY_VAT),
     receivedOn: today,
     validUntil: "",
     priceBasis: "",
@@ -107,7 +127,7 @@ function payload(s: QuoteState) {
     receivedOn: s.receivedOn,
     validUntil: s.validUntil || null,
     currency: s.currency.trim().toUpperCase(),
-    pricesIncludeVat: s.pricesIncludeVat,
+    vatRate: numberText(s.vatRate),
     priceBasis: s.priceBasis,
     leadTime: s.leadTime,
     moq: s.moq,
@@ -121,7 +141,7 @@ function payload(s: QuoteState) {
       quantity: numberText(l.quantity),
       unit: l.unit.trim() || "pcs",
       unitPrice: numberText(l.unitPrice),
-      vatRate: numberText(l.vatRate),
+      hsCode: cleanHs(l.hsCode) || null,
       rebateRate: numberText(l.rebateRate),
     })),
   };
@@ -213,9 +233,7 @@ function FactoryPicker({ value, onChange, search, error }: { value: QuoteState["
               className="cursor-pointer rounded-lg px-2.5 py-2 hover:bg-surface-2"
             >
               <p className="truncate text-sm font-medium">{f.name}</p>
-              <p className="truncate text-xs text-muted">
-                {f.contactPerson ? `${f.contactPerson} · ` : ""}VAT {Number(f.defaultVatRate)}% {f.pricesIncludeVat ? "included" : "on top"}
-              </p>
+              {f.contactPerson && <p className="truncate text-xs text-muted">{f.contactPerson}</p>}
             </li>
           ))}
           {typed && !exact && (
@@ -239,9 +257,11 @@ function FactoryPicker({ value, onChange, search, error }: { value: QuoteState["
 }
 
 /**
- * One factory's prices for this deal: who, in what currency, with or without
- * VAT, and a price per requested item. Shows the landed unit cost in the
- * selling currency as you type (the same maths as the API).
+ * One factory's prices for this deal: who, in what currency, the tax % added
+ * on top (prices are always without tax), and a price per requested item with
+ * its HS code and export rebate. Each line explains itself as you type
+ * ("CNY 100.00 + 13% tax = CNY 113.00 · 13% rebate back · your cost CNY 100.00")
+ * with the same maths as the API, plus the cost in the selling currency.
  */
 export function FactoryQuoteForm({
   action,
@@ -251,6 +271,7 @@ export function FactoryQuoteForm({
   mainCurrency,
   rates,
   searchFactories,
+  lookupHsCode,
   onDone,
 }: {
   action: Action;
@@ -260,6 +281,7 @@ export function FactoryQuoteForm({
   mainCurrency: string;
   rates: Record<string, number>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
+  lookupHsCode: HsLookup;
   onDone: () => void;
 }) {
   const [s, setS] = useState<QuoteState>(() => initialState(quote, items, today));
@@ -269,11 +291,38 @@ export function FactoryQuoteForm({
   const rate = /^[A-Z]{3}$/.test(currency) ? fxRate(currency, mainCurrency, mainCurrency, rates) : null;
   const known = [mainCurrency, ...Object.keys(rates)];
 
-  const landed = (l: LineState) => {
+  const vatRate = Number(numberText(s.vatRate)) || 0;
+  const setLineByKey = (key: string, patch: Partial<LineState>) => setS((st) => ({ ...st, lines: st.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) }));
+
+  /** A line's cost in the factory's currency (price + tax − rebate) and in the selling currency; null without a price. */
+  const costOf = (l: LineState) => {
     const price = numberText(l.unitPrice);
-    if (!price || !Number.isFinite(Number(price)) || rate === null) return null;
-    const cost = unitCostMinor({ unitPriceMinor: toMinor(price), vatRate: Number(numberText(l.vatRate)) || 0, pricesIncludeVat: s.pricesIncludeVat, rebateRate: Number(numberText(l.rebateRate)) || 0 });
-    return convertMinor(cost, rate);
+    if (!price || !Number.isFinite(Number(price))) return null;
+    const unitPriceMinor = toMinor(price);
+    const rebateRate = Number(numberText(l.rebateRate)) || 0;
+    const costMinor = unitCostMinor({ unitPriceMinor, vatRate, pricesIncludeVat: false, rebateRate });
+    return {
+      sentence: costSentence({ unitPriceMinor, vatRate, rebateRate, costMinor, currency: currency || "—" }),
+      landed: rate === null ? null : convertMinor(costMinor, rate),
+    };
+  };
+
+  /** When an HS code is typed, start from the rebate remembered for it. */
+  const checkHs = async (key: string, typed: string) => {
+    const code = cleanHs(typed);
+    const line = s.lines.find((l) => l.key === key);
+    if (!line || code === line.hsChecked) return;
+    if (!/^[0-9.]{2,20}$/.test(code)) return setLineByKey(key, { ...blankHs, hsChecked: code });
+    const found = await lookupHsCode(code);
+    setS((st) => ({
+      ...st,
+      lines: st.lines.map((l) => {
+        if (l.key !== key || cleanHs(l.hsCode) !== code) return l;
+        if (found === undefined) return { ...l, ...blankHs };
+        if (found === null) return { ...l, hsChecked: code, hsKnown: null, hsNew: true };
+        return { ...l, hsChecked: code, hsKnown: found, hsNew: false, rebateRate: String(found.rebateRate) };
+      }),
+    }));
   };
 
   const linkItem = (i: number, itemId: string) => {
@@ -300,10 +349,7 @@ export function FactoryQuoteForm({
                 value={s.factory}
                 search={searchFactories}
                 error={st.errors?.factoryId}
-                onChange={(f, k) => {
-                  set("factory", f);
-                  if (k && !quote) setS((x) => ({ ...x, factory: f, pricesIncludeVat: k.pricesIncludeVat, lines: x.lines.map((l) => ({ ...l, vatRate: String(Number(k.defaultVatRate)) })) }));
-                }}
+                onChange={(f) => set("factory", f)}
               />
             </Field>
             <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
@@ -323,12 +369,9 @@ export function FactoryQuoteForm({
             <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil}>
               <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
             </Field>
-            <div className="flex items-center gap-2 md:col-span-3">
-              <Checkbox id="pricesIncludeVat" checked={s.pricesIncludeVat} onChange={(e) => set("pricesIncludeVat", e.target.checked)} />
-              <label htmlFor="pricesIncludeVat" className="text-sm">
-                Prices include VAT <span className="text-muted">(Chinese factories usually quote with 13% VAT included)</span>
-              </label>
-            </div>
+            <Field label="Tax added on top" htmlFor="fq-vat" error={st.errors?.vatRate} hint="Prices are without tax" className="md:col-span-2">
+              <PercentChoice id="fq-vat" label="Tax added on top" value={s.vatRate} onChange={(v) => set("vatRate", v)} choices={TAX_OPTIONS} invalid={!!st.errors?.vatRate} />
+            </Field>
             <Field label="Price basis" htmlFor="priceBasis" optional error={st.errors?.priceBasis}>
               <Input id="priceBasis" value={s.priceBasis} onChange={(e) => set("priceBasis", e.target.value)} maxLength={60} list="fq-basis" placeholder="e.g. EXW factory" />
               <datalist id="fq-basis">
@@ -352,7 +395,10 @@ export function FactoryQuoteForm({
             <h3 className="mb-2 text-sm font-semibold">Prices</h3>
             <ol className="flex flex-col gap-3">
               {s.lines.map((l, i) => {
-                const cost = landed(l);
+                const cost = costOf(l);
+                const err = (f: string) => st.errors?.[`lines.${i}.${f}`];
+                const remembered = l.hsKnown && cleanHs(l.hsCode) === l.hsChecked ? l.hsKnown : null;
+                const rebateNow = numberText(l.rebateRate);
                 return (
                   <li key={l.key} className="rounded-lg border border-line p-3">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -374,7 +420,8 @@ export function FactoryQuoteForm({
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-8">
                       <div className="col-span-2 sm:col-span-5">
                         <MiniLabel htmlFor={`fq-desc-${l.key}`}>Description (as the factory wrote it)</MiniLabel>
-                        <Input id={`fq-desc-${l.key}`} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
+                        <Input id={`fq-desc-${l.key}`} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} aria-invalid={!!err("description") || undefined} />
+                        <ErrorText error={err("description")} />
                       </div>
                       <div className="col-span-2 sm:col-span-3">
                         <MiniLabel htmlFor={`fq-model-${l.key}`}>Model</MiniLabel>
@@ -382,36 +429,63 @@ export function FactoryQuoteForm({
                       </div>
                       <div>
                         <MiniLabel htmlFor={`fq-qty-${l.key}`}>Quantity</MiniLabel>
-                        <Input id={`fq-qty-${l.key}`} inputMode="decimal" className="tabular" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
+                        <Input id={`fq-qty-${l.key}`} inputMode="decimal" className="tabular" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} aria-invalid={!!err("quantity") || undefined} />
+                        <ErrorText error={err("quantity")} />
                       </div>
                       <div>
                         <MiniLabel htmlFor={`fq-unit-${l.key}`}>Unit</MiniLabel>
                         <Input id={`fq-unit-${l.key}`} value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })} maxLength={20} />
                       </div>
                       <div className="col-span-2">
-                        <MiniLabel htmlFor={`fq-price-${l.key}`}>Unit price ({currency || "—"})</MiniLabel>
-                        <Input id={`fq-price-${l.key}`} inputMode="decimal" className="tabular" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} />
+                        <MiniLabel htmlFor={`fq-price-${l.key}`}>Unit price without tax ({currency || "—"})</MiniLabel>
+                        <Input id={`fq-price-${l.key}`} inputMode="decimal" className="tabular" value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} aria-invalid={!!err("unitPrice") || undefined} />
+                        <ErrorText error={err("unitPrice")} />
                       </div>
-                      <div>
-                        <MiniLabel htmlFor={`fq-vat-${l.key}`}>VAT %</MiniLabel>
-                        <Input id={`fq-vat-${l.key}`} inputMode="decimal" className="tabular" value={l.vatRate} onChange={(e) => setLine(i, { vatRate: e.target.value })} />
+                      <div className="col-span-2 sm:col-span-2">
+                        <MiniLabel htmlFor={`fq-hs-${l.key}`}>
+                          HS code <span className="text-muted/80">optional</span>
+                        </MiniLabel>
+                        <Input
+                          id={`fq-hs-${l.key}`}
+                          inputMode="decimal"
+                          className="tabular"
+                          value={l.hsCode}
+                          maxLength={20}
+                          placeholder="e.g. 8437.80"
+                          onChange={(e) => setLine(i, { hsCode: e.target.value })}
+                          onBlur={(e) => void checkHs(l.key, e.target.value)}
+                          aria-invalid={!!err("hsCode") || undefined}
+                        />
+                        <ErrorText error={err("hsCode")} />
                       </div>
-                      <div>
-                        <MiniLabel htmlFor={`fq-rebate-${l.key}`}>Rebate %</MiniLabel>
-                        <Input id={`fq-rebate-${l.key}`} inputMode="decimal" className="tabular" value={l.rebateRate} onChange={(e) => setLine(i, { rebateRate: e.target.value })} title="Export VAT rebate rate for this product's HS code (0 when not claimed)" />
+                      <div className="col-span-2 flex flex-col justify-end sm:col-span-2">
+                        <span className="mb-1 block text-xs text-muted">Your cost / unit ({mainCurrency})</span>
+                        <span className="flex h-9 items-center text-sm font-medium tabular">{cost === null ? <span className="text-xs font-normal text-muted">Enter a price</span> : cost.landed === null ? <span className="text-xs font-normal text-warn">No exchange rate</span> : formatMinor(cost.landed, mainCurrency)}</span>
                       </div>
-                      <div className="col-span-2 flex flex-col justify-end">
-                        <span className="mb-1 block text-xs text-muted">Landed cost / unit</span>
-                        <span className="flex h-9 items-center text-sm font-medium tabular">{cost === null ? <span className="text-xs font-normal text-muted">{rate === null ? "No exchange rate" : "Enter a price"}</span> : formatMinor(cost, mainCurrency)}</span>
+                      <div className="col-span-2 sm:col-span-8">
+                        <MiniLabel htmlFor={`fq-rebate-${l.key}`}>Export rebate</MiniLabel>
+                        <PercentChoice id={`fq-rebate-${l.key}`} label={`Export rebate for price ${i + 1}`} value={l.rebateRate} onChange={(v) => setLine(i, { rebateRate: v })} choices={REBATE_OPTIONS} invalid={!!err("rebateRate")} />
+                        {err("rebateRate") ? (
+                          <ErrorText error={err("rebateRate")} />
+                        ) : l.hsNew && cleanHs(l.hsCode) === l.hsChecked ? (
+                          <p className="mt-1 text-xs text-primary">New HS code: choose its rebate — it will be remembered</p>
+                        ) : remembered ? (
+                          <p className="mt-1 text-xs text-muted">
+                            {rebateNow !== "" && Number(rebateNow) !== remembered.rebateRate
+                              ? `HS ${l.hsChecked} was ${remembered.rebateRate}%: saving remembers ${rebateNow}% instead`
+                              : `Remembered for HS ${l.hsChecked}${remembered.description ? ` (${remembered.description})` : ""}`}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
+                    {cost && <p className="mt-2 rounded-md bg-surface-2/70 px-2.5 py-1.5 text-xs text-text-2 tabular">{cost.sentence}</p>}
                   </li>
                 );
               })}
             </ol>
-            <ErrorText error={st.errors?.lines} />
+            {!Object.keys(st.errors ?? {}).some((k) => k.startsWith("lines.")) && <ErrorText error={st.errors?.lines} />}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => setS((x) => ({ ...x, lines: [...x.lines, { key: rowKey(), id: null, requestedItemId: "", description: "", model: "", quantity: "1", unit: "pcs", unitPrice: "", vatRate: x.lines[0]?.vatRate ?? "13", rebateRate: "0" }] }))}>
+              <Button size="sm" onClick={() => setS((x) => ({ ...x, lines: [...x.lines, { key: rowKey(), id: null, requestedItemId: "", description: "", model: "", quantity: "1", unit: "pcs", unitPrice: "", hsCode: "", rebateRate: "", ...blankHs }] }))}>
                 <Plus aria-hidden /> Add a price
               </Button>
             </div>

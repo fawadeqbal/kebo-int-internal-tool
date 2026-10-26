@@ -1,4 +1,5 @@
 import type { INestApplication } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { ErrorFilter } from "./common/http/error.filter";
@@ -10,6 +11,8 @@ export function configureApp(app: INestApplication, env: Env) {
   // req.ip honours X-Forwarded-For only for the configured number of proxy hops.
   (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set("trust proxy", env.TRUST_PROXY);
   app.use(helmet());
+  // Room for the company stamp image in the settings (a data URL of up to ~400 KB).
+  (app as NestExpressApplication).useBodyParser("json", { limit: "1mb" });
   app.enableCors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false, credentials: true });
   app.useGlobalFilters(new ErrorFilter());
   app.enableShutdownHooks();

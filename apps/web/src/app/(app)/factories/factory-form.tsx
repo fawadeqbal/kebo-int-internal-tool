@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { buttonClass, Card, CardBody, CardFooter, CardHeader, Checkbox, Field, Input, Textarea } from "@kebo/ui";
+import { buttonClass, Card, CardBody, CardFooter, CardHeader, Field, Input, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -15,7 +15,6 @@ export function FactoryForm({ action, factory, cancelHref }: { action: Action; f
     <ActionForm action={action}>
       {(s) => {
         const val = (k: keyof Factory) => s.values?.[k] ?? (factory?.[k] === null || factory?.[k] === undefined ? "" : String(factory[k]));
-        const includesVat = s.values ? s.values.pricesIncludeVat === "on" : (factory?.pricesIncludeVat ?? true);
         return (
           <Card>
             <CardHeader title="Factory" description="Shared by the whole team; never shown to customers" />
@@ -38,16 +37,6 @@ export function FactoryForm({ action, factory, cancelHref }: { action: Action; f
               <Field label="Address" htmlFor="address" optional error={s.errors?.address} className="sm:col-span-2">
                 <Textarea id="address" name="address" rows={2} className="min-h-0" defaultValue={val("address")} />
               </Field>
-              <Field label="Their usual VAT rate (%)" htmlFor="defaultVatRate" error={s.errors?.defaultVatRate} hint="13% for goods, 6% for services. Leave empty for 13%.">
-                <Input id="defaultVatRate" name="defaultVatRate" inputMode="decimal" defaultValue={factory || s.values ? val("defaultVatRate") : "13"} aria-invalid={!!s.errors?.defaultVatRate} />
-              </Field>
-              <div className="flex items-start gap-2.5 pt-7">
-                <Checkbox id="pricesIncludeVat" name="pricesIncludeVat" defaultChecked={includesVat} className="mt-0.5" />
-                <label htmlFor="pricesIncludeVat" className="text-sm">
-                  <span className="font-medium">Their prices include VAT</span>
-                  <span className="block text-xs text-muted">Most Chinese factories quote with VAT included. Untick if they add it on top.</span>
-                </label>
-              </div>
               <Field label="Bank details" htmlFor="bankDetails" optional error={s.errors?.bankDetails} className="sm:col-span-2" hint="Account name, bank, account number, for paying them">
                 <Textarea id="bankDetails" name="bankDetails" rows={3} defaultValue={val("bankDetails")} />
               </Field>

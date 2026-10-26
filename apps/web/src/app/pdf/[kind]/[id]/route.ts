@@ -126,14 +126,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
       return new Response("The document could not be rendered. Please try again.", { status: 502 });
     }
     await page.evaluate(() => document.fonts.ready);
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      displayHeaderFooter: true,
-      headerTemplate: "<span></span>",
-      footerTemplate: FOOTER,
-      margin: { top: "14mm", right: "14mm", bottom: "18mm", left: "14mm" },
-    });
+    const pdf = await page.pdf(
+      kind === "proforma"
+        ? // Kebo's own proforma layout: its page margins, no footer (as the Word original).
+          { format: "A4", printBackground: true, margin: { top: "40pt", right: "21.2pt", bottom: "40pt", left: "14.2pt" } }
+        : {
+            format: "A4",
+            printBackground: true,
+            displayHeaderFooter: true,
+            headerTemplate: "<span></span>",
+            footerTemplate: FOOTER,
+            margin: { top: "14mm", right: "14mm", bottom: "18mm", left: "14mm" },
+          },
+    );
     const file = `${target.name.replace(/[^\w.() -]+/g, "-")}.pdf`;
     return new Response(Buffer.from(pdf), {
       headers: {

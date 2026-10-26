@@ -125,7 +125,7 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
 
         <H2>Estimated profit</H2>
         <p className="text-[8pt] text-[#64748b]">
-          On {t.orders} order{t.orders === 1 ? "" : "s"} made in the period, from the costs recorded on their lines (sales after discount, without VAT).
+          On {t.orders} order{t.orders === 1 ? "" : "s"} made in the period, from the costs recorded on their lines (sales after discount, without tax).
           {t.coveragePercent !== null && t.coveragePercent < 100 ? ` Only ${t.coveragePercent}% of sales have a cost; lines without one are left out of profit and margin.` : ""}
         </p>
         <Tiles

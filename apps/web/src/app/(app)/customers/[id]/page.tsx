@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Mail, MessageCircle, Phone, Star } from "lucide-react";
-import { can, CUSTOMER_TYPE_LABEL, TAX_TREATMENT_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
+import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
 import { Badge, ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, PageHeader, StageBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
@@ -48,7 +48,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       />
       {c.country === UNKNOWN_COUNTRY && (
         <p className="mb-4 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-sm">
-          This customer&apos;s country is not set yet. {canEdit ? <Link href={`/customers/${c.id}/edit`} className="font-medium underline">Add it</Link> : "Ask someone to add it"} — it decides VAT and shipping.
+          This customer&apos;s country is not set yet. {canEdit ? <Link href={`/customers/${c.id}/edit`} className="font-medium underline">Add it</Link> : "Ask someone to add it"} — it decides tax and shipping.
         </p>
       )}
 
@@ -193,8 +193,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   { label: "Country", value: c.country === UNKNOWN_COUNTRY ? <span className="text-warn">Not known yet</span> : `${countryName(c.country)} (${c.country})` },
                   { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, hidden: !c.address },
                   { label: "Currency they pay in", value: c.defaultCurrency },
-                  { label: "VAT", value: TAX_TREATMENT_LABEL[c.taxTreatment] },
-                  { label: "Tax or company number", value: c.taxNo, hidden: !c.taxNo },
+                  { label: "Business license number", value: c.taxNo, hidden: !c.taxNo },
+                  { label: "Reg. number", value: c.regNo, hidden: !c.regNo },
                   { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, hidden: !c.notes },
                   { label: "Added", value: date(c.createdAt) },
                 ]}

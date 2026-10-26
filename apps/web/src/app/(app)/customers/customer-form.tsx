@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Plus, Star, Trash2 } from "lucide-react";
-import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES, TAX_TREATMENT_LABEL, TAX_TREATMENTS, UNKNOWN_COUNTRY, type CustomerType, type TaxTreatment } from "@kebo/shared";
+import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES, UNKNOWN_COUNTRY, type CustomerType } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardBody, CardFooter, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -21,7 +21,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 const DRAFT = "customer-draft";
 
 type ContactDraft = { key: string; id: string | null; name: string; position: string; email: string; phone: string; whatsapp: string; wechat: string; isPrimary: boolean };
-type Draft = { type: CustomerType; name: string; country: string; address: string; taxNo: string; taxTreatment: TaxTreatment; defaultCurrency: string; notes: string };
+type Draft = { type: CustomerType; name: string; country: string; address: string; taxNo: string; regNo: string; defaultCurrency: string; notes: string };
 
 let seq = 0;
 const newKey = () => `new-${++seq}`;
@@ -46,7 +46,7 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
     country: customer?.country ?? UNKNOWN_COUNTRY,
     address: customer?.address ?? "",
     taxNo: customer?.taxNo ?? "",
-    taxTreatment: customer?.taxTreatment ?? "export_zero_rated",
+    regNo: customer?.regNo ?? "",
     defaultCurrency: customer?.defaultCurrency ?? currencies[0] ?? "USD",
     notes: customer?.notes ?? "",
   }));
@@ -90,7 +90,7 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
                 label="Country"
                 htmlFor="country"
                 error={s.errors?.country}
-                hint={draft.country === UNKNOWN_COUNTRY ? <span className="text-warn">Set it as soon as you know: it decides VAT and shipping.</span> : "Where the goods are shipped to"}
+                hint={draft.country === UNKNOWN_COUNTRY ? <span className="text-warn">Set it as soon as you know: it decides tax and shipping.</span> : draft.country === "CN" ? "Quotations add 13% tax (customer in China)" : "Where the goods are shipped to · export, no tax"}
               >
                 <CountrySelect form={DRAFT} id="country" value={draft.country} onChange={(e) => set("country", e.target.value)} aria-invalid={!!s.errors?.country} />
               </Field>
@@ -106,17 +106,11 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
                   ))}
                 </Select>
               </Field>
-              <Field label="VAT" htmlFor="taxTreatment" error={s.errors?.taxTreatment} hint="Export sales carry no Chinese VAT; domestic sales do">
-                <Select form={DRAFT} id="taxTreatment" value={draft.taxTreatment} onChange={(e) => set("taxTreatment", e.target.value as TaxTreatment)}>
-                  {TAX_TREATMENTS.map((t) => (
-                    <option key={t} value={t}>
-                      {TAX_TREATMENT_LABEL[t]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Tax or company number" htmlFor="taxNo" optional error={s.errors?.taxNo} hint="Printed on invoices when given">
+              <Field label="Business license number" htmlFor="taxNo" optional error={s.errors?.taxNo} hint="Printed on the proforma invoice when given">
                 <Input form={DRAFT} id="taxNo" value={draft.taxNo} onChange={(e) => set("taxNo", e.target.value)} />
+              </Field>
+              <Field label="Reg. number" htmlFor="regNo" optional error={s.errors?.regNo} hint="Printed on the proforma invoice when given">
+                <Input form={DRAFT} id="regNo" value={draft.regNo} onChange={(e) => set("regNo", e.target.value)} />
               </Field>
               <Field label="Notes" htmlFor="notes" optional error={s.errors?.notes} className="sm:col-span-2" hint="Only the team sees these">
                 <Textarea form={DRAFT} id="notes" rows={3} value={draft.notes} onChange={(e) => set("notes", e.target.value)} />

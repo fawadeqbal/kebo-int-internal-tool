@@ -8,7 +8,7 @@ import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, money as amount, qty as qtyText } from "@/lib/format";
 import type { FactoryOption, FactoryQuoteView, SourcingView } from "@/lib/types-deals";
-import { FactoryQuoteForm } from "./factory-quote-form";
+import { FactoryQuoteForm, type HsLookup } from "./factory-quote-form";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -46,6 +46,7 @@ export function FactoryQuotes({
   saveAction,
   removeAction,
   searchFactories,
+  lookupHsCode,
 }: {
   quotes: FactoryQuoteView[];
   items: SourcingView["items"];
@@ -57,6 +58,7 @@ export function FactoryQuotes({
   saveAction: (quoteId: string | null, prev: ActionState, form: FormData) => Promise<ActionState>;
   removeAction: (quoteId: string, prev: ActionState, form: FormData) => Promise<ActionState>;
   searchFactories: (q: string) => Promise<FactoryOption[]>;
+  lookupHsCode: HsLookup;
 }) {
   const [editing, setEditing] = useState<string | null>(quotes.length === 0 && canEdit ? "new" : null);
   const itemNo = (id: string | null) => {
@@ -81,7 +83,7 @@ export function FactoryQuotes({
         {editing === "new" && (
           <div className="rounded-xl border border-primary/30 bg-primary-soft/20 p-4">
             <h3 className="mb-3 text-sm font-semibold">New factory offer</h3>
-            <FactoryQuoteForm action={saveAction.bind(null, null)} quote={null} items={items} today={today} mainCurrency={mainCurrency} rates={rates} searchFactories={searchFactories} onDone={() => setEditing(null)} />
+            <FactoryQuoteForm action={saveAction.bind(null, null)} quote={null} items={items} today={today} mainCurrency={mainCurrency} rates={rates} searchFactories={searchFactories} lookupHsCode={lookupHsCode} onDone={() => setEditing(null)} />
           </div>
         )}
         {quotes.length === 0 && editing !== "new" && <EmptyState title="No factory prices yet" description="Ask two or three factories, then record each offer here to compare them." />}
@@ -89,7 +91,7 @@ export function FactoryQuotes({
           editing === q.id ? (
             <div key={q.id} className="rounded-xl border border-primary/30 bg-primary-soft/20 p-4">
               <h3 className="mb-3 text-sm font-semibold">Edit the offer from {q.factory.name}</h3>
-              <FactoryQuoteForm action={saveAction.bind(null, q.id)} quote={q} items={items} today={today} mainCurrency={mainCurrency} rates={rates} searchFactories={searchFactories} onDone={() => setEditing(null)} />
+              <FactoryQuoteForm action={saveAction.bind(null, q.id)} quote={q} items={items} today={today} mainCurrency={mainCurrency} rates={rates} searchFactories={searchFactories} lookupHsCode={lookupHsCode} onDone={() => setEditing(null)} />
             </div>
           ) : (
             <article key={q.id} className="rounded-xl border border-line">
@@ -100,7 +102,7 @@ export function FactoryQuotes({
                     {q.reference && <span className="ml-2 font-normal text-muted">ref. {q.reference}</span>}
                   </h3>
                   <p className="mt-0.5 text-xs text-muted">
-                    {q.currency}, VAT {q.pricesIncludeVat ? "included" : "not included"} · received {dateText(q.receivedOn)}
+                    {q.currency}, {q.vatRate > 0 ? `+${q.vatRate}% tax` : "no tax"} · received {dateText(q.receivedOn)}
                     {q.validUntil ? ` · valid until ${dateText(q.validUntil)}` : ""}
                     {q.fxRate === null && <span className="ml-1 font-medium text-warn">· no exchange rate for {q.currency}</span>}
                   </p>
@@ -136,9 +138,8 @@ export function FactoryQuotes({
                   <tr>
                     <Th>Item</Th>
                     <Th className="text-right">Qty</Th>
-                    <Th className="text-right">Factory price</Th>
-                    <Th className="hidden text-right sm:table-cell">VAT · rebate</Th>
-                    <Th className="text-right">Landed / unit</Th>
+                    <Th className="text-right">Price</Th>
+                    <Th className="text-right">Your cost / unit</Th>
                   </tr>
                 </THead>
                 <tbody>
@@ -149,15 +150,14 @@ export function FactoryQuotes({
                         <span className="text-xs text-muted">
                           {itemNo(l.requestedItemId) ? `For item ${itemNo(l.requestedItemId)}` : "Not linked to a requested item"}
                           {l.model ? ` · ${l.model}` : ""}
+                          {l.hsCode ? ` · HS ${l.hsCode}` : ""}
                         </span>
+                        <span className="mt-0.5 block text-xs text-text-2">{l.costNote}</span>
                       </Td>
                       <Td className="text-right whitespace-nowrap tabular">
                         {qtyText(l.quantity)} {l.unit}
                       </Td>
                       <Td className="text-right whitespace-nowrap tabular">{amount(l.unitPrice, q.currency)}</Td>
-                      <Td className="hidden text-right text-xs sm:table-cell whitespace-nowrap text-muted tabular">
-                        {l.vatRate}% · {l.rebateRate}%
-                      </Td>
                       <Td className="text-right font-medium whitespace-nowrap tabular">{l.unitCost === null ? <span className="text-xs font-normal text-warn">No rate</span> : amount(l.unitCost, mainCurrency)}</Td>
                     </Tr>
                   ))}
