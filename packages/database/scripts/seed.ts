@@ -125,23 +125,28 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     }
     if (o.stage === "new") return;
 
-    // Factory prices (CNY, without tax; each item's 13% tax is added on top) for each goods line.
+    // Factory prices (CNY, without tax; each item's 13% tax is added on top): one offer per factory with its lines.
     const costByLine = new Map<number, { lineId: string; costMinor: number; costCny: number; factory: number }>();
-    for (const [i, l] of o.lines.entries()) {
-      if (l.type === "charge") continue;
+    const offerOf = new Map<number, string>();
+    for (const f of [...new Set(o.lines.filter((l) => l.type !== "charge").map((l) => l.factory))]) {
+      const mine = [...o.lines.entries()].filter(([, l]) => l.type !== "charge" && l.factory === f);
       const fq = await db.factoryQuote.create({
         data: {
           inquiryId: inquiry.id,
-          factoryId: factories[l.factory].id,
+          factoryId: factories[f].id,
           receivedOn: toDbDate(addDays(created, 2)),
           currency: "CNY",
+          leadTime: "35 days after deposit",
           createdById: o.assignee ?? people.staff.id,
-          lines: { create: { requestedItemId: inquiry.items[i]?.id, description: l.description, quantity: l.quantity, unit: l.unit ?? "pcs", unitPrice: l.factoryPrice, taxRate: 13 } },
+          lines: { create: mine.map(([i, l], k) => ({ requestedItemId: inquiry.items[i]?.id, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit ?? "pcs", unitPrice: l.factoryPrice, taxRate: 13, sortOrder: k })) },
         },
-        include: { lines: true },
+        include: { lines: { orderBy: { sortOrder: "asc" } } },
       });
-      const costCny = withTaxMinor(toMinor(l.factoryPrice), Number(fq.lines[0].taxRate));
-      costByLine.set(i, { lineId: fq.lines[0].id, costMinor: Math.round(costCny / rate), costCny, factory: l.factory });
+      offerOf.set(f, fq.id);
+      for (const [k, [i, l]] of mine.entries()) {
+        const costCny = withTaxMinor(toMinor(l.factoryPrice), Number(fq.lines[k].taxRate));
+        costByLine.set(i, { lineId: fq.lines[k].id, costMinor: Math.round(costCny / rate), costCny, factory: f });
+      }
     }
     if (!o.revisions?.length) return;
 
@@ -155,6 +160,7 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
         return { l, i, unitPrice, cost };
       });
       const totals = documentTotals(lines.map((x) => ({ quantity: x.l.quantity, unitPrice: fromMinor(x.unitPrice) })), 0);
+      const header = { subtotal: fromMinor(totals.subtotal), total: fromMinor(totals.total) };
       const rev = await db.quotationRevision.create({
         data: {
           quotationId: quotation.id,
@@ -163,12 +169,23 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
           validUntil: toDbDate(addDays(created, 20 + n * 5)),
           sentOn: toDbDate(addDays(created, 4 + n * 3)),
           answeredOn: status === "accepted" || status === "rejected" ? toDbDate(addDays(created, 6 + n * 3)) : null,
-          subtotal: fromMinor(totals.subtotal),
-          total: fromMinor(totals.total),
+          ...header,
           balanceTerms: o.order?.terms ?? "before_shipment",
           createdById: o.assignee ?? people.staff.id,
+        },
+      });
+      // One option: the offer the goods came from (demo deals use one factory each), plus our charges.
+      const option = await db.quotationOption.create({
+        data: {
+          revisionId: rev.id,
+          letter: "A",
+          factoryQuoteId: offerOf.get(o.lines.find((l) => l.type !== "charge")!.factory) ?? null,
+          status: status === "accepted" ? "accepted" : "open",
+          leadTime: "35 days after deposit",
+          ...header,
           lines: {
             create: lines.map((x, k) => ({
+              revisionId: rev.id,
               requestedItemId: x.l.type === "charge" ? null : inquiry.items[x.i]?.id,
               type: x.l.type ?? "goods",
               description: x.l.description,
@@ -184,9 +201,9 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
             })),
           },
         },
-        include: { lines: true },
+        include: { lines: { orderBy: { sortOrder: "asc" } } },
       });
-      if (status === "accepted") accepted = { id: rev.id, total: totals.total, lines: rev.lines };
+      if (status === "accepted") accepted = { id: rev.id, total: totals.total, lines: option.lines };
     }
     if (!accepted || !o.order) return;
 

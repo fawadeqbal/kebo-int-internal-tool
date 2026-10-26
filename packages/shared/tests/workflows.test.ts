@@ -134,10 +134,10 @@ describe("input schemas", () => {
     const r = revisionInput.parse({
       validUntil: "2026-12-01",
       depositPercent: "30",
-      lines: [{ description: "Tablet press", quantity: "2", unitPrice: "12500.50" }],
+      options: [{ prices: [{ lineId: "6f1c1f2e-9d3a-4a4b-8c3e-2b1d0e9f8a7b", unitPrice: "12500.50" }], charges: [{ description: "Sea freight", quantity: "1", unitPrice: "800" }] }],
     });
     expect(r.depositPercent).toBe(30);
-    expect(r.lines[0]).toMatchObject({ type: "goods", unit: "pcs", unitPrice: 12500.5 });
+    expect(r.options[0]).toMatchObject({ factoryQuoteId: null, discount: 0, prices: [{ unitPrice: 12500.5 }], charges: [{ type: "charge", unit: "lot", unitPrice: 800 }] });
     expect(r.incoterm).toBe("FOB");
   });
 
@@ -163,20 +163,32 @@ describe("settings", () => {
 
 describe("review fixes", () => {
   it("reads blank form fields as not given, never as 0", async () => {
-    const { revisionInput, quoteLineInput } = await import("../src");
-    const line = quoteLineInput.parse({ description: "Valve", quantity: "2", unitPrice: "10", unitCost: "", fxRate: "" });
-    expect(line.unitCost).toBeNull();
-    expect(line.fxRate).toBeNull();
-    expect(quoteLineInput.safeParse({ description: "Valve", quantity: "2", unitPrice: "" }).error?.issues[0].message).toBe("Enter a price");
-    const rev = revisionInput.parse({ validUntil: "2026-12-01", depositPercent: "", lines: [{ description: "Valve", quantity: 1, unitPrice: 5 }] });
+    const { revisionInput, chargeInput } = await import("../src");
+    const charge = chargeInput.parse({ description: "Freight", quantity: "1", unitPrice: "10", unitCost: "" });
+    expect(charge.unitCost).toBeNull();
+    expect(chargeInput.safeParse({ description: "Freight", quantity: "2", unitPrice: "" }).error?.issues[0].message).toBe("Enter a price");
+    const rev = revisionInput.parse({ validUntil: "2026-12-01", depositPercent: "", options: [{ prices: [], charges: [{ description: "Freight", quantity: 1, unitPrice: 5 }] }] });
     expect(rev.depositPercent).toBe(30);
+    expect(revisionInput.safeParse({ validUntil: "2026-12-01", options: [] }).success).toBe(false);
   });
 
   it("only accepts what the database columns can hold", async () => {
-    const { quoteLineInput, amount } = await import("../src");
-    expect(quoteLineInput.safeParse({ description: "x", quantity: "1.005", unitPrice: 1 }).success).toBe(false);
-    expect(quoteLineInput.safeParse({ description: "x", quantity: "0.001", unitPrice: 1 }).success).toBe(false);
+    const { chargeInput, amount } = await import("../src");
+    expect(chargeInput.safeParse({ description: "x", quantity: "1.005", unitPrice: 1 }).success).toBe(false);
+    expect(chargeInput.safeParse({ description: "x", quantity: "0.001", unitPrice: 1 }).success).toBe(false);
     expect(amount().safeParse(1e12).success).toBe(false);
+  });
+
+  it("says which of the customer's items an offer covers", async () => {
+    const { coverage, optionLetter } = await import("../src");
+    const items = [
+      { id: "a", parentId: null, no: "1" },
+      { id: "b", parentId: null, no: "2" },
+      { id: "b1", parentId: "b", no: "2.1" },
+      { id: "c", parentId: null, no: "3" },
+    ];
+    expect(coverage(items, ["a", "b1", null])).toEqual({ covered: ["1", "2"], missing: ["3"] });
+    expect(optionLetter(0) + optionLetter(2)).toBe("AC");
   });
 
   it("records the customer's answer to the sent revision even when a newer draft exists", async () => {
@@ -213,7 +225,7 @@ describe("tax", () => {
     expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, hsCode: "8437", rebateRate: 13 })).not.toHaveProperty("hsCode");
     const quote = factoryQuoteInput.parse({ newFactoryName: "X", receivedOn: "2026-10-20", lines: [{ description: "x", quantity: 1, unitPrice: 10 }] });
     expect(quote).not.toHaveProperty("vatRate");
-    expect(revisionInput.parse({ validUntil: "2026-11-01", vatRate: 13, lines: [{ description: "x", quantity: 1, unitPrice: 1 }] })).not.toHaveProperty("vatRate");
+    expect(revisionInput.parse({ validUntil: "2026-11-01", vatRate: 13, options: [{ prices: [] }] })).not.toHaveProperty("vatRate");
   });
 });
 

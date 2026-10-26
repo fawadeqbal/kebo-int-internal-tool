@@ -111,3 +111,18 @@ export function lineNumbers(lines: { key: string; parentKey?: string | null }[])
     return no;
   });
 }
+
+/** Options are lettered A, B, C… in the order they are offered. */
+export const optionLetter = (index: number) => String.fromCharCode(65 + index);
+
+/**
+ * Which of the customer's items (top level) an offer answers. An item counts as
+ * covered when the offer answers it or any of its parts; extras the factory
+ * added (no item) do not count.
+ */
+export function coverage(items: { id: string; parentId: string | null; no: string }[], answered: Iterable<string | null | undefined>) {
+  const set = new Set([...answered].filter((v): v is string => !!v));
+  const top = items.filter((i) => !i.parentId);
+  const isCovered = (t: { id: string }) => set.has(t.id) || items.some((p) => p.parentId === t.id && set.has(p.id));
+  return { covered: top.filter(isCovered).map((t) => t.no), missing: top.filter((t) => !isCovered(t)).map((t) => t.no) };
+}
