@@ -13,6 +13,8 @@ import { InquiriesModule } from "./modules/inquiries/inquiries.module";
 import { SourcingModule } from "./modules/sourcing/sourcing.module";
 import { QuotationsModule } from "./modules/quotations/quotations.module";
 import { FulfilmentModule } from "./modules/fulfilment/fulfilment.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { ReportsModule } from "./modules/reports/reports.module";
 import { StorageModule } from "./common/storage/storage.service";
 import { EventsModule } from "./common/events/event-bus";
 
@@ -22,6 +24,6 @@ import { EventsModule } from "./common/events/event-bus";
  * AuthCore (the guard every route passes through).
  */
 @Module({
-  imports: [EnvModule, PrismaModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, FulfilmentModule],
+  imports: [EnvModule, PrismaModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, FulfilmentModule, NotificationsModule, ReportsModule],
 })
 export class AppModule {}
