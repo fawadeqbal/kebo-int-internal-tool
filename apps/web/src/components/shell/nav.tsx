@@ -132,6 +132,7 @@ function ThemeMenu() {
     } catch {
       // storage blocked: keep the default
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read the saved choice once on mount
     setMode(saved);
     setDark(document.documentElement.classList.contains("dark"));
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -218,6 +219,7 @@ function SidebarContent({ groups, companyName, roleLabel }: { groups: NavGroup[]
   return (
     <>
       <Link href="/dashboard" className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line px-4">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
         <img src="/brand/kebo-logo-96.png" alt="" width={32} height={32} className="size-8 shrink-0" />
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold text-text">{companyName}</span>
