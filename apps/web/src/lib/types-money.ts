@@ -1,6 +1,13 @@
 import type { ExpenseCategory, InquiryStage, LostReason, PaymentKind, PaymentMethod, InstalmentStatus } from "@kebo/shared";
 import type { Person } from "./types";
 
+/** A file kept with a record (an expense's receipt, a payment's bank slip). */
+export interface AttachedFileInfo {
+  name: string;
+  type: string;
+  size: number;
+}
+
 /** GET /orders/:id/money (each part only for the people who may see it). */
 export interface OrderMoney {
   orderId: string;
@@ -78,6 +85,8 @@ export interface FactoryPaymentView {
   reference: string | null;
   note: string | null;
   account: { id: string; name: string } | null;
+  /** A photo or PDF proving it. */
+  file: AttachedFileInfo | null;
   voided: { at: string; reason: string | null } | null;
 }
 

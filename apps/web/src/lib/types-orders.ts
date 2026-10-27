@@ -1,3 +1,4 @@
+import type { AttachedFileInfo } from "./types-money";
 import type { OfferFile } from "./types-deals";
 import type { BalanceTerms, Incoterm, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus } from "@kebo/shared";
 import type { Person } from "./types";
@@ -157,6 +158,8 @@ export interface PaymentsView {
     recordedAt: string;
     /** Received so far and still due once it counted (null when removed). */
     after: { received: string; due: string } | null;
+    /** A photo or PDF proving it (bank slip, transfer screenshot). */
+    file: AttachedFileInfo | null;
     voided: { at: string; reason: string | null } | null;
   }[];
 }

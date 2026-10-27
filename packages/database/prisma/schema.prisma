@@ -919,6 +919,11 @@ model FactoryPayment {
   /// Which of our accounts the money moved through (cash, a bank, a wallet).
   accountId    String?       @map("account_id") @db.Uuid
   account      MoneyAccount? @relation(fields: [accountId], references: [id])
+  /// A photo or PDF proving the payment (bank slip, transfer screenshot).
+  fileKey      String?       @map("file_key")
+  fileName     String?       @map("file_name") @db.VarChar(255)
+  fileType     String?       @map("file_type") @db.VarChar(150)
+  fileSize     Int?          @map("file_size")
   recordedById String        @map("recorded_by") @db.Uuid
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
@@ -1002,6 +1007,11 @@ model Payment {
   /// Which of our accounts the money moved through (cash, a bank, a wallet).
   accountId    String?       @map("account_id") @db.Uuid
   account      MoneyAccount? @relation(fields: [accountId], references: [id])
+  /// A photo or PDF proving the payment (bank slip, transfer screenshot).
+  fileKey      String?       @map("file_key")
+  fileName     String?       @map("file_name") @db.VarChar(255)
+  fileType     String?       @map("file_type") @db.VarChar(150)
+  fileSize     Int?          @map("file_size")
   recordedById String        @map("recorded_by") @db.Uuid
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")

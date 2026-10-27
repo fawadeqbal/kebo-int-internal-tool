@@ -135,6 +135,13 @@ export async function expenseAction(
   return r;
 }
 
+/** Removes the proof kept with a payment: `in` from a customer, `out` to a factory. */
+export async function removePaymentFileAction(side: "in" | "out", paymentId: string, orderId: string): Promise<ActionState> {
+  const r = await attempt(null, () => api.delete(`/${side === "in" ? "payments" : "factory-payments"}/${paymentId}/file`), "File removed.");
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
 /** Removes the receipt kept with an expense. */
 export async function removeReceiptAction(expenseId: string, customerId: string | null, orderId: string | null): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/expenses/${expenseId}/receipt`), "Receipt removed.");

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowRight, Pencil } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind } from "@kebo/shared";
-import { Button, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Button, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
 import type { OrderNext } from "@/lib/types-orders";
 import { AccountSelect } from "@/components/money/accounts";
+import { FilePicker, uploadFile } from "@/components/money/attachment";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -227,15 +229,34 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
   const first: PaymentKind = Number(depositDue) > 0 ? "deposit" : "balance";
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<PaymentKind>(first);
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const router = useRouter();
+  const done = async (s: ActionState) => {
+    const id = (s.data as { createdId?: string } | undefined)?.createdId;
+    if (file && id) {
+      setSending(true);
+      const error = await uploadFile(`/files/payments/${id}`, file);
+      setSending(false);
+      router.refresh();
+      if (error) setFileError(`The payment is recorded, but its file was not: ${error} Open the payment below to add it again.`);
+    }
+    setFile(null);
+    setOpen(false);
+  };
   if (Number(due) <= 0) return <p className="text-sm text-muted">Paid in full: nothing more to record.</p>;
   if (!open)
     return (
-      <div>
+      <div className="flex flex-col gap-2">
+        {fileError && <Alert tone="error">{fileError}</Alert>}
         <Button
+          className="w-fit"
           variant="primary"
           size="sm"
           onClick={() => {
             setKind(first);
+            setFileError(null);
             setOpen(true);
           }}
         >
@@ -245,7 +266,7 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
     );
   const amount = kind === "deposit" && Number(depositDue) > 0 ? depositDue : kind === "other" ? "" : due;
   return (
-    <ActionForm action={action} onDone={() => setOpen(false)} className={framed}>
+    <ActionForm action={action} onDone={done} className={framed}>
       {(s) => (
         <>
           <p className="text-sm font-medium">Payment from the customer</p>
@@ -285,13 +306,14 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <AccountSelect id="p-account" label="Into account" currency={currency} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <FilePicker id="p-file" label="Proof of payment" hint="Bank slip or transfer screenshot (photo or PDF)" file={file} onChange={setFile} className="sm:col-span-2" />
           </div>
           <Field label="Note" htmlFor="p-note" optional error={s.errors?.note}>
             <Textarea id="p-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
           <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Recording…">
-              Record the payment
+            <SubmitButton size="sm" pendingText="Recording…" disabled={sending}>
+              {sending ? "Sending the file…" : "Record the payment"}
             </SubmitButton>
             <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
               Cancel

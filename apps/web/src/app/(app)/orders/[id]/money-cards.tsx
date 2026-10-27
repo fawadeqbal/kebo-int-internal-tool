@@ -7,9 +7,10 @@ import type { OrderMoney } from "@/lib/types-money";
 import { EditFactoryPayment, NewExpense, NewFactoryPayment, VoidForm } from "@/components/money/forms";
 import { ExpenseRecord } from "@/components/money/expense-record";
 import type { Fx } from "@/lib/fx";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Paperclip } from "lucide-react";
 import { PaymentRecord } from "@/components/money/payment-record";
-import { expenseAction, factoryPaymentAction, voidFactoryPaymentAction } from "../../money/actions";
+import { expenseAction, factoryPaymentAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../money/actions";
+import { AttachedFile } from "@/components/money/attachment";
 
 /**
  * What we owe each factory for this order (their prices plus tax × the
@@ -82,7 +83,7 @@ export function FactoriesCard({ m, people, today, fx }: { m: OrderMoney; people:
                     <>
                       <span className={cn("font-medium tabular", p.voided && "line-through")}>{money(p.amount, p.currency)}</span>{" "}
                       <span className="text-text-2">to {p.factory.name}</span> · {PAYMENT_KIND_LABEL[p.kind]}{" "}
-                      {p.voided && <Badge tone="bad">Removed</Badge>}
+                      {p.file && <Paperclip className="inline size-3.5 align-[-2px] text-muted" aria-label="Proof kept" />} {p.voided && <Badge tone="bad">Removed</Badge>}
                     </>
                   }
                   sub={
@@ -129,6 +130,20 @@ export function FactoriesCard({ m, people, today, fx }: { m: OrderMoney; people:
                       wide: true,
                     },
                     ...(p.note ? [{ label: "Note", value: <span className="whitespace-pre-line">{p.note}</span>, wide: true }] : []),
+                    {
+                      label: "Proof of payment",
+                      value: (
+                        <AttachedFile
+                          src={`/files/factory-payments/${p.id}`}
+                          file={p.file}
+                          what="Proof of payment"
+                          canChange={f.canRecord && !p.voided}
+                          remove={removePaymentFileAction.bind(null, "out", p.id, m.orderId)}
+                          empty="No bank slip kept"
+                        />
+                      ),
+                      wide: true,
+                    },
                     ...(p.voided
                       ? [{ label: "Removed", value: <span className="text-bad">{`${dateTime(p.voided.at)}${p.voided.reason ? `: ${p.voided.reason}` : ""}`}</span>, wide: true }]
                       : []),

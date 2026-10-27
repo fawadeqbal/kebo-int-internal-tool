@@ -44,6 +44,7 @@ import { MoneyService } from "./money.service";
 import { AccountsService } from "./accounts.service";
 import { CashService } from "./cash.service";
 import { LeaksService } from "./leaks.service";
+import { PaymentFilesService, type PaymentSide } from "./payment-files.service";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const expenseQuery = z.object({
@@ -78,6 +79,7 @@ class MoneyController {
     private readonly accounts: AccountsService,
     private readonly cash: CashService,
     private readonly leaks: LeaksService,
+    private readonly paymentFiles: PaymentFilesService,
   ) {}
 
   /** Managers: where we lose money in a period (?from&to, default this year), with warnings. */
@@ -244,6 +246,60 @@ class MoneyController {
     return this.money.removeReceipt(user, id);
   }
 
+  /**
+   * multipart/form-data with one `file`: a photo or PDF proving a payment (bank
+   * slip, transfer screenshot). `payments` is money in from a customer,
+   * `factory-payments` money out to a factory. A new one replaces the one there.
+   */
+  @Post("payments/:id/file")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
+  attachPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
+    return this.attachFile(user, "in", id, file);
+  }
+
+  @Post("factory-payments/:id/file")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
+  attachFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
+    return this.attachFile(user, "out", id, file);
+  }
+
+  @Get("payments/:id/file")
+  paymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
+    return this.sendFile(user, "in", id, res);
+  }
+
+  @Get("factory-payments/:id/file")
+  factoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
+    return this.sendFile(user, "out", id, res);
+  }
+
+  @Delete("payments/:id/file")
+  removePaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.paymentFiles.remove(user, "in", id);
+  }
+
+  @Delete("factory-payments/:id/file")
+  removeFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.paymentFiles.remove(user, "out", id);
+  }
+
+  private attachFile(user: SessionUser, side: PaymentSide, id: string, file: Express.Multer.File | undefined) {
+    if (!file) throw new z.ZodError([{ code: "custom", path: ["file"], message: "Choose a photo or PDF of the payment", input: undefined }]);
+    return this.paymentFiles.attach(user, side, id, file);
+  }
+
+  private async sendFile(user: SessionUser, side: PaymentSide, id: string, res: Response) {
+    const f = await this.paymentFiles.open(user, side, id);
+    res.set({
+      "Content-Type": f.mimeType,
+      "Content-Length": String(f.size),
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-store",
+    });
+    return new StreamableFile(f.stream);
+  }
+
   /** Managers only: the year month by month, earned and cash, in the main currency. */
   @Get("money/profit-and-loss")
   pnl(@CurrentUser() user: SessionUser, @Query(Validate(yearQuery)) q: z.infer<typeof yearQuery>) {
@@ -251,5 +307,5 @@ class MoneyController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService, CashService, LeaksService], exports: [MoneyService, AccountsService, CashService, LeaksService] })
+@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService, CashService, LeaksService, PaymentFilesService], exports: [MoneyService, AccountsService, CashService, LeaksService] })
 export class MoneyModule {}
