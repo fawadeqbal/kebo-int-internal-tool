@@ -82,7 +82,13 @@ export default async function DealLayout({ children, params }: { children: React
           — it decides shipping.
         </p>
       )}
-      <DealTabs id={d.id} source={can(me, "sourcing.manage")} orderId={order?.id ?? null} />
+      <DealTabs
+        id={d.id}
+        source={can(me, "sourcing.manage")}
+        orderId={order?.id ?? null}
+        files={d.attachments.length + d.notes.length}
+        managers={can(me, "expenses.manage")}
+      />
       <div className="mt-5">{children}</div>
     </div>
   );

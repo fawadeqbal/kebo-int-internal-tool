@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { can } from "@kebo/shared";
-import { ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { can, EXPENSE_CATEGORY_LABEL } from "@kebo/shared";
+import { ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, LinkTabs, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
-import { date } from "@/lib/format";
+import { date, money } from "@/lib/format";
+import type { ExpenseList } from "@/lib/types-money";
 import type { FactoryDetail } from "@/lib/types-people";
 import type { HistoryEntry } from "@/lib/types";
 import { HistoryList } from "@/components/common/history-list";
@@ -12,11 +13,18 @@ import { removeFactoryAction } from "../actions";
 
 export const metadata = { title: "Factory" };
 
-export default async function FactoryPage({ params }: { params: Promise<{ id: string }> }) {
+type Tab = "prices" | "costs" | "details" | "history";
+
+export default async function FactoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
   const me = await requirePermission("sourcing.manage");
+  const managers = can(me, "expenses.manage");
+  const tabs: Tab[] = ["prices", ...(managers ? (["costs"] as const) : []), "details", "history"];
+  const tab: Tab = tabs.includes(sp.tab as Tab) ? (sp.tab as Tab) : "prices";
   const f = await load(() => api.get<FactoryDetail>(`/factories/${id}`));
-  const history = await api.get<HistoryEntry[]>("/history", { type: "factory", id });
+  const history = tab === "history" ? await api.get<HistoryEntry[]>("/history", { type: "factory", id }) : [];
+  const costs = tab === "costs" ? await api.get<ExpenseList>("/expenses", { factoryId: id }) : null;
   const canRemove = can(me, "inquiries.updateAny");
   return (
     <div>
@@ -33,8 +41,17 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
           </ButtonLink>
         }
       />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-5">
+      <LinkTabs
+        label="Factory sections"
+        className="mb-5"
+        tabs={[
+          { href: `/factories/${f.id}`, label: "Price quotes", count: f.quotes.length, active: tab === "prices" },
+          ...(managers ? [{ href: `/factories/${f.id}?tab=costs`, label: "Visits and costs", active: tab === "costs" }] : []),
+          { href: `/factories/${f.id}?tab=details`, label: "Details", active: tab === "details" },
+          { href: `/factories/${f.id}?tab=history`, label: "History", active: tab === "history" },
+        ]}
+      />
+      {tab === "prices" && (
           <Card>
             <CardHeader title="Price quotes" description="Prices this factory gave on our deals, newest first" />
             {f.quotes.length === 0 ? (
@@ -67,8 +84,58 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
               </Table>
             )}
           </Card>
-        </div>
-        <aside className="flex flex-col gap-5">
+      )}
+      {tab === "costs" && costs && (
+        <Card>
+          <CardHeader
+            title="Visits and costs"
+            description="Managers only. Expenses that name this factory: trips to check its products, inspections there."
+            actions={<span className="text-sm font-semibold tabular">{money(costs.total, costs.currency)}</span>}
+          />
+          {costs.rows.length === 0 ? (
+            <EmptyState title="Nothing spent here yet" description="When adding an expense, choose this factory under Factory visited." className="py-8" />
+          ) : (
+            <Table>
+              <THead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>What for</Th>
+                  <Th>For</Th>
+                  <Th className="text-right">Amount</Th>
+                </tr>
+              </THead>
+              <tbody>
+                {costs.rows.map((e) => (
+                  <Tr key={e.id} className={e.voided ? "text-muted line-through" : undefined}>
+                    <Td className="text-sm whitespace-nowrap">{date(e.spentOn)}</Td>
+                    <Td>
+                      <span className="text-sm">{e.description}</span>
+                      <span className="block text-xs text-muted">{EXPENSE_CATEGORY_LABEL[e.category]}</span>
+                    </Td>
+                    <Td className="text-sm">
+                      {e.deal ? (
+                        <Link href={`/deals/${e.deal.id}`} className="hover:text-primary">
+                          {e.deal.refNo}
+                        </Link>
+                      ) : e.order ? (
+                        <Link href={`/orders/${e.order.id}/money`} className="hover:text-primary">
+                          {e.order.refNo}
+                        </Link>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                      {e.customer && <span className="block text-xs text-muted">{e.customer.name}</span>}
+                    </Td>
+                    <Td className="text-right whitespace-nowrap tabular">{money(e.amount, e.currency)}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+      )}
+      {tab === "details" && (
+        <div className="grid items-start gap-5 lg:grid-cols-2">
           <Card>
             <CardHeader title="Details" />
             <CardBody>
@@ -102,12 +169,6 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
               />
             </CardBody>
           </Card>
-          <Card>
-            <CardHeader title="History" description="Changes to this factory, with the reason when one was asked" />
-            <CardBody>
-              <HistoryList entries={history} />
-            </CardBody>
-          </Card>
           {canRemove && (
             <Card>
               <CardHeader title="Remove factory" description="Hides it from lists and pickers. Its past prices stay on their deals." />
@@ -122,8 +183,16 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
               </CardBody>
             </Card>
           )}
-        </aside>
-      </div>
+        </div>
+      )}
+      {tab === "history" && (
+          <Card>
+            <CardHeader title="History" description="Changes to this factory, with the reason when one was asked" />
+            <CardBody>
+              <HistoryList entries={history} />
+            </CardBody>
+          </Card>
+      )}
     </div>
   );
 }

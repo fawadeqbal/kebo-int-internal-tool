@@ -200,6 +200,11 @@ function priced(lines: OfferLine[], prices: Record<string, string>, margin: numb
  * (@kebo/money); people who may see costs get costs and margins per line and
  * per option.
  */
+/** The sheet look shared with the line tables: bordered cells, a grey header and row numbers. */
+const SHEET = "w-full border-collapse text-sm [&_tr>*:first-child]:border-l-0 [&_tr>*:last-child]:border-r-0";
+const HEAD = "h-8 border border-t-0 border-line bg-surface-2 px-2 text-left text-xs font-medium whitespace-nowrap text-text-2";
+const CELL = "h-9 border border-line px-2 align-middle";
+
 export function RevisionEditor({
   action,
   number,
@@ -524,17 +529,17 @@ export function RevisionEditor({
                   <p className="rounded-md bg-warn-soft px-3 py-2 text-sm">This factory offer was removed from the deal. Remove this option or choose another offer.</p>
                 )}
 
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
+                <div className="relative overflow-x-auto rounded-lg border border-line bg-surface">
+                  <table className={cn(SHEET, "min-w-[640px]")} aria-label={`Option ${optionLetter(at)} prices`}>
                     <thead>
-                      <tr className="border-b border-line text-left text-xs text-muted">
-                        <th className="w-10 py-2 font-medium">No.</th>
-                        <th className="py-2 font-medium">Description</th>
-                        <th className="py-2 text-right font-medium">Qty</th>
-                        {showCosts && <th className="py-2 text-right font-medium">{extra.minor > 0 ? "Landed cost" : "Cost"}</th>}
-                        <th className="w-32 py-2 text-right font-medium">Unit price</th>
-                        {showCosts && <th className="py-2 text-right font-medium">Margin</th>}
-                        <th className="py-2 text-right font-medium">Total</th>
+                      <tr>
+                        <th className={cn(HEAD, "w-12 text-center")}>No.</th>
+                        <th className={HEAD}>Description</th>
+                        <th className={cn(HEAD, "w-28 text-right")}>Qty</th>
+                        {showCosts && <th className={cn(HEAD, "w-32 text-right")}>{extra.minor > 0 ? "Landed cost" : "Cost"}</th>}
+                        <th className={cn(HEAD, "w-36 text-right")}>Unit price ({currency})</th>
+                        {showCosts && <th className={cn(HEAD, "w-24 text-right")}>Margin</th>}
+                        <th className={cn(HEAD, "w-36 text-right")}>Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -544,9 +549,11 @@ export function RevisionEditor({
                         const cost = landed[i] ?? null;
                         const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
                         return (
-                          <tr key={l.id} className="border-b border-line/70 align-top">
-                            <td className="py-2 text-muted tabular">{l.no}</td>
-                            <td className={cn("py-2 pr-3", l.parentId && "pl-4")}>
+                          <tr key={l.id}>
+                            <th scope="row" className={cn(CELL, "bg-surface-2 text-center text-xs font-normal text-muted tabular")}>
+                              {l.no}
+                            </th>
+                            <td className={cn(CELL, "py-1.5", l.parentId && "pl-5")}>
                               <span className="flex items-start gap-1">
                                 {l.parentId && <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />}
                                 <span className="whitespace-pre-line">{l.description}</span>
@@ -555,11 +562,11 @@ export function RevisionEditor({
                                 {[l.model, opt.factoryQuoteId && l.answersNo ? `for item ${l.answersNo}` : null].filter(Boolean).join(" · ")}
                               </span>
                             </td>
-                            <td className="py-2 text-right whitespace-nowrap tabular">
+                            <td className={cn(CELL, "bg-surface-2/40 text-right whitespace-nowrap text-text-2 tabular")}>
                               {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
                             </td>
                             {showCosts && (
-                              <td className="py-2 text-right whitespace-nowrap text-text-2 tabular">
+                              <td className={cn(CELL, "bg-surface-2/40 text-right whitespace-nowrap text-text-2 tabular")}>
                                 {cost === null ? "—" : fmt(cost)}
                                 {cost !== null && extra.minor > 0 && l.unitCost !== null && (
                                   <span className="block text-xs text-muted" title={`Factory ${fmt(toMinor(l.unitCost))} + its share of the costs to reach ${s.incoterm}`}>
@@ -568,29 +575,56 @@ export function RevisionEditor({
                                 )}
                               </td>
                             )}
-                            <td className="py-1.5 pl-2">
-                              <Input
+                            <td className={cn(CELL, "p-0")}>
+                              <input
                                 aria-label={`Unit price for ${l.no}`}
+                                data-price={`${at}:${i}`}
                                 inputMode="decimal"
-                                className="h-8 text-right tabular"
+                                className="block h-9 w-full min-w-0 border-0 bg-transparent px-2 text-right text-sm tabular outline-none placeholder:text-muted/70 focus:bg-surface focus:ring-2 focus:ring-primary focus:ring-inset"
                                 value={price}
                                 placeholder="0.00"
+                                onFocus={(e) => e.currentTarget.select()}
                                 onChange={(e) => setOption(at, (o) => ({ prices: { ...o.prices, [l.id]: e.target.value } }))}
+                                onKeyDown={(e) => {
+                                  // Like a spreadsheet: Enter and the arrows go to the price above or below.
+                                  const to = e.key === "ArrowDown" || (e.key === "Enter" && !e.shiftKey) ? i + 1 : e.key === "ArrowUp" || (e.key === "Enter" && e.shiftKey) ? i - 1 : null;
+                                  if (to === null) return;
+                                  const next = document.querySelector<HTMLInputElement>(`[data-price="${at}:${to}"]`);
+                                  e.preventDefault();
+                                  next?.focus();
+                                }}
+                                onPaste={(e) => {
+                                  // A column of prices copied from Excel fills this line and the ones below.
+                                  const values = e.clipboardData.getData("text/plain").replace(/\r?\n$/, "").split(/\r?\n/).map((v) => v.split("\t")[0]!.trim());
+                                  if (values.length < 2) return;
+                                  e.preventDefault();
+                                  setOption(at, (o) => {
+                                    const prices = { ...o.prices };
+                                    values.forEach((v, n) => {
+                                      const target = lines[i + n];
+                                      if (target) prices[target.id] = v.replace(/[^\d.,-]/g, "");
+                                    });
+                                    return { prices };
+                                  });
+                                }}
                               />
                             </td>
                             {showCosts && (
-                              <td className={cn("py-2 text-right font-medium tabular", m === null ? "text-muted" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : "text-ok")}>
+                              <td className={cn(CELL, "text-right font-medium tabular", m === null ? "text-muted" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : "text-ok")}>
                                 {m === null ? "—" : `${m.toFixed(1)}%`}
                               </td>
                             )}
-                            <td className="py-2 text-right font-semibold whitespace-nowrap tabular">{fmt(totals.lines[i]?.lineTotal ?? 0)}</td>
+                            <td className={cn(CELL, "bg-surface-2/40 text-right font-semibold whitespace-nowrap tabular")}>{fmt(totals.lines[i]?.lineTotal ?? 0)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-muted">The factory&apos;s lines cannot change here: change the offer on Factory prices.</p>
+                <p className="text-xs text-muted">
+                  Type a price and press Enter for the next line; a column of prices copied from Excel fills the lines below. The factory&apos;s lines
+                  themselves change on Factory prices.
+                </p>
                 {showCosts && opt.factoryQuoteId && (
                   <BasisCosts
                     letter={optionLetter(at)}

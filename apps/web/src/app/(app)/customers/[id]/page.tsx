@@ -9,6 +9,7 @@ import {
   CardHeader,
   DetailList,
   EmptyState,
+  LinkTabs,
   PageHeader,
   StageBadge,
   Table,
@@ -39,11 +40,17 @@ const ORDER_STATUS: Record<OrderStatus, { label: string; tone: "info" | "ok" | "
 
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 
-export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
+type Tab = "overview" | "deals" | "orders" | "account" | "history";
+
+export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
   const me = await requireUser();
+  const managers = can(me, "expenses.manage");
+  const tabs: Tab[] = ["overview", "deals", "orders", ...(managers ? (["account"] as const) : []), "history"];
+  const tab: Tab = tabs.includes(sp.tab as Tab) ? (sp.tab as Tab) : "overview";
   const c = await load(() => api.get<CustomerDetail>(`/customers/${id}`));
-  const history = await api.get<HistoryEntry[]>("/history", { type: "customer", id });
+  const history = tab === "history" ? await api.get<HistoryEntry[]>("/history", { type: "customer", id }) : [];
   const canEdit = can(me, "customers.manage");
   const openOrders = c.orders.filter((o) => o.status === "open").length;
   const openDeals = c.inquiries.filter((d) => ["new", "sourcing", "quoted"].includes(d.stage)).length;
@@ -87,89 +94,20 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         </p>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-5">
-          <Card>
-            <CardHeader
-              title="Deals"
-              description={
-                can(me, "inquiries.viewAll")
-                  ? "Every inquiry from this customer, newest first"
-                  : "Their inquiries that you handle or created"
-              }
-            />
-            {c.inquiries.length === 0 ? (
-              <EmptyState title="No deals yet" description="Inquiries from this customer will show here." className="py-8" />
-            ) : (
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Deal</Th>
-                    <Th>Stage</Th>
-                    <Th>Handled by</Th>
-                    <Th className="text-right">Received</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {c.inquiries.map((d) => (
-                    <Tr key={d.id} className="hover:bg-surface-2/50">
-                      <Td>
-                        <Link href={`/deals/${d.id}`} className="font-medium hover:text-primary">
-                          {d.refNo}
-                        </Link>
-                        <span className="block max-w-80 truncate text-xs text-muted">{d.title}</span>
-                      </Td>
-                      <Td>
-                        <StageBadge stage={d.stage} onHold={d.onHold} />
-                      </Td>
-                      <Td className="text-sm">{d.assignee?.name ?? <span className="text-xs text-warn">Nobody yet</span>}</Td>
-                      <Td className="text-right text-xs whitespace-nowrap text-muted">{date(d.createdAt)}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
-          </Card>
+      <LinkTabs
+        label="Customer sections"
+        className="mb-5"
+        tabs={[
+          { href: `/customers/${c.id}`, label: "Overview", active: tab === "overview" },
+          { href: `/customers/${c.id}?tab=deals`, label: "Deals", count: c.inquiries.length, active: tab === "deals" },
+          { href: `/customers/${c.id}?tab=orders`, label: "Orders", count: c.orders.length, active: tab === "orders" },
+          ...(managers ? [{ href: `/customers/${c.id}?tab=account`, label: "Account", active: tab === "account" }] : []),
+          { href: `/customers/${c.id}?tab=history`, label: "History", active: tab === "history" },
+        ]}
+      />
 
-          <Card>
-            <CardHeader title="Orders" description="Confirmed orders, newest first" />
-            {c.orders.length === 0 ? (
-              <EmptyState title="No orders yet" description="An order appears when this customer accepts a quotation." className="py-8" />
-            ) : (
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Order</Th>
-                    <Th>Status</Th>
-                    <Th className="text-right">Total</Th>
-                    <Th className="text-right">Ordered</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {c.orders.map((o) => (
-                    <Tr key={o.id} className="hover:bg-surface-2/50">
-                      <Td>
-                        <Link href={`/orders/${o.id}`} className="font-medium hover:text-primary">
-                          {o.refNo}
-                        </Link>
-                      </Td>
-                      <Td>
-                        <Badge tone={ORDER_STATUS[o.status].tone} dot>
-                          {ORDER_STATUS[o.status].label}
-                        </Badge>
-                      </Td>
-                      <Td className="text-right tabular">{money(o.total, o.currency)}</Td>
-                      <Td className="text-right text-xs whitespace-nowrap text-muted">{date(o.orderedOn)}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
-          </Card>
-          {can(me, "expenses.manage") && <CustomerAccountCard customerId={c.id} customerName={c.name} />}
-        </div>
-
-        <aside className="flex flex-col gap-5">
+      {tab === "overview" && (
+        <div className="grid items-start gap-5 lg:grid-cols-2">
           <Card>
             <CardHeader title="Contacts" description={`${c.contacts.length} ${c.contacts.length === 1 ? "person" : "people"}`} />
             <CardBody className="p-0">
@@ -226,59 +164,141 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               )}
             </CardBody>
           </Card>
-
+          <div className="flex flex-col gap-5">
+            <Card>
+              <CardHeader title="Details" />
+              <CardBody>
+                <DetailList
+                  columns={1}
+                  items={[
+                    {
+                      label: "Country",
+                      value:
+                        c.country === UNKNOWN_COUNTRY ? (
+                          <span className="text-warn">Not known yet</span>
+                        ) : (
+                          `${countryName(c.country)} (${c.country})`
+                        ),
+                    },
+                    { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, hidden: !c.address },
+                    { label: "Currency they pay in", value: c.defaultCurrency },
+                    { label: "Business license number", value: c.taxNo, hidden: !c.taxNo },
+                    { label: "Reg. number", value: c.regNo, hidden: !c.regNo },
+                    { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, hidden: !c.notes },
+                    { label: "Added", value: date(c.createdAt) },
+                  ]}
+                />
+              </CardBody>
+            </Card>
+            {can(me, "customers.delete") && (
+              <Card>
+                <CardHeader
+                  title="Remove customer"
+                  description="Hides them from lists and pickers. Past deals and orders keep their name. Not possible while an order is open."
+                />
+                <CardBody>
+                  <ConfirmAction
+                    action={removeCustomerAction.bind(null, c.id)}
+                    confirm={`Remove ${c.name}? They will no longer appear in lists.`}
+                    label="Remove this customer"
+                    pendingText="Removing…"
+                    variant="danger-ghost"
+                  />
+                </CardBody>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
+      {tab === "deals" && (
           <Card>
-            <CardHeader title="Details" />
-            <CardBody>
-              <DetailList
-                columns={1}
-                items={[
-                  {
-                    label: "Country",
-                    value:
-                      c.country === UNKNOWN_COUNTRY ? (
-                        <span className="text-warn">Not known yet</span>
-                      ) : (
-                        `${countryName(c.country)} (${c.country})`
-                      ),
-                  },
-                  { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, hidden: !c.address },
-                  { label: "Currency they pay in", value: c.defaultCurrency },
-                  { label: "Business license number", value: c.taxNo, hidden: !c.taxNo },
-                  { label: "Reg. number", value: c.regNo, hidden: !c.regNo },
-                  { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, hidden: !c.notes },
-                  { label: "Added", value: date(c.createdAt) },
-                ]}
-              />
-            </CardBody>
+            <CardHeader
+              title="Deals"
+              description={
+                can(me, "inquiries.viewAll")
+                  ? "Every inquiry from this customer, newest first"
+                  : "Their inquiries that you handle or created"
+              }
+            />
+            {c.inquiries.length === 0 ? (
+              <EmptyState title="No deals yet" description="Inquiries from this customer will show here." className="py-8" />
+            ) : (
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Deal</Th>
+                    <Th>Stage</Th>
+                    <Th>Handled by</Th>
+                    <Th className="text-right">Received</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {c.inquiries.map((d) => (
+                    <Tr key={d.id} className="hover:bg-surface-2/50">
+                      <Td>
+                        <Link href={`/deals/${d.id}`} className="font-medium hover:text-primary">
+                          {d.refNo}
+                        </Link>
+                        <span className="block max-w-80 truncate text-xs text-muted">{d.title}</span>
+                      </Td>
+                      <Td>
+                        <StageBadge stage={d.stage} onHold={d.onHold} />
+                      </Td>
+                      <Td className="text-sm">{d.assignee?.name ?? <span className="text-xs text-warn">Nobody yet</span>}</Td>
+                      <Td className="text-right text-xs whitespace-nowrap text-muted">{date(d.createdAt)}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
           </Card>
-
+      )}
+      {tab === "orders" && (
+          <Card>
+            <CardHeader title="Orders" description="Confirmed orders, newest first" />
+            {c.orders.length === 0 ? (
+              <EmptyState title="No orders yet" description="An order appears when this customer accepts a quotation." className="py-8" />
+            ) : (
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>Order</Th>
+                    <Th>Status</Th>
+                    <Th className="text-right">Total</Th>
+                    <Th className="text-right">Ordered</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {c.orders.map((o) => (
+                    <Tr key={o.id} className="hover:bg-surface-2/50">
+                      <Td>
+                        <Link href={`/orders/${o.id}`} className="font-medium hover:text-primary">
+                          {o.refNo}
+                        </Link>
+                      </Td>
+                      <Td>
+                        <Badge tone={ORDER_STATUS[o.status].tone} dot>
+                          {ORDER_STATUS[o.status].label}
+                        </Badge>
+                      </Td>
+                      <Td className="text-right tabular">{money(o.total, o.currency)}</Td>
+                      <Td className="text-right text-xs whitespace-nowrap text-muted">{date(o.orderedOn)}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </Card>
+      )}
+      {tab === "account" && managers && <CustomerAccountCard customerId={c.id} customerName={c.name} />}
+      {tab === "history" && (
           <Card>
             <CardHeader title="History" description="Changes to this customer, with the reason when one was asked" />
             <CardBody>
               <HistoryList entries={history} />
             </CardBody>
           </Card>
-
-          {can(me, "customers.delete") && (
-            <Card>
-              <CardHeader
-                title="Remove customer"
-                description="Hides them from lists and pickers. Past deals and orders keep their name. Not possible while an order is open."
-              />
-              <CardBody>
-                <ConfirmAction
-                  action={removeCustomerAction.bind(null, c.id)}
-                  confirm={`Remove ${c.name}? They will no longer appear in lists.`}
-                  label="Remove this customer"
-                  pendingText="Removing…"
-                  variant="danger-ghost"
-                />
-              </CardBody>
-            </Card>
-          )}
-        </aside>
-      </div>
+      )}
     </div>
   );
 }

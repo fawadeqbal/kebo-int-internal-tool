@@ -7,6 +7,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { LinePacking } from "@/lib/types-orders";
+import { Sheet } from "@/components/lines/sheet";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -107,50 +108,44 @@ export function GoodsReceipt({ lines, canEdit, action, today }: { lines: GoodsLi
         )}
       </div>
     );
-  return <ReceiptForm lines={lines} action={action} today={today} rows={rows} close={() => setEditing(false)} />;
+  return <ReceiptForm lines={lines} action={action} today={today} close={() => setEditing(false)} />;
 }
 
-function ReceiptForm({
-  lines,
-  action,
-  today,
-  rows,
-  close,
-}: {
-  lines: GoodsLine[];
-  action: Action;
-  today: string;
-  rows: (input: (l: GoodsLine, i: number) => ReactNode) => ReactNode;
-  close: () => void;
-}) {
+function ReceiptForm({ lines, action, today, close }: { lines: GoodsLine[]; action: Action; today: string; close: () => void }) {
   const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(lines.map((l) => [l.id, String(Number(l.receivedQty))])));
   const [on, setOn] = useState(today);
   const payload = JSON.stringify({ on, lines: lines.map((l) => ({ lineId: l.id, receivedQty: qty[l.id] ?? "" })) });
   return (
     <ActionForm action={action} onDone={close} className={framed}>
-      <p className="text-sm font-medium">How many have come in so far, in total?</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">How many have come in so far, in total?</p>
+        <Button type="button" size="xs" variant="ghost" onClick={() => setQty(Object.fromEntries(lines.map((l) => [l.id, String(Number(l.quantity))])))}>
+          <CheckCircle2 aria-hidden /> Everything ordered
+        </Button>
+      </div>
       <input type="hidden" name="payload" value={payload} />
-      {rows((l) => (
-        <div className="flex items-center gap-2">
-          <label htmlFor={`rcv-${l.id}`} className="text-xs text-text-2">
-            Came in so far
-          </label>
-          <Input
-            id={`rcv-${l.id}`}
-            inputMode="decimal"
-            className="h-8 w-24 tabular"
-            value={qty[l.id] ?? ""}
-            onChange={(e) => setQty((q) => ({ ...q, [l.id]: e.target.value }))}
-            aria-label={`${head(l.description)}: came in so far (${l.unit})`}
-          />
-          <span className="text-xs text-muted">
-            of {n(l.quantity)} {l.unit}
-          </span>
-          <Button type="button" size="xs" variant="ghost" onClick={() => setQty((q) => ({ ...q, [l.id]: String(Number(l.quantity)) }))}>
-            All
-          </Button>
-        </div>
-      ))}
+      <Sheet
+        label="Goods that came in"
+        rows={lines}
+        rowKey={(l) => l.id}
+        rowNo={(l) => l.no}
+        onChange={(i, _k, v) => setQty((q) => ({ ...q, [lines[i]!.id]: v }))}
+        columns={[
+          { key: "goods", label: "Goods", show: (l) => <span className="line-clamp-2 text-text">{head(l.description)}</span> },
+          { key: "factory", label: "Factory", width: "10rem", show: (l) => <span className="truncate">{l.factory ?? "—"}</span> },
+          { key: "ordered", label: "Ordered", width: "7rem", align: "right", show: (l) => `${n(l.quantity)} ${l.unit}` },
+          {
+            key: "received",
+            label: "Came in so far",
+            width: "8rem",
+            align: "right",
+            input: "number",
+            maxLength: 14,
+            value: (l) => qty[l.id] ?? "",
+            aria: (l) => `${head(l.description)}: came in so far (${l.unit})`,
+          },
+        ]}
+      />
       <Field label="Date" htmlFor="rcv-on" hint="When these came in">
         <Input id="rcv-on" type="date" max={today} className="w-44" value={on} onChange={(e) => setOn(e.target.value)} />
       </Field>
@@ -177,7 +172,6 @@ interface PackRow {
   cbm: string;
 }
 
-const COLS = "grid grid-cols-6 gap-x-2 gap-y-1.5 sm:grid-cols-[minmax(0,1fr)_4.5rem_6.5rem_5.5rem_5.5rem_4.5rem] sm:items-center";
 const FIELDS: {
   key: Exclude<keyof PackRow, "lineId">;
   label: string;
@@ -320,60 +314,38 @@ function PackingForm({
     <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
       <input type="hidden" name="payload" value={payload} />
       {started && !packed && <p className="text-xs text-warn">Not complete yet: every line needs its number of packages.</p>}
-      <div className="flex flex-col gap-2">
-        <div className={cn(COLS, "hidden px-1 text-xs font-medium text-muted sm:grid")} aria-hidden>
-          <span>Goods</span>
-          {FIELDS.map((f) => (
-            <span key={f.key} className={f.mode === "text" ? "" : "text-right"}>
-              {f.short}
-            </span>
-          ))}
-        </div>
-        {lines.map((l, i) => (
-          <fieldset
-            key={l.id}
-            className={cn(COLS, "rounded-lg border border-line p-2 sm:border-0 sm:border-t sm:rounded-none sm:px-1 sm:py-1.5")}
-          >
-            <legend className="sr-only">{head(l.description)}</legend>
-            <p className="col-span-6 min-w-0 text-sm sm:col-span-1">
-              <span className="block truncate font-medium" title={head(l.description)}>
-                <span className="mr-1.5 text-muted tabular">{l.no}</span>
-                {head(l.description)}
+      <Sheet
+        label="Packing list"
+        rows={lines}
+        rowKey={(l) => l.id}
+        rowNo={(l) => l.no}
+        onChange={(i, k, v) => set(i, k as keyof PackRow, v)}
+        columns={[
+          {
+            key: "goods",
+            label: "Goods",
+            show: (l) => (
+              <span className="block min-w-0">
+                <span className="line-clamp-1 text-text">{head(l.description)}</span>
+                <span className="text-xs text-muted tabular">
+                  {n(l.quantity)} {l.unit}
+                </span>
               </span>
-              <span className="text-xs text-muted tabular">
-                {n(l.quantity)} {l.unit}
-              </span>
-            </p>
-            {FIELDS.map((f) => (
-              <div key={f.key} className={cn(f.span, "flex flex-col gap-0.5 sm:col-span-1")}>
-                <label htmlFor={`pk-${f.key}-${l.id}`} className="text-xs text-muted sm:sr-only">
-                  {f.label}
-                </label>
-                <Input
-                  id={`pk-${f.key}-${l.id}`}
-                  inputMode={f.mode}
-                  className={cn("h-8 px-2", f.mode !== "text" && "text-right tabular")}
-                  maxLength={f.mode === "text" ? 40 : 14}
-                  value={rows[i]![f.key]}
-                  onChange={(e) => set(i, f.key, e.target.value)}
-                />
-              </div>
-            ))}
-          </fieldset>
-        ))}
-        <div className={cn(COLS, "hidden border-t-2 border-line-strong px-1 pt-1.5 text-sm font-semibold tabular sm:grid")}>
-          <span>Total</span>
-          <span className="text-right">{n(total.packages, 0)}</span>
-          <span />
-          <span className="text-right">{n(total.net)}</span>
-          <span className="text-right">{n(total.gross)}</span>
-          <span className="text-right">{n(total.cbm, 3)}</span>
-        </div>
-        <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm tabular sm:hidden">
-          <span className="font-medium">Total:</span> {n(total.packages, 0)} packages · net {n(total.net)} kg · gross {n(total.gross)} kg ·{" "}
-          {n(total.cbm, 3)} m³
-        </p>
-      </div>
+            ),
+          },
+          ...FIELDS.map((f) => ({
+            key: f.key,
+            label: f.label,
+            width: f.mode === "text" ? "8rem" : "6.5rem",
+            align: f.mode === "text" ? undefined : ("right" as const),
+            input: f.mode === "text" ? ("text" as const) : ("number" as const),
+            maxLength: f.mode === "text" ? 40 : 14,
+            value: (l: GoodsLine) => rows[lines.indexOf(l)]![f.key],
+            aria: (l: GoodsLine) => `${head(l.description)}: ${f.label}`,
+          })),
+        ]}
+        foot={["Total", n(total.packages, 0), "", n(total.net), n(total.gross), n(total.cbm, 3)]}
+      />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Container number" htmlFor="pk-container" optional>
           <Input

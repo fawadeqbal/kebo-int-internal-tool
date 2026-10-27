@@ -1,4 +1,4 @@
-import { Avatar, Card, CardBody, CardHeader, PageHeader } from "@kebo/ui";
+import { Avatar, Card, CardBody, CardHeader, LinkTabs, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { date } from "@/lib/format";
@@ -12,8 +12,12 @@ import { PasswordForm, TwoStepPanel } from "./forms";
 export const metadata = { title: "My account" };
 
 /** The signed-in person's own sign-in: password and two-step sign-in. */
-export default async function AccountPage() {
+type Tab = "password" | "two-step" | "devices";
+
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const me = await requireUser();
+  const sp = await searchParams;
+  const tab: Tab = sp.tab === "two-step" || sp.tab === "devices" ? sp.tab : "password";
   const [status, sessions, signIns] = await Promise.all([api.get<TwoStepStatus>("/me/two-step"), api.get<SessionRow[]>("/me/sessions"), api.get<SignInRow[]>("/me/sign-ins")]);
   const others = sessions.filter((s) => !s.current).length;
   return (
@@ -27,13 +31,24 @@ export default async function AccountPage() {
           </span>
         }
       />
-      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <LinkTabs
+        label="Account sections"
+        className="mb-5"
+        tabs={[
+          { href: "/account", label: "Password", active: tab === "password" },
+          { href: "/account?tab=two-step", label: status.on ? "Two-step sign-in · on" : "Two-step sign-in · off", active: tab === "two-step" },
+          { href: "/account?tab=devices", label: "Devices and sign-ins", count: sessions.length, active: tab === "devices" },
+        ]}
+      />
+      {tab === "password" && <div className="max-w-xl">
         <Card>
           <CardHeader title="Password" description="Changing it signs you out on your other devices" />
           <CardBody>
             <PasswordForm action={changePasswordAction} />
           </CardBody>
         </Card>
+      </div>}
+      {tab === "two-step" && <div className="max-w-2xl">
         <Card>
           <CardHeader title="Two-step sign-in" description="A code from your phone as well as your password" />
           <CardBody>
@@ -47,8 +62,9 @@ export default async function AccountPage() {
             />
           </CardBody>
         </Card>
-      </div>
-      <div className="mt-5 grid items-start gap-5 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      </div>}
+      {tab === "devices" && (
+        <div className="grid items-start gap-5 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <Card className="overflow-hidden">
           <CardHeader
             title="Where you are signed in"
@@ -65,7 +81,8 @@ export default async function AccountPage() {
           <CardHeader title="Recent sign-ins" description="Yours, right and wrong. A wrong password you did not type means someone is trying: change it." />
           {signIns.length ? <SignInList rows={signIns} /> : <p className="px-4 pb-4 text-sm text-muted">None yet.</p>}
         </Card>
-      </div>
+        </div>
+      )}
       <p className="mt-5 text-xs text-muted">To change your name, email or role, ask a Super Admin.</p>
     </div>
   );
