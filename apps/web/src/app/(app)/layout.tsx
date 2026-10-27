@@ -5,11 +5,14 @@ import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { AppShell, type NavGroup, type NavItem } from "@/components/shell/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
+import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const me = await requireUser();
   const [{ unread }, settings] = await Promise.all([api.get<{ unread: number }>("/notifications", { take: 1 }), api.get<{ company: { name: string } }>("/settings")]);
   const has = (p: Parameters<typeof can>[1]) => can(me, p);
+  // Our money accounts, for every form that records money (payments, factory payments, expenses).
+  const accounts = has("payments.record") || has("expenses.manage") ? await api.get<AccountOption[]>("/money/accounts").catch(() => []) : [];
 
   const work: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -34,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <AppShell groups={groups} companyName={settings.company.name} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
-        {children}
+        <AccountsProvider accounts={accounts}>{children}</AccountsProvider>
       </AppShell>
       <Suspense>
         <Toast />

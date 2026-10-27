@@ -36,6 +36,7 @@ export async function editPaymentAction(
     method: v.method,
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
+    accountId: v.accountId || null,
     reason: reasonOf(form),
   };
   const r = await attempt(form, () => api.patch(`/payments/${paymentId}`, body), "Payment changed.");
@@ -56,6 +57,7 @@ const factoryBody = (form: FormData) => {
     paidById: v.paidById || null,
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
+    accountId: v.accountId || null,
     reason: reasonOf(form),
   };
 };
@@ -105,7 +107,9 @@ export async function expenseAction(
   const v = formValues(form);
   const body = {
     orderId: orderId ?? (v.orderId || null),
+    inquiryId: orderId ? null : v.inquiryId || null,
     customerId: orderId ? null : v.customerId || null,
+    factoryId: v.factoryId || null,
     category: v.category,
     description: v.description?.trim() ?? "",
     amount: v.amount,
@@ -115,6 +119,7 @@ export async function expenseAction(
     paidById: v.paidById || null,
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
+    accountId: v.accountId || null,
     reason: reasonOf(form),
   };
   const r = await attempt(
@@ -122,7 +127,11 @@ export async function expenseAction(
     () => (expenseId ? api.patch(`/expenses/${expenseId}`, body) : api.post("/expenses", body)),
     expenseId ? "Expense changed." : "Expense added.",
   );
-  if (r.ok) refresh(body.orderId, (r.data as { customer?: { id: string } | null } | undefined)?.customer?.id ?? body.customerId);
+  if (r.ok) {
+    const saved = r.data as { customer?: { id: string } | null; deal?: { id: string } | null } | undefined;
+    refresh(body.orderId, saved?.customer?.id ?? body.customerId);
+    if (saved?.deal) revalidatePath(`/deals/${saved.deal.id}`, "layout");
+  }
   return r;
 }
 
@@ -144,5 +153,54 @@ export async function voidExpenseAction(
     refresh(orderId);
     revalidatePath("/customers", "layout");
   }
+  return r;
+}
+
+/* ---------------------------------------------------------------- cash book */
+
+/** Add (id null) or change one of our accounts. */
+export async function saveAccountAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const body = {
+    name: v.name?.trim() ?? "",
+    kind: v.kind,
+    currency: v.currency,
+    openingBalance: v.openingBalance || "0",
+    openingOn: v.openingOn,
+    note: v.note?.trim() || null,
+    archived: v.archived === "on",
+  };
+  const r = await attempt(form, () => (id ? api.patch(`/money/accounts/${id}`, body) : api.post("/money/accounts", body)), id ? "Account saved." : "Account added.");
+  if (r.ok) revalidatePath("/", "layout");
+  return r;
+}
+
+/** Money moved between two of our accounts. */
+export async function transferAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const body = {
+    fromAccountId: v.fromAccountId,
+    toAccountId: v.toAccountId,
+    amountOut: v.amountOut,
+    amountIn: v.amountIn?.trim() || null,
+    transferredOn: v.transferredOn,
+    reference: v.reference?.trim() || null,
+    note: v.note?.trim() || null,
+  };
+  const r = await attempt(form, () => api.post("/money/transfers", body), "Money moved.");
+  if (r.ok) revalidatePath("/money");
+  return r;
+}
+
+export async function voidTransferAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post(`/money/transfers/${id}/void`, { reason: formValues(form).reason }), "Move removed.");
+  if (r.ok) revalidatePath("/money");
+  return r;
+}
+
+/** Put an amount recorded without an account on one. */
+export async function setEntryAccountAction(kind: "in" | "factory" | "expense", id: string, accountId: string | null): Promise<ActionState> {
+  const r = await attempt(null, () => api.put(`/money/entries/${kind}/${id}/account`, { accountId }), "Saved.");
+  if (r.ok) revalidatePath("/", "layout");
   return r;
 }

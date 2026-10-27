@@ -97,6 +97,10 @@ export type OrderStage = (typeof ORDER_STAGES)[number];
 export const PAYMENT_KINDS = values("deposit", "balance", "other");
 export type PaymentKind = (typeof PAYMENT_KINDS)[number];
 
+/** Where money is kept: an office cash box, a bank account, a wallet (Alipay, JazzCash…). */
+export const MONEY_ACCOUNT_KINDS = values("cash", "bank", "wallet");
+export type MoneyAccountKind = (typeof MONEY_ACCOUNT_KINDS)[number];
+
 export const PAYMENT_METHODS = values("bank_transfer", "letter_of_credit", "cash", "cheque", "online", "other");
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 

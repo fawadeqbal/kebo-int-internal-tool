@@ -1,5 +1,5 @@
 import { Download, FileDown } from "lucide-react";
-import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
+import { can, CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { buildHref, buttonClass, Card, CardBody, CardHeader, Input, PageHeader, Segmented, Select, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { addDays, formatDuration, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -8,6 +8,7 @@ import { date, money } from "@/lib/format";
 import type { PersonWithRole, ProfitRow, ReportView } from "@/lib/types-deals";
 import { Stat } from "@/components/common/stat";
 import { ReportTrendChart } from "@/components/deals/report-trend-chart";
+import { ReportTabs } from "./tabs";
 
 export const metadata = { title: "Reports" };
 
@@ -103,7 +104,7 @@ function ProfitTable({ title, column, rows, currency }: { title: string; column:
 
 /** Managers' view of the deal funnel, win rates and estimated profit over a period. */
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  await requirePermission("reports.view");
+  const me = await requirePermission("reports.view");
   const sp = await searchParams;
   const today = todayIn(TZ);
   const from = isDay(sp.from) ? sp.from : undefined;
@@ -138,6 +139,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </>
         }
       />
+
+      {can(me, "expenses.manage") && <ReportTabs active="deals" />}
 
       <div className="mb-5 flex flex-col gap-3 rounded-xl border border-line bg-surface p-3 lg:flex-row lg:items-end lg:justify-between">
         <Segmented label="Period" options={quick.map((q) => ({ href: buildHref("/reports", { staff }, { from: q.from, to: q.to }), label: q.label, active: q.from === r.range.from && q.to === r.range.to }))} />

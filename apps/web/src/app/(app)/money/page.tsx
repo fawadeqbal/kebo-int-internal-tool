@@ -1,8 +1,18 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { can, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, ORDER_STAGE_LABEL, type ExpenseCategory, type OrderStage } from "@kebo/shared";
+import { Banknote, ChevronLeft, ChevronRight, Landmark, Wallet, X } from "lucide-react";
+import {
+  can,
+  CURRENCIES,
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABEL,
+  MONEY_ACCOUNT_KIND_LABEL,
+  ORDER_STAGE_LABEL,
+  type ExpenseCategory,
+  type OrderStage,
+} from "@kebo/shared";
 import {
   Alert,
+  Badge,
   buildHref,
   Card,
   CardBody,
@@ -22,12 +32,13 @@ import {
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
-import { money } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
-import type { ExpenseList, Payable, ProfitAndLoss } from "@/lib/types-money";
-import { NewExpense, type ExpenseChoices } from "@/components/money/forms";
+import type { CashBook, CashRow, ExpenseList, Payable, ProfitAndLoss } from "@/lib/types-money";
+import { NewExpense, VoidForm, type ExpenseChoices } from "@/components/money/forms";
+import { EditAccount, MoveMoney, NewAccount, PutOnAccount, type AccountRow } from "@/components/money/cash-forms";
 import { ExpenseRecord } from "@/components/money/expense-record";
-import { expenseAction } from "./actions";
+import { expenseAction, voidTransferAction } from "./actions";
 
 export const metadata = { title: "Money" };
 
@@ -36,7 +47,19 @@ const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC"
 const monthName = (ym: string) => MONTH.format(new Date(`${ym}-01T00:00:00Z`));
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
-type Search = { tab?: string; year?: string; view?: string; month?: string; p?: string; kind?: string; customer?: string; category?: string; mine?: string };
+type Search = {
+  tab?: string;
+  year?: string;
+  view?: string;
+  month?: string;
+  p?: string;
+  kind?: string;
+  customer?: string;
+  category?: string;
+  mine?: string;
+  acct?: string;
+  cur?: string;
+};
 
 /**
  * The company's money: profit & loss by month (earned and cash), expenses
@@ -46,13 +69,14 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   const me = await requirePermission("sourcing.manage");
   const sp = await searchParams;
   const managers = can(me, "expenses.manage");
-  const tab = managers ? (sp.tab === "expenses" || sp.tab === "owe" ? sp.tab : "pnl") : "owe";
+  const tab = managers ? (sp.tab === "expenses" || sp.tab === "owe" || sp.tab === "cash" ? sp.tab : "pnl") : "owe";
   const today = todayIn(TZ);
   const tabs = [
     ...(managers
       ? [
           { href: "/money", label: "Profit & loss", active: tab === "pnl" },
           { href: "/money?tab=expenses", label: "Expenses", active: tab === "expenses" },
+          { href: "/money?tab=cash", label: "Cash book", active: tab === "cash" },
         ]
       : []),
     { href: "/money?tab=owe", label: "What we owe factories", active: tab === "owe" },
@@ -70,6 +94,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
       <LinkTabs label="Money sections" className="mb-5" tabs={tabs} />
       {tab === "pnl" && <ProfitTab sp={sp} today={today} />}
       {tab === "expenses" && <ExpensesTab sp={sp} today={today} />}
+      {tab === "cash" && <CashTab sp={sp} today={today} />}
       {tab === "owe" && <OweTab mine={sp.mine === "1"} />}
     </div>
   );
@@ -312,18 +337,14 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
   const customer = UUID.test(sp.customer ?? "") ? sp.customer : undefined;
   const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.category ?? "") ? (sp.category as ExpenseCategory) : undefined;
 
-  const [list, people, orders, customers, settings] = await Promise.all([
+  const [list, people, choices, settings] = await Promise.all([
     api.get<ExpenseList>("/expenses", { from, to, kind, customerId: customer, category }),
     api.get<Person[]>("/users/people"),
-    api.get<{ id: string; refNo: string; customer: { id: string; name: string } }[]>("/orders", { status: "open" }),
-    api.get<{ id: string; name: string }[]>("/customers/names"),
+    api.get<ExpenseChoices>("/expenses/targets"),
     api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
   ]);
+  const customers = choices.customers;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const choices: ExpenseChoices = {
-    customers,
-    orders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customerId: o.customer.id, customer: o.customer.name })),
-  };
   const c = list.currency;
   const keep = { tab: "expenses", p: period === thisMonth ? undefined : period, kind, customer, category };
   const href = (change: Record<string, string | undefined>) => buildHref("/money", keep, change);
@@ -529,6 +550,309 @@ function BarRow({ href, active, label, sub, amount, share }: { href: string; act
         </span>
       </Link>
     </li>
+  );
+}
+
+/* ---------------------------------------------------------------- cash book */
+
+/** A month (YYYY-MM) or a year (YYYY) from ?p=, never after today. */
+function periodOf(asked: string | undefined, today: string) {
+  const thisMonth = today.slice(0, 7);
+  const period = /^\d{4}(-\d{2})?$/.test(asked ?? "") && asked! <= thisMonth ? asked! : thisMonth;
+  const isYear = period.length === 4;
+  const from = isYear ? `${period}-01-01` : `${period}-01`;
+  const to = isYear ? `${period}-12-31` : addDays(`${addDays(`${period}-28`, 4).slice(0, 7)}-01`, -1);
+  const prev = isYear ? String(Number(period) - 1) : addDays(from, -1).slice(0, 7);
+  const next = isYear ? String(Number(period) + 1) : addDays(`${period}-28`, 4).slice(0, 7);
+  const hasNext = isYear ? next <= today.slice(0, 4) : next <= thisMonth;
+  const name = isYear ? period : MONTH_YEAR.format(new Date(`${period}-01T00:00:00Z`));
+  return { period, isYear, from, to: to > today ? today : to, prev, next, hasNext, name, thisMonth };
+}
+
+function PeriodBar({ pr, href, today }: { pr: ReturnType<typeof periodOf>; href: (c: Record<string, string | undefined>) => string; today: string }) {
+  const p = (v: string) => (v === pr.thisMonth ? undefined : v);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <nav aria-label="Period" className="inline-flex items-center rounded-lg border border-line bg-surface-2 p-0.5">
+        <Link href={href({ p: pr.prev })} className="inline-flex size-7 items-center justify-center rounded-md text-muted hover:text-text" aria-label={`Previous ${pr.isYear ? "year" : "month"}`}>
+          <ChevronLeft className="size-4" aria-hidden />
+        </Link>
+        <span className="min-w-28 px-2 text-center text-sm font-medium">{pr.name}</span>
+        {pr.hasNext ? (
+          <Link href={href({ p: p(pr.next) })} className="inline-flex size-7 items-center justify-center rounded-md text-muted hover:text-text" aria-label={`Next ${pr.isYear ? "year" : "month"}`}>
+            <ChevronRight className="size-4" aria-hidden />
+          </Link>
+        ) : (
+          <span className="inline-flex size-7 items-center justify-center text-line-strong" aria-hidden>
+            <ChevronRight className="size-4" />
+          </span>
+        )}
+      </nav>
+      <Segmented
+        label="Show a month or a year"
+        options={[
+          { href: href({ p: pr.isYear ? (pr.period === today.slice(0, 4) ? undefined : `${pr.period}-12`) : p(pr.period) }), label: "Month", active: !pr.isYear },
+          { href: href({ p: pr.period.slice(0, 4) }), label: "Year", active: pr.isYear },
+        ]}
+      />
+    </div>
+  );
+}
+
+const KIND_ICON = { cash: Banknote, bank: Landmark, wallet: Wallet } as const;
+
+/**
+ * Where our money is (each account and its balance today), and every amount in
+ * and out in a month or a year: from customers, to factories, expenses, and
+ * moves between our accounts. One account shows its balance line by line, like
+ * a bank statement, so the two can be checked against each other.
+ */
+async function CashTab({ sp, today }: { sp: Search; today: string }) {
+  const pr = periodOf(sp.p, today);
+  const accounts = await api.get<AccountRow[]>("/money/accounts");
+  const acct = sp.acct === "none" || accounts.some((a) => a.id === sp.acct) ? sp.acct : undefined;
+  const cur = (CURRENCIES as readonly string[]).includes(sp.cur ?? "") ? sp.cur : undefined;
+  const book = await api.get<CashBook>("/money/cash-book", { from: pr.from, to: pr.to, account: acct, currency: acct && acct !== "none" ? undefined : cur });
+  const keep = { tab: "cash", p: pr.period === pr.thisMonth ? undefined : pr.period, acct, cur };
+  const href = (change: Record<string, string | undefined>) => buildHref("/money", keep, change);
+  const one = book.account;
+  const open = accounts.filter((a) => !a.archived);
+  const byCurrency = new Map<string, number>();
+  for (const a of open) byCurrency.set(a.currency, (byCurrency.get(a.currency) ?? 0) + Number(a.balance));
+  const kindOf = (k: CashRow["kind"]) => (k === "in" ? "From a customer" : k === "factory" ? "To a factory" : k === "expense" ? "Expense" : "Between our accounts");
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Card>
+        <CardHeader
+          title="Our accounts"
+          description={
+            open.length
+              ? `Balance today: ${[...byCurrency.entries()].map(([c, v]) => money(v, c)).join(" · ")}`
+              : "Add the office cash box, each bank account and wallet, with what is in it today."
+          }
+          actions={<div className="flex flex-wrap justify-end gap-2"><MoveMoney accounts={accounts} today={today} /></div>}
+        />
+        <CardBody className="flex flex-col gap-3">
+          {accounts.length > 0 && (
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {accounts.map((a) => {
+                const Icon = KIND_ICON[a.kind];
+                return (
+                  <li key={a.id} className={cn("flex items-start justify-between gap-2 rounded-lg border p-3", acct === a.id ? "border-primary ring-1 ring-primary/30" : "border-line", a.archived && "opacity-60")}>
+                    <Link href={href({ acct: acct === a.id ? undefined : a.id, cur: undefined })} className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                        <Icon className="size-4 shrink-0 text-muted" aria-hidden />
+                        <span className="truncate">{a.name}</span>
+                        {a.archived && <Badge tone="neutral">Closed</Badge>}
+                      </span>
+                      <span className={cn("mt-1 block text-lg font-semibold tabular", Number(a.balance) < 0 && "text-bad")}>{money(a.balance, a.currency)}</span>
+                      <span className="text-xs text-muted">
+                        {MONEY_ACCOUNT_KIND_LABEL[a.kind]} · from {date(a.openingOn)}
+                      </span>
+                    </Link>
+                    <EditAccount account={a} today={today} />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <NewAccount today={today} />
+          </div>
+        </CardBody>
+      </Card>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PeriodBar pr={pr} href={href} today={today} />
+        {!one && acct !== "none" && (
+          <Segmented
+            label="Currency"
+            options={[
+              { href: href({ cur: undefined }), label: "All", active: !cur },
+              ...CURRENCIES.map((c) => ({ href: href({ cur: c }), label: c, active: cur === c })),
+            ]}
+          />
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterChip href={href({ acct: undefined })} active={!acct}>
+          Every account
+        </FilterChip>
+        {open.map((a) => (
+          <FilterChip key={a.id} href={href({ acct: a.id, cur: undefined })} active={acct === a.id}>
+            {a.name}
+          </FilterChip>
+        ))}
+        <FilterChip href={href({ acct: "none", cur: undefined })} active={acct === "none"}>
+          Not on an account{book.unassigned > 0 && acct !== "none" ? ` (${book.unassigned})` : ""}
+        </FilterChip>
+      </div>
+      {acct !== "none" && book.unassigned > 0 && (
+        <Alert tone="warning">
+          {book.unassigned} {one ? `${one.currency} ` : ""}amount{book.unassigned === 1 ? " is" : "s are"} not on an account in {pr.name}, so the balances leave{" "}
+          {book.unassigned === 1 ? "it" : "them"} out.{" "}
+          <Link href={href({ acct: "none", cur: undefined })} className="font-medium underline">
+            Put {book.unassigned === 1 ? "it" : "them"} on an account
+          </Link>
+        </Alert>
+      )}
+
+      {one ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {pr.from >= one.openingOn ? (
+            <Tile label={`On ${date(pr.from)}`} value={money(book.opening ?? "0", one.currency)} hint="Balance before the period" />
+          ) : (
+            <Tile label={`Opened ${date(one.openingOn)}`} value={money(book.opening ?? "0", one.currency)} hint="Balance it started with" />
+          )}
+          <Tile label="In" value={money(book.totals[0]?.in ?? "0", one.currency)} hint="Customers and moves in" />
+          <Tile label="Out" value={money(book.totals[0]?.out ?? "0", one.currency)} hint="Factories, expenses, moves out" />
+          <Tile label={`On ${date(pr.to)}`} value={money(book.closing ?? "0", one.currency)} hint="Check it against the statement" />
+        </div>
+      ) : (
+        book.totals.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {book.totals
+              .filter((t) => Number(t.in) !== 0 || Number(t.out) !== 0)
+              .map((t) => (
+              <Tile key={t.currency} label={`${t.currency} in ${pr.name}`} value={money(t.net, t.currency)} hint={`In ${money(t.in, t.currency)} · out ${money(t.out, t.currency)}`} />
+            ))}
+          </div>
+        )
+      )}
+
+      <Card className="overflow-hidden">
+        <CardHeader
+          title={one ? one.name : acct === "none" ? "Not on an account" : "Cash book"}
+          description={
+            one
+              ? "Like a bank statement: the balance after each line."
+              : acct === "none"
+                ? "Choose the account each amount went through, so the balances match the bank and the cash box."
+                : "Money in from customers and out to factories and expenses. Moves between our accounts are shown but not counted."
+          }
+        />
+        {book.rows.length === 0 ? (
+          <EmptyState title={`Nothing in ${pr.name}`} description="Money recorded on orders and expenses shows here by its date." />
+        ) : (
+          <>
+          {/* Phone: one line per amount. */}
+          <ul className="flex flex-col divide-y divide-line sm:hidden" aria-label="Cash book">
+            {book.rows.map((r) => {
+              const n = Number(r.amount);
+              return (
+                <li key={r.key} className={cn("flex flex-col gap-1 px-4 py-2.5 text-sm", r.voided && "text-muted line-through")}>
+                  <span className="flex items-start justify-between gap-3">
+                    {r.href ? (
+                      <Link href={r.href} className="min-w-0 font-medium hover:text-primary">
+                        {r.what}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 font-medium">{r.what}</span>
+                    )}
+                    <span className={cn("shrink-0 font-medium tabular", n > 0 && r.kind === "in" && "text-ok")}>
+                      {n > 0 ? "+ " : "− "}
+                      {money(Math.abs(n), r.currency)}
+                    </span>
+                  </span>
+                  <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted">
+                    <span>
+                      {date(r.on)} · {kindOf(r.kind)}
+                      {r.party && ` · ${r.party.name}`}
+                      {!one && r.account && ` · ${r.account.name}`}
+                    </span>
+                    {one && r.balance && <span className="tabular">Balance {money(r.balance, r.currency)}</span>}
+                  </span>
+                  {!one && !r.account && (r.kind === "in" || r.kind === "factory" || r.kind === "expense") && (
+                    <PutOnAccount kind={r.kind} id={r.id} currency={r.currency} accounts={accounts} />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto sm:block">
+            <Table>
+              <THead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>What</Th>
+                  {!one && <Th>Account</Th>}
+                  <Th className="text-right">In</Th>
+                  <Th className="text-right">Out</Th>
+                  {one && <Th className="text-right">Balance</Th>}
+                </tr>
+              </THead>
+              <tbody>
+                {book.rows.map((r) => {
+                  const n = Number(r.amount);
+                  const isMove = r.kind === "transfer_in" || r.kind === "transfer_out";
+                  return (
+                    <Tr key={r.key} className={cn("align-top", r.voided && "text-muted line-through")}>
+                      <Td className="text-sm whitespace-nowrap">{date(r.on)}</Td>
+                      <Td className="min-w-56">
+                        {r.href ? (
+                          <Link href={r.href} className="text-sm font-medium hover:text-primary">
+                            {r.what}
+                          </Link>
+                        ) : (
+                          <span className="text-sm font-medium">{r.what}</span>
+                        )}
+                        <span className="block text-xs text-muted">
+                          {kindOf(r.kind)}
+                          {r.party && (
+                            <>
+                              {" · "}
+                              {r.party.href ? (
+                                <Link href={r.party.href} className="hover:text-primary">
+                                  {r.party.name}
+                                </Link>
+                              ) : (
+                                r.party.name
+                              )}
+                            </>
+                          )}
+                          {r.reference && ` · ${r.reference}`}
+                        </span>
+                      </Td>
+                      {!one && (
+                        <Td className="text-sm">
+                          {r.account ? (
+                            r.account.name
+                          ) : r.kind === "in" || r.kind === "factory" || r.kind === "expense" ? (
+                            <PutOnAccount kind={r.kind} id={r.id} currency={r.currency} accounts={accounts} />
+                          ) : null}
+                        </Td>
+                      )}
+                      <Td className={cn("text-right whitespace-nowrap tabular", !isMove && n > 0 && "text-ok")}>{n > 0 ? money(n, r.currency) : ""}</Td>
+                      <Td className="text-right whitespace-nowrap tabular">{n < 0 ? money(-n, r.currency) : ""}</Td>
+                      {one && <Td className={cn("text-right font-medium whitespace-nowrap tabular", r.balance && Number(r.balance) < 0 && "text-bad")}>{r.balance ? money(r.balance, r.currency) : ""}</Td>}
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </div>
+          </>
+        )}
+      </Card>
+      {book.rows.some((r) => r.kind === "transfer_out") && (
+        <Card>
+          <CardHeader title="Moves between our accounts" description="Remove one typed by mistake." />
+          <ul className="flex flex-col divide-y divide-line">
+            {book.rows
+              .filter((r) => r.kind === "transfer_out" && !r.voided)
+              .map((r) => (
+                <li key={r.key} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                  <span>
+                    {date(r.on)} · {r.party?.name} · <span className="tabular">{money(-Number(r.amount), r.currency)}</span>
+                  </span>
+                  <VoidForm action={voidTransferAction.bind(null, r.id)} label="this move" />
+                </li>
+              ))}
+          </ul>
+        </Card>
+      )}
+    </div>
   );
 }
 

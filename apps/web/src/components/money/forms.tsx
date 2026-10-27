@@ -12,7 +12,9 @@ import {
   PAYMENT_KINDS,
   PAYMENT_METHOD_LABEL,
   PAYMENT_METHODS,
+  INQUIRY_STAGE_LABEL,
   type ExpenseCategory,
+  type InquiryStage,
   type InstalmentStatus,
   type PaymentKind,
   type PaymentMethod,
@@ -21,6 +23,7 @@ import { Alert, Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
+import { AccountSelect } from "./accounts";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
@@ -307,6 +310,7 @@ export function EditCustomerPayment({
     method: PaymentMethod;
     reference: string | null;
     note: string | null;
+    account?: { id: string; name: string } | null;
   };
   currency: string;
   today: string;
@@ -353,6 +357,7 @@ export function EditCustomerPayment({
             <Field label="Bank reference" htmlFor="ep-reference" optional>
               <Input id="ep-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment.reference ?? ""} />
             </Field>
+            <AccountSelect id="ep-account" label="Into account" currency={currency} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
           </div>
           <input type="hidden" name="note" value={payment.note ?? ""} />
           <div className="flex gap-2">
@@ -577,6 +582,7 @@ export function FactoryPaymentForm({
             <Field label="Bank reference" htmlFor="fp-reference" optional>
               <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? ""} />
             </Field>
+            <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
           </div>
           <Field label="Note" htmlFor="fp-note" optional>
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />
@@ -627,19 +633,22 @@ export function EditFactoryPayment(props: Omit<Parameters<typeof FactoryPaymentF
 
 /* ---------------------------------------------------------------- expenses */
 
-/** Who an expense is for: the company's own cost, spent on a customer, or a cost of one order. */
-type ForWhom = "company" | "customer" | "order";
+/** Who an expense is for: the company's own cost, spent on a customer, on one of their deals (won or lost), or a cost of one order. */
+type ForWhom = "company" | "customer" | "deal" | "order";
 
-/** What the expense form can point at (the Money page and a customer's page). */
+/** What the expense form can point at (GET /expenses/targets, or narrowed on a customer's or a deal's page). */
 export interface ExpenseChoices {
   customers: { id: string; name: string }[];
-  /** Open orders, with their customer. */
-  orders: { id: string; refNo: string; customerId: string; customer: string }[];
-  /** On a customer's page: the expense is always on this customer (or one of their orders). */
+  deals: { id: string; refNo: string; title: string; stage: InquiryStage; customerId: string; customer: string }[];
+  orders: { id: string; refNo: string; dealId: string; customerId: string; customer: string }[];
+  factories: { id: string; name: string }[];
+  /** On a customer's page: the expense is always on this customer (or one of their deals or orders). */
   customerId?: string;
+  /** On a deal's page: the expense is always on this deal. */
+  dealId?: string;
 }
 
-const DEFAULT_KIND: Record<ForWhom, ExpenseCategory> = { company: "rent", customer: "meals", order: "freight" };
+const DEFAULT_KIND: Record<ForWhom, ExpenseCategory> = { company: "rent", customer: "meals", deal: "travel", order: "freight" };
 
 const PLACEHOLDER: Partial<Record<ExpenseCategory, string>> = {
   travel: "e.g. Flight Lahore → Guangzhou",
@@ -735,8 +744,12 @@ export function ExpenseForm({
 }) {
   const from = expense ?? template;
   const fixedCustomer = choices?.customerId ?? null;
-  const [forWhom, setForWhomRaw] = useState<ForWhom>(from?.order ? "order" : from?.customer || fixedCustomer ? "customer" : "company");
+  const fixedDeal = choices?.dealId ?? null;
+  const [forWhom, setForWhomRaw] = useState<ForWhom>(
+    fixedDeal ? "deal" : from?.order ? "order" : from?.deal ? "deal" : from?.customer || fixedCustomer ? "customer" : "company",
+  );
   const [customerId, setCustomerId] = useState(fixedCustomer ?? from?.customer?.id ?? "");
+  const [dealId, setDealId] = useState(fixedDeal ?? from?.deal?.id ?? "");
   const [orderId, setOrderId] = useState(from?.orderId ?? "");
   const [category, setCategory] = useState<ExpenseCategory>(from?.category ?? DEFAULT_KIND[forWhom]);
   const [kindTouched, setKindTouched] = useState(Boolean(from));
@@ -749,7 +762,14 @@ export function ExpenseForm({
     setForWhomRaw(to);
     if (!kindTouched) setCategory(DEFAULT_KIND[to]);
   };
-  const orders = (choices?.orders ?? []).filter((o) => !fixedCustomer || o.customerId === fixedCustomer);
+  const ofCustomer = <T extends { customerId: string }>(list: T[]) => list.filter((x) => !customerId || x.customerId === customerId);
+  const deals = ofCustomer(choices?.deals ?? []);
+  const orders = ofCustomer(choices?.orders ?? []);
+  const pickDeal = (id: string) => {
+    setDealId(id);
+    const d = deals.find((x) => x.id === id);
+    if (d && !fixedCustomer) setCustomerId(d.customerId);
+  };
   const pickOrder = (id: string) => {
     setOrderId(id);
     const o = orders.find((x) => x.id === id);
@@ -758,11 +778,13 @@ export function ExpenseForm({
   const forOptions: { value: ForWhom; label: string }[] = fixedCustomer
     ? [
         { value: "customer", label: "This customer" },
+        { value: "deal", label: "One of their deals" },
         { value: "order", label: "One of their orders" },
       ]
     : [
         { value: "company", label: "The company" },
         { value: "customer", label: "A customer" },
+        { value: "deal", label: "A deal" },
         { value: "order", label: "An order" },
       ];
 
@@ -783,12 +805,12 @@ export function ExpenseForm({
       {(s) => (
         <>
           <p className="text-sm font-medium">{expense ? "Change the expense" : template ? "Add it again" : "New expense"}</p>
-          {choices && (
+          {choices && !fixedDeal && (
             <div className="flex flex-col gap-2">
               <span className="text-xs font-medium text-text-2" id="ex-for-label">
                 Who is it for?
               </span>
-              <div role="radiogroup" aria-labelledby="ex-for-label" className="inline-flex w-fit flex-wrap rounded-lg border border-line bg-surface-2 p-0.5">
+              <div role="radiogroup" aria-labelledby="ex-for-label" className="inline-flex w-fit max-w-full flex-wrap rounded-lg border border-line bg-surface-2 p-0.5">
                 {forOptions.map((o) => (
                   <button
                     key={o.value}
@@ -806,10 +828,18 @@ export function ExpenseForm({
                 ))}
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {forWhom === "customer" && !fixedCustomer && (
-                  <Field label="Customer" htmlFor="ex-customer" error={s.errors?.customerId}>
-                    <Select id="ex-customer" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                      <option value="">Choose the customer…</option>
+                {forWhom !== "company" && !fixedCustomer && (
+                  <Field label="Customer" htmlFor="ex-customer" error={s.errors?.customerId} optional={forWhom !== "customer"}>
+                    <Select
+                      id="ex-customer"
+                      value={customerId}
+                      onChange={(e) => {
+                        setCustomerId(e.target.value);
+                        setDealId("");
+                        setOrderId("");
+                      }}
+                    >
+                      <option value="">{forWhom === "customer" ? "Choose the customer…" : "Any customer"}</option>
                       {choices.customers.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -818,14 +848,27 @@ export function ExpenseForm({
                     </Select>
                   </Field>
                 )}
+                {forWhom === "deal" && (
+                  <Field label="Deal" htmlFor="ex-deal" error={s.errors?.inquiryId} hint={deals.length === 0 ? "No deal for this customer" : "Won, lost or still open"}>
+                    <Select id="ex-deal" value={dealId} onChange={(e) => pickDeal(e.target.value)}>
+                      <option value="">Choose the deal…</option>
+                      {deals.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.refNo} · {INQUIRY_STAGE_LABEL[d.stage]}
+                          {fixedCustomer || customerId ? "" : ` — ${d.customer}`} — {d.title}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
                 {forWhom === "order" && (
-                  <Field label="Order" htmlFor="ex-order" error={s.errors?.orderId} hint={orders.length === 0 ? "No open order" : undefined}>
+                  <Field label="Order" htmlFor="ex-order" error={s.errors?.orderId} hint={orders.length === 0 ? "No order for this customer" : undefined}>
                     <Select id="ex-order" value={orderId} onChange={(e) => pickOrder(e.target.value)}>
                       <option value="">Choose the order…</option>
                       {orders.map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.refNo}
-                          {fixedCustomer ? "" : ` — ${o.customer}`}
+                          {fixedCustomer || customerId ? "" : ` — ${o.customer}`}
                         </option>
                       ))}
                     </Select>
@@ -833,12 +876,21 @@ export function ExpenseForm({
                 )}
               </div>
               {forWhom === "company" && <p className="text-xs text-muted">Rent, salaries, bills and other costs of running the company.</p>}
-              {forWhom === "customer" && (
-                <p className="text-xs text-muted">Tickets, hotels, dinners, gifts and samples spent on winning or keeping this customer.</p>
+              {forWhom === "customer" && <p className="text-xs text-muted">Dinners, gifts and visits for the customer, not for one deal.</p>}
+              {forWhom === "deal" && (
+                <p className="text-xs text-muted">
+                  Trips to check products, samples and visits for one request. If the deal is won it comes off that order&apos;s profit; if it is lost it shows as the
+                  cost of a lost deal.
+                </p>
               )}
-              <input type="hidden" name="customerId" value={forWhom === "company" ? "" : customerId} />
-              <input type="hidden" name="orderId" value={forWhom === "order" ? orderId : ""} />
             </div>
+          )}
+          {choices && (
+            <>
+              <input type="hidden" name="customerId" value={forWhom === "company" ? "" : customerId} />
+              <input type="hidden" name="inquiryId" value={forWhom === "deal" ? dealId : ""} />
+              <input type="hidden" name="orderId" value={forWhom === "order" ? orderId : ""} />
+            </>
           )}
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Kind" htmlFor="ex-category" error={s.errors?.category}>
@@ -909,9 +961,24 @@ export function ExpenseForm({
             <Field label="Bill / ticket number" htmlFor="ex-reference" optional>
               <Input id="ex-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? expense?.reference ?? ""} />
             </Field>
+            <AccountSelect id="ex-account" label="Paid from account" currency={m.currency} defaultValue={s.values?.accountId ?? from?.account?.id} error={s.errors?.accountId} />
             <Field label="Note" htmlFor="ex-note" optional className="sm:col-span-3">
               <Textarea id="ex-note" name="note" rows={2} maxLength={2000} defaultValue={s.values?.note ?? expense?.note ?? ""} />
             </Field>
+            {choices && choices.factories.length > 0 ? (
+              <Field label="Factory visited" htmlFor="ex-factory" optional hint="A trip to check its products, an inspection there…">
+                <Select id="ex-factory" name="factoryId" defaultValue={s.values?.factoryId ?? from?.factory?.id ?? ""}>
+                  <option value="">None</option>
+                  {choices.factories.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : (
+              <input type="hidden" name="factoryId" value={from?.factory?.id ?? ""} />
+            )}
             <ReceiptPicker file={file} onChange={setFile} current={expense?.receipt?.name} />
           </div>
           <div className="flex gap-2">

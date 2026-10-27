@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Paperclip, Trash2, Upload } from "lucide-react";
-import { EXPENSE_CATEGORY_LABEL } from "@kebo/shared";
+import { EXPENSE_CATEGORY_LABEL, INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE } from "@kebo/shared";
 import { Alert, Badge, Button, buttonClass, cn } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import type { Fx } from "@/lib/fx";
@@ -18,7 +18,12 @@ const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
 /** Who an expense was for, in a few words. */
-export const forWhom = (e: ExpenseView) => (e.order ? `${e.order.refNo} · ${e.customer?.name ?? ""}` : (e.customer?.name ?? "The company"));
+export const forWhom = (e: ExpenseView) =>
+  e.order
+    ? `${e.order.refNo} · ${e.customer?.name ?? ""}`
+    : e.deal
+      ? `${e.deal.refNo}${e.deal.stage === "lost" ? " (lost)" : ""} · ${e.customer?.name ?? ""}`
+      : (e.customer?.name ?? "The company");
 
 /** The receipt kept with an expense: a preview of a photo, a PDF link, and add / replace / remove. */
 function Receipt({ e, canChange }: { e: ExpenseView; canChange: boolean }) {
@@ -173,6 +178,19 @@ export function ExpenseRecord({
                 </Link>
               )}
             </>
+          ) : e.deal ? (
+            <>
+              <Link href={`/deals/${e.deal.id}`} className="font-medium hover:text-primary">
+                Deal {e.deal.refNo}
+              </Link>{" "}
+              <Badge tone={INQUIRY_STAGE_TONE[e.deal.stage]}>{INQUIRY_STAGE_LABEL[e.deal.stage]}</Badge>
+              <span className="block truncate text-xs text-muted">{e.deal.title}</span>
+              {e.customer && (
+                <Link href={`/customers/${e.customer.id}`} className="block text-xs text-muted hover:text-primary">
+                  {e.customer.name}
+                </Link>
+              )}
+            </>
           ) : e.customer ? (
             <Link href={`/customers/${e.customer.id}`} className="font-medium hover:text-primary">
               {e.customer.name}
@@ -182,7 +200,20 @@ export function ExpenseRecord({
           ),
         },
         { label: "Paid by", value: e.paidBy?.name ?? <span className="text-muted">Not said</span> },
+        ...(e.factory
+          ? [
+              {
+                label: "Factory visited",
+                value: (
+                  <Link href={`/factories/${e.factory.id}`} className="hover:text-primary">
+                    {e.factory.name}
+                  </Link>
+                ),
+              },
+            ]
+          : []),
         { label: "Bill / ticket number", value: e.reference ?? <span className="text-muted">None</span> },
+        { label: "Paid from account", value: e.account?.name ?? <span className="text-muted">Not said</span> },
         ...(e.note ? [{ label: "Note", value: <span className="whitespace-pre-line">{e.note}</span>, wide: true }] : []),
         ...(e.voided ? [{ label: "Removed because", value: e.voided.reason ?? "—", wide: true }] : []),
         { label: "Receipt or ticket", value: <Receipt e={e} canChange={canChange && !removed} />, wide: true },

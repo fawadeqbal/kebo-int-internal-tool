@@ -150,6 +150,7 @@ export interface PaymentsView {
     method: PaymentMethod;
     reference: string | null;
     note: string | null;
+    account: { id: string; name: string } | null;
     /** Amount plus bank charges: what it settles. */
     counts: string;
     recordedBy: { id: string; name: string } | null;

@@ -8,6 +8,7 @@ import type {
   InquiryStage,
   LineType,
   LostReason,
+  MoneyAccountKind,
   OrderStage,
   PaymentKind,
   PaymentMethod,
@@ -104,6 +105,8 @@ export const ORDER_STAGE_HINT: Record<OrderStage, string> = {
 };
 
 export const PAYMENT_KIND_LABEL: Record<PaymentKind, string> = { deposit: "Deposit", balance: "Balance", other: "Other" };
+
+export const MONEY_ACCOUNT_KIND_LABEL: Record<MoneyAccountKind, string> = { cash: "Cash", bank: "Bank account", wallet: "Wallet" };
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   bank_transfer: "Bank transfer (T/T)",
