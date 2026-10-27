@@ -1,21 +1,18 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FileText, Paperclip, Trash2, Upload } from "lucide-react";
+import { Paperclip } from "lucide-react";
 import { EXPENSE_CATEGORY_LABEL, INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE } from "@kebo/shared";
-import { Alert, Badge, Button, buttonClass, cn } from "@kebo/ui";
+import { Badge, cn } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import type { Fx } from "@/lib/fx";
 import type { Person } from "@/lib/types";
 import type { ExpenseView } from "@/lib/types-money";
 import { expenseAction, removeReceiptAction, voidExpenseAction } from "@/app/(app)/money/actions";
 import { PaymentRecord } from "./payment-record";
-import { EditExpense, NewExpense, uploadReceipt, VoidForm, type ExpenseChoices } from "./forms";
+import { AttachedFile } from "./attachment";
+import { EditExpense, NewExpense, VoidForm, type ExpenseChoices } from "./forms";
 
-const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
-const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
 /** Who an expense was for, in a few words. */
 export const forWhom = (e: ExpenseView) =>
@@ -27,79 +24,7 @@ export const forWhom = (e: ExpenseView) =>
 
 /** The receipt kept with an expense: a preview of a photo, a PDF link, and add / replace / remove. */
 function Receipt({ e, canChange }: { e: ExpenseView; canChange: boolean }) {
-  const input = useRef<HTMLInputElement>(null);
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [removing, startRemove] = useTransition();
-  const send = async (file: File | undefined) => {
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    const err = await uploadReceipt(e.id, file);
-    setBusy(false);
-    if (err) setError(err);
-    else router.refresh();
-    if (input.current) input.current.value = "";
-  };
-  const r = e.receipt;
-  return (
-    <div className="flex flex-col gap-2">
-      {r ? (
-        <div className="flex flex-wrap items-center gap-3">
-          {r.type.startsWith("image/") && VIEWABLE.test(r.type) ? (
-            <a href={`/files/expenses/${e.id}?view=1`} target="_blank" rel="noreferrer" className="block shrink-0" aria-label={`Open ${r.name}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- a private file from our own route, not an optimisable image */}
-              <img src={`/files/expenses/${e.id}?view=1`} alt={`Receipt: ${r.name}`} className="h-20 w-28 rounded-md border border-line object-cover" />
-            </a>
-          ) : (
-            <span className="flex size-12 items-center justify-center rounded-md border border-line bg-surface">
-              <FileText className="size-5 text-muted" aria-hidden />
-            </span>
-          )}
-          <span className="min-w-0 text-sm">
-            <a
-              href={`/files/expenses/${e.id}${VIEWABLE.test(r.type) ? "?view=1" : ""}`}
-              target={VIEWABLE.test(r.type) ? "_blank" : undefined}
-              rel="noreferrer"
-              className="block truncate font-medium hover:text-primary"
-            >
-              {r.name}
-            </a>
-            <span className="text-xs text-muted">{size(r.size)}</span>
-          </span>
-        </div>
-      ) : (
-        <span className="text-muted">None kept</span>
-      )}
-      {canChange && (
-        <div className="flex flex-wrap gap-1">
-          <input ref={input} type="file" accept="image/*,application/pdf" className="sr-only" id={`rc-${e.id}`} onChange={(ev) => send(ev.target.files?.[0])} />
-          <label htmlFor={`rc-${e.id}`} className={cn(buttonClass("secondary", "xs"), "cursor-pointer", busy && "pointer-events-none opacity-60")}>
-            <Upload aria-hidden /> {busy ? "Sending…" : r ? "Replace" : "Add a photo or PDF"}
-          </label>
-          {r && (
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              disabled={removing}
-              onClick={() =>
-                startRemove(async () => {
-                  const res = await removeReceiptAction(e.id, e.customer?.id ?? null, e.orderId);
-                  if (!res.ok) setError(res.message ?? "Could not remove it.");
-                  router.refresh();
-                })
-              }
-            >
-              <Trash2 aria-hidden /> {removing ? "Removing…" : "Remove"}
-            </Button>
-          )}
-        </div>
-      )}
-      {error && <Alert tone="error">{error}</Alert>}
-    </div>
-  );
+  return <AttachedFile src={`/files/expenses/${e.id}`} file={e.receipt} what="Receipt" canChange={canChange} remove={() => removeReceiptAction(e.id, e.customer?.id ?? null, e.orderId)} />;
 }
 
 /**

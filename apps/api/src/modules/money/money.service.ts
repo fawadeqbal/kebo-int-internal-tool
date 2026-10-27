@@ -19,6 +19,7 @@ import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { checkAccount } from "./account-check";
+import { fileView } from "./payment-file-view";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
 import { Clock } from "../../common/time/clock.service";
@@ -293,6 +294,8 @@ export class MoneyService {
               note: p.note,
               account: p.account,
               voided: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
+              /** A photo or PDF proving it (bank slip, the factory's receipt). */
+              file: fileView(p),
             })),
             canRecord: can(user, "payments.record") && o.status !== "cancelled",
           }
@@ -424,8 +427,8 @@ export class MoneyService {
     const o = await this.orders.load(user, orderId);
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     const { factoryName, ...data } = await this.factoryPaymentData(o, input);
-    await this.prisma.tx(async (tx) => {
-      await tx.factoryPayment.create({ data: { ...data, orderId, recordedById: user.id } });
+    const createdId = await this.prisma.tx(async (tx) => {
+      const created = await tx.factoryPayment.create({ data: { ...data, orderId, recordedById: user.id } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out",
@@ -433,8 +436,10 @@ export class MoneyService {
         entityId: orderId,
         summary: `${o.refNo}: paid ${factoryName} ${input.currency} ${data.amount}${input.reference ? ` (${input.reference})` : ""}`,
       });
+      return created.id;
     });
-    return this.forOrder(user, orderId);
+    /** `createdId`: the new payment, so its proof can follow. */
+    return { ...(await this.forOrder(user, orderId)), createdId };
   }
 
   private async findFactoryPayment(user: SessionUser, id: string) {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Paperclip, Pencil, Plus, X } from "lucide-react";
+import { Copy, Pencil, Plus, X } from "lucide-react";
 import { toMinor, formatMinor } from "@kebo/money";
 import {
   EXPENSE_CATEGORIES,
@@ -24,6 +24,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { AccountSelect } from "./accounts";
+import { FilePicker, uploadFile } from "./attachment";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
@@ -426,6 +427,7 @@ export function FactoryPaymentForm({
   today,
   payment,
   onClose,
+  onFileError,
 }: {
   action: Action;
   factories: FactoryOwed[];
@@ -436,6 +438,8 @@ export function FactoryPaymentForm({
   today: string;
   payment?: FactoryPaymentView;
   onClose: () => void;
+  /** The payment was recorded but its file was not. */
+  onFileError?: (message: string) => void;
 }) {
   const first = factories.find((f) => Number(f.toPay) > 0) ?? factories[0];
   const [factoryKey, setFactoryKey] = useState(
@@ -452,8 +456,22 @@ export function FactoryPaymentForm({
   const kept = !!payment && payment.factory.id === chosen?.factory.id && payment.currency === m.currency;
   const mismatch = !!owedIn && m.currency !== owedIn && !kept;
   const left = chosen && Number(chosen.toPay) > 0 && m.currency === chosen.currency ? chosen.toPay : null;
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const router = useRouter();
+  const done = async (s: ActionState) => {
+    const id = (s.data as { createdId?: string } | undefined)?.createdId;
+    if (file && id) {
+      setSending(true);
+      const error = await uploadFile(`/files/factory-payments/${id}`, file);
+      setSending(false);
+      router.refresh();
+      if (error) onFileError?.(`The payment is recorded, but its file was not: ${error} Open the payment to add it again.`);
+    }
+    onClose();
+  };
   return (
-    <ActionForm action={action} onDone={onClose} className={framed}>
+    <ActionForm action={action} onDone={done} className={framed}>
       {(s) => (
         <>
           <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a factory"}</p>
@@ -584,12 +602,17 @@ export function FactoryPaymentForm({
             </Field>
             <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
           </div>
+          {!payment && (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <FilePicker id="fp-file" label="Proof of payment" hint="Bank slip or the factory's receipt (photo or PDF)" file={file} onChange={setFile} className="sm:col-span-2" />
+            </div>
+          )}
           <Field label="Note" htmlFor="fp-note" optional>
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />
           </Field>
           <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…" disabled={mismatch}>
-              {payment ? "Save the change" : "Record the payment"}
+            <SubmitButton size="sm" pendingText="Saving…" disabled={mismatch || sending}>
+              {sending ? "Sending the file…" : payment ? "Save the change" : "Record the payment"}
             </SubmitButton>
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               Cancel
@@ -602,17 +625,28 @@ export function FactoryPaymentForm({
 }
 
 /** "Record a payment to a factory" button that opens the form. */
-export function NewFactoryPayment(props: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose" | "payment">) {
+export function NewFactoryPayment(props: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose" | "payment" | "onFileError">) {
   const [open, setOpen] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   if (!open)
     return (
-      <div>
-        <Button size="sm" variant="primary" onClick={() => setOpen(true)} disabled={!props.factories.length}>
+      <div className="flex flex-col gap-2">
+        {fileError && <Alert tone="error">{fileError}</Alert>}
+        <Button
+          className="w-fit"
+          size="sm"
+          variant="primary"
+          onClick={() => {
+            setFileError(null);
+            setOpen(true);
+          }}
+          disabled={!props.factories.length}
+        >
           Record a payment to a factory
         </Button>
       </div>
     );
-  return <FactoryPaymentForm {...props} onClose={() => setOpen(false)} />;
+  return <FactoryPaymentForm {...props} onClose={() => setOpen(false)} onFileError={setFileError} />;
 }
 
 /** "Change" on one factory payment. */
@@ -666,49 +700,7 @@ const PLACEHOLDER: Partial<Record<ExpenseCategory, string>> = {
 };
 
 /** Sends a receipt for a saved expense; returns an error message, or null when it is kept. */
-export async function uploadReceipt(expenseId: string, file: File): Promise<string | null> {
-  const body = new FormData();
-  body.set("file", file, file.name);
-  try {
-    const res = await fetch(`/files/expenses/${expenseId}`, { method: "POST", body });
-    if (res.ok) return null;
-    if (res.status === 413) return "This file is too large.";
-    return ((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Upload failed (${res.status})`;
-  } catch {
-    return "The connection dropped. Try again.";
-  }
-}
-
-/** A photo or PDF to keep with the expense (chosen here, sent once the expense is saved). */
-function ReceiptPicker({ file, onChange, current }: { file: File | null; onChange: (f: File | null) => void; current?: string | null }) {
-  return (
-    <Field
-      label="Receipt or ticket"
-      htmlFor="ex-receipt"
-      optional
-      hint={file ? undefined : current ? `Kept: ${current}. A new one replaces it.` : "A photo or PDF"}
-      className="sm:col-span-3"
-    >
-      {file ? (
-        <span className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm">
-          <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{file.name}</span>
-          <Button type="button" size="xs" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
-            <X aria-hidden />
-          </Button>
-        </span>
-      ) : (
-        <Input
-          id="ex-receipt"
-          type="file"
-          accept="image/*,application/pdf"
-          className="file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-2.5 file:py-1 file:text-xs file:font-medium"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        />
-      )}
-    </Field>
-  );
-}
+export const uploadReceipt = (expenseId: string, file: File) => uploadFile(`/files/expenses/${expenseId}`, file);
 
 /**
  * An expense (new, again from an earlier one, or a change that asks why). With
@@ -979,7 +971,7 @@ export function ExpenseForm({
             ) : (
               <input type="hidden" name="factoryId" value={from?.factory?.id ?? ""} />
             )}
-            <ReceiptPicker file={file} onChange={setFile} current={expense?.receipt?.name} />
+            <FilePicker id="ex-receipt" label="Receipt or ticket" file={file} onChange={setFile} current={expense?.receipt?.name} className="sm:col-span-3" />
           </div>
           <div className="flex gap-2">
             <SubmitButton size="sm" pendingText="Saving…" disabled={sending}>

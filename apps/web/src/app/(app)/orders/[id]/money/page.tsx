@@ -8,11 +8,13 @@ import type { Person } from "@/lib/types";
 import type { PaymentStatus } from "@/lib/types-orders";
 import { today } from "@/components/orders/today";
 import { EditCustomerPayment, PaymentPlan } from "@/components/money/forms";
-import { editPaymentAction, savePlanAction } from "../../../money/actions";
+import { editPaymentAction, removePaymentFileAction, savePlanAction } from "../../../money/actions";
 import { paymentAction, voidPaymentAction } from "../../actions";
 import { PaymentForm, VoidPayment } from "../forms";
 import { FactoriesCard, ProfitCard } from "../money-cards";
 import { PaymentRecord } from "@/components/money/payment-record";
+import { AttachedFile } from "@/components/money/attachment";
+import { Paperclip } from "lucide-react";
 
 export const metadata = { title: "Order money" };
 
@@ -79,7 +81,7 @@ export default async function OrderMoneyTab({ params }: { params: Promise<{ id: 
                       <span className={cn("font-medium tabular", x.voided && "line-through")}>{money(x.amount, x.currency)}</span>{" "}
                       <span className="text-text-2">{PAYMENT_KIND_LABEL[x.kind]}</span>
                       {Number(x.bankCharges) > 0 && <span className="text-xs text-muted"> + {money(x.bankCharges, x.currency)} bank charges</span>}{" "}
-                      {x.voided && <Badge tone="bad">Removed</Badge>}
+                      {x.file && <Paperclip className="inline size-3.5 align-[-2px] text-muted" aria-label="Proof kept" />} {x.voided && <Badge tone="bad">Removed</Badge>}
                     </>
                   }
                   sub={
@@ -109,6 +111,20 @@ export default async function OrderMoneyTab({ params }: { params: Promise<{ id: 
                       ),
                     },
                     ...(x.note ? [{ label: "Note", value: <span className="whitespace-pre-line">{x.note}</span>, wide: true }] : []),
+                    {
+                      label: "Proof of payment",
+                      value: (
+                        <AttachedFile
+                          src={`/files/payments/${x.id}`}
+                          file={x.file}
+                          what="Proof of payment"
+                          canChange={can(me, "payments.record") && !x.voided}
+                          remove={removePaymentFileAction.bind(null, "in", x.id, o.id)}
+                          empty="No bank slip kept"
+                        />
+                      ),
+                      wide: true,
+                    },
                     ...(x.voided
                       ? [{ label: "Removed", value: <span className="text-bad">{`${dateTime(x.voided.at)}${x.voided.reason ? `: ${x.voided.reason}` : ""}`}</span>, wide: true }]
                       : []),

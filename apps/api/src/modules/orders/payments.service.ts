@@ -11,6 +11,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "./orders.service";
 import { requireReason } from "../../common/audit/reason";
 import { checkAccount } from "../money/account-check";
+import { fileView } from "../money/payment-file-view";
 
 /**
  * Money in from the customer against an order, in the order's currency. The
@@ -72,6 +73,8 @@ export class PaymentsService {
         /** Received so far and still due once this payment counted (null when removed or in another currency). */
         after: after.has(p.id) ? { received: fromMinor(after.get(p.id)!.receivedMinor), due: fromMinor(after.get(p.id)!.dueMinor) } : null,
         voided: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
+        /** A photo or PDF proving it (bank slip, transfer screenshot). */
+        file: fileView(p),
       })),
     };
   }
@@ -80,6 +83,7 @@ export class PaymentsService {
   async record(user: SessionUser, orderId: string, input: PaymentInput) {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
+    let createdId = "";
     const event = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
       const o = await this.orders.load(user, orderId, tx);
@@ -91,7 +95,7 @@ export class PaymentsService {
         Number(o.depositPercent),
       );
       if (toMinor(input.amount) + toMinor(input.bankCharges) > before.outstandingMinor) throw new DomainError(`That is more than is still due (${formatMinor(before.outstandingMinor, o.currency)}).`);
-      await tx.payment.create({
+      const created = await tx.payment.create({
         data: {
           kind: input.kind,
           orderId,
@@ -108,10 +112,12 @@ export class PaymentsService {
         },
       });
       await this.audit.record(tx, { userId: user.id, action: "payment_in", entityType: "order", entityId: orderId, summary: `${o.refNo}: received ${o.currency} ${input.amount}${toMinor(input.bankCharges) ? ` (+${input.bankCharges} bank charges)` : ""}, ${input.reference ?? "no reference"}` });
+      createdId = created.id;
       return { type: "payment.recorded" as const, orderId, refNo: o.refNo, amount: `${o.currency} ${input.amount}`, actorId: user.id, notify: [o.inquiry.assigneeId].filter((v): v is string => !!v) };
     });
     await this.events.publish(event);
-    return this.forOrder(user, orderId);
+    /** `createdId`: the new payment, so its proof can follow. */
+    return { ...(await this.forOrder(user, orderId)), createdId };
   }
 
   /** A payment typed wrong (amount, date, reference): changed with a reason, kept in the order's history. */
