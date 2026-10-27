@@ -5,6 +5,7 @@ import { can, OPEN_STAGES } from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
+import { ReadCache } from "../../common/cache/read-cache";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
@@ -48,10 +49,17 @@ export class RemindersListService {
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
     private readonly leaks: LeaksService,
+    private readonly cache: ReadCache,
   ) {}
 
   async list(user: SessionUser) {
     const today = this.clock.today();
+    // Worked out once per person while nothing changes (ReadCache); done and put-off are applied fresh.
+    const items = await this.cache.get(`reminders:${user.id}:${today}`, () => this.build(user, today));
+    return this.withStates(user, items, today);
+  }
+
+  private async build(user: SessionUser, today: ISODate): Promise<Reminder[]> {
     const s = await this.settings.get();
     const manager = can(user, "inquiries.viewAll");
     const scope = { deletedAt: null, ...inquiryAccess(user) };
@@ -204,7 +212,11 @@ export class RemindersListService {
         });
     }
 
-    // What this person marked done, or put off until later.
+    return items;
+  }
+
+  /** Leaves out what this person marked done, or put off until later; the most urgent first. */
+  private async withStates(user: SessionUser, items: Reminder[], today: ISODate) {
     const states = await this.prisma.db.reminderState.findMany({ where: { userId: user.id, key: { in: items.map((i) => i.key) } } });
     const hidden = new Map(states.filter((x) => x.doneAt || (x.snoozedUntil && fromDbDate(x.snoozedUntil) > today)).map((x) => [x.key, x]));
     const shown = items

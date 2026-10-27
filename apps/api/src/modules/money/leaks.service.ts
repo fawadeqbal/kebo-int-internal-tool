@@ -5,6 +5,7 @@ import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
 import { addDays, ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
+import { ReadCache } from "../../common/cache/read-cache";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 
@@ -73,10 +74,16 @@ export class LeaksService {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly clock: Clock,
+    private readonly cache: ReadCache,
   ) {}
 
+  /** The same for every manager: shared while nothing changes (ReadCache). */
   async report(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can see where money is lost.");
+    return this.cache.get(`leaks:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}`, () => this.compute(q));
+  }
+
+  private async compute(q: { from?: ISODate; to?: ISODate }) {
     const today = this.clock.today();
     const to = q.to ?? today;
     const from = q.from ?? `${to.slice(0, 4)}-01-01`;

@@ -12,6 +12,8 @@ import { configureApp } from "../src/setup";
  */
 export async function startApp(): Promise<INestApplication> {
   process.env.AUTH_SECRET ??= "test-secret-test-secret-test-secret-test-1234";
+  // Tests change data straight in the database too: no remembered reads.
+  process.env.READ_CACHE_SECONDS ??= "0";
   const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = mod.createNestApplication();
   configureApp(app, app.get<Env>(ENV));

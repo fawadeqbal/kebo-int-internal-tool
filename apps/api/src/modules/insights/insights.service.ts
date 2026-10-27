@@ -5,6 +5,7 @@ import { can, LOST_REASON_LABEL, planStatus, type InquiryChannel, type InquirySt
 import { addDays, daysBetween, ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
+import { ReadCache } from "../../common/cache/read-cache";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { CashService } from "../money/cash.service";
@@ -137,14 +138,21 @@ export class InsightsService {
     private readonly clock: Clock,
     private readonly cash: CashService,
     private readonly money: MoneyService,
+    private readonly cache: ReadCache,
   ) {}
 
   private assert(user: SessionUser) {
     if (!can(user, "reports.view")) throw new ForbiddenError("Only managers can see insights.");
   }
 
+  /** The same answer for everyone with the same permissions, shared while nothing changes (ReadCache). */
   async overview(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     this.assert(user);
+    const key = `insights:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}:${[...user.permissions].sort().join(",")}`;
+    return this.cache.get(key, () => this.computeOverview(user, q));
+  }
+
+  private async computeOverview(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     const today = this.clock.today();
     const to = q.to && q.to < today ? q.to : today;
     const from = q.from && q.from <= to ? q.from : `${ymOf(to)}-01`;
