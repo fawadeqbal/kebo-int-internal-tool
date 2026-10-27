@@ -10,6 +10,7 @@ import { EventBus } from "../../common/events/event-bus";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "./orders.service";
 import { requireReason } from "../../common/audit/reason";
+import { checkAccount } from "../money/account-check";
 
 /**
  * Money in from the customer against an order, in the order's currency. The
@@ -28,7 +29,11 @@ export class PaymentsService {
 
   async forOrder(user: SessionUser, orderId: string) {
     const o = await this.orders.load(user, orderId);
-    const all = await this.prisma.db.payment.findMany({ where: { orderId }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] });
+    const all = await this.prisma.db.payment.findMany({
+      where: { orderId },
+      include: { account: { select: { id: true, name: true } } },
+      orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
+    });
     const live = all.filter((p) => !p.voidedAt && p.currency === o.currency);
     const position = settle(decimalToMinor(o.total), live.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })), Number(o.depositPercent));
     // Who recorded each payment, and where the order stood after it (counted payments in date order).
@@ -59,6 +64,7 @@ export class PaymentsService {
         method: p.method,
         reference: p.reference,
         note: p.note,
+        account: p.account ? { id: p.account.id, name: p.account.name } : null,
         /** Amount plus bank charges: what it settles. */
         counts: fromMinor(decimalToMinor(p.amount) + decimalToMinor(p.bankCharges)),
         recordedBy: people.get(p.recordedById) ?? null,
@@ -97,6 +103,7 @@ export class PaymentsService {
           method: input.method,
           reference: input.reference,
           note: input.note,
+          accountId: await checkAccount(tx, input.accountId, input.currency),
           recordedById: user.id,
         },
       });
@@ -125,7 +132,7 @@ export class PaymentsService {
         Number(o.depositPercent),
       );
       if (toMinor(input.amount) + toMinor(input.bankCharges) > others.outstandingMinor) throw new DomainError(`That is more than is still due (${formatMinor(others.outstandingMinor, o.currency)}).`);
-      await tx.payment.update({ where: { id: p.id }, data: { kind: input.kind, amount: input.amount, bankCharges: input.bankCharges, paidOn: toDbDate(input.paidOn), method: input.method, reference: input.reference, note: input.note } });
+      await tx.payment.update({ where: { id: p.id }, data: { kind: input.kind, amount: input.amount, bankCharges: input.bankCharges, paidOn: toDbDate(input.paidOn), method: input.method, reference: input.reference, note: input.note, accountId: await checkAccount(tx, input.accountId, input.currency, p.accountId) } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_edit",

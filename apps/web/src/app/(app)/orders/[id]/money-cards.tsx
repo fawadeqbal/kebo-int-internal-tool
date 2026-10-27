@@ -111,6 +111,7 @@ export function FactoriesCard({ m, people, today, fx }: { m: OrderMoney; people:
                     { label: "Method", value: PAYMENT_METHOD_LABEL[p.method] },
                     { label: "Paid by", value: p.paidBy?.name ?? "Not said" },
                     { label: "Bank reference", value: p.reference ?? "—" },
+                    { label: "Account", value: p.account?.name ?? <span className="text-muted">Not said</span> },
                     {
                       label: "Recorded by",
                       value: `${p.recordedBy?.name ?? "Someone"} · ${dateTime(p.recordedAt)}${p.changedAt ? ` (changed ${dateTime(p.changedAt)})` : ""}`,

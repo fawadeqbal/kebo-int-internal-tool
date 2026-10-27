@@ -213,6 +213,7 @@ export function ExpenseRecord({
             ]
           : []),
         { label: "Bill / ticket number", value: e.reference ?? <span className="text-muted">None</span> },
+        { label: "Paid from account", value: e.account?.name ?? <span className="text-muted">Not said</span> },
         ...(e.note ? [{ label: "Note", value: <span className="whitespace-pre-line">{e.note}</span>, wide: true }] : []),
         ...(e.voided ? [{ label: "Removed because", value: e.voided.reason ?? "—", wide: true }] : []),
         { label: "Receipt or ticket", value: <Receipt e={e} canChange={canChange && !removed} />, wide: true },

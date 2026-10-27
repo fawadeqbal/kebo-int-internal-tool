@@ -18,6 +18,7 @@ import { BALANCE_TERMS_LABEL, can, planStatus, type ExpenseInput, type FactoryPa
 import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
+import { checkAccount } from "./account-check";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
 import { Clock } from "../../common/time/clock.service";
@@ -56,6 +57,7 @@ const expenseInclude = {
   customer: { select: { id: true, name: true } },
   inquiry: { select: { id: true, refNo: true, title: true, stage: true } },
   factory: { select: { id: true, name: true } },
+  account: { select: { id: true, name: true } },
 } satisfies Prisma.ExpenseInclude;
 type ExpenseRow = Prisma.ExpenseGetPayload<{ include: typeof expenseInclude }>;
 
@@ -133,7 +135,7 @@ export class MoneyService {
         payments: { where: { voidedAt: null } },
         factoryPaid: {
           orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
-          include: { factory: { select: { id: true, name: true } }, paidBy: person },
+          include: { factory: { select: { id: true, name: true } }, paidBy: person, account: { select: { id: true, name: true } } },
         },
         expenses: { orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }], include: expenseInclude },
       },
@@ -289,6 +291,7 @@ export class MoneyService {
               paidBy: p.paidBy,
               reference: p.reference,
               note: p.note,
+              account: p.account,
               voided: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
             })),
             canRecord: can(user, "payments.record") && o.status !== "cancelled",
@@ -394,7 +397,7 @@ export class MoneyService {
     }
   }
 
-  private async factoryPaymentData(o: { id: string; currency: string }, input: FactoryPaymentInput, keepCurrency?: string) {
+  private async factoryPaymentData(o: { id: string; currency: string }, input: FactoryPaymentInput, keepCurrency?: string, keepAccount?: string | null) {
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
     const f = await this.prisma.db.factory.findFirst({ where: { id: input.factoryId, deletedAt: null } });
     if (!f) throw new DomainError("That factory was removed. Choose another one.");
@@ -411,6 +414,7 @@ export class MoneyService {
       paidById: (await this.activePerson(input.paidById)) ?? f.ownerId,
       reference: input.reference,
       note: input.note,
+      accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount),
       factoryName: f.name,
     };
   }
@@ -447,7 +451,7 @@ export class MoneyService {
     const { p, o } = await this.findFactoryPayment(user, id);
     const reason = requireReason(input.reason, "payment", "a recorded payment changes");
     // A payment already recorded in another currency (before this rule) may keep it.
-    const { factoryName, ...data } = await this.factoryPaymentData(o, { ...input, rate: input.rate ?? Number(p.rate) }, p.factoryId === input.factoryId ? p.currency : undefined);
+    const { factoryName, ...data } = await this.factoryPaymentData(o, { ...input, rate: input.rate ?? Number(p.rate) }, p.factoryId === input.factoryId ? p.currency : undefined, p.accountId);
     await this.prisma.tx(async (tx) => {
       await tx.factoryPayment.update({ where: { id }, data });
       await this.audit.record(tx, {
@@ -555,6 +559,7 @@ export class MoneyService {
       customer: e.customer ?? null,
       deal: e.inquiry ?? null,
       factory: e.factory ?? null,
+      account: e.account ?? null,
       category: e.category,
       description: e.description,
       amount: e.amount.toFixed(2),
@@ -654,7 +659,7 @@ export class MoneyService {
     };
   }
 
-  private async expenseData(user: SessionUser, input: ExpenseInput) {
+  private async expenseData(user: SessionUser, input: ExpenseInput, keepAccount?: string | null) {
     if (input.spentOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
     let order: { id: string; refNo: string } | null = null;
     let customerId = input.customerId ?? null;
@@ -697,6 +702,7 @@ export class MoneyService {
         paidById: await this.activePerson(input.paidById),
         reference: input.reference,
         note: input.note,
+        accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount),
       },
     };
   }
@@ -747,7 +753,7 @@ export class MoneyService {
   async editExpense(user: SessionUser, id: string, input: ExpenseInput) {
     const e = await this.findExpense(user, id);
     const reason = requireReason(input.reason, "payment", "a recorded expense changes");
-    const { order, data } = await this.expenseData(user, { ...input, rate: input.rate ?? Number(e.rate) });
+    const { order, data } = await this.expenseData(user, { ...input, rate: input.rate ?? Number(e.rate) }, e.accountId);
     const row = await this.prisma.tx(async (tx) => {
       const updated = await tx.expense.update({
         where: { id },

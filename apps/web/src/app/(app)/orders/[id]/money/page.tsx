@@ -96,6 +96,7 @@ export default async function OrderMoneyTab({ params }: { params: Promise<{ id: 
                     { label: "Paid on", value: date(x.paidOn) },
                     { label: "Method", value: PAYMENT_METHOD_LABEL[x.method] },
                     { label: "Bank reference", value: x.reference ?? "—" },
+                    { label: "Account", value: x.account?.name ?? <span className="text-muted">Not said</span> },
                     { label: "Recorded by", value: `${x.recordedBy?.name ?? "Someone"} · ${dateTime(x.recordedAt)}` },
                     {
                       label: "After this payment",

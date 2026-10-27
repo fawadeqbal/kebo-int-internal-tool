@@ -150,6 +150,13 @@ enum PaymentKind {
   other
 }
 
+/// Where money is kept: cash in the office, a bank account, a wallet (Alipay, JazzCash…).
+enum MoneyAccountKind {
+  cash
+  bank
+  wallet
+}
+
 enum PaymentMethod {
   bank_transfer
   letter_of_credit
@@ -907,6 +914,9 @@ model FactoryPayment {
   paidBy       User?         @relation("FactoryPaymentPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
   reference    String?       @db.VarChar(120)
   note         String?
+  /// Which of our accounts the money moved through (cash, a bank, a wallet).
+  accountId    String?       @map("account_id") @db.Uuid
+  account      MoneyAccount? @relation(fields: [accountId], references: [id])
   recordedById String        @map("recorded_by") @db.Uuid
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
@@ -916,52 +926,57 @@ model FactoryPayment {
   @@index([orderId])
   @@index([factoryId])
   @@index([paidOn])
+  @@index([accountId])
   @@map("factory_payments")
 }
 
 /// A cost: for one order (freight, inspection…) or for the company when orderId
 /// is empty (rent, salaries…). Only managers and the super admin see these.
 model Expense {
-  id           String    @id @default(uuid()) @db.Uuid
-  orderId      String?   @map("order_id") @db.Uuid
-  order        Order?    @relation(fields: [orderId], references: [id])
+  id           String        @id @default(uuid()) @db.Uuid
+  orderId      String?       @map("order_id") @db.Uuid
+  order        Order?        @relation(fields: [orderId], references: [id])
   /// Who it was spent on (a dinner, a ticket to visit them…); for a deal or an order always its customer. Empty: the company's own cost.
-  customerId   String?   @map("customer_id") @db.Uuid
-  customer     Customer? @relation(fields: [customerId], references: [id])
+  customerId   String?       @map("customer_id") @db.Uuid
+  customer     Customer?     @relation(fields: [customerId], references: [id])
   /// The deal it was spent on (a trip to check products, samples…), won or lost; for an order always its deal.
-  inquiryId    String?   @map("inquiry_id") @db.Uuid
-  inquiry      Inquiry?  @relation(fields: [inquiryId], references: [id])
+  inquiryId    String?       @map("inquiry_id") @db.Uuid
+  inquiry      Inquiry?      @relation(fields: [inquiryId], references: [id])
   /// The factory visited or paid for (a trip to check its products, an inspection there).
-  factoryId    String?   @map("factory_id") @db.Uuid
-  factory      Factory?  @relation(fields: [factoryId], references: [id])
+  factoryId    String?       @map("factory_id") @db.Uuid
+  factory      Factory?      @relation(fields: [factoryId], references: [id])
   /// See EXPENSE_CATEGORIES in @kebo/shared.
-  category     String    @db.VarChar(30)
-  description  String    @db.VarChar(200)
-  amount       Decimal   @db.Decimal(14, 2)
-  currency     String    @db.Char(3)
+  category     String        @db.VarChar(30)
+  description  String        @db.VarChar(200)
+  amount       Decimal       @db.Decimal(14, 2)
+  currency     String        @db.Char(3)
   /// Units of `currency` per one unit of the main currency when it was spent.
-  rate         Decimal   @db.Decimal(14, 6)
-  spentOn      DateTime  @map("spent_on") @db.Date
-  paidById     String?   @map("paid_by") @db.Uuid
-  paidBy       User?     @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
-  reference    String?   @db.VarChar(120)
+  rate         Decimal       @db.Decimal(14, 6)
+  spentOn      DateTime      @map("spent_on") @db.Date
+  paidById     String?       @map("paid_by") @db.Uuid
+  paidBy       User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  reference    String?       @db.VarChar(120)
   note         String?
   /// A photo or PDF of the receipt or ticket.
-  receiptKey   String?   @map("receipt_key")
-  receiptName  String?   @map("receipt_name") @db.VarChar(255)
-  receiptType  String?   @map("receipt_type") @db.VarChar(150)
-  receiptSize  Int?      @map("receipt_size")
-  recordedById String    @map("recorded_by") @db.Uuid
-  voidedAt     DateTime? @map("voided_at") @db.Timestamptz
-  voidReason   String?   @map("void_reason")
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  receiptKey   String?       @map("receipt_key")
+  receiptName  String?       @map("receipt_name") @db.VarChar(255)
+  receiptType  String?       @map("receipt_type") @db.VarChar(150)
+  receiptSize  Int?          @map("receipt_size")
+  /// Which of our accounts the money moved through (cash, a bank, a wallet).
+  accountId    String?       @map("account_id") @db.Uuid
+  account      MoneyAccount? @relation(fields: [accountId], references: [id])
+  recordedById String        @map("recorded_by") @db.Uuid
+  voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
+  voidReason   String?       @map("void_reason")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([orderId])
   @@index([customerId])
   @@index([inquiryId])
   @@index([factoryId])
   @@index([spentOn])
+  @@index([accountId])
   @@map("expenses")
 }
 
@@ -982,6 +997,9 @@ model Payment {
   method       PaymentMethod @default(bank_transfer)
   reference    String?       @db.VarChar(120)
   note         String?
+  /// Which of our accounts the money moved through (cash, a bank, a wallet).
+  accountId    String?       @map("account_id") @db.Uuid
+  account      MoneyAccount? @relation(fields: [accountId], references: [id])
   recordedById String        @map("recorded_by") @db.Uuid
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
@@ -989,9 +1007,65 @@ model Payment {
 
   @@index([orderId])
   @@index([paidOn])
+  @@index([accountId])
   @@map("payments")
 }
 
 // ============================================================================
 // Shipping: a shipment (one or more per order) and its packing list
 // ============================================================================
+
+// ============================================================================
+// Cash book: where our money is kept, and money moved between accounts
+// ============================================================================
+
+/**
+ * A place money is kept, in one currency: an office cash box, a bank account, a wallet.
+ */
+model MoneyAccount {
+  id             String           @id @default(uuid()) @db.Uuid
+  name           String           @unique @db.VarChar(80)
+  kind           MoneyAccountKind @default(bank)
+  currency       String           @db.Char(3)
+  /// What was in it on `openingOn`; movements from that day on are added.
+  openingBalance Decimal          @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  openingOn      DateTime         @map("opening_on") @db.Date
+  note           String?
+  archivedAt     DateTime?        @map("archived_at") @db.Timestamptz
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  payments        Payment[]
+  factoryPayments FactoryPayment[]
+  expenses        Expense[]
+  transfersOut    MoneyTransfer[]  @relation("TransferFrom")
+  transfersIn     MoneyTransfer[]  @relation("TransferTo")
+
+  @@map("money_accounts")
+}
+
+/**
+ * Money moved between two of our accounts: cash paid into the bank, dollars changed into rupees.
+ */
+model MoneyTransfer {
+  id            String       @id @default(uuid()) @db.Uuid
+  fromAccountId String       @map("from_account_id") @db.Uuid
+  fromAccount   MoneyAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccountId   String       @map("to_account_id") @db.Uuid
+  toAccount     MoneyAccount @relation("TransferTo", fields: [toAccountId], references: [id])
+  /// Left the first account (its currency) and arrived in the second (its currency).
+  amountOut     Decimal      @map("amount_out") @db.Decimal(14, 2)
+  amountIn      Decimal      @map("amount_in") @db.Decimal(14, 2)
+  transferredOn DateTime     @map("transferred_on") @db.Date
+  reference     String?      @db.VarChar(120)
+  note          String?
+  recordedById  String       @map("recorded_by") @db.Uuid
+  voidedAt      DateTime?    @map("voided_at") @db.Timestamptz
+  voidReason    String?      @map("void_reason")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([fromAccountId])
+  @@index([toAccountId])
+  @@index([transferredOn])
+  @@map("money_transfers")
+}

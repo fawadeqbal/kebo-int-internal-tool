@@ -9,6 +9,7 @@ import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
 import type { OrderNext } from "@/lib/types-orders";
+import { AccountSelect } from "@/components/money/accounts";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -281,6 +282,9 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
             <Field label="Bank reference" htmlFor="p-reference" optional hint="e.g. the T/T or SWIFT reference" error={s.errors?.reference}>
               <Input id="p-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <AccountSelect id="p-account" label="Into account" currency={currency} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
           </div>
           <Field label="Note" htmlFor="p-note" optional error={s.errors?.note}>
             <Textarea id="p-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />

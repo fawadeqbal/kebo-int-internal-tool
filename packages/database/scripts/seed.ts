@@ -359,6 +359,15 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
       data: { customerId: customers[e.customer].id, category: e.category, description: e.description, amount: e.amount, currency: e.currency, rate: e.currency === "USD" ? 1 : rate, spentOn: toDbDate(addDays(today, -e.back)), paidById: people.manager.id, recordedById: people.manager.id },
     });
   }
+  // Our accounts, with the demo money put on them by currency (a few expenses left off, to show what still needs an account).
+  const opened = toDbDate(addDays(today, -120));
+  const usd = await db.moneyAccount.create({ data: { name: "Bank Alfalah USD", kind: "bank", currency: "USD", openingBalance: "20000.00", openingOn: opened } });
+  const cny = await db.moneyAccount.create({ data: { name: "ICBC Jining CNY", kind: "bank", currency: "CNY", openingBalance: "400000.00", openingOn: opened } });
+  await db.moneyAccount.create({ data: { name: "Office cash PKR", kind: "cash", currency: "PKR", openingBalance: "150000.00", openingOn: opened } });
+  await db.payment.updateMany({ where: { currency: "USD" }, data: { accountId: usd.id } });
+  await db.factoryPayment.updateMany({ where: { currency: "CNY" }, data: { accountId: cny.id } });
+  await db.expense.updateMany({ where: { currency: "CNY", category: { in: ["rent", "utilities", "inland_transport", "travel"] } }, data: { accountId: cny.id } });
+  await db.expense.updateMany({ where: { currency: "USD", category: { in: ["inspection", "travel"] } }, data: { accountId: usd.id } });
   console.log("[seed] demo data created: 4 customers, 3 factories, 10 deals (orders: 1 confirmed, 1 in production, 1 shipped, 1 done)");
   console.log("[seed] demo people bilal@example.com / sana@example.com, password Demo@12345");
 }

@@ -36,6 +36,7 @@ export async function editPaymentAction(
     method: v.method,
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
+    accountId: v.accountId || null,
     reason: reasonOf(form),
   };
   const r = await attempt(form, () => api.patch(`/payments/${paymentId}`, body), "Payment changed.");
@@ -56,6 +57,7 @@ const factoryBody = (form: FormData) => {
     paidById: v.paidById || null,
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
+    accountId: v.accountId || null,
     reason: reasonOf(form),
   };
 };
@@ -117,6 +119,7 @@ export async function expenseAction(
     paidById: v.paidById || null,
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
+    accountId: v.accountId || null,
     reason: reasonOf(form),
   };
   const r = await attempt(
@@ -150,5 +153,54 @@ export async function voidExpenseAction(
     refresh(orderId);
     revalidatePath("/customers", "layout");
   }
+  return r;
+}
+
+/* ---------------------------------------------------------------- cash book */
+
+/** Add (id null) or change one of our accounts. */
+export async function saveAccountAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const body = {
+    name: v.name?.trim() ?? "",
+    kind: v.kind,
+    currency: v.currency,
+    openingBalance: v.openingBalance || "0",
+    openingOn: v.openingOn,
+    note: v.note?.trim() || null,
+    archived: v.archived === "on",
+  };
+  const r = await attempt(form, () => (id ? api.patch(`/money/accounts/${id}`, body) : api.post("/money/accounts", body)), id ? "Account saved." : "Account added.");
+  if (r.ok) revalidatePath("/", "layout");
+  return r;
+}
+
+/** Money moved between two of our accounts. */
+export async function transferAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const body = {
+    fromAccountId: v.fromAccountId,
+    toAccountId: v.toAccountId,
+    amountOut: v.amountOut,
+    amountIn: v.amountIn?.trim() || null,
+    transferredOn: v.transferredOn,
+    reference: v.reference?.trim() || null,
+    note: v.note?.trim() || null,
+  };
+  const r = await attempt(form, () => api.post("/money/transfers", body), "Money moved.");
+  if (r.ok) revalidatePath("/money");
+  return r;
+}
+
+export async function voidTransferAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post(`/money/transfers/${id}/void`, { reason: formValues(form).reason }), "Move removed.");
+  if (r.ok) revalidatePath("/money");
+  return r;
+}
+
+/** Put an amount recorded without an account on one. */
+export async function setEntryAccountAction(kind: "in" | "factory" | "expense", id: string, accountId: string | null): Promise<ActionState> {
+  const r = await attempt(null, () => api.put(`/money/entries/${kind}/${id}/account`, { accountId }), "Saved.");
+  if (r.ok) revalidatePath("/", "layout");
   return r;
 }

@@ -21,8 +21,13 @@ import type { Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
+  CURRENCIES,
   EXPENSE_CATEGORIES,
   expenseInput,
+  moneyAccountInput,
+  transferInput,
+  type MoneyAccountInput,
+  type TransferInput,
   factoryPaymentInput,
   paymentPlanInput,
   voidInput,
@@ -37,6 +42,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { MoneyService } from "./money.service";
 import { AccountsService } from "./accounts.service";
+import { CashService } from "./cash.service";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const expenseQuery = z.object({
@@ -50,11 +56,18 @@ const expenseQuery = z.object({
   kind: z.enum(["order", "customer", "general"]).optional(),
 });
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
-const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
 const flag = z
   .enum(["true", "false"])
   .optional()
   .transform((v) => v === "true");
+const cashBookQuery = z.object({
+  from: z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)"),
+  to: z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)"),
+  account: z.union([z.uuid(), z.literal("none")]).optional(),
+  currency: z.enum(CURRENCIES).optional(),
+  removed: flag,
+});
+const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
 
 @ApiTags("money")
 @Controller()
@@ -62,7 +75,54 @@ class MoneyController {
   constructor(
     private readonly money: MoneyService,
     private readonly accounts: AccountsService,
+    private readonly cash: CashService,
   ) {}
+
+  /** Our accounts (cash, banks, wallets): to choose from when recording money; managers also get balances. */
+  @Get("money/accounts")
+  moneyAccounts(@CurrentUser() user: SessionUser) {
+    return this.cash.accounts(user);
+  }
+
+  @Post("money/accounts")
+  addAccount(@CurrentUser() user: SessionUser, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
+    return this.cash.saveAccount(user, null, body);
+  }
+
+  @Patch("money/accounts/:id")
+  changeAccount(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
+    return this.cash.saveAccount(user, id, body);
+  }
+
+  /** Money moved between two of our accounts. */
+  @Post("money/transfers")
+  transfer(@CurrentUser() user: SessionUser, @Body(Validate(transferInput)) body: TransferInput) {
+    return this.cash.transfer(user, body);
+  }
+
+  @Post("money/transfers/:id/void")
+  @HttpCode(200)
+  voidTransfer(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
+    return this.cash.voidTransfer(user, id, body.reason);
+  }
+
+  /** Managers: every amount in and out between two dates; ?account=<id>|none, ?currency=, ?removed=true. */
+  @Get("money/cash-book")
+  cashBook(@CurrentUser() user: SessionUser, @Query(Validate(cashBookQuery)) q: z.infer<typeof cashBookQuery>) {
+    return this.cash.cashBook(user, q);
+  }
+
+  /** Put a payment, a factory payment or an expense on an account afterwards: { accountId | null }. */
+  @Put("money/entries/:kind/:id/account")
+  setAccount(
+    @CurrentUser() user: SessionUser,
+    @Param("kind") kind: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(z.object({ accountId: z.uuid().nullable() }))) body: { accountId: string | null },
+  ) {
+    const k = z.enum(["in", "factory", "expense"]).parse(kind);
+    return this.cash.setAccount(user, k, id, body.accountId);
+  }
 
   /** Managers only: what an expense can be for (customers, deals, orders, factories). */
   @Get("expenses/targets")
@@ -183,5 +243,5 @@ class MoneyController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService], exports: [MoneyService, AccountsService] })
+@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService, CashService], exports: [MoneyService, AccountsService, CashService] })
 export class MoneyModule {}

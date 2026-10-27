@@ -77,6 +77,7 @@ export interface FactoryPaymentView {
   paidBy: Person | null;
   reference: string | null;
   note: string | null;
+  account: { id: string; name: string } | null;
   voided: { at: string; reason: string | null } | null;
 }
 
@@ -90,6 +91,8 @@ export interface ExpenseView {
   deal: { id: string; refNo: string; title: string; stage: InquiryStage } | null;
   /** The factory visited or paid for. */
   factory: { id: string; name: string } | null;
+  /** Which of our accounts it was paid from. */
+  account: { id: string; name: string } | null;
   category: ExpenseCategory;
   description: string;
   amount: string;
@@ -213,4 +216,35 @@ export interface CustomerAccount {
   }[];
   timeline: { on: string; kind: "deal" | "won" | "lost" | "order" | "shipped" | "payment" | "expense"; text: string; amount?: string; currency?: string; href?: string }[];
   missingRates: string[];
+}
+
+/** One line of GET /money/cash-book. */
+export interface CashRow {
+  key: string;
+  id: string;
+  kind: "in" | "factory" | "expense" | "transfer_out" | "transfer_in";
+  on: string;
+  /** Signed: in positive, out negative. */
+  amount: string;
+  currency: string;
+  account: { id: string; name: string } | null;
+  what: string;
+  party: { name: string; href: string | null } | null;
+  reference: string | null;
+  href: string | null;
+  voided: boolean;
+  /** One account shown: its balance after this line. */
+  balance: string | null;
+}
+
+/** GET /money/cash-book */
+export interface CashBook {
+  from: string;
+  to: string;
+  account: { id: string; name: string; currency: string; kind: string; openingOn: string } | null;
+  opening: string | null;
+  closing: string | null;
+  totals: { currency: string; in: string; out: string; net: string }[];
+  unassigned: number;
+  rows: CashRow[];
 }

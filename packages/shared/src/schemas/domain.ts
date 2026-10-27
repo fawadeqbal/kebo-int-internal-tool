@@ -10,6 +10,7 @@ import {
   INQUIRY_STAGES,
   LINE_TYPES,
   LOST_REASONS,
+  MONEY_ACCOUNT_KINDS,
   ORDER_STAGES,
   PAYMENT_KINDS,
   PAYMENT_METHODS,
@@ -396,6 +397,8 @@ export const paymentInput = z.object({
   method: z.enum(PAYMENT_METHODS).default("bank_transfer"),
   reference: optionalText(120),
   note: optionalText(2000),
+  /** Which of our accounts it arrived in (same currency). */
+  accountId: optionalId,
 });
 export type PaymentInput = z.infer<typeof paymentInput>;
 
@@ -447,6 +450,8 @@ export const factoryPaymentInput = z.object({
   paidById: optionalId,
   reference: optionalText(120),
   note: optionalText(2000),
+  /** Which of our accounts it was paid from (same currency). */
+  accountId: optionalId,
   reason: optionalText(500).optional(),
 });
 export type FactoryPaymentInput = z.infer<typeof factoryPaymentInput>;
@@ -467,6 +472,8 @@ export const expenseInput = z.object({
   customerId: optionalId,
   /** The factory visited or paid for. */
   factoryId: optionalId,
+  /** Which of our accounts it was paid from (same currency). */
+  accountId: optionalId,
   category: z.enum(EXPENSE_CATEGORIES),
   description: text(200, "Say what it was for"),
   amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
@@ -481,3 +488,31 @@ export const expenseInput = z.object({
 export type ExpenseInput = z.infer<typeof expenseInput>;
 
 export const voidInput = z.object({ reason: text(500, "Say why it is removed") });
+
+/* ---------------------------------------------------------------- cash book */
+
+/** A place money is kept, in one currency, with what was in it on a day. */
+export const moneyAccountInput = z.object({
+  name: text(80, "Name the account, e.g. Meezan Bank USD"),
+  kind: z.enum(MONEY_ACCOUNT_KINDS).default("bank"),
+  currency,
+  openingBalance: amountOr(0),
+  openingOn: isoDate(),
+  note: optionalText(500),
+  archived: bool.optional(),
+});
+export type MoneyAccountInput = z.infer<typeof moneyAccountInput>;
+
+/** Money moved between two of our accounts; `amountIn` differs when the currencies do (dollars changed into rupees). */
+export const transferInput = z
+  .object({
+    fromAccountId: id("Choose where the money left"),
+    toAccountId: id("Choose where it arrived"),
+    amountOut: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+    amountIn: optionalAmount,
+    transferredOn: isoDate(),
+    reference: optionalText(120),
+    note: optionalText(500),
+  })
+  .refine((v) => v.fromAccountId !== v.toAccountId, { message: "Choose two different accounts", path: ["toAccountId"] });
+export type TransferInput = z.infer<typeof transferInput>;

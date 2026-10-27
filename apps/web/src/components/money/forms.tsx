@@ -23,6 +23,7 @@ import { Alert, Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
+import { AccountSelect } from "./accounts";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
@@ -309,6 +310,7 @@ export function EditCustomerPayment({
     method: PaymentMethod;
     reference: string | null;
     note: string | null;
+    account?: { id: string; name: string } | null;
   };
   currency: string;
   today: string;
@@ -355,6 +357,7 @@ export function EditCustomerPayment({
             <Field label="Bank reference" htmlFor="ep-reference" optional>
               <Input id="ep-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment.reference ?? ""} />
             </Field>
+            <AccountSelect id="ep-account" label="Into account" currency={currency} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
           </div>
           <input type="hidden" name="note" value={payment.note ?? ""} />
           <div className="flex gap-2">
@@ -579,6 +582,7 @@ export function FactoryPaymentForm({
             <Field label="Bank reference" htmlFor="fp-reference" optional>
               <Input id="fp-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment?.reference ?? ""} />
             </Field>
+            <AccountSelect id="fp-account" label="From account" currency={m.currency} defaultValue={s.values?.accountId ?? payment?.account?.id} error={s.errors?.accountId} />
           </div>
           <Field label="Note" htmlFor="fp-note" optional>
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />
@@ -957,6 +961,7 @@ export function ExpenseForm({
             <Field label="Bill / ticket number" htmlFor="ex-reference" optional>
               <Input id="ex-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? expense?.reference ?? ""} />
             </Field>
+            <AccountSelect id="ex-account" label="Paid from account" currency={m.currency} defaultValue={s.values?.accountId ?? from?.account?.id} error={s.errors?.accountId} />
             <Field label="Note" htmlFor="ex-note" optional className="sm:col-span-3">
               <Textarea id="ex-note" name="note" rows={2} maxLength={2000} defaultValue={s.values?.note ?? expense?.note ?? ""} />
             </Field>

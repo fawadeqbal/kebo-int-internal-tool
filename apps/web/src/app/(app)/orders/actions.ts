@@ -83,6 +83,7 @@ export async function paymentAction(orderId: string, currency: string, _prev: Ac
     method: v.method,
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
+    accountId: v.accountId || null,
   };
   const r = await attempt(form, () => api.post(`/orders/${orderId}/payments`, body), "Payment recorded.");
   if (r.ok) refresh(orderId);
