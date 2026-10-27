@@ -50,7 +50,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   const d = await getDoc(id, kind);
-  return { title: `${d.title} ${d.number}${sp.copy === "internal" && d.kind !== "packing-list" ? " (internal)" : ""}` };
+  return { title: `${d.title} ${d.number ?? "(draft)"}${sp.copy === "internal" && d.kind !== "packing-list" ? " (internal)" : ""}` };
 }
 
 type Line = OrderDocument["lines"][number];
@@ -86,7 +86,7 @@ export default async function OrderDocumentPrint({
 
   const toolbar = (
     <PrintToolbar
-      title={`${d.title} ${d.number}`}
+      title={`${d.title} ${d.number ?? "(draft, not issued)"}`}
       backHref={backTo(sp.back, `/orders/${o.id}`)}
       pdfHref={`/pdf/${d.kind}/${o.id}${internal ? "?copy=internal" : ""}`}
       copies={
@@ -253,7 +253,7 @@ export default async function OrderDocumentPrint({
         customer={customer}
         title={TITLE[d.kind]}
         numberLabel={NUMBER_LABEL[d.kind]}
-        number={d.number}
+        number={d.number ?? "DRAFT"}
         date={d.date}
         meta={d.kind === "proforma" ? [] : [{ label: "Order NO.", value: o.refNo }]}
         heading={o.documentTitle}

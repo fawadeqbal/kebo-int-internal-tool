@@ -28,6 +28,13 @@ export const companySettings = z.object({
       "ACCOUNT NAME: SHANDONG KEBO INTERNATIONAL TRADE CO., LTD.\nBANK NAME: BANK OF CHINA RENCHENG SUB BRANCH\nBANK ADDRESS: B.O.C TOWER,1 TAIBAI ROAD JINING, SHANDONG, P, R. CHINA,\nPOST CODE: 272000\nSWIFT CODE: BKCHCNBJ500\nACCOUNT NO: 242895006310",
     ),
   invoiceFooter: z.string().trim().max(1000).default(""),
+  /** Starts every proforma number, e.g. KEB in KEB260916TN07. */
+  proformaPrefix: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{1,6}$/, "Use 1 to 6 letters")
+    .default("KEB"),
   /** The company stamp (seal) printed on proforma invoices: a PNG/JPEG image as a data URL, or empty. */
   stamp: z
     .string()

@@ -273,3 +273,18 @@ describe("payment plan", () => {
     expect(planStatus(plan, 0, "2026-10-06", 3)[0]!.status).toBe("due_soon");
   });
 });
+
+describe("proforma numbers", () => {
+  it("builds KEB + issue date + customer letters + the handler's count", async () => {
+    const { proformaNumber, customerLetters } = await import("../src");
+    expect(proformaNumber("KEB", "2026-09-16", "TN", 7)).toBe("KEB260916TN07");
+    expect(proformaNumber("KEB", "2026-01-02", "ap", 123)).toBe("KEB260102AP123");
+    expect(customerLetters("Tanzania Nuts Ltd")).toBe("TN");
+    expect(customerLetters("Al-Shifa Pharma Ltd")).toBe("AP");
+    expect(customerLetters("The Kampala Juice Company")).toBe("KJ");
+    expect(customerLetters("Nile")).toBe("NI");
+    expect(customerLetters("Société Générale SARL")).toBe("SG");
+    expect(customerLetters("Kampala Juices mvpx")).toBe("KJ");
+    expect(customerLetters("北京")).toBe("XX");
+  });
+});

@@ -46,6 +46,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "email2", label: "Second email", kind: "text", hint: "Also printed, if given" },
       { name: "bankDetails", label: "Bank details for customers", kind: "textarea", wide: true, hint: "Beneficiary, bank, SWIFT and account number, printed on invoices so customers can pay" },
       { name: "invoiceFooter", label: "Invoice footer", kind: "textarea", wide: true, hint: "A line at the bottom of every invoice, e.g. thanks or payment notes" },
+      { name: "proformaPrefix", label: "Proforma number starts with", kind: "text", hint: "e.g. KEB in KEB260916TN07 (then the issue date, the customer's letters and the handler's count this year)" },
       { name: "stamp", label: "Company stamp", kind: "image", wide: true, hint: "The red seal printed on proforma invoices. A PNG or JPEG under 300 KB, scanned on white." },
     ],
   },

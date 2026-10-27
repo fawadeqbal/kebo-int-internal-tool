@@ -27,9 +27,10 @@ export { paymentSentenceOf };
 
 /**
  * The documents of an order, made from the order itself whenever they are
- * opened: nothing to create, issue or keep in step. Their numbers follow the
- * order's (SO-2026-0005 → PI-2026-0005, PL-2026-0005).
- *  - Proforma invoice: the whole order, the one invoice Kebo sends (dated the order day).
+ * opened. The proforma gets its own number when it is issued (KEB260916TN07:
+ * prefix, issue date, customer letters, the handler's count this year); the
+ * packing list's follows the order's (SO-2026-0005 → PL-2026-0005).
+ *  - Proforma invoice: the whole order, the one invoice Kebo sends (dated the day it is issued).
  *  - Packing list: the goods, without prices (dated the ship date).
  */
 @Injectable()
@@ -75,8 +76,11 @@ export class DocumentsService {
     return {
       kind,
       title: TITLE[kind],
-      number: o.refNo.replace(/^[A-Z]+-/, `${PREFIX[kind]}-`),
-      date: kind === "proforma" ? fromDbDate(o.orderedOn) : (shippedOn ?? this.clock.today()),
+      // The proforma has its own number once issued (KEB260916TN07); before that it is a draft without one.
+      number: kind === "proforma" ? o.proformaNo : o.refNo.replace(/^[A-Z]+-/, `${PREFIX[kind]}-`),
+      /** The proforma is not issued yet: printed as a draft, without a number. */
+      draft: kind === "proforma" && !o.proformaNo,
+      date: kind === "proforma" ? (fromDbDateOrNull(o.proformaIssuedOn) ?? this.clock.today()) : (shippedOn ?? this.clock.today()),
       company: { ...companySnapshot(settings), stamp: settings.company.stamp || null },
       customer: await this.customerOf(o.customerId, o.inquiry.contactId, rev.customerSnapshot as Partial<Awaited<ReturnType<typeof customerSnapshot>>> | null),
       order: {

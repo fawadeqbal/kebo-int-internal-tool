@@ -4,6 +4,7 @@ import { fromMinor, settle } from "@kebo/money";
 import {
   can,
   checkMove,
+  customerLetters,
   defaultPlan,
   depositOf,
   dueOf,
@@ -13,6 +14,7 @@ import {
   ORDER_STAGE_HINT,
   ORDER_STAGE_LABEL,
   previousStage,
+  proformaNumber,
   STAGE_BUTTON,
   type MoveStageInput,
   type OrderDetailsInput,
@@ -227,6 +229,49 @@ export class OrdersService {
     return this.get(user, id);
   }
 
+  /**
+   * Gives the proforma its number, dated today: prefix (Settings), YYMMDD,
+   * the customer's letters and the deal handler's count this year, e.g.
+   * KEB260916TN07. Once issued the number does not change.
+   */
+  async issueProforma(user: SessionUser, id: string) {
+    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot issue proformas.");
+    const { company } = await this.settings.get();
+    await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+      const o = await this.load(user, id, tx);
+      if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+      if (o.proformaNo) throw new DomainError(`The proforma is already issued as ${o.proformaNo}.`);
+      const customer = await tx.customer.findUniqueOrThrow({ where: { id: o.customerId }, select: { name: true, initials: true } });
+      const letters = customer.initials || customerLetters(customer.name);
+      const today = this.clock.today();
+      // The count belongs to the person handling the deal (or whoever issues it when nobody does).
+      const person = o.inquiry.assigneeId ?? user.id;
+      const key = `pi:${person}:${today.slice(0, 4)}`;
+      let number = "";
+      // Two people can reach the same number for the same customer on the same day: take the next count then.
+      for (let tries = 0; tries < 20 && !number; tries++) {
+        const [row] = await tx.$queryRaw<{ value: number }[]>`
+          insert into counters (key, value) values (${key}, 1)
+          on conflict (key) do update set value = counters.value + 1
+          returning value`;
+        const candidate = proformaNumber(company.proformaPrefix, today, letters, row!.value);
+        if (!(await tx.order.findFirst({ where: { proformaNo: candidate }, select: { id: true } }))) number = candidate;
+      }
+      if (!number) throw new DomainError("Could not find a free proforma number. Try again.");
+      await tx.order.update({ where: { id }, data: { proformaNo: number, proformaIssuedOn: toDbDate(today) } });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "update",
+        entityType: "order",
+        entityId: id,
+        summary: `Issued proforma ${number} for order ${o.refNo}`,
+        newValues: { proformaNo: number, proformaIssuedOn: today },
+      });
+    });
+    return this.get(user, id);
+  }
+
   /* ---------------------------------------------------------------- reading */
 
   /** An order the person may see, or 404. */
@@ -371,6 +416,8 @@ export class OrdersService {
       })),
       cancelled: o.status === "cancelled" ? { at: o.cancelledAt, reason: o.cancelReason } : null,
       documents: this.documentsOf(o),
+      /** null until issued (the proforma is a draft without a number until then). */
+      proforma: o.proformaNo ? { number: o.proformaNo, issuedOn: fromDbDateOrNull(o.proformaIssuedOn) } : null,
     };
   }
 

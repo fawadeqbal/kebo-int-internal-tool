@@ -104,6 +104,16 @@ export async function cancelOrderAction(orderId: string, _prev: ActionState, for
   return r;
 }
 
+/** Gives the proforma its number (KEB260916TN07), dated today. */
+export async function issueProformaAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post<{ proforma: { number: string } }>(`/orders/${orderId}/proforma`), undefined);
+  if (r.ok) {
+    refresh(orderId);
+    return { ...r, message: `Proforma issued as ${(r.data as { proforma: { number: string } }).proforma.number}.` };
+  }
+  return r;
+}
+
 /** Notes and files live on the deal; the order page shows them and adds to them. */
 export async function orderNoteAction(orderId: string, dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);

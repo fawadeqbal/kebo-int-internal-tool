@@ -287,6 +287,8 @@ model Customer {
   /// Registration number (shown on documents as "Reg. Number").
   regNo           String?      @map("reg_no") @db.VarChar(60)
   defaultCurrency String       @default("USD") @map("default_currency") @db.Char(3)
+  /// Short letters for the customer on documents, e.g. "TN" in proforma KEB260916TN07. Empty: taken from the name.
+  initials        String?      @db.VarChar(6)
   notes           String?
   createdById     String?      @map("created_by") @db.Uuid
   deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz
@@ -674,46 +676,49 @@ model QuoteLine {
 // ============================================================================
 
 model Order {
-  id              String            @id @default(uuid()) @db.Uuid
+  id               String            @id @default(uuid()) @db.Uuid
   /// SO-2026-0001
-  refNo           String            @unique @map("ref_no") @db.VarChar(30)
-  inquiryId       String            @map("inquiry_id") @db.Uuid
-  inquiry         Inquiry           @relation(fields: [inquiryId], references: [id])
-  revisionId      String            @unique @map("revision_id") @db.Uuid
-  revision        QuotationRevision @relation(fields: [revisionId], references: [id])
-  customerId      String            @map("customer_id") @db.Uuid
-  customer        Customer          @relation(fields: [customerId], references: [id])
-  status          OrderStatus       @default(open)
-  stage           OrderStage        @default(confirmed)
+  refNo            String            @unique @map("ref_no") @db.VarChar(30)
+  inquiryId        String            @map("inquiry_id") @db.Uuid
+  inquiry          Inquiry           @relation(fields: [inquiryId], references: [id])
+  revisionId       String            @unique @map("revision_id") @db.Uuid
+  revision         QuotationRevision @relation(fields: [revisionId], references: [id])
+  customerId       String            @map("customer_id") @db.Uuid
+  customer         Customer          @relation(fields: [customerId], references: [id])
+  status           OrderStatus       @default(open)
+  stage            OrderStage        @default(confirmed)
   /// When the order entered its current stage.
-  stageSince      DateTime          @default(now()) @map("stage_since") @db.Timestamptz
-  orderedOn       DateTime          @map("ordered_on") @db.Date
+  stageSince       DateTime          @default(now()) @map("stage_since") @db.Timestamptz
+  orderedOn        DateTime          @map("ordered_on") @db.Date
+  /// The proforma invoice's number once issued, e.g. KEB260916TN07 (prefix, issue date, customer letters, the handler's count this year).
+  proformaNo       String?           @unique @map("proforma_no") @db.VarChar(40)
+  proformaIssuedOn DateTime?         @map("proforma_issued_on") @db.Date
   /// Ship date promised to the customer.
-  shipBy          DateTime?         @map("ship_by") @db.Date
+  shipBy           DateTime?         @map("ship_by") @db.Date
   /// Ready date the factory confirmed.
-  readyOn         DateTime?         @map("ready_on") @db.Date
-  shippedOn       DateTime?         @map("shipped_on") @db.Date
-  blNo            String?           @map("bl_no") @db.VarChar(60)
+  readyOn          DateTime?         @map("ready_on") @db.Date
+  shippedOn        DateTime?         @map("shipped_on") @db.Date
+  blNo             String?           @map("bl_no") @db.VarChar(60)
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
-  documentTitle   String?           @map("document_title") @db.VarChar(200)
+  documentTitle    String?           @map("document_title") @db.VarChar(200)
   /// Where the goods are unloaded, e.g. "Hairatan, Afghanistan" (the port of loading is the Incoterm place).
-  portOfDischarge String?           @map("port_of_discharge") @db.VarChar(120)
+  portOfDischarge  String?           @map("port_of_discharge") @db.VarChar(120)
   /// When the packing list was filled in (null: not yet).
-  packedAt        DateTime?         @map("packed_at") @db.Timestamptz
-  containerNo     String?           @map("container_no") @db.VarChar(120)
-  shippingMarks   String?           @map("shipping_marks")
-  currency        String            @db.Char(3)
-  total           Decimal           @db.Decimal(14, 2)
-  depositPercent  Decimal           @map("deposit_percent") @db.Decimal(5, 2)
-  balanceTerms    BalanceTerms      @map("balance_terms")
-  incoterm        Incoterm
-  incotermPlace   String?           @map("incoterm_place") @db.VarChar(80)
-  closedAt        DateTime?         @map("closed_at") @db.Timestamptz
-  cancelledAt     DateTime?         @map("cancelled_at") @db.Timestamptz
-  cancelReason    String?           @map("cancel_reason")
-  createdById     String            @map("created_by") @db.Uuid
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  packedAt         DateTime?         @map("packed_at") @db.Timestamptz
+  containerNo      String?           @map("container_no") @db.VarChar(120)
+  shippingMarks    String?           @map("shipping_marks")
+  currency         String            @db.Char(3)
+  total            Decimal           @db.Decimal(14, 2)
+  depositPercent   Decimal           @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms     BalanceTerms      @map("balance_terms")
+  incoterm         Incoterm
+  incotermPlace    String?           @map("incoterm_place") @db.VarChar(80)
+  closedAt         DateTime?         @map("closed_at") @db.Timestamptz
+  cancelledAt      DateTime?         @map("cancelled_at") @db.Timestamptz
+  cancelReason     String?           @map("cancel_reason")
+  createdById      String            @map("created_by") @db.Uuid
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
   lines        OrderLine[]
   stageChanges OrderStageChange[]

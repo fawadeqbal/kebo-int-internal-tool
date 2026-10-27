@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Plus, Star, Trash2 } from "lucide-react";
-import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES, UNKNOWN_COUNTRY, type CustomerType } from "@kebo/shared";
+import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES, customerLetters, UNKNOWN_COUNTRY, type CustomerType } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardBody, CardFooter, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -21,7 +21,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 const DRAFT = "customer-draft";
 
 type ContactDraft = { key: string; id: string | null; name: string; position: string; email: string; phone: string; whatsapp: string; wechat: string; isPrimary: boolean };
-type Draft = { type: CustomerType; name: string; country: string; address: string; taxNo: string; regNo: string; defaultCurrency: string; notes: string };
+type Draft = { type: CustomerType; name: string; country: string; address: string; taxNo: string; regNo: string; initials: string; defaultCurrency: string; notes: string };
 
 let seq = 0;
 const newKey = () => `new-${++seq}`;
@@ -47,6 +47,7 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
     address: customer?.address ?? "",
     taxNo: customer?.taxNo ?? "",
     regNo: customer?.regNo ?? "",
+    initials: customer?.initials ?? "",
     defaultCurrency: customer?.defaultCurrency ?? currencies[0] ?? "USD",
     notes: customer?.notes ?? "",
   }));
@@ -111,6 +112,23 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
               </Field>
               <Field label="Reg. number" htmlFor="regNo" optional error={s.errors?.regNo} hint="Printed on the proforma invoice when given">
                 <Input form={DRAFT} id="regNo" value={draft.regNo} onChange={(e) => set("regNo", e.target.value)} />
+              </Field>
+              <Field
+                label="Letters on documents"
+                htmlFor="initials"
+                optional
+                error={s.errors?.initials}
+                hint={`In proforma numbers, e.g. KEB260916${(draft.initials || customerLetters(draft.name || "Customer")).toUpperCase()}07. Empty: from the name (${customerLetters(draft.name || "Customer")}).`}
+              >
+                <Input
+                  form={DRAFT}
+                  id="initials"
+                  value={draft.initials}
+                  maxLength={6}
+                  className="w-28 uppercase"
+                  placeholder={customerLetters(draft.name || "Customer")}
+                  onChange={(e) => set("initials", e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
+                />
               </Field>
               <Field label="Notes" htmlFor="notes" optional error={s.errors?.notes} className="sm:col-span-2" hint="Only the team sees these">
                 <Textarea form={DRAFT} id="notes" rows={3} value={draft.notes} onChange={(e) => set("notes", e.target.value)} />
