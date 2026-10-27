@@ -118,7 +118,7 @@ describe("costing", () => {
       { quantity: 1, unitPriceMinor: 50_50, unitCostMinor: 40_25 },
       { quantity: 1, unitPriceMinor: 300_00, unitCostMinor: null },
     ]);
-    expect(s).toEqual({ costMinor: 21025, salesMinor: 25050, profitMinor: 4025, marginPercent: 16.1, uncostedLines: 1 });
+    expect(s).toEqual({ costMinor: 21025, salesMinor: 25050, profitMinor: 4025, marginPercent: 16.1, uncostedLines: 1, extraCostMinor: 0 });
   });
 });
 
@@ -195,5 +195,19 @@ describe("order profit", () => {
       [300, 0],
       [200, 500],
     ]);
+  });
+});
+describe("costs that are not lines", () => {
+  it("adds them to the cost and spreads them over the lines by what each costs", async () => {
+    const { costSummary, landedUnitCosts } = await import("../src");
+    const lines = [
+      { quantity: "1", unitPriceMinor: 120000, unitCostMinor: 100000 },
+      { quantity: "10", unitPriceMinor: 1200, unitCostMinor: 1000 },
+    ];
+    expect(costSummary(lines, 0, 20000)).toMatchObject({ costMinor: 130000, salesMinor: 132000, profitMinor: 2000, extraCostMinor: 20000 });
+    // 100,000 and 10,000 of cost: freight 22,000 splits 20,000 / 2,000 → per unit +20,000 and +200.
+    expect(landedUnitCosts(lines, 22000)).toEqual([120000, 1200]);
+    expect(landedUnitCosts([{ unitCostMinor: null, quantity: 1 }, { unitCostMinor: 500, quantity: 2 }], 100)).toEqual([null, 550]);
+    expect(landedUnitCosts(lines, 0)).toEqual([100000, 1000]);
   });
 });

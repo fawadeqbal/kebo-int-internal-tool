@@ -98,6 +98,15 @@ enum LineType {
   charge
 }
 
+/// The costs between a factory's price basis and ours (to the port, sea freight, insurance, destination delivery, import duties).
+enum BasisStep {
+  to_port
+  freight
+  insurance
+  delivery
+  duties
+}
+
 enum Incoterm {
   EXW
   FCA
@@ -556,8 +565,10 @@ model FactoryQuote {
   receivedOn   DateTime  @map("received_on") @db.Date
   validUntil   DateTime? @map("valid_until") @db.Date
   currency     String    @default("CNY") @db.Char(3)
-  /// EXW, FOB Qingdao, delivered to port…
-  priceBasis   String?   @map("price_basis") @db.VarChar(60)
+  /// The factory's price basis (EXW, FOB, CFR…): what its prices already pay for.
+  basis        Incoterm?
+  /// Where the basis applies: "Zhangjiagang" (EXW), "Qingdao" (FOB)…
+  basisPlace   String?   @map("basis_place") @db.VarChar(60)
   leadTime     String?   @map("lead_time") @db.VarChar(120)
   moq          String?   @db.VarChar(60)
   paymentTerms String?   @map("payment_terms")
@@ -667,25 +678,47 @@ model QuotationRevision {
 /// An option the customer can choose: one factory's offer (its lines, our prices),
 /// or, without factory prices, the customer's own items priced by hand.
 model QuotationOption {
-  id             String            @id @default(uuid()) @db.Uuid
-  revisionId     String            @map("revision_id") @db.Uuid
-  revision       QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  id                String            @id @default(uuid()) @db.Uuid
+  revisionId        String            @map("revision_id") @db.Uuid
+  revision          QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
   /// A, B, C…
-  letter         String            @db.VarChar(2)
-  sortOrder      Int               @default(0) @map("sort_order")
-  factoryQuoteId String?           @map("factory_quote_id") @db.Uuid
-  factoryQuote   FactoryQuote?     @relation(fields: [factoryQuoteId], references: [id])
-  status         OptionStatus      @default(open)
-  leadTime       String?           @map("lead_time") @db.VarChar(120)
-  subtotal       Decimal           @default(0) @db.Decimal(14, 2)
-  discount       Decimal           @default(0) @db.Decimal(14, 2)
-  total          Decimal           @default(0) @db.Decimal(14, 2)
+  letter            String            @db.VarChar(2)
+  sortOrder         Int               @default(0) @map("sort_order")
+  factoryQuoteId    String?           @map("factory_quote_id") @db.Uuid
+  factoryQuote      FactoryQuote?     @relation(fields: [factoryQuoteId], references: [id])
+  status            OptionStatus      @default(open)
+  leadTime          String?           @map("lead_time") @db.VarChar(120)
+  subtotal          Decimal           @default(0) @db.Decimal(14, 2)
+  discount          Decimal           @default(0) @db.Decimal(14, 2)
+  total             Decimal           @default(0) @db.Decimal(14, 2)
+  /// The factory's price basis when the option was saved (the offer can change later).
+  factoryBasis      Incoterm?         @map("factory_basis")
+  factoryBasisPlace String?           @map("factory_basis_place") @db.VarChar(60)
 
   lines QuoteLine[]
+  costs OptionCost[]
 
   @@unique([revisionId, letter])
   @@index([factoryQuoteId])
   @@map("quotation_options")
+}
+
+/// A cost between the factory's price basis and the one we sell on (EXW → FOB: to the port…), part of the option's cost.
+model OptionCost {
+  id       String          @id @default(uuid()) @db.Uuid
+  optionId String          @map("option_id") @db.Uuid
+  option   QuotationOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  step     BasisStep
+  /// As entered, in its own currency.
+  amount   Decimal         @db.Decimal(14, 2)
+  currency String          @db.Char(3)
+  /// In the quotation's currency, at the rate when saved.
+  cost     Decimal         @db.Decimal(14, 2)
+  fxRate   Decimal?        @map("fx_rate") @db.Decimal(18, 8)
+  note     String?         @db.VarChar(200)
+
+  @@unique([optionId, step])
+  @@map("option_costs")
 }
 
 model QuoteLine {

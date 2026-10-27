@@ -98,6 +98,10 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const EXPENSE_CATEGORIES = values("freight", "inland_transport", "inspection", "customs", "bank_charges", "commission", "samples", "travel", "office", "salaries", "rent", "other");
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
+/** The costs between a factory's price and ours (see workflows/basis). */
+export const BASIS_STEPS = values("to_port", "freight", "insurance", "delivery", "duties");
+export type BasisStep = (typeof BASIS_STEPS)[number];
+
 export const ENUMS = {
   SignInResult: SIGN_IN_RESULTS,
   InquiryStage: INQUIRY_STAGES,
@@ -108,6 +112,7 @@ export const ENUMS = {
   RevisionStatus: REVISION_STATUSES,
   LineType: LINE_TYPES,
   Incoterm: INCOTERMS,
+  BasisStep: BASIS_STEPS,
   BalanceTerms: BALANCE_TERMS,
   OrderStatus: ORDER_STATUSES,
   OrderStage: ORDER_STAGES,

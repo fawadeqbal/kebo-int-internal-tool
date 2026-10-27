@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Download, Eye, FileText, ListPlus, Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
 import { formatMinor, toMinor } from "@kebo/money";
-import { ATTACHMENT_KIND_LABEL, DEFAULT_TAX_RATE, type AttachmentKind } from "@kebo/shared";
+import { ATTACHMENT_KIND_LABEL, basisText, DEFAULT_TAX_RATE, type AttachmentKind } from "@kebo/shared";
 import { Button, Card, CardBody, CardHeader, cn, DetailList, EmptyState, Select } from "@kebo/ui";
 import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -337,6 +337,11 @@ function Offer({
             {items.length > 0 && q.lines.length > 0 && <CoverageBadge missing={q.coverage.missing} />}
           </h3>
           <p className="mt-0.5 text-xs text-muted">
+            {q.basis ? (
+              <span className="font-medium text-text-2">{basisText(q.basis, q.basisPlace)} · </span>
+            ) : (
+              <span className="font-medium text-warn">Price basis not said · </span>
+            )}
             {q.currency} · received {dateText(q.receivedOn)}
             {q.validUntil ? ` · valid until ${dateText(q.validUntil)}` : ""}
             {q.leadTime ? ` · ${q.leadTime}` : ""}
@@ -360,11 +365,10 @@ function Offer({
       {details ? (
         <div className="rounded-xl border border-primary/30 bg-primary-soft/20 p-4">{headerForm}</div>
       ) : (
-        (q.priceBasis || q.moq || q.paymentTerms || q.notes) && (
+        (q.moq || q.paymentTerms || q.notes) && (
           <DetailList
             columns={3}
             items={[
-              { label: "Price basis", value: q.priceBasis, hidden: !q.priceBasis },
               { label: "MOQ", value: q.moq, hidden: !q.moq },
               { label: "Payment terms", value: q.paymentTerms, hidden: !q.paymentTerms },
               { label: "Notes", value: <span className="whitespace-pre-line">{q.notes}</span>, hidden: !q.notes },

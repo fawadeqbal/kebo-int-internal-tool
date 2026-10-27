@@ -1,5 +1,5 @@
 import { CornerDownRight } from "lucide-react";
-import { BALANCE_TERMS_LABEL, LINE_TYPE_LABEL } from "@kebo/shared";
+import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, basisText, LINE_TYPE_LABEL } from "@kebo/shared";
 import { Badge, cn, DetailList, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { date, money, qty } from "@/lib/format";
 import type { OptionView, RevisionView } from "@/lib/types-deals";
@@ -32,7 +32,12 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
               <span className="flex items-center gap-2">
                 <span className="font-semibold">Option {o.letter}</span>
                 <Badge tone="neutral">Not chosen</Badge>
-                {o.factory && <span className="text-xs text-muted">from {o.factory.name}</span>}
+                {o.factory && (
+            <span className="text-xs text-muted">
+              from {o.factory.name}
+              {o.factoryBasis ? ` · ${basisText(o.factoryBasis, o.factoryBasisPlace ?? null)}` : ""}
+            </span>
+          )}
               </span>
               <span className="flex items-center gap-2 text-muted">
                 <span className="tabular">{money(o.total, r.currency)}</span>
@@ -41,11 +46,11 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
               </span>
             </summary>
             <div className="border-t border-line p-2">
-              <OptionSummary o={o} currency={r.currency} single={false} />
+              <OptionSummary o={o} currency={r.currency} incoterm={r.incoterm} single={false} />
             </div>
           </details>
         ) : (
-          <OptionSummary key={o.id} o={o} currency={r.currency} single={r.options.length === 1} />
+          <OptionSummary key={o.id} o={o} currency={r.currency} incoterm={r.incoterm} single={r.options.length === 1} />
         ),
       )}
       {(r.paymentTerms || r.deliveryTerms || r.notes) && (
@@ -62,7 +67,7 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
   );
 }
 
-function OptionSummary({ o, currency, single }: { o: OptionView; currency: string; single: boolean }) {
+function OptionSummary({ o, currency, incoterm, single }: { o: OptionView; currency: string; incoterm: string; single: boolean }) {
   const showCosts = !!o.costing;
   const st = STATUS[o.status];
   return (
@@ -146,7 +151,25 @@ function OptionSummary({ o, currency, single }: { o: OptionView; currency: strin
               profit={o.costing.profitMinor}
               margin={o.costing.marginPercent}
               uncosted={o.costing.uncostedLines}
+              extra={o.costing.extraCostMinor}
+              extraLabel={`incl. costs to reach ${incoterm}`}
             />
+          )}
+          {o.costs && o.costs.length > 0 && (
+            <ul className="text-xs text-muted">
+              {o.costs.map((c) => (
+                <li key={c.step} className="flex justify-between gap-2">
+                  <span>
+                    {BASIS_STEP_LABEL[c.step]}
+                    {c.note ? ` · ${c.note}` : ""}
+                  </span>
+                  <span className="tabular">
+                    {money(c.amount, c.currency)}
+                    {c.currency !== currency ? ` ≈ ${money(c.cost, currency)}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { paymentSentenceOf } from "@kebo/shared";
+import { fromMinor, landedUnitCosts, toMinor } from "@kebo/money";
+import { basisText, paymentSentenceOf } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
@@ -64,6 +65,17 @@ export default async function QuotationPrint({
   const options = r.options.some((o) => o.status === "accepted") ? r.options.filter((o) => o.status === "accepted") : r.options;
   const single = options.length === 1;
   const costs = internal && options.some((o) => o.lines.some((l) => l.unitCost != null));
+  // On the internal copy, each line's cost is its landed cost: the factory's plus its share of the costs to reach our basis.
+  const landed = internal && options.some((o) => (o.costing?.extraCostMinor ?? 0) > 0);
+  const rowsOf = (o: (typeof options)[number]) => {
+    const extra = o.costing?.extraCostMinor ?? 0;
+    if (!internal || !extra) return o.lines;
+    const per = landedUnitCosts(
+      o.lines.map((l) => ({ unitCostMinor: l.unitCost == null ? null : toMinor(l.unitCost), quantity: l.quantity })),
+      extra,
+    );
+    return o.lines.map((l, i) => ({ ...l, unitCost: per[i] == null ? l.unitCost : fromMinor(per[i]!) }));
+  };
 
   const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<DocLine> = {
@@ -77,7 +89,7 @@ export default async function QuotationPrint({
         { label: "Qty.", width: 58, render: (l) => docQty(l.quantity, l.unit) },
         ...(costs
           ? ([
-              { label: "Unit cost", width: 62, align: "right", render: (l) => (l.unitCost != null ? docMoney(l.unitCost, c) : "") },
+              { label: landed ? "Landed cost" : "Unit cost", width: 62, align: "right", render: (l) => (l.unitCost != null ? docMoney(l.unitCost, c) : "") },
               { label: "Margin", width: 42, align: "right", render: (l) => marginOf(l.unitPrice, l.unitCost) },
             ] satisfies DocColumn<DocLine>[])
           : []),
@@ -89,7 +101,7 @@ export default async function QuotationPrint({
   // Each option: its lines and its own total. Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const groups = options.map((o) => ({
     heading: single ? "" : `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.factory ? ` (${o.factory.name})` : ""}`,
-    rows: o.lines,
+    rows: rowsOf(o),
     sums:
       internal || Number(o.discount)
         ? [
@@ -140,8 +152,15 @@ export default async function QuotationPrint({
               head={single ? undefined : ["", ...options.map((o) => `Option ${o.letter}`)]}
               rows={[
                 ["Factory", ...options.map((o) => o.factory?.name ?? "—")],
+                ["Factory price basis", ...options.map((o) => basisText(o.factoryBasis ?? null, o.factoryBasisPlace ?? null) ?? "—")],
                 ["Sales (after discount)", ...options.map((o) => (o.costing ? docMoney(o.costing.sales, c) : "—"))],
-                ["Factory cost", ...options.map((o) => (o.costing ? docMoney(o.costing.cost, c) : "—"))],
+                ...(options.some((o) => o.costing && o.costing.extraCostMinor > 0)
+                  ? [
+                      ["Factory cost", ...options.map((o) => (o.costing ? docMoney(fromMinor(o.costing.costMinor - o.costing.extraCostMinor), c) : "—"))],
+                      [`Costs to reach ${r.incoterm}`, ...options.map((o) => (o.costing ? docMoney(o.costing.extraCost, c) : "—"))],
+                      ["Total cost", ...options.map((o) => (o.costing ? docMoney(o.costing.cost, c) : "—"))],
+                    ]
+                  : [["Factory cost", ...options.map((o) => (o.costing ? docMoney(o.costing.cost, c) : "—"))]]),
                 ["Profit", ...options.map((o) => (o.costing ? docMoney(o.costing.profit, c) : "—"))],
                 ["Margin", ...options.map((o) => (o.costing?.marginPercent == null ? "—" : `${o.costing.marginPercent}%`))],
               ]}

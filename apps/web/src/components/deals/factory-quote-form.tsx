@@ -3,7 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Factory, Loader2, Plus } from "lucide-react";
 import { fxRate } from "@kebo/money";
-import { Button, cn, controlClass, Field, Input, Textarea } from "@kebo/ui";
+import { INCOTERMS, type Incoterm } from "@kebo/shared";
+import { Button, cn, controlClass, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -11,13 +12,25 @@ import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
+/** What each basis means for us, in a few words. */
+const BASIS_HINT: Partial<Record<Incoterm, string>> = {
+  EXW: "At their factory: we pay transport to the port and everything after",
+  FCA: "Handed to our carrier, export cleared: we pay the freight and after",
+  FOB: "On board at the port: we pay the sea freight and after",
+  CFR: "Freight paid to the destination port: we pay insurance and after",
+  CIF: "Freight and insurance paid to the destination port",
+  DAP: "Delivered to the named place, not import cleared",
+  DDP: "Delivered, duties paid",
+};
+
 interface QuoteState {
   factory: { id: string | null; name: string } | null;
   reference: string;
   currency: string;
   receivedOn: string;
   validUntil: string;
-  priceBasis: string;
+  basis: Incoterm | "";
+  basisPlace: string;
   leadTime: string;
   moq: string;
   paymentTerms: string;
@@ -31,7 +44,8 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
     currency: quote?.currency ?? "CNY",
     receivedOn: quote?.receivedOn ?? today,
     validUntil: quote?.validUntil ?? "",
-    priceBasis: quote?.priceBasis ?? "",
+    basis: quote?.basis ?? "",
+    basisPlace: quote?.basisPlace ?? "",
     leadTime: quote?.leadTime ?? "",
     moq: quote?.moq ?? "",
     paymentTerms: quote?.paymentTerms ?? "",
@@ -48,7 +62,8 @@ function payload(s: QuoteState) {
     receivedOn: s.receivedOn,
     validUntil: s.validUntil || null,
     currency: s.currency.trim().toUpperCase(),
-    priceBasis: s.priceBasis,
+    basis: s.basis || null,
+    basisPlace: s.basisPlace,
     leadTime: s.leadTime,
     moq: s.moq,
     paymentTerms: s.paymentTerms,
@@ -262,20 +277,36 @@ export function OfferHeaderForm({
             <Field label="Valid until" htmlFor="validUntil" optional error={st.errors?.validUntil}>
               <Input id="validUntil" type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
             </Field>
-            <Field label="Price basis" htmlFor="priceBasis" optional error={st.errors?.priceBasis}>
-              <Input
-                id="priceBasis"
-                value={s.priceBasis}
-                onChange={(e) => set("priceBasis", e.target.value)}
-                maxLength={60}
-                list="fq-basis"
-                placeholder="e.g. EXW factory"
-              />
-              <datalist id="fq-basis">
-                {["EXW factory", "Delivered to our warehouse", "FOB Qingdao", "FOB Shanghai", "FOB Ningbo"].map((b) => (
-                  <option key={b} value={b} />
-                ))}
-              </datalist>
+            <Field
+              label="Price basis"
+              htmlFor="basis"
+              error={st.errors?.basis ?? st.errors?.basisPlace}
+              hint={s.basis ? BASIS_HINT[s.basis] : "What their prices already pay for: needed to work out freight and the like"}
+            >
+              <div className="flex gap-2">
+                <Select id="basis" value={s.basis} onChange={(e) => set("basis", e.target.value as Incoterm | "")} className="w-28 shrink-0">
+                  <option value="">Not said</option>
+                  {INCOTERMS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  id="basisPlace"
+                  aria-label="Basis place"
+                  value={s.basisPlace}
+                  onChange={(e) => set("basisPlace", e.target.value)}
+                  maxLength={60}
+                  list="fq-basis-place"
+                  placeholder={s.basis === "EXW" ? "Factory town" : "Port, e.g. Qingdao"}
+                />
+                <datalist id="fq-basis-place">
+                  {["Qingdao", "Shanghai", "Ningbo", "Tianjin", "Shenzhen", "Guangzhou", "Xiamen"].map((b) => (
+                    <option key={b} value={b} />
+                  ))}
+                </datalist>
+              </div>
             </Field>
             <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime}>
               <Input

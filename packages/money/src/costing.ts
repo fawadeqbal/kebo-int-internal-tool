@@ -58,7 +58,7 @@ export interface CostedLine {
  * a cost; lines without one are counted apart. The document discount is spread
  * over all lines by amount (as on the invoice), so it lowers the profit shown.
  */
-export function costSummary(lines: CostedLine[], discountMinor: Minor = 0) {
+export function costSummary(lines: CostedLine[], discountMinor: Minor = 0, extraCostMinor: Minor = 0) {
   const gross = lines.map((l) => roundHalfAway(l.unitPriceMinor * (Number(l.quantity) || 0)));
   const subtotal = gross.reduce((s, g) => s + g, 0);
   const shares = allocate(Math.min(Math.max(discountMinor, 0), Math.max(subtotal, 0)), gross);
@@ -74,11 +74,30 @@ export function costSummary(lines: CostedLine[], discountMinor: Minor = 0) {
     sales += afterDiscount;
     cost += roundHalfAway(l.unitCostMinor * (Number(l.quantity) || 0));
   });
+  // Costs that are not lines (freight to reach the basis we sell on…) are part of the cost too.
+  cost += Math.max(Math.round(extraCostMinor), 0);
   return {
     costMinor: cost,
     salesMinor: sales,
     profitMinor: sales - cost,
     marginPercent: sales > 0 ? roundHalfAway(((sales - cost) / sales) * 1000) / 10 : null,
     uncostedLines: uncosted,
+    extraCostMinor: Math.max(Math.round(extraCostMinor), 0),
   };
+}
+
+/**
+ * Each line's cost per unit with a share of costs that are not lines (freight,
+ * transport to the port…), shared by what each line costs: what prices must
+ * cover. Lines without a cost stay null and take no share.
+ */
+export function landedUnitCosts(lines: { unitCostMinor: Minor | null; quantity: number | string }[], extraMinor: Minor): (Minor | null)[] {
+  const weights = lines.map((l) => (l.unitCostMinor === null ? 0 : Math.max(l.unitCostMinor * (Number(l.quantity) || 0), 0)));
+  const total = weights.reduce((t, w) => t + w, 0);
+  const shares = total > 0 && extraMinor > 0 ? allocate(Math.round(extraMinor), weights) : weights.map(() => 0);
+  return lines.map((l, i) => {
+    if (l.unitCostMinor === null) return null;
+    const qty = Number(l.quantity) || 0;
+    return qty > 0 ? l.unitCostMinor + roundHalfAway(shares[i]! / qty) : l.unitCostMinor;
+  });
 }
