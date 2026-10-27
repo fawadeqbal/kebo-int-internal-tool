@@ -54,6 +54,12 @@ export interface FactoryOwed {
 export interface FactoryPaymentView {
   id: string;
   factory: { id: string; name: string };
+  recordedBy: { id: string; name: string } | null;
+  recordedAt: string;
+  /** Set when it was changed after it was recorded. */
+  changedAt: string | null;
+  /** Paid to that factory so far and still to pay, once it counted (null when removed). */
+  after: { paid: string; toPay: string } | null;
   kind: PaymentKind;
   amount: string;
   currency: string;

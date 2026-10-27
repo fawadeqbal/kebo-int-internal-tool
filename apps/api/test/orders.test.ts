@@ -105,6 +105,12 @@ describe("orders: four stages", () => {
     await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: "2099-01-01" }).expect(400);
     const paid = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: (deposit - 25).toFixed(2), bankCharges: "25", currency: "USD", paidOn: "2026-10-21", reference: "TT-1" }).expect(201)).body;
     expect(paid).toMatchObject({ status: "deposit_paid", received: deposit.toFixed(2) });
+    // The full record: what it counts for, who recorded it, and where the order stood after it.
+    expect(paid.payments.at(-1)).toMatchObject({
+      counts: deposit.toFixed(2),
+      recordedBy: { name: expect.any(String) },
+      after: { received: deposit.toFixed(2), due: (Number(o.total) - deposit).toFixed(2) },
+    });
     await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: (Number(o.total) + 1).toFixed(2), currency: "USD", paidOn: "2026-10-21" }).expect(400); // more than due
     expect((await order()).money).toMatchObject({ received: deposit.toFixed(2), depositDue: "0.00" });
   });

@@ -3,7 +3,7 @@ import { Badge, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
-import { date, money } from "@/lib/format";
+import { date, dateTime, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { PaymentStatus } from "@/lib/types-orders";
 import { today } from "@/components/orders/today";
@@ -12,6 +12,7 @@ import { editPaymentAction, savePlanAction } from "../../../money/actions";
 import { paymentAction, voidPaymentAction } from "../../actions";
 import { PaymentForm, VoidPayment } from "../forms";
 import { FactoriesCard, ProfitCard } from "../money-cards";
+import { PaymentRecord } from "@/components/money/payment-record";
 
 export const metadata = { title: "Order money" };
 
@@ -67,35 +68,59 @@ export default async function OrderMoneyTab({ params }: { params: Promise<{ id: 
               No payments yet. {canPay ? "Record the deposit when it reaches the bank." : "Accounts records payments when they reach the bank."}
             </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Payments">
+            <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line" aria-label="Payments from the customer">
               {p.payments.map((x) => (
-                <li key={x.id} className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-3 py-2.5 text-sm", x.voided && "text-muted")}>
-                  <div className="min-w-0">
-                    <p>
+                <PaymentRecord
+                  key={x.id}
+                  label={`Payment of ${money(x.amount, x.currency)} on ${date(x.paidOn)}`}
+                  removed={!!x.voided}
+                  summary={
+                    <>
                       <span className={cn("font-medium tabular", x.voided && "line-through")}>{money(x.amount, x.currency)}</span>{" "}
                       <span className="text-text-2">{PAYMENT_KIND_LABEL[x.kind]}</span>
-                      {Number(x.bankCharges) > 0 && (
-                        <span className={cn("text-xs text-muted", x.voided && "line-through")}> + {money(x.bankCharges, x.currency)} bank charges</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted">
+                      {Number(x.bankCharges) > 0 && <span className="text-xs text-muted"> + {money(x.bankCharges, x.currency)} bank charges</span>}{" "}
+                      {x.voided && <Badge tone="bad">Removed</Badge>}
+                    </>
+                  }
+                  sub={
+                    <>
                       {date(x.paidOn)} · {PAYMENT_METHOD_LABEL[x.method]}
                       {x.reference && ` · ${x.reference}`}
-                    </p>
-                    {x.note && <p className="text-xs text-text-2">{x.note}</p>}
-                    {x.voided && (
-                      <p className="text-xs">
-                        <Badge tone="bad">Removed</Badge> {x.voided.reason}
-                      </p>
-                    )}
-                  </div>
-                  {(canManage || canPay) && !x.voided && (
-                    <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
-                      {canPay && <EditCustomerPayment action={editPaymentAction.bind(null, o.id, x.id, o.currency)} payment={x} currency={o.currency} today={now} />}
-                      {canManage && <VoidPayment action={voidPaymentAction.bind(null, o.id, x.id)} />}
-                    </div>
-                  )}
-                </li>
+                    </>
+                  }
+                  fields={[
+                    { label: "Amount received", value: <span className="tabular">{money(x.amount, x.currency)}</span> },
+                    { label: "Bank charges", value: Number(x.bankCharges) > 0 ? <span className="tabular">{money(x.bankCharges, x.currency)}</span> : "None" },
+                    { label: "Counts as paid", value: <span className="font-medium tabular">{money(x.counts, x.currency)}</span> },
+                    { label: "What for", value: PAYMENT_KIND_LABEL[x.kind] },
+                    { label: "Paid on", value: date(x.paidOn) },
+                    { label: "Method", value: PAYMENT_METHOD_LABEL[x.method] },
+                    { label: "Bank reference", value: x.reference ?? "—" },
+                    { label: "Recorded by", value: `${x.recordedBy?.name ?? "Someone"} · ${dateTime(x.recordedAt)}` },
+                    {
+                      label: "After this payment",
+                      value: x.after ? (
+                        <span className="tabular">
+                          {money(x.after.received, x.currency)} received · {Number(x.after.due) > 0 ? `${money(x.after.due, x.currency)} still due` : "paid in full"}
+                        </span>
+                      ) : (
+                        "Not counted"
+                      ),
+                    },
+                    ...(x.note ? [{ label: "Note", value: <span className="whitespace-pre-line">{x.note}</span>, wide: true }] : []),
+                    ...(x.voided
+                      ? [{ label: "Removed", value: <span className="text-bad">{`${dateTime(x.voided.at)}${x.voided.reason ? `: ${x.voided.reason}` : ""}`}</span>, wide: true }]
+                      : []),
+                  ]}
+                  actions={
+                    (canManage || canPay) && !x.voided ? (
+                      <>
+                        {canPay && <EditCustomerPayment action={editPaymentAction.bind(null, o.id, x.id, o.currency)} payment={x} currency={o.currency} today={now} />}
+                        {canManage && <VoidPayment action={voidPaymentAction.bind(null, o.id, x.id)} />}
+                      </>
+                    ) : undefined
+                  }
+                />
               ))}
             </ul>
           )}

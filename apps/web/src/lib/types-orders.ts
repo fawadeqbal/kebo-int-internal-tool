@@ -150,6 +150,12 @@ export interface PaymentsView {
     method: PaymentMethod;
     reference: string | null;
     note: string | null;
+    /** Amount plus bank charges: what it settles. */
+    counts: string;
+    recordedBy: { id: string; name: string } | null;
+    recordedAt: string;
+    /** Received so far and still due once it counted (null when removed). */
+    after: { received: string; due: string } | null;
     voided: { at: string; reason: string | null } | null;
   }[];
 }

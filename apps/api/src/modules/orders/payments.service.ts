@@ -31,6 +31,17 @@ export class PaymentsService {
     const all = await this.prisma.db.payment.findMany({ where: { orderId }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] });
     const live = all.filter((p) => !p.voidedAt && p.currency === o.currency);
     const position = settle(decimalToMinor(o.total), live.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })), Number(o.depositPercent));
+    // Who recorded each payment, and where the order stood after it (counted payments in date order).
+    const people = new Map(
+      (await this.prisma.db.user.findMany({ where: { id: { in: [...new Set(all.map((p) => p.recordedById))] } }, select: { id: true, name: true } })).map((u) => [u.id, u]),
+    );
+    const totalMinor = decimalToMinor(o.total);
+    let runningMinor = 0;
+    const after = new Map<string, { receivedMinor: number; dueMinor: number }>();
+    for (const p of live) {
+      runningMinor += decimalToMinor(p.amount) + decimalToMinor(p.bankCharges);
+      after.set(p.id, { receivedMinor: runningMinor, dueMinor: Math.max(totalMinor - runningMinor, 0) });
+    }
     return {
       currency: o.currency,
       total: fromMinor(position.dueMinor),
@@ -48,6 +59,12 @@ export class PaymentsService {
         method: p.method,
         reference: p.reference,
         note: p.note,
+        /** Amount plus bank charges: what it settles. */
+        counts: fromMinor(decimalToMinor(p.amount) + decimalToMinor(p.bankCharges)),
+        recordedBy: people.get(p.recordedById) ?? null,
+        recordedAt: p.createdAt,
+        /** Received so far and still due once this payment counted (null when removed or in another currency). */
+        after: after.has(p.id) ? { received: fromMinor(after.get(p.id)!.receivedMinor), due: fromMinor(after.get(p.id)!.dueMinor) } : null,
         voided: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
       })),
     };
