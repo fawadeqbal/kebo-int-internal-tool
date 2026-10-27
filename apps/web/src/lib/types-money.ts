@@ -248,3 +248,48 @@ export interface CashBook {
   unassigned: number;
   rows: CashRow[];
 }
+
+/** GET /reports/leaks (managers): where we lose money, in the main currency. */
+export interface LeaksReport {
+  range: { from: string; to: string };
+  currency: string;
+  summary: { lostDeals: number; lostSpent: string; winRate: number | null; planned: string; actual: string; leaked: string; keptPercent: number | null; stuck: string };
+  lostReasons: { reason: LostReason | "not_said"; label: string; deals: number; spent: string }[];
+  lostDeals: { id: string; refNo: string; title: string; customer: { id: string; name: string }; reason: LostReason | null; assignee: string; spent: string }[];
+  byPerson: LeakGroup[];
+  byCategory: LeakGroup[];
+  orders: {
+    id: string;
+    refNo: string;
+    customer: { id: string; name: string };
+    revenue: string;
+    planned: string;
+    orderCosts: string;
+    beforeSale: string;
+    factoryExtra: string;
+    actual: string;
+    leaked: string;
+    uncosted: boolean;
+  }[];
+  customers: { best: LeakCustomer[]; costing: LeakCustomer[] };
+  trend: { month: string; sales: string; expenses: string; percent: number | null }[];
+  stuck: { id: string; refNo: string; customer: { id: string; name: string }; currency: string; amount: string; days: number }[];
+  factories: { factory: { id: string; name: string }; spent: string; count: number }[];
+  warnings: { level: "bad" | "warn"; text: string; href: string | null }[];
+  missingRates: string[];
+}
+export interface LeakGroup {
+  key: string;
+  won: number;
+  lost: number;
+  winRate: number | null;
+  spent: string;
+  costPerWin: string | null;
+}
+export interface LeakCustomer {
+  customer: { id: string; name: string };
+  sales: string;
+  profit: string;
+  spent: string;
+  net: string;
+}

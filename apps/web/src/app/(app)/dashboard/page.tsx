@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { ORDER_STAGE_LABEL, type InquiryStage, type Priority } from "@kebo/shared";
-import { Card, CardBody, CardHeader, EmptyState, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
+import { can, ORDER_STAGE_LABEL, type InquiryStage, type Priority } from "@kebo/shared";
+import { Card, CardBody, CardHeader, cn, EmptyState, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
+import type { LeaksReport } from "@/lib/types-money";
 import { Stat } from "@/components/common/stat";
 
 export const metadata = { title: "Dashboard" };
@@ -66,6 +67,8 @@ export default async function DashboardPage() {
   const me = await requireUser();
   const d = await api.get<Dashboard>("/dashboard");
   const cur = d.money?.currency ?? "USD";
+  // Managers: what needs attention in money (this year).
+  const leaks = can(me, "expenses.manage") ? await api.get<LeaksReport>("/reports/leaks").catch(() => null) : null;
   return (
     <div>
       <PageHeader title={`Good day, ${me.name.split(" ")[0]}`} description="What needs you today." />
@@ -162,6 +165,30 @@ export default async function DashboardPage() {
             hint={(["confirmed", "in_production", "shipped"] as const).map((s) => `${d.money!.now.ordersByStage[s]} ${ORDER_STAGE_LABEL[s].toLowerCase()}`).join(" · ")}
           />
         </section>
+      )}
+
+      {leaks && leaks.warnings.length > 0 && (
+        <Card className="mt-5">
+          <CardHeader
+            title="Money that needs attention"
+            description={`${leaks.warnings.length} thing${leaks.warnings.length === 1 ? "" : "s"} this year`}
+            actions={
+              <Link href="/reports/money" className="text-sm text-primary hover:underline">
+                Where we lose money
+              </Link>
+            }
+          />
+          <ul className="flex flex-col divide-y divide-line">
+            {leaks.warnings.slice(0, 4).map((w, i) => (
+              <li key={i}>
+                <Link href={w.href ?? "/reports/money"} className="flex items-start gap-2.5 px-4 py-2.5 text-sm hover:bg-surface-2/60">
+                  <AlertTriangle className={cn("mt-0.5 size-4 shrink-0", w.level === "bad" ? "text-bad" : "text-warn")} aria-hidden />
+                  {w.text}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       {d.workload && (

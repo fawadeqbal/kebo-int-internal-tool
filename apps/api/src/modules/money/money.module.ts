@@ -43,6 +43,7 @@ import { OrdersModule } from "../orders/orders.module";
 import { MoneyService } from "./money.service";
 import { AccountsService } from "./accounts.service";
 import { CashService } from "./cash.service";
+import { LeaksService } from "./leaks.service";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const expenseQuery = z.object({
@@ -76,7 +77,14 @@ class MoneyController {
     private readonly money: MoneyService,
     private readonly accounts: AccountsService,
     private readonly cash: CashService,
+    private readonly leaks: LeaksService,
   ) {}
+
+  /** Managers: where we lose money in a period (?from&to, default this year), with warnings. */
+  @Get("reports/leaks")
+  leaksReport(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: string; to?: string }) {
+    return this.leaks.report(user, q);
+  }
 
   /** Our accounts (cash, banks, wallets): to choose from when recording money; managers also get balances. */
   @Get("money/accounts")
@@ -243,5 +251,5 @@ class MoneyController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService, CashService], exports: [MoneyService, AccountsService, CashService] })
+@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService, CashService, LeaksService], exports: [MoneyService, AccountsService, CashService, LeaksService] })
 export class MoneyModule {}
