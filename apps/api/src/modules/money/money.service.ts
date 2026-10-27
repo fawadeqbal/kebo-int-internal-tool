@@ -19,6 +19,7 @@ import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { checkAccount } from "./account-check";
+import { ordersOwingFactories } from "./due";
 import { fileView } from "./payment-file-view";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
@@ -505,8 +506,10 @@ export class MoneyService {
   /** What we still owe each factory across all orders that are not cancelled (people who see costs). */
   async payables(user: SessionUser, mine: boolean) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+    // Only orders where a factory may still be owed (worked out in the database), not every order ever.
+    const owing = await ordersOwingFactories(this.prisma);
     const orders = await this.prisma.db.order.findMany({
-      where: { status: { not: "cancelled" } },
+      where: { status: { not: "cancelled" }, id: { in: owing } },
       select: {
         id: true,
         refNo: true,

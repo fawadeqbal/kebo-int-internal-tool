@@ -21,6 +21,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx scripts/seed.ts",
+    "db:load-data": "tsx scripts/load-data.ts",
     "db:import-legacy": "tsx scripts/import-legacy.ts",
     "db:studio": "prisma studio",
     "build": "prisma generate && tsup",

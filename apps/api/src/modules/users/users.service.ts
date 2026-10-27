@@ -60,10 +60,14 @@ export class UsersService {
 
   /** One atomic statement: parallel failures all count, and a failure never lifts a lock. */
   async registerFailure(userId: string) {
+    // The lock's end is worked out here and sent like any date the app writes: the database's now()
+    // would be read back shifted by its TimeZone (the Prisma adapter reads timestamps in it), which
+    // made a 15-minute lock last hours on a server set to Asia/Shanghai.
+    const until = new Date(Date.now() + LOCK_MINUTES * 60_000);
     await this.prisma.db.$executeRaw`
       update users set
         failed_logins = case when failed_logins + 1 >= ${MAX_FAILED_LOGINS} then 0 else failed_logins + 1 end,
-        locked_until = case when failed_logins + 1 >= ${MAX_FAILED_LOGINS} then now() + make_interval(mins => ${LOCK_MINUTES}) else locked_until end
+        locked_until = case when failed_logins + 1 >= ${MAX_FAILED_LOGINS} then ${until} else locked_until end
       where id = ${userId}::uuid`;
   }
 
