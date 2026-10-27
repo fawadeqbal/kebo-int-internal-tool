@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Factory,
-  Bell,
   Banknote,
   BarChart3,
+  Bell,
   Building2,
   ClipboardList,
+  Factory,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -21,6 +21,7 @@ import {
   ScrollText,
   Search,
   Settings,
+  ShieldCheck,
   Sun,
   User,
   Users,
@@ -54,6 +55,7 @@ const ICONS = {
   users: Users,
   settings: Settings,
   audit: ScrollText,
+  security: ShieldCheck,
 };
 
 const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);

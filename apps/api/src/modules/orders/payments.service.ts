@@ -55,7 +55,7 @@ export class PaymentsService {
 
   /** Money in from the customer, in the order's currency; never more than is still due. */
   async record(user: SessionUser, orderId: string, input: PaymentInput) {
-    if (!can(user.role, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
+    if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
     const event = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
@@ -92,7 +92,7 @@ export class PaymentsService {
 
   /** A payment typed wrong (amount, date, reference): changed with a reason, kept in the order's history. */
   async edit(user: SessionUser, paymentId: string, input: EditPaymentInput) {
-    if (!can(user.role, "payments.record")) throw new ForbiddenError("Only accounts (managers) can change payments.");
+    if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can change payments.");
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
     const p = await this.prisma.db.payment.findUnique({ where: { id: paymentId } });
     if (!p) throw new NotFoundError("Payment");
@@ -125,7 +125,7 @@ export class PaymentsService {
 
   /** A payment recorded by mistake. It stays visible, crossed out. */
   async void(user: SessionUser, paymentId: string, reason: string) {
-    if (!can(user.role, "orders.manage")) throw new ForbiddenError("Only a manager can remove a payment.");
+    if (!can(user, "orders.manage")) throw new ForbiddenError("Only a manager can remove a payment.");
     const p = await this.prisma.db.payment.findUnique({ where: { id: paymentId } });
     if (!p) throw new NotFoundError("Payment");
     const o = await this.orders.load(user, p.orderId);

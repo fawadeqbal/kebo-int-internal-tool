@@ -9,6 +9,11 @@ import {
   stageAfter,
   supersededBy,
   can,
+  PERMISSION_GROUPS,
+  PERMISSIONS,
+  permissionsOfRole,
+  PRESET_ROLES,
+  deviceOf,
   inquiryInput,
   revisionInput,
   stageMoveInput,
@@ -119,13 +124,29 @@ describe("order stages", () => {
 });
 
 describe("permissions", () => {
+  const as = (key: "admin" | "manager" | "staff") => ({ permissions: permissionsOfRole(PRESET_ROLES[key]) });
   it("lets staff move their orders but not record payments or cancel", () => {
-    expect(can("staff", "orders.update")).toBe(true);
-    expect(can("staff", "payments.record")).toBe(false);
-    expect(can("staff", "orders.manage")).toBe(false);
-    expect(can("manager", "payments.record")).toBe(true);
-    expect(can("manager", "users.manage")).toBe(false);
-    expect(can("admin", "users.manage")).toBe(true);
+    expect(can(as("staff"), "orders.update")).toBe(true);
+    expect(can(as("staff"), "payments.record")).toBe(false);
+    expect(can(as("staff"), "orders.manage")).toBe(false);
+    expect(can(as("manager"), "payments.record")).toBe(true);
+    expect(can(as("manager"), "users.manage")).toBe(false);
+    expect(can(as("manager"), "security.manage")).toBe(false);
+    expect(can(as("admin"), "security.manage")).toBe(true);
+    expect(can(null, "dashboard.view")).toBe(false);
+  });
+
+  it("gives the Super Admin everything and ignores unknown permissions", () => {
+    expect(permissionsOfRole({ superAdmin: true, permissions: [] })).toEqual([...PERMISSIONS]);
+    expect(permissionsOfRole({ superAdmin: false, permissions: ["reports.view", "gone.away", "dashboard.view"] })).toEqual([
+      "dashboard.view",
+      "reports.view",
+    ]);
+  });
+
+  it("lists every permission once in the role editor's groups", () => {
+    const listed = PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.permission));
+    expect([...listed].sort()).toEqual([...PERMISSIONS].sort());
   });
 });
 
@@ -286,5 +307,26 @@ describe("proforma numbers", () => {
     expect(customerLetters("Société Générale SARL")).toBe("SG");
     expect(customerLetters("Kampala Juices mvpx")).toBe("KJ");
     expect(customerLetters("北京")).toBe("XX");
+  });
+});
+
+describe("devices", () => {
+  it("names the browser or app and the system", () => {
+    expect(
+      deviceOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"),
+    ).toBe("Chrome on Windows");
+    expect(
+      deviceOf(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+      ),
+    ).toBe("Edge on Windows");
+    expect(
+      deviceOf(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+      ),
+    ).toBe("Safari on iPhone");
+    expect(deviceOf("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:131.0) Gecko/20100101 Firefox/131.0")).toBe("Firefox on Mac");
+    expect(deviceOf("Dart/3.5 (dart:io)")).toBe("Kebo app");
+    expect(deviceOf(null)).toBe("Unknown device");
   });
 });

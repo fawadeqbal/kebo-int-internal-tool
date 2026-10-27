@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { codeInput, newUserInput, passwordChangeInput, passwordRule, userInput, UsersService } from "./users.service";
 
@@ -71,18 +71,21 @@ export class AccountController {
     return { ok: true, message: "Password changed. Your other devices are signed out." };
   }
 
+  @AllowDuringTwoStepSetup()
   @Get("two-step")
   twoStep(@CurrentUser() actor: SessionUser) {
     return this.users.twoStepStatus(actor);
   }
 
   /** Start setup: returns the secret and the otpauth:// link for the QR code. */
+  @AllowDuringTwoStepSetup()
   @Post("two-step/setup")
   @HttpCode(200)
   setup(@CurrentUser() actor: SessionUser) {
     return this.users.startTwoStep(actor);
   }
 
+  @AllowDuringTwoStepSetup()
   @Post("two-step/confirm")
   @HttpCode(200)
   confirm(@CurrentUser() actor: SessionUser, @Body(Validate(codeInput)) body: { code: string }) {

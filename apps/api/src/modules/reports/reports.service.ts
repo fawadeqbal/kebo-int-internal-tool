@@ -35,7 +35,7 @@ export class ReportsService {
   async dashboard(user: SessionUser) {
     const today = this.clock.today();
     const s = await this.settings.get();
-    const manager = can(user.role, "inquiries.viewAll");
+    const manager = can(user, "inquiries.viewAll");
     const scope: Prisma.InquiryWhereInput = { deletedAt: null, ...inquiryAccess(user) };
     const open = { ...scope, stage: { in: [...OPEN_STAGES] } };
     const deal = { id: true, refNo: true, title: true, stage: true, onHold: true, requiredBy: true, priority: true, customer: { select: { id: true, name: true } }, assignee: { select: { id: true, name: true } } } as const;
@@ -107,25 +107,31 @@ export class ReportsService {
 
   /** Open deals and orders per person, and their late order steps. */
   private async workload() {
-    const people = await this.prisma.db.user.findMany({ where: { isActive: true, isSystem: false }, select: { id: true, name: true, role: true }, orderBy: { name: "asc" } });
+    const people = await this.prisma.db.user.findMany({
+      where: { isActive: true, isSystem: false },
+      select: { id: true, name: true, role: true, access: { select: { superAdmin: true, permissions: true } } },
+      orderBy: { name: "asc" },
+    });
     const [deals, orders] = await Promise.all([
       this.prisma.db.inquiry.groupBy({ by: ["assigneeId"], where: { deletedAt: null, stage: { in: [...OPEN_STAGES] } }, _count: true }),
       this.prisma.db.order.findMany({ where: { status: "open" }, select: { inquiry: { select: { assigneeId: true } } } }),
     ]);
     return people
-      .map((p) => ({
+      .map(({ access, ...p }) => ({
         ...p,
+        /** Works only their own deals (no "see every deal"): always listed, even with nothing open. */
+        ownWork: !access.superAdmin && !access.permissions.includes("inquiries.viewAll"),
         openDeals: deals.find((d) => d.assigneeId === p.id)?._count ?? 0,
         openOrders: orders.filter((o) => o.inquiry.assigneeId === p.id).length,
       }))
-      .filter((p) => p.openDeals || p.openOrders || p.role === "staff")
+      .filter((p) => p.openDeals || p.openOrders || p.ownWork)
       .sort((a, b) => b.openDeals + b.openOrders - (a.openDeals + a.openOrders));
   }
 
   /* ---------------------------------------------------------------- reports */
 
   async report(user: SessionUser, r: Range, staffId?: string) {
-    if (!can(user.role, "reports.view")) throw new ForbiddenError();
+    if (!can(user, "reports.view")) throw new ForbiddenError();
     const { sales } = await this.settings.get();
     const main = sales.currency;
     const toMain = (minor: number, currency: string) => {
@@ -227,7 +233,7 @@ export class ReportsService {
   /* ---------------------------------------------------------------- audit */
 
   async audit(user: SessionUser, q: { entityType?: string; entityId?: string; userId?: string; page: number; pageSize: number }) {
-    if (!can(user.role, "audit.view")) throw new ForbiddenError();
+    if (!can(user, "audit.view")) throw new ForbiddenError();
     const where: Prisma.AuditLogWhereInput = { ...(q.entityType ? { entityType: q.entityType } : {}), ...(q.entityId ? { entityId: q.entityId } : {}), ...(q.userId ? { userId: q.userId } : {}) };
     const [rows, total] = await Promise.all([
       this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),

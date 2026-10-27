@@ -130,7 +130,7 @@ export class QuotationsService {
     const { sales } = await this.settings.get();
     const items = await this.items(db, inquiryId);
     const refs = items.map((i) => ({ id: i.id, parentId: i.parentId, no: i.no }));
-    const quotes = can(user.role, "sourcing.manage")
+    const quotes = can(user, "sourcing.manage")
       ? await db.factoryQuote.findMany({
           // An offer still being typed in (no lines yet) cannot be offered.
           where: { inquiryId, deletedAt: null, lines: { some: {} } },
@@ -196,7 +196,7 @@ export class QuotationsService {
   /* ---------------------------------------------------------------- reading */
 
   private optionView(user: SessionUser, o: OptionRow, items: { id: string; parentId: string | null; no: string }[]) {
-    const seeCosts = can(user.role, "sourcing.manage");
+    const seeCosts = can(user, "sourcing.manage");
     const no = numbersOf(o.lines);
     const costing = seeCosts
       ? costSummary(
@@ -401,7 +401,7 @@ export class QuotationsService {
   /* ---------------------------------------------------------------- writing revisions */
 
   private assertCan(user: SessionUser) {
-    if (!can(user.role, "quotations.manage")) throw new ForbiddenError("You cannot make quotations.");
+    if (!can(user, "quotations.manage")) throw new ForbiddenError("You cannot make quotations.");
   }
 
   /**
@@ -426,7 +426,7 @@ export class QuotationsService {
       };
       const lines: Omit<Prisma.QuoteLineCreateManyInput, "revisionId" | "optionId" | "lineTotal">[] = [];
       if (o.factoryQuoteId) {
-        if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can quote a factory's offer.");
+        if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can quote a factory's offer.");
         if (seen.has(o.factoryQuoteId)) throw new DomainError("Each option must be a different factory's offer.");
         seen.add(o.factoryQuoteId);
         const q = await tx.factoryQuote.findFirst({

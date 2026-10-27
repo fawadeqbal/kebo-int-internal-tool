@@ -8,14 +8,22 @@ export interface Me {
   id: string;
   name: string;
   email: string;
+  /** The role's key, and its name as it is now. */
   role: Role;
+  roleName: string;
   permissions: Permission[];
+  /** Their role needs two-step sign-in and they have not set it up: only the setup page is open. */
+  twoStepSetupRequired: boolean;
 }
+
+export const TWO_STEP_SETUP_PATH = "/login/set-up-two-step";
 
 /** The signed-in person (once per request), or off to the sign-in page. */
 export const requireUser = cache(async (): Promise<Me> => {
   try {
-    return await api.get<Me>("/auth/me");
+    const me = await api.get<Me>("/auth/me");
+    if (me.twoStepSetupRequired) redirect(TWO_STEP_SETUP_PATH);
+    return me;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) redirect("/login");
     throw e;
@@ -24,7 +32,7 @@ export const requireUser = cache(async (): Promise<Me> => {
 
 export async function requirePermission(permission: Permission) {
   const me = await requireUser();
-  if (!can(me.role, permission)) redirect("/forbidden");
+  if (!can(me, permission)) redirect("/forbidden");
   return me;
 }
 

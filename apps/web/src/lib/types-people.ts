@@ -1,4 +1,4 @@
-import type { CustomerType, InquiryStage, OrderStatus, Role } from "@kebo/shared";
+import type { CustomerType, InquiryStage, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
@@ -86,6 +86,7 @@ export interface UserRow {
   name: string;
   email: string;
   role: Role;
+  access: { name: string; superAdmin: boolean; requireTwoStep: boolean };
   isActive: boolean;
   lastLoginAt: string | null;
   totpEnabledAt: string | null;
@@ -96,6 +97,69 @@ export interface TwoStepStatus {
   on: boolean;
   since: string | null;
   recoveryCodesLeft: number;
+  /** Their role needs it: it cannot be turned off. */
+  required: boolean;
+  roleName: string;
+}
+
+/* ---------------------------------------------------------------- security */
+
+/** GET /roles */
+export interface RoleRow {
+  key: string;
+  name: string;
+  description: string | null;
+  permissions: Permission[];
+  superAdmin: boolean;
+  /** Admin, Manager, Staff: cannot be removed. */
+  preset: boolean;
+  requireTwoStep: boolean;
+  /** Active people in it, and how many of them have no two-step sign-in. */
+  people: number;
+  withoutTwoStep: number;
+  /** The signed-in person may give this role (it allows nothing more than theirs). */
+  givable: boolean;
+}
+
+/** GET /roles/:key */
+export interface RoleDetail extends RoleRow {
+  members: { id: string; name: string; email: string; isActive: boolean; totpEnabledAt: string | null; lastLoginAt: string | null }[];
+}
+
+/** GET /security/overview */
+export interface SecurityOverview {
+  liveSessions: number;
+  people: number;
+  withTwoStep: number;
+  failedLastDay: number;
+  blockedIpsLastDay: number;
+  mustSetUp: { id: string; name: string; role: string }[];
+}
+
+/** A signed-in browser or phone (GET /security/sessions, GET /me/sessions). */
+export interface SessionRow {
+  id: string;
+  user: { id: string; name: string; email: string };
+  device: string;
+  userAgent: string | null;
+  ip: string | null;
+  signedInAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  waitingForCode: boolean;
+  current: boolean;
+}
+
+/** One sign-in attempt (GET /security/sign-ins, GET /me/sign-ins). */
+export interface SignInRow {
+  id: string;
+  at: string;
+  email: string;
+  user: { id: string; name: string } | null;
+  result: SignInResult;
+  detail: string | null;
+  ip: string;
+  device: string;
 }
 
 export interface AuditRow {

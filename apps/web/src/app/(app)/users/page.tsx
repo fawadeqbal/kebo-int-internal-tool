@@ -48,7 +48,7 @@ export default async function UsersPage() {
                   </Link>
                 </Td>
                 <Td>
-                  <RoleBadge role={u.role} />
+                  <RoleBadge name={u.access.name} superAdmin={u.access.superAdmin} />
                 </Td>
                 <Td>{u.isActive ? <Badge tone="ok" dot>Active</Badge> : <Badge tone="outline">Switched off</Badge>}</Td>
                 <Td>
@@ -56,6 +56,8 @@ export default async function UsersPage() {
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-ok">
                       <ShieldCheck className="size-3.5" aria-hidden /> On
                     </span>
+                  ) : u.access.requireTwoStep && u.isActive ? (
+                    <span className="text-xs font-medium text-warn">Must set up</span>
                   ) : (
                     <span className="text-xs text-muted">Off</span>
                   )}

@@ -65,7 +65,7 @@ export class MoneyService {
   ) {}
 
   private assertExpenses(user: SessionUser) {
-    if (!can(user.role, "expenses.manage")) throw new ForbiddenError("Only managers can see expenses and profit.");
+    if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can see expenses and profit.");
   }
 
   /** Units of `from` per one unit of `to` from Settings, or the rate given; refuses a missing rate instead of using 1:1. */
@@ -141,8 +141,8 @@ export class MoneyService {
     const planSum = planTotalMinor(plan);
     const next = plan.find((p) => p.status !== "paid") ?? null;
 
-    const seeCosts = can(user.role, "sourcing.manage");
-    const seeExpenses = can(user.role, "expenses.manage");
+    const seeCosts = can(user, "sourcing.manage");
+    const seeExpenses = can(user, "expenses.manage");
 
     // Factories: owed from the order's lines, paid from the factory payments (same currency only).
     const owed = this.owedByFactory(o.lines);
@@ -223,7 +223,7 @@ export class MoneyService {
         matchesTotal: planSum === totalMinor,
         difference: fromMinor(totalMinor - planSum),
         next: next && { label: next.label, open: fromMinor(next.openMinor), dueOn: next.dueOn, status: next.status },
-        canEdit: can(user.role, "orders.update") && o.status !== "cancelled",
+        canEdit: can(user, "orders.update") && o.status !== "cancelled",
       },
       factories: seeCosts
         ? {
@@ -244,7 +244,7 @@ export class MoneyService {
               note: p.note,
               voided: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
             })),
-            canRecord: can(user.role, "payments.record") && o.status !== "cancelled",
+            canRecord: can(user, "payments.record") && o.status !== "cancelled",
           }
         : null,
       expenses: seeExpenses ? o.expenses.map((e) => this.expenseView(e)) : null,
@@ -275,7 +275,7 @@ export class MoneyService {
    * the customer has paid something, changing the plan says why.
    */
   async setPlan(user: SessionUser, orderId: string, input: PaymentPlanInput) {
-    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
       const o = await this.orders.load(user, orderId, tx);
@@ -342,7 +342,7 @@ export class MoneyService {
   }
 
   async recordFactoryPayment(user: SessionUser, orderId: string, input: FactoryPaymentInput) {
-    if (!can(user.role, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
+    if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
     const o = await this.orders.load(user, orderId);
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     const { factoryName, ...data } = await this.factoryPaymentData(o, input);
@@ -360,7 +360,7 @@ export class MoneyService {
   }
 
   private async findFactoryPayment(user: SessionUser, id: string) {
-    if (!can(user.role, "payments.record")) throw new ForbiddenError("Only accounts (managers) can change payments.");
+    if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can change payments.");
     const p = await this.prisma.db.factoryPayment.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
     if (!p) throw new NotFoundError("Payment");
     const o = await this.orders.load(user, p.orderId);
@@ -420,7 +420,7 @@ export class MoneyService {
 
   /** What we still owe each factory across all orders that are not cancelled (people who see costs). */
   async payables(user: SessionUser, mine: boolean) {
-    if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
     const orders = await this.prisma.db.order.findMany({
       where: { status: { not: "cancelled" } },
       select: {

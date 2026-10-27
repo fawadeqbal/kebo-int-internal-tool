@@ -18,7 +18,11 @@ export class NotFoundError extends DomainError {
 }
 
 export class ForbiddenError extends DomainError {
-  constructor(message = "You do not have permission to do this.") {
+  /** `code` lets the UI offer the way in (e.g. "two_step_setup": set up two-step sign-in first). */
+  constructor(
+    message = "You do not have permission to do this.",
+    public readonly code?: string,
+  ) {
     super(message);
     this.name = "ForbiddenError";
   }

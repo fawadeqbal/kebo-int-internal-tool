@@ -12,12 +12,21 @@ import type {
   PaymentMethod,
   Priority,
   RevisionStatus,
-  Role,
+  SignInResult,
 } from "./enums";
 
 /** The words people see, in one place, so anything can be renamed without touching logic. */
 
-export const ROLE_LABEL: Record<Role, string> = { admin: "Super Admin", manager: "Manager", staff: "Staff" };
+export const SIGN_IN_RESULT_LABEL: Record<SignInResult, string> = {
+  signed_in: "Signed in",
+  code_needed: "Password right, code asked",
+  wrong_password: "Wrong password",
+  unknown_email: "Unknown email",
+  wrong_code: "Wrong two-step code",
+  locked: "Account locked",
+  switched_off: "Account switched off",
+  too_many: "Too many attempts",
+};
 
 export const INQUIRY_STAGE_LABEL: Record<InquiryStage, string> = {
   new: "New",

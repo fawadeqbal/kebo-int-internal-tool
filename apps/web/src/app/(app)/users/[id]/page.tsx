@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { can } from "@kebo/shared";
 import { ShieldCheck } from "lucide-react";
 import { Avatar, Badge, Card, CardBody, CardHeader, DetailList, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { dateTime } from "@/lib/format";
-import type { UserRow } from "@/lib/types-people";
+import type { RoleRow, UserRow } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { RoleBadge } from "@/components/people/role-badge";
 import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserAction } from "../actions";
@@ -16,7 +18,7 @@ export const metadata = { title: "Person" };
 export default async function UserPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requirePermission("users.manage");
-  const users = await api.get<UserRow[]>("/users");
+  const [users, roles] = await Promise.all([api.get<UserRow[]>("/users"), api.get<RoleRow[]>("/roles")]);
   const u = users.find((x) => x.id === id);
   if (!u) notFound();
   const isMe = u.id === me.id;
@@ -29,7 +31,7 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
           <span className="flex flex-wrap items-center gap-2.5">
             <Avatar name={u.name} size={32} />
             {u.name}
-            <RoleBadge role={u.role} />
+            <RoleBadge name={u.access.name} superAdmin={u.access.superAdmin} />
             {!u.isActive && <Badge tone="outline">Switched off</Badge>}
           </span>
         }
@@ -39,7 +41,7 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
         <Card>
           <CardHeader title="Details" description="Name, sign-in email and what they may do" />
           <CardBody>
-            <EditUserForm action={updateUserAction.bind(null, u.id)} user={u} isMe={isMe} />
+            <EditUserForm action={updateUserAction.bind(null, u.id)} user={u} roles={roles} isMe={isMe} />
           </CardBody>
         </Card>
         <div className="flex flex-col gap-5">
@@ -57,6 +59,8 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
                       <span className="inline-flex items-center gap-1 text-ok">
                         <ShieldCheck className="size-4" aria-hidden /> On since {dateTime(u.totpEnabledAt)}
                       </span>
+                    ) : u.access.requireTwoStep ? (
+                      <span className="text-warn">Off: their role needs it, so they set it up at their next sign-in</span>
                     ) : (
                       "Off"
                     ),
@@ -64,6 +68,16 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
                   { label: "Added", value: dateTime(u.createdAt) },
                 ]}
               />
+              {can(me, "security.manage") && (
+                <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  <Link href={`/security/sessions?person=${u.id}`} className="font-medium text-primary hover:underline">
+                    Where they are signed in
+                  </Link>
+                  <Link href={`/security/sign-ins?person=${u.id}`} className="font-medium text-primary hover:underline">
+                    Their sign-in history
+                  </Link>
+                </p>
+              )}
               {!isMe && (
                 <div className="flex flex-col gap-3 border-t border-line pt-4">
                   {u.isActive ? (

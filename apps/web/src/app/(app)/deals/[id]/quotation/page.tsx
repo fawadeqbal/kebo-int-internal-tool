@@ -34,9 +34,9 @@ export default async function QuotationPage({
   const sp = await searchParams;
   const me = await requireUser();
   const [d, q] = await Promise.all([load(() => api.get<DealDetail>(`/inquiries/${id}`)), load(() => api.get<QuotationView>(`/inquiries/${id}/quotation`))]);
-  const quoter = can(me.role, "quotations.manage");
+  const quoter = can(me, "quotations.manage");
   const manage = quoter && d.allowed.quote;
-  const showCosts = can(me.role, "sourcing.manage");
+  const showCosts = can(me, "sourcing.manage");
   const today = todayIn(TZ);
   const draft = q.revisions.find((r) => r.status === "draft") ?? null;
   // The editor's values and what it can offer (each factory offer, costed in the quotation currency).

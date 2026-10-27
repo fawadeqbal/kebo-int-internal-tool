@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { can, ROLES } from "@kebo/shared";
+import { can, PERMISSION_GROUPS, permissionsOfRole } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -22,13 +22,26 @@ export const passwordRule = z
 export const userInput = z.object({
   name: z.string().trim().min(1, "Enter a name").max(120),
   email: z.email("Enter a valid email").trim().toLowerCase(),
-  role: z.enum(ROLES),
+  /** The role's key (Security → Roles). */
+  role: z.string().trim().min(1, "Choose a role").max(40),
 });
 export const newUserInput = userInput.extend({ password: passwordRule });
 export const passwordChangeInput = z.object({ current: z.string().min(1, "Enter your current password"), next: passwordRule });
 export const codeInput = z.object({ code: z.string().trim().min(6, "Enter the code").max(20) });
 
-const publicUser = { id: true, name: true, email: true, role: true, isActive: true, lastLoginAt: true, totpEnabledAt: true, createdAt: true } as const;
+const publicUser = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  access: { select: { name: true, superAdmin: true, requireTwoStep: true } },
+  isActive: true,
+  lastLoginAt: true,
+  totpEnabledAt: true,
+  createdAt: true,
+} as const;
+
+const LABEL = new Map(PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => [i.permission, i.label] as const)));
 
 /**
  * People and their sign-in: admin management, own password, and two-step
@@ -69,27 +82,74 @@ export class UsersService {
     return this.prisma.db.user.findMany({ where: { isSystem: false, isActive: true }, select: { id: true, name: true, role: true }, orderBy: { name: "asc" } });
   }
 
+  /**
+   * A role the person may hand out, take away, or whose people they may manage:
+   * it allows nothing their own role does not (so People cannot be used to get
+   * round Security). Only a Super Admin gives the Super Admin role or manages a Super Admin.
+   */
+  private async within(actor: SessionUser, key: string, doing: (roleName: string) => string) {
+    const [role, mine] = await Promise.all([
+      this.prisma.db.role.findUnique({ where: { key } }),
+      this.prisma.db.role.findUnique({ where: { key: actor.role } }),
+    ]);
+    if (!role) throw new DomainError("That role no longer exists. Reload and choose another.");
+    if (mine?.superAdmin) return role;
+    if (role.superAdmin) throw new ForbiddenError(`Only a Super Admin can ${doing(role.name)}.`);
+    const more = permissionsOfRole(role).filter((p) => !actor.permissions.includes(p));
+    if (more.length)
+      throw new ForbiddenError(
+        `You cannot ${doing(role.name)}: that role allows more than yours (${more.map((p) => LABEL.get(p) ?? p).join(", ")}).`,
+      );
+    return role;
+  }
+
+  private checkAssignable(actor: SessionUser, key: string) {
+    return this.within(actor, key, (name) => `give the ${name} role`);
+  }
+
+  /** At least one active Super Admin stays. */
+  private async keepASuperAdmin(userId: string) {
+    const others = await this.prisma.db.user.count({
+      where: { access: { superAdmin: true }, isActive: true, isSystem: false, id: { not: userId } },
+    });
+    if (others === 0) throw new DomainError("Keep at least one active Super Admin.");
+  }
+
   async create(actor: SessionUser, input: z.infer<typeof newUserInput>) {
     if (await this.prisma.db.user.findUnique({ where: { email: input.email } })) throw new ConflictError("Someone already uses this email.");
+    const role = await this.checkAssignable(actor, input.role);
     return this.prisma.tx(async (tx) => {
       const user = await tx.user.create({
         data: { name: input.name, email: input.email, role: input.role, passwordHash: await bcrypt.hash(input.password, 12) },
         select: publicUser,
       });
-      await this.audit.record(tx, { userId: actor.id, action: "create", entityType: "user", entityId: user.id, summary: `Added ${input.role} ${input.email}` });
+      await this.audit.record(tx, {
+        userId: actor.id,
+        action: "create",
+        entityType: "user",
+        entityId: user.id,
+        summary: `Added ${role.name} ${input.email}`,
+      });
       return user;
     });
   }
 
+  /** Someone the actor may manage: not a system account, and in a role within the actor's own. */
   private async managed(actor: SessionUser, id: string) {
     const user = await this.prisma.db.user.findFirst({ where: { id, isSystem: false } });
     if (!user) throw new NotFoundError("User");
+    if (user.id !== actor.id) await this.within(actor, user.role, (name) => `change the account of someone with the ${name} role`);
     return user;
   }
 
   async update(actor: SessionUser, id: string, input: z.infer<typeof userInput>) {
     const user = await this.managed(actor, id);
     if (actor.id === id && input.role !== user.role) throw new DomainError("You cannot change your own role.");
+    if (input.role !== user.role) {
+      const next = await this.checkAssignable(actor, input.role);
+      const was = await this.prisma.db.role.findUniqueOrThrow({ where: { key: user.role } });
+      if (was.superAdmin && !next.superAdmin && user.isActive) await this.keepASuperAdmin(id);
+    }
     const clash = await this.prisma.db.user.findFirst({ where: { email: input.email, id: { not: id } } });
     if (clash) throw new ConflictError("Someone already uses this email.");
     return this.prisma.tx(async (tx) => {
@@ -112,10 +172,7 @@ export class UsersService {
   async setActive(actor: SessionUser, id: string, active: boolean) {
     if (actor.id === id) throw new DomainError("You cannot switch off your own account.");
     const user = await this.managed(actor, id);
-    if (!active && user.role === "admin") {
-      const otherAdmins = await this.prisma.db.user.count({ where: { role: "admin", isActive: true, isSystem: false, id: { not: id } } });
-      if (otherAdmins === 0) throw new DomainError("Keep at least one active Super Admin.");
-    }
+    if (!active && (await this.prisma.db.role.findUnique({ where: { key: user.role } }))?.superAdmin) await this.keepASuperAdmin(id);
     await this.prisma.tx(async (tx) => {
       await tx.user.update({ where: { id }, data: { isActive: active } });
       if (!active) await this.revokeSessions(tx, id);
@@ -134,7 +191,7 @@ export class UsersService {
 
   /** When someone lost their phone and recovery codes. Signs them out everywhere. */
   async resetTwoStep(actor: SessionUser, id: string) {
-    if (!can(actor.role, "users.manage")) throw new ForbiddenError();
+    if (!can(actor, "users.manage")) throw new ForbiddenError();
     if (actor.id === id) throw new DomainError("Use My account to change your own two-step sign-in.");
     const user = await this.managed(actor, id);
     await this.prisma.tx(async (tx) => {
@@ -158,8 +215,15 @@ export class UsersService {
   }
 
   async twoStepStatus(actor: SessionUser) {
-    const u = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id } });
-    return { on: !!u.totpEnabledAt, since: u.totpEnabledAt, recoveryCodesLeft: u.recoveryCodes.length };
+    const u = await this.prisma.db.user.findUniqueOrThrow({ where: { id: actor.id }, include: { access: true } });
+    return {
+      on: !!u.totpEnabledAt,
+      since: u.totpEnabledAt,
+      recoveryCodesLeft: u.recoveryCodes.length,
+      /** Their role needs it: it cannot be turned off. */
+      required: u.access.requireTwoStep,
+      roleName: u.access.name,
+    };
   }
 
   /** Start (or restart) setup: a new secret, shown as a QR link until confirmed. */
@@ -206,6 +270,8 @@ export class UsersService {
   }
 
   async turnOffTwoStep(actor: SessionUser, code: string) {
+    const role = await this.prisma.db.role.findUniqueOrThrow({ where: { key: actor.role } });
+    if (role.requireTwoStep) throw new DomainError(`Your role (${role.name}) needs two-step sign-in, so it stays on.`);
     await this.checkOwnCode(actor.id, code);
     await this.prisma.tx(async (tx) => {
       await tx.user.update({ where: { id: actor.id }, data: { totpSecret: null, totpEnabledAt: null, totpLastStep: null, recoveryCodes: [] } });

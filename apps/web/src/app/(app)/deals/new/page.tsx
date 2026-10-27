@@ -51,8 +51,8 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
         categories={settings.sales.categories}
         people={people}
         meId={me.id}
-        canAssignOthers={can(me.role, "inquiries.assign")}
-        canAddCustomer={can(me.role, "customers.manage")}
+        canAssignOthers={can(me, "inquiries.assign")}
+        canAddCustomer={can(me, "customers.manage")}
         addCustomer={quickCustomerAction}
         searchCustomers={searchCustomersAction}
         loadContacts={customerContactsAction}

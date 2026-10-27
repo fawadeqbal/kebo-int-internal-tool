@@ -51,7 +51,7 @@ export class SourcingService {
   ) {}
 
   private assertCan(user: SessionUser) {
-    if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
   }
 
   /** Every offer with its lines (numbered, parts under their line), costs in the selling currency and which items it covers; per item the prices cheapest first. */

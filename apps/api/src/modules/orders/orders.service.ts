@@ -36,7 +36,7 @@ import { requireReason } from "../../common/audit/reason";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
-  if (can(user.role, "inquiries.viewAll")) return {};
+  if (can(user, "inquiries.viewAll")) return {};
   return { inquiry: { OR: [{ assigneeId: user.id }, { createdById: user.id }] } };
 }
 
@@ -204,7 +204,7 @@ export class OrdersService {
    * Money already received stays recorded on the order.
    */
   async cancel(user: SessionUser, id: string, reason: string) {
-    if (!can(user.role, "orders.manage")) throw new ForbiddenError("Only a manager can cancel an order.");
+    if (!can(user, "orders.manage")) throw new ForbiddenError("Only a manager can cancel an order.");
     const events = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
@@ -235,7 +235,7 @@ export class OrdersService {
    * KEB260916TN07. Once issued the number does not change.
    */
   async issueProforma(user: SessionUser, id: string) {
-    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot issue proformas.");
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot issue proformas.");
     const { company } = await this.settings.get();
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
@@ -441,7 +441,7 @@ export class OrdersService {
    * see factory prices. The deal's URS and documents are the deal's files.
    */
   private async factoryFilesOf(user: SessionUser, orderId: string) {
-    if (!can(user.role, "sourcing.manage")) return [];
+    if (!can(user, "sourcing.manage")) return [];
     const quotes = await this.prisma.db.factoryQuote.findMany({
       where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId } } } } } } },
       select: { id: true, factory: { select: { name: true } } },
@@ -526,7 +526,7 @@ export class OrdersService {
    * closes the order; moving back from Done reopens it.
    */
   async moveStage(user: SessionUser, id: string, input: MoveStageInput) {
-    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     const today = this.clock.today();
     if (input.shippedOn && input.shippedOn > today) throw new DomainError("The ship date cannot be in the future.");
     const event = await this.prisma.tx(async (tx) => {
@@ -536,7 +536,7 @@ export class OrdersService {
       const m = this.moneyOf(o);
       const check = checkMove(o.stage, input.to, o.status, { ...m, goods: goodsOf(o.lines, o.packedAt) });
       if (!check.ok) throw new GateError(check.message, check.code);
-      if (check.warnings.some((w) => w.code === "money_due") && !can(user.role, "orders.manage")) {
+      if (check.warnings.some((w) => w.code === "money_due") && !can(user, "orders.manage")) {
         throw new GateError(
           `${check.warnings.find((w) => w.code === "money_due")!.message} Record the payment first, or ask a manager to close it.`,
           "manager_needed",
@@ -632,7 +632,7 @@ export class OrdersService {
 
   /** How many of each goods line came in from the factory so far (totals, not additions). */
   async recordReceipt(user: SessionUser, id: string, input: ReceiptInput) {
-    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     const today = this.clock.today();
     const on = input.on ?? today;
     if (on > today) throw new DomainError("The date cannot be in the future.");
@@ -671,7 +671,7 @@ export class OrdersService {
 
   /** The packing list: packages, weights and volume per goods line, the container and the shipping marks. */
   async savePacking(user: SessionUser, id: string, input: PackingInput) {
-    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     await this.prisma.tx(async (tx) => {
       const { o, byId } = await this.goodsLinesFor(
         tx,
@@ -717,7 +717,7 @@ export class OrdersService {
 
   /** Dates and the B/L number, editable at any stage. Only the fields sent change; an empty one is cleared. */
   async setDetails(user: SessionUser, id: string, input: OrderDetailsInput) {
-    if (!can(user.role, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     if (input.shippedOn && input.shippedOn > this.clock.today()) throw new DomainError("The ship date cannot be in the future.");
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;

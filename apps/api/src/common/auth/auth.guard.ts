@@ -1,10 +1,17 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { can, type Permission } from "@kebo/shared";
+import { can, permissionsOfRole, type Permission } from "@kebo/shared";
 import { ForbiddenError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
-import { IS_PUBLIC, PERMISSIONS } from "./decorators";
-import { SESSION_COOKIE, SESSION_MAX_AGE_DAYS, SESSION_TTL_SECONDS, TokensService, sessionCookieOptions, tokenFrom } from "./tokens.service";
+import { IS_PUBLIC, PERMISSIONS, SETUP_ALLOWED } from "./decorators";
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_DAYS,
+  SESSION_TTL_SECONDS,
+  TokensService,
+  sessionCookieOptions,
+  tokenFrom,
+} from "./tokens.service";
 import type { SessionUser } from "./session-user";
 
 const SLIDE_EVERY_MS = 60 * 60 * 1000;
@@ -31,7 +38,10 @@ export class AuthGuard implements CanActivate {
     const claims = await this.tokens.verify(token);
     if (!claims) throw new UnauthorizedException("Please sign in.");
 
-    const session = await this.prisma.db.session.findUnique({ where: { id: claims.sessionId }, include: { user: true } });
+    const session = await this.prisma.db.session.findUnique({
+      where: { id: claims.sessionId },
+      include: { user: { include: { access: true } } },
+    });
     const now = Date.now();
     if (
       !session ||
@@ -52,11 +62,26 @@ export class AuthGuard implements CanActivate {
         ctx.switchToHttp().getResponse().cookie(SESSION_COOKIE, token, sessionCookieOptions());
       }
     }
-    const user: SessionUser = { id: session.user.id, name: session.user.name, email: session.user.email, role: session.user.role, sessionId: session.id };
+    const u = session.user;
+    const user: SessionUser = {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      roleName: u.access.name,
+      permissions: permissionsOfRole(u.access),
+      twoStepSetupRequired: u.access.requireTwoStep && !u.totpEnabledAt,
+      sessionId: session.id,
+    };
     req.user = user;
 
+    // The role needs two-step sign-in and they have not set it up: only the setup is open to them.
+    if (user.twoStepSetupRequired && !this.reflector.getAllAndOverride<boolean>(SETUP_ALLOWED, targets)) {
+      throw new ForbiddenError(`Your role (${u.access.name}) needs two-step sign-in. Set it up to carry on.`, "two_step_setup");
+    }
+
     const required = this.reflector.getAllAndOverride<Permission[] | undefined>(PERMISSIONS, targets) ?? [];
-    const missing = required.filter((p) => !can(user.role, p));
+    const missing = required.filter((p) => !can(user, p));
     if (missing.length) throw new ForbiddenError();
     return true;
   }

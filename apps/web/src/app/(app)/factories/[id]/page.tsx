@@ -17,7 +17,7 @@ export default async function FactoryPage({ params }: { params: Promise<{ id: st
   const me = await requirePermission("sourcing.manage");
   const f = await load(() => api.get<FactoryDetail>(`/factories/${id}`));
   const history = await api.get<HistoryEntry[]>("/history", { type: "factory", id });
-  const canRemove = can(me.role, "inquiries.updateAny");
+  const canRemove = can(me, "inquiries.updateAny");
   return (
     <div>
       <PageHeader

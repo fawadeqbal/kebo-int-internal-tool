@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { can, ROLE_LABEL } from "@kebo/shared";
+import { can } from "@kebo/shared";
 import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -9,7 +9,7 @@ import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const me = await requireUser();
   const [{ unread }, settings] = await Promise.all([api.get<{ unread: number }>("/notifications", { take: 1 }), api.get<{ company: { name: string } }>("/settings")]);
-  const has = (p: Parameters<typeof can>[1]) => can(me.role, p);
+  const has = (p: Parameters<typeof can>[1]) => can(me, p);
 
   const work: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ];
   const admin: NavItem[] = [
     ...(has("users.manage") ? [{ href: "/users", label: "Users", icon: "users" } as NavItem] : []),
+    ...(has("security.manage") ? [{ href: "/security", label: "Security", icon: "security" } as NavItem] : []),
     ...(has("settings.manage") ? [{ href: "/settings", label: "Settings", icon: "settings" } as NavItem] : []),
     ...(has("audit.view") ? [{ href: "/audit", label: "Audit log", icon: "audit" } as NavItem] : []),
   ];
@@ -32,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      <AppShell groups={groups} companyName={settings.company.name} user={{ name: me.name, email: me.email, role: ROLE_LABEL[me.role] }} unread={unread} canCreate={has("inquiries.create")}>
+      <AppShell groups={groups} companyName={settings.company.name} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {children}
       </AppShell>
       <Suspense>

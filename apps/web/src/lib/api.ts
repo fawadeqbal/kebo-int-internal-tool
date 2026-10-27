@@ -1,5 +1,6 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 /**
  * The only way the web app talks to the API: on the server, with the person's
@@ -42,8 +43,28 @@ function url(path: string, query?: Query) {
   return u.toString();
 }
 
+/**
+ * The browser behind this request, passed on so the API records the person's
+ * own device and address (sessions, sign-in history) rather than this server's.
+ * The proxy in front sets X-Forwarded-For; the API trusts only its last hop (TRUST_PROXY).
+ */
+async function client(): Promise<Record<string, string>> {
+  try {
+    const h = await headers();
+    const out: Record<string, string> = {};
+    const ua = h.get("user-agent");
+    const xff = h.get("x-forwarded-for");
+    if (ua) out["user-agent"] = ua;
+    if (xff) out["x-forwarded-for"] = xff;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 export async function apiFetch(path: string, init: RequestInit & { query?: Query; auth?: boolean } = {}): Promise<Response> {
   const headers = new Headers(init.headers);
+  for (const [k, v] of Object.entries(await client())) if (!headers.has(k)) headers.set(k, v);
   const t = init.auth === false ? undefined : await token();
   if (t) headers.set("authorization", `Bearer ${t}`);
   if (init.body && typeof init.body === "string") headers.set("content-type", "application/json");
@@ -52,6 +73,8 @@ export async function apiFetch(path: string, init: RequestInit & { query?: Query
 
 async function parse<T>(res: Response): Promise<T> {
   const body = res.status === 204 ? null : await res.json().catch(() => null);
+  // Their role needs two-step sign-in and they have not set it up: off to the setup, wherever they were.
+  if (res.status === 403 && body?.code === "two_step_setup") redirect("/login/set-up-two-step");
   if (!res.ok) throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`, body ?? {});
   return body as T;
 }

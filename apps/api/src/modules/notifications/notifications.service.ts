@@ -40,8 +40,14 @@ export class NotificationsService implements OnModuleInit {
 
   /* ---------------------------------------------------------------- sending */
 
+  /** The people who get the managers' reminders: the Super Admin and every role that sees every deal. */
   async managerIds(db: PrismaService["db"] | Tx = this.prisma.db) {
-    return (await db.user.findMany({ where: { role: { in: ["admin", "manager"] }, isActive: true, isSystem: false }, select: { id: true } })).map((u) => u.id);
+    return (
+      await db.user.findMany({
+        where: { access: { OR: [{ superAdmin: true }, { permissions: { has: "inquiries.viewAll" } }] }, isActive: true, isSystem: false },
+        select: { id: true },
+      })
+    ).map((u) => u.id);
   }
 
   /** Store for each person (once per dedupe key) and push to their phones. Returns how many were new. */

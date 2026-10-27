@@ -43,7 +43,7 @@ type Search = { tab?: string; year?: string; view?: string; month?: string; kind
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requirePermission("sourcing.manage");
   const sp = await searchParams;
-  const managers = can(me.role, "expenses.manage");
+  const managers = can(me, "expenses.manage");
   const tab = managers ? (sp.tab === "expenses" || sp.tab === "owe" ? sp.tab : "pnl") : "owe";
   const today = todayIn(TZ);
   const tabs = [

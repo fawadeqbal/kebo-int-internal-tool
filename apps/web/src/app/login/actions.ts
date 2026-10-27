@@ -16,7 +16,7 @@ export async function loginAction(_prev: ActionState, form: FormData): Promise<A
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return { ok: false, message: body.error ?? "Could not sign in.", errors: body.fieldErrors, values: { email } };
   (await cookies()).set(SESSION_COOKIE, body.token, cookieOptions(body.expiresInSeconds));
-  redirect(body.twoStepRequired ? `/login/two-step?next=${encodeURIComponent(safeNext(form.get("next")))}` : safeNext(form.get("next")));
+  redirect(body.twoStepRequired ? `/login/two-step?next=${encodeURIComponent(safeNext(form.get("next")))}` : body.twoStepSetupRequired ? "/login/set-up-two-step" : safeNext(form.get("next")));
 }
 
 export async function twoStepAction(_prev: ActionState, form: FormData): Promise<ActionState> {
