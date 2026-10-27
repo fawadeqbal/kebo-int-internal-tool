@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, OctagonAlert } from "lucide-react";
-import { Alert, buildHref, Card, CardBody, CardHeader, cn, PageHeader, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, buildHref, Card, CardBody, CardHeader, cn, LinkTabs, PageHeader, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
@@ -126,7 +126,12 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
   await requirePermission("expenses.manage");
   const sp = await searchParams;
   const today = todayIn(TZ);
-  const r = await api.get<LeaksReport>("/reports/leaks", { from: isDay(sp.from) ? sp.from : undefined, to: isDay(sp.to) ? sp.to : undefined });
+  const from = isDay(sp.from) ? sp.from : undefined;
+  const to = isDay(sp.to) ? sp.to : undefined;
+  const r = await api.get<LeaksReport>("/reports/leaks", { from, to });
+  const views = ["attention", "deals", "orders", "customers", "spending"] as const;
+  const view = (views as readonly string[]).includes(sp.view ?? "") ? (sp.view as (typeof views)[number]) : "attention";
+  const href = (v: string) => buildHref("/reports/money", { from, to }, { view: v === "attention" ? undefined : v });
   const c = r.currency;
   const s = r.summary;
   const maxReason = Math.max(1, ...r.lostReasons.map((x) => x.deals));
@@ -139,7 +144,11 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
       <div className="mb-5">
         <Segmented
           label="Period"
-          options={ranges(today).map((q) => ({ href: buildHref("/reports/money", {}, { from: q.from, to: q.to }), label: q.label, active: q.from === r.range.from && q.to === r.range.to }))}
+          options={ranges(today).map((q) => ({
+            href: buildHref("/reports/money", { view: view === "attention" ? undefined : view }, { from: q.from, to: q.to }),
+            label: q.label,
+            active: q.from === r.range.from && q.to === r.range.to,
+          }))}
         />
       </div>
       {r.missingRates.length > 0 && (
@@ -148,6 +157,32 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
         </Alert>
       )}
 
+      <section aria-label="Summary" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Figure label="Deals lost" value={String(s.lostDeals)} hint={`${money(s.lostSpent, c)} spent on them`} tone={s.lostDeals ? "bad" : undefined} />
+        <Figure label="Win rate" value={s.winRate === null ? "—" : `${s.winRate}%`} hint="Won ÷ (won + lost)" />
+        <Figure label="Profit planned" value={money(s.planned, c)} hint="Orders placed: value less goods" />
+        <Figure
+          label="Profit kept"
+          value={money(s.actual, c)}
+          hint={s.keptPercent === null ? "After every cost" : `${s.keptPercent}% kept · ${money(s.leaked, c)} went on costs`}
+          tone={Number(s.actual) < 0 ? "bad" : s.keptPercent !== null && s.keptPercent < 75 ? "warn" : "ok"}
+        />
+        <Figure label="Stuck with factories" value={money(s.stuck, c)} hint="Paid to them before the customer paid us" tone={Number(s.stuck) > 0 ? "warn" : undefined} />
+      </section>
+
+      <LinkTabs
+        label="Report sections"
+        className="mb-5"
+        tabs={[
+          { href: href("attention"), label: "Needs attention", count: r.warnings.length || undefined, alert: r.warnings.some((w) => w.level === "bad"), active: view === "attention" },
+          { href: href("deals"), label: "Deals we lose", active: view === "deals" },
+          { href: href("orders"), label: "Profit kept", active: view === "orders" },
+          { href: href("customers"), label: "Customers", active: view === "customers" },
+          { href: href("spending"), label: "Spending and cash", active: view === "spending" },
+        ]}
+      />
+      {view === "attention" && (
+        <>
       <Card className="mb-5">
         <CardHeader title="Needs attention" description="Raised when a deal, an order or a customer crosses a line" />
         {r.warnings.length === 0 ? (
@@ -173,19 +208,10 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
         )}
       </Card>
 
-      <section aria-label="Summary" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Figure label="Deals lost" value={String(s.lostDeals)} hint={`${money(s.lostSpent, c)} spent on them`} tone={s.lostDeals ? "bad" : undefined} />
-        <Figure label="Win rate" value={s.winRate === null ? "—" : `${s.winRate}%`} hint="Won ÷ (won + lost)" />
-        <Figure label="Profit planned" value={money(s.planned, c)} hint="Orders placed: value less goods" />
-        <Figure
-          label="Profit kept"
-          value={money(s.actual, c)}
-          hint={s.keptPercent === null ? "After every cost" : `${s.keptPercent}% kept · ${money(s.leaked, c)} went on costs`}
-          tone={Number(s.actual) < 0 ? "bad" : s.keptPercent !== null && s.keptPercent < 75 ? "warn" : "ok"}
-        />
-        <Figure label="Stuck with factories" value={money(s.stuck, c)} hint="Paid to them before the customer paid us" tone={Number(s.stuck) > 0 ? "warn" : undefined} />
-      </section>
-
+        </>
+      )}
+      {view === "deals" && (
+        <>
       <div className="mb-5 grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader title="Why we lose deals" description="Deals lost in the period and what we had spent on them" />
@@ -237,6 +263,11 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
         </Card>
       </div>
 
+        </>
+      )}
+
+      {view === "orders" && (
+        <>
       <Card className="mb-5 overflow-hidden">
         <CardHeader title="Profit planned against profit kept" description="Orders placed in the period, the biggest leak first: what the quote promised and what costs took after it" />
         {r.orders.length === 0 ? (
@@ -287,16 +318,31 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
         )}
       </Card>
 
+        </>
+      )}
+
+      {view === "customers" && (
+        <>
       <div className="mb-5 grid gap-5 lg:grid-cols-2">
         <CustomerList title="Customers who earn us most" description="Profit from their orders less what was spent on them" rows={r.customers.best} c={c} empty="No customer earned us money in this period yet." />
         <CustomerList title="Customers who cost more than they earn" description="Spent on them more than their orders brought" rows={r.customers.costing} c={c} empty="None: every customer we spent on earned it back." />
       </div>
 
+        </>
+      )}
+
+      {view === "deals" && (
+        <>
       <div className="mb-5 grid gap-5 xl:grid-cols-2">
         <GroupTable title="By person" description="Deals they won and lost, and what was spent to win them" rows={r.byPerson} c={c} />
         <GroupTable title="By product category" description="Where we win, and what winning costs" rows={r.byCategory} c={c} />
       </div>
 
+        </>
+      )}
+
+      {view === "spending" && (
+        <>
       <Card className="mb-5">
         <CardHeader title="Expenses against sales" description="Month by month to the end of the period: orders placed and everything spent" />
         <ul className="flex flex-col gap-2.5 p-4">
@@ -327,6 +373,10 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
         </p>
       </Card>
 
+        </>
+      )}
+
+      {(view === "orders" || view === "spending") && (
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader title="Money stuck with factories" description="Open orders where we paid the factory more than the customer has paid us" />
@@ -372,6 +422,7 @@ export default async function MoneyReportPage({ searchParams }: { searchParams: 
           )}
         </Card>
       </div>
+      )}
     </div>
   );
 }

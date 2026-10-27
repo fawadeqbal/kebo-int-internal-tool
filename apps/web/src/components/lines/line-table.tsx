@@ -15,7 +15,6 @@ import {
   Loader2,
   MessageCircleQuestion,
   MoreHorizontal,
-  Pencil,
   Plus,
   Search,
   Trash2,
@@ -162,15 +161,12 @@ export function LineTable({
   flat,
 }: LineTableProps) {
   const numbers = useMemo(() => lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey }))), [rows]);
-  const grid = `2.75rem ${columns.map((c) => c.width).join(" ")} 5.5rem`;
   const editable = columns.filter((c) => c.input);
 
   // Adding: where the entry row is (at the end, or under a line), and what is typed in it.
   const [entryAt, setEntryAt] = useState<{ afterKey: string | null; parentKey: string | null }>({ afterKey: null, parentKey: null });
   const [entry, setEntry] = useState<LineValues>(() => initialValues(columns, null));
   const [adding, setAdding] = useState<LineValues[]>([]);
-  // Changing one saved row.
-  const [editing, setEditing] = useState<{ key: string; values: LineValues } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -341,52 +337,169 @@ export function LineTable({
     }
   };
 
-  /* ---------- changing a saved row */
+  /* ---------- the grid: one cell selected, typed into like a spreadsheet */
 
-  const open = (row: LineRow) => {
-    if (readOnly) return;
-    if (editing && editing.key !== row.key) void save(); // keep what was typed in the other row
-    setMenu(null);
-    setEditing({ key: row.key, values: { ...row.values } });
-    focus(`${row.key}:${editable[0]!.key}`);
+  const [sel, setSel] = useState<{ row: string; col: string } | null>(null);
+  /** The cell being typed into (a saved row's cell; the new row's cells are always open). */
+  const [cell, setCellState] = useState<{ row: string; col: string; value: string } | null>(null);
+  // The same, read when it is saved: a blur right after Enter must not save it twice.
+  const open = useRef<typeof cell>(null);
+  const setCell = (v: typeof cell | ((x: typeof cell) => typeof cell)) => {
+    const next = typeof v === "function" ? v(open.current) : v;
+    open.current = next;
+    setCellState(next);
+  };
+  /** What a cell shows while its change is being saved. */
+  const [shown, setShown] = useState<Map<string, string>>(new Map());
+  const gridRef = useRef<HTMLDivElement>(null);
+  const cellId = (row: string, col: string) => `${row}:${col}`;
+
+  const q = query.trim().toLowerCase();
+  const matches = (r: LineRow) => !q || Object.values(r.values).some((v) => v.toLowerCase().includes(q));
+  const visible = rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => {
+      if (q) return matches(r) || rows.some((p) => p.parentKey === r.key && matches(p));
+      return !(r.parentKey && folded.has(r.parentKey));
+    });
+  const anyParts = rows.some((r) => r.parentKey);
+  const entryIndex = entryAt.afterKey ? rows.findIndex((r) => r.key === entryAt.afterKey) : -1;
+  // An inline new row goes after its line (and the line's parts when it adds whole lines).
+  const anchor = entryIndex < 0 ? null : entryAt.parentKey ? entryIndex : blockEnd(rows, entryIndex) - 1;
+  // Hidden by a search or folded parts: the new row shows at the end instead.
+  const entryAfter = anchor !== null && visible.some((v) => v.i === anchor) ? anchor : null;
+  const inline = entryAfter !== null;
+  const rowLabel = (i: number) => `${rows[i]!.parentKey ? "Part" : noun[0]!.toUpperCase() + noun.slice(1)} ${numbers[i]}`;
+
+  /** Rows in the order the grid shows them, the new row included. */
+  const order: string[] = [];
+  for (const { r, i } of visible) {
+    order.push(r.key);
+    if (entryAfter === i) order.push("entry");
+  }
+  if (!readOnly && entryAfter === null) order.push("entry");
+
+  const valueOf = (row: LineRow, col: string) => shown.get(cellId(row.key, col)) ?? row.values[col] ?? "";
+
+  /** Puts the keyboard on the grid (or on the new row's box) for the selected cell. */
+  const select = (row: string, col: string) => {
+    setSel({ row, col });
+    const c = columns.find((x) => x.key === col);
+    if (row === "entry" && c?.input) focus(entryCell(col));
+    else requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
   };
 
-  const save = async () => {
-    if (!editing) return;
-    const row = rows.find((r) => r.key === editing.key);
-    if (!row) return setEditing(null);
-    const changed = Object.fromEntries(Object.entries(editing.values).filter(([k, v]) => (row.values[k] ?? "") !== v));
-    if (!Object.keys(changed).length) return setEditing(null);
-    const lack = missing(editing.values, columns);
-    if (lack) {
-      setMessage(lack.required!);
+  const step = (from: { row: string; col: string }, dir: "up" | "down" | "left" | "right" | "next" | "prev") => {
+    const ri = order.indexOf(from.row);
+    const ci = columns.findIndex((c) => c.key === from.col);
+    let r = ri;
+    let c = ci;
+    if (dir === "up") r = Math.max(0, ri - 1);
+    else if (dir === "down") r = Math.min(order.length - 1, ri + 1);
+    else if (dir === "left") c = Math.max(0, ci - 1);
+    else if (dir === "right") c = Math.min(columns.length - 1, ci + 1);
+    else if (dir === "next") {
+      if (ci < columns.length - 1) c = ci + 1;
+      else if (ri < order.length - 1) [r, c] = [ri + 1, 0];
+    } else if (dir === "prev") {
+      if (ci > 0) c = ci - 1;
+      else if (ri > 0) [r, c] = [ri - 1, columns.length - 1];
+    }
+    if (order[r] === undefined) return;
+    select(order[r]!, columns[c]!.key);
+  };
+
+  /** Start typing into a saved cell: with what it holds, or with the key pressed (which replaces it). */
+  const edit = (rowKey: string, colKey: string, typed?: string) => {
+    if (readOnly) return;
+    const row = rows.find((r) => r.key === rowKey);
+    const col = columns.find((c) => c.key === colKey);
+    if (!row || !col?.input) return;
+    setMenu(null);
+    setSel({ row: rowKey, col: colKey });
+    setCell({ row: rowKey, col: colKey, value: typed ?? valueOf(row, colKey) });
+    focus(cellId(rowKey, colKey));
+  };
+
+  /** Save one cell (only if it changed); it shows the new value while saving. */
+  const saveValue = (rowKey: string, colKey: string, value: string) => {
+    const row = rows.find((r) => r.key === rowKey);
+    const col = columns.find((x) => x.key === colKey);
+    if (!row || !col || value === (row.values[colKey] ?? "")) return;
+    if (col.required && !value.trim()) {
+      setMessage(col.required);
       return;
     }
-    const key = editing.key;
-    await run(
-      key,
-      (reason) => onEdit(key, changed, reason),
-      () => setEditing((e) => (e?.key === key ? null : e)),
+    const id = cellId(rowKey, colKey);
+    setShown((m) => new Map(m).set(id, value));
+    void run(rowKey, (reason) => onEdit(rowKey, { [colKey]: value }, reason)).then(() =>
+      setShown((m) => {
+        const n = new Map(m);
+        n.delete(id);
+        return n;
+      }),
     );
   };
 
-  const rowKeyDown = (e: KeyboardEvent<HTMLElement>, row: LineRow, col: LineColumn, i: number) => {
+
+  /** Save the cell being typed into, then move. */
+  const commit = (move?: "down" | "up" | "next" | "prev") => {
+    const c = open.current;
+    if (!c) return;
+    open.current = null;
+    setCell(null);
+    if (move) step(c, move);
+    else requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
+    saveValue(c.row, c.col, c.value);
+  };
+
+  const cellKeyDown = (e: KeyboardEvent<HTMLElement>, col: LineColumn) => {
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
       e.preventDefault();
-      void save();
+      commit("down");
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      commit(e.shiftKey ? "prev" : "next");
     } else if (e.key === "Escape") {
       e.preventDefault();
-      setEditing(null);
-    } else if (col.input !== "textarea" && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-      // Like a spreadsheet: the same column in the row above or below.
-      const other = rows[i + (e.key === "ArrowUp" ? -1 : 1)];
-      if (!other) return;
+      open.current = null;
+      setCell(null);
+      requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
+    } else if (col.input !== "textarea" && col.input !== "select" && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault();
-      void save().then(() => {
-        setEditing({ key: other.key, values: { ...other.values } });
-        focus(`${other.key}:${col.key}`);
-      });
+      commit(e.key === "ArrowUp" ? "up" : "down");
+    }
+  };
+
+  /** Keys on the grid when a cell is selected but not being typed into. */
+  const gridKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!sel || cell || sel.row === "entry" || e.target !== gridRef.current) return;
+    const col = columns.find((c) => c.key === sel.col);
+    const row = rows.find((r) => r.key === sel.row);
+    if (!col || !row) return;
+    const k = e.key;
+    if (k === "ArrowUp" || k === "ArrowDown" || k === "ArrowLeft" || k === "ArrowRight") {
+      e.preventDefault();
+      step(sel, k === "ArrowUp" ? "up" : k === "ArrowDown" ? "down" : k === "ArrowLeft" ? "left" : "right");
+    } else if (k === "Tab") {
+      e.preventDefault();
+      step(sel, e.shiftKey ? "prev" : "next");
+    } else if (k === "Enter" || k === "F2") {
+      e.preventDefault();
+      edit(sel.row, sel.col);
+    } else if ((k === "Delete" || k === "Backspace") && col.input && col.input !== "select") {
+      e.preventDefault();
+      if (valueOf(row, col.key)) saveValue(row.key, col.key, "");
+    } else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "c") {
+      e.preventDefault();
+      void navigator.clipboard?.writeText(valueOf(row, col.key));
+    } else if (k === "Escape") {
+      setSel(null);
+    } else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && col.input && col.input !== "select") {
+      // Typing on a selected cell replaces what it holds, like a spreadsheet.
+      e.preventDefault();
+      edit(sel.row, sel.col, k);
     }
   };
 
@@ -405,7 +518,8 @@ export function LineTable({
       row.key,
       (reason) => onRemove(row.key, reason),
       () => {
-        setEditing((e) => (e?.key === row.key ? null : e));
+        setCell((c) => (c?.row === row.key ? null : c));
+        setSel((s) => (s?.row === row.key ? null : s));
         setRemoved(removedRow);
       },
     );
@@ -431,123 +545,93 @@ export function LineTable({
 
   /* ---------- what is shown */
 
-  const q = query.trim().toLowerCase();
-  const matches = (r: LineRow) => !q || Object.values(r.values).some((v) => v.toLowerCase().includes(q));
-  const visible = rows
-    .map((r, i) => ({ r, i }))
-    .filter(({ r }) => {
-      if (q) return matches(r) || rows.some((p) => p.parentKey === r.key && matches(p));
-      return !(r.parentKey && folded.has(r.parentKey));
-    });
-  const anyParts = rows.some((r) => r.parentKey);
-  const entryIndex = entryAt.afterKey ? rows.findIndex((r) => r.key === entryAt.afterKey) : -1;
-  // An inline entry row goes after its line (and the line's parts when it adds whole lines).
-  const anchor = entryIndex < 0 ? null : entryAt.parentKey ? entryIndex : blockEnd(rows, entryIndex) - 1;
-  // Hidden by a search or folded parts: the new row shows at the end instead.
-  const entryAfter = anchor !== null && visible.some((v) => v.i === anchor) ? anchor : null;
+  // Fixed widths stay; flexible ones (the description) take the rest, with a floor so the grid scrolls sideways on a phone like a sheet.
+  const widthOf = (w: string) => (/fr|minmax|auto/.test(w) ? undefined : w);
+  const flexible = columns.filter((c) => !widthOf(c.width)).length;
+  const fixedRem = columns.reduce((t, c) => t + (widthOf(c.width) ? parseFloat(c.width) : 0), 0);
+  const minWidth = `${3 + fixedRem + flexible * 16 + (readOnly ? 0 : 3)}rem`;
+  const cellBase = "h-9 border border-line px-2 align-middle text-sm";
 
-  const rowLabel = (i: number) => `${rows[i]!.parentKey ? "Part" : noun[0]!.toUpperCase() + noun.slice(1)} ${numbers[i]}`;
-
-  // Only one new-row line exists: after a line (inline) or at the end.
-  const inline = entryAfter !== null;
   const entryRow = readOnly ? null : (
-    <div
-      key="entry"
-      className={cn(
-        "grid items-start gap-x-2 gap-y-1.5 border-t border-dashed border-line bg-surface-2/40 px-1 py-1.5 max-sm:!grid-cols-1",
-        inline && "border-y border-primary/40 bg-primary-soft/30",
-      )}
-      style={{ gridTemplateColumns: grid }}
-      role="row"
-      aria-label={`New ${entryAt.parentKey ? `part of ${parentLabel(entryAt.parentKey)}` : noun}`}
-    >
-      <span className="flex items-center gap-1 pt-2 text-xs text-muted">
+    <tr key="entry" aria-label={`New ${entryAt.parentKey ? `part of ${parentLabel(entryAt.parentKey)}` : noun}`} className={cn(inline ? "bg-primary-soft/30" : "bg-surface")}>
+      <td className={cn(cellBase, "bg-surface-2 px-1 text-center text-xs text-muted")}>
         {entryAt.parentKey ? (
           <button
             type="button"
             onClick={() => toPart(false)}
-            className="flex items-center gap-0.5 rounded px-1 text-primary hover:bg-primary-soft"
+            className="inline-flex items-center gap-0.5 rounded px-1 text-primary hover:bg-primary-soft"
             title="Make it a whole line (Shift+Tab)"
           >
             <CornerDownRight className="size-3.5" aria-hidden />
             {parentLabel(entryAt.parentKey)}.
           </button>
         ) : (
-          <Plus className="ml-1 size-4" aria-hidden />
+          <Plus className="mx-auto size-4" aria-hidden />
         )}
-      </span>
-      {columns.map((c) =>
-        c.input ? (
-          <Cell
-            key={c.key}
-            col={c}
-            value={entry[c.key] ?? ""}
-            onChange={(v) => setEntry((s) => ({ ...s, [c.key]: v }))}
-            onKeyDown={(e) => entryKey(e, c)}
-            onPaste={c.input === "textarea" ? entryPaste : undefined}
-            inputRef={ref(entryCell(c.key))}
-            label={`New ${noun}: ${c.label}`}
-            placeholder={
-              c.input === "textarea"
-                ? entryAt.parentKey
-                  ? `A part of ${noun} ${parentLabel(entryAt.parentKey)} — Enter adds it`
-                  : rows.length
-                    ? `Next ${noun} — type and press Enter`
-                    : `First ${noun} — type and press Enter, or paste a list`
-                : c.placeholder
-            }
-          />
-        ) : (
-          <span key={c.key} className="max-sm:hidden" />
-        ),
-      )}
-      <span className="flex items-center justify-end gap-0.5 pt-0.5">
-        {busy === "entry" && <Loader2 className="size-4 animate-spin text-muted" aria-label="Saving" />}
-        <Button
-          size="icon-xs"
-          variant="primary"
-          onClick={() => void submitEntry()}
-          aria-label={`Add the ${noun}`}
-          title="Add (Enter)"
-          disabled={isBlank(entry, columns, entryAt.parentKey)}
+      </td>
+      {columns.map((c) => (
+        <td
+          key={c.key}
+          className={cn(cellBase, "p-0", sel?.row === "entry" && sel.col === c.key && "outline-2 -outline-offset-2 outline-primary")}
+          onMouseDown={() => setSel({ row: "entry", col: c.key })}
         >
-          <Check aria-hidden />
-        </Button>
-        {inline && (
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            onClick={() => setEntryAt({ afterKey: null, parentKey: null })}
-            aria-label="Stop adding here"
-            title="Esc"
-          >
-            <X aria-hidden />
-          </Button>
-        )}
-      </span>
-      {offer && (
-        <div className="col-span-full flex flex-wrap items-center gap-2 rounded-md bg-info-soft px-3 py-2 text-sm">
-          <span>
-            {offer.items.length} lines pasted. Make them {offer.items.length} {noun}s?
-          </span>
-          <Button
-            size="xs"
-            variant="primary"
-            onClick={() => void addPasted(offer.items).then(() => setEntry((v) => ({ ...v, description: offer.before })))}
-          >
-            Add {offer.items.length} {noun}s
-          </Button>
-          <Button size="xs" variant="ghost" onClick={() => setOffer(null)}>
-            Keep as one description
-          </Button>
-        </div>
-      )}
-      {adding.map((v, n) => (
-        <div key={n} className="col-span-full flex items-center gap-2 px-1 text-sm text-muted">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden /> {(v.description ?? "").split("\n")[0]}
-        </div>
+          {c.input ? (
+            <GridInput
+              col={c}
+              value={entry[c.key] ?? ""}
+              onChange={(v) => setEntry((s) => ({ ...s, [c.key]: v }))}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowUp" && c.input !== "textarea" && c.input !== "select") {
+                  const above = order[order.indexOf("entry") - 1];
+                  if (above) {
+                    e.preventDefault();
+                    select(above, c.key);
+                    return;
+                  }
+                }
+                entryKey(e, c);
+              }}
+              onFocus={() => setSel({ row: "entry", col: c.key })}
+              onPaste={c.input === "textarea" ? entryPaste : undefined}
+              inputRef={ref(entryCell(c.key))}
+              label={`New ${noun}: ${c.label}`}
+              placeholder={
+                c.input === "textarea"
+                  ? entryAt.parentKey
+                    ? `A part of ${noun} ${parentLabel(entryAt.parentKey)} — Enter adds it`
+                    : rows.length
+                      ? `New ${noun}: type, Enter adds it`
+                      : `First ${noun}: type, or paste rows from Excel`
+                  : c.placeholder
+              }
+            />
+          ) : null}
+        </td>
       ))}
-    </div>
+      <td className={cn(cellBase, "px-1 text-center")}>
+        {busy === "entry" ? (
+          <Loader2 className="mx-auto size-4 animate-spin text-muted" aria-label="Saving" />
+        ) : (
+          <span className="flex justify-center gap-0.5">
+            <Button
+              size="icon-xs"
+              variant="primary"
+              onClick={() => void submitEntry()}
+              aria-label={`Add the ${noun}`}
+              title="Add (Enter)"
+              disabled={isBlank(entry, columns, entryAt.parentKey)}
+            >
+              <Check aria-hidden />
+            </Button>
+            {inline && (
+              <Button size="icon-xs" variant="ghost" onClick={() => setEntryAt({ afterKey: null, parentKey: null })} aria-label="Stop adding here" title="Esc">
+                <X aria-hidden />
+              </Button>
+            )}
+          </span>
+        )}
+      </td>
+    </tr>
   );
 
   return (
@@ -596,225 +680,255 @@ export function LineTable({
         />
       )}
 
-      <div role="table" aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`} className="rounded-lg border border-line">
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
         <div
-          role="row"
-          className="sticky top-14 z-10 grid gap-x-2 rounded-t-lg border-b border-line bg-surface-2 px-1 py-2 text-xs font-medium text-muted max-sm:hidden"
-          style={{ gridTemplateColumns: grid }}
+          ref={gridRef}
+          tabIndex={-1}
+          onKeyDown={gridKeyDown}
+          className="relative overflow-x-auto outline-none"
+          aria-label={`${noun[0]!.toUpperCase()}${noun.slice(1)}s`}
+          role="region"
         >
-          <span role="columnheader" className="pl-1">
-            No.
-          </span>
-          {columns.map((c) => (
-            <span key={c.key} role="columnheader" className={cn(c.align === "right" && "text-right")}>
-              {c.label}
-            </span>
-          ))}
-          <span role="columnheader" className="sr-only">
-            Actions
-          </span>
-        </div>
-
-        {rows.length === 0 && readOnly && <p className="px-3 py-6 text-center text-sm text-muted">{empty ?? `No ${noun}s yet.`}</p>}
-        {rows.length === 0 && !readOnly && empty && <div className="px-3 pt-3 text-sm text-muted">{empty}</div>}
-        {q && !visible.length && <p className="px-3 py-4 text-sm text-muted">Nothing matches &ldquo;{query}&rdquo;.</p>}
-
-        {visible.map(({ r, i }) => {
-          const no = numbers[i]!;
-          const part = !!r.parentKey;
-          const label = rowLabel(i);
-          const parts = rows.filter((p) => p.parentKey === r.key).length;
-          const isEditing = editing?.key === r.key;
-          const siblings = rows.filter((x) => x.parentKey === r.parentKey);
-          const at = siblings.indexOf(r);
-          return (
-            <div key={r.key}>
-              <div
-                role="row"
-                aria-label={label}
-                className={cn(
-                  "group grid items-start gap-x-2 gap-y-1 border-t border-line px-1 py-1.5 first:border-t-0 max-sm:!grid-cols-[2.75rem_minmax(0,1fr)]",
-                  isEditing ? "bg-primary-soft/40" : !readOnly && "cursor-pointer hover:bg-surface-2/60",
-                  part && !isEditing && "bg-surface-2/20",
+          <table role="grid" aria-rowcount={rows.length + 1} className="w-full border-collapse [&_tr>*:first-child]:border-l-0 [&_tr>*:last-child]:border-r-0" style={{ minWidth }}>
+            <colgroup>
+              <col style={{ width: "3rem" }} />
+              {columns.map((c) => (
+                <col key={c.key} style={{ width: widthOf(c.width) }} />
+              ))}
+              {!readOnly && <col style={{ width: "3rem" }} />}
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col" className="h-8 border border-t-0 border-line bg-surface-2 px-1 text-center text-xs font-medium text-muted">
+                  No.
+                </th>
+                {columns.map((c) => (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    className={cn("h-8 border border-t-0 border-line bg-surface-2 px-2 text-left text-xs font-medium whitespace-nowrap text-text-2", c.align === "right" && "text-right")}
+                  >
+                    {c.label}
+                  </th>
+                ))}
+                {!readOnly && (
+                  <th scope="col" className="h-8 border border-t-0 border-line bg-surface-2">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 )}
-                style={{ gridTemplateColumns: grid }}
-                onClick={(e) => {
-                  if (isEditing || (e.target as HTMLElement).closest("button,a,input,textarea,select")) return;
-                  open(r);
-                }}
-              >
-                <span role="cell" className={cn("flex items-center gap-0.5 pt-1.5 text-sm text-muted tabular", part && "pl-2")}>
-                  {parts > 0 && !q ? (
-                    <button
-                      type="button"
-                      className="-ml-1 rounded p-0.5 hover:bg-surface-3"
-                      aria-label={folded.has(r.key) ? `Show the ${parts} parts of ${no}` : `Hide the parts of ${no}`}
-                      aria-expanded={!folded.has(r.key)}
-                      onClick={() =>
-                        setFolded((f) => {
-                          const n = new Set(f);
-                          if (n.has(r.key)) n.delete(r.key);
-                          else n.add(r.key);
-                          return n;
-                        })
-                      }
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && readOnly && (
+                <tr>
+                  <td colSpan={columns.length + 1} className="px-3 py-6 text-center text-sm text-muted">
+                    {empty ?? `No ${noun}s yet.`}
+                  </td>
+                </tr>
+              )}
+              {rows.length === 0 && !readOnly && empty && (
+                <tr>
+                  <td colSpan={columns.length + 2} className="px-3 py-2 text-sm text-muted">
+                    {empty}
+                  </td>
+                </tr>
+              )}
+              {q && !visible.length && (
+                <tr>
+                  <td colSpan={columns.length + 2} className="px-3 py-4 text-sm text-muted">
+                    Nothing matches &ldquo;{query}&rdquo;.
+                  </td>
+                </tr>
+              )}
+              {visible.map(({ r, i }) => {
+                const no = numbers[i]!;
+                const part = !!r.parentKey;
+                const label = rowLabel(i);
+                const parts = rows.filter((p) => p.parentKey === r.key).length;
+                const siblings = rows.filter((x) => x.parentKey === r.parentKey);
+                const at = siblings.indexOf(r);
+                const rowSelected = sel?.row === r.key;
+                return [
+                  <tr key={r.key} aria-label={label} aria-rowindex={i + 1} className={cn("group", part && "bg-surface-2/30", rowSelected && "bg-primary-soft/20")}>
+                    <th
+                      scope="row"
+                      className={cn(cellBase, "bg-surface-2 px-1 text-center text-xs font-normal whitespace-nowrap text-muted tabular", rowSelected && "bg-primary-soft text-primary")}
                     >
-                      {folded.has(r.key) ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-                    </button>
-                  ) : null}
-                  {no}
-                </span>
-                {columns.map((c, n) =>
-                  isEditing && c.input ? (
-                    <Cell
-                      key={c.key}
-                      col={c}
-                      value={editing.values[c.key] ?? ""}
-                      onChange={(v) => setEditing((s) => s && { ...s, values: { ...s.values, [c.key]: v } })}
-                      onKeyDown={(e) => rowKeyDown(e, r, c, i)}
-                      inputRef={ref(`${r.key}:${c.key}`)}
-                      label={`${label}: ${c.label}`}
-                      indent={n === 0 && part}
-                    />
-                  ) : (
-                    <span
-                      key={c.key}
-                      role="cell"
-                      className={cn(
-                        "min-w-0 py-1.5 text-sm",
-                        c.align === "right" && "text-right tabular",
-                        // On a phone the other columns show as one short line under the description.
-                        n === 0 ? "max-sm:col-start-2" : "max-sm:hidden",
-                      )}
-                    >
-                      {n === 0 ? (
-                        <span className={cn("flex items-start gap-1", part && "pl-3")}>
-                          {part && <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />}
-                          <span className="min-w-0">
-                            <span className="line-clamp-3 whitespace-pre-line">{c.format ? c.format(r.values, r) : r.values[c.key]}</span>
-                            {r.badge}
-                            <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-text-2 sm:hidden">
-                              {columns.slice(1).map((x) =>
-                                x.phoneHidden || !(x.format || (r.values[x.key] ?? "").trim()) ? null : (
-                                  <span key={x.key}>
-                                    <span className="text-muted">{x.label} </span>
-                                    {x.format ? x.format(r.values, r) : r.values[x.key]}
-                                  </span>
-                                ),
-                              )}
-                            </span>
-                          </span>
-                        </span>
-                      ) : (
-                        <>{c.format ? c.format(r.values, r) : r.values[c.key] || <span className="text-muted">—</span>}</>
-                      )}
-                    </span>
-                  ),
-                )}
-                <span role="cell" className="relative flex items-start justify-end gap-0.5 pt-0.5 max-sm:col-start-2 max-sm:justify-start">
-                  {busy === r.key && <Loader2 className="mt-1 size-4 animate-spin text-muted" aria-label="Saving" />}
-                  {readOnly ? null : isEditing ? (
-                    <>
-                      <Button
-                        size="icon-xs"
-                        variant="primary"
-                        onClick={() => void save()}
-                        aria-label={`Save ${label}`}
-                        title="Save (Enter)"
-                      >
-                        <Check aria-hidden />
-                      </Button>
-                      <Button size="icon-xs" variant="ghost" onClick={() => setEditing(null)} aria-label="Cancel" title="Cancel (Esc)">
-                        <X aria-hidden />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => open(r)}
-                        aria-label={`Change ${label}`}
-                        className="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                      >
-                        <Pencil aria-hidden />
-                      </Button>
-                      <Button
-                        size="icon-xs"
-                        variant="danger-ghost"
-                        onClick={() => void remove(r, i)}
-                        aria-label={`Remove ${label}${parts ? ` and its ${parts} parts` : ""}`}
-                        className="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                      >
-                        <Trash2 aria-hidden />
-                      </Button>
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => setMenu(menu === r.key ? null : r.key)}
-                        aria-label={`More for ${label}`}
-                        aria-expanded={menu === r.key}
-                      >
-                        <MoreHorizontal aria-hidden />
-                      </Button>
-                    </>
-                  )}
-                  {menu === r.key && (
-                    <RowMenu onClose={() => setMenu(null)}>
-                      {!part && !flat && (
-                        <MenuItem
-                          icon={<Plus />}
-                          onClick={() => {
-                            setMenu(null);
-                            const lastPart = [...rows].reverse().find((x) => x.parentKey === r.key);
-                            setEntryAt({ afterKey: lastPart?.key ?? r.key, parentKey: r.key });
-                            setEntry(initialValues(columns, r.key));
-                            focus(entryCell(editable[0]!.key));
+                      <span className={cn("inline-flex items-center gap-0.5", part && "pl-1.5")}>
+                        {parts > 0 && !q ? (
+                          <button
+                            type="button"
+                            className="-ml-1 rounded p-0.5 hover:bg-surface-3"
+                            aria-label={folded.has(r.key) ? `Show the ${parts} parts of ${no}` : `Hide the parts of ${no}`}
+                            aria-expanded={!folded.has(r.key)}
+                            onClick={() =>
+                              setFolded((f) => {
+                                const n = new Set(f);
+                                if (n.has(r.key)) n.delete(r.key);
+                                else n.add(r.key);
+                                return n;
+                              })
+                            }
+                          >
+                            {folded.has(r.key) ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                          </button>
+                        ) : null}
+                        {no}
+                      </span>
+                    </th>
+                    {columns.map((c, n) => {
+                      const isSel = sel?.row === r.key && sel.col === c.key;
+                      const isEditing = cell?.row === r.key && cell.col === c.key;
+                      const value = valueOf(r, c.key);
+                      return (
+                        <td
+                          key={c.key}
+                          role="gridcell"
+                          aria-selected={isSel}
+                          aria-readonly={!c.input || readOnly}
+                          title={!readOnly && c.input && isSel && !isEditing ? "Type, or press Enter, to change it" : undefined}
+                          className={cn(
+                            cellBase,
+                            isEditing ? "p-0" : "py-1",
+                            c.align === "right" && "text-right tabular",
+                            isSel && "outline-2 -outline-offset-2 outline-primary",
+                            !readOnly && c.input && "cursor-cell",
+                            !c.input && !isEditing && "bg-surface-2/40 text-text-2",
+                          )}
+                          onMouseDown={(e) => {
+                            if (isEditing || (e.target as HTMLElement).closest("button,a,input,textarea,select")) return;
+                            e.preventDefault();
+                            if (cell) commit();
+                            if (isSel) edit(r.key, c.key);
+                            else select(r.key, c.key);
                           }}
+                          onDoubleClick={() => edit(r.key, c.key)}
                         >
-                          Add a part
-                        </MenuItem>
-                      )}
-                      <MenuItem
-                        icon={<Plus />}
-                        onClick={() => {
-                          setMenu(null);
-                          setEntryAt({ afterKey: r.key, parentKey: r.parentKey });
-                          setEntry(initialValues(columns, r.parentKey));
-                          focus(entryCell(editable[0]!.key));
-                        }}
-                      >
-                        Add {part ? "a part" : an(noun)} below
-                      </MenuItem>
-                      {flat ? null : part ? (
-                        <MenuItem icon={<IndentDecrease />} onClick={() => void move(r, "outdent")}>
-                          Make it {an(noun)} of its own
-                        </MenuItem>
-                      ) : (
-                        <MenuItem icon={<IndentIncrease />} onClick={() => void move(r, "indent")} disabled={!canIndent(rows, i)}>
-                          Make it a part of {numbers[rows.indexOf(lineAbove(rows, i) ?? r)]}
-                        </MenuItem>
-                      )}
-                      <MenuItem icon={<ArrowUp />} onClick={() => void move(r, "up")} disabled={at === 0}>
-                        Move up
-                      </MenuItem>
-                      <MenuItem icon={<ArrowDown />} onClick={() => void move(r, "down")} disabled={at === siblings.length - 1}>
-                        Move down
-                      </MenuItem>
-                      <MenuItem icon={<Copy />} onClick={() => void duplicate(r)}>
-                        Duplicate
-                      </MenuItem>
-                    </RowMenu>
-                  )}
+                          {isEditing ? (
+                            <GridInput
+                              col={c}
+                              value={cell.value}
+                              onChange={(v) => setCell((x) => x && { ...x, value: v })}
+                              onKeyDown={(e) => cellKeyDown(e, c)}
+                              onBlur={() => commit()}
+                              inputRef={ref(cellId(r.key, c.key))}
+                              label={`${label}: ${c.label}`}
+                            />
+                          ) : n === 0 ? (
+                            <span className={cn("flex items-start gap-1", part && "pl-3")}>
+                              {part && <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />}
+                              <span className="min-w-0">
+                                <span className="line-clamp-3 whitespace-pre-line">{c.format ? c.format({ ...r.values, [c.key]: value }, r) : value}</span>
+                                {r.badge}
+                              </span>
+                            </span>
+                          ) : c.format ? (
+                            c.format(Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)])), r)
+                          ) : (
+                            value || <span className="text-muted">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    {!readOnly && (
+                      <td className={cn(cellBase, "relative px-1 text-center")}>
+                        {busy === r.key ? (
+                          <Loader2 className="mx-auto size-4 animate-spin text-muted" aria-label="Saving" />
+                        ) : (
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            onClick={() => setMenu(menu === r.key ? null : r.key)}
+                            aria-label={`More for ${label}`}
+                            aria-expanded={menu === r.key}
+                            className={cn(!rowSelected && menu !== r.key && "sm:opacity-40 sm:group-hover:opacity-100")}
+                          >
+                            <MoreHorizontal aria-hidden />
+                          </Button>
+                        )}
+                        {menu === r.key && (
+                          <RowMenu onClose={() => setMenu(null)}>
+                            {!part && !flat && (
+                              <MenuItem
+                                icon={<Plus />}
+                                onClick={() => {
+                                  setMenu(null);
+                                  const lastPart = [...rows].reverse().find((x) => x.parentKey === r.key);
+                                  setEntryAt({ afterKey: lastPart?.key ?? r.key, parentKey: r.key });
+                                  setEntry(initialValues(columns, r.key));
+                                  focus(entryCell(editable[0]!.key));
+                                }}
+                              >
+                                Add a part
+                              </MenuItem>
+                            )}
+                            <MenuItem
+                              icon={<Plus />}
+                              onClick={() => {
+                                setMenu(null);
+                                setEntryAt({ afterKey: r.key, parentKey: r.parentKey });
+                                setEntry(initialValues(columns, r.parentKey));
+                                focus(entryCell(editable[0]!.key));
+                              }}
+                            >
+                              Add {part ? "a part" : an(noun)} below
+                            </MenuItem>
+                            {flat ? null : part ? (
+                              <MenuItem icon={<IndentDecrease />} onClick={() => void move(r, "outdent")}>
+                                Make it {an(noun)} of its own
+                              </MenuItem>
+                            ) : (
+                              <MenuItem icon={<IndentIncrease />} onClick={() => void move(r, "indent")} disabled={!canIndent(rows, i)}>
+                                Make it a part of {numbers[rows.indexOf(lineAbove(rows, i) ?? r)]}
+                              </MenuItem>
+                            )}
+                            <MenuItem icon={<ArrowUp />} onClick={() => void move(r, "up")} disabled={at === 0}>
+                              Move up
+                            </MenuItem>
+                            <MenuItem icon={<ArrowDown />} onClick={() => void move(r, "down")} disabled={at === siblings.length - 1}>
+                              Move down
+                            </MenuItem>
+                            <MenuItem icon={<Copy />} onClick={() => void duplicate(r)}>
+                              Duplicate
+                            </MenuItem>
+                            <MenuItem icon={<Trash2 />} danger onClick={() => void remove(r, i)}>
+                              Remove{parts ? ` with its ${parts} part${parts === 1 ? "" : "s"}` : ""}
+                            </MenuItem>
+                          </RowMenu>
+                        )}
+                      </td>
+                    )}
+                  </tr>,
+                  entryAfter === i ? entryRow : null,
+                ];
+              })}
+              {entryAfter === null && entryRow}
+            </tbody>
+          </table>
+        </div>
+        {(offer || adding.length > 0) && (
+          <div className="flex flex-col gap-1.5 border-t border-line px-3 py-2">
+            {offer && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md bg-info-soft px-3 py-2 text-sm">
+                <span>
+                  {offer.items.length} lines pasted. Make them {offer.items.length} {noun}s?
                 </span>
+                <Button size="xs" variant="primary" onClick={() => void addPasted(offer.items).then(() => setEntry((v) => ({ ...v, description: offer.before })))}>
+                  Add {offer.items.length} {noun}s
+                </Button>
+                <Button size="xs" variant="ghost" onClick={() => setOffer(null)}>
+                  Keep as one description
+                </Button>
               </div>
-              {entryAfter === i && entryRow}
-            </div>
-          );
-        })}
-
-        {entryAfter === null && entryRow}
-        {footer && <div className="rounded-b-lg border-t border-line bg-surface lg:sticky lg:bottom-0">{footer}</div>}
+            )}
+            {adding.map((v, n) => (
+              <div key={n} className="flex items-center gap-2 text-sm text-muted">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden /> {(v.description ?? "").split("\n")[0]}
+              </div>
+            ))}
+          </div>
+        )}
+        {footer && <div className="border-t border-line bg-surface lg:sticky lg:bottom-0">{footer}</div>}
       </div>
 
       {error && <p className="text-xs text-bad">{error}</p>}
@@ -827,15 +941,12 @@ export function LineTable({
                 pending={pending}
                 onCancel={() => {
                   setPending(null);
-                  setEditing(null);
+                  setCell(null);
                 }}
               />
             )}
             {message && (
-              <p
-                role="alert"
-                className="flex items-center justify-between gap-2 rounded-lg border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad shadow-pop"
-              >
+              <p role="alert" className="flex items-center justify-between gap-2 rounded-lg border border-bad/30 bg-bad-soft px-3 py-2 text-sm text-bad shadow-pop">
                 {message}
                 <button type="button" onClick={() => setMessage(null)} aria-label="Close" className="text-muted">
                   <X className="size-4" />
@@ -844,10 +955,7 @@ export function LineTable({
             )}
 
             {removed && (
-              <div
-                role="status"
-                className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm shadow-pop"
-              >
+              <div role="status" className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm shadow-pop">
                 <span>Removed {removed.label}.</span>
                 <span className="flex gap-1">
                   <Button size="xs" variant="secondary" onClick={() => void undo()}>
@@ -864,13 +972,8 @@ export function LineTable({
       )}
       {!readOnly && (
         <p className="text-xs text-muted">
-          <Kbd>Enter</Kbd> adds{flat ? "" : " · "}
-          {!flat && (
-            <>
-              <Kbd>Tab</Kbd> on an empty new row makes it a part
-            </>
-          )}{" "}
-          · click {an(noun)} to change it · <Kbd>Esc</Kbd> cancels
+          Click a cell, then type to change it · <Kbd>Enter</Kbd> saves and goes down · <Kbd>Tab</Kbd> and arrows move · <Kbd>Delete</Kbd> clears ·{" "}
+          <Kbd>Esc</Kbd> cancels · paste rows from Excel into the last row{flat ? "" : <> · <Kbd>Tab</Kbd> on an empty new row makes it a part</>}
         </p>
       )}
     </div>
@@ -885,58 +988,54 @@ function lineBefore(rows: LineRow[], i: number) {
 
 /* ---------------------------------------------------------------- pieces */
 
-function Cell({
+/** A box that fills its grid cell, with no frame of its own (the cell is the frame). */
+function GridInput({
   col,
   value,
   onChange,
   onKeyDown,
   onPaste,
+  onFocus,
+  onBlur,
   inputRef,
   label,
   placeholder,
-  indent,
 }: {
   col: LineColumn;
   value: string;
   onChange: (v: string) => void;
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
   onPaste?: (e: ClipboardEvent<HTMLTextAreaElement | HTMLInputElement>) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   inputRef: (el: HTMLElement | null) => void;
   label: string;
   placeholder?: string;
-  indent?: boolean;
 }) {
   const cls = cn(
-    "h-8 w-full min-w-0 rounded-md border border-line bg-surface px-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 max-sm:col-start-2",
+    "block h-9 w-full min-w-0 border-0 bg-transparent px-2 text-sm outline-none placeholder:text-muted/70 focus:bg-surface focus:ring-2 focus:ring-primary focus:ring-inset",
     col.align === "right" && "text-right tabular",
   );
   if (col.input === "textarea")
     return (
-      <span className={cn("min-w-0 max-sm:col-start-2", indent && "pl-3")}>
-        <Textarea
-          ref={inputRef}
-          aria-label={label}
-          value={value}
-          rows={Math.min(6, Math.max(1, value.split("\n").length))}
-          maxLength={col.maxLength ?? 2000}
-          placeholder={placeholder ?? col.placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-          className="min-h-8 resize-none py-1 text-sm [field-sizing:content]"
-        />
-      </span>
-    );
-  if (col.input === "select")
-    return (
-      <select
+      <textarea
         ref={inputRef}
         aria-label={label}
         value={value}
+        rows={1}
+        maxLength={col.maxLength ?? 2000}
+        placeholder={placeholder ?? col.placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        className={cn(cls, "pr-6")}
-      >
+        onPaste={onPaste}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        className={cn(cls, "min-h-9 resize-none py-2 leading-5 [field-sizing:content]")}
+      />
+    );
+  if (col.input === "select")
+    return (
+      <select ref={inputRef} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur} className={cn(cls, "pr-6")}>
         {col.options?.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -956,6 +1055,8 @@ function Cell({
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       onPaste={onPaste}
+      onFocus={onFocus}
+      onBlur={onBlur}
       className={cls}
     />
   );
@@ -990,11 +1091,13 @@ function MenuItem({
   children,
   onClick,
   disabled,
+  danger,
 }: {
   icon: ReactNode;
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  danger?: boolean;
 }) {
   return (
     <button
@@ -1002,7 +1105,10 @@ function MenuItem({
       role="menuitem"
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-muted"
+      className={cn(
+        "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-muted",
+        danger && "border-t border-line text-bad hover:bg-bad-soft [&_svg]:text-bad",
+      )}
     >
       {icon}
       {children}
