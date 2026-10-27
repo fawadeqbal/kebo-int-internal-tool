@@ -157,6 +157,18 @@ export class MoneyService {
         owed.set(key, { factory: f, currency: p.currency, owedMinor: 0, lines: 0 });
       }
     }
+    // For each counted factory payment: paid so far to that factory (same currency) and what is left after it.
+    const factoryAfter = new Map<string, { paid: string; toPay: string }>();
+    const running = new Map<string, number>();
+    for (const p of livePaid) {
+      const key = `${p.factoryId}:${p.currency}`;
+      const sum = (running.get(key) ?? 0) + decimalToMinor(p.amount);
+      running.set(key, sum);
+      factoryAfter.set(p.id, { paid: fromMinor(sum), toPay: fromMinor(Math.max((owed.get(key)?.owedMinor ?? 0) - sum, 0)) });
+    }
+    const recorders = new Map(
+      (await this.prisma.db.user.findMany({ where: { id: { in: [...new Set(o.factoryPaid.map((p) => p.recordedById))] } }, select: { id: true, name: true } })).map((u) => [u.id, u]),
+    );
     const factories = [...owed.entries()].map(([key, f]) => {
       const paidMinor = livePaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0);
       return {
@@ -231,6 +243,12 @@ export class MoneyService {
             payments: o.factoryPaid.map((p) => ({
               id: p.id,
               factory: p.factory,
+              recordedBy: recorders.get(p.recordedById) ?? null,
+              recordedAt: p.createdAt,
+              /** Set when it was changed after it was recorded. */
+              changedAt: p.updatedAt.getTime() - p.createdAt.getTime() > 2000 ? p.updatedAt : null,
+              /** Paid to this factory so far and still to pay (in this currency) once this payment counted. */
+              after: factoryAfter.get(p.id) ?? null,
               kind: p.kind,
               amount: p.amount.toFixed(2),
               currency: p.currency,

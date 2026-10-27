@@ -164,7 +164,7 @@ describe("money", () => {
     const m = (await api(app, manager).post(`/orders/${orderId}/factory-payments`, pay).expect(201)).body;
     expect(m.factories.rows[0]).toMatchObject({ paid: "3390.00", toPay: "7910.00" });
     const p = m.factories.payments[0];
-    expect(p).toMatchObject({ amount: "3390.00", currency: "CNY", paidBy: { id: sanaId } });
+    expect(p).toMatchObject({ amount: "3390.00", currency: "CNY", paidBy: { id: sanaId }, recordedBy: { name: expect.any(String) }, changedAt: null, after: { paid: "3390.00", toPay: "7910.00" } });
     expect(p.rate).toBeGreaterThan(1);
     // Changing it says why; removing it too, and it stays listed, crossed out.
     expect(
