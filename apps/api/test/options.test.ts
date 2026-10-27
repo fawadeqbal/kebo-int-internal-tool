@@ -1,4 +1,5 @@
 import type { INestApplication } from "@nestjs/common";
+import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 
@@ -201,6 +202,8 @@ describe("quotation options from factory offers", () => {
           ...draft,
           options: [draft.options[0], optionB],
           lines: [{ description: "Something else" }],
+          paymentTerms: "By T/T. L/C at sight accepted.",
+          deliveryTerms: "Packing: export wooden cases.\nInspection before shipment.",
         })
         .expect(201)
     ).body;
@@ -246,5 +249,36 @@ describe("quotation options from factory offers", () => {
       `Guangzhou Lines ${tag} 282500.00`,
     ]);
     await api(app, bilal).get(`/revisions/${revisionId}`).expect(404);
+  });
+
+  it("prints the quotation's payment and delivery terms on the order's proforma", async () => {
+    const r = (await api(app, sana).get(`/revisions/${revisionId}`).expect(200)).body;
+    expect(r).toMatchObject({ paymentTerms: "By T/T. L/C at sight accepted.", deliveryTerms: "Packing: export wooden cases.\nInspection before shipment." });
+    const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
+    const pi = (await api(app, sana).get(`/orders/${deal.orders[0].id}/documents/proforma`).expect(200)).body;
+    expect(pi).toMatchObject({ paymentTermsText: "By T/T. L/C at sight accepted.", deliveryTermsText: "Packing: export wooden cases.\nInspection before shipment." });
+    const pl = (await api(app, sana).get(`/orders/${deal.orders[0].id}/documents/packing-list`).expect(200)).body;
+    expect(pl).toMatchObject({ paymentTermsText: null, deliveryTermsText: null });
+  });
+
+  it("keeps the chosen factory's quotation with the order", async () => {
+    await request(app.getHttpServer())
+      .post(`/api/inquiries/${inquiryId}/files`)
+      .set("authorization", `Bearer ${sana}`)
+      .field("kind", "factory_quote")
+      .field("factoryQuoteId", offerY)
+      .attach("file", Buffer.from("%PDF-1.4 y"), { filename: "Guangzhou PI.pdf", contentType: "application/pdf" })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/inquiries/${inquiryId}/files`)
+      .set("authorization", `Bearer ${sana}`)
+      .field("kind", "factory_quote")
+      .field("factoryQuoteId", offerX)
+      .attach("file", Buffer.from("%PDF-1.4 x"), { filename: "Zhangjiagang quote.pdf", contentType: "application/pdf" })
+      .expect(201);
+    const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
+    const order = (await api(app, sana).get(`/orders/${deal.orders[0].id}`).expect(200)).body;
+    // Only the offer the order was made from (option B), not the one the customer did not choose.
+    expect(order.factoryFiles.map((f: { fileName: string; factory: string }) => `${f.factory}: ${f.fileName}`)).toEqual([`Guangzhou Lines ${tag}: Guangzhou PI.pdf`]);
   });
 });

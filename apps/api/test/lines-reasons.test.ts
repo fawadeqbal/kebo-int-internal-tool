@@ -325,7 +325,7 @@ describe("lines, reasons and history", () => {
       .put("/settings/sales", { ...sales, reason: "Mistake fixed" })
       .expect(200);
     await api(app, admin)
-      .put("/settings/sales", { ...sales, defaultTerms: sales.defaultTerms })
+      .put("/settings/sales", { ...sales, defaultPaymentTerms: "By T/T", defaultDeliveryTerms: "Export wooden cases" })
       .expect(200); // nothing that moves money: not asked
   });
 });

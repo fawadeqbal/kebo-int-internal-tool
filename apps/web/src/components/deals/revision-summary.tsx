@@ -48,11 +48,15 @@ export function RevisionSummary({ r }: { r: RevisionView }) {
           <OptionSummary key={o.id} o={o} currency={r.currency} single={r.options.length === 1} />
         ),
       )}
-      {(r.terms || r.notes) && (
-        <div className="text-sm">
-          {r.terms && <p className="whitespace-pre-line text-text-2">{r.terms}</p>}
-          {r.notes && <p className="mt-2 whitespace-pre-line text-muted">{r.notes}</p>}
-        </div>
+      {(r.paymentTerms || r.deliveryTerms || r.notes) && (
+        <DetailList
+          columns={3}
+          items={[
+            { label: "Payment terms", value: <span className="whitespace-pre-line">{r.paymentTerms}</span>, hidden: !r.paymentTerms },
+            { label: "Delivery terms", value: <span className="whitespace-pre-line">{r.deliveryTerms}</span>, hidden: !r.deliveryTerms },
+            { label: "Notes", value: <span className="whitespace-pre-line">{r.notes}</span>, hidden: !r.notes },
+          ]}
+        />
       )}
     </div>
   );

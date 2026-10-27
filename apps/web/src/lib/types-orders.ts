@@ -1,3 +1,4 @@
+import type { OfferFile } from "./types-deals";
 import type { BalanceTerms, Incoterm, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus } from "@kebo/shared";
 import type { Person } from "./types";
 
@@ -80,6 +81,8 @@ export interface OrderView {
   lines: OrderLineView[];
   goods: OrderGoodsView;
   documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
+  /** The chosen factory's own quotation, catalogue and screenshots (people who see factory prices). */
+  factoryFiles: (OfferFile & { factory: string })[];
 }
 
 /** The packing list figures of one goods line (null until filled in). */
@@ -241,7 +244,9 @@ export interface OrderDocument {
     received: string;
     due: string;
   } | null;
-  terms: string | null;
+  /** The quotation's own payment and delivery terms (free text). */
+  paymentTermsText: string | null;
+  deliveryTermsText: string | null;
   bankDetails: string | null;
   /** Every payment received (the internal copy lists them; the customer's copy only the total). */
   payments: { paidOn: string; kind: string; amount: string; bankCharges: string; currency: string; reference: string | null }[];
@@ -280,7 +285,10 @@ export interface RevisionDoc {
   subtotal: string;
   discount: string;
   total: string;
-  terms: string | null;
+  /** Printed under the payment (beyond the deposit and balance). */
+  paymentTerms: string | null;
+  /** Printed under the delivery (packing, inspection, warranty…). */
+  deliveryTerms: string | null;
   notes: string | null;
   sentOn: string | null;
   customerSnapshot: CustomerSnapshot | null;

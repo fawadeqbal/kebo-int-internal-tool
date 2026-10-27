@@ -384,7 +384,7 @@ export function mapSettings(old: Record<string, unknown> | null | undefined): Se
       exchangeRates: o.exchangeRates,
       defaultMarginPercent: o.defaultMarginPercent,
       quotationValidityDays: o.quotationValidityDays,
-      defaultTerms: o.defaultQuotationTerms,
+      defaultPaymentTerms: o.defaultQuotationTerms,
       defaultDepositPercent: depositPercentFromTerms(typeof o.defaultQuotationTerms === "string" ? o.defaultQuotationTerms : null),
       categories: o.categories,
     }),

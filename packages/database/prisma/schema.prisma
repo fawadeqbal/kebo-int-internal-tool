@@ -591,7 +591,10 @@ model QuotationRevision {
   subtotal         Decimal        @default(0) @db.Decimal(14, 2)
   discount         Decimal        @default(0) @db.Decimal(14, 2)
   total            Decimal        @default(0) @db.Decimal(14, 2)
-  terms            String?
+  /// Payment terms printed on the quotation (beyond the deposit and balance above), e.g. "By T/T; L/C at sight accepted".
+  paymentTerms     String?        @map("payment_terms")
+  /// Delivery terms printed on the quotation, e.g. "Packing: export wooden cases. Inspection before shipment."
+  deliveryTerms    String?        @map("delivery_terms")
   notes            String?
   sentOn           DateTime?      @map("sent_on") @db.Date
   answeredOn       DateTime?      @map("answered_on") @db.Date

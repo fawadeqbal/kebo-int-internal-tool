@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Download, FileText, Printer } from "lucide-react";
+import { AlertTriangle, ArrowRight, Download, Eye, FileText, Printer } from "lucide-react";
 import {
+  ATTACHMENT_KIND_LABEL,
   BALANCE_TERMS_LABEL,
   can,
   ORDER_STAGE_HINT,
@@ -400,11 +401,57 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 );
               })}
             </ul>
+            {deal && (
+              <section aria-label="URS & documents" className="flex flex-col gap-3 border-t border-line px-4 py-4">
+                <h3 className="text-sm font-semibold">
+                  URS &amp; documents <span className="text-xs font-normal text-muted">· from deal {deal.refNo}, kept with the order</span>
+                </h3>
+                <DocumentsPanel
+                  dealId={deal.id}
+                  canUpload={open}
+                  files={deal.attachments.map((f) => ({
+                    ...f,
+                    uploadedBy: name(f.uploadedById),
+                    when: date(f.createdAt),
+                    canChange: f.uploadedById === me.id || deal.canWork,
+                    describe: describeFileAction.bind(null, deal.id, f.id),
+                    remove: orderRemoveFileAction.bind(null, o.id, deal.id, f.id),
+                  }))}
+                  />
+              </section>
+            )}
+            {o.factoryFiles.length > 0 && (
+              <section aria-label="The factory's quotation" className="flex flex-col gap-2 border-t border-line px-4 py-4">
+                <h3 className="text-sm font-semibold">
+                  The factory&apos;s quotation <span className="text-xs font-normal text-muted">· internal, from the offer this order was made from</span>
+                </h3>
+                <ul className="flex flex-col divide-y divide-line">
+                  {o.factoryFiles.map((f) => (
+                    <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <FileText className="size-4 shrink-0 text-muted" aria-hidden />
+                        <span className="min-w-0">
+                          <a href={`/files/${f.id}`} className="block truncate text-sm font-medium hover:text-primary">
+                            {f.fileName}
+                          </a>
+                          <span className="text-xs text-muted">
+                            {f.factory} · {ATTACHMENT_KIND_LABEL[f.kind]} · {date(f.uploadedOn)}
+                          </span>
+                        </span>
+                      </span>
+                      <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "sm")}>
+                        <Eye aria-hidden /> View
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </Card>
 
           {deal && (
             <Card>
-              <CardHeader title="Notes, URS & documents" description={`Shared with deal ${deal.refNo}`} />
+              <CardHeader title="Notes" description={`Shared with deal ${deal.refNo}`} />
               <CardBody className="flex flex-col gap-4">
                 <NoteForm action={orderNoteAction.bind(null, o.id, deal.id)} />
                 {deal.notes.length > 0 && (
@@ -419,21 +466,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     ))}
                   </ul>
                 )}
-                <div className="flex flex-col gap-3 border-t border-line pt-4">
-                  <h3 className="text-sm font-semibold">URS & documents</h3>
-                  <DocumentsPanel
-                    dealId={deal.id}
-                    canUpload={open}
-                    files={deal.attachments.map((f) => ({
-                      ...f,
-                      uploadedBy: name(f.uploadedById),
-                      when: date(f.createdAt),
-                      canChange: f.uploadedById === me.id || deal.canWork,
-                      describe: describeFileAction.bind(null, deal.id, f.id),
-                      remove: orderRemoveFileAction.bind(null, o.id, deal.id, f.id),
-                    }))}
-                  />
-                </div>
               </CardBody>
             </Card>
           )}

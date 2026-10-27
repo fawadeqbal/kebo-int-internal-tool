@@ -384,7 +384,36 @@ export class OrdersService {
   }
 
   async get(user: SessionUser, id: string) {
-    return this.view(await this.load(user, id));
+    const o = await this.load(user, id);
+    return { ...(await this.view(o)), factoryFiles: await this.factoryFilesOf(user, o.id) };
+  }
+
+  /**
+   * The factory's own quotation, catalogue and screenshots kept with the offer
+   * this order was made from (evidence for what was bought), for people who
+   * see factory prices. The deal's URS and documents are the deal's files.
+   */
+  private async factoryFilesOf(user: SessionUser, orderId: string) {
+    if (!can(user.role, "sourcing.manage")) return [];
+    const quotes = await this.prisma.db.factoryQuote.findMany({
+      where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId } } } } } } },
+      select: { id: true, factory: { select: { name: true } } },
+    });
+    if (!quotes.length) return [];
+    const files = await this.prisma.db.attachment.findMany({
+      where: { factoryQuoteId: { in: quotes.map((q) => q.id) }, deletedAt: null },
+      orderBy: { createdAt: "asc" },
+    });
+    return files.map((f) => ({
+      id: f.id,
+      fileName: f.fileName,
+      mimeType: f.mimeType,
+      size: f.size,
+      kind: f.kind,
+      note: f.note,
+      uploadedOn: f.createdAt.toISOString(),
+      factory: quotes.find((q) => q.id === f.factoryQuoteId)!.factory.name,
+    }));
   }
 
   /**
