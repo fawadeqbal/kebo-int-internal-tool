@@ -135,7 +135,16 @@ export function Funnel({ steps }: { steps: { label: string; value: number }[] })
 }
 
 /** Rows of label · amount with a share bar. */
-export function ShareBars({ rows, currency, tone = "primary" }: { rows: { key: string; label: ReactNode; value: number; sub?: ReactNode; href?: string }[]; currency?: string; tone?: "primary" | "bad" | "warn" | "ok" }) {
+export function ShareBars({
+  rows,
+  currency,
+  tone = "primary",
+}: {
+  /** `display`: the figure as shown, when it is not `value` in `currency` (a list in several currencies). */
+  rows: { key: string; label: ReactNode; value: number; display?: ReactNode; sub?: ReactNode; href?: string }[];
+  currency?: string;
+  tone?: "primary" | "bad" | "warn" | "ok";
+}) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   const bar = tone === "bad" ? "bg-bad" : tone === "warn" ? "bg-warn" : tone === "ok" ? "bg-ok" : "bg-primary";
   return (
@@ -143,12 +152,12 @@ export function ShareBars({ rows, currency, tone = "primary" }: { rows: { key: s
       {rows.map((r) => {
         const inner = (
           <>
-            <span className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate">
-                {r.label}
-                {r.sub && <span className="ml-1.5 text-xs text-muted">{r.sub}</span>}
+            <span className="flex items-start justify-between gap-3 text-sm">
+              <span className="min-w-0">
+                <span className="line-clamp-2 break-words">{r.label}</span>
+                {r.sub && <span className="block text-xs text-muted">{r.sub}</span>}
               </span>
-              <span className="shrink-0 font-medium tabular">{currency ? money(r.value, currency) : r.value}</span>
+              <span className="shrink-0 font-medium tabular">{r.display ?? (currency ? money(r.value, currency) : r.value)}</span>
             </span>
             <span className="mt-1 block h-1.5 rounded-full bg-surface-2" aria-hidden>
               <span className={cn("block h-1.5 rounded-full", bar)} style={{ width: `${Math.max((r.value / max) * 100, 1)}%` }} />

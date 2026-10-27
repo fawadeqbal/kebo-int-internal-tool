@@ -39,7 +39,6 @@ export function PeriodPicker({
   return (
     <div className="no-print flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 shadow-card lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-col gap-1.5">
-        <div className="-mx-1 max-w-full overflow-x-auto px-1 pb-0.5">
           <Segmented
             label="Period"
             options={list.map((p, n) => ({
@@ -48,7 +47,7 @@ export function PeriodPicker({
               active: n === at,
             }))}
           />
-        </div>
+        
         <p className="px-1 text-xs text-muted">
           {custom ? "Your dates: " : ""}
           {date(range.from)} – {date(range.to)} · compared with {date(previous.from)} – {date(previous.to)}

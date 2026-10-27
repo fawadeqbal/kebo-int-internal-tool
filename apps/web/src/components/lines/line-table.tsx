@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -23,6 +23,7 @@ import {
 import { lineNumbers } from "@kebo/shared";
 import { Button, cn, Input, Kbd, Textarea } from "@kebo/ui";
 import { parseList, type PastedItem } from "@/components/deals/paste-list";
+import { FloatingMenu } from "@/components/common/floating";
 
 /* ---------------------------------------------------------------- types */
 
@@ -172,6 +173,8 @@ export function LineTable({
   const [pending, setPending] = useState<Pending | null>(null);
   const [removed, setRemoved] = useState<Removed | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const menuId = useId().replace(/:/g, "");
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -836,10 +839,12 @@ export function LineTable({
                           <Loader2 className="mx-auto size-4 animate-spin text-muted" aria-label="Saving" />
                         ) : (
                           <Button
+                            id={`rowmenu-${menuId}-${r.key}`}
                             size="icon-xs"
                             variant="ghost"
                             onClick={() => setMenu(menu === r.key ? null : r.key)}
                             aria-label={`More for ${label}`}
+                            aria-haspopup="menu"
                             aria-expanded={menu === r.key}
                             className={cn(!rowSelected && menu !== r.key && "sm:opacity-40 sm:group-hover:opacity-100")}
                           >
@@ -847,7 +852,7 @@ export function LineTable({
                           </Button>
                         )}
                         {menu === r.key && (
-                          <RowMenu onClose={() => setMenu(null)}>
+                          <RowMenu onClose={closeMenu} anchorId={`rowmenu-${menuId}-${r.key}`} label={label}>
                             {!part && !flat && (
                               <MenuItem
                                 icon={<Plus />}
@@ -1062,27 +1067,11 @@ function GridInput({
   );
 }
 
-function RowMenu({ children, onClose }: { children: ReactNode; onClose: () => void }) {
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && onClose();
-    const esc = (e: globalThis.KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc);
-    box.current?.querySelector("button")?.focus();
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [onClose]);
+function RowMenu({ children, onClose, anchorId, label }: { children: ReactNode; onClose: () => void; anchorId: string; label: string }) {
   return (
-    <div
-      ref={box}
-      role="menu"
-      className="absolute top-full right-0 z-30 mt-1 flex w-60 flex-col rounded-lg border border-line bg-surface p-1 text-left shadow-pop"
-    >
+    <FloatingMenu anchor={() => document.getElementById(anchorId)} onClose={onClose} label={label} width={240}>
       {children}
-    </div>
+    </FloatingMenu>
   );
 }
 

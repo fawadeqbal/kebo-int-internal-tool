@@ -487,7 +487,7 @@ async function FactoriesTab({ i, from, to }: { i: Insights; from: string; to: st
             {leaks.stuck.length ? (
               <ShareBars
                 tone="warn"
-                rows={leaks.stuck.map((x) => ({ key: x.id, label: `${x.refNo} · ${x.customer.name}`, sub: `${x.days} days · ${money(x.amount, x.currency)}`, value: Number(x.amount), href: `/orders/${x.id}/money` }))}
+                rows={leaks.stuck.map((x) => ({ key: x.id, label: `${x.refNo} · ${x.customer.name}`, sub: `paid ${x.days} days ago`, value: Number(x.amount), display: money(x.amount, x.currency), href: `/orders/${x.id}/money` }))}
               />
             ) : (
               <p className="text-sm text-muted">None: customers have paid ahead of the factories.</p>

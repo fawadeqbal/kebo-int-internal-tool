@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Info, Inbox, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
@@ -143,12 +144,13 @@ export function Card({ className, ...props }: ComponentProps<"section">) {
 
 export function CardHeader({ title, description, actions, className }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex items-start justify-between gap-3 border-b border-line px-4 py-3", className)}>
+    // With a description and actions, a phone puts the actions under the text instead of squeezing it.
+    <div className={cn("flex items-start justify-between gap-3 border-b border-line px-4 py-3", description && actions && "max-sm:flex-col max-sm:gap-2", className)}>
       <div className="min-w-0">
         <h2 className="text-sm font-semibold text-text">{title}</h2>
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -182,7 +184,7 @@ export function PageHeader({
   return (
     <header className="mb-5">
       {backHref && (
-        <Link href={backHref} className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-text">
+        <Link href={backHref} className="mb-1 inline-flex min-h-7 items-center gap-1 text-xs font-medium text-muted hover:text-text">
           ← {backLabel ?? "Back"}
         </Link>
       )}
@@ -244,9 +246,10 @@ export function Alert({ tone = "info", children, className }: { tone?: keyof typ
 /* ---------------------------------------------------------------- Table */
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
-    <div className="w-full overflow-x-auto">
+    // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
+    <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
       <table className={cn("w-full border-collapse text-sm", className)} {...props} />
-    </div>
+    </ScrollFade>
   );
 }
 export function THead({ className, ...props }: ComponentProps<"thead">) {
@@ -308,7 +311,8 @@ export function Kbd({ children }: { children: ReactNode }) {
 /** Underlined tabs as links (URL-driven, so they work without JavaScript). */
 export function LinkTabs({ tabs, className, label }: { tabs: { href: string; label: ReactNode; count?: number; active: boolean; alert?: boolean }[]; className?: string; label: string }) {
   return (
-    <nav
+    <ScrollFade
+      as="nav"
       aria-label={label}
       className={cn("flex items-center gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-line)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
     >
@@ -328,7 +332,7 @@ export function LinkTabs({ tabs, className, label }: { tabs: { href: string; lab
           )}
         </Link>
       ))}
-    </nav>
+    </ScrollFade>
   );
 }
 
@@ -347,7 +351,7 @@ export function FilterChip({ href, active, children }: { href: string; active: b
   return (
     <Link
       href={href}
-      aria-pressed={active}
+      aria-current={active ? "true" : undefined}
       className={cn(
         buttonClass("secondary", "sm"),
         "h-8 gap-1 border-dashed px-2.5 text-xs",
@@ -362,7 +366,11 @@ export function FilterChip({ href, active, children }: { href: string; active: b
 /** Pill links for a small set of options (e.g. This month / Last month). */
 export function Segmented({ options, className, label }: { options: { href: string; label: ReactNode; active: boolean }[]; className?: string; label: string }) {
   return (
-    <nav aria-label={label} className={cn("inline-flex rounded-lg border border-line bg-surface-2 p-0.5", className)}>
+    <ScrollFade
+      as="nav"
+      aria-label={label}
+      className={cn("inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-surface-2 p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+    >
       {options.map((o) => (
         <Link
           key={o.href}
@@ -373,7 +381,7 @@ export function Segmented({ options, className, label }: { options: { href: stri
           {o.label}
         </Link>
       ))}
-    </nav>
+    </ScrollFade>
   );
 }
 
