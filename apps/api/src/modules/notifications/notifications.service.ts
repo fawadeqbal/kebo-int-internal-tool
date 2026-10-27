@@ -21,6 +21,8 @@ export interface NewNotification {
 export const links = {
   deal: (id: string) => `/deals/${id}`,
   order: (id: string) => `/orders/${id}`,
+  /** The order's Money tab (payments in, the plan, factory payments). */
+  orderMoney: (id: string) => `/orders/${id}/money`,
 };
 
 /**
@@ -134,8 +136,8 @@ export class NotificationsService implements OnModuleInit {
   }
 
   private async paymentRecorded(e: Extract<DomainEvent, { type: "payment.recorded" }>) {
-    await this.notify(e.notify, { type: "payment.in", title: `${e.refNo}: received ${e.amount}`, link: links.order(e.orderId) }, e.actorId);
-    await this.emailAdmins("paymentReceived", `Payment received on ${e.refNo}: ${e.amount}`, { heading: `Payment received: ${e.amount}`, rows: [["Order", e.refNo]], link: links.order(e.orderId), linkLabel: "Open the order" });
+    await this.notify(e.notify, { type: "payment.in", title: `${e.refNo}: received ${e.amount}`, link: links.orderMoney(e.orderId) }, e.actorId);
+    await this.emailAdmins("paymentReceived", `Payment received on ${e.refNo}: ${e.amount}`, { heading: `Payment received: ${e.amount}`, rows: [["Order", e.refNo]], link: links.orderMoney(e.orderId), linkLabel: "Open the order" });
   }
 
   /* ---------------------------------------------------------------- reading */

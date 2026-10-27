@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 
 const refresh = (orderId: string) => {
-  revalidatePath(`/orders/${orderId}`);
+  revalidatePath(`/orders/${orderId}`, "layout");
   revalidatePath("/orders");
 };
 
@@ -119,7 +119,7 @@ export async function orderNoteAction(orderId: string, dealId: string, _prev: Ac
   const v = formValues(form);
   const r = await attempt(form, () => api.post(`/inquiries/${dealId}/notes`, { body: v.body }));
   if (r.ok) {
-    revalidatePath(`/orders/${orderId}`);
+    revalidatePath(`/orders/${orderId}`, "layout");
     revalidatePath(`/deals/${dealId}`);
   }
   return r;
@@ -134,7 +134,7 @@ export async function orderRemoveFileAction(
 ): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
   if (r.ok) {
-    revalidatePath(`/orders/${orderId}`);
+    revalidatePath(`/orders/${orderId}`, "layout");
     revalidatePath(`/deals/${dealId}`);
   }
   return r;
