@@ -45,3 +45,18 @@ export async function turnOffTwoStepAction(_prev: ActionState, form: FormData): 
   if (r.ok) revalidatePath("/account");
   return forget(r);
 }
+
+/** Sign out one of my own devices. */
+export async function endMySessionAction(id: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
+  const r = await attempt(null, () => api.delete(`/me/sessions/${id}`), "Signed out.");
+  if (r.ok) revalidatePath("/account");
+  return r;
+}
+
+export async function signOutOthersAction(_prev: ActionState, _form: FormData): Promise<ActionState> {
+  const r = await attempt(null, () => api.post<{ ended: number }>("/me/sessions/sign-out-others"));
+  if (!r.ok) return r;
+  revalidatePath("/account");
+  const n = (r.data as { ended: number }).ended;
+  return { ok: true, message: n ? `Signed out ${n} other device${n === 1 ? "" : "s"}.` : "No other devices were signed in." };
+}

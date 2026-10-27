@@ -117,9 +117,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     api.get<{ sales: { currency: string } }>("/settings"),
   ]);
   const open = o.status !== "cancelled";
-  const canMove = can(me.role, "orders.update") && open;
-  const canPay = can(me.role, "payments.record") && open;
-  const canManage = can(me.role, "orders.manage");
+  const canMove = can(me, "orders.update") && open;
+  const canPay = can(me, "payments.record") && open;
+  const canManage = can(me, "orders.manage");
   const now = today();
   const st = PAY_STATUS[o.money.status] ?? { label: o.money.status, tone: "neutral" as const };
   const name = (uid: string | null) => (uid ? (deal?.people[uid] ?? "Someone") : "System");
@@ -501,7 +501,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <CardBody>
               <DetailsForm
                 action={detailsAction.bind(null, o.id)}
-                canEdit={can(me.role, "orders.update") && open}
+                canEdit={can(me, "orders.update") && open}
                 today={now}
                 fixed={[
                   { label: "Incoterm", value: incoterm },

@@ -71,7 +71,7 @@ export class DocumentsService {
     const goodsOnly = kind === "packing-list";
     const lines = o.lines.filter((l) => !goodsOnly || l.type === "goods");
     const numbers = orderLineNumbers(lines);
-    const seeCosts = can(user.role, "sourcing.manage");
+    const seeCosts = can(user, "sourcing.manage");
 
     return {
       kind,

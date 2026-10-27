@@ -27,13 +27,13 @@ import { StagesService } from "./stages.service";
 
 /** Staff see the deals they handle or created; managers see all. */
 export function inquiryAccess(user: SessionUser): Prisma.InquiryWhereInput {
-  if (can(user.role, "inquiries.viewAll")) return {};
+  if (can(user, "inquiries.viewAll")) return {};
   return { OR: [{ assigneeId: user.id }, { createdById: user.id }] };
 }
 
 /** The handler, its creator while nobody handles it, or a manager may change a deal. */
 export function canWorkOn(user: SessionUser, i: { assigneeId: string | null; createdById: string }) {
-  return can(user.role, "inquiries.updateAny") || i.assigneeId === user.id || (i.assigneeId === null && i.createdById === user.id);
+  return can(user, "inquiries.updateAny") || i.assigneeId === user.id || (i.assigneeId === null && i.createdById === user.id);
 }
 
 /** "Tablet press + 2 more" when no title is typed; without items, the first line of the requirement. */
@@ -181,7 +181,7 @@ export class InquiriesService {
 
   async get(user: SessionUser, id: string) {
     await this.find(user, id);
-    const seeCosts = can(user.role, "sourcing.manage");
+    const seeCosts = can(user, "sourcing.manage");
     const i = await this.prisma.db.inquiry.findUniqueOrThrow({
       where: { id },
       include: {
@@ -261,11 +261,11 @@ export class InquiriesService {
       canWork: canWorkOn(user, i),
       allowed: {
         edit: canWorkOn(user, i) && isOpen(i.stage),
-        quote: canWorkOn(user, i) && isOpen(i.stage) && can(user.role, "quotations.manage"),
-        source: canWorkOn(user, i) && can(user.role, "sourcing.manage"),
-        assign: can(user.role, "inquiries.assign") || (i.assigneeId === null && can(user.role, "inquiries.create")),
+        quote: canWorkOn(user, i) && isOpen(i.stage) && can(user, "quotations.manage"),
+        source: canWorkOn(user, i) && can(user, "sourcing.manage"),
+        assign: can(user, "inquiries.assign") || (i.assigneeId === null && can(user, "inquiries.create")),
         hold: canWorkOn(user, i) && canHold(i.stage),
-        reopen: i.stage === "lost" && can(user.role, "inquiries.reopen"),
+        reopen: i.stage === "lost" && can(user, "inquiries.reopen"),
       },
     };
   }
@@ -279,7 +279,7 @@ export class InquiriesService {
 
   private async assertAssignable(user: SessionUser, assigneeId: string | null | undefined) {
     if (!assigneeId) return;
-    if (!can(user.role, "inquiries.assign") && assigneeId !== user.id) throw new ForbiddenError("You can only assign work to yourself.");
+    if (!can(user, "inquiries.assign") && assigneeId !== user.id) throw new ForbiddenError("You can only assign work to yourself.");
     const a = await this.prisma.db.user.findFirst({ where: { id: assigneeId, isActive: true, isSystem: false } });
     if (!a) throw new DomainError("The selected person is not an active user.");
   }
@@ -392,7 +392,7 @@ export class InquiriesService {
   }
 
   async create(user: SessionUser, input: InquiryInput) {
-    if (!can(user.role, "inquiries.create")) throw new ForbiddenError();
+    if (!can(user, "inquiries.create")) throw new ForbiddenError();
     await this.assertAssignable(user, input.assigneeId);
     const customer = await this.prisma.db.customer.findFirst({ where: { id: input.customerId, deletedAt: null } });
     if (!customer) throw new DomainError("The selected customer no longer exists.");
@@ -473,7 +473,7 @@ export class InquiriesService {
         i,
         input.to,
         { lostReason: input.lostReason, note: input.note, reason },
-        { id: user.id, canReopen: can(user.role, "inquiries.reopen") },
+        { id: user.id, canReopen: can(user, "inquiries.reopen") },
       );
     });
     await this.events.publish(event);
@@ -512,7 +512,7 @@ export class InquiriesService {
     const events = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${id}::uuid for update`;
       const i = await this.find(user, id, tx);
-      if (!can(user.role, "inquiries.assign") && !(i.assigneeId === null && assigneeId === user.id))
+      if (!can(user, "inquiries.assign") && !(i.assigneeId === null && assigneeId === user.id))
         throw new ForbiddenError("Only a manager can assign or reassign work.");
       await this.assertAssignable(user, assigneeId);
       if (i.assigneeId === assigneeId) return [];
@@ -610,7 +610,7 @@ export class InquiriesService {
 
   /** Soft delete; never for a deal that has an order. */
   async remove(user: SessionUser, id: string) {
-    if (!can(user.role, "inquiries.delete")) throw new ForbiddenError();
+    if (!can(user, "inquiries.delete")) throw new ForbiddenError();
     const i = await this.find(user, id);
     if (await this.prisma.db.order.count({ where: { inquiryId: id } }))
       throw new ConflictError("This deal has an order, so it cannot be removed.");
@@ -637,7 +637,7 @@ export class InquiriesService {
     await this.find(user, id);
     // Evidence for a factory offer: only for people who see factory prices, and only that deal's offers.
     if (meta.factoryQuoteId) {
-      if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
+      if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
       const q = await this.prisma.db.factoryQuote.findFirst({ where: { id: meta.factoryQuoteId, inquiryId: id, deletedAt: null } });
       if (!q) throw new DomainError("That factory offer is not on this deal any more.");
     }
@@ -681,7 +681,7 @@ export class InquiriesService {
   /** A file the person may see: a factory offer's files only for people who see factory prices. */
   private async fileFor(user: SessionUser, attachmentId: string) {
     const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null } });
-    if (!a || (a.factoryQuoteId && !can(user.role, "sourcing.manage"))) throw new NotFoundError("File");
+    if (!a || (a.factoryQuoteId && !can(user, "sourcing.manage"))) throw new NotFoundError("File");
     return a;
   }
 

@@ -70,7 +70,7 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
         categories={settings.sales.categories}
         people={null}
         meId={me.id}
-        canAssignOthers={can(me.role, "inquiries.assign")}
+        canAssignOthers={can(me, "inquiries.assign")}
         customerLocked={sent ? "Already quoted: the customer cannot change" : undefined}
         searchCustomers={searchCustomersAction}
         loadContacts={customerContactsAction}

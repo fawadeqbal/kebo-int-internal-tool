@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, Public } from "../../common/auth/decorators";
+import { AllowDuringTwoStepSetup, CurrentUser, Public } from "../../common/auth/decorators";
 import { SESSION_COOKIE, sessionCookieOptions, tokenFrom } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { AuthService } from "./auth.service";
@@ -38,10 +38,14 @@ export class AuthController {
   @Public()
   @Post("two-step")
   @HttpCode(200)
-  twoStep(@Body(Validate(z.object({ code: z.string().trim().min(6, "Enter the code").max(20) }))) body: { code: string }, @Req() req: Request) {
-    return this.auth.completeTwoStep(tokenFrom(req.headers), body.code, clientIp(req));
+  twoStep(
+    @Body(Validate(z.object({ code: z.string().trim().min(6, "Enter the code").max(20) }))) body: { code: string },
+    @Req() req: Request,
+  ) {
+    return this.auth.completeTwoStep(tokenFrom(req.headers), body.code, { ip: clientIp(req), userAgent: req.headers["user-agent"] });
   }
 
+  @AllowDuringTwoStepSetup()
   @Post("logout")
   @HttpCode(200)
   async logout(@CurrentUser() user: SessionUser, @Res({ passthrough: true }) res: Response) {
@@ -50,6 +54,7 @@ export class AuthController {
     return { ok: true };
   }
 
+  @AllowDuringTwoStepSetup()
   @Get("me")
   me(@CurrentUser() user: SessionUser) {
     return this.auth.profile(user);

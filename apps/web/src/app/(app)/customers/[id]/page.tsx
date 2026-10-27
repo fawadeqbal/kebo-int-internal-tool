@@ -42,7 +42,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const me = await requireUser();
   const c = await load(() => api.get<CustomerDetail>(`/customers/${id}`));
   const history = await api.get<HistoryEntry[]>("/history", { type: "customer", id });
-  const canEdit = can(me.role, "customers.manage");
+  const canEdit = can(me, "customers.manage");
   const openOrders = c.orders.filter((o) => o.status === "open").length;
   const openDeals = c.inquiries.filter((d) => ["new", "sourcing", "quoted"].includes(d.stage)).length;
 
@@ -91,7 +91,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <CardHeader
               title="Deals"
               description={
-                can(me.role, "inquiries.viewAll")
+                can(me, "inquiries.viewAll")
                   ? "Every inquiry from this customer, newest first"
                   : "Their inquiries that you handle or created"
               }
@@ -257,7 +257,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             </CardBody>
           </Card>
 
-          {can(me.role, "customers.delete") && (
+          {can(me, "customers.delete") && (
             <Card>
               <CardHeader
                 title="Remove customer"

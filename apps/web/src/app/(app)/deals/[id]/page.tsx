@@ -153,7 +153,7 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
                 action={assignAction.bind(null, d.id)}
                 people={people}
                 current={d.assignee?.id ?? null}
-                canAssignOthers={can(me.role, "inquiries.assign")}
+                canAssignOthers={can(me, "inquiries.assign")}
                 meId={me.id}
               />
             ) : (

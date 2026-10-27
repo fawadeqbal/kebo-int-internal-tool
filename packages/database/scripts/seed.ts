@@ -8,7 +8,7 @@
 import "./env";
 import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, splitDeposit, withTaxMinor, priceForMargin, toMinor } from "@kebo/money";
-import { defaultPlan, readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
+import { defaultPlan, PRESET_ROLES, readSettings, SETTINGS, type BalanceTerms, type OrderStage, type SettingsKey } from "@kebo/shared";
 import { addDays, todayIn } from "@kebo/utils";
 import { createPrismaClient, nextReference, toDbDate, type PrismaClient } from "../src";
 
@@ -27,6 +27,14 @@ async function upsertUser(email: string, name: string, role: "admin" | "manager"
 }
 
 async function seedBase() {
+  // The migration makes the three preset roles; this only puts back one that is missing.
+  for (const [key, r] of Object.entries(PRESET_ROLES)) {
+    await prisma.role.upsert({
+      where: { key },
+      update: {},
+      create: { key, name: r.name, description: r.description, permissions: r.superAdmin ? [] : [...r.permissions], superAdmin: r.superAdmin },
+    });
+  }
   const admin = await upsertUser(process.env.SEED_ADMIN_EMAIL ?? "admin@example.com", process.env.SEED_ADMIN_NAME ?? "Super Admin", "admin", process.env.SEED_ADMIN_PASSWORD ?? "Admin@12345");
   const manager = await upsertUser(process.env.SEED_MANAGER_EMAIL ?? "manager@example.com", process.env.SEED_MANAGER_NAME ?? "Manager", "manager", process.env.SEED_MANAGER_PASSWORD ?? "Manager@12345");
   const staff = await upsertUser(process.env.SEED_STAFF_EMAIL ?? "staff@example.com", process.env.SEED_STAFF_NAME ?? "Staff", "staff", process.env.SEED_STAFF_PASSWORD ?? "Staff@12345");

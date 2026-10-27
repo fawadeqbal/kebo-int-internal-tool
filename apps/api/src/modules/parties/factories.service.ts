@@ -111,7 +111,7 @@ export class FactoriesService {
 
   /** Hidden from lists and pickers; its past prices stay on their deals. */
   async remove(user: SessionUser, id: string) {
-    if (!can(user.role, "inquiries.updateAny")) throw new ForbiddenError("Only a manager can remove a factory.");
+    if (!can(user, "inquiries.updateAny")) throw new ForbiddenError("Only a manager can remove a factory.");
     const f = await this.get(id);
     await this.prisma.tx(async (tx) => {
       await tx.factory.update({ where: { id }, data: { deletedAt: new Date() } });

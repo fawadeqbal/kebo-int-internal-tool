@@ -1,6 +1,10 @@
-import { ROLE_LABEL, type Role } from "@kebo/shared";
+import { ShieldCheck } from "lucide-react";
 import { Badge } from "@kebo/ui";
 
-const ROLE_TONE: Record<Role, "primary" | "info" | "neutral"> = { admin: "primary", manager: "info", staff: "neutral" };
-
-export const RoleBadge = ({ role }: { role: Role }) => <Badge tone={ROLE_TONE[role]}>{ROLE_LABEL[role]}</Badge>;
+/** A person's role by its current name; the Super Admin stands out, and a role that needs two-step sign-in shows a shield. */
+export const RoleBadge = ({ name, superAdmin, requireTwoStep }: { name: string; superAdmin?: boolean; requireTwoStep?: boolean }) => (
+  <Badge tone={superAdmin ? "primary" : "neutral"}>
+    {name}
+    {requireTwoStep && <ShieldCheck aria-label="Needs two-step sign-in" />}
+  </Badge>
+);

@@ -75,7 +75,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     api.get<Person[]>("/users/people"),
   ]);
   const keep = { type: sp.type, person: sp.person };
-  const canUsers = can(me.role, "users.manage");
+  const canUsers = can(me, "users.manage");
   const filtered = !!(sp.type || sp.person);
   return (
     <div>

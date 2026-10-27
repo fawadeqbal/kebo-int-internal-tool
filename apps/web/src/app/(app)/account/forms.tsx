@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
 import { Alert, Button, Field, Input } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -87,6 +88,7 @@ export function TwoStepPanel({
   confirm,
   newCodes,
   turnOff,
+  doneHref,
 }: {
   status: TwoStepStatus;
   sinceText: string | null;
@@ -94,12 +96,24 @@ export function TwoStepPanel({
   confirm: Action;
   newCodes: Action;
   turnOff: Action;
+  /** Where to go once the recovery codes are saved (the setup a role requires, at sign-in). */
+  doneHref?: string;
 }) {
+  const router = useRouter();
   const [setup, setSetup] = useState<{ secret: string; qr: string } | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [manage, setManage] = useState<"codes" | "off" | null>(null);
 
-  if (codes) return <RecoveryCodes codes={codes} onDone={() => setCodes(null)} />;
+  if (codes)
+    return (
+      <RecoveryCodes
+        codes={codes}
+        onDone={() => {
+          setCodes(null);
+          if (doneHref) router.replace(doneHref);
+        }}
+      />
+    );
 
   // While setting up, stay on the setup step even once the page data says "on": the confirm
   // form must stay mounted until it has handed over the recovery codes (its onDone runs after the refresh).
@@ -122,10 +136,13 @@ export function TwoStepPanel({
           <Button size="sm" variant={manage === "codes" ? "primary" : "secondary"} onClick={() => setManage(manage === "codes" ? null : "codes")} aria-pressed={manage === "codes"}>
             <KeyRound aria-hidden /> Make new recovery codes
           </Button>
-          <Button size="sm" variant={manage === "off" ? "danger" : "danger-ghost"} onClick={() => setManage(manage === "off" ? null : "off")} aria-pressed={manage === "off"}>
-            Turn off
-          </Button>
+          {!status.required && (
+            <Button size="sm" variant={manage === "off" ? "danger" : "danger-ghost"} onClick={() => setManage(manage === "off" ? null : "off")} aria-pressed={manage === "off"}>
+              Turn off
+            </Button>
+          )}
         </div>
+        {status.required && <p className="text-xs text-muted">Your role ({status.roleName}) needs two-step sign-in, so it cannot be turned off.</p>}
         {manage === "codes" && (
           <ActionForm
             key="codes"
@@ -219,7 +236,10 @@ export function TwoStepPanel({
         <Smartphone className="mt-0.5 size-5 shrink-0 text-muted" aria-hidden />
         <div>
           <p className="font-medium">Two-step sign-in is off.</p>
-          <p className="text-text-2">Turn it on so a stolen password is not enough: after your password, you also enter a 6-digit code from an app on your phone. It takes two minutes.</p>
+          <p className="text-text-2">
+            {status.required ? `Your role (${status.roleName}) needs it. ` : "Turn it on so a stolen password is not enough: "}
+            After your password, you also enter a 6-digit code from an app on your phone. It takes two minutes.
+          </p>
         </div>
       </div>
       <ActionForm action={start} showSuccess={false} onDone={(s) => {

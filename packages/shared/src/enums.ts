@@ -5,8 +5,26 @@
  */
 const values = <const T extends readonly string[]>(...v: T) => v;
 
-export const ROLES = values("admin", "manager", "staff");
-export type Role = (typeof ROLES)[number];
+/** The built-in roles (more can be made in Security). Their key never changes; the name can. */
+export const PRESET_ROLE_KEYS = values("admin", "manager", "staff");
+export type PresetRoleKey = (typeof PRESET_ROLE_KEYS)[number];
+/** A role's key: a preset, or one made in Security ("accounts", "sales-china"). */
+export type Role = string;
+
+/* ---------------------------------------------------------------- sign-in */
+
+/** What happened at one sign-in attempt (the sign-in history). */
+export const SIGN_IN_RESULTS = values(
+  "signed_in",
+  "code_needed",
+  "wrong_password",
+  "unknown_email",
+  "wrong_code",
+  "locked",
+  "switched_off",
+  "too_many",
+);
+export type SignInResult = (typeof SIGN_IN_RESULTS)[number];
 
 /* ---------------------------------------------------------------- inquiries */
 
@@ -85,7 +103,7 @@ export const BASIS_STEPS = values("to_port", "freight", "insurance", "delivery",
 export type BasisStep = (typeof BASIS_STEPS)[number];
 
 export const ENUMS = {
-  Role: ROLES,
+  SignInResult: SIGN_IN_RESULTS,
   InquiryStage: INQUIRY_STAGES,
   InquiryChannel: INQUIRY_CHANNELS,
   Priority: PRIORITIES,

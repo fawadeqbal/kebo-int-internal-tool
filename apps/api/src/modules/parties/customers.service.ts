@@ -9,7 +9,7 @@ import { requireReason } from "../../common/audit/reason";
 
 /** Staff see the customers on deals they handle or created, and customers they added; managers see all. */
 export function customerAccess(user: SessionUser): Prisma.CustomerWhereInput {
-  if (can(user.role, "inquiries.viewAll")) return {};
+  if (can(user, "inquiries.viewAll")) return {};
   return {
     OR: [{ createdById: user.id }, { inquiries: { some: { deletedAt: null, OR: [{ assigneeId: user.id }, { createdById: user.id }] } } }],
   };
@@ -73,7 +73,7 @@ export class CustomersService {
   }
 
   async get(user: SessionUser, id: string) {
-    const mine = can(user.role, "inquiries.viewAll") ? null : { OR: [{ assigneeId: user.id }, { createdById: user.id }] };
+    const mine = can(user, "inquiries.viewAll") ? null : { OR: [{ assigneeId: user.id }, { createdById: user.id }] };
     const c = await this.prisma.db.customer.findFirst({
       where: { id, deletedAt: null, ...customerAccess(user) },
       include: {

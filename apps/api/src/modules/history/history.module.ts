@@ -42,7 +42,7 @@ export class HistoryService {
         },
       });
       if (!i) throw new NotFoundError("Inquiry");
-      const seeCosts = can(user.role, "sourcing.manage");
+      const seeCosts = can(user, "sourcing.manage");
       return [
         { entityType: "inquiry", ids: [i.id] },
         { entityType: "factory_quote", ids: seeCosts ? i.factoryQuotes.map((f) => f.id) : [] },
@@ -61,7 +61,7 @@ export class HistoryService {
       await this.customers.get(user, q.id);
       return [{ entityType: "customer", ids: [q.id] }];
     }
-    if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("You cannot see factories.");
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factories.");
     const f = await db.factory.findFirst({ where: { id: q.id }, select: { id: true } });
     if (!f) throw new NotFoundError("Factory");
     return [{ entityType: "factory", ids: [f.id] }];
@@ -71,8 +71,8 @@ export class HistoryService {
     const scope = (await this.scope(user, q)).filter((s) => s.ids.length);
     // Expenses are for managers only; payments to factories for people who see costs.
     const hidden = [
-      ...(can(user.role, "expenses.manage") ? [] : ["expense"]),
-      ...(can(user.role, "sourcing.manage") ? [] : ["payment_out"]),
+      ...(can(user, "expenses.manage") ? [] : ["expense"]),
+      ...(can(user, "sourcing.manage") ? [] : ["payment_out"]),
     ];
     const rows = await this.prisma.db.auditLog.findMany({
       where: {

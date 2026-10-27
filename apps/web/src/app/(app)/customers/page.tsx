@@ -20,13 +20,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const country = sp.country?.toUpperCase();
   const data = await api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, page: toPage(sp.page) });
   const keep = { q: sp.q, country };
-  const canAdd = can(me.role, "customers.manage");
+  const canAdd = can(me, "customers.manage");
   const filtered = !!(sp.q || country);
   return (
     <div>
       <PageHeader
         title="Customers"
-        description={can(me.role, "inquiries.viewAll") ? "Every buyer, their contacts and what is open with them." : "The customers of the deals you handle or created."}
+        description={can(me, "inquiries.viewAll") ? "Every buyer, their contacts and what is open with them." : "The customers of the deals you handle or created."}
         actions={canAdd && <ButtonLink href="/customers/new" variant="primary">New customer</ButtonLink>}
       />
       <Card className="overflow-hidden p-0">

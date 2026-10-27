@@ -2,31 +2,33 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ROLE_LABEL, ROLES, type Role } from "@kebo/shared";
 import { buttonClass, Field, Input, Select } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
+import type { RoleRow } from "@/lib/types-people";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-const ROLE_HINT: Record<Role, string> = {
-  staff: "Works the deals and orders they handle; sees only their own customers.",
-  manager: "Sees and changes everything, assigns work, sees money and reports.",
-  admin: "Everything a manager does, plus people and settings.",
-};
-
 const PASSWORD_HINT = "At least 10 characters, with letters and at least one number.";
 
-function RoleField({ value, error, disabled }: { value: string; error?: string[]; disabled?: boolean }) {
+/** The roles they may be given: those within the giver's own (the current one always shows). */
+function RoleField({ value, roles, error, disabled }: { value: string; roles: RoleRow[]; error?: string[]; disabled?: boolean }) {
   const [picked, setPicked] = useState(value);
+  const options = roles.filter((r) => r.givable || r.key === value);
+  const role = roles.find((r) => r.key === picked);
+  const hint = disabled
+    ? "You cannot change your own role."
+    : role
+      ? `${role.description ?? ""}${role.requireTwoStep ? `${role.description ? " " : ""}Needs two-step sign-in: they set it up when they first sign in.` : ""}`
+      : undefined;
   return (
-    <Field label="Role" htmlFor="role" error={error} hint={disabled ? "You cannot change your own role." : ROLE_HINT[picked as Role]}>
+    <Field label="Role" htmlFor="role" error={error} hint={hint || undefined}>
       {/* Keyed by the value: a select's default only applies when it mounts, and React resets the form after each submit. */}
       <Select key={value} id="role" name="role" defaultValue={value} disabled={disabled} onChange={(e) => setPicked(e.target.value)}>
-        {ROLES.map((r) => (
-          <option key={r} value={r}>
-            {ROLE_LABEL[r]}
+        {options.map((r) => (
+          <option key={r.key} value={r.key} disabled={!r.givable}>
+            {r.name}
           </option>
         ))}
       </Select>
@@ -34,7 +36,7 @@ function RoleField({ value, error, disabled }: { value: string; error?: string[]
   );
 }
 
-export function NewUserForm({ action }: { action: Action }) {
+export function NewUserForm({ action, roles }: { action: Action; roles: RoleRow[] }) {
   return (
     <ActionForm action={action} className="flex flex-col gap-4">
       {(s) => (
@@ -46,7 +48,7 @@ export function NewUserForm({ action }: { action: Action }) {
             <Field label="Email" htmlFor="email" error={s.errors?.email} hint="They sign in with this">
               <Input id="email" name="email" type="email" autoComplete="off" defaultValue={s.values?.email} aria-invalid={!!s.errors?.email} />
             </Field>
-            <RoleField value={s.values?.role ?? "staff"} error={s.errors?.role} />
+            <RoleField value={s.values?.role ?? (roles.some((r) => r.key === "staff" && r.givable) ? "staff" : (roles.find((r) => r.givable)?.key ?? ""))} roles={roles} error={s.errors?.role} />
             <Field label="First password" htmlFor="password" error={s.errors?.password} hint={`${PASSWORD_HINT} Give it to them privately; they can change it under My account.`}>
               <Input id="password" name="password" type="text" autoComplete="new-password" spellCheck={false} defaultValue={s.values?.password} aria-invalid={!!s.errors?.password} />
             </Field>
@@ -63,7 +65,7 @@ export function NewUserForm({ action }: { action: Action }) {
   );
 }
 
-export function EditUserForm({ action, user, isMe }: { action: Action; user: { name: string; email: string; role: Role }; isMe: boolean }) {
+export function EditUserForm({ action, user, roles, isMe }: { action: Action; user: { name: string; email: string; role: string }; roles: RoleRow[]; isMe: boolean }) {
   return (
     <ActionForm action={action} className="flex flex-col gap-4">
       {(s) => (
@@ -76,7 +78,7 @@ export function EditUserForm({ action, user, isMe }: { action: Action; user: { n
           </Field>
           {/* A disabled select sends nothing, so the current role goes along hidden. */}
           {isMe && <input type="hidden" name="role" value={user.role} />}
-          <RoleField value={s.values?.role ?? user.role} error={s.errors?.role} disabled={isMe} />
+          <RoleField value={s.values?.role ?? user.role} roles={roles} error={s.errors?.role} disabled={isMe} />
           <div>
             <SubmitButton size="sm" pendingText="Saving…">
               Save details

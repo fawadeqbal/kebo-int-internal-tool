@@ -1,10 +1,12 @@
-import type { Role } from "./enums";
+import type { PresetRoleKey } from "./enums";
 
 /**
- * Role-based access. Every check in the API and the web goes through `can`, so
- * a role can be changed or added here without touching feature code.
- * Row-level rules (staff only see their own deals) live in the API's access
- * policies, not here.
+ * Access is by permission. Roles are rows in the database (made and edited
+ * under Security), each a set of these permissions; the Super Admin role always
+ * has every one, including any added later. Every check in the API and the web
+ * goes through `can`, with the permissions the API sends for the signed-in person.
+ * Row-level rules (people without "inquiries.viewAll" only see their own deals)
+ * live in the API's access policies, not here.
  */
 export const PERMISSIONS = [
   "dashboard.view",
@@ -31,11 +33,88 @@ export const PERMISSIONS = [
   "users.manage",
   "settings.manage",
   "audit.view",
+  /** Roles, two-step rules, everyone's sessions and sign-in history. */
+  "security.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-const MANAGER: readonly Permission[] = PERMISSIONS.filter((p) => p !== "users.manage" && p !== "settings.manage");
+export const isPermission = (p: string): p is Permission => (PERMISSIONS as readonly string[]).includes(p);
+
+/** How the role editor shows the permissions: grouped, each with a name and what it allows. */
+export const PERMISSION_GROUPS: { title: string; items: { permission: Permission; label: string; hint?: string }[] }[] = [
+  {
+    title: "Deals",
+    items: [
+      { permission: "inquiries.create", label: "Start deals", hint: "Add a customer's request as a new deal." },
+      {
+        permission: "inquiries.viewAll",
+        label: "See every deal",
+        hint: "Without it, they see only the deals they handle or started, and those deals' customers and orders. They also get the managers' reminders.",
+      },
+      { permission: "inquiries.updateAny", label: "Change anyone's deals", hint: "Work on deals handled by others, and remove factories." },
+      {
+        permission: "inquiries.assign",
+        label: "Hand deals to others",
+        hint: "Without it, they can only take unassigned deals themselves.",
+      },
+      { permission: "inquiries.reopen", label: "Reopen lost deals" },
+      { permission: "inquiries.delete", label: "Delete deals" },
+    ],
+  },
+  {
+    title: "Customers",
+    items: [
+      { permission: "customers.manage", label: "Add and edit customers" },
+      { permission: "customers.delete", label: "Delete customers" },
+      { permission: "customers.export", label: "Export customers" },
+    ],
+  },
+  {
+    title: "Factories and quotations",
+    items: [
+      {
+        permission: "sourcing.manage",
+        label: "Factories, factory prices, costs and margins",
+        hint: "Factory offers, what we pay, profit per line. Needed to quote a factory's offer.",
+      },
+      { permission: "quotations.manage", label: "Make and send quotations" },
+    ],
+  },
+  {
+    title: "Orders and money",
+    items: [
+      {
+        permission: "orders.update",
+        label: "Move orders along",
+        hint: "Next stage, dates, goods received, packing and the proforma, on deals they work on.",
+      },
+      { permission: "orders.manage", label: "Cancel orders, remove payments, ship with money due" },
+      { permission: "payments.record", label: "Record customer payments" },
+      { permission: "expenses.manage", label: "Expenses, factory payments and profit & loss" },
+    ],
+  },
+  {
+    title: "Overview",
+    items: [
+      { permission: "dashboard.view", label: "Dashboard" },
+      { permission: "reports.view", label: "Reports" },
+      { permission: "audit.view", label: "Audit log" },
+    ],
+  },
+  {
+    title: "Administration",
+    items: [
+      { permission: "users.manage", label: "People", hint: "Add people, give them a role, set passwords, switch them off." },
+      { permission: "settings.manage", label: "Company settings" },
+      { permission: "security.manage", label: "Security", hint: "Roles, two-step rules, everyone's sessions and sign-in history." },
+    ],
+  },
+];
+
+const MANAGER: readonly Permission[] = PERMISSIONS.filter(
+  (p) => p !== "users.manage" && p !== "settings.manage" && p !== "security.manage",
+);
 
 const STAFF: readonly Permission[] = [
   "dashboard.view",
@@ -46,12 +125,35 @@ const STAFF: readonly Permission[] = [
   "orders.update",
 ];
 
-export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  admin: PERMISSIONS,
-  manager: MANAGER,
-  staff: STAFF,
+/** The roles every installation starts with. Manager and Staff can be changed in Security; the Super Admin cannot. */
+export const PRESET_ROLES: Record<
+  PresetRoleKey,
+  { name: string; description: string; permissions: readonly Permission[]; superAdmin: boolean }
+> = {
+  admin: {
+    name: "Super Admin",
+    description: "Everything, always, including permissions added later.",
+    permissions: PERMISSIONS,
+    superAdmin: true,
+  },
+  manager: {
+    name: "Manager",
+    description: "Sees and changes everything, assigns work, sees money and reports.",
+    permissions: MANAGER,
+    superAdmin: false,
+  },
+  staff: {
+    name: "Staff",
+    description: "Works the deals and orders they handle; sees only their own customers.",
+    permissions: STAFF,
+    superAdmin: false,
+  },
 };
 
-export const can = (role: Role, permission: Permission): boolean => ROLE_PERMISSIONS[role].includes(permission);
+/** What a role allows: every permission for the Super Admin; otherwise its known permissions, in the usual order. */
+export const permissionsOfRole = (role: { superAdmin: boolean; permissions: readonly string[] }): Permission[] =>
+  role.superAdmin ? [...PERMISSIONS] : PERMISSIONS.filter((p) => role.permissions.includes(p));
 
-export const permissionsOf = (role: Role): Permission[] => [...ROLE_PERMISSIONS[role]];
+/** Whether the signed-in person (as the API describes them) may do something. */
+export const can = (who: { permissions: readonly string[] } | null | undefined, permission: Permission): boolean =>
+  !!who?.permissions.includes(permission);

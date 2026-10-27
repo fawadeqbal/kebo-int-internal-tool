@@ -24,7 +24,7 @@ export class ErrorFilter implements ExceptionFilter {
     if (error instanceof ReasonNeededError) return send(409, { error: error.message, code: error.code, choices: error.choices });
     if (error instanceof GateError) return send(409, { error: error.message, code: error.code });
     if (error instanceof NotFoundError) return send(404, { error: error.message });
-    if (error instanceof ForbiddenError) return send(403, { error: error.message });
+    if (error instanceof ForbiddenError) return send(403, { error: error.message, ...(error.code ? { code: error.code } : {}) });
     if (error instanceof ConflictError) return send(409, { error: error.message });
     if (error instanceof DomainError) return send(400, { error: error.message });
     if (isDbError(error, DB_ERROR.notFound)) return send(404, { error: "This record no longer exists. Reload and try again." });
