@@ -171,7 +171,8 @@ describe("orders: four stages", () => {
   it("makes the documents from the order", async () => {
     const o = await order();
     const pi = (await api(app, sana).get(`/orders/${orderId}/documents/proforma`).expect(200)).body;
-    expect(pi).toMatchObject({ title: "Proforma invoice", number: o.refNo.replace("SO-", "PI-"), date: o.orderedOn, currency: "USD", showPrices: true });
+    // A draft (no number) until it is issued.
+    expect(pi).toMatchObject({ title: "Proforma invoice", number: null, draft: true, currency: "USD", showPrices: true });
     expect(pi.lines.map((l: { type: string }) => l.type)).toEqual(["goods", "charge"]);
     expect(pi.totals).toMatchObject({ discount: "100.00", total: o.total, depositPercent: 30 });
     expect(pi.customer).toMatchObject({ name: `Kano Agro ${tag}` });

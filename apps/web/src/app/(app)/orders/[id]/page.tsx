@@ -13,6 +13,8 @@ import {
   type OrderStage,
 } from "@kebo/shared";
 import { Badge, buttonClass, Card, CardBody, CardHeader, cn, OrderStageBadge, PageHeader } from "@kebo/ui";
+import { ConfirmSubmit } from "@kebo/ui/client";
+import { ActionForm } from "@/components/common/action-form";
 import { api } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
 import { date, dateTime, money } from "@/lib/format";
@@ -30,6 +32,7 @@ import { describeFileAction } from "../../deals/actions";
 import { DocumentsPanel } from "@/components/deals/documents-panel";
 import {
   cancelOrderAction,
+  issueProformaAction,
   detailsAction,
   moveStageAction,
   orderNoteAction,
@@ -374,6 +377,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <span className="flex flex-col">
                       <span className="flex items-center gap-2 text-sm font-medium">
                         <FileText className="size-4 text-muted" aria-hidden /> {d.label}
+                        {d.kind === "proforma" &&
+                          (o.proforma ? (
+                            <span className="font-normal text-text-2 tabular">
+                              {o.proforma.number}
+                              {o.proforma.issuedOn ? ` · issued ${date(o.proforma.issuedOn)}` : ""}
+                            </span>
+                          ) : (
+                            <Badge tone="warn">Draft · no number yet</Badge>
+                          ))}
                       </span>
                       {d.kind !== "packing-list" && (
                         <a
@@ -385,6 +397,18 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                       )}
                     </span>
                     <span className="flex flex-wrap gap-2">
+                      {d.kind === "proforma" && !o.proforma && canMove && (
+                        <ActionForm action={issueProformaAction.bind(null, o.id)} className="inline-flex">
+                          <ConfirmSubmit
+                            size="sm"
+                            variant="primary"
+                            pendingText="Issuing…"
+                            message="Issue the proforma now? It gets its number dated today (KEB, the date, the customer's letters, the handler's count) and the number does not change afterwards."
+                          >
+                            Issue the proforma
+                          </ConfirmSubmit>
+                        </ActionForm>
+                      )}
                       <Link
                         href={h.view}
                         target="_blank"

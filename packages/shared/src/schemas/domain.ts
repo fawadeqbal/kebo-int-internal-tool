@@ -51,6 +51,17 @@ export const customerInput = z.object({
   taxNo: optionalText(60),
   regNo: optionalText(60),
   defaultCurrency: currency.default("USD"),
+  /** Letters on documents (proforma numbers), e.g. "TN". Empty: from the name. */
+  initials: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+    z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{1,6}$/, "Use 1 to 6 letters, e.g. TN")
+      .nullable()
+      .default(null),
+  ),
   notes: optionalText(5000),
   contacts: z.array(contactInput).min(1, "Add at least one contact").max(20),
   reason: reasonField,

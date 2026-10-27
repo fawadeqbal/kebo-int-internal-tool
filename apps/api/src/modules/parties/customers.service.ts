@@ -135,6 +135,7 @@ export class CustomersService {
       taxNo: input.taxNo,
       regNo: input.regNo,
       defaultCurrency: input.defaultCurrency,
+      initials: input.initials,
       notes: input.notes,
     };
   }

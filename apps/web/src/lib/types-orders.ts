@@ -81,6 +81,8 @@ export interface OrderView {
   lines: OrderLineView[];
   goods: OrderGoodsView;
   documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
+  /** The proforma's number once issued (KEB260916TN07); null while it is a draft. */
+  proforma: { number: string; issuedOn: string | null } | null;
   /** The chosen factory's own quotation, catalogue and screenshots (people who see factory prices). */
   factoryFiles: (OfferFile & { factory: string })[];
 }
@@ -187,7 +189,9 @@ export interface CustomerSnapshot {
 export interface OrderDocument {
   kind: OrderDocumentKind;
   title: string;
-  number: string;
+  /** null: a proforma not issued yet (a draft). */
+  number: string | null;
+  draft: boolean;
   date: string;
   company: CompanySnapshot;
   customer: CustomerSnapshot;

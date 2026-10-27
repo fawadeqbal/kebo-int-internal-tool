@@ -261,6 +261,22 @@ describe("quotation options from factory offers", () => {
     expect(pl).toMatchObject({ paymentTermsText: null, deliveryTermsText: null });
   });
 
+  it("gives the proforma its KEB number when it is issued, and keeps it", async () => {
+    const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
+    const id = deal.orders[0].id;
+    // Before: a draft without a number.
+    expect((await api(app, sana).get(`/orders/${id}`).expect(200)).body.proforma).toBeNull();
+    expect((await api(app, sana).get(`/orders/${id}/documents/proforma`).expect(200)).body).toMatchObject({ number: null, draft: true });
+    const issued = (await api(app, sana).post(`/orders/${id}/proforma`).expect(200)).body.proforma;
+    // KEB + YYMMDD (today) + the customer's letters (Kampala Juices → KJ) + Sana's count this year.
+    const yymmdd = issued.issuedOn.slice(2).replace(/-/g, "");
+    expect(issued.number).toMatch(new RegExp(`^KEB${yymmdd}KJ\\d{2,}$`));
+    expect((await api(app, sana).get(`/orders/${id}/documents/proforma`).expect(200)).body).toMatchObject({ number: issued.number, draft: false, date: issued.issuedOn });
+    expect((await api(app, sana).post(`/orders/${id}/proforma`).expect(400)).body.error).toBe(`The proforma is already issued as ${issued.number}.`);
+    // The packing list keeps the order's number.
+    expect((await api(app, sana).get(`/orders/${id}/documents/packing-list`).expect(200)).body.number).toMatch(/^PL-\d{4}-\d{4}$/);
+  });
+
   it("keeps the chosen factory's quotation with the order", async () => {
     await request(app.getHttpServer())
       .post(`/api/inquiries/${inquiryId}/files`)

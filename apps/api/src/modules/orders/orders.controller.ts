@@ -82,6 +82,13 @@ export class OrdersController {
     return this.orders.savePacking(user, id, body);
   }
 
+  /** Gives the proforma its number (KEB260916TN07), dated today. Once issued it does not change. */
+  @Post(":id/proforma")
+  @HttpCode(200)
+  issueProforma(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.orders.issueProforma(user, id);
+  }
+
   /** { reason } — managers only; the deal becomes lost (customer cancelled) and can be reopened. */
   @Post(":id/cancel")
   @HttpCode(200)

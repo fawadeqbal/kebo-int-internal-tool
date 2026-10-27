@@ -32,6 +32,8 @@ export interface CustomerDetail {
   address: string | null;
   taxNo: string | null;
   regNo: string | null;
+  /** Letters on documents (proforma numbers); null: from the name. */
+  initials: string | null;
   defaultCurrency: string;
   notes: string | null;
   createdAt: string;
