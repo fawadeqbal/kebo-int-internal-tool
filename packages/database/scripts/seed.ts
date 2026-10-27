@@ -285,8 +285,8 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
       if (shippedOn) await pay("balance", cny - Math.round(cny * 0.3), addDays(shippedOn, -3));
     }
     if (shippedOn) {
-      await db.expense.create({ data: { orderId: order.id, category: "inland_transport", description: "Truck from the factory to Qingdao port", amount: "3200.00", currency: "CNY", rate, spentOn: toDbDate(addDays(shippedOn, -2)), paidById: o.assignee ?? people.manager.id, recordedById: people.manager.id } });
-      await db.expense.create({ data: { orderId: order.id, category: "inspection", description: "Pre-shipment inspection", amount: "280.00", currency: "USD", rate: 1, spentOn: toDbDate(addDays(shippedOn, -4)), recordedById: people.manager.id } });
+      await db.expense.create({ data: { orderId: order.id, customerId: customer.id, category: "inland_transport", description: "Truck from the factory to Qingdao port", amount: "3200.00", currency: "CNY", rate, spentOn: toDbDate(addDays(shippedOn, -2)), paidById: o.assignee ?? people.manager.id, recordedById: people.manager.id } });
+      await db.expense.create({ data: { orderId: order.id, customerId: customer.id, category: "inspection", description: "Pre-shipment inspection", amount: "280.00", currency: "USD", rate: 1, spentOn: toDbDate(addDays(shippedOn, -4)), recordedById: people.manager.id } });
     }
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     if (o.order.paid !== "none") {
@@ -332,7 +332,21 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
   for (const back of [0, 1]) {
     const on = addDays(today, -back * 30);
     await db.expense.create({ data: { category: "rent", description: "Office rent, Jining", amount: "8000.00", currency: "CNY", rate, spentOn: toDbDate(on), recordedById: people.manager.id } });
-    await db.expense.create({ data: { category: "office", description: "Phone and internet", amount: "450.00", currency: "CNY", rate, spentOn: toDbDate(on), recordedById: people.manager.id } });
+    await db.expense.create({ data: { category: "utilities", description: "Phone and internet", amount: "450.00", currency: "CNY", rate, spentOn: toDbDate(on), recordedById: people.manager.id } });
+  }
+  // Spent on customers before or around their orders: visits, dinners, samples.
+  const onCustomer = [
+    { customer: 0, category: "travel", description: "Flight to Lagos to visit the plant", amount: "1450.00", currency: "USD", back: 3 },
+    { customer: 0, category: "hotel", description: "Hotel in Lagos, 3 nights", amount: "540.00", currency: "USD", back: 2 },
+    { customer: 0, category: "meals", description: "Dinner with the customer's buyers", amount: "1200.00", currency: "CNY", back: 1 },
+    { customer: 1, category: "samples", description: "Valve samples by courier", amount: "860.00", currency: "CNY", back: 6 },
+    { customer: 2, category: "meals", description: "Lunch at the Canton Fair", amount: "680.00", currency: "CNY", back: 0 },
+    { customer: 2, category: "gifts", description: "Tea gift set", amount: "420.00", currency: "CNY", back: 0 },
+  ] as const;
+  for (const e of onCustomer) {
+    await db.expense.create({
+      data: { customerId: customers[e.customer].id, category: e.category, description: e.description, amount: e.amount, currency: e.currency, rate: e.currency === "USD" ? 1 : rate, spentOn: toDbDate(addDays(today, -e.back)), paidById: people.manager.id, recordedById: people.manager.id },
+    });
   }
   console.log("[seed] demo data created: 4 customers, 3 factories, 10 deals (orders: 1 confirmed, 1 in production, 1 shipped, 1 done)");
   console.log("[seed] demo people bilal@example.com / sana@example.com, password Demo@12345");

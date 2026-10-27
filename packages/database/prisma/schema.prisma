@@ -355,6 +355,7 @@ model Customer {
   inquiries Inquiry[]
   orders    Order[]
   payments  Payment[]
+  expenses  Expense[]
 
   @@index([name])
   @@index([country])
@@ -922,6 +923,9 @@ model Expense {
   id           String    @id @default(uuid()) @db.Uuid
   orderId      String?   @map("order_id") @db.Uuid
   order        Order?    @relation(fields: [orderId], references: [id])
+  /// Who it was spent on (a dinner, a ticket to visit them…); for an order always its customer. Empty: the company's own cost.
+  customerId   String?   @map("customer_id") @db.Uuid
+  customer     Customer? @relation(fields: [customerId], references: [id])
   /// See EXPENSE_CATEGORIES in @kebo/shared.
   category     String    @db.VarChar(30)
   description  String    @db.VarChar(200)
@@ -934,6 +938,11 @@ model Expense {
   paidBy       User?     @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
   reference    String?   @db.VarChar(120)
   note         String?
+  /// A photo or PDF of the receipt or ticket.
+  receiptKey   String?   @map("receipt_key")
+  receiptName  String?   @map("receipt_name") @db.VarChar(255)
+  receiptType  String?   @map("receipt_type") @db.VarChar(150)
+  receiptSize  Int?      @map("receipt_size")
   recordedById String    @map("recorded_by") @db.Uuid
   voidedAt     DateTime? @map("voided_at") @db.Timestamptz
   voidReason   String?   @map("void_reason")
@@ -941,6 +950,7 @@ model Expense {
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([orderId])
+  @@index([customerId])
   @@index([spentOn])
   @@map("expenses")
 }

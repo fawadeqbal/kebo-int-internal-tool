@@ -1,7 +1,27 @@
-import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Module,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import type { Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
+  EXPENSE_CATEGORIES,
   expenseInput,
   factoryPaymentInput,
   paymentPlanInput,
@@ -18,7 +38,15 @@ import { OrdersModule } from "../orders/orders.module";
 import { MoneyService } from "./money.service";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
-const expenseQuery = z.object({ from: date, to: date, orderId: z.uuid().optional(), kind: z.enum(["order", "general"]).optional() });
+const expenseQuery = z.object({
+  from: date,
+  to: date,
+  orderId: z.uuid().optional(),
+  customerId: z.uuid().optional(),
+  category: z.enum(EXPENSE_CATEGORIES).optional(),
+  kind: z.enum(["order", "customer", "general"]).optional(),
+});
+const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
 const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
 const flag = z
   .enum(["true", "false"])
@@ -77,7 +105,7 @@ class MoneyController {
     return this.money.payables(user, q.mine);
   }
 
-  /** Managers only. ?from&to (dates), ?orderId, ?kind=order|general */
+  /** Managers only. ?from&to (dates), ?orderId, ?customerId, ?category, ?kind=order|customer|general; with totals by kind and by customer. */
   @Get("expenses")
   expenses(@CurrentUser() user: SessionUser, @Query(Validate(expenseQuery)) q: z.infer<typeof expenseQuery>) {
     return this.money.listExpenses(user, q);
@@ -102,6 +130,32 @@ class MoneyController {
     @Body(Validate(voidInput)) body: z.infer<typeof voidInput>,
   ) {
     return this.money.voidExpense(user, id, body.reason);
+  }
+
+  /** multipart/form-data with one `file`: a photo or PDF of the receipt (replaces the one there). */
+  @Post("expenses/:id/receipt")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
+  attachReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
+    if (!file) throw new z.ZodError([{ code: "custom", path: ["file"], message: "Choose a photo or PDF of the receipt", input: undefined }]);
+    return this.money.attachReceipt(user, id, file);
+  }
+
+  @Get("expenses/:id/receipt")
+  async receipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
+    const f = await this.money.receipt(user, id);
+    res.set({
+      "Content-Type": f.mimeType,
+      "Content-Length": String(f.size),
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-store",
+    });
+    return new StreamableFile(f.stream);
+  }
+
+  @Delete("expenses/:id/receipt")
+  removeReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.money.removeReceipt(user, id);
   }
 
   /** Managers only: the year month by month, earned and cash, in the main currency. */

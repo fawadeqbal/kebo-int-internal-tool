@@ -454,12 +454,14 @@ export type FactoryPaymentInput = z.infer<typeof factoryPaymentInput>;
 /* ---------------------------------------------------------------- expenses */
 
 /**
- * A cost: for one order (freight, inspection…) or for the company (rent,
- * salaries…). `rate` turns it into the main currency (units of its currency per
- * one main-currency unit); it starts from Settings.
+ * A cost: for one order (freight, inspection…), spent on a customer (a dinner,
+ * tickets to visit them…), or for the company (rent, salaries…). An order's
+ * cost is always on its customer. `rate` turns it into the main currency (units
+ * of its currency per one main-currency unit); it starts from Settings.
  */
 export const expenseInput = z.object({
   orderId: optionalId,
+  customerId: optionalId,
   category: z.enum(EXPENSE_CATEGORIES),
   description: text(200, "Say what it was for"),
   amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),

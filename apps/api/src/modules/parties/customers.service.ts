@@ -24,6 +24,10 @@ export class CustomersService {
     private readonly audit: AuditService,
   ) {}
 
+  names(user: SessionUser) {
+    return this.prisma.db.customer.findMany({ where: { deletedAt: null, ...customerAccess(user) }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  }
+
   async list(user: SessionUser, q: ListQuery & { country?: string }) {
     const term = q.q?.trim();
     const where: Prisma.CustomerWhereInput = {

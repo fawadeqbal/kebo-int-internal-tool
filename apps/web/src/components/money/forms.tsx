@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, Paperclip, Pencil, Plus, X } from "lucide-react";
 import { toMinor, formatMinor } from "@kebo/money";
 import {
   EXPENSE_CATEGORIES,
@@ -11,6 +12,7 @@ import {
   PAYMENT_KINDS,
   PAYMENT_METHOD_LABEL,
   PAYMENT_METHODS,
+  type ExpenseCategory,
   type InstalmentStatus,
   type PaymentKind,
   type PaymentMethod,
@@ -625,7 +627,85 @@ export function EditFactoryPayment(props: Omit<Parameters<typeof FactoryPaymentF
 
 /* ---------------------------------------------------------------- expenses */
 
-/** An expense for an order or for the company (new, or a change that asks why). */
+/** Who an expense is for: the company's own cost, spent on a customer, or a cost of one order. */
+type ForWhom = "company" | "customer" | "order";
+
+/** What the expense form can point at (the Money page and a customer's page). */
+export interface ExpenseChoices {
+  customers: { id: string; name: string }[];
+  /** Open orders, with their customer. */
+  orders: { id: string; refNo: string; customerId: string; customer: string }[];
+  /** On a customer's page: the expense is always on this customer (or one of their orders). */
+  customerId?: string;
+}
+
+const DEFAULT_KIND: Record<ForWhom, ExpenseCategory> = { company: "rent", customer: "meals", order: "freight" };
+
+const PLACEHOLDER: Partial<Record<ExpenseCategory, string>> = {
+  travel: "e.g. Flight Lahore → Guangzhou",
+  hotel: "e.g. Hotel in Lagos, 3 nights",
+  meals: "e.g. Dinner with the buyers",
+  gifts: "e.g. Tea gift set",
+  samples: "e.g. Samples by courier",
+  freight: "e.g. Sea freight to Karachi",
+  inland_transport: "e.g. Truck to Qingdao port",
+  inspection: "e.g. Pre-shipment inspection",
+  rent: "e.g. Office rent, October",
+  salaries: "e.g. Salaries, October",
+  utilities: "e.g. Electricity bill",
+  office: "e.g. Printer paper and ink",
+};
+
+/** Sends a receipt for a saved expense; returns an error message, or null when it is kept. */
+export async function uploadReceipt(expenseId: string, file: File): Promise<string | null> {
+  const body = new FormData();
+  body.set("file", file, file.name);
+  try {
+    const res = await fetch(`/files/expenses/${expenseId}`, { method: "POST", body });
+    if (res.ok) return null;
+    if (res.status === 413) return "This file is too large.";
+    return ((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Upload failed (${res.status})`;
+  } catch {
+    return "The connection dropped. Try again.";
+  }
+}
+
+/** A photo or PDF to keep with the expense (chosen here, sent once the expense is saved). */
+function ReceiptPicker({ file, onChange, current }: { file: File | null; onChange: (f: File | null) => void; current?: string | null }) {
+  return (
+    <Field
+      label="Receipt or ticket"
+      htmlFor="ex-receipt"
+      optional
+      hint={file ? undefined : current ? `Kept: ${current}. A new one replaces it.` : "A photo or PDF"}
+      className="sm:col-span-3"
+    >
+      {file ? (
+        <span className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm">
+          <Paperclip className="size-4 shrink-0 text-muted" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">{file.name}</span>
+          <Button type="button" size="xs" variant="ghost" onClick={() => onChange(null)} aria-label="Do not attach this file">
+            <X aria-hidden />
+          </Button>
+        </span>
+      ) : (
+        <Input
+          id="ex-receipt"
+          type="file"
+          accept="image/*,application/pdf"
+          className="file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-2.5 file:py-1 file:text-xs file:font-medium"
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        />
+      )}
+    </Field>
+  );
+}
+
+/**
+ * An expense (new, again from an earlier one, or a change that asks why). With
+ * `choices` it asks who it is for: the company, a customer, or one of their
+ * orders; on an order's page it is always for that order.
+ */
 export function ExpenseForm({
   action,
   people,
@@ -633,8 +713,10 @@ export function ExpenseForm({
   fx,
   today,
   expense,
-  orders,
+  template,
+  choices,
   onClose,
+  onReceiptError,
 }: {
   action: Action;
   people: Person[];
@@ -642,37 +724,134 @@ export function ExpenseForm({
   /** Settings rates: the amount is converted when the currency changes. */
   fx: Fx;
   today: string;
+  /** The expense being changed. */
   expense?: ExpenseView;
-  /** On the Money page: the orders an expense can belong to (empty = company). */
-  orders?: { id: string; refNo: string; label: string }[];
+  /** A new expense filled in from this one ("Add again": next month's rent, the return ticket…). */
+  template?: ExpenseView;
+  choices?: ExpenseChoices;
   onClose: () => void;
+  /** The expense was saved but its receipt was not. */
+  onReceiptError?: (message: string) => void;
 }) {
-  const m = useMoneyFields(fx, mainCurrency, { currency: expense?.currency ?? mainCurrency, amount: expense?.amount ?? "", rate: expense ? String(expense.rate) : "" });
+  const from = expense ?? template;
+  const fixedCustomer = choices?.customerId ?? null;
+  const [forWhom, setForWhomRaw] = useState<ForWhom>(from?.order ? "order" : from?.customer || fixedCustomer ? "customer" : "company");
+  const [customerId, setCustomerId] = useState(fixedCustomer ?? from?.customer?.id ?? "");
+  const [orderId, setOrderId] = useState(from?.orderId ?? "");
+  const [category, setCategory] = useState<ExpenseCategory>(from?.category ?? DEFAULT_KIND[forWhom]);
+  const [kindTouched, setKindTouched] = useState(Boolean(from));
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const router = useRouter();
+  const m = useMoneyFields(fx, mainCurrency, { currency: from?.currency ?? mainCurrency, amount: from?.amount ?? "", rate: expense ? String(expense.rate) : "" });
+
+  const setForWhom = (to: ForWhom) => {
+    setForWhomRaw(to);
+    if (!kindTouched) setCategory(DEFAULT_KIND[to]);
+  };
+  const orders = (choices?.orders ?? []).filter((o) => !fixedCustomer || o.customerId === fixedCustomer);
+  const pickOrder = (id: string) => {
+    setOrderId(id);
+    const o = orders.find((x) => x.id === id);
+    if (o && !fixedCustomer) setCustomerId(o.customerId);
+  };
+  const forOptions: { value: ForWhom; label: string }[] = fixedCustomer
+    ? [
+        { value: "customer", label: "This customer" },
+        { value: "order", label: "One of their orders" },
+      ]
+    : [
+        { value: "company", label: "The company" },
+        { value: "customer", label: "A customer" },
+        { value: "order", label: "An order" },
+      ];
+
+  const done = async (s: ActionState) => {
+    const id = (s.data as { id?: string } | undefined)?.id ?? expense?.id;
+    if (file && id) {
+      setSending(true);
+      const error = await uploadReceipt(id, file);
+      setSending(false);
+      router.refresh();
+      if (error) onReceiptError?.(`The expense is saved, but the receipt was not: ${error} Open the expense to add it again.`);
+    }
+    onClose();
+  };
+
   return (
-    <ActionForm action={action} onDone={onClose} className={framed}>
+    <ActionForm action={action} onDone={done} className={framed} keepFields>
       {(s) => (
         <>
-          <p className="text-sm font-medium">{expense ? "Change the expense" : "New expense"}</p>
+          <p className="text-sm font-medium">{expense ? "Change the expense" : template ? "Add it again" : "New expense"}</p>
+          {choices && (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-text-2" id="ex-for-label">
+                Who is it for?
+              </span>
+              <div role="radiogroup" aria-labelledby="ex-for-label" className="inline-flex w-fit flex-wrap rounded-lg border border-line bg-surface-2 p-0.5">
+                {forOptions.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={forWhom === o.value}
+                    onClick={() => setForWhom(o.value)}
+                    className={cn(
+                      "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted transition-colors hover:text-text",
+                      forWhom === o.value && "bg-surface text-text shadow-card",
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {forWhom === "customer" && !fixedCustomer && (
+                  <Field label="Customer" htmlFor="ex-customer" error={s.errors?.customerId}>
+                    <Select id="ex-customer" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+                      <option value="">Choose the customer…</option>
+                      {choices.customers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+                {forWhom === "order" && (
+                  <Field label="Order" htmlFor="ex-order" error={s.errors?.orderId} hint={orders.length === 0 ? "No open order" : undefined}>
+                    <Select id="ex-order" value={orderId} onChange={(e) => pickOrder(e.target.value)}>
+                      <option value="">Choose the order…</option>
+                      {orders.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.refNo}
+                          {fixedCustomer ? "" : ` — ${o.customer}`}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+              </div>
+              {forWhom === "company" && <p className="text-xs text-muted">Rent, salaries, bills and other costs of running the company.</p>}
+              {forWhom === "customer" && (
+                <p className="text-xs text-muted">Tickets, hotels, dinners, gifts and samples spent on winning or keeping this customer.</p>
+              )}
+              <input type="hidden" name="customerId" value={forWhom === "company" ? "" : customerId} />
+              <input type="hidden" name="orderId" value={forWhom === "order" ? orderId : ""} />
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-3">
-            {orders && (
-              <Field label="For" htmlFor="ex-order" className="sm:col-span-3">
-                <Select id="ex-order" name="orderId" defaultValue={s.values?.orderId ?? expense?.orderId ?? ""}>
-                  <option value="">The company (rent, salaries, office…)</option>
-                  {orders.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.refNo} — {o.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            )}
             <Field label="Kind" htmlFor="ex-category" error={s.errors?.category}>
               <Choice
                 id="ex-category"
                 name="category"
                 options={EXPENSE_CATEGORIES}
                 labels={EXPENSE_CATEGORY_LABEL}
-                value={(s.values?.category as (typeof EXPENSE_CATEGORIES)[number]) ?? expense?.category ?? (orders ? "office" : "freight")}
+                value={category}
+                onChange={(v) => {
+                  setCategory(v);
+                  setKindTouched(true);
+                }}
               />
             </Field>
             <Field label="What for" htmlFor="ex-description" error={s.errors?.description} className="sm:col-span-2">
@@ -680,8 +859,8 @@ export function ExpenseForm({
                 id="ex-description"
                 name="description"
                 maxLength={200}
-                defaultValue={s.values?.description ?? expense?.description ?? ""}
-                placeholder="e.g. Truck to Qingdao port"
+                defaultValue={s.values?.description ?? from?.description ?? ""}
+                placeholder={PLACEHOLDER[category] ?? "Say what it was for"}
               />
             </Field>
             <Field label="Currency" htmlFor="ex-currency" error={s.errors?.currency} hint="Changing it converts the amount">
@@ -725,18 +904,21 @@ export function ExpenseForm({
               <Input id="ex-spentOn" name="spentOn" type="date" max={today} defaultValue={s.values?.spentOn ?? expense?.spentOn ?? today} />
             </Field>
             <Field label="Paid by" htmlFor="ex-paidBy" optional>
-              <PeopleSelect id="ex-paidBy" value={s.values?.paidById ?? expense?.paidBy?.id ?? ""} people={people} none="Not said" />
+              <PeopleSelect id="ex-paidBy" value={s.values?.paidById ?? from?.paidBy?.id ?? ""} people={people} none="Not said" />
             </Field>
-            <Field label="Receipt / reference" htmlFor="ex-reference" optional>
+            <Field label="Bill / ticket number" htmlFor="ex-reference" optional>
               <Input id="ex-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? expense?.reference ?? ""} />
             </Field>
+            <Field label="Note" htmlFor="ex-note" optional className="sm:col-span-3">
+              <Textarea id="ex-note" name="note" rows={2} maxLength={2000} defaultValue={s.values?.note ?? expense?.note ?? ""} />
+            </Field>
+            <ReceiptPicker file={file} onChange={setFile} current={expense?.receipt?.name} />
           </div>
-          <input type="hidden" name="note" value={expense?.note ?? ""} />
           <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…">
-              {expense ? "Save the change" : "Add the expense"}
+            <SubmitButton size="sm" pendingText="Saving…" disabled={sending}>
+              {sending ? "Sending the receipt…" : expense ? "Save the change" : "Add the expense"}
             </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+            <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={sending}>
               Cancel
             </Button>
           </div>
@@ -746,30 +928,53 @@ export function ExpenseForm({
   );
 }
 
-export function NewExpense(props: Omit<Parameters<typeof ExpenseForm>[0], "onClose" | "expense"> & { label?: string }) {
-  const [open, setOpen] = useState(false);
-  if (!open)
-    return (
-      <div>
-        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-          <Plus aria-hidden /> {props.label ?? "Add an expense"}
+function Notice({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+  return (
+    <Alert tone="warning" className="w-full">
+      <span className="flex items-start justify-between gap-2">
+        {text}
+        <Button type="button" size="xs" variant="ghost" onClick={onDismiss} aria-label="Close this message">
+          <X aria-hidden />
         </Button>
-      </div>
-    );
-  return <ExpenseForm {...props} onClose={() => setOpen(false)} />;
+      </span>
+    </Alert>
+  );
 }
 
-export function EditExpense(props: Omit<Parameters<typeof ExpenseForm>[0], "onClose">) {
+export function NewExpense(props: Omit<Parameters<typeof ExpenseForm>[0], "onClose" | "expense" | "onReceiptError"> & { label?: string }) {
   const [open, setOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  return (
+    <div className={cn("flex flex-col gap-2", (open || notice) && "w-full")}>
+      {notice && <Notice text={notice} onDismiss={() => setNotice(null)} />}
+      {open ? (
+        <ExpenseForm {...props} onClose={() => setOpen(false)} onReceiptError={setNotice} />
+      ) : (
+        <div>
+          <Button size={props.template ? "xs" : "sm"} variant={props.template ? "ghost" : "primary"} onClick={() => setOpen(true)}>
+            {props.template ? <Copy aria-hidden /> : <Plus aria-hidden />} {props.label ?? "Add an expense"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function EditExpense(props: Omit<Parameters<typeof ExpenseForm>[0], "onClose" | "onReceiptError">) {
+  const [open, setOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   if (!open)
     return (
-      <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
-        Change
-      </Button>
+      <>
+        <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
+          <Pencil aria-hidden /> Change
+        </Button>
+        {notice && <Notice text={notice} onDismiss={() => setNotice(null)} />}
+      </>
     );
   return (
     <div className="mt-2 w-full">
-      <ExpenseForm {...props} onClose={() => setOpen(false)} />
+      <ExpenseForm {...props} onClose={() => setOpen(false)} onReceiptError={setNotice} />
     </div>
   );
 }

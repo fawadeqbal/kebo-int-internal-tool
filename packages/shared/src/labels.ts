@@ -115,17 +115,21 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 };
 
 export const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
+  travel: "Travel & tickets",
+  hotel: "Hotels",
+  meals: "Meals & entertainment",
+  gifts: "Gifts",
+  samples: "Samples",
   freight: "Sea / air freight",
   inland_transport: "Inland transport",
   inspection: "Inspection",
   customs: "Customs & documents",
   bank_charges: "Bank charges",
   commission: "Commission",
-  samples: "Samples",
-  travel: "Travel",
-  office: "Office",
-  salaries: "Salaries",
   rent: "Rent",
+  salaries: "Salaries",
+  utilities: "Electricity, internet & phone",
+  office: "Office",
   other: "Other",
 };
 

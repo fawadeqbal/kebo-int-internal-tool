@@ -101,7 +101,26 @@ export const PAYMENT_METHODS = values("bank_transfer", "letter_of_credit", "cash
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 /** What a cost was for. Order expenses belong to one order; general ones to the company (rent, salaries…). */
-export const EXPENSE_CATEGORIES = values("freight", "inland_transport", "inspection", "customs", "bank_charges", "commission", "samples", "travel", "office", "salaries", "rent", "other");
+export const EXPENSE_CATEGORIES = values(
+  "travel",
+  "hotel",
+  "meals",
+  "gifts",
+  "samples",
+  "freight",
+  "inland_transport",
+  "inspection",
+  "customs",
+  "bank_charges",
+  "commission",
+  "rent",
+  "salaries",
+  "utilities",
+  "office",
+  "other",
+);
+/** The company's running costs, the same every month whoever the customers are. */
+export const RUNNING_COST_CATEGORIES: readonly ExpenseCategory[] = ["rent", "salaries", "utilities", "office"];
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
 /** The costs between a factory's price and ours (see workflows/basis). */

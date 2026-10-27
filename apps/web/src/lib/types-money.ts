@@ -77,6 +77,8 @@ export interface ExpenseView {
   id: string;
   order: { id: string; refNo: string } | null;
   orderId: string | null;
+  /** Who it was spent on; an order's expense is always on its customer. Null: the company's own cost. */
+  customer: { id: string; name: string } | null;
   category: ExpenseCategory;
   description: string;
   amount: string;
@@ -87,13 +89,22 @@ export interface ExpenseView {
   paidBy: Person | null;
   reference: string | null;
   note: string | null;
+  receipt: { name: string; type: string; size: number } | null;
   voided: { at: string; reason: string | null } | null;
 }
 
-/** GET /expenses */
+/** GET /expenses: what is shown, with its totals (in the main currency). */
 export interface ExpenseList {
   currency: string;
   total: string;
+  count: number;
+  /** The company's own costs and the costs spent on customers. */
+  company: string;
+  customers: string;
+  /** Ignores the kind filter, so every kind is still there to pick. */
+  byCategory: { category: ExpenseCategory; total: string; count: number }[];
+  /** Ignores the customer filter. */
+  byCustomer: { customer: { id: string; name: string }; total: string; count: number; orders: number }[];
   rows: ExpenseView[];
 }
 
