@@ -1,4 +1,4 @@
-import type { AttachmentKind, BalanceTerms, Incoterm, InquiryChannel, LineType, LostReason, RevisionStatus } from "@kebo/shared";
+import type { AttachmentKind, BalanceTerms, BasisStep, Incoterm, InquiryChannel, LineType, LostReason, RevisionStatus } from "@kebo/shared";
 
 /** Response shapes for the deal-work screens: inquiry form, factory prices, quotation, reports. */
 
@@ -117,7 +117,9 @@ export interface FactoryQuoteView {
   receivedOn: string;
   validUntil: string | null;
   currency: string;
-  priceBasis: string | null;
+  /** What the factory's prices already pay for (EXW, FOB…), and where. */
+  basis: Incoterm | null;
+  basisPlace: string | null;
   leadTime: string | null;
   moq: string | null;
   paymentTerms: string | null;
@@ -190,6 +192,19 @@ export interface Costing {
   cost: string;
   sales: string;
   profit: string;
+  /** Costs to reach the basis we sell on (to the port, freight…), part of the cost. */
+  extraCostMinor: number;
+  extraCost: string;
+}
+
+/** A cost between the factory's basis and ours, as saved on an option. */
+export interface BasisCost {
+  step: BasisStep;
+  amount: string;
+  currency: string;
+  /** In the quotation's currency. */
+  cost: string;
+  note: string | null;
 }
 
 export type OptionStatus = "open" | "accepted" | "not_chosen";
@@ -215,6 +230,11 @@ export interface OptionView {
   coverage: Coverage;
   lines: QuoteLineView[];
   costing: Costing | null;
+  /** People who see costs: the factory's basis when priced, what it takes to reach ours, and those costs. */
+  factoryBasis?: Incoterm | null;
+  factoryBasisPlace?: string | null;
+  gap?: { needed: BasisStep[]; extra: BasisStep[] } | null;
+  costs?: BasisCost[];
 }
 
 export interface RevisionView {
@@ -259,6 +279,7 @@ export interface OptionValues {
   discount: number;
   prices: { lineId: string; unitPrice: number }[];
   charges: { type: "service" | "charge"; description: string; quantity: number; unit: string; unitPrice: number; unitCost: number | null }[];
+  costs: { step: BasisStep; amount: number; currency: string; note: string | null }[];
 }
 
 /** GET …/quotation/draft and GET /revisions/:id/values: the editor's values (the API's revision input). */
@@ -296,10 +317,15 @@ export interface OfferLine {
 export interface QuoteOffers {
   currency: string;
   defaultMargin: number;
+  /** Settings' exchange rates (1 mainCurrency buys N), for costs entered in other currencies. */
+  mainCurrency: string;
+  rates: Record<string, number>;
   offers: {
     factoryQuoteId: string;
     factory: { id: string; name: string };
     currency: string;
+    basis: Incoterm | null;
+    basisPlace: string | null;
     receivedOn: string;
     validUntil: string | null;
     leadTime: string | null;

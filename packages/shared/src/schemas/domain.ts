@@ -5,6 +5,7 @@ import {
   CUSTOMER_TYPES,
   EXPENSE_CATEGORIES,
   INCOTERMS,
+  BASIS_STEPS,
   INQUIRY_CHANNELS,
   INQUIRY_STAGES,
   LINE_TYPES,
@@ -189,7 +190,9 @@ export const factoryQuoteInput = z
     receivedOn: isoDate(),
     validUntil: optionalDate,
     currency: currency.default("CNY"),
-    priceBasis: optionalText(60),
+    /** The factory's price basis (EXW, FOB…) and its place ("Zhangjiagang", "Qingdao"). */
+    basis: z.preprocess((v) => (v === "" ? null : v), z.enum(INCOTERMS).nullable().default(null)),
+    basisPlace: optionalText(60),
     leadTime: optionalText(120),
     moq: optionalText(60),
     paymentTerms: optionalText(2000),
@@ -257,10 +260,24 @@ export const chargeInput = z.object({
  * gave them, locked — with our prices, discount and lead time, plus charges.
  * Without factory prices (factoryQuoteId empty) the lines are the customer's items.
  */
+/**
+ * A cost between the factory's price basis and ours (EXW → FOB: to the port;
+ * FOB → CFR: sea freight…), in any currency; it is part of the option's cost
+ * and spread into its prices.
+ */
+export const basisCostInput = z.object({
+  step: z.enum(BASIS_STEPS),
+  amount: amountOr(0),
+  currency: currency.default("USD"),
+  note: optionalText(200),
+});
+export type BasisCostInput = z.infer<typeof basisCostInput>;
+
 export const optionInput = z.object({
   factoryQuoteId: optionalId,
-  prices: z.array(optionPriceInput).max(300),
+  prices: z.array(optionPriceInput).max(1000),
   charges: z.array(chargeInput).max(20).default([]),
+  costs: z.array(basisCostInput).max(BASIS_STEPS.length).default([]),
   discount: amountOr(0),
   leadTime: optionalText(120),
 });

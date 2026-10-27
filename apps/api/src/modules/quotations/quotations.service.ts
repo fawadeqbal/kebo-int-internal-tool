@@ -2,6 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, type Prisma } from "@kebo/database";
 import { convertMinor, costSummary, documentTotals, fromMinor, fxRate, priceForMargin, toMinor, withTaxMinor } from "@kebo/money";
 import {
+  BASIS_STEP_LABEL,
+  BASIS_STEPS,
+  basisGap,
   can,
   canAnswer,
   canMoveRevision,
@@ -15,6 +18,7 @@ import {
   numberQuoteLines,
   optionLetter,
   supersededBy,
+  type Incoterm,
   type OptionInput,
   type RevisionInput,
   type RevisionStatus,
@@ -47,6 +51,7 @@ const revisionInclude = {
     include: {
       factoryQuote: { select: { id: true, currency: true, factory: { select: { id: true, name: true } } } },
       lines: { orderBy: { sortOrder: "asc" }, include: numberedLineInclude },
+      costs: true,
     },
   },
 } satisfies Prisma.QuotationRevisionInclude;
@@ -161,6 +166,9 @@ export class QuotationsService {
         factoryQuoteId: q.id,
         factory: q.factory,
         currency: q.currency,
+        /** What the factory's prices already pay for (EXW, FOB…), and where. */
+        basis: q.basis,
+        basisPlace: q.basisPlace,
         receivedOn: fromDbDate(q.receivedOn),
         validUntil: fromDbDateOrNull(q.validUntil),
         leadTime: q.leadTime,
@@ -179,6 +187,9 @@ export class QuotationsService {
     return {
       currency,
       defaultMargin: sales.defaultMarginPercent,
+      /** For costs entered in other currencies (freight in USD, trucking in CNY): 1 main currency buys N. */
+      mainCurrency: sales.currency,
+      rates: sales.exchangeRates,
       offers,
       /** The customer's items, for an option priced by hand (no factory prices). */
       items: items.map((i) => ({
@@ -195,9 +206,10 @@ export class QuotationsService {
 
   /* ---------------------------------------------------------------- reading */
 
-  private optionView(user: SessionUser, o: OptionRow, items: { id: string; parentId: string | null; no: string }[]) {
+  private optionView(user: SessionUser, o: OptionRow, items: { id: string; parentId: string | null; no: string }[], selling: Incoterm) {
     const seeCosts = can(user.role, "sourcing.manage");
     const no = numbersOf(o.lines);
+    const extra = o.costs.reduce((t, c) => t + decimalToMinor(c.cost), 0);
     const costing = seeCosts
       ? costSummary(
           o.lines.map((l) => ({
@@ -206,8 +218,10 @@ export class QuotationsService {
             unitCostMinor: l.unitCost === null ? null : decimalToMinor(l.unitCost),
           })),
           decimalToMinor(o.discount),
+          extra,
         )
       : null;
+    const gap = o.factoryQuoteId ? basisGap(o.factoryBasis, selling) : null;
     return {
       id: o.id,
       letter: o.letter,
@@ -244,7 +258,20 @@ export class QuotationsService {
         cost: fromMinor(costing.costMinor),
         sales: fromMinor(costing.salesMinor),
         profit: fromMinor(costing.profitMinor),
+        /** Freight and the like to reach the basis we sell on (part of the cost). */
+        extraCost: fromMinor(costing.extraCostMinor),
       },
+      ...(seeCosts
+        ? {
+            /** The factory's price basis this option was priced on, and what it takes to reach ours. */
+            factoryBasis: o.factoryBasis,
+            factoryBasisPlace: o.factoryBasisPlace,
+            gap,
+            costs: o.costs
+              .sort((a, b) => BASIS_STEPS.indexOf(a.step) - BASIS_STEPS.indexOf(b.step))
+              .map((c) => ({ step: c.step, amount: c.amount.toFixed(2), currency: c.currency, cost: c.cost.toFixed(2), note: c.note })),
+          }
+        : {}),
     };
   }
 
@@ -272,7 +299,7 @@ export class QuotationsService {
       customerSnapshot: r.customerSnapshot,
       companySnapshot: r.companySnapshot,
       createdAt: r.createdAt,
-      options: r.options.map((o) => this.optionView(user, o, items)),
+      options: r.options.map((o) => this.optionView(user, o, items, r.incoterm)),
     };
   }
 
@@ -328,6 +355,7 @@ export class QuotationsService {
             unitPrice: Number(l.unitPrice),
             unitCost: l.unitCost === null ? null : Number(l.unitCost),
           })),
+        costs: o.costs.map((c) => ({ step: c.step, amount: Number(c.amount), currency: c.currency, note: c.note })),
       })),
     };
   }
@@ -371,6 +399,7 @@ export class QuotationsService {
           discount: 0,
           leadTime: best.leadTime,
           charges: [],
+          costs: [],
           prices: best.lines.map((l) => ({
             lineId: l.id,
             unitPrice: l.unitCost === null ? 0 : Number(fromMinor(priceForMargin(toMinor(l.unitCost), margin))),
@@ -381,6 +410,7 @@ export class QuotationsService {
           discount: 0,
           leadTime: null,
           charges: [],
+          costs: [],
           prices: available.items.map((i) => ({ lineId: i.id, unitPrice: 0 })),
         };
     return {
@@ -416,6 +446,7 @@ export class QuotationsService {
     const built: {
       option: Omit<Prisma.QuotationOptionUncheckedCreateInput, "revisionId">;
       lines: Omit<Prisma.QuoteLineCreateManyInput, "revisionId" | "optionId">[];
+      costs: Omit<Prisma.OptionCostCreateManyInput, "optionId">[];
     }[] = [];
     for (const [n, o] of input.options.entries()) {
       const letter = optionLetter(n);
@@ -425,6 +456,7 @@ export class QuotationsService {
         return p.unitPrice;
       };
       const lines: Omit<Prisma.QuoteLineCreateManyInput, "revisionId" | "optionId" | "lineTotal">[] = [];
+      let basis: { factoryBasis: Incoterm | null; factoryBasisPlace: string | null } = { factoryBasis: null, factoryBasisPlace: null };
       if (o.factoryQuoteId) {
         if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can quote a factory's offer.");
         if (seen.has(o.factoryQuoteId)) throw new DomainError("Each option must be a different factory's offer.");
@@ -434,6 +466,7 @@ export class QuotationsService {
           include: { lines: { orderBy: { sortOrder: "asc" } } },
         });
         if (!q) throw new DomainError(`Option ${letter}: that factory offer is no longer on this deal. Reload the page.`);
+        basis = { factoryBasis: q.basis, factoryBasisPlace: q.basisPlace };
         const rate = fxRate(q.currency, input.currency, sales.currency, sales.exchangeRates);
         for (const l of q.lines) {
           const cost = rate ? convertMinor(withTaxMinor(decimalToMinor(l.unitPrice), Number(l.taxRate)), rate) : null;
@@ -473,6 +506,15 @@ export class QuotationsService {
           unitPrice: c.unitPrice,
           unitCost: c.unitCost ?? null,
         });
+      // Costs between the factory's basis and ours, in the quotation's currency at today's rate.
+      const costs: Omit<Prisma.OptionCostCreateManyInput, "optionId">[] = [];
+      for (const c of o.costs.filter((x) => Number(x.amount) > 0)) {
+        if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("Only people who see factory prices can enter costs.");
+        if (costs.some((x) => x.step === c.step)) throw new DomainError(`Option ${letter}: ${BASIS_STEP_LABEL[c.step]} is entered twice.`);
+        const rate = fxRate(c.currency, input.currency, sales.currency, sales.exchangeRates);
+        if (rate === null) throw new DomainError(`Option ${letter}: there is no exchange rate for ${c.currency} in Settings, so ${BASIS_STEP_LABEL[c.step].toLowerCase()} cannot be turned into ${input.currency}.`);
+        costs.push({ step: c.step, amount: c.amount, currency: c.currency, cost: fromMinor(convertMinor(toMinor(c.amount), rate)), fxRate: rate, note: c.note ?? null });
+      }
       const totals = documentTotals(
         lines.map((l) => ({ quantity: String(l.quantity), unitPrice: String(l.unitPrice) })),
         o.discount,
@@ -484,12 +526,14 @@ export class QuotationsService {
           letter,
           sortOrder: n,
           factoryQuoteId: o.factoryQuoteId ?? null,
+          ...basis,
           leadTime: o.leadTime,
           subtotal: fromMinor(totals.subtotal),
           discount: fromMinor(totals.discount),
           total: fromMinor(totals.total),
         },
         lines: lines.map((l, k) => ({ ...l, lineTotal: fromMinor(totals.lines[k]!.lineTotal), sortOrder: k })),
+        costs,
       });
     }
     const a = built[0]!.option;
@@ -518,6 +562,7 @@ export class QuotationsService {
     for (const b of built) {
       const o = await tx.quotationOption.create({ data: { ...b.option, revisionId } });
       await tx.quoteLine.createMany({ data: b.lines.map((l) => ({ ...l, revisionId, optionId: o.id })) });
+      if (b.costs.length) await tx.optionCost.createMany({ data: b.costs.map((c) => ({ ...c, optionId: o.id })) });
     }
   }
 
