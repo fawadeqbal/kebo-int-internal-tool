@@ -1,551 +1,169 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Download, Eye, FileText, Printer } from "lucide-react";
-import {
-  ATTACHMENT_KIND_LABEL,
-  BALANCE_TERMS_LABEL,
-  can,
-  ORDER_STAGE_HINT,
-  ORDER_STAGE_LABEL,
-  PAYMENT_KIND_LABEL,
-  PAYMENT_METHOD_LABEL,
-  STAGE_FLOW,
-  type OrderStage,
-} from "@kebo/shared";
-import { Badge, buttonClass, Card, CardBody, CardHeader, cn, OrderStageBadge, PageHeader } from "@kebo/ui";
-import { ConfirmSubmit } from "@kebo/ui/client";
-import { ActionForm } from "@/components/common/action-form";
+import { ArrowRight } from "lucide-react";
+import { can, INSTALMENT_STATUS_LABEL } from "@kebo/shared";
+import { Badge, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { load, requireUser } from "@/lib/session";
-import { date, dateTime, money } from "@/lib/format";
-import type { DealDetail, HistoryEntry, Person } from "@/lib/types";
-import type { OrderMoney } from "@/lib/types-money";
-import { EditCustomerPayment, PaymentPlan } from "@/components/money/forms";
-import { editPaymentAction, savePlanAction } from "../../money/actions";
-import { FactoriesCard, ProfitCard } from "./money-cards";
-import { HistoryList } from "@/components/common/history-list";
-import type { OrderView, PaymentsView, PaymentStatus } from "@/lib/types-orders";
+import { requireUser } from "@/lib/session";
+import { orderMoneyOf, orderOf } from "@/lib/order-data";
+import { date, dateTime, money, qty } from "@/lib/format";
+import type { DealDetail } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { NoteForm } from "../../deals/[id]/panels";
-import { describeFileAction } from "../../deals/actions";
-import { DocumentsPanel } from "@/components/deals/documents-panel";
-import {
-  cancelOrderAction,
-  issueProformaAction,
-  detailsAction,
-  moveStageAction,
-  orderNoteAction,
-  orderRemoveFileAction,
-  packingAction,
-  paymentAction,
-  receiptAction,
-  voidPaymentAction,
-} from "../actions";
-import { CancelOrderForm, DetailsForm, PaymentForm, StageActions, VoidPayment } from "./forms";
-import { GoodsReceipt, PackingList, type GoodsLine } from "./goods";
+import { detailsAction, orderNoteAction } from "../actions";
+import { DetailsForm } from "./forms";
+import { goodsOf, incotermOf, termsOf } from "./shared";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const o = await load(() => api.get<OrderView>(`/orders/${id}`));
+  const o = await orderOf(id);
   return { title: `Order ${o.refNo}` };
 }
 
-const PAY_STATUS: Record<PaymentStatus, { label: string; tone: "neutral" | "warn" | "info" | "ok" }> = {
-  unpaid: { label: "Nothing received", tone: "warn" },
-  partly_paid: { label: "Part-paid", tone: "warn" },
-  deposit_paid: { label: "Deposit received", tone: "info" },
-  paid: { label: "Paid in full", tone: "ok" },
-  overpaid: { label: "Overpaid", tone: "warn" },
-};
+const more = "flex items-center gap-1 text-sm font-medium text-primary hover:underline";
 
-/** The four stages as a bar, each with the day the order got there. */
-function StageBar({ o }: { o: OrderView }) {
-  const at = STAGE_FLOW.indexOf(o.stage);
-  const reachedOn = (s: OrderStage): string | null => {
-    if (s === "confirmed") return o.orderedOn;
-    if (s === "shipped" && o.shippedOn) return o.shippedOn;
-    const h = o.history.findLast((x) => x.to === s);
-    return h ? h.at : null;
-  };
-  const off = o.status === "cancelled";
-  return (
-    <ol className="grid grid-cols-4 gap-1.5" aria-label="Stages">
-      {STAGE_FLOW.map((s, i) => {
-        const reached = i <= at;
-        const when = reached ? reachedOn(s) : null;
-        return (
-          <li key={s} className="min-w-0" aria-current={i === at ? "step" : undefined}>
-            <div
-              className={cn(
-                "h-2 rounded-full",
-                reached ? (off ? "bg-line-strong" : i === at && s !== "done" ? "bg-primary" : "bg-primary/60") : "bg-surface-3",
-              )}
-              aria-hidden
-            />
-            <p className={cn("mt-1.5 text-xs leading-tight font-medium", i === at ? "text-text" : reached ? "text-text-2" : "text-muted")}>
-              {ORDER_STAGE_LABEL[s]}
-              {i === at && <span className="sr-only"> (now)</span>}
-            </p>
-            <p className="text-xs text-muted tabular">{when ? date(when) : reached ? "" : "—"}</p>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-const docHref = (o: OrderView, d: OrderView["documents"][number]) =>
-  d.kind === "quotation"
-    ? { view: `/print/revisions/${d.revisionId}?back=/orders/${o.id}`, pdf: `/pdf/revisions/${d.revisionId}` }
-    : { view: `/print/orders/${o.id}/${d.kind}?back=/orders/${o.id}`, pdf: `/pdf/${d.kind}/${o.id}` };
-
-/**
- * One order: where it is (four stages), the one button that moves it, the
- * money, its documents, details, history, and the deal's notes and files.
- */
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+/** The order at a glance: its goods, the next payment, the notes, and its details. */
+export default async function OrderOverview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
-  const o = await load(() => api.get<OrderView>(`/orders/${id}`));
-  const [p, deal, history, m, people, settings] = await Promise.all([
-    api.get<PaymentsView>(`/orders/${id}/payments`),
-    optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
-    api.get<HistoryEntry[]>("/history", { type: "order", id }),
-    api.get<OrderMoney>(`/orders/${id}/money`),
-    api.get<Person[]>("/users/people"),
-    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
-  ]);
+  const o = await orderOf(id);
+  const [m, deal] = await Promise.all([orderMoneyOf(id), optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`))]);
+  const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
-  const canMove = can(me, "orders.update") && open;
-  const canPay = can(me, "payments.record") && open;
-  const canManage = can(me, "orders.manage");
-  const now = today();
-  const st = PAY_STATUS[o.money.status] ?? { label: o.money.status, tone: "neutral" as const };
+  const goods = goodsOf(o);
   const name = (uid: string | null) => (uid ? (deal?.people[uid] ?? "Someone") : "System");
-  const incoterm = `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
-  const balance = BALANCE_TERMS_LABEL[o.balanceTerms];
-  const terms = o.depositPercent > 0 ? `${o.depositPercent}% deposit, ${balance.charAt(0).toLowerCase()}${balance.slice(1)}` : balance;
-  // Goods from the factory and the packing list (goods lines only; charges are not shipped).
-  const goods: GoodsLine[] = o.lines
-    .filter((l) => l.type === "goods")
-    .map((l) => ({
-      id: l.id,
-      no: l.no,
-      description: l.description,
-      model: l.model,
-      quantity: l.quantity,
-      unit: l.unit,
-      factory: l.factory?.name ?? null,
-      receivedQty: l.receivedQty,
-      receivedOn: l.receivedOn ? date(l.receivedOn) : null,
-      packing: l.packing,
-    }));
-  const showPacking = goods.length > 0 && (o.goods.allReceived || o.stage !== "confirmed");
-  const packingDoc = docHref(o, { kind: "packing-list", label: "Packing list" });
+  const next = m.plan.next;
 
   return (
-    <div>
-      <PageHeader
-        backHref="/orders"
-        backLabel="Orders"
-        title={
-          <span className="flex flex-wrap items-center gap-2">
-            {o.refNo} <OrderStageBadge stage={o.stage} />
-            {!open && <Badge tone="bad">Cancelled</Badge>}
-          </span>
-        }
-        description={
-          <>
-            <Link href={`/customers/${o.customer.id}`} className="font-medium text-text hover:underline">
-              {o.customer.name}
-            </Link>{" "}
-            · deal{" "}
-            <Link href={`/deals/${o.inquiry.id}`} className="hover:underline">
-              {o.inquiry.refNo}
-            </Link>{" "}
-            · {o.inquiry.title}
-            {o.inquiry.assignee && <> · handled by {o.inquiry.assignee.name}</>}
-          </>
-        }
-      />
-
-      {o.cancelled && (
-        <div role="status" className="mb-5 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
-          <p className="font-medium">This order was cancelled{o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.</p>
-          {o.cancelled.reason && <p className="mt-0.5 text-text-2">{o.cancelled.reason}</p>}
-          <p className="mt-1 text-muted">The deal can be reopened and quoted again. Money already received stays recorded here.</p>
-        </div>
-      )}
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-5">
-          <Card>
-            <CardHeader title="Where it is" description={ORDER_STAGE_HINT[o.stage]} />
-            <CardBody className="flex flex-col gap-4">
-              <StageBar o={o} />
-              {o.needs && (
-                <p
-                  className={cn(
-                    "flex items-start gap-2 rounded-lg px-3 py-2 text-sm",
-                    o.needs.late ? "bg-bad-soft text-bad" : "bg-surface-2 text-text",
-                  )}
-                >
-                  {o.needs.late ? (
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  ) : (
-                    <ArrowRight className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                  )}
-                  <span>
-                    <span className="font-medium">Now: {o.needs.title}</span>
-                    <span className="block text-xs">
-                      {o.needs.late ? `Late — was due ${date(o.needs.due)}` : `By ${date(o.needs.due)}`}
-                    </span>
-                  </span>
-                </p>
-              )}
-              {o.stage === "done" && <p className="text-sm text-muted">Closed. Nothing more to do on this order.</p>}
-              {canMove ? (
-                <StageActions
-                  key={o.stage}
-                  next={o.next}
-                  back={o.back}
-                  action={moveStageAction.bind(null, o.id)}
-                  today={now}
-                  readyOn={o.readyOn}
-                  shippedOn={o.shippedOn}
-                  blNo={o.blNo}
-                />
-              ) : (
-                open && o.next && <p className="text-sm text-muted">The person handling the deal moves this order on.</p>
-              )}
-            </CardBody>
-          </Card>
-
-          {goods.length > 0 && (
-            <Card>
-              <CardHeader
-                title="Goods from the factory"
-                description={
-                  o.goods.allReceived
-                    ? "Everything has come in."
-                    : `${o.goods.received} of ${o.goods.lines} item${o.goods.lines === 1 ? "" : "s"} complete. Record what comes in as it arrives.`
-                }
-                actions={o.goods.allReceived ? <Badge tone="ok">All in</Badge> : undefined}
-              />
-              <CardBody>
-                <GoodsReceipt
-                  key={goods.map((l) => l.receivedQty).join()}
-                  lines={goods}
-                  canEdit={canMove}
-                  action={receiptAction.bind(null, o.id)}
-                  today={now}
-                />
-              </CardBody>
-            </Card>
-          )}
-
-          {showPacking && (
-            <Card>
-              <CardHeader
-                title="Packing list"
-                description={o.goods.packed ? undefined : "Packages, weights and volume for each line, before shipping."}
-                actions={o.goods.packed ? undefined : <Badge tone="warn">Not made yet</Badge>}
-              />
-              <CardBody>
-                <PackingList
-                  lines={goods}
-                  containerNo={o.goods.containerNo}
-                  shippingMarks={o.goods.shippingMarks}
-                  packed={o.goods.packed}
-                  totals={o.goods.totals}
-                  canEdit={canMove}
-                  action={packingAction.bind(null, o.id)}
-                  links={packingDoc}
-                />
-              </CardBody>
-            </Card>
-          )}
-
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="flex min-w-0 flex-col gap-5">
+        {goods.length > 0 && (
           <Card>
             <CardHeader
-              title="Money"
-              description={`In ${o.currency}. Bank charges the banks deducted count as paid.`}
-              actions={<Badge tone={st.tone}>{st.label}</Badge>}
+              title="Goods at a glance"
+              description={o.goods.allReceived ? (o.goods.packed ? "Everything is in and packed." : "Everything is in; the packing list is next.") : `${o.goods.received} of ${o.goods.lines} complete`}
+              actions={
+                <Link href={`${base}/goods`} className={more}>
+                  Goods and packing <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              }
             />
-            <CardBody className="flex flex-col gap-4">
-              <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                {[
-                  { label: "Order total", value: money(o.money.total, o.currency) },
-                  {
-                    label: o.depositPercent > 0 ? `Deposit (${o.depositPercent}%)` : "Deposit",
-                    value: o.depositPercent > 0 ? money(o.money.deposit, o.currency) : "None",
-                    hint:
-                      o.depositPercent > 0
-                        ? Number(o.money.depositDue) > 0
-                          ? `${money(o.money.depositDue, o.currency)} still missing`
-                          : "Received"
-                        : undefined,
-                    warn: Number(o.money.depositDue) > 0,
-                  },
-                  {
-                    label: "Received",
-                    value: money(o.money.received, o.currency),
-                    hint: Number(o.money.bankCharges) ? `incl. ${money(o.money.bankCharges, o.currency)} bank charges` : undefined,
-                  },
-                  { label: "Still due", value: money(o.money.due, o.currency), strong: Number(o.money.due) > 0 },
-                ].map((x) => (
-                  <div key={x.label} className="min-w-0 rounded-lg border border-line p-3">
-                    <dt className="text-xs text-muted">{x.label}</dt>
-                    <dd className={cn("mt-0.5 font-semibold tabular", x.strong && "text-text")}>{x.value}</dd>
-                    {x.hint && <dd className={cn("text-xs", x.warn ? "text-warn" : "text-muted")}>{x.hint}</dd>}
-                  </div>
-                ))}
-              </dl>
-
-              <PaymentPlan plan={m.plan} currency={o.currency} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} />
-
-              {p.payments.length === 0 ? (
-                <p className="text-sm text-muted">
-                  No payments yet.{" "}
-                  {canPay ? "Record the deposit when it reaches the bank." : "Accounts records payments when they reach the bank."}
-                </p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Payments">
-                  {p.payments.map((x) => (
-                    <li
-                      key={x.id}
-                      className={cn(
-                        "flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-3 py-2.5 text-sm",
-                        x.voided && "text-muted",
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <p>
-                          <span className={cn("font-medium tabular", x.voided && "line-through")}>{money(x.amount, x.currency)}</span>{" "}
-                          <span className="text-text-2">{PAYMENT_KIND_LABEL[x.kind]}</span>
-                          {Number(x.bankCharges) > 0 && (
-                            <span className={cn("text-xs text-muted", x.voided && "line-through")}>
-                              {" "}
-                              + {money(x.bankCharges, x.currency)} bank charges
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {date(x.paidOn)} · {PAYMENT_METHOD_LABEL[x.method]}
-                          {x.reference && ` · ${x.reference}`}
-                        </p>
-                        {x.note && <p className="text-xs text-text-2">{x.note}</p>}
-                        {x.voided && (
-                          <p className="text-xs">
-                            <Badge tone="bad">Removed</Badge> {x.voided.reason}
-                          </p>
-                        )}
-                      </div>
-                      {(canManage || canPay) && !x.voided && (
-                        <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
-                          {canPay && <EditCustomerPayment action={editPaymentAction.bind(null, o.id, x.id, o.currency)} payment={x} currency={o.currency} today={now} />}
-                          {canManage && <VoidPayment action={voidPaymentAction.bind(null, o.id, x.id)} />}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {canPay && (
-                <PaymentForm
-                  action={paymentAction.bind(null, o.id, o.currency)}
-                  currency={o.currency}
-                  depositDue={p.depositDue}
-                  due={p.due}
-                  today={now}
-                />
-              )}
-            </CardBody>
-          </Card>
-
-          {m.factories && <FactoriesCard m={m} people={people} today={now} fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }} />}
-          {m.expenses && <ProfitCard m={m} people={people} today={now} mainCurrency={settings.sales.currency} fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }} />}
-
-          <Card>
-            <CardHeader title="Documents" description="Made from the order whenever you open them, so they are always up to date." />
-            <ul className="flex flex-col divide-y divide-line">
-              {o.documents.map((d) => {
-                const h = docHref(o, d);
+            <ul className="divide-y divide-line">
+              {goods.map((l) => {
+                const inQty = Number(l.receivedQty);
+                const full = inQty >= Number(l.quantity);
                 return (
-                  <li key={d.kind} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                    <span className="flex flex-col">
-                      <span className="flex items-center gap-2 text-sm font-medium">
-                        <FileText className="size-4 text-muted" aria-hidden /> {d.label}
-                        {d.kind === "proforma" &&
-                          (o.proforma ? (
-                            <span className="font-normal text-text-2 tabular">
-                              {o.proforma.number}
-                              {o.proforma.issuedOn ? ` · issued ${date(o.proforma.issuedOn)}` : ""}
-                            </span>
-                          ) : (
-                            <Badge tone="warn">Draft · no number yet</Badge>
-                          ))}
+                  <li key={l.id} className={cn("flex items-center justify-between gap-3 px-4 py-2 text-sm", l.no.includes(".") && "pl-9")}>
+                    <span className="min-w-0">
+                      <span className="mr-2 text-muted tabular">{l.no}</span>
+                      <span className="font-medium">{l.description.split("\n")[0]}</span>
+                      <span className="text-muted">
+                        {" "}
+                        × {qty(l.quantity)} {l.unit}
                       </span>
-                      {d.kind !== "packing-list" && (
-                        <a
-                          href={`${h.pdf}${h.pdf.includes("?") ? "&" : "?"}copy=internal`}
-                          className="ml-6 text-xs text-muted underline-offset-2 hover:text-primary hover:underline"
-                        >
-                          Internal copy (all prices, costs, payments)
-                        </a>
-                      )}
                     </span>
-                    <span className="flex flex-wrap gap-2">
-                      {d.kind === "proforma" && !o.proforma && canMove && (
-                        <ActionForm action={issueProformaAction.bind(null, o.id)} className="inline-flex">
-                          <ConfirmSubmit
-                            size="sm"
-                            variant="primary"
-                            pendingText="Issuing…"
-                            message="Issue the proforma now? It gets its number dated today (KEB, the date, the customer's letters, the handler's count) and the number does not change afterwards."
-                          >
-                            Issue the proforma
-                          </ConfirmSubmit>
-                        </ActionForm>
-                      )}
-                      <Link
-                        href={h.view}
-                        target="_blank"
-                        className={buttonClass("secondary", "sm")}
-                        aria-label={`View or print the ${d.label.toLowerCase()}`}
-                      >
-                        <Printer aria-hidden /> View / Print
-                      </Link>
-                      <a href={h.pdf} className={buttonClass("ghost", "sm")} aria-label={`Download the ${d.label.toLowerCase()} as PDF`}>
-                        <Download aria-hidden /> Download PDF
-                      </a>
+                    <span className={cn("shrink-0 text-xs tabular", full ? "text-ok" : inQty > 0 ? "text-warn" : "text-muted")}>
+                      {full ? "all in" : `${qty(inQty)} of ${qty(l.quantity)} in`}
                     </span>
                   </li>
                 );
               })}
             </ul>
-            {deal && (
-              <section aria-label="URS & documents" className="flex flex-col gap-3 border-t border-line px-4 py-4">
-                <h3 className="text-sm font-semibold">
-                  URS &amp; documents <span className="text-xs font-normal text-muted">· from deal {deal.refNo}, kept with the order</span>
-                </h3>
-                <DocumentsPanel
-                  dealId={deal.id}
-                  canUpload={open}
-                  files={deal.attachments.map((f) => ({
-                    ...f,
-                    uploadedBy: name(f.uploadedById),
-                    when: date(f.createdAt),
-                    canChange: f.uploadedById === me.id || deal.canWork,
-                    describe: describeFileAction.bind(null, deal.id, f.id),
-                    remove: orderRemoveFileAction.bind(null, o.id, deal.id, f.id),
-                  }))}
-                  />
-              </section>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader
+            title="Money from the customer"
+            description={`${termsOf(o)} · in ${o.currency}`}
+            actions={
+              <Link href={`${base}/money`} className={more}>
+                Money <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            }
+          />
+          <CardBody className="flex flex-col gap-3 text-sm">
+            {next ? (
+              <p className="flex flex-wrap items-baseline justify-between gap-2">
+                <span>
+                  Next: <span className="font-medium">{next.label}</span>
+                  {next.dueOn && <span className="text-muted"> · due {date(next.dueOn)}</span>}{" "}
+                  {next.status !== "open" && <Badge tone={next.status === "late" ? "bad" : "warn"}>{INSTALMENT_STATUS_LABEL[next.status]}</Badge>}
+                </span>
+                <span className="font-semibold tabular">{money(next.open, o.currency)}</span>
+              </p>
+            ) : (
+              <p className="text-ok">Nothing more to receive.</p>
             )}
-            {o.factoryFiles.length > 0 && (
-              <section aria-label="The factory's quotation" className="flex flex-col gap-2 border-t border-line px-4 py-4">
-                <h3 className="text-sm font-semibold">
-                  The factory&apos;s quotation <span className="text-xs font-normal text-muted">· internal, from the offer this order was made from</span>
-                </h3>
-                <ul className="flex flex-col divide-y divide-line">
-                  {o.factoryFiles.map((f) => (
-                    <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <FileText className="size-4 shrink-0 text-muted" aria-hidden />
-                        <span className="min-w-0">
-                          <a href={`/files/${f.id}`} className="block truncate text-sm font-medium hover:text-primary">
-                            {f.fileName}
-                          </a>
-                          <span className="text-xs text-muted">
-                            {f.factory} · {ATTACHMENT_KIND_LABEL[f.kind]} · {date(f.uploadedOn)}
-                          </span>
-                        </span>
-                      </span>
-                      <a href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className={buttonClass("ghost", "sm")}>
-                        <Eye aria-hidden /> View
-                      </a>
+            <ul className="flex flex-col gap-1">
+              {m.plan.items.map((i) => (
+                <li key={i.id} className="flex items-baseline justify-between gap-2 text-xs">
+                  <span className={cn(Number(i.open) <= 0 ? "text-muted line-through" : "text-text-2")}>{i.label}</span>
+                  <span className="text-muted tabular">
+                    {money(i.paid, o.currency)} of {money(i.amount, o.currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+
+        {deal && (
+          <Card>
+            <CardHeader title="Notes" description={`Shared with deal ${deal.refNo}`} />
+            <CardBody className="flex flex-col gap-4">
+              {open && <NoteForm action={orderNoteAction.bind(null, o.id, deal.id)} />}
+              {deal.notes.length > 0 ? (
+                <ul className="flex flex-col gap-3">
+                  {deal.notes.map((n) => (
+                    <li key={n.id} className="rounded-lg border border-line p-3">
+                      <p className="text-sm whitespace-pre-line">{n.body}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {name(n.authorId)} · {dateTime(n.createdAt)}
+                      </p>
                     </li>
                   ))}
                 </ul>
-              </section>
-            )}
-          </Card>
-
-          {deal && (
-            <Card>
-              <CardHeader title="Notes" description={`Shared with deal ${deal.refNo}`} />
-              <CardBody className="flex flex-col gap-4">
-                <NoteForm action={orderNoteAction.bind(null, o.id, deal.id)} />
-                {deal.notes.length > 0 && (
-                  <ul className="flex flex-col gap-3">
-                    {deal.notes.map((n) => (
-                      <li key={n.id} className="rounded-lg border border-line p-3">
-                        <p className="text-sm whitespace-pre-line">{n.body}</p>
-                        <p className="mt-1 text-xs text-muted">
-                          {name(n.authorId)} · {dateTime(n.createdAt)}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardBody>
-            </Card>
-          )}
-        </div>
-
-        <aside className="flex min-w-0 flex-col gap-5">
-          <Card>
-            <CardHeader title="Details" />
-            <CardBody>
-              <DetailsForm
-                action={detailsAction.bind(null, o.id)}
-                canEdit={can(me, "orders.update") && open}
-                today={now}
-                fixed={[
-                  { label: "Incoterm", value: incoterm },
-                  { label: "Payment terms", value: terms },
-                  { label: "Ordered on", value: date(o.orderedOn) },
-                ]}
-                values={{
-                  shipBy: o.shipBy,
-                  readyOn: o.readyOn,
-                  shippedOn: o.shippedOn,
-                  blNo: o.blNo,
-                  documentTitle: o.documentTitle,
-                  portOfDischarge: o.portOfDischarge,
-                }}
-                shown={{
-                  shipBy: o.shipBy ? date(o.shipBy) : "Not set",
-                  readyOn: o.readyOn ? date(o.readyOn) : "Not known yet",
-                  shippedOn: o.shippedOn ? date(o.shippedOn) : "Not shipped",
-                  blNo: o.blNo ?? "—",
-                }}
-              />
+              ) : (
+                <p className="text-sm text-muted">No notes yet.</p>
+              )}
             </CardBody>
           </Card>
-
-          <Card>
-            <CardHeader title="History" description="Every change, newest first, with the reason when one was asked" />
-            <CardBody>
-              <HistoryList entries={history} />
-            </CardBody>
-          </Card>
-
-          {canManage && open && (
-            <Card>
-              <CardHeader
-                title="Cancel the order"
-                description="Only if the customer called it off. The deal becomes lost and can be reopened."
-              />
-              <CardBody>
-                <CancelOrderForm action={cancelOrderAction.bind(null, o.id)} />
-              </CardBody>
-            </Card>
-          )}
-        </aside>
+        )}
       </div>
+
+      <aside className="flex min-w-0 flex-col gap-5">
+        <Card>
+          <CardHeader title="Details" description="Dates and shipping; the ready date and B/L number tick their steps" />
+          <CardBody>
+            <DetailsForm
+              action={detailsAction.bind(null, o.id)}
+              canEdit={can(me, "orders.update") && open}
+              today={today()}
+              fixed={[
+                { label: "Incoterm", value: incotermOf(o) },
+                { label: "Payment terms", value: termsOf(o) },
+                { label: "Ordered on", value: date(o.orderedOn) },
+              ]}
+              values={{
+                shipBy: o.shipBy,
+                readyOn: o.readyOn,
+                shippedOn: o.shippedOn,
+                blNo: o.blNo,
+                documentTitle: o.documentTitle,
+                portOfDischarge: o.portOfDischarge,
+              }}
+              shown={{
+                shipBy: o.shipBy ? date(o.shipBy) : "Not set",
+                readyOn: o.readyOn ? date(o.readyOn) : "Not known yet",
+                shippedOn: o.shippedOn ? date(o.shippedOn) : "Not shipped",
+                blNo: o.blNo ?? "—",
+              }}
+            />
+          </CardBody>
+        </Card>
+      </aside>
     </div>
   );
 }
