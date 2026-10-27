@@ -125,8 +125,10 @@ export default async function QuotationPrint({
         groups={groups}
         bullets={[
           paymentSentenceOf(r.depositPercent, r.balanceTerms),
-          single ? (options[0]!.leadTime ? `Delivery: ${options[0]!.leadTime}` : null) : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
-          ...textBullets(r.terms),
+          ...textBullets(r.paymentTerms),
+          single ? (options[0]!.leadTime ? `Delivery: ${options[0]!.leadTime}` : null) : null,
+          ...textBullets(r.deliveryTerms),
+          single ? null : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
           ...textBullets(r.notes),
           ...portBullets(r.incoterm, r.incotermPlace),
           `This quotation is valid until ${docDate(r.validUntil)}.`,

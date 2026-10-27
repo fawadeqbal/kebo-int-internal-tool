@@ -45,7 +45,8 @@ interface EditorState {
   depositPercent: string;
   balanceTerms: BalanceTerms;
   validUntil: string;
-  terms: string;
+  paymentTerms: string;
+  deliveryTerms: string;
   notes: string;
   options: OptionState[];
 }
@@ -62,7 +63,8 @@ function fromDraft(d: RevisionDraft): EditorState {
     depositPercent: str(d.depositPercent),
     balanceTerms: d.balanceTerms,
     validUntil: d.validUntil,
-    terms: str(d.terms),
+    paymentTerms: str(d.paymentTerms),
+    deliveryTerms: str(d.deliveryTerms),
     notes: str(d.notes),
     options: d.options.map((o, i) => ({
       key: `option-${i}`,
@@ -98,7 +100,8 @@ function payload(s: EditorState, offers: QuoteOffers) {
     depositPercent: numberText(s.depositPercent),
     balanceTerms: s.balanceTerms,
     validUntil: s.validUntil,
-    terms: s.terms,
+    paymentTerms: s.paymentTerms,
+    deliveryTerms: s.deliveryTerms,
     notes: s.notes,
     options: s.options.map((o) => ({
       factoryQuoteId: o.factoryQuoteId,
@@ -535,10 +538,25 @@ export function RevisionEditor({
             </section>
 
             <section aria-label="Terms and notes" className="grid gap-4 lg:grid-cols-2">
-              <Field label="Terms" htmlFor={`terms-${number}`} optional error={st.errors?.terms} hint="Printed on the quotation">
-                <Textarea id={`terms-${number}`} rows={3} value={s.terms} onChange={(e) => set("terms", e.target.value)} />
+              <Field
+                label="Payment terms"
+                htmlFor={`pay-terms-${number}`}
+                optional
+                error={st.errors?.paymentTerms}
+                hint="Printed after the deposit and balance, e.g. By T/T; L/C at sight accepted"
+              >
+                <Textarea id={`pay-terms-${number}`} rows={3} value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} />
               </Field>
-              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes}>
+              <Field
+                label="Delivery terms"
+                htmlFor={`del-terms-${number}`}
+                optional
+                error={st.errors?.deliveryTerms}
+                hint="Printed under the delivery time, e.g. packing, inspection, warranty"
+              >
+                <Textarea id={`del-terms-${number}`} rows={3} value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
+              </Field>
+              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last" className="lg:col-span-2">
                 <Textarea id={`notes-${number}`} rows={3} value={s.notes} onChange={(e) => set("notes", e.target.value)} />
               </Field>
             </section>

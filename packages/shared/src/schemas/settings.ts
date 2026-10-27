@@ -49,7 +49,10 @@ export const salesSettings = z.object({
   defaultDepositPercent: z.coerce.number().min(0).max(100).default(30),
   defaultBalanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
   defaultIncoterm: z.enum(INCOTERMS).default("FOB"),
-  defaultTerms: z.string().trim().max(5000).default(""),
+  /** Payment terms that go on every new quotation (beyond the deposit and balance). */
+  defaultPaymentTerms: z.string().trim().max(5000).default(""),
+  /** Delivery terms that go on every new quotation (packing, inspection, warranty…). */
+  defaultDeliveryTerms: z.string().trim().max(5000).default(""),
   categories: z.array(z.string().trim().min(1).max(120)).default(["Machinery", "Chemicals", "Building materials", "Auto parts", "Other"]),
 });
 

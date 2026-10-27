@@ -166,8 +166,9 @@ export default async function OrderDocumentPrint({
       ]
     : [
         d.paymentSentence,
+        ...textBullets(d.paymentTermsText),
         o.leadTime ? `Delivery: ${o.leadTime}` : null,
-        ...textBullets(d.terms),
+        ...textBullets(d.deliveryTermsText),
         ...textBullets(d.notes),
         ...ports,
         o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn)) : null,

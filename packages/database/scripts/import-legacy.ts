@@ -492,7 +492,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         subtotal: v.subtotal,
         discount: v.discount,
         total: v.total,
-        terms: v.terms,
+        paymentTerms: v.terms,
         notes: v.notes,
         sentOn: v.submitted_at ? toDbDate(v.submitted_at) : null,
         answeredOn: answered ? toDbDate(answered) : null,

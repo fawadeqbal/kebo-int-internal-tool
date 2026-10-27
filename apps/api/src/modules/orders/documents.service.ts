@@ -142,7 +142,9 @@ export class DocumentsService {
             received: fromMinor(position.settledMinor),
             due: fromMinor(position.outstandingMinor),
           },
-      terms: kind === "packing-list" ? null : rev.terms,
+      /** The quotation's own payment and delivery terms (free text, printed as bullets). */
+      paymentTermsText: kind === "packing-list" ? null : rev.paymentTerms,
+      deliveryTermsText: kind === "packing-list" ? null : rev.deliveryTerms,
       bankDetails: kind === "packing-list" ? null : settings.company.bankDetails || null,
       /** The internal copy: every payment received (the customer's copy shows only the total). */
       payments: goodsOnly

@@ -231,7 +231,10 @@ export interface RevisionView {
   subtotal: string;
   discount: string;
   total: string;
-  terms: string | null;
+  /** Printed under the payment (beyond the deposit and balance). */
+  paymentTerms: string | null;
+  /** Printed under the delivery (packing, inspection, warranty…). */
+  deliveryTerms: string | null;
   notes: string | null;
   sentOn: string | null;
   answeredOn: string | null;
@@ -267,7 +270,10 @@ export interface RevisionDraft {
   depositPercent: number;
   balanceTerms: BalanceTerms;
   validUntil: string;
-  terms: string | null;
+  /** Printed under the payment (beyond the deposit and balance). */
+  paymentTerms: string | null;
+  /** Printed under the delivery (packing, inspection, warranty…). */
+  deliveryTerms: string | null;
   notes: string | null;
   options: OptionValues[];
 }

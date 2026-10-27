@@ -262,7 +262,10 @@ export const revisionInput = z.object({
   depositPercent: percentOr(30),
   balanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
   validUntil: isoDate(),
-  terms: optionalText(5000),
+  /** Printed under the payment (deposit and balance), e.g. "By T/T; L/C at sight accepted". */
+  paymentTerms: optionalText(5000),
+  /** Printed under the delivery, e.g. "Packing: export wooden cases. Inspection before shipment." */
+  deliveryTerms: optionalText(5000),
   notes: optionalText(5000),
   /** Options A, B… in this order; the customer accepts exactly one. */
   options: z.array(optionInput).min(1, "Add at least one option").max(6, "Use at most 6 options"),

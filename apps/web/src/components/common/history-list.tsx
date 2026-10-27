@@ -22,6 +22,10 @@ const FIELD: Record<string, string> = {
   defaultMarginPercent: "Default margin %",
   defaultDepositPercent: "Default deposit %",
   defaultBalanceTerms: "Balance terms",
+  defaultPaymentTerms: "Payment terms",
+  defaultDeliveryTerms: "Delivery terms",
+  paymentTerms: "Payment terms",
+  deliveryTerms: "Delivery terms",
 };
 const fieldLabel = (f: string) => FIELD[f] ?? f.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 const shown = (v: string | null) =>

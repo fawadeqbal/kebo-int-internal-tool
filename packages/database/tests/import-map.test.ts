@@ -257,7 +257,7 @@ describe("settings", () => {
       exchangeRates: { CNY: 7.2 },
       defaultMarginPercent: 18,
       quotationValidityDays: 20,
-      defaultTerms: "1. Payment: 40% advance by T/T",
+      defaultPaymentTerms: "1. Payment: 40% advance by T/T",
       defaultDepositPercent: 40,
       categories: ["Pharmaceutical Machinery"],
     });
