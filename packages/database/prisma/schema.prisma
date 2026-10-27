@@ -470,21 +470,25 @@ model InquiryNote {
 
 /// Files on a deal. Optionally tied to an order step (inspection report, payment slip, B/L copy).
 model Attachment {
-  id           String    @id @default(uuid()) @db.Uuid
-  inquiryId    String    @map("inquiry_id") @db.Uuid
-  inquiry      Inquiry   @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  fileName     String    @map("file_name") @db.VarChar(255)
-  mimeType     String    @map("mime_type") @db.VarChar(150)
-  size         Int
-  storageKey   String    @map("storage_key")
-  /// urs | drawing | photo | specification | other
-  kind         String    @default("other") @db.VarChar(20)
-  note         String?   @db.VarChar(300)
-  uploadedById String    @map("uploaded_by") @db.Uuid
-  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id             String        @id @default(uuid()) @db.Uuid
+  inquiryId      String        @map("inquiry_id") @db.Uuid
+  inquiry        Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  /// The factory offer this file is evidence for (its quotation, catalogue, WeChat screenshots). Internal: only people who see factory prices.
+  factoryQuoteId String?       @map("factory_quote_id") @db.Uuid
+  factoryQuote   FactoryQuote? @relation(fields: [factoryQuoteId], references: [id], onDelete: SetNull)
+  fileName       String        @map("file_name") @db.VarChar(255)
+  mimeType       String        @map("mime_type") @db.VarChar(150)
+  size           Int
+  storageKey     String        @map("storage_key")
+  /// urs | drawing | photo | specification | factory_quote | other
+  kind           String        @default("other") @db.VarChar(20)
+  note           String?       @db.VarChar(300)
+  uploadedById   String        @map("uploaded_by") @db.Uuid
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([inquiryId])
+  @@index([factoryQuoteId])
   @@map("attachments")
 }
 
@@ -516,6 +520,7 @@ model FactoryQuote {
 
   lines   FactoryQuoteLine[]
   options QuotationOption[]
+  files   Attachment[]
 
   @@index([inquiryId])
   @@index([factoryId])
@@ -542,11 +547,14 @@ model FactoryQuoteLine {
   parentId        String?            @map("parent_id") @db.Uuid
   parent          FactoryQuoteLine?  @relation("FactoryLineParts", fields: [parentId], references: [id], onDelete: Cascade)
   parts           FactoryQuoteLine[] @relation("FactoryLineParts")
+  /// The same product across factories' offers: a line copied from another offer keeps that line's key, so offers can be compared product by product.
+  productKey      String?            @map("product_key") @db.Uuid
 
   quoteLines QuoteLine[]
 
   @@index([factoryQuoteId])
   @@index([parentId])
+  @@index([productKey])
   @@map("factory_quote_lines")
 }
 

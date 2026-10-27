@@ -145,7 +145,8 @@ describe("input schemas", () => {
     const bad = inquiryInput.safeParse({ customerId: "x", category: "", items: [] });
     expect(bad.success).toBe(false);
     const messages = bad.error!.issues.map((i) => i.message);
-    expect(messages).toEqual(expect.arrayContaining(["Choose a customer", "Choose a category", "Add at least one item"]));
+    // The list of items is optional; the requirement then has to say what is needed.
+    expect(messages).toEqual(expect.arrayContaining(["Choose a customer", "Choose a category", "Write what the customer needs, or add their list of items"]));
     expect(stageMoveInput.safeParse({ to: "lost" }).error?.issues[0].message).toBe("Choose why the deal was lost");
   });
 });

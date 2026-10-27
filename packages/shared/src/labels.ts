@@ -65,7 +65,7 @@ export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   void: "Order cancelled",
 };
 
-export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = { urs: "URS", drawing: "Drawing", photo: "Photo", specification: "Specification", other: "Other" };
+export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = { urs: "URS", drawing: "Drawing", photo: "Photo", specification: "Specification", factory_quote: "Factory quotation", other: "Other" };
 
 export const LINE_TYPE_LABEL: Record<LineType, string> = { goods: "Goods", service: "Service", charge: "Charge (freight, fees)" };
 

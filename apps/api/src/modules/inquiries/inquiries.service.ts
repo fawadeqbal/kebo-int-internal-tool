@@ -36,10 +36,14 @@ export function canWorkOn(user: SessionUser, i: { assigneeId: string | null; cre
   return can(user.role, "inquiries.updateAny") || i.assigneeId === user.id || (i.assigneeId === null && i.createdById === user.id);
 }
 
-/** "Tablet press + 2 more" when no title is typed. */
-export function titleFromItems(items: { description: string }[], category: string) {
+/** "Tablet press + 2 more" when no title is typed; without items, the first line of the requirement. */
+export function titleFromItems(items: { description: string }[], category: string, requirements?: string | null) {
   const first = items[0]?.description.split("\n")[0].trim();
-  if (!first) return `${category} inquiry`;
+  if (!first) {
+    const need = requirements?.split("\n").find((l) => l.trim())?.trim();
+    if (!need) return `${category} inquiry`;
+    return need.length > 120 ? `${need.slice(0, 117)}…` : need;
+  }
   const head = first.length > 120 ? `${first.slice(0, 117)}…` : first;
   return items.length > 1 ? `${head} + ${items.length - 1} more` : head;
 }
@@ -187,7 +191,7 @@ export class InquiriesService {
         createdBy: { select: { id: true, name: true } },
         items: { orderBy: { sortOrder: "asc" } },
         notes: { orderBy: { createdAt: "desc" } },
-        attachments: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } },
+        attachments: { where: { deletedAt: null, factoryQuoteId: null }, orderBy: { createdAt: "desc" } },
         stageChanges: { orderBy: { changedAt: "asc" } },
         assignments: { orderBy: { assignedAt: "asc" } },
         quotation: {
@@ -358,7 +362,7 @@ export class InquiriesService {
         contactId: input.contactId,
         channel: input.channel,
         category,
-        title: input.title || titleFromItems(input.items, category),
+        title: input.title || titleFromItems(input.items, category, input.requirements),
         requirements: [input.requirements, opts.channelNote].filter(Boolean).join("\n\n") || null,
         priority: input.priority,
         requiredBy: toDbDateOrNull(input.requiredBy),
@@ -427,7 +431,7 @@ export class InquiriesService {
           contactId: input.contactId,
           channel: input.channel,
           category,
-          title: input.title || titleFromItems(input.items, category),
+          title: input.title || titleFromItems(input.items, category, input.requirements),
           requirements: input.requirements,
           priority: input.priority,
           requiredBy: toDbDateOrNull(input.requiredBy),
@@ -628,15 +632,21 @@ export class InquiriesService {
     user: SessionUser,
     id: string,
     file: { originalname: string; mimetype: string; size: number; buffer: Buffer },
-    meta: { kind: string; note: string | null } = { kind: "other", note: null },
+    meta: { kind: string; note: string | null; factoryQuoteId?: string | null } = { kind: "other", note: null },
   ) {
     await this.find(user, id);
+    // Evidence for a factory offer: only for people who see factory prices, and only that deal's offers.
+    if (meta.factoryQuoteId) {
+      if (!can(user.role, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
+      const q = await this.prisma.db.factoryQuote.findFirst({ where: { id: meta.factoryQuoteId, inquiryId: id, deletedAt: null } });
+      if (!q) throw new DomainError("That factory offer is not on this deal any more.");
+    }
     if (!this.storage.isAllowed(file.originalname))
       throw new DomainError("This kind of file is not allowed. Use PDF, Office, images, CAD drawings or zip files.");
     if (file.size > this.storage.maxBytes)
       throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
     const name = safeFileName(file.originalname);
-    const key = `inquiries/${id}/${randomUUID()}-${name}`;
+    const key = `inquiries/${id}/${meta.factoryQuoteId ? `offers/${meta.factoryQuoteId}/` : ""}${randomUUID()}-${name}`;
     await this.storage.put(key, file.buffer, file.mimetype);
     try {
       return await this.prisma.tx(async (tx) => {
@@ -649,6 +659,7 @@ export class InquiriesService {
             storageKey: key,
             kind: meta.kind,
             note: meta.note,
+            factoryQuoteId: meta.factoryQuoteId ?? null,
             uploadedById: user.id,
           },
         });
@@ -657,7 +668,7 @@ export class InquiriesService {
           action: "upload",
           entityType: "attachment",
           entityId: row.id,
-          summary: `Uploaded ${name}`,
+          summary: meta.factoryQuoteId ? `Uploaded ${name} to a factory offer` : `Uploaded ${name}`,
         });
         return row;
       });
@@ -667,23 +678,28 @@ export class InquiriesService {
     }
   }
 
+  /** A file the person may see: a factory offer's files only for people who see factory prices. */
+  private async fileFor(user: SessionUser, attachmentId: string) {
+    const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null } });
+    if (!a || (a.factoryQuoteId && !can(user.role, "sourcing.manage"))) throw new NotFoundError("File");
+    return a;
+  }
+
   /** Streams a file after checking the person may see its deal. */
   async download(user: SessionUser, attachmentId: string): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
-    const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null } });
-    if (!a) throw new NotFoundError("File");
+    const a = await this.fileFor(user, attachmentId);
     await this.find(user, a.inquiryId);
     return { stream: await this.storage.get(a.storageKey), fileName: a.fileName, mimeType: a.mimeType, size: a.size };
   }
 
   /** A file's type (URS, drawing…) and note. The uploader, the deal's handler or a manager may change them. */
   async describeFile(user: SessionUser, attachmentId: string, input: { kind: string; note: string | null }) {
-    const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null } });
-    if (!a) throw new NotFoundError("File");
+    const a = await this.fileFor(user, attachmentId);
     const i = await this.find(user, a.inquiryId);
     if (!(canWorkOn(user, i) || a.uploadedById === user.id))
       throw new ForbiddenError("Only the uploader, the person handling the deal or a manager can change this file.");
     return this.prisma.tx(async (tx) => {
-      const row = await tx.attachment.update({ where: { id: attachmentId }, data: { kind: input.kind, note: input.note } });
+      const row = await tx.attachment.update({ where: { id: attachmentId }, data: { kind: input.kind, note: input.note ?? null } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",
@@ -691,7 +707,7 @@ export class InquiriesService {
         entityId: attachmentId,
         summary: `${i.refNo}: ${a.fileName} described`,
         oldValues: { kind: a.kind, note: a.note },
-        newValues: input,
+        newValues: { kind: input.kind, note: input.note },
       });
       return row;
     });
@@ -700,7 +716,8 @@ export class InquiriesService {
   /** Every file on a deal in one zip (names made unique; URS first), for "Download all". */
   async zipFiles(user: SessionUser, id: string): Promise<{ data: Uint8Array; fileName: string }> {
     const i = await this.find(user, id);
-    const files = await this.prisma.db.attachment.findMany({ where: { inquiryId: id, deletedAt: null }, orderBy: [{ createdAt: "asc" }] });
+    // The deal's own documents; factory offers' files stay on Factory prices.
+    const files = await this.prisma.db.attachment.findMany({ where: { inquiryId: id, deletedAt: null, factoryQuoteId: null }, orderBy: [{ createdAt: "asc" }] });
     if (!files.length) throw new DomainError("There are no files on this deal yet.");
     const total = files.reduce((t, f) => t + f.size, 0);
     if (total > 300 * 1024 * 1024) throw new DomainError("These files are over 300 MB together. Download them one by one.");
@@ -719,8 +736,7 @@ export class InquiriesService {
   }
 
   async removeFile(user: SessionUser, attachmentId: string) {
-    const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null } });
-    if (!a) throw new NotFoundError("File");
+    const a = await this.fileFor(user, attachmentId);
     const i = await this.find(user, a.inquiryId);
     if (!(canWorkOn(user, i) || a.uploadedById === user.id))
       throw new ForbiddenError("Only the uploader, the person handling the deal or a manager can remove this file.");

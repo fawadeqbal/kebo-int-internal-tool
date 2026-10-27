@@ -88,7 +88,8 @@ export const requestedItemInput = z.object({
   targetPrice: optionalAmount,
 });
 
-export const inquiryInput = z.object({
+export const inquiryInput = z
+  .object({
   customerId: id("Choose a customer"),
   contactId: optionalId,
   channel: z.enum(INQUIRY_CHANNELS).default("email"),
@@ -98,9 +99,14 @@ export const inquiryInput = z.object({
   priority: z.enum(PRIORITIES).default("normal"),
   requiredBy: optionalDate,
   assigneeId: optionalId,
-  items: z.array(requestedItemInput).min(1, "Add at least one item").max(300),
+  /** Optional: often the customer sends only a requirement or a URS; the lines are made at factory prices. */
+  items: z.array(requestedItemInput).max(1000).default([]),
   reason: reasonField,
-});
+})
+  .refine((v) => v.items.length > 0 || !!v.requirements, {
+    message: "Write what the customer needs, or add their list of items",
+    path: ["requirements"],
+  });
 export type InquiryInput = z.infer<typeof inquiryInput>;
 
 export const stageMoveInput = z
@@ -127,7 +133,12 @@ export const splitItemInput = z.object({
 export type SplitItemInput = z.infer<typeof splitItemInput>;
 
 /** A file's type and note (URS & Documents). */
-export const attachmentInput = z.object({ kind: z.enum(ATTACHMENT_KINDS).default("other"), note: optionalText(300) });
+export const attachmentInput = z.object({
+  kind: z.enum(ATTACHMENT_KINDS).default("other"),
+  note: optionalText(300),
+  /** Evidence for a factory offer (only people who see factory prices see it). */
+  factoryQuoteId: optionalId,
+});
 export type AttachmentInput = z.infer<typeof attachmentInput>;
 export const noteInput = z.object({ body: text(5000, "Write a note first") });
 
@@ -172,11 +183,47 @@ export const factoryQuoteInput = z
     moq: optionalText(60),
     paymentTerms: optionalText(2000),
     notes: optionalText(5000),
-    lines: z.array(factoryQuoteLineInput).min(1, "Add at least one price").max(300),
+    /** Left out: the lines are not touched (they are added one by one, see factoryLinesInput). */
+    lines: z.array(factoryQuoteLineInput).max(1000).optional(),
     reason: reasonField,
   })
   .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] });
 export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
+
+/**
+ * Lines added to an offer as they are typed or pasted: after a line (or at the
+ * end), at the same level as that line or as parts of `parentId`.
+ */
+export const factoryLinesInput = z.object({
+  lines: z.array(factoryQuoteLineInput.omit({ id: true })).min(1, "Add a line").max(1000),
+  /** Insert after this line (and its parts); empty = at the end. */
+  afterId: optionalId,
+  /** All new lines become parts of this line (pasting under a line). */
+  parentId: optionalId,
+  reason: reasonField,
+});
+export type FactoryLinesInput = z.infer<typeof factoryLinesInput>;
+
+/** One line changed in place (only the fields sent). */
+export const factoryLinePatch = z.object({
+  requestedItemId: optionalId.optional(),
+  description: text(2000, "Each line needs a description").optional(),
+  model: optionalText(120).optional(),
+  quantity: quantity.optional(),
+  unit: z.string().trim().min(1).max(20).optional(),
+  unitPrice: amount("Enter the factory's price (without tax)").optional(),
+  taxRate: percentOr(DEFAULT_TAX_RATE).optional(),
+  reason: reasonField,
+});
+export type FactoryLinePatch = z.infer<typeof factoryLinePatch>;
+
+/** Up / down among its neighbours, into the line above as a part, or out to a line of its own. */
+export const lineMoveInput = z.object({ to: z.enum(["up", "down", "indent", "outdent"]), reason: reasonField });
+export type LineMoveInput = z.infer<typeof lineMoveInput>;
+
+/** Start an offer from another factory's lines (same products, this factory's models and prices). */
+export const copyLinesInput = z.object({ fromQuoteId: id("Choose the offer to copy"), withPrices: bool.default(false) });
+export type CopyLinesInput = z.infer<typeof copyLinesInput>;
 
 
 /* ---------------------------------------------------------------- quotations */

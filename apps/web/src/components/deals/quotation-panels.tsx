@@ -35,6 +35,14 @@ export function StartRevision({
 }) {
   const [open, setOpen] = useState(false);
   const label = first ? "Make the quotation (R1)" : `Start a new revision${draft ? ` (R${draft.number})` : ""}`;
+  // Nothing to offer yet: no factory offer with lines, and no list from the customer to price by hand.
+  const nothing = !!offers && offers.offers.length === 0 && offers.items.length === 0;
+  if (nothing)
+    return (
+      <p className="text-sm text-muted">
+        Add a factory offer with its lines on the Factory prices tab first; each offer becomes an option the customer can choose.
+      </p>
+    );
   if (!open || !draft || !offers)
     return (
       <div className="flex flex-col items-start gap-1.5">

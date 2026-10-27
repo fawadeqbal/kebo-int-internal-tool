@@ -132,7 +132,8 @@ export class QuotationsService {
     const refs = items.map((i) => ({ id: i.id, parentId: i.parentId, no: i.no }));
     const quotes = can(user.role, "sourcing.manage")
       ? await db.factoryQuote.findMany({
-          where: { inquiryId, deletedAt: null },
+          // An offer still being typed in (no lines yet) cannot be offered.
+          where: { inquiryId, deletedAt: null, lines: { some: {} } },
           include: { factory: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
           orderBy: { receivedOn: "asc" },
         })
@@ -169,6 +170,8 @@ export class QuotationsService {
         ),
         /** No exchange rate for its currency in Settings: costs are unknown. */
         missingRate: rate === null,
+        /** Lines still without a factory price (a line priced in its parts does not count). */
+        unpriced: q.lines.filter((l) => Number(l.unitPrice) === 0 && !q.lines.some((p) => p.parentId === l.id)).length,
         totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + Math.round((l.costMinor ?? 0) * Number(l.quantity)), 0)),
         lines: lines.map(({ costMinor: _c, ...l }) => l),
       };
@@ -357,6 +360,7 @@ export class QuotationsService {
     const best = [...available.offers].sort(
       (a, b) =>
         a.coverage.missing.length - b.coverage.missing.length ||
+        a.unpriced - b.unpriced ||
         (a.totalCost === null ? 1 : b.totalCost === null ? -1 : Number(a.totalCost) - Number(b.totalCost)),
     )[0];
     const option: OptionInput = best

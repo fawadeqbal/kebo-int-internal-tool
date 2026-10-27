@@ -22,6 +22,9 @@ export type DocumentRow = DealFile & {
   remove: Action;
 };
 
+/** What a deal's own documents can be (a factory's quotation is kept with its offer). */
+const DEAL_KINDS = ATTACHMENT_KINDS.filter((k) => k !== "factory_quote");
+
 /** URS first: it is what the factories price against. */
 const ORDER: AttachmentKind[] = ["urs", "specification", "drawing", "photo", "other"];
 const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
@@ -41,11 +44,12 @@ export function guessKind(name: string, type: string): AttachmentKind {
 export type Staged = { key: string; file: File; kind: AttachmentKind; note: string; progress: number | null; error: string | null };
 
 /** Sends one file with progress (XHR: fetch cannot report upload progress). */
-export function send(dealId: string, s: Staged, onProgress: (p: number) => void): Promise<string | null> {
+export function send(dealId: string, s: Staged, onProgress: (p: number) => void, extra: Record<string, string> = {}): Promise<string | null> {
   return new Promise((resolve) => {
     const body = new FormData();
     body.set("file", s.file, s.file.name);
     body.set("kind", s.kind);
+    for (const [k, v] of Object.entries(extra)) body.set(k, v);
     if (s.note.trim()) body.set("note", s.note.trim());
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/files/deals/${dealId}`);
@@ -195,7 +199,7 @@ export function DocumentsPanel({ dealId, files, canUpload }: { dealId: string; f
                             className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
                           >
                             <Select name="kind" aria-label="Type" defaultValue={f.kind} className="w-40">
-                              {ATTACHMENT_KINDS.map((k) => (
+                              {DEAL_KINDS.map((k) => (
                                 <option key={k} value={k}>
                                   {ATTACHMENT_KIND_LABEL[k]}
                                 </option>
@@ -238,11 +242,18 @@ export function FileDrop({
   setStaged,
   busy,
   onUpload,
+  kinds = DEAL_KINDS,
+  guess = guessKind,
+  title = "Drop the URS, drawings, photos or specs here",
 }: {
   staged: Staged[];
   setStaged: (fn: (s: Staged[]) => Staged[]) => void;
   busy: boolean;
   onUpload?: () => void;
+  /** The types a file can be here. */
+  kinds?: readonly AttachmentKind[];
+  guess?: (name: string, type: string) => AttachmentKind;
+  title?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -252,7 +263,7 @@ export function FileDrop({
     const added = Array.from(list).map((file) => ({
       key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
       file,
-      kind: guessKind(file.name, file.type),
+      kind: guess(file.name, file.type),
       note: "",
       progress: null,
       error: null,
@@ -281,7 +292,7 @@ export function FileDrop({
       >
         <UploadCloud className="size-6 text-muted" aria-hidden />
         <p className="text-sm">
-          <span className="font-medium">Drop the URS, drawings, photos or specs here</span>
+          <span className="font-medium">{title}</span>
           <span className="block text-xs text-muted">Several at once is fine. You can say what each one is before uploading.</span>
         </p>
         <Button size="sm" variant="secondary" onClick={() => input.current?.click()} disabled={busy}>
@@ -329,7 +340,7 @@ export function FileDrop({
                     disabled={busy}
                     className="w-40"
                   >
-                    {ATTACHMENT_KINDS.map((k) => (
+                    {kinds.map((k) => (
                       <option key={k} value={k}>
                         {ATTACHMENT_KIND_LABEL[k]}
                       </option>
