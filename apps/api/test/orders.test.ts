@@ -101,7 +101,7 @@ describe("orders: four stages", () => {
     const o = await order();
     const deposit = Number(o.money.deposit);
     await api(app, sana).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: "2026-10-21" }).expect(403);
-    await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "EUR", paidOn: "2026-10-21" }).expect(400);
+    await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "PKR", paidOn: "2026-10-21" }).expect(400);
     await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: "2099-01-01" }).expect(400);
     const paid = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: (deposit - 25).toFixed(2), bankCharges: "25", currency: "USD", paidOn: "2026-10-21", reference: "TT-1" }).expect(201)).body;
     expect(paid).toMatchObject({ status: "deposit_paid", received: deposit.toFixed(2) });

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isISODate } from "@kebo/utils";
+import { CURRENCIES } from "../enums";
 
 /**
  * Building blocks for input schemas. Every schema accepts what a JSON client
@@ -89,11 +90,8 @@ export const quantity = z.preprocess(
 /** An optional positive rate (exchange rate): blank → null. */
 export const optionalRate = z.preprocess((v) => blank(v) ?? null, z.coerce.number().positive("Must be more than 0").max(1_000_000).refine(decimals(6), "Use at most 6 decimals").nullable());
 
-export const currency = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .regex(/^[A-Z]{3}$/, "Use a three-letter currency code, e.g. USD");
+/** One of the business's currencies (USD, CNY, PKR); typed codes are accepted in any case. */
+export const currency = z.preprocess((v) => (typeof v === "string" ? v.trim().toUpperCase() : v), z.enum(CURRENCIES, `Choose ${CURRENCIES.join(", ")}`));
 
 export const email = z
   .string()

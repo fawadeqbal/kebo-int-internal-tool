@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Plus, Star, Trash2 } from "lucide-react";
-import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES, customerLetters, UNKNOWN_COUNTRY, type CustomerType } from "@kebo/shared";
+import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES, customerLetters, UNKNOWN_COUNTRY, type CustomerType, CURRENCY_LABEL } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardBody, CardFooter, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -103,6 +103,7 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
                   {currencyOptions.map((c) => (
                     <option key={c} value={c}>
                       {c}
+                      {c in CURRENCY_LABEL ? ` · ${CURRENCY_LABEL[c as keyof typeof CURRENCY_LABEL]}` : ""}
                     </option>
                   ))}
                 </Select>

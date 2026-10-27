@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
-import { convertMinor, fxRate, withTaxMinor, fromMinor } from "@kebo/money";
+import { convertAmount, convertMinor, fxRate, withTaxMinor, fromMinor } from "@kebo/money";
 import {
   can,
   coverage,
@@ -328,11 +328,26 @@ export class SourcingService {
             `${l.description}: ${l.unitPrice.toFixed(2)} → ${Number(next.unitPrice).toFixed(2)}${Number(next.taxRate) !== Number(l.taxRate) ? `, tax ${Number(l.taxRate)}% → ${Number(next.taxRate)}%` : ""}${Number(next.quantity) !== Number(l.quantity) ? `, qty ${l.quantity.toString()} → ${next.quantity}` : ""}`,
           );
       }
+      // A new currency: the prices are turned into it at the Settings rates, or kept as they are (typed in the wrong currency).
+      const recurrency = input.currency !== q.currency;
+      let converted: { id: string; unitPrice: number }[] = [];
+      if (recurrency && input.convertPrices && !input.lines) {
+        const { sales } = await this.settings.get();
+        const lines = await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId }, select: { id: true, unitPrice: true } });
+        converted = lines.map((l) => {
+          const v = convertAmount(Number(l.unitPrice), q.currency, input.currency, sales.currency, sales.exchangeRates);
+          if (v === null) throw new DomainError(`There is no exchange rate between ${q.currency} and ${input.currency} in Settings, so the prices cannot be converted.`);
+          return { id: l.id, unitPrice: v };
+        });
+      }
+      if (used.size && recurrency) changes.push(`currency ${q.currency} → ${input.currency}${converted.length ? " (prices converted)" : " (prices kept)"}`);
       const reason = changes.length
         ? requireReason(input.reason, "factoryPrice", "you are changing prices a quotation uses")
         : input.reason;
       const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input), factoryId: factory.id } });
       if (input.lines) await this.writeLines(tx, quoteId, q.inquiryId, input.lines);
+      for (const l of converted) await tx.factoryQuoteLine.update({ where: { id: l.id }, data: { unitPrice: l.unitPrice } });
+      if (recurrency && !used.size) changes.push(`currency ${q.currency} → ${input.currency}${converted.length ? `, ${converted.length} prices converted` : ""}`);
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",

@@ -1,4 +1,6 @@
-/** The currencies the business works in: the main one first, then each one with an exchange rate in Settings. */
+import { CURRENCIES } from "@kebo/shared";
+
+/** The currencies the business works in (USD, CNY, PKR), the main one first. */
 export type SalesCurrencies = { sales: { currency: string; exchangeRates: Record<string, number> } };
 
-export const currenciesFrom = (s: SalesCurrencies) => [...new Set([s.sales.currency, ...Object.keys(s.sales.exchangeRates)])];
+export const currenciesFrom = (s: SalesCurrencies): string[] => [s.sales.currency, ...CURRENCIES.filter((c) => c !== s.sales.currency)];

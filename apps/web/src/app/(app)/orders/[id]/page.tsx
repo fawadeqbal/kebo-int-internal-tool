@@ -114,7 +114,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     api.get<HistoryEntry[]>("/history", { type: "order", id }),
     api.get<OrderMoney>(`/orders/${id}/money`),
     api.get<Person[]>("/users/people"),
-    api.get<{ sales: { currency: string } }>("/settings"),
+    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
   ]);
   const open = o.status !== "cancelled";
   const canMove = can(me, "orders.update") && open;
@@ -364,8 +364,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </CardBody>
           </Card>
 
-          {m.factories && <FactoriesCard m={m} people={people} today={now} />}
-          {m.expenses && <ProfitCard m={m} people={people} today={now} mainCurrency={settings.sales.currency} />}
+          {m.factories && <FactoriesCard m={m} people={people} today={now} fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }} />}
+          {m.expenses && <ProfitCard m={m} people={people} today={now} mainCurrency={settings.sales.currency} fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }} />}
 
           <Card>
             <CardHeader title="Documents" description="Made from the order whenever you open them, so they are always up to date." />

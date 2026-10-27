@@ -10,6 +10,8 @@ import {
   formatMinor,
   fromMinor,
   fxRate,
+  convertAmount,
+  restateRates,
   marginPercent,
   money,
   priceForMargin,
@@ -92,6 +94,22 @@ describe("costing", () => {
     expect(fxRate("JPY", "USD", "USD", rates)).toBeNull();
     expect(convertMinor(710_000, 7.1)).toBe(100_000);
     expect(() => convertMinor(1, 0)).toThrow();
+  });
+
+  it("converts an amount between USD, CNY and PKR, and restates the rates for a new main currency", () => {
+    const rates = { CNY: 7.1, PKR: 280 };
+    expect(convertAmount(7100, "CNY", "USD", "USD", rates)).toBe(1000);
+    expect(convertAmount(1000, "USD", "PKR", "USD", rates)).toBe(280000);
+    expect(convertAmount(100, "CNY", "PKR", "USD", rates)).toBe(3943.66); // 100 / 7.1 * 280
+    expect(convertAmount(12.5, "USD", "USD", "USD", rates)).toBe(12.5);
+    expect(convertAmount(5, "USD", "PKR", "USD", { CNY: 7.1 })).toBeNull();
+    const pkr = restateRates(rates, "USD", "PKR");
+    expect(pkr.USD).toBeCloseTo(1 / 280, 12);
+    expect(pkr.CNY).toBeCloseTo(7.1 / 280, 12);
+    // Same answers whichever currency is the main one.
+    expect(convertAmount(7100, "CNY", "USD", "PKR", pkr)).toBe(1000);
+    expect(convertAmount(1000, "USD", "PKR", "PKR", pkr)).toBe(280000);
+    expect(restateRates({ CNY: 7.1 }, "USD", "PKR")).toEqual({});
   });
 
   it("adds a factory price's tax on top", () => {

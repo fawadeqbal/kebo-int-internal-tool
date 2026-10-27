@@ -11,6 +11,12 @@ export type PresetRoleKey = (typeof PRESET_ROLE_KEYS)[number];
 /** A role's key: a preset, or one made in Security ("accounts", "sales-china"). */
 export type Role = string;
 
+/* ---------------------------------------------------------------- money */
+
+/** The currencies the business works in. Everything with a currency is chosen from these. */
+export const CURRENCIES = values("USD", "CNY", "PKR");
+export type Currency = (typeof CURRENCIES)[number];
+
 /* ---------------------------------------------------------------- sign-in */
 
 /** What happened at one sign-in attempt (the sign-in history). */

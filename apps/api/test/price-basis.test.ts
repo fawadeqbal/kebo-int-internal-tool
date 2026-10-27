@@ -78,9 +78,9 @@ describe("factory price basis", () => {
     };
     // A currency without a rate cannot be turned into USD.
     const bad = structuredClone(body);
-    bad.options[0].costs[1].currency = "EUR";
+    bad.options[0].costs[1].currency = "PKR";
     expect((await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, bad).expect(400)).body.error).toMatch(
-      /^Option A: there is no exchange rate for EUR in Settings/,
+      /^Option A: there is no exchange rate for PKR in Settings/,
     );
     const r = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, body).expect(201)).body;
     revisionId = r.id;

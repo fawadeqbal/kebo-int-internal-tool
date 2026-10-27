@@ -9,6 +9,8 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
+import { convertText, rateOf, rateSentence } from "@/lib/fx";
+import { CurrencySelect } from "@/components/common/currency-select";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -27,6 +29,8 @@ interface QuoteState {
   factory: { id: string | null; name: string } | null;
   reference: string;
   currency: string;
+  /** When the currency changes on an offer with prices: turn them into the new currency, or keep the numbers. */
+  convertPrices: boolean;
   receivedOn: string;
   validUntil: string;
   basis: Incoterm | "";
@@ -42,6 +46,7 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
     factory: quote ? { id: quote.factory.id, name: quote.factory.name } : null,
     reference: quote?.reference ?? "",
     currency: quote?.currency ?? "CNY",
+    convertPrices: true,
     receivedOn: quote?.receivedOn ?? today,
     validUntil: quote?.validUntil ?? "",
     basis: quote?.basis ?? "",
@@ -54,7 +59,7 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
 }
 
 /** The offer's details; its lines are added and changed in the line table, one at a time. */
-function payload(s: QuoteState) {
+function payload(s: QuoteState, convertible?: boolean) {
   return {
     factoryId: s.factory?.id ?? null,
     newFactoryName: s.factory && !s.factory.id ? s.factory.name : null,
@@ -62,6 +67,7 @@ function payload(s: QuoteState) {
     receivedOn: s.receivedOn,
     validUntil: s.validUntil || null,
     currency: s.currency.trim().toUpperCase(),
+    convertPrices: s.convertPrices && !!convertible,
     basis: s.basis || null,
     basisPlace: s.basisPlace,
     leadTime: s.leadTime,
@@ -224,14 +230,20 @@ export function OfferHeaderForm({
   const [s, setS] = useState<QuoteState>(() => initialState(quote, today));
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
   const currency = s.currency.trim().toUpperCase();
-  const rate = /^[A-Z]{3}$/.test(currency) ? fxRate(currency, mainCurrency, mainCurrency, rates) : null;
-  const known = [mainCurrency, ...Object.keys(rates)];
+  const fx = { main: mainCurrency, rates };
+  const rate = fxRate(currency, mainCurrency, mainCurrency, rates);
+  // Changing the currency of an offer that has prices: convert them, or keep the numbers.
+  const priced = (quote?.lines ?? []).filter((l) => Number(l.unitPrice) > 0);
+  const recurrency = !!quote && currency !== quote.currency && priced.length > 0;
+  const canConvert = recurrency && rateOf(fx, quote!.currency, currency) !== null;
+  const sample = recurrency ? priced[0]! : null;
+  const sampleTo = sample && canConvert ? convertText(String(sample.unitPrice), quote!.currency, currency, fx) : null;
 
   return (
     <ActionForm action={action} onDone={onDone} className="flex flex-col gap-4" keepFields>
       {(st) => (
         <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(s))} />
+          <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
           <div className="grid gap-4 md:grid-cols-3">
             <Field label="Factory" htmlFor="factory" error={st.errors?.factoryId ?? st.errors?.newFactoryName} className="md:col-span-2">
               <FactoryPicker value={s.factory} search={searchFactories} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} />
@@ -249,28 +261,39 @@ export function OfferHeaderForm({
               label="Currency"
               htmlFor="currency"
               error={st.errors?.currency}
-              hint={
-                rate === null && /^[A-Z]{3}$/.test(currency)
-                  ? `No exchange rate for ${currency} in Settings`
-                  : rate && rate !== 1
-                    ? `1 ${mainCurrency} = ${rate} ${currency}`
-                    : undefined
-              }
+              hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
             >
-              <Input
-                id="currency"
-                value={s.currency}
-                onChange={(e) => set("currency", e.target.value.toUpperCase())}
-                maxLength={3}
-                list="fq-currencies"
-                className="uppercase"
-              />
-              <datalist id="fq-currencies">
-                {known.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
+              <CurrencySelect id="currency" value={s.currency} onChange={(e) => set("currency", e.target.value)} />
             </Field>
+            {recurrency && (
+              <fieldset className="flex flex-col gap-2 rounded-lg border border-warn/30 bg-warn-soft/40 p-3 md:col-span-3">
+                <legend className="sr-only">What to do with the prices</legend>
+                <p className="text-sm font-medium">
+                  Its {priced.length} price{priced.length === 1 ? " is" : "s are"} in {quote!.currency}. What should happen to {priced.length === 1 ? "it" : "them"}?
+                </p>
+                <label className={cn("flex items-start gap-2 text-sm", !canConvert && "text-muted")}>
+                  <input type="radio" name="fq-convert" className="mt-1" checked={canConvert && s.convertPrices} disabled={!canConvert} onChange={() => set("convertPrices", true)} />
+                  <span>
+                    Convert them to {currency}
+                    {canConvert ? (
+                      <span className="block text-xs text-text-2">
+                        At {rateSentence(fx, quote!.currency, currency)}: {sample!.description.split("\n")[0]} {quote!.currency} {Number(sample!.unitPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} → {currency}{" "}
+                        {Number(sampleTo).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <span className="block text-xs">Add the exchange rate in Settings first.</span>
+                    )}
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="radio" name="fq-convert" className="mt-1" checked={!canConvert || !s.convertPrices} onChange={() => set("convertPrices", false)} />
+                  <span>
+                    Keep the numbers
+                    <span className="block text-xs text-text-2">They were typed in {currency} already; only the currency was wrong.</span>
+                  </span>
+                </label>
+              </fieldset>
+            )}
             <Field label="Received on" htmlFor="receivedOn" error={st.errors?.receivedOn}>
               <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
             </Field>
