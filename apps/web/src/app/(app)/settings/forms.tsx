@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { SettingsKey } from "@kebo/shared";
+import { restateRates } from "@kebo/money";
+import { CURRENCIES, CURRENCY_LABEL, type SettingsKey } from "@kebo/shared";
 import { Card, CardBody, CardFooter, CardHeader, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -47,6 +48,65 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
   );
 }
 
+/** A rate as typed text: 6 decimals for big rates, 10 significant digits for small ones (1 PKR = 0.003571428571 USD), so switching the main currency back and forth gives the same numbers. */
+const rateText = (n: number | undefined) => (n === undefined || !Number.isFinite(n) || n <= 0 ? "" : String(n >= 1 ? Number(n.toFixed(6)) : Number(n.toPrecision(10))));
+
+/**
+ * The main currency and, for each other currency, how many of it one unit of
+ * the main one buys. Choosing another main currency restates the rates
+ * (1 USD = 280 PKR becomes 1 PKR = 0.003571 USD), so nothing has to be retyped.
+ */
+function CurrenciesControl({ f, main: initialMain, rates: initialRates, errors }: { f: SettingField; main: string; rates: Record<string, string>; errors?: string[] }) {
+  const [main, setMain] = useState(initialMain);
+  const [rates, setRates] = useState<Record<string, string>>(initialRates);
+  const others = CURRENCIES.filter((c) => c !== main);
+  const changeMain = (next: string) => {
+    const numeric = Object.fromEntries(Object.entries(rates).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Number(v)]));
+    const restated = restateRates(numeric, main, next);
+    setRates(Object.fromEntries(Object.entries(restated).map(([k, v]) => [k, rateText(v)])));
+    setMain(next);
+  };
+  return (
+    <fieldset className={cn("flex flex-col gap-3", f.wide && "sm:col-span-2")}>
+      <legend className="mb-1 text-sm font-medium">{f.label}</legend>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Main currency" htmlFor="set-currency">
+          <Select id="set-currency" name="currency" value={main} onChange={(e) => changeMain(e.target.value)}>
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c} · {CURRENCY_LABEL[c]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {others.map((c) => (
+          <Field key={c} label={`1 ${main} buys`} htmlFor={`set-rate-${c}`} hint={CURRENCY_LABEL[c]}>
+            <div className="flex items-center gap-2">
+              <Input
+                id={`set-rate-${c}`}
+                name={`rate_${c}`}
+                inputMode="decimal"
+                className="w-32 tabular"
+                value={rates[c] ?? ""}
+                placeholder="Enter the rate"
+                aria-invalid={!rates[c]}
+                onChange={(e) => setRates((r) => ({ ...r, [c]: e.target.value }))}
+              />
+              <span className="text-sm font-medium text-text-2">{c}</span>
+            </div>
+          </Field>
+        ))}
+      </div>
+      {f.hint && <p className="text-xs text-muted">{f.hint}</p>}
+      {errors?.map((e) => (
+        <p key={e} className="text-xs text-bad">
+          {e}
+        </p>
+      ))}
+    </fieldset>
+  );
+}
+
 function Control({ f, text, checked, error }: { f: SettingField; text: string; checked: boolean; error?: string[] }) {
   const id = `set-${f.name}`;
   if (f.kind === "image") return <ImageControl key={text.length} f={f} text={text} error={error} />;
@@ -65,7 +125,7 @@ function Control({ f, text, checked, error }: { f: SettingField; text: string; c
     <Field label={f.label} htmlFor={id} hint={f.hint} error={error} className={cn(f.wide && "sm:col-span-2")}>
       {f.kind === "textarea" ? (
         <Textarea {...common} rows={3} />
-      ) : f.kind === "lines" || f.kind === "rates" ? (
+      ) : f.kind === "lines" ? (
         <Textarea {...common} rows={Math.min(8, Math.max(3, text.split("\n").length + 1))} className="font-mono text-[13px]" spellCheck={false} />
       ) : f.kind === "select" ? (
         // Keyed by the value: a select's default only applies when it mounts, and React resets the form after each submit.
@@ -82,7 +142,7 @@ function Control({ f, text, checked, error }: { f: SettingField; text: string; c
           {f.unit && <span className="text-sm text-muted">{f.unit}</span>}
         </div>
       ) : (
-        <Input {...common} className={f.name === "currency" ? "w-28 uppercase" : undefined} maxLength={f.name === "currency" ? 3 : undefined} />
+        <Input {...common} />
       )}
     </Field>
   );
@@ -97,7 +157,20 @@ export function SettingsGroupForm({ groupKey, values, action }: { groupKey: Sett
         <Card id={group.key} className="scroll-mt-20">
           <CardHeader title={group.title} description={group.description} />
           <CardBody className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
-            {group.fields.map((f) => (
+            {group.fields.map((f) =>
+              f.kind === "currencies" ? (
+                <CurrenciesControl
+                  key={`${f.name}-${s.values?.currency ?? values.currency}`}
+                  f={f}
+                  main={String(s.values?.currency ?? values.currency ?? "USD")}
+                  rates={
+                    s.values
+                      ? Object.fromEntries(CURRENCIES.map((c) => [c, s.values?.[`rate_${c}`] ?? ""]))
+                      : Object.fromEntries(Object.entries((values.exchangeRates ?? {}) as Record<string, number>).map(([k, v]) => [k, rateText(v)]))
+                  }
+                  errors={[...(s.errors?.currency ?? []), ...(s.errors?.exchangeRates ?? [])]}
+                />
+              ) : (
               <Control
                 key={f.name}
                 f={f}
@@ -105,7 +178,8 @@ export function SettingsGroupForm({ groupKey, values, action }: { groupKey: Sett
                 checked={s.values ? s.values[f.name] === "on" : values[f.name] === true}
                 error={s.errors?.[f.name]}
               />
-            ))}
+              ),
+            )}
           </CardBody>
           <CardFooter>
             <SubmitButton pendingText="Saving…">{group.save}</SubmitButton>

@@ -5,7 +5,7 @@ import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, type SettingsKey } from 
  * and the action turns them back into the group's object for PUT /settings/:key
  * (see packages/shared/src/schemas/settings.ts for the rules).
  */
-export type FieldKind = "text" | "textarea" | "number" | "bool" | "lines" | "rates" | "select" | "image";
+export type FieldKind = "text" | "textarea" | "number" | "bool" | "lines" | "currencies" | "select" | "image";
 
 export interface SettingField {
   name: string;
@@ -56,13 +56,12 @@ export const SETTING_GROUPS: SettingGroup[] = [
     description: "Starting values for new quotations. People can change them on each quotation.",
     save: "Save sales settings",
     fields: [
-      { name: "currency", label: "Main currency", kind: "text", hint: "Reports and totals are shown in it. Three letters, e.g. USD." },
       {
-        name: "exchangeRates",
-        label: "Exchange rates",
-        kind: "rates",
-        hint: "One line per currency: how many of it one unit of the main currency buys, e.g. CNY = 7.10. Used to turn factory prices into quotation prices.",
-        placeholder: "CNY = 7.10\nEUR = 0.92",
+        name: "currency",
+        label: "Currencies",
+        kind: "currencies",
+        wide: true,
+        hint: "Reports and totals are shown in the main currency. The rates turn factory prices into quotation prices, and convert amounts wherever a currency is changed.",
       },
       { name: "defaultMarginPercent", label: "Usual margin", kind: "number", unit: "%", hint: "Added on top of the factory cost when a quotation is made" },
       { name: "quotationValidityDays", label: "Quotations are valid for", kind: "number", unit: "days", hint: "The customer must answer within this time" },
@@ -106,7 +105,6 @@ export const SETTING_GROUPS: SettingGroup[] = [
 
 /** Stored value → what the form box shows. */
 export function toFormText(field: SettingField, value: unknown): string {
-  if (field.kind === "rates") return Object.entries((value ?? {}) as Record<string, number>).map(([k, v]) => `${k} = ${v}`).join("\n");
   if (field.kind === "lines") return ((value ?? []) as string[]).join("\n");
   return value === null || value === undefined ? "" : String(value);
 }

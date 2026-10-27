@@ -313,7 +313,7 @@ describe("lines, reasons and history", () => {
 
   it("asks why exchange rates or money defaults change", async () => {
     const sales = (await api(app, admin).get("/settings").expect(200)).body.sales;
-    const withEur = { ...sales, exchangeRates: { ...sales.exchangeRates, EUR: 0.92 } };
+    const withEur = { ...sales, exchangeRates: { ...sales.exchangeRates, PKR: 280 } };
     expect((await api(app, admin).put("/settings/sales", withEur).expect(409)).body).toMatchObject({
       code: "reason_needed",
       choices: expect.arrayContaining(["New exchange rate"]),

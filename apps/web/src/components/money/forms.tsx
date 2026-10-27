@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 import { toMinor, formatMinor } from "@kebo/money";
 import {
@@ -18,6 +18,8 @@ import {
 import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { CurrencySelect } from "@/components/common/currency-select";
+import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
 import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
@@ -380,6 +382,22 @@ export function EditCustomerPayment({
   );
 }
 
+/**
+ * The currency of a money form changed: the amount typed follows it (CNY 3,550 →
+ * USD 500.00 at the Settings rate), and a rate already filled in is replaced by
+ * the Settings rate for the new currency. Without a rate, the numbers stay.
+ */
+function switchCurrency(amount: HTMLInputElement | null, rate: HTMLInputElement | null, from: string, to: string, per: string, fx: Fx) {
+  if (amount && amount.value.trim()) {
+    const v = convertText(amount.value, from, to, fx);
+    if (v !== null) amount.value = v;
+  }
+  if (rate && rate.value.trim()) {
+    const r = rateOf(fx, to, per);
+    rate.value = r === null || to === per ? "" : String(Number(r.toFixed(6)));
+  }
+}
+
 /* ---------------------------------------------------------------- factory payments */
 
 /**
@@ -391,6 +409,7 @@ export function FactoryPaymentForm({
   factories,
   people,
   orderCurrency,
+  fx,
   today,
   payment,
   onClose,
@@ -399,10 +418,14 @@ export function FactoryPaymentForm({
   factories: FactoryOwed[];
   people: Person[];
   orderCurrency: string;
+  /** Settings rates: the amount is converted when the currency changes. */
+  fx: Fx;
   today: string;
   payment?: FactoryPaymentView;
   onClose: () => void;
 }) {
+  const amountRef = useRef<HTMLInputElement>(null);
+  const rateRef = useRef<HTMLInputElement>(null);
   const first = factories.find((f) => Number(f.toPay) > 0) ?? factories[0];
   const [factoryKey, setFactoryKey] = useState(
     payment ? `${payment.factory.id}:${payment.currency}` : first ? `${first.factory.id}:${first.currency}` : "",
@@ -447,6 +470,7 @@ export function FactoryPaymentForm({
             </Field>
             <Field label="Amount" htmlFor="fp-amount" error={s.errors?.amount}>
               <Input
+                ref={amountRef}
                 id="fp-amount"
                 name="amount"
                 inputMode="decimal"
@@ -455,24 +479,27 @@ export function FactoryPaymentForm({
                 placeholder={chosen && Number(chosen.toPay) > 0 ? chosen.toPay : ""}
               />
             </Field>
-            <Field label="Currency" htmlFor="fp-currency" error={s.errors?.currency}>
-              <Input
+            <Field label="Currency" htmlFor="fp-currency" error={s.errors?.currency} hint="Changing it converts the amount">
+              <CurrencySelect
                 id="fp-currency"
                 name="currency"
-                maxLength={3}
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                className="uppercase"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  switchCurrency(amountRef.current, rateRef.current, currency, next, orderCurrency, fx);
+                  setCurrency(next);
+                }}
               />
             </Field>
             <Field
               label={`Rate (${currency || "…"} per 1 ${orderCurrency})`}
               htmlFor="fp-rate"
               optional={!payment}
-              hint={payment ? undefined : "Empty: today's rate from Settings"}
+              hint={payment ? undefined : `Empty: today's rate from Settings${rateOf(fx, currency, orderCurrency) && currency !== orderCurrency ? ` (${rateOf(fx, currency, orderCurrency)!.toFixed(4).replace(/\.?0+$/, "")})` : ""}`}
               error={s.errors?.rate}
             >
               <Input
+                ref={rateRef}
                 id="fp-rate"
                 name="rate"
                 inputMode="decimal"
@@ -561,6 +588,7 @@ export function ExpenseForm({
   action,
   people,
   mainCurrency,
+  fx,
   today,
   expense,
   orders,
@@ -569,6 +597,8 @@ export function ExpenseForm({
   action: Action;
   people: Person[];
   mainCurrency: string;
+  /** Settings rates: the amount is converted when the currency changes. */
+  fx: Fx;
   today: string;
   expense?: ExpenseView;
   /** On the Money page: the orders an expense can belong to (empty = company). */
@@ -576,6 +606,8 @@ export function ExpenseForm({
   onClose: () => void;
 }) {
   const [currency, setCurrency] = useState(expense?.currency ?? mainCurrency);
+  const amountRef = useRef<HTMLInputElement>(null);
+  const rateRef = useRef<HTMLInputElement>(null);
   return (
     <ActionForm action={action} onDone={onClose} className={framed}>
       {(s) => (
@@ -614,6 +646,7 @@ export function ExpenseForm({
             </Field>
             <Field label="Amount" htmlFor="ex-amount" error={s.errors?.amount}>
               <Input
+                ref={amountRef}
                 id="ex-amount"
                 name="amount"
                 inputMode="decimal"
@@ -621,24 +654,27 @@ export function ExpenseForm({
                 defaultValue={s.values?.amount ?? expense?.amount ?? ""}
               />
             </Field>
-            <Field label="Currency" htmlFor="ex-currency" error={s.errors?.currency}>
-              <Input
+            <Field label="Currency" htmlFor="ex-currency" error={s.errors?.currency} hint="Changing it converts the amount">
+              <CurrencySelect
                 id="ex-currency"
                 name="currency"
-                maxLength={3}
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                className="uppercase"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  switchCurrency(amountRef.current, rateRef.current, currency, next, mainCurrency, fx);
+                  setCurrency(next);
+                }}
               />
             </Field>
             <Field
               label={`Rate (${currency || "…"} per 1 ${mainCurrency})`}
               htmlFor="ex-rate"
               optional={!expense}
-              hint={expense ? undefined : "Empty: today's rate from Settings"}
+              hint={expense ? undefined : `Empty: today's rate from Settings${rateOf(fx, currency, mainCurrency) && currency !== mainCurrency ? ` (${rateOf(fx, currency, mainCurrency)!.toFixed(4).replace(/\.?0+$/, "")})` : ""}`}
               error={s.errors?.rate}
             >
               <Input
+                ref={rateRef}
                 id="ex-rate"
                 name="rate"
                 inputMode="decimal"

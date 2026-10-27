@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BALANCE_TERMS, INCOTERMS } from "../enums";
+import { BALANCE_TERMS, CURRENCIES, INCOTERMS } from "../enums";
 import { DEFAULT_ORDER_REMINDER_DAYS } from "../workflows/order";
 
 /**
@@ -45,12 +45,19 @@ export const companySettings = z.object({
 });
 
 export const salesSettings = z.object({
-  currency: z.string().trim().toUpperCase().length(3).default("USD"),
-  /** 1 unit of the main currency buys N of each other currency. */
+  /** Reports and totals are in it. */
+  currency: z.preprocess((v) => (typeof v === "string" ? v.trim().toUpperCase() : v), z.enum(CURRENCIES, `Choose ${CURRENCIES.join(", ")}`)).default("USD"),
+  /** 1 unit of the main currency buys N of each other currency (only the business's currencies are kept). */
   exchangeRates: z
-    .record(z.string().trim().regex(/^[A-Za-z]{3}$/, "Use three-letter currency codes"), z.coerce.number().positive())
+    .record(z.string().trim(), z.coerce.number().positive("A rate must be more than 0"))
     .default({ CNY: 7.1 })
-    .transform((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k.toUpperCase(), v]))),
+    .transform((r) =>
+      Object.fromEntries(
+        Object.entries(r)
+          .map(([k, v]) => [k.toUpperCase(), v] as const)
+          .filter(([k]) => (CURRENCIES as readonly string[]).includes(k)),
+      ),
+    ),
   defaultMarginPercent: z.coerce.number().min(0).max(95).default(15),
   quotationValidityDays: days(15),
   defaultDepositPercent: z.coerce.number().min(0).max(100).default(30),

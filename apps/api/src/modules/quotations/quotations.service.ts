@@ -14,6 +14,7 @@ import {
   draftsDiscardedBy,
   isEditable,
   latestRevision,
+  type Currency,
   lineNumbers,
   numberQuoteLines,
   optionLetter,
@@ -329,7 +330,8 @@ export class QuotationsService {
   /** A revision's values as the editor sends them back (prices keyed by factory line, or by item without factory prices). */
   private asInput(r: RevisionRow): RevisionInput {
     return {
-      currency: r.currency,
+      // Stored as text; only the business's currencies can be saved.
+      currency: r.currency as Currency,
       incoterm: r.incoterm,
       incotermPlace: r.incotermPlace,
       depositPercent: Number(r.depositPercent),
@@ -355,7 +357,7 @@ export class QuotationsService {
             unitPrice: Number(l.unitPrice),
             unitCost: l.unitCost === null ? null : Number(l.unitCost),
           })),
-        costs: o.costs.map((c) => ({ step: c.step, amount: Number(c.amount), currency: c.currency, note: c.note })),
+        costs: o.costs.map((c) => ({ step: c.step, amount: Number(c.amount), currency: c.currency as Currency, note: c.note })),
       })),
     };
   }

@@ -199,6 +199,12 @@ export const factoryQuoteInput = z
     notes: optionalText(5000),
     /** Left out: the lines are not touched (they are added one by one, see factoryLinesInput). */
     lines: z.array(factoryQuoteLineInput).max(1000).optional(),
+    /**
+     * When the currency changes: true turns every line's price into the new
+     * currency at the Settings rates (CNY 7,100 → USD 1,000); false keeps the
+     * numbers (they were typed in the new currency already).
+     */
+    convertPrices: bool.default(false),
     reason: reasonField,
   })
   .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a factory or type a new one", path: ["factoryId"] });

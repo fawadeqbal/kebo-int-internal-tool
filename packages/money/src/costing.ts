@@ -23,6 +23,32 @@ export function fxRate(from: string, to: string, main: string, rates: Rates): nu
   return rf / rt;
 }
 
+/**
+ * An amount in one currency → another at the Settings rates, to 2 decimals
+ * (CNY 7,100.00 → USD 1,000.00 at 7.10). null when a rate is missing.
+ */
+export function convertAmount(amount: number, from: string, to: string, main: string, rates: Rates): number | null {
+  const r = fxRate(from, to, main, rates);
+  if (r === null || !Number.isFinite(amount)) return null;
+  return roundHalfAway((amount * 100) / r) / 100;
+}
+
+/**
+ * The same rates said against another main currency: { CNY: 7.1, PKR: 280 }
+ * against USD → { USD: 0.003571…, CNY: 0.025357… } against PKR. Rates that
+ * cannot be restated (missing) are left out.
+ */
+export function restateRates(rates: Rates, oldMain: string, newMain: string): Rates {
+  const o = oldMain.toUpperCase();
+  const n = newMain.toUpperCase();
+  if (o === n) return { ...rates };
+  const base = rates[n];
+  if (!base) return {};
+  const out: Rates = { [o]: 1 / base };
+  for (const [c, r] of Object.entries(rates)) if (c !== n && c !== o) out[c] = r / base;
+  return out;
+}
+
 /** An amount in the factory's currency → the document currency, given rate = factory units per document unit. */
 export const convertMinor = (minor: Minor, rate: number): Minor => {
   if (!(rate > 0)) throw new Error("Exchange rate must be more than 0");

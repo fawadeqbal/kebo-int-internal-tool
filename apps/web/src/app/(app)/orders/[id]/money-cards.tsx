@@ -5,13 +5,14 @@ import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { OrderMoney } from "@/lib/types-money";
 import { EditExpense, EditFactoryPayment, NewExpense, NewFactoryPayment, VoidForm } from "@/components/money/forms";
+import type { Fx } from "@/lib/fx";
 import { expenseAction, factoryPaymentAction, voidExpenseAction, voidFactoryPaymentAction } from "../../money/actions";
 
 /**
  * What we owe each factory for this order (their prices plus tax × the
  * quantities ordered) and what we paid them. For people who see costs.
  */
-export function FactoriesCard({ m, people, today }: { m: OrderMoney; people: Person[]; today: string }) {
+export function FactoriesCard({ m, people, today, fx }: { m: OrderMoney; people: Person[]; today: string; fx: Fx }) {
   const f = m.factories!;
   const live = f.payments.filter((p) => !p.voided);
   return (
@@ -103,6 +104,7 @@ export function FactoriesCard({ m, people, today }: { m: OrderMoney; people: Per
                       factories={f.rows}
                       people={people}
                       orderCurrency={m.currency}
+                      fx={fx}
                       today={today}
                       payment={p}
                     />
@@ -119,6 +121,7 @@ export function FactoriesCard({ m, people, today }: { m: OrderMoney; people: Per
             factories={f.rows}
             people={people}
             orderCurrency={m.currency}
+                      fx={fx}
             today={today}
           />
         )}
@@ -128,7 +131,7 @@ export function FactoriesCard({ m, people, today }: { m: OrderMoney; people: Per
 }
 
 /** The order's expenses and its profit, earned and cash. Managers and the super admin only. */
-export function ProfitCard({ m, people, today, mainCurrency }: { m: OrderMoney; people: Person[]; today: string; mainCurrency: string }) {
+export function ProfitCard({ m, people, today, mainCurrency, fx }: { m: OrderMoney; people: Person[]; today: string; mainCurrency: string; fx: Fx }) {
   const p = m.profit;
   const c = m.currency;
   return (
@@ -206,6 +209,7 @@ export function ProfitCard({ m, people, today, mainCurrency }: { m: OrderMoney; 
                       action={expenseAction.bind(null, m.orderId, e.id)}
                       people={people}
                       mainCurrency={mainCurrency}
+                      fx={fx}
                       today={today}
                       expense={e}
                     />
@@ -217,7 +221,7 @@ export function ProfitCard({ m, people, today, mainCurrency }: { m: OrderMoney; 
           </ul>
         )}
         {!m.cancelled && (
-          <NewExpense action={expenseAction.bind(null, m.orderId, null)} people={people} mainCurrency={mainCurrency} today={today} />
+          <NewExpense action={expenseAction.bind(null, m.orderId, null)} people={people} mainCurrency={mainCurrency} fx={fx} today={today} />
         )}
       </CardBody>
     </Card>

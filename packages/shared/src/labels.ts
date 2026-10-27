@@ -1,5 +1,6 @@
 import type {
   AttachmentKind,
+  Currency,
   BalanceTerms,
   CustomerType,
   ExpenseCategory,
@@ -16,6 +17,8 @@ import type {
 } from "./enums";
 
 /** The words people see, in one place, so anything can be renamed without touching logic. */
+
+export const CURRENCY_LABEL: Record<Currency, string> = { USD: "US dollar", CNY: "Chinese yuan (RMB)", PKR: "Pakistani rupee" };
 
 export const SIGN_IN_RESULT_LABEL: Record<SignInResult, string> = {
   signed_in: "Signed in",

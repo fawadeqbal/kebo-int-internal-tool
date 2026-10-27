@@ -298,8 +298,9 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
     api.get<ExpenseList>("/expenses", { from, to, kind }),
     api.get<Person[]>("/users/people"),
     api.get<{ id: string; refNo: string; customer: { name: string } }[]>("/orders", { status: "open" }),
-    api.get<{ sales: { currency: string } }>("/settings"),
+    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
   ]);
+  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   const openOrders = orders.map((o) => ({ id: o.id, refNo: o.refNo, label: o.customer.name }));
   const keep = { tab: "expenses", month: month === today.slice(0, 7) ? undefined : month, kind };
   const c = list.currency;
@@ -336,6 +337,7 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
         action={expenseAction.bind(null, null, null)}
         people={people}
         mainCurrency={settings.sales.currency}
+        fx={fx}
         today={today}
         orders={openOrders}
       />
@@ -382,6 +384,7 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
                       action={expenseAction.bind(null, null, e.id)}
                       people={people}
                       mainCurrency={c}
+                      fx={fx}
                       today={today}
                       expense={e}
                       orders={openOrders}

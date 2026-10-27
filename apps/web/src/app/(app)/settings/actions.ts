@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { SettingsKey } from "@kebo/shared";
+import { CURRENCIES, type SettingsKey } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { attempt, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import { SETTING_GROUPS } from "./groups";
@@ -41,14 +41,19 @@ export async function saveSettingsAction(key: SettingsKey, _prev: ActionState, f
       case "lines":
         body[f.name] = lines(raw, f.name === "emails");
         break;
-      case "rates": {
+      case "currencies": {
+        // The main currency, and a rate for each of the others (how many of it 1 main buys).
+        const main = (raw ?? "USD").toUpperCase();
+        body.currency = main;
         const rates: Record<string, number> = {};
-        lines(raw).forEach((line, i) => {
-          const m = line.match(/^([A-Za-z]{3})\s*[=:]\s*(\d+(?:[.,]\d+)?)$/);
-          if (!m) errors[f.name] = [`Line ${i + 1} ("${line}"): write it like CNY = 7.10`];
-          else rates[m[1].toUpperCase()] = Number(m[2].replace(",", "."));
-        });
-        body[f.name] = rates;
+        const missing: string[] = [];
+        for (const c of CURRENCIES.filter((x) => x !== main)) {
+          const n = Number((v[`rate_${c}`] ?? "").replace(/,/g, "").trim());
+          if (!(n > 0) || !Number.isFinite(n)) missing.push(c);
+          else rates[c] = n;
+        }
+        if (missing.length) errors[f.name] = [`Enter how many ${missing.join(" and ")} one ${main} buys (more than 0).`];
+        body.exchangeRates = rates;
         break;
       }
       default:

@@ -24,6 +24,8 @@ import type { OfferLine, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { LineTable, type LineColumn } from "@/components/lines/line-table";
 import { localLineHandlers } from "@/components/lines/local-lines";
 import { ErrorText, numberText, rowKey } from "./form-bits";
+import { convertText, rateSentence, type Fx } from "@/lib/fx";
+import { CurrencySelect } from "@/components/common/currency-select";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -298,10 +300,38 @@ export function RevisionEditor({
     setAdding(false);
   };
 
-  const refreshCosts = async (code: string) => {
-    if (!loadOffers || !/^[A-Z]{3}$/.test(code) || code === offers.currency) return;
-    const next = await loadOffers(code);
-    if (next) setOffers(next);
+  const fx: Fx = { main: offers.mainCurrency, rates: offers.rates };
+  /** The note under the currency after a change: what was converted, or why the numbers were kept. */
+  const [converted, setConverted] = useState<{ text: string; ok: boolean } | null>(null);
+  /**
+   * Another currency: every price, discount and charge is converted at the
+   * Settings rates (USD 1,000 → PKR 280,000), and the factory costs are
+   * fetched again in the new currency. Without a rate the numbers are kept.
+   */
+  const changeCurrency = async (to: string) => {
+    const from = s.currency.trim().toUpperCase();
+    if (to === from) return;
+    const ok = convertText("1", from, to, fx) !== null;
+    const c = (t: string) => (ok && t.trim() !== "" ? (convertText(t, from, to, fx) ?? t) : t);
+    setS((st) => ({
+      ...st,
+      currency: to,
+      options: st.options.map((o) => ({
+        ...o,
+        discount: c(o.discount),
+        prices: Object.fromEntries(Object.entries(o.prices).map(([k, v]) => [k, c(v)])),
+        charges: o.charges.map((ch) => ({ ...ch, unitPrice: c(ch.unitPrice), unitCost: c(ch.unitCost) })),
+      })),
+    }));
+    setConverted(
+      ok
+        ? { ok: true, text: `Prices, discounts and charges converted from ${from} at ${rateSentence(fx, from, to)}.` }
+        : { ok: false, text: `No exchange rate between ${from} and ${to} in Settings: the numbers were kept as they are.` },
+    );
+    if (loadOffers && to !== offers.currency) {
+      const next = await loadOffers(to);
+      if (next) setOffers(next);
+    }
   };
 
   const { lines, totals, costing, extra } = totalsOf(opt);
@@ -329,15 +359,13 @@ export function RevisionEditor({
             <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
 
             <section aria-label="Terms" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Field label="Currency" htmlFor={`cur-${number}`} error={st.errors?.currency} hint={showCosts && offers.currency !== currency && currency !== "—" ? "Costs update when you leave this box" : undefined}>
-                <Input
-                  id={`cur-${number}`}
-                  value={s.currency}
-                  maxLength={3}
-                  className="uppercase"
-                  onChange={(e) => set("currency", e.target.value.toUpperCase())}
-                  onBlur={(e) => void refreshCosts(e.target.value.trim().toUpperCase())}
-                />
+              <Field
+                label="Currency"
+                htmlFor={`cur-${number}`}
+                error={st.errors?.currency}
+                hint={converted ? <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span> : "Changing it converts the prices at the Settings rates"}
+              >
+                <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
               </Field>
               <Field label="Incoterm" htmlFor={`inco-${number}`} error={st.errors?.incoterm}>
                 <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
@@ -569,7 +597,7 @@ export function RevisionEditor({
                     selling={s.incoterm}
                     sellingPlace={s.incotermPlace}
                     currency={currency}
-                    known={[offers.mainCurrency, ...Object.keys(offers.rates)]}
+                    fx={fx}
                     costs={opt.costs}
                     extra={extra}
                     asLine={(step) => asLineOf(opt, step)}
@@ -815,7 +843,7 @@ function BasisCosts({
   selling,
   sellingPlace,
   currency,
-  known,
+  fx,
   costs,
   extra,
   asLine,
@@ -830,7 +858,7 @@ function BasisCosts({
   selling: Incoterm;
   sellingPlace: string;
   currency: string;
-  known: string[];
+  fx: Fx;
   costs: Partial<Record<BasisStep, CostState>>;
   extra: ReturnType<typeof extraOf>;
   asLine: (step: BasisStep) => boolean;
@@ -875,7 +903,7 @@ function BasisCosts({
                 const minor = convert(c);
                 const filled = valid(c.amount) && Number(numberText(c.amount)) > 0;
                 return (
-                  <li key={step} className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_7rem_4.5rem_minmax(0,1fr)_auto] sm:items-center">
+                  <li key={step} className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_7rem_5.5rem_minmax(0,1fr)_auto] sm:items-center">
                     <span className="min-w-0">
                       <span className="block text-sm">{BASIS_STEP_LABEL[step]}</span>
                       <span className="block text-xs text-muted">{BASIS_STEP_HINT[step]}</span>
@@ -888,13 +916,18 @@ function BasisCosts({
                       value={c.amount}
                       onChange={(e) => onChange(step, { amount: e.target.value })}
                     />
-                    <Input
+                    <CurrencySelect
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} currency`}
-                      className="h-8 uppercase"
-                      maxLength={3}
-                      list="basis-currencies"
+                      compact
+                      short
+                      className="h-8"
                       value={c.currency}
-                      onChange={(e) => onChange(step, { currency: e.target.value.toUpperCase() })}
+                      onChange={(e) => {
+                        // The amount follows the currency: CNY 3,550 → USD 500.00.
+                        const to = e.target.value;
+                        const amount = c.amount.trim() ? convertText(c.amount, c.currency, to, fx) : null;
+                        onChange(step, { currency: to, ...(amount !== null ? { amount } : {}) });
+                      }}
                     />
                     <Input
                       aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} note`}
@@ -945,11 +978,6 @@ function BasisCosts({
               )}
             </p>
           )}
-          <datalist id="basis-currencies">
-            {known.map((k) => (
-              <option key={k} value={k} />
-            ))}
-          </datalist>
         </>
       )}
     </section>
