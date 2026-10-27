@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CornerDownRight, Lock, Plus, Trash2 } from "lucide-react";
 import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import {
@@ -303,30 +303,32 @@ export function RevisionEditor({
   const fx: Fx = { main: offers.mainCurrency, rates: offers.rates };
   /** The note under the currency after a change: what was converted, or why the numbers were kept. */
   const [converted, setConverted] = useState<{ text: string; ok: boolean } | null>(null);
+  const typedIn = useRef<{ currency: string; options: OptionState[]; shown: string } | null>(null);
   /**
    * Another currency: every price, discount and charge is converted at the
    * Settings rates (USD 1,000 → PKR 280,000), and the factory costs are
    * fetched again in the new currency. Without a rate the numbers are kept.
    */
   const changeCurrency = async (to: string) => {
-    const from = s.currency.trim().toUpperCase();
-    if (to === from) return;
-    const ok = convertText("1", from, to, fx) !== null;
-    const c = (t: string) => (ok && t.trim() !== "" ? (convertText(t, from, to, fx) ?? t) : t);
-    setS((st) => ({
-      ...st,
-      currency: to,
-      options: st.options.map((o) => ({
-        ...o,
-        discount: c(o.discount),
-        prices: Object.fromEntries(Object.entries(o.prices).map(([k, v]) => [k, c(v)])),
-        charges: o.charges.map((ch) => ({ ...ch, unitPrice: c(ch.unitPrice), unitCost: c(ch.unitCost) })),
-      })),
+    const now = s.currency.trim().toUpperCase();
+    if (to === now) return;
+    // Convert from the numbers as they were typed (unless edited since), so USD → PKR → USD gives back the same cents.
+    const origin = typedIn.current && JSON.stringify(s.options) === typedIn.current.shown ? typedIn.current : { currency: now, options: s.options, shown: "" };
+    const from = origin.currency;
+    const ok = from === to || convertText("1", from, to, fx) !== null;
+    const c = (t: string) => (from === to ? t : ok && t.trim() !== "" ? (convertText(t, from, to, fx) ?? t) : t);
+    const options = (ok ? origin.options : s.options).map((o) => ({
+      ...o,
+      discount: c(o.discount),
+      prices: Object.fromEntries(Object.entries(o.prices).map(([k, v]) => [k, c(v)])),
+      charges: o.charges.map((ch) => ({ ...ch, unitPrice: c(ch.unitPrice), unitCost: c(ch.unitCost) })),
     }));
+    typedIn.current = ok && from !== to ? { currency: from, options: origin.options, shown: JSON.stringify(options) } : null;
+    setS((st) => ({ ...st, currency: to, options }));
     setConverted(
       ok
-        ? { ok: true, text: `Prices, discounts and charges converted from ${from} at ${rateSentence(fx, from, to)}.` }
-        : { ok: false, text: `No exchange rate between ${from} and ${to} in Settings: the numbers were kept as they are.` },
+        ? { ok: true, text: from === to ? `Back in ${to}: the prices as they were typed.` : `Prices, discounts and charges converted from ${now} at ${rateSentence(fx, now, to)}.` }
+        : { ok: false, text: `No exchange rate between ${now} and ${to} in Settings: the numbers were kept as they are.` },
     );
     if (loadOffers && to !== offers.currency) {
       const next = await loadOffers(to);

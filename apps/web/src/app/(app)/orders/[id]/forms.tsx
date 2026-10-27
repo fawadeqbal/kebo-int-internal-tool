@@ -6,6 +6,7 @@ import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHOD
 import { Button, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
 import type { OrderNext } from "@/lib/types-orders";
 
@@ -246,7 +247,7 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
     <ActionForm action={action} onDone={() => setOpen(false)} className={framed}>
       {(s) => (
         <>
-          <p className="text-sm font-medium">Payment from the customer, in {currency}</p>
+          <p className="text-sm font-medium">Payment from the customer</p>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="What for" htmlFor="p-kind" error={s.errors?.kind}>
               <Select id="p-kind" name="kind" value={kind} onChange={(e) => setKind(e.target.value as PaymentKind)}>
@@ -257,11 +258,11 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
                 ))}
               </Select>
             </Field>
-            <Field label={`Amount received (${currency})`} htmlFor="p-amount" hint="What reached our bank" error={s.errors?.amount}>
-              <Input key={kind} id="p-amount" name="amount" inputMode="decimal" className="tabular" defaultValue={s.values?.amount ?? amount} />
+            <Field label="Amount received" htmlFor="p-amount" hint={`What reached our bank, in ${currency} (the order's currency)`} error={s.errors?.amount}>
+              <MoneyInput key={kind} id="p-amount" name="amount" currency={currency} defaultValue={s.values?.amount ?? amount} />
             </Field>
             <Field label="Bank charges" htmlFor="p-charges" optional hint="Deducted by the banks; counts as paid" error={s.errors?.bankCharges}>
-              <Input id="p-charges" name="bankCharges" inputMode="decimal" placeholder="0.00" className="tabular" defaultValue={s.values?.bankCharges ?? ""} />
+              <MoneyInput id="p-charges" name="bankCharges" currency={currency} placeholder="0.00" defaultValue={s.values?.bankCharges ?? ""} />
             </Field>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
