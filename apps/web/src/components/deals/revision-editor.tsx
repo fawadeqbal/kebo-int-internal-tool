@@ -734,7 +734,7 @@ export function RevisionEditor({
                 {submitLabel}
               </SubmitButton>
               {onCancel && (
-                <Button variant="ghost" onClick={onCancel}>
+                <Button variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
                   Cancel
                 </Button>
               )}

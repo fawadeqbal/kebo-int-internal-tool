@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { CheckCircle2, Clock, Download, FilePlus2, Printer, Send, XCircle } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+import { CheckCircle2, Clock, Download, FilePlus2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
 import { Button, buttonClass, cn, Field, Input } from "@kebo/ui";
 import { money } from "@/lib/format";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
@@ -65,13 +65,18 @@ export function StartRevision({
   );
 }
 
-/** The open draft: edit it, send it, or throw it away. */
+/**
+ * The open draft. It opens read only, as the customer will see it, with what
+ * can be done next: Edit, Preview, Download, Mark as sent, Delete. Edit opens
+ * the editor; saving or cancelling comes back to the read-only view.
+ */
 export function DraftPanel({
   number,
   initial,
   offers,
   loadOffers,
   showCosts,
+  summary,
   saveAction,
   deleteAction,
   moveAction,
@@ -84,6 +89,8 @@ export function DraftPanel({
   offers: QuoteOffers;
   loadOffers: (currency: string) => Promise<QuoteOffers | null>;
   showCosts: boolean;
+  /** The draft read only (the same view as a sent revision). */
+  summary: ReactNode;
   saveAction: Action;
   deleteAction: Action;
   moveAction: Action;
@@ -91,50 +98,81 @@ export function DraftPanel({
   pdfHref: string;
   today: string;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const top = useRef<HTMLDivElement>(null);
+  const back = () => {
+    setEditing(false);
+    // The read-only view starts where the editor did.
+    requestAnimationFrame(() => top.current?.scrollIntoView({ block: "nearest" }));
+  };
+
+  if (editing)
+    return (
+      <div ref={top} className="flex flex-col gap-3">
+        <p className="flex items-center gap-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-sm">
+          <Pencil className="size-4 shrink-0 text-primary" aria-hidden />
+          Editing R{number}. Save the draft to keep the changes, or cancel to leave it as it was.
+        </p>
+        <RevisionEditor
+          action={saveAction}
+          number={number}
+          initial={initial}
+          offers={offers}
+          loadOffers={loadOffers}
+          showCosts={showCosts}
+          submitLabel="Save draft"
+          requireChanges
+          onDone={back}
+          onCancel={back}
+        />
+      </div>
+    );
+
   return (
-    <RevisionEditor
-      action={saveAction}
-      number={number}
-      initial={initial}
-      offers={offers}
-      loadOffers={loadOffers}
-      showCosts={showCosts}
-      submitLabel="Save draft"
-      requireChanges
-      footer={(dirty) => (
-        <div className="mt-5 flex flex-col gap-4 border-t border-line pt-4 lg:flex-row lg:items-end lg:justify-between">
-          <ActionForm action={moveAction} className="flex flex-wrap items-end gap-2">
-            {(s) => (
-              <>
-                <input type="hidden" name="to" value="sent" />
-                <Field label="Sent on" htmlFor={`sent-on-${number}`} optional hint="Today when empty" error={s.errors?.on}>
-                  <Input id={`sent-on-${number}`} name="on" type="date" max={today} className="w-40" defaultValue={s.values?.on} />
-                </Field>
-                <div className="flex flex-col gap-1">
-                  <ConfirmSubmit variant="primary" pendingText="Saving…" disabled={dirty} message={`Mark R${number} as sent? It can no longer be changed; a price change will need a new revision.`}>
-                    <Send aria-hidden /> Mark as sent
-                  </ConfirmSubmit>
-                </div>
-                {dirty && <p className="w-full text-xs text-warn">Save the draft first, so the customer gets what you see.</p>}
-              </>
-            )}
-          </ActionForm>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={printHref} target="_blank" className={buttonClass("secondary")}>
-              <Printer aria-hidden /> Preview
-            </Link>
-            <a href={pdfHref} className={buttonClass("secondary")}>
-              <Download aria-hidden /> Download PDF
-            </a>
-            <ActionForm action={deleteAction} showSuccess={false}>
-              <ConfirmSubmit variant="danger-ghost" pendingText="Deleting…" message={`Delete the R${number} draft? This cannot be undone.`}>
-                Delete draft
-              </ConfirmSubmit>
-            </ActionForm>
-          </div>
-        </div>
+    <div ref={top} className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="primary" onClick={() => setEditing(true)}>
+          <Pencil aria-hidden /> Edit
+        </Button>
+        <Link href={printHref} target="_blank" className={buttonClass("secondary")}>
+          <Printer aria-hidden /> Preview
+        </Link>
+        <a href={pdfHref} className={buttonClass("secondary")}>
+          <Download aria-hidden /> Download PDF
+        </a>
+        <Button variant={sending ? "primary" : "secondary"} onClick={() => setSending((v) => !v)} aria-expanded={sending}>
+          <Send aria-hidden /> Mark as sent…
+        </Button>
+        <ActionForm action={deleteAction} showSuccess={false} className="ml-auto">
+          <ConfirmSubmit variant="danger-ghost" pendingText="Deleting…" message={`Delete the R${number} draft? This cannot be undone.`}>
+            <Trash2 aria-hidden /> Delete draft
+          </ConfirmSubmit>
+        </ActionForm>
+      </div>
+      {sending && (
+        <ActionForm action={moveAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-primary/25 bg-primary-soft/30 p-3">
+          {(s) => (
+            <>
+              <input type="hidden" name="to" value="sent" />
+              <p className="w-full text-sm">
+                Did you send R{number} to the customer? Once marked as sent it is frozen: a change of price needs a new revision. Check it with Preview first.
+              </p>
+              <Field label="Sent on" htmlFor={`sent-on-${number}`} optional hint="Today when empty" error={s.errors?.on}>
+                <Input id={`sent-on-${number}`} name="on" type="date" max={today} className="w-40" defaultValue={s.values?.on} />
+              </Field>
+              <SubmitButton variant="primary" pendingText="Saving…">
+                <Send aria-hidden /> Mark R{number} as sent
+              </SubmitButton>
+              <Button variant="ghost" onClick={() => setSending(false)}>
+                Cancel
+              </Button>
+            </>
+          )}
+        </ActionForm>
       )}
-    />
+      {summary}
+    </div>
   );
 }
 
