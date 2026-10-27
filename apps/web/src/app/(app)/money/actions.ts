@@ -204,3 +204,24 @@ export async function setEntryAccountAction(kind: "in" | "factory" | "expense", 
   if (r.ok) revalidatePath("/", "layout");
   return r;
 }
+
+/* ---------------------------------------------------------------- insights */
+
+/** A month's sales target (empty or 0 removes it). */
+export async function saveTargetAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const amount = v.amount?.replace(/[,\s]/g, "") ?? "";
+  const r = await attempt(form, () => api.put(`/insights/targets/${v.month}`, { amount: amount ? Number(amount) : null }), amount && Number(amount) > 0 ? "Target saved." : "Target removed.");
+  if (r.ok) {
+    revalidatePath("/insights");
+    revalidatePath("/dashboard");
+  }
+  return r;
+}
+
+/** Put a reminder off for some days, mark it done, or bring it back. */
+export async function reminderAction(what: "snooze" | "done" | "restore", key: string, days?: number): Promise<ActionState> {
+  const r = await attempt(null, () => api.post(`/reminders/${what}`, what === "snooze" ? { key, days } : { key }));
+  if (r.ok) revalidatePath("/dashboard");
+  return r;
+}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Banknote, ChevronLeft, ChevronRight, Landmark, Wallet, X } from "lucide-react";
+import { Banknote, ChartNoAxesCombined, ChevronLeft, ChevronRight, Landmark, Wallet, X } from "lucide-react";
 import {
   can,
   CURRENCIES,
@@ -14,6 +14,7 @@ import {
   Alert,
   Badge,
   buildHref,
+  buttonClass,
   Card,
   CardBody,
   CardHeader,
@@ -32,9 +33,11 @@ import {
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
+import { redirect } from "next/navigation";
+import type { Receivables } from "@/lib/types-insights";
 import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
-import type { CashBook, CashRow, ExpenseList, Payable, ProfitAndLoss } from "@/lib/types-money";
+import type { CashBook, CashRow, ExpenseList, Payable } from "@/lib/types-money";
 import { NewExpense, VoidForm, type ExpenseChoices } from "@/components/money/forms";
 import { EditAccount, MoveMoney, NewAccount, PutOnAccount, type AccountRow } from "@/components/money/cash-forms";
 import { ExpenseRecord } from "@/components/money/expense-record";
@@ -43,8 +46,6 @@ import { expenseAction, voidTransferAction } from "./actions";
 export const metadata = { title: "Money" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
-const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
-const monthName = (ym: string) => MONTH.format(new Date(`${ym}-01T00:00:00Z`));
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
 type Search = {
@@ -62,252 +63,45 @@ type Search = {
 };
 
 /**
- * The company's money: profit & loss by month (earned and cash), expenses
- * (managers and the super admin), and what we still owe the factories.
+ * The company's money records: the cash book (where the money is), expenses,
+ * what customers still owe us, and what we still owe the factories. The
+ * numbers and charts are on Insights.
  */
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requirePermission("sourcing.manage");
   const sp = await searchParams;
   const managers = can(me, "expenses.manage");
-  const tab = managers ? (sp.tab === "expenses" || sp.tab === "owe" || sp.tab === "cash" ? sp.tab : "pnl") : "owe";
+  const recorders = managers || can(me, "payments.record");
+  type Tab = "cash" | "expenses" | "receive" | "owe";
+  const allowed: Tab[] = [...(managers ? (["cash", "expenses"] as const) : []), ...(recorders ? (["receive"] as const) : []), "owe"];
+  // Old links to profit & loss now open on Insights.
+  if (sp.tab === "pnl") redirect("/insights?tab=profit&sub=pnl");
+  const tab: Tab = allowed.includes(sp.tab as Tab) ? (sp.tab as Tab) : allowed[0]!;
   const today = todayIn(TZ);
-  const tabs = [
-    ...(managers
-      ? [
-          { href: "/money", label: "Profit & loss", active: tab === "pnl" },
-          { href: "/money?tab=expenses", label: "Expenses", active: tab === "expenses" },
-          { href: "/money?tab=cash", label: "Cash book", active: tab === "cash" },
-        ]
-      : []),
-    { href: "/money?tab=owe", label: "What we owe factories", active: tab === "owe" },
-  ];
+  const label: Record<Tab, string> = { cash: "Cash book", expenses: "Expenses", receive: "To receive", owe: "What we owe factories" };
+  const tabs = allowed.map((t) => ({ href: t === allowed[0] ? "/money" : `/money?tab=${t}`, label: label[t], active: tab === t }));
   return (
     <div>
       <PageHeader
         title="Money"
         description={
           managers
-            ? "Profit and loss, expenses and what we owe the factories. Only managers see profit and expenses."
-            : "What we still owe the factories on our orders."
+            ? "Where the money is, what was spent, what customers owe us and what we owe the factories. Charts and profit are on Insights."
+            : "What customers owe us and what we still owe the factories."
+        }
+        actions={
+          can(me, "reports.view") ? (
+            <Link href="/insights?tab=profit" className={buttonClass("secondary", "sm")}>
+              <ChartNoAxesCombined aria-hidden /> Profit on Insights
+            </Link>
+          ) : undefined
         }
       />
       <LinkTabs label="Money sections" className="mb-5" tabs={tabs} />
-      {tab === "pnl" && <ProfitTab sp={sp} today={today} />}
       {tab === "expenses" && <ExpensesTab sp={sp} today={today} />}
       {tab === "cash" && <CashTab sp={sp} today={today} />}
+      {tab === "receive" && <ReceiveTab />}
       {tab === "owe" && <OweTab mine={sp.mine === "1"} />}
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------- profit & loss */
-
-async function ProfitTab({ sp, today }: { sp: Search; today: string }) {
-  const thisYear = Number(today.slice(0, 4));
-  const year = Number(sp.year) >= 2020 && Number(sp.year) <= thisYear ? Number(sp.year) : thisYear;
-  const cash = sp.view === "cash";
-  const pnl = await api.get<ProfitAndLoss>("/money/profit-and-loss", { year });
-  const c = pnl.currency;
-  const keep = { tab: undefined, year: year === thisYear ? undefined : String(year), view: cash ? "cash" : undefined };
-  const shownMonths = pnl.months.filter((m) => m.month <= today.slice(0, 7));
-  const values = shownMonths.map((m) => Number(cash ? m.cash.net : m.earned.profit));
-  const scale = Math.max(1, ...values.map(Math.abs));
-  const t = pnl.total;
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <Segmented
-          label="Year"
-          options={[thisYear - 1, thisYear].map((y) => ({
-            href: buildHref("/money", keep, { year: y === thisYear ? undefined : String(y) }),
-            label: String(y),
-            active: y === year,
-          }))}
-        />
-        <Segmented
-          label="View"
-          options={[
-            { href: buildHref("/money", keep, { view: undefined }), label: "Earned", active: !cash },
-            { href: buildHref("/money", keep, { view: "cash" }), label: "Cash", active: cash },
-          ]}
-        />
-        <p className="text-xs text-muted">
-          {cash
-            ? "Cash: money in from customers less what we paid factories and all expenses, in the month it moved."
-            : "Earned: each order counts in the month it shipped — its value less its goods and expenses — less the company's own expenses that month."}
-        </p>
-      </div>
-      {pnl.missingRates.length > 0 && (
-        <Alert tone="warning">
-          There is no exchange rate for {pnl.missingRates.join(", ")} in Settings, so some amounts in those currencies are left out.
-        </Alert>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-4">
-        {(cash
-          ? [
-              ["In from customers", t.cash.in],
-              ["Paid to factories", t.cash.factories],
-              ["Expenses", t.cash.expenses],
-              ["Net cash", t.cash.net],
-            ]
-          : [
-              ["Orders shipped", null, t.earned.orders],
-              ["Value", t.earned.revenue],
-              [
-                "Costs and expenses",
-                String(Number(t.earned.goodsCost) + Number(t.earned.orderExpenses) + Number(t.earned.generalExpenses)),
-              ],
-              ["Profit", t.earned.profit],
-            ]
-        ).map(([label, value, count]) => (
-          <div key={label as string} className="rounded-xl border border-line bg-surface p-4">
-            <p className="text-xs text-muted">{label}</p>
-            <p className={cn("mt-1 text-lg font-semibold tabular", value !== null && Number(value) < 0 && "text-bad")}>
-              {value === null ? count : money(value as string, c)}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <Card className="overflow-hidden p-0">
-        <Table>
-          <THead>
-            {cash ? (
-              <tr>
-                <Th>Month</Th>
-                <Th className="text-right">In</Th>
-                <Th className="text-right">To factories</Th>
-                <Th className="text-right">Expenses</Th>
-                <Th className="text-right">Net</Th>
-                <Th className="hidden w-40 md:table-cell">
-                  <span className="sr-only">Chart</span>
-                </Th>
-              </tr>
-            ) : (
-              <tr>
-                <Th>Month</Th>
-                <Th className="text-right">Orders</Th>
-                <Th className="text-right">Value</Th>
-                <Th className="text-right">Goods</Th>
-                <Th className="text-right">Order expenses</Th>
-                <Th className="text-right">Company expenses</Th>
-                <Th className="text-right">Profit</Th>
-                <Th className="hidden w-40 md:table-cell">
-                  <span className="sr-only">Chart</span>
-                </Th>
-              </tr>
-            )}
-          </THead>
-          <tbody>
-            {shownMonths.map((m, i) => {
-              const v = values[i]!;
-              return (
-                <Tr key={m.month}>
-                  <Td className="font-medium">{monthName(m.month)}</Td>
-                  {cash ? (
-                    <>
-                      <Td className="text-right tabular">{money(m.cash.in, c)}</Td>
-                      <Td className="text-right tabular">{money(m.cash.factories, c)}</Td>
-                      <Td className="text-right tabular">{money(m.cash.expenses, c)}</Td>
-                    </>
-                  ) : (
-                    <>
-                      <Td className="text-right tabular">{m.earned.orders || <span className="text-muted">0</span>}</Td>
-                      <Td className="text-right tabular">{money(m.earned.revenue, c)}</Td>
-                      <Td className="text-right tabular">{money(m.earned.goodsCost, c)}</Td>
-                      <Td className="text-right tabular">{money(m.earned.orderExpenses, c)}</Td>
-                      <Td className="text-right tabular">{money(m.earned.generalExpenses, c)}</Td>
-                    </>
-                  )}
-                  <Td className={cn("text-right font-semibold tabular", v < 0 && "text-bad")}>{money(v, c)}</Td>
-                  <Td className="hidden md:table-cell">
-                    <div className="flex h-2 w-36" aria-hidden>
-                      <div className="flex w-1/2 justify-end">
-                        {v < 0 && <div className="h-2 rounded-l bg-bad" style={{ width: `${(Math.abs(v) / scale) * 100}%` }} />}
-                      </div>
-                      <div className="w-1/2 border-l border-line">
-                        {v > 0 && <div className="h-2 rounded-r bg-ok" style={{ width: `${(v / scale) * 100}%` }} />}
-                      </div>
-                    </div>
-                  </Td>
-                </Tr>
-              );
-            })}
-            <Tr className="bg-surface-2/60 font-semibold">
-              <Td>{year}</Td>
-              {cash ? (
-                <>
-                  <Td className="text-right tabular">{money(t.cash.in, c)}</Td>
-                  <Td className="text-right tabular">{money(t.cash.factories, c)}</Td>
-                  <Td className="text-right tabular">{money(t.cash.expenses, c)}</Td>
-                  <Td className={cn("text-right tabular", Number(t.cash.net) < 0 && "text-bad")}>{money(t.cash.net, c)}</Td>
-                </>
-              ) : (
-                <>
-                  <Td className="text-right tabular">{t.earned.orders}</Td>
-                  <Td className="text-right tabular">{money(t.earned.revenue, c)}</Td>
-                  <Td className="text-right tabular">{money(t.earned.goodsCost, c)}</Td>
-                  <Td className="text-right tabular">{money(t.earned.orderExpenses, c)}</Td>
-                  <Td className="text-right tabular">{money(t.earned.generalExpenses, c)}</Td>
-                  <Td className={cn("text-right tabular", Number(t.earned.profit) < 0 && "text-bad")}>{money(t.earned.profit, c)}</Td>
-                </>
-              )}
-              <Td className="hidden md:table-cell" />
-            </Tr>
-          </tbody>
-        </Table>
-      </Card>
-      {!cash && Number(t.earned.uncostedRevenue) > 0 && (
-        <p className="text-xs text-warn">
-          {money(t.earned.uncostedRevenue, c)} of the value has no factory cost recorded (freight or hand-priced lines), so profit may be
-          too high by that much at most.
-        </p>
-      )}
-
-      {!cash && (
-        <Card>
-          <CardHeader
-            title={`Orders shipped in ${year}`}
-            description="Most profit first. Other expenses are not shared out over orders."
-          />
-          {pnl.orders.length === 0 ? (
-            <CardBody>
-              <p className="text-sm text-muted">No order shipped in {year} yet.</p>
-            </CardBody>
-          ) : (
-            <Table>
-              <THead>
-                <tr>
-                  <Th>Order</Th>
-                  <Th>Shipped</Th>
-                  <Th className="text-right">Value</Th>
-                  <Th className="text-right">Goods</Th>
-                  <Th className="text-right">Expenses</Th>
-                  <Th className="text-right">Profit</Th>
-                </tr>
-              </THead>
-              <tbody>
-                {pnl.orders.map((o) => (
-                  <Tr key={o.id} className="hover:bg-surface-2/50">
-                    <Td>
-                      <Link href={`/orders/${o.id}`} className="font-medium hover:text-primary">
-                        {o.refNo}
-                      </Link>
-                      <span className="block max-w-60 truncate text-xs text-muted">{o.customer}</span>
-                    </Td>
-                    <Td className="text-sm">{monthName(o.month)}</Td>
-                    <Td className="text-right tabular">{money(o.revenue, c)}</Td>
-                    <Td className="text-right tabular">{money(o.goodsCost, c)}</Td>
-                    <Td className="text-right tabular">{money(o.expenses, c)}</Td>
-                    <Td className={cn("text-right font-semibold tabular", Number(o.profit) < 0 && "text-bad")}>{money(o.profit, c)}</Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
-        </Card>
-      )}
     </div>
   );
 }
@@ -852,6 +646,81 @@ async function CashTab({ sp, today }: { sp: Search; today: string }) {
           </ul>
         </Card>
       )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- to receive */
+
+/** What customers still owe us, order by order, the most overdue first. */
+async function ReceiveTab() {
+  const r = await api.get<Receivables>("/money/receivables");
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {r.totals.map((t) => (
+          <Tile
+            key={t.currency}
+            label={`Customers owe us (${t.currency})`}
+            value={money(t.due, t.currency)}
+            hint={Number(t.overdue) > 0 ? `${money(t.overdue, t.currency)} overdue` : "Nothing overdue"}
+          />
+        ))}
+      </div>
+      <Card className="overflow-hidden">
+        <CardHeader title="To receive" description="Open orders with money still due. Overdue first: remind those customers today." />
+        {r.rows.length === 0 ? (
+          <EmptyState title="Nothing to receive" description="Every customer has paid what they owe." />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <THead>
+                <tr>
+                  <Th>Order</Th>
+                  <Th>Next</Th>
+                  <Th className="text-right">Received</Th>
+                  <Th className="text-right">Still due</Th>
+                </tr>
+              </THead>
+              <tbody>
+                {r.rows.map((o) => (
+                  <Tr key={o.id} className="hover:bg-surface-2/50">
+                    <Td>
+                      <Link href={`/orders/${o.id}/money`} className="font-medium hover:text-primary">
+                        {o.refNo}
+                      </Link>
+                      <span className="block text-xs text-muted">
+                        <Link href={`/customers/${o.customer.id}`} className="hover:text-primary">
+                          {o.customer.name}
+                        </Link>
+                        {o.handledBy && ` · ${o.handledBy.name}`}
+                        {o.closed && " · closed"}
+                      </span>
+                    </Td>
+                    <Td className="text-sm">
+                      {o.next ? (
+                        <>
+                          {o.next.label} <span className="tabular">{money(o.next.open, o.currency)}</span>
+                          <span className={cn("block text-xs", o.daysLate > 0 ? "font-medium text-bad" : "text-muted")}>
+                            {o.daysLate > 0 ? `${o.daysLate} days late` : o.next.dueOn ? `due ${date(o.next.dueOn)}` : "no due date"}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </Td>
+                    <Td className="text-right whitespace-nowrap tabular">
+                      {money(o.received, o.currency)}
+                      <span className="block text-xs text-muted">of {money(o.total, o.currency)}</span>
+                    </Td>
+                    <Td className={cn("text-right font-semibold whitespace-nowrap tabular", Number(o.overdue) > 0 && "text-bad")}>{money(o.due, o.currency)}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

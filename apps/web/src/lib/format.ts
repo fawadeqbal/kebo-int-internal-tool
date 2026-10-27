@@ -5,6 +5,9 @@ import { formatDate as fmtDate, formatDateTime as fmtDateTime, timeAgo as ago, t
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 export const money = (amount: string | number | null | undefined, currency: string) => (amount === null || amount === undefined ? "—" : formatMinor(toMinor(amount), currency));
+/** A headline amount in whole units (KPI cards): "USD 58,140". Exact amounts stay in the tables. */
+export const whole = (amount: string | number | null | undefined, currency: string) =>
+  amount === null || amount === undefined ? "—" : `${currency} ${Math.round(Number(amount)).toLocaleString("en-US")}`;
 export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, TZ);
 export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, TZ);
 export const timeAgo = (d: Date | string) => ago(d, TZ);

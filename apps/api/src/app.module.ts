@@ -24,8 +24,9 @@ import { EventsModule } from "./common/events/event-bus";
  * Feature modules (one per business area) sit on four global ones:
  * Env (validated settings), Prisma (database), Common (audit, clock) and
  * AuthCore (the guard every route passes through).
- */
+ */import { InsightsModule } from "./modules/insights/insights.module";
+
 @Module({
-  imports: [EnvModule, PrismaModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, SecurityModule],
+  imports: [EnvModule, PrismaModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, SecurityModule, InsightsModule],
 })
 export class AppModule {}

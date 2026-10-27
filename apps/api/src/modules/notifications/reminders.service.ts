@@ -1,7 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
 import { settle } from "@kebo/money";
-import { instalmentSentence, orderNeeds, planStatus } from "@kebo/shared";
+import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -9,6 +10,7 @@ import { Clock } from "../../common/time/clock.service";
 import { SettingsService } from "../settings/settings.service";
 import { links, NotificationsService } from "./notifications.service";
 import { goodsOf } from "../orders/orders.service";
+import { InsightsService } from "../insights/insights.service";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -25,6 +27,7 @@ export class RemindersService {
     private readonly clock: Clock,
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
+    private readonly modules: ModuleRef,
   ) {}
 
   async run() {
@@ -173,8 +176,27 @@ export class RemindersService {
     const claimed = await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`summary-${today}`}, 1) on conflict do nothing`;
     if (claimed) await this.summary(today);
 
+    // 8. On the 1st, last month's report, once.
+    if (today.endsWith("-01")) {
+      const last = addDays(today, -1).slice(0, 7);
+      const monthly = await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`monthly-${last}`}, 1) on conflict do nothing`;
+      if (monthly) await this.monthly(last);
+    }
+
     this.log.log(`reminders sent: ${sent}`);
     return { sent };
+  }
+
+  /** The numbers for a period, read as the system (every permission): the insights service lives in another module. */
+  private async insights(from: string, to: string) {
+    try {
+      const service = this.modules.get(InsightsService, { strict: false });
+      const system = { id: "00000000-0000-0000-0000-000000000000", name: "System", email: "", role: "super_admin", roleName: "System", permissions: [...PERMISSIONS], twoStepSetupRequired: false, sessionId: "" };
+      return await service.overview(system as never, { from, to });
+    } catch (e) {
+      this.log.warn(`insights for the email failed: ${(e as Error).message}`);
+      return null;
+    }
   }
 
   private async summary(today: string) {
@@ -186,16 +208,56 @@ export class RemindersService {
       this.prisma.db.inquiry.count({ where: { deletedAt: null, stage: "lost", closedAt: { gte: yesterday } } }),
       this.prisma.db.order.count({ where: { status: "open" } }),
     ]);
+    const i = await this.insights(`${today.slice(0, 7)}-01`, today);
+    const m = (v: string | null | undefined) => (i && v !== null && v !== undefined ? `${i.currency} ${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null);
+    const target = i?.target.amount ? `${m(i.target.reached)} of ${m(i.target.amount)} (${i.target.percent}%)` : null;
     await this.notifications.emailAdmins("dailySummary", `Kebo summary for ${today}`, {
       heading: `Summary for ${today}`,
       rows: [
         ["New inquiries (since yesterday)", String(newDeals)],
-        ["Open deals", String(open)],
         ["Won / lost since yesterday", `${won} / ${lost}`],
+        ["Open deals", String(open)],
         ["Open orders", String(overdueOrders)],
+        ["Sales this month", m(i?.kpis.revenue.value as string | null)],
+        ["Monthly target", target],
+        ["Money in this month", m(i?.kpis.cashIn.value as string | null)],
+        ["Customers owe us", i ? `${m(i.now.toReceive)}${Number(i.now.overdue) > 0 ? ` (${m(i.now.overdue)} overdue)` : ""}` : null],
+        ["In our accounts", m(i?.now.cashInHand)],
       ],
       link: "/dashboard",
-      linkLabel: "Open the dashboard",
+      linkLabel: "Open Home",
+    });
+  }
+
+  /** Last month in numbers, against the month before, with a link to the full picture. */
+  private async monthly(month: string) {
+    const [y, mo] = month.split("-").map(Number) as [number, number];
+    const to = `${month}-${String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0")}`;
+    const i = await this.insights(`${month}-01`, to);
+    if (!i) return;
+    const name = new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+    const m = (v: unknown) => (v === null || v === undefined ? null : `${i.currency} ${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    const ch = (c: number | null) => (c === null ? "" : ` (${c >= 0 ? "▲" : "▼"} ${Math.abs(c)}% vs the month before)`);
+    const k = i.kpis;
+    const top = i.topCustomers
+      .slice(0, 5)
+      .map((c, n) => `${n + 1}. ${c.customer.name}: ${m(c.revenue)}`)
+      .join("\n");
+    await this.notifications.emailAdmins("dailySummary", `Kebo: ${name} in numbers`, {
+      heading: `${name} in numbers`,
+      rows: [
+        ["Sales (orders won)", `${m(k.revenue.value)}${ch(k.revenue.change)}`],
+        ["Gross profit", `${m(k.grossProfit.value)}${k.margin.value !== null ? ` · ${k.margin.value}% margin` : ""}`],
+        ["Profit after expenses", k.netProfit ? `${m(k.netProfit.value)}${ch(k.netProfit.change)}` : null],
+        ["Orders", `${k.orders.value}${ch(k.orders.change)}`],
+        ["Win rate", k.winRate.value === null ? null : `${k.winRate.value}%`],
+        ["Money in", m(k.cashIn.value)],
+        ["New customers", String(k.newCustomers.value)],
+        ["Customers owe us now", m(i.now.toReceive)],
+      ],
+      body: top ? `Best customers this month\n${top}` : null,
+      link: `/insights?from=${month}-01&to=${to}`,
+      linkLabel: "See the full month",
     });
   }
 }
