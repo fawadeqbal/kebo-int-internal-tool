@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Banknote, ChartLine, Coins, Download, FileDown, HandCoins, Percent, Target, TrendingUp, Trophy, Users } from "lucide-react";
 import { CHANNEL_LABEL } from "@kebo/shared";
@@ -431,9 +432,13 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                 ]}
               />
               {!sp.sub || sp.sub === "pnl" ? (
-                <ProfitTable year={sp.year} cash={sp.pl === "cash"} href={(change) => href(change)} />
+                <Suspense fallback={<SectionSkeleton />}>
+                  <ProfitTable year={sp.year} cash={sp.pl === "cash"} href={(change) => href(change)} />
+                </Suspense>
               ) : (
-                <LeaksTab from={i.range.from} to={i.range.to} view={(LEAK_VIEWS as readonly string[]).includes(sp.sub) ? (sp.sub as LeakView) : "attention"} href={(v) => href({ sub: v })} />
+                <Suspense fallback={<SectionSkeleton />}>
+                  <LeaksTab from={i.range.from} to={i.range.to} view={(LEAK_VIEWS as readonly string[]).includes(sp.sub) ? (sp.sub as LeakView) : "attention"} href={(v) => href({ sub: v })} />
+                </Suspense>
               )}
             </>
           ) : (
@@ -495,6 +500,16 @@ async function FactoriesTab({ i, from, to }: { i: Insights; from: string; to: st
           </CardBody>
         </Card>
       )}
+    </div>
+  );
+}
+
+/** While a section's figures are on their way. */
+function SectionSkeleton() {
+  return (
+    <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading">
+      <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />
+      <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
     </div>
   );
 }

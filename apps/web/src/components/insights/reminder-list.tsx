@@ -169,8 +169,13 @@ export function ReminderList({ data, limit = 8 }: { data: Reminders; limit?: num
           onClick={() => setAll((v) => !v)}
           className="border-t border-line px-4 py-2.5 text-left text-sm font-medium text-primary hover:bg-surface-2/60"
         >
-          {all ? "Show fewer" : `Show all ${items.length}`}
+          {all ? "Show fewer" : data.counts.total > data.items.length ? `Show the ${items.length} most urgent` : `Show all ${items.length}`}
         </button>
+      )}
+      {all && data.counts.total > data.items.length && (
+        <p className="border-t border-line px-4 py-2.5 text-xs text-muted">
+          And {data.counts.total - data.items.length} more, less urgent. Deal with these first and the rest move up.
+        </p>
       )}
     </div>
   );

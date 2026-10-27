@@ -602,10 +602,17 @@ export class MoneyService {
       customerId?: string;
       category?: string;
       kind?: "order" | "customer" | "general";
+      /** The list comes a page at a time; the totals are always for the whole period. */
+      page?: number;
+      pageSize?: number;
     },
   ) {
     this.assertExpenses(user);
     const { sales } = await this.settings.get();
+    const page = q.page ?? 1;
+    const pageSize = q.pageSize ?? 100;
+    const orderBy: Prisma.ExpenseOrderByWithRelationInput[] = [{ spentOn: "desc" }, { createdAt: "desc" }];
+    // Light rows for the totals (every expense of the period), full ones only for the page shown.
     const rows = await this.prisma.db.expense.findMany({
       where: {
         ...(q.inquiryId ? { inquiryId: q.inquiryId } : {}),
@@ -621,16 +628,16 @@ export class MoneyService {
                 : {}),
         ...(q.from || q.to ? { spentOn: { ...(q.from ? { gte: toDbDate(q.from) } : {}), ...(q.to ? { lte: toDbDate(q.to) } : {}) } } : {}),
       },
-      include: expenseInclude,
-      orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
-      take: 5000,
+      select: { id: true, amount: true, rate: true, category: true, customerId: true, orderId: true, voidedAt: true, customer: { select: { id: true, name: true } } },
+      orderBy,
     });
-    const inMain = (e: ExpenseRow) => convert(decimalToMinor(e.amount), Number(e.rate));
+    type Light = (typeof rows)[number];
+    const inMain = (e: Light) => convert(decimalToMinor(e.amount), Number(e.rate));
     const live = rows.filter((r) => !r.voidedAt);
     const byCustomerFilter = live.filter((e) => !q.customerId || e.customerId === q.customerId);
     const byCategoryFilter = live.filter((e) => !q.category || e.category === q.category);
     const shown = byCustomerFilter.filter((e) => !q.category || e.category === q.category);
-    const sum = (list: ExpenseRow[]) => list.reduce((t, e) => t + inMain(e), 0);
+    const sum = (list: Light[]) => list.reduce((t, e) => t + inMain(e), 0);
 
     const categories = new Map<string, { total: number; count: number }>();
     for (const e of byCustomerFilter) {
@@ -661,9 +668,13 @@ export class MoneyService {
       byCustomer: [...customers.values()]
         .map((c) => ({ customer: c.customer, total: fromMinor(c.total), count: c.count, orders: c.orders.size }))
         .sort((a, b) => Number(b.total) - Number(a.total)),
-      rows: rows
-        .filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category))
-        .map((e) => this.expenseView(e)),
+      ...(await (async () => {
+        const listed = rows.filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category));
+        const ids = listed.slice((page - 1) * pageSize, page * pageSize).map((e) => e.id);
+        const full = ids.length ? await this.prisma.db.expense.findMany({ where: { id: { in: ids } }, include: expenseInclude, orderBy }) : [];
+        /** `listed`: how many rows the list has (removed ones included), for the page links. */
+        return { page, pageSize, listed: listed.length, rows: full.map((e) => this.expenseView(e)) };
+      })()),
     };
   }
 

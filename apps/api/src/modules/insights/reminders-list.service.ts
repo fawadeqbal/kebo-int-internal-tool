@@ -30,6 +30,7 @@ export interface Reminder {
 }
 
 const LEVEL_ORDER: Record<ReminderLevel, number> = { bad: 0, warn: 1, info: 2 };
+const MAX_ITEMS = 100;
 const shortHash = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 12);
 
 /**
@@ -209,8 +210,9 @@ export class RemindersListService {
     const shown = items
       .filter((i) => !hidden.has(i.key))
       .sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level] || (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+    // The most urgent hundred are plenty for a screen; the counts are for all of them.
     return {
-      items: shown,
+      items: shown.slice(0, MAX_ITEMS),
       counts: { total: shown.length, bad: shown.filter((i) => i.level === "bad").length, hidden: hidden.size },
     };
   }
