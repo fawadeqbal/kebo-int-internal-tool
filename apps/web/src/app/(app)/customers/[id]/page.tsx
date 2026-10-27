@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Mail, MessageCircle, Phone, Star } from "lucide-react";
-import { can, CUSTOMER_TYPE_LABEL, EXPENSE_CATEGORY_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
+import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
 import {
   Badge,
   ButtonLink,
@@ -23,19 +23,13 @@ import { date, money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import type { CustomerDetail } from "@/lib/types-people";
 import type { HistoryEntry } from "@/lib/types";
-import { todayIn } from "@kebo/utils";
 import { HistoryList } from "@/components/common/history-list";
-import { NewExpense } from "@/components/money/forms";
-import { ExpenseRecord } from "@/components/money/expense-record";
-import type { Person } from "@/lib/types";
-import type { ExpenseList } from "@/lib/types-money";
-import { expenseAction } from "../../money/actions";
+import { CustomerAccountCard } from "@/components/money/customer-account";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeCustomerAction } from "../actions";
 
 export const metadata = { title: "Customer" };
 
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 const ORDER_STATUS: Record<OrderStatus, { label: string; tone: "info" | "ok" | "neutral" }> = {
   open: { label: "Open", tone: "info" },
@@ -172,7 +166,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               </Table>
             )}
           </Card>
-          {can(me, "expenses.manage") && <SpentCard customer={c} />}
+          {can(me, "expenses.manage") && <CustomerAccountCard customerId={c.id} customerName={c.name} />}
         </div>
 
         <aside className="flex flex-col gap-5">
@@ -289,65 +283,3 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   );
 }
 
-/**
- * Everything spent on this customer (tickets, hotels, dinners, samples, and
- * their orders' costs), by kind, with the latest expenses. Managers only.
- */
-async function SpentCard({ customer: c }: { customer: CustomerDetail }) {
-  const today = todayIn(TZ);
-  const [list, people, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { customerId: c.id }),
-    api.get<Person[]>("/users/people"),
-    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
-  ]);
-  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const cur = list.currency;
-  const choices = {
-    customers: [{ id: c.id, name: c.name }],
-    orders: c.orders.filter((o) => o.status === "open").map((o) => ({ id: o.id, refNo: o.refNo, customerId: c.id, customer: c.name })),
-    customerId: c.id,
-  };
-  const onOrders = list.rows.filter((e) => !e.voided && e.order).length;
-  const shown = list.rows.slice(0, 8);
-  return (
-    <Card>
-      <CardHeader
-        title="Spent on this customer"
-        description="Managers only. Tickets, hotels, dinners and samples for them, and their orders' costs."
-        actions={<span className="text-sm font-semibold tabular">{money(list.total, cur)}</span>}
-      />
-      <CardBody className="flex flex-col gap-4">
-        {list.count > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs text-muted">
-              {list.count} expense{list.count === 1 ? "" : "s"}
-              {onOrders > 0 && `, ${onOrders} of them on orders`}
-            </p>
-            <ul className="flex flex-wrap gap-1.5" aria-label="By kind">
-              {list.byCategory.map((k) => (
-                <li key={k.category}>
-                  <Badge tone="outline">
-                    {EXPENSE_CATEGORY_LABEL[k.category]} <span className="tabular">{money(k.total, cur)}</span>
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {shown.length > 0 && (
-          <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Expenses">
-            {shown.map((e) => (
-              <ExpenseRecord key={e.id} e={e} mainCurrency={cur} people={people} fx={fx} today={today} choices={choices} showFor={Boolean(e.order)} />
-            ))}
-          </ul>
-        )}
-        {list.rows.length > shown.length && (
-          <Link href={`/money?tab=expenses&p=${today.slice(0, 4)}&customer=${c.id}`} className="text-sm text-primary hover:underline">
-            See all {list.rows.length} on the Money page
-          </Link>
-        )}
-        <NewExpense action={expenseAction.bind(null, null, null)} people={people} mainCurrency={cur} fx={fx} today={today} choices={choices} label="Add an expense for them" />
-      </CardBody>
-    </Card>
-  );
-}

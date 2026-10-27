@@ -285,8 +285,8 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
       if (shippedOn) await pay("balance", cny - Math.round(cny * 0.3), addDays(shippedOn, -3));
     }
     if (shippedOn) {
-      await db.expense.create({ data: { orderId: order.id, customerId: customer.id, category: "inland_transport", description: "Truck from the factory to Qingdao port", amount: "3200.00", currency: "CNY", rate, spentOn: toDbDate(addDays(shippedOn, -2)), paidById: o.assignee ?? people.manager.id, recordedById: people.manager.id } });
-      await db.expense.create({ data: { orderId: order.id, customerId: customer.id, category: "inspection", description: "Pre-shipment inspection", amount: "280.00", currency: "USD", rate: 1, spentOn: toDbDate(addDays(shippedOn, -4)), recordedById: people.manager.id } });
+      await db.expense.create({ data: { orderId: order.id, inquiryId: order.inquiryId, customerId: customer.id, category: "inland_transport", description: "Truck from the factory to Qingdao port", amount: "3200.00", currency: "CNY", rate, spentOn: toDbDate(addDays(shippedOn, -2)), paidById: o.assignee ?? people.manager.id, recordedById: people.manager.id } });
+      await db.expense.create({ data: { orderId: order.id, inquiryId: order.inquiryId, customerId: customer.id, category: "inspection", description: "Pre-shipment inspection", amount: "280.00", currency: "USD", rate: 1, spentOn: toDbDate(addDays(shippedOn, -4)), recordedById: people.manager.id } });
     }
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     if (o.order.paid !== "none") {
@@ -343,6 +343,17 @@ async function demoData(db: PrismaClient, people: Awaited<ReturnType<typeof seed
     { customer: 2, category: "meals", description: "Lunch at the Canton Fair", amount: "680.00", currency: "CNY", back: 0 },
     { customer: 2, category: "gifts", description: "Tea gift set", amount: "420.00", currency: "CNY", back: 0 },
   ] as const;
+  // Spent on deals: a factory trip for a deal we then lost, and a visit before a deal we won.
+  const lostDeal = await db.inquiry.findFirst({ where: { stage: "lost" }, select: { id: true, customerId: true } });
+  const wonDeal = await db.inquiry.findFirst({ where: { stage: "won", orders: { some: { status: { not: "cancelled" } } } }, orderBy: { createdAt: "asc" }, select: { id: true, customerId: true } });
+  if (lostDeal)
+    await db.expense.create({
+      data: { inquiryId: lostDeal.id, customerId: lostDeal.customerId, factoryId: factories[2].id, category: "travel", description: "Train to the film factory to check samples", amount: "1650.00", currency: "CNY", rate, spentOn: toDbDate(addDays(today, -22)), paidById: people.manager.id, recordedById: people.manager.id },
+    });
+  if (wonDeal)
+    await db.expense.create({
+      data: { inquiryId: wonDeal.id, customerId: wonDeal.customerId, factoryId: factories[0].id, category: "travel", description: "Visit to the factory with the customer's engineer", amount: "2400.00", currency: "CNY", rate, spentOn: toDbDate(addDays(today, -40)), paidById: people.manager.id, recordedById: people.manager.id },
+    });
   for (const e of onCustomer) {
     await db.expense.create({
       data: { customerId: customers[e.customer].id, category: e.category, description: e.description, amount: e.amount, currency: e.currency, rate: e.currency === "USD" ? 1 : rate, spentOn: toDbDate(addDays(today, -e.back)), paidById: people.manager.id, recordedById: people.manager.id },

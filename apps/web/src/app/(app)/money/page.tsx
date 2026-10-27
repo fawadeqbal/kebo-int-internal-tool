@@ -312,18 +312,14 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
   const customer = UUID.test(sp.customer ?? "") ? sp.customer : undefined;
   const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.category ?? "") ? (sp.category as ExpenseCategory) : undefined;
 
-  const [list, people, orders, customers, settings] = await Promise.all([
+  const [list, people, choices, settings] = await Promise.all([
     api.get<ExpenseList>("/expenses", { from, to, kind, customerId: customer, category }),
     api.get<Person[]>("/users/people"),
-    api.get<{ id: string; refNo: string; customer: { id: string; name: string } }[]>("/orders", { status: "open" }),
-    api.get<{ id: string; name: string }[]>("/customers/names"),
+    api.get<ExpenseChoices>("/expenses/targets"),
     api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
   ]);
+  const customers = choices.customers;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const choices: ExpenseChoices = {
-    customers,
-    orders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customerId: o.customer.id, customer: o.customer.name })),
-  };
   const c = list.currency;
   const keep = { tab: "expenses", p: period === thisMonth ? undefined : period, kind, customer, category };
   const href = (change: Record<string, string | undefined>) => buildHref("/money", keep, change);

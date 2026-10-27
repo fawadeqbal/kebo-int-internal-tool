@@ -406,6 +406,7 @@ model Factory {
 
   quotes   FactoryQuote[]
   payments FactoryPayment[]
+  expenses Expense[]
 
   @@index([name])
   @@index([ownerId])
@@ -454,6 +455,7 @@ model Inquiry {
   quotation     Quotation?
   /// At most one order that is not cancelled (partial unique index in the integrity migration).
   orders        Order[]
+  expenses      Expense[]
 
   @@index([stage])
   @@index([assigneeId])
@@ -923,9 +925,15 @@ model Expense {
   id           String    @id @default(uuid()) @db.Uuid
   orderId      String?   @map("order_id") @db.Uuid
   order        Order?    @relation(fields: [orderId], references: [id])
-  /// Who it was spent on (a dinner, a ticket to visit them…); for an order always its customer. Empty: the company's own cost.
+  /// Who it was spent on (a dinner, a ticket to visit them…); for a deal or an order always its customer. Empty: the company's own cost.
   customerId   String?   @map("customer_id") @db.Uuid
   customer     Customer? @relation(fields: [customerId], references: [id])
+  /// The deal it was spent on (a trip to check products, samples…), won or lost; for an order always its deal.
+  inquiryId    String?   @map("inquiry_id") @db.Uuid
+  inquiry      Inquiry?  @relation(fields: [inquiryId], references: [id])
+  /// The factory visited or paid for (a trip to check its products, an inspection there).
+  factoryId    String?   @map("factory_id") @db.Uuid
+  factory      Factory?  @relation(fields: [factoryId], references: [id])
   /// See EXPENSE_CATEGORIES in @kebo/shared.
   category     String    @db.VarChar(30)
   description  String    @db.VarChar(200)
@@ -951,6 +959,8 @@ model Expense {
 
   @@index([orderId])
   @@index([customerId])
+  @@index([inquiryId])
+  @@index([factoryId])
   @@index([spentOn])
   @@map("expenses")
 }

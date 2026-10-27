@@ -54,6 +54,8 @@ const expenseInclude = {
   paidBy: person,
   order: { select: { id: true, refNo: true } },
   customer: { select: { id: true, name: true } },
+  inquiry: { select: { id: true, refNo: true, title: true, stage: true } },
+  factory: { select: { id: true, name: true } },
 } satisfies Prisma.ExpenseInclude;
 type ExpenseRow = Prisma.ExpenseGetPayload<{ include: typeof expenseInclude }>;
 
@@ -139,6 +141,14 @@ export class MoneyService {
     const s = await this.settings.get();
     const today = this.clock.today();
     const totalMinor = decimalToMinor(o.total);
+    // Spent on the deal before it became this order (trips, samples, visits to factories): managers only.
+    const dealExpenses = can(user, "expenses.manage")
+      ? await this.prisma.db.expense.findMany({
+          where: { inquiryId: o.inquiryId, orderId: null },
+          include: expenseInclude,
+          orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
+        })
+      : [];
     const live = o.payments.filter((p) => p.currency === o.currency);
     const position = settle(
       totalMinor,
@@ -204,6 +214,12 @@ export class MoneyService {
       orderPerMain === null
         ? null
         : liveExpenses.reduce((t, e) => t + roundHalfAway(convert(decimalToMinor(e.amount), Number(e.rate)) * orderPerMain), 0);
+    const beforeSaleMinor =
+      orderPerMain === null
+        ? null
+        : dealExpenses
+            .filter((e) => !e.voidedAt)
+            .reduce((t, e) => t + roundHalfAway(convert(decimalToMinor(e.amount), Number(e.rate)) * orderPerMain), 0);
     const factoryPaidMinor = livePaid.reduce((t, p) => t + convert(decimalToMinor(p.amount), Number(p.rate)), 0);
     let goodsCostMinor = 0;
     let uncostedMinor = 0;
@@ -279,6 +295,9 @@ export class MoneyService {
           }
         : null,
       expenses: seeExpenses ? o.expenses.map((e) => this.expenseView(e)) : null,
+      /** Spent on the deal before the order (not part of the order's own expenses). */
+      dealExpenses: seeExpenses ? dealExpenses.map((e) => this.expenseView(e)) : null,
+      deal: { id: o.inquiryId },
       profit:
         seeExpenses && profit
           ? {
@@ -287,6 +306,10 @@ export class MoneyService {
               uncostedRevenue: fromMinor(uncostedRevenueMinor),
               expenses: fromMinor(expensesMinor!),
               earned: fromMinor(profit.earnedMinor),
+              /** Spent on the deal before the sale, and the profit once that is taken off too. */
+              beforeSale: fromMinor(beforeSaleMinor ?? 0),
+              net: fromMinor(profit.earnedMinor - (beforeSaleMinor ?? 0)),
+              netMarginPercent: totalMinor > 0 ? Math.round(((profit.earnedMinor - (beforeSaleMinor ?? 0)) / totalMinor) * 1000) / 10 : null,
               marginPercent: profit.marginPercent,
               coveragePercent: profit.coveragePercent,
               received: fromMinor(position.receivedMinor),
@@ -530,6 +553,8 @@ export class MoneyService {
       order: e.order ?? null,
       orderId: e.orderId,
       customer: e.customer ?? null,
+      deal: e.inquiry ?? null,
+      factory: e.factory ?? null,
       category: e.category,
       description: e.description,
       amount: e.amount.toFixed(2),
@@ -555,12 +580,23 @@ export class MoneyService {
    */
   async listExpenses(
     user: SessionUser,
-    q: { from?: ISODate; to?: ISODate; orderId?: string; customerId?: string; category?: string; kind?: "order" | "customer" | "general" },
+    q: {
+      from?: ISODate;
+      to?: ISODate;
+      orderId?: string;
+      inquiryId?: string;
+      factoryId?: string;
+      customerId?: string;
+      category?: string;
+      kind?: "order" | "customer" | "general";
+    },
   ) {
     this.assertExpenses(user);
     const { sales } = await this.settings.get();
     const rows = await this.prisma.db.expense.findMany({
       where: {
+        ...(q.inquiryId ? { inquiryId: q.inquiryId } : {}),
+        ...(q.factoryId ? { factoryId: q.factoryId } : {}),
         ...(q.orderId
           ? { orderId: q.orderId }
           : q.kind === "order"
@@ -622,15 +658,27 @@ export class MoneyService {
     if (input.spentOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
     let order: { id: string; refNo: string } | null = null;
     let customerId = input.customerId ?? null;
+    let inquiryId = input.inquiryId ?? null;
     if (input.orderId) {
       const o = await this.orders.load(user, input.orderId);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
       if (customerId && customerId !== o.customerId) throw new DomainError(`Order ${o.refNo} is for another customer.`);
+      if (inquiryId && inquiryId !== o.inquiryId) throw new DomainError(`Order ${o.refNo} is from another deal.`);
       order = { id: o.id, refNo: o.refNo };
       customerId = o.customerId;
+      inquiryId = o.inquiryId;
+    } else if (inquiryId) {
+      const d = await this.prisma.db.inquiry.findFirst({ where: { id: inquiryId, deletedAt: null }, select: { refNo: true, customerId: true } });
+      if (!d) throw new DomainError("That deal is not in the system any more.");
+      if (customerId && customerId !== d.customerId) throw new DomainError(`Deal ${d.refNo} is for another customer.`);
+      customerId = d.customerId;
     } else if (customerId) {
       const c = await this.prisma.db.customer.findFirst({ where: { id: customerId, deletedAt: null }, select: { id: true } });
       if (!c) throw new DomainError("That customer is not in the system any more.");
+    }
+    if (input.factoryId) {
+      const f = await this.prisma.db.factory.findFirst({ where: { id: input.factoryId, deletedAt: null }, select: { id: true } });
+      if (!f) throw new DomainError("That factory is not in the system any more.");
     }
     const { sales } = await this.settings.get();
     return {
@@ -638,6 +686,8 @@ export class MoneyService {
       data: {
         orderId: order?.id ?? null,
         customerId,
+        inquiryId,
+        factoryId: input.factoryId ?? null,
         category: input.category,
         description: input.description,
         amount: input.amount,
@@ -711,7 +761,9 @@ export class MoneyService {
           category: e.category,
           spentOn: fromDbDate(e.spentOn),
           order: e.order?.refNo ?? null,
+          deal: e.inquiry?.refNo ?? null,
           customer: e.customer?.name ?? null,
+          factory: e.factory?.name ?? null,
           description: e.description,
         },
         newValues: {
@@ -719,7 +771,9 @@ export class MoneyService {
           category: data.category,
           spentOn: input.spentOn,
           order: order?.refNo ?? null,
+          deal: updated.inquiry?.refNo ?? null,
           customer: updated.customer?.name ?? null,
+          factory: updated.factory?.name ?? null,
           description: data.description,
         },
       });

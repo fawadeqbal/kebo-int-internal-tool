@@ -36,12 +36,15 @@ import { CurrentUser } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { MoneyService } from "./money.service";
+import { AccountsService } from "./accounts.service";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const expenseQuery = z.object({
   from: date,
   to: date,
   orderId: z.uuid().optional(),
+  inquiryId: z.uuid().optional(),
+  factoryId: z.uuid().optional(),
   customerId: z.uuid().optional(),
   category: z.enum(EXPENSE_CATEGORIES).optional(),
   kind: z.enum(["order", "customer", "general"]).optional(),
@@ -56,7 +59,22 @@ const flag = z
 @ApiTags("money")
 @Controller()
 class MoneyController {
-  constructor(private readonly money: MoneyService) {}
+  constructor(
+    private readonly money: MoneyService,
+    private readonly accounts: AccountsService,
+  ) {}
+
+  /** Managers only: what an expense can be for (customers, deals, orders, factories). */
+  @Get("expenses/targets")
+  expenseTargets(@CurrentUser() user: SessionUser) {
+    return this.accounts.expenseTargets(user);
+  }
+
+  /** Managers only: a customer's deals, what they earned us, everything spent on them, and a timeline. */
+  @Get("customers/:id/account")
+  customerAccount(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.accounts.customerAccount(user, id);
+  }
 
   /** An order's money: payment plan, what we owe and paid factories, expenses and profit (each for the people who may see it). */
   @Get("orders/:id/money")
@@ -165,5 +183,5 @@ class MoneyController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService], exports: [MoneyService] })
+@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService], exports: [MoneyService, AccountsService] })
 export class MoneyModule {}

@@ -205,6 +205,18 @@ export function ProfitCard({ m, people, today, mainCurrency, fx }: { m: OrderMon
                   tone={Number(p.earned) < 0 ? "bad" : undefined}
                   hint={p.marginPercent === null ? undefined : `${p.marginPercent}% of the order`}
                 />
+                {Number(p.beforeSale) > 0 && (
+                  <>
+                    <Line label="Spent on the deal before the sale" value={`− ${money(p.beforeSale, c)}`} />
+                    <Line
+                      label="Profit after everything"
+                      value={money(p.net, c)}
+                      strong
+                      tone={Number(p.net) < 0 ? "bad" : undefined}
+                      hint={p.netMarginPercent === null ? undefined : `${p.netMarginPercent}% of the order`}
+                    />
+                  </>
+                )}
               </dl>
               {p.coveragePercent !== null && p.coveragePercent < 100 && (
                 <p className="mt-1 text-xs text-warn">
@@ -229,6 +241,21 @@ export function ProfitCard({ m, people, today, mainCurrency, fx }: { m: OrderMon
               <ExpenseRecord key={e.id} e={e} mainCurrency={mainCurrency} people={people} fx={fx} today={today} showFor={false} canChange={!m.cancelled} />
             ))}
           </ul>
+        )}
+        {m.dealExpenses && m.dealExpenses.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-medium tracking-wide text-muted uppercase">
+              Spent on the deal before the order ·{" "}
+              <Link href={`/deals/${m.deal.id}`} className="normal-case hover:text-primary">
+                open the deal
+              </Link>
+            </p>
+            <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Spent on the deal before the order">
+              {m.dealExpenses.map((e) => (
+                <ExpenseRecord key={e.id} e={e} mainCurrency={mainCurrency} people={people} fx={fx} today={today} showFor={false} canChange={!m.cancelled} />
+              ))}
+            </ul>
+          </div>
         )}
         {!m.cancelled && (
           <NewExpense action={expenseAction.bind(null, m.orderId, null)} people={people} mainCurrency={mainCurrency} fx={fx} today={today} />

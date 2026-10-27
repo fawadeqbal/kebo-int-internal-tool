@@ -1,4 +1,4 @@
-import type { ExpenseCategory, PaymentKind, PaymentMethod, InstalmentStatus } from "@kebo/shared";
+import type { ExpenseCategory, InquiryStage, LostReason, PaymentKind, PaymentMethod, InstalmentStatus } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** GET /orders/:id/money (each part only for the people who may see it). */
@@ -24,12 +24,19 @@ export interface OrderMoney {
     canRecord: boolean;
   } | null;
   expenses: ExpenseView[] | null;
+  /** Spent on the deal before it became this order (managers). */
+  dealExpenses: ExpenseView[] | null;
+  deal: { id: string };
   profit: {
     revenue: string;
     goodsCost: string;
     uncostedRevenue: string;
     expenses: string;
     earned: string;
+    /** Spent on the deal before the sale, and the profit once that is taken off too. */
+    beforeSale: string;
+    net: string;
+    netMarginPercent: number | null;
     marginPercent: number | null;
     coveragePercent: number | null;
     received: string;
@@ -79,6 +86,10 @@ export interface ExpenseView {
   orderId: string | null;
   /** Who it was spent on; an order's expense is always on its customer. Null: the company's own cost. */
   customer: { id: string; name: string } | null;
+  /** The deal it was spent on (won or lost); an order's expense is on its deal. */
+  deal: { id: string; refNo: string; title: string; stage: InquiryStage } | null;
+  /** The factory visited or paid for. */
+  factory: { id: string; name: string } | null;
   category: ExpenseCategory;
   description: string;
   amount: string;
@@ -151,5 +162,55 @@ export interface ProfitAndLoss {
     expenses: string;
     profit: string;
   }[];
+  missingRates: string[];
+}
+
+/** GET /expenses/targets: what an expense can be for. */
+export interface ExpenseTargets {
+  customers: { id: string; name: string }[];
+  deals: { id: string; refNo: string; title: string; stage: InquiryStage; customerId: string; customer: string }[];
+  orders: { id: string; refNo: string; dealId: string; customerId: string; customer: string }[];
+  factories: { id: string; name: string }[];
+}
+
+/** GET /customers/:id/account (managers): in the main currency. */
+export interface CustomerAccount {
+  customer: { id: string; name: string; since: string };
+  currency: string;
+  deals: { total: number; won: number; lost: number; open: number };
+  winRate: number | null;
+  totals: {
+    sales: string;
+    goodsCost: string;
+    orderCosts: string;
+    profit: string;
+    beforeSale: string;
+    lostDeals: string;
+    openDeals: string;
+    otherCosts: string;
+    spent: string;
+    net: string;
+    sellingCostPerWin: string | null;
+    received: string;
+    factoryPaid: string;
+    cash: string;
+    uncostedRevenue: string;
+  };
+  lostReasons: { reason: LostReason | "not_said"; deals: number; spent: string }[];
+  rows: {
+    id: string;
+    refNo: string;
+    title: string;
+    stage: InquiryStage;
+    lostReason: LostReason | null;
+    lostNote: string | null;
+    receivedOn: string;
+    closedAt: string | null;
+    assignee: { id: string; name: string } | null;
+    spent: string;
+    beforeSale: string;
+    order: { id: string; refNo: string; stage: string; status: string; revenue: string; goodsCost: string; costs: string; profit: string; net: string } | null;
+  }[];
+  timeline: { on: string; kind: "deal" | "won" | "lost" | "order" | "shipped" | "payment" | "expense"; text: string; amount?: string; currency?: string; href?: string }[];
   missingRates: string[];
 }

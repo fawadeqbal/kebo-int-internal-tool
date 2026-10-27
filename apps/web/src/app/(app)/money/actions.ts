@@ -105,7 +105,9 @@ export async function expenseAction(
   const v = formValues(form);
   const body = {
     orderId: orderId ?? (v.orderId || null),
+    inquiryId: orderId ? null : v.inquiryId || null,
     customerId: orderId ? null : v.customerId || null,
+    factoryId: v.factoryId || null,
     category: v.category,
     description: v.description?.trim() ?? "",
     amount: v.amount,
@@ -122,7 +124,11 @@ export async function expenseAction(
     () => (expenseId ? api.patch(`/expenses/${expenseId}`, body) : api.post("/expenses", body)),
     expenseId ? "Expense changed." : "Expense added.",
   );
-  if (r.ok) refresh(body.orderId, (r.data as { customer?: { id: string } | null } | undefined)?.customer?.id ?? body.customerId);
+  if (r.ok) {
+    const saved = r.data as { customer?: { id: string } | null; deal?: { id: string } | null } | undefined;
+    refresh(body.orderId, saved?.customer?.id ?? body.customerId);
+    if (saved?.deal) revalidatePath(`/deals/${saved.deal.id}`, "layout");
+  }
   return r;
 }
 
