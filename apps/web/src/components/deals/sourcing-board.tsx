@@ -98,7 +98,8 @@ export function FactoryQuotes({
     <Card>
       <CardHeader title="Factory offers" description="Internal, never shown to the customer. Each offer is one factory's lines as it gave them." />
       <CardBody className="flex flex-col gap-4">
-        <div role="tablist" aria-label="Factory offers" className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div role="tablist" aria-label="Factory offers" className="contents">
           {offers.map((q) => (
             <button
               key={q.id}
@@ -122,6 +123,7 @@ export function FactoryQuotes({
               </span>
             </button>
           ))}
+          </div>
           {canEdit && (
             <Button size="sm" variant={active === "new" ? "primary" : "ghost"} onClick={() => setActive("new")} aria-pressed={active === "new"}>
               <Plus aria-hidden /> New offer

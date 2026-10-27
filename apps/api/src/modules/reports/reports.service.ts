@@ -9,6 +9,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
+import { ordersWithMoneyDue } from "../money/due";
 
 export interface Range {
   from: ISODate;
@@ -81,8 +82,8 @@ export class ReportsService {
       this.prisma.db.order.findMany({ where: { status: { not: "cancelled" }, orderedOn: { gte: day(monthStart) } }, select: { total: true, currency: true } }),
       this.prisma.db.payment.findMany({ where: { voidedAt: null, paidOn: { gte: day(monthStart) } }, select: { amount: true, bankCharges: true, currency: true } }),
       this.prisma.db.order.findMany({
-        // Closed orders too: money still owed on them is still to receive.
-        where: { status: { in: ["open", "closed"] } },
+        // Closed orders too, while money is still owed on them.
+        where: { OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma) } }] },
         select: { total: true, currency: true, stage: true, status: true, payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, currency: true } } },
       }),
     ]);

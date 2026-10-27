@@ -5,6 +5,7 @@ import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
 import { addDays, ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
+import { ReadCache } from "../../common/cache/read-cache";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 
@@ -33,16 +34,56 @@ export type Warning = { level: "bad" | "warn"; text: string; href: string | null
  * with factories before the customer paid, what visits to each factory cost —
  * and warnings when something crosses a line.
  */
+/** A deal decided in the period, with what was spent on it in minor units of the main currency. */
+type ClosedDeal = {
+  id: string;
+  refNo: string;
+  title: string;
+  stage: "won" | "lost";
+  category: string;
+  lostReason: LostReason | null;
+  assigneeId: string | null;
+  customerId: string;
+  customerName: string;
+  spentMinor: number;
+  /** Before any order: the selling cost. */
+  sellingMinor: number;
+};
+/** An order as the report reads it: its sums in minor units (of its currency, expenses in the main one). */
+type LeakOrder = {
+  id: string;
+  refNo: string;
+  status: string;
+  currency: string;
+  totalMinor: number;
+  orderedOn: ISODate;
+  customerId: string;
+  customerName: string;
+  costMinor: number;
+  uncostedMinor: number;
+  factoryPaidMinor: number;
+  firstFactoryPaid: ISODate | null;
+  receivedMinor: number;
+  orderCostsMinor: number;
+  beforeSaleMinor: number;
+};
+
 @Injectable()
 export class LeaksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly clock: Clock,
+    private readonly cache: ReadCache,
   ) {}
 
+  /** The same for every manager: shared while nothing changes (ReadCache). */
   async report(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can see where money is lost.");
+    return this.cache.get(`leaks:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}`, () => this.compute(q));
+  }
+
+  private async compute(q: { from?: ISODate; to?: ISODate }) {
     const today = this.clock.today();
     const to = q.to ?? today;
     const from = q.from ?? `${to.slice(0, 4)}-01-01`;
@@ -58,27 +99,26 @@ export class LeaksService {
       return convert(minor, r);
     };
     const range = { gte: toDbDate(from), lte: toDbDate(to) };
-    const closedRange = { gte: new Date(`${from}T00:00:00Z`), lt: new Date(`${addDays(to, 1)}T00:00:00Z`) };
     const inMain = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) => convert(decimalToMinor(e.amount), Number(e.rate));
     const show = (minor: Minor, currency: string = main) => formatMinor(minor, currency as typeof main);
     const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
 
     const [closedDeals, openDeals, orders, periodExpenses, people] = await Promise.all([
-      // Deals decided in the period, with everything spent on them.
-      this.prisma.db.inquiry.findMany({
-        where: { deletedAt: null, stage: { in: ["won", "lost"] }, closedAt: closedRange },
-        select: {
-          id: true,
-          refNo: true,
-          title: true,
-          stage: true,
-          category: true,
-          lostReason: true,
-          assigneeId: true,
-          customer: { select: { id: true, name: true } },
-          expenses: { where: { voidedAt: null }, select: { amount: true, rate: true, orderId: true } },
-        },
-      }),
+      // Deals decided in the period, with what was spent on them (all of it, and before any order: the
+      // selling cost), added up in the database. Each expense in the main currency at its rate, rounded
+      // as inMain does; timestamps in the database's zone, as Prisma writes them.
+      this.prisma.db.$queryRaw<ClosedDeal[]>`
+        select i.id, i.ref_no as "refNo", i.title, i.stage::text as stage, i.category, i.lost_reason::text as "lostReason",
+               i.assignee_id as "assigneeId", c.id as "customerId", c.name as "customerName",
+               coalesce(sum(sign(v.x) * floor(abs(v.x) + 0.5)), 0)::float8 as "spentMinor",
+               coalesce(sum(sign(v.x) * floor(abs(v.x) + 0.5)) filter (where e.order_id is null), 0)::float8 as "sellingMinor"
+        from inquiries i
+        join customers c on c.id = i.customer_id
+        left join expenses e on e.inquiry_id = i.id and e.voided_at is null
+        left join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v on e.id is not null
+        where i.deleted_at is null and i.stage in ('won', 'lost')
+          and i.closed_at >= ${from}::timestamp and i.closed_at < ${addDays(to, 1)}::timestamp
+        group by i.id, c.id`,
       // Deals still open, with their latest quotation value and what was spent on them.
       this.prisma.db.inquiry.findMany({
         where: { deletedAt: null, stage: { in: ["new", "sourcing", "quoted"] }, expenses: { some: { voidedAt: null } } },
@@ -91,25 +131,31 @@ export class LeaksService {
           quotation: { select: { revisions: { where: { deletedAt: null }, orderBy: { number: "desc" }, take: 1, select: { total: true, currency: true } } } },
         },
       }),
-      // Orders placed in the period (planned against actual), and open ones (money stuck).
-      this.prisma.db.order.findMany({
-        where: { status: { not: "cancelled" }, OR: [{ orderedOn: range }, { status: "open" }] },
-        select: {
-          id: true,
-          refNo: true,
-          status: true,
-          currency: true,
-          total: true,
-          orderedOn: true,
-          inquiryId: true,
-          customer: { select: { id: true, name: true } },
-          lines: { select: { unitCost: true, quantity: true, lineTotal: true } },
-          payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, currency: true, paidOn: true } },
-          factoryPaid: { where: { voidedAt: null }, select: { amount: true, rate: true, paidOn: true } },
-          expenses: { where: { voidedAt: null }, select: { amount: true, rate: true } },
-          inquiry: { select: { expenses: { where: { voidedAt: null, orderId: null }, select: { amount: true, rate: true } } } },
-        },
-      }),
+      // Orders placed in the period (planned against actual), and open ones (money stuck), each as one
+      // row of sums from the database: goods cost, what is not costed, paid to factories (in the order's
+      // currency at each payment's rate), received, the order's expenses and those on its deal before it.
+      this.prisma.db.$queryRaw<LeakOrder[]>`
+        select o.id, o.ref_no as "refNo", o.status::text as status, o.currency, (o.total * 100)::float8 as "totalMinor",
+               to_char(o.ordered_on, 'YYYY-MM-DD') as "orderedOn", c.id as "customerId", c.name as "customerName",
+               coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from order_lines l
+                 cross join lateral (select (l.unit_cost * 100)::float8 * l.quantity::float8 as x) v
+                 where l.order_id = o.id and l.unit_cost is not null), 0)::float8 as "costMinor",
+               coalesce((select sum(l.line_total * 100) from order_lines l where l.order_id = o.id and l.unit_cost is null), 0)::float8 as "uncostedMinor",
+               coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from factory_payments p
+                 cross join lateral (select (p.amount * 100)::float8 / p.rate::float8 as x) v
+                 where p.order_id = o.id and p.voided_at is null), 0)::float8 as "factoryPaidMinor",
+               (select to_char(min(p.paid_on), 'YYYY-MM-DD') from factory_payments p where p.order_id = o.id and p.voided_at is null) as "firstFactoryPaid",
+               coalesce((select sum((p.amount + p.bank_charges) * 100) from payments p
+                 where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "receivedMinor",
+               coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
+                 cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
+                 where e.order_id = o.id and e.voided_at is null), 0)::float8 as "orderCostsMinor",
+               coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
+                 cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
+                 where e.inquiry_id = o.inquiry_id and e.order_id is null and e.voided_at is null), 0)::float8 as "beforeSaleMinor"
+        from orders o
+        join customers c on c.id = o.customer_id
+        where o.status <> 'cancelled' and (o.ordered_on between ${from}::date and ${to}::date or o.status = 'open')`,
       // Every expense in the period, and the 12 months before its end for the trend.
       this.prisma.db.expense.findMany({
         where: { voidedAt: null, spentOn: { gte: toDbDate(`${addDays(`${to.slice(0, 7)}-01`, -334).slice(0, 7)}-01`), lte: toDbDate(to) } },
@@ -119,19 +165,20 @@ export class LeaksService {
     ]);
     const nameOf = (id: string | null) => people.find((p) => p.id === id)?.name ?? "Nobody";
     const inPeriod = (d: Date) => fromDbDate(d) >= from && fromDbDate(d) <= to;
+    const inPeriodDay = (d: ISODate) => d >= from && d <= to;
     const warnings: Warning[] = [];
 
     /* ----- lost deals: what they cost and why */
     const lost = closedDeals.filter((d) => d.stage === "lost");
     const reasons = new Map<string, { deals: number; spent: number }>();
     const lostRows = lost.map((d) => {
-      const spent = d.expenses.reduce((t, e) => t + inMain(e), 0);
+      const spent = d.spentMinor;
       const key = d.lostReason ?? "not_said";
       const r = reasons.get(key) ?? { deals: 0, spent: 0 };
       r.deals += 1;
       r.spent += spent;
       reasons.set(key, r);
-      return { id: d.id, refNo: d.refNo, title: d.title, customer: d.customer, reason: d.lostReason, assignee: nameOf(d.assigneeId), spentMinor: spent };
+      return { id: d.id, refNo: d.refNo, title: d.title, customer: { id: d.customerId, name: d.customerName }, reason: d.lostReason, assignee: nameOf(d.assigneeId), spentMinor: spent };
     });
     const lostSpent = lostRows.reduce((t, r) => t + r.spentMinor, 0);
 
@@ -143,7 +190,7 @@ export class LeaksService {
         const g = m.get(k) ?? { won: 0, lost: 0, spent: 0 };
         g[d.stage as "won" | "lost"] += 1;
         // Selling cost: what was spent before the order (or on the lost deal), not the order's own freight and inspection.
-        g.spent += d.expenses.filter((e) => !e.orderId).reduce((t, e) => t + inMain(e), 0);
+        g.spent += d.sellingMinor;
         m.set(k, g);
       }
       return [...m.entries()]
@@ -155,36 +202,28 @@ export class LeaksService {
           spent: fromMinor(g.spent),
           costPerWin: g.won ? fromMinor(roundHalfAway(g.spent / g.won)) : null,
         }))
-        .sort((a, b) => b.won + b.lost - (a.won + a.lost));
+        .sort((a, b) => b.won + b.lost - (a.won + a.lost) || a.key.localeCompare(b.key));
     };
 
     /* ----- profit planned against actual, for orders placed in the period */
-    const placed = orders.filter((o) => inPeriod(o.orderedOn));
+    const placed = orders.filter((o) => inPeriodDay(o.orderedOn));
     const leakRows = placed
       .map((o) => {
-        const revenue = toMain(decimalToMinor(o.total), o.currency);
-        let cost = 0;
-        let uncosted = 0;
-        for (const l of o.lines) {
-          if (l.unitCost === null) uncosted += decimalToMinor(l.lineTotal);
-          else cost += roundHalfAway(decimalToMinor(l.unitCost) * Number(l.quantity));
-        }
-        const goods = toMain(cost, o.currency);
+        const revenue = toMain(o.totalMinor, o.currency);
+        const uncosted = o.uncostedMinor;
+        const goods = toMain(o.costMinor, o.currency);
         // Paid to factories beyond the costs on the lines (extra work, a price that changed); counted only once paid in full or more.
-        const paidFactories = toMain(
-          o.factoryPaid.reduce((t, p) => t + convert(decimalToMinor(p.amount), Number(p.rate)), 0),
-          o.currency,
-        );
+        const paidFactories = toMain(o.factoryPaidMinor, o.currency);
         // Rate rounding is not a cost: only more than half a percent (and more than 1.00) counts.
         const factoryExtra = paidFactories - goods > Math.max(100, goods * 0.005) ? paidFactories - goods : 0;
-        const orderCosts = o.expenses.reduce((t, e) => t + inMain(e), 0);
-        const beforeSale = o.inquiry.expenses.reduce((t, e) => t + inMain(e), 0);
+        const orderCosts = o.orderCostsMinor;
+        const beforeSale = o.beforeSaleMinor;
         const planned = revenue - goods;
         const actual = planned - orderCosts - beforeSale - factoryExtra;
         return {
           id: o.id,
           refNo: o.refNo,
-          customer: o.customer,
+          customer: { id: o.customerId, name: o.customerName },
           revenueMinor: revenue,
           plannedMinor: planned,
           orderCostsMinor: orderCosts,
@@ -195,7 +234,7 @@ export class LeaksService {
           uncosted: uncosted > 0,
         };
       })
-      .sort((a, b) => b.leakMinor - a.leakMinor);
+      .sort((a, b) => b.leakMinor - a.leakMinor || a.refNo.localeCompare(b.refNo));
     for (const r of leakRows) {
       if (r.actualMinor < 0) warnings.push({ level: "bad", text: `Order ${r.refNo} (${r.customer.name}) is losing money: ${show(r.actualMinor)} after all costs.`, href: `/orders/${r.id}/money` });
       else if (r.plannedMinor > 0 && (r.leakMinor / r.plannedMinor) * 100 >= LIMITS.leakPercent)
@@ -224,7 +263,7 @@ export class LeaksService {
     }
     const customerRows = [...customers.values()]
       .map((c) => ({ customer: c.customer, sales: fromMinor(c.sales), profit: fromMinor(c.profit), spent: fromMinor(c.spent), net: fromMinor(c.profit - c.spent), netMinor: c.profit - c.spent, spentMinor: c.spent }))
-      .sort((a, b) => b.netMinor - a.netMinor);
+      .sort((a, b) => b.netMinor - a.netMinor || a.customer.name.localeCompare(b.customer.name));
     for (const c of customerRows.filter((x) => x.netMinor < 0 && Number(x.spent) > 0).slice(0, 5))
       warnings.push({ level: "warn", text: `${c.customer.name} cost more than they earned us: net ${show(c.netMinor)} (spent ${show(c.spentMinor)}).`, href: `/customers/${c.customer.id}` });
 
@@ -245,14 +284,14 @@ export class LeaksService {
     const stuck = orders
       .filter((o) => o.status === "open")
       .map((o) => {
-        const received = o.payments.filter((p) => p.currency === o.currency).reduce((t, p) => t + decimalToMinor(p.amount) + decimalToMinor(p.bankCharges), 0);
-        const paid = o.factoryPaid.reduce((t, p) => t + convert(decimalToMinor(p.amount), Number(p.rate)), 0);
-        const first = o.factoryPaid.map((p) => fromDbDate(p.paidOn)).sort()[0] ?? null;
+        const received = o.receivedMinor;
+        const paid = o.factoryPaidMinor;
+        const first = o.firstFactoryPaid;
         const days = first ? Math.round((new Date(`${today}T00:00:00Z`).getTime() - new Date(`${first}T00:00:00Z`).getTime()) / 86_400_000) : 0;
-        return { id: o.id, refNo: o.refNo, customer: o.customer, currency: o.currency, stuckMinor: paid - received, days, mainMinor: toMain(paid - received, o.currency) };
+        return { id: o.id, refNo: o.refNo, customer: { id: o.customerId, name: o.customerName }, currency: o.currency, stuckMinor: paid - received, days, mainMinor: toMain(paid - received, o.currency) };
       })
       .filter((x) => x.stuckMinor > 0)
-      .sort((a, b) => b.mainMinor - a.mainMinor);
+      .sort((a, b) => b.mainMinor - a.mainMinor || a.refNo.localeCompare(b.refNo));
     for (const s of stuck.filter((x) => x.days >= LIMITS.stuckDays))
       warnings.push({ level: "warn", text: `${s.refNo}: ${show(s.stuckMinor, s.currency)} paid to the factory ${s.days} days ago is not back from ${s.customer.name} yet.`, href: `/orders/${s.id}/money` });
 
@@ -317,7 +356,7 @@ export class LeaksService {
         .map(([reason, r]) => ({ reason: reason as LostReason | "not_said", label: reason === "not_said" ? "No reason given" : LOST_REASON_LABEL[reason as LostReason], deals: r.deals, spent: fromMinor(r.spent) }))
         .sort((a, b) => b.deals - a.deals),
       lostDeals: lostRows
-        .sort((a, b) => b.spentMinor - a.spentMinor)
+        .sort((a, b) => b.spentMinor - a.spentMinor || b.refNo.localeCompare(a.refNo))
         .slice(0, 10)
         .map(({ spentMinor, ...r }) => ({ ...r, spent: fromMinor(spentMinor) })),
       byPerson: groupBy((d) => nameOf(d.assigneeId)),

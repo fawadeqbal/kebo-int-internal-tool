@@ -19,6 +19,7 @@ import {
 import { Button, cn } from "@kebo/ui";
 import { reminderAction } from "@/app/(app)/money/actions";
 import type { Reminders } from "@/lib/types-insights";
+import { FloatingMenu } from "@/components/common/floating";
 
 const KIND_ICON = { order: Package, quote: FileText, deal: Inbox, offer: Factory, money: Banknote } as const;
 const LEVEL = {
@@ -129,26 +130,17 @@ export function ReminderList({ data, limit = 8 }: { data: Reminders; limit?: num
                   <Check aria-hidden />
                 </Button>
                 {menu === it.key && (
-                  <div
-                    role="menu"
-                    className="absolute top-full right-0 z-30 mt-1 flex w-44 flex-col rounded-lg border border-line bg-surface p-1 shadow-pop"
-                  >
+                  <FloatingMenu anchor={() => document.getElementById(`later-${it.key}`)} onClose={() => setMenu(null)} label={`Put off: ${it.title}`} width={176}>
                     {[
                       [1, "Tomorrow"],
                       [3, "In 3 days"],
                       [7, "Next week"],
                     ].map(([d, label]) => (
-                      <button
-                        key={d}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => act(it, "snooze", d as number)}
-                        className="rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-surface-2"
-                      >
+                      <button key={d} type="button" role="menuitem" onClick={() => act(it, "snooze", d as number)} className="rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none">
                         {label}
                       </button>
                     ))}
-                  </div>
+                  </FloatingMenu>
                 )}
               </div>
             </li>
@@ -177,8 +169,13 @@ export function ReminderList({ data, limit = 8 }: { data: Reminders; limit?: num
           onClick={() => setAll((v) => !v)}
           className="border-t border-line px-4 py-2.5 text-left text-sm font-medium text-primary hover:bg-surface-2/60"
         >
-          {all ? "Show fewer" : `Show all ${items.length}`}
+          {all ? "Show fewer" : data.counts.total > data.items.length ? `Show the ${items.length} most urgent` : `Show all ${items.length}`}
         </button>
+      )}
+      {all && data.counts.total > data.items.length && (
+        <p className="border-t border-line px-4 py-2.5 text-xs text-muted">
+          And {data.counts.total - data.items.length} more, less urgent. Deal with these first and the rest move up.
+        </p>
       )}
     </div>
   );

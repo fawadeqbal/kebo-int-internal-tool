@@ -25,16 +25,18 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const cancelled = sp.view === "cancelled";
   const keep = { mine: mine ? "1" : undefined, view: cancelled ? "cancelled" : undefined };
   const q = { mine: mine ? "true" : undefined };
-  const [openRows, doneRows, cancelledRows] = await Promise.all([
+  // Done: only the latest few and how many there are (a company has thousands over the years).
+  const [openRows, recentDone, doneCount, cancelledRows] = await Promise.all([
     cancelled ? Promise.resolve([] as OrderRow[]) : api.get<OrderRow[]>("/orders", { ...q, status: "open" }),
-    cancelled ? Promise.resolve([] as OrderRow[]) : api.get<OrderRow[]>("/orders", { ...q, status: "closed" }),
-    cancelled ? api.get<OrderRow[]>("/orders", { ...q, status: "cancelled" }) : Promise.resolve([] as OrderRow[]),
+    cancelled ? Promise.resolve([] as OrderRow[]) : api.get<OrderRow[]>("/orders", { ...q, status: "closed", recent: "true", limit: String(RECENT_DONE) }),
+    cancelled ? Promise.resolve(0) : api.get<{ count: number }>("/orders/count", { ...q, status: "closed" }).then((r) => r.count),
+    cancelled ? api.get<OrderRow[]>("/orders", { ...q, status: "cancelled", recent: "true" }) : Promise.resolve([] as OrderRow[]),
   ]);
-  const recentDone = [...doneRows].sort((a, b) => b.stageSince.localeCompare(a.stageSince)).slice(0, RECENT_DONE);
-  const columns: { stage: OrderStage; rows: OrderRow[]; note?: string }[] = STAGE_FLOW.map((stage) => ({
+  const columns: { stage: OrderStage; rows: OrderRow[]; note?: string; count?: number }[] = STAGE_FLOW.map((stage) => ({
     stage,
     rows: stage === "done" ? recentDone : openRows.filter((r) => r.stage === stage),
-    note: stage === "done" && doneRows.length > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneRows.length}` : undefined,
+    note: stage === "done" && doneCount > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneCount}` : undefined,
+    count: stage === "done" ? doneCount : undefined,
   }));
   const phoneStage: OrderStage = STAGE_FLOW.includes(sp.stage as OrderStage) ? (sp.stage as OrderStage) : (columns.find((c) => c.stage !== "done" && c.rows.length)?.stage ?? "confirmed");
   const phone = columns.find((c) => c.stage === phoneStage)!;
@@ -65,7 +67,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             ))}
           </div>
         )
-      ) : openRows.length + doneRows.length === 0 ? (
+      ) : openRows.length + doneCount === 0 ? (
         <EmptyState title={mine ? "No orders of yours yet" : "No orders yet"} description="An order appears when a customer accepts a quotation." />
       ) : (
         <>
@@ -74,14 +76,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <LinkTabs
               label="Stage"
               className="mb-4"
-              tabs={columns.map((c) => ({ href: buildHref("/orders", keep, { stage: c.stage }), label: ORDER_STAGE_LABEL[c.stage], count: c.rows.length, active: c.stage === phoneStage }))}
+              tabs={columns.map((c) => ({ href: buildHref("/orders", keep, { stage: c.stage }), label: ORDER_STAGE_LABEL[c.stage], count: c.count ?? c.rows.length, active: c.stage === phoneStage }))}
             />
             <Column stage={phone.stage} rows={phone.rows} note={phone.note} hideTitle />
           </div>
           {/* Wide screens: the board. */}
           <div className="hidden gap-4 lg:grid lg:grid-cols-4">
             {columns.map((c) => (
-              <Column key={c.stage} stage={c.stage} rows={c.rows} note={c.note} />
+              <Column key={c.stage} stage={c.stage} rows={c.rows} note={c.note} count={c.count} />
             ))}
           </div>
         </>
@@ -90,12 +92,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   );
 }
 
-function Column({ stage, rows, note, hideTitle }: { stage: OrderStage; rows: OrderRow[]; note?: string; hideTitle?: boolean }) {
+function Column({ stage, rows, note, count, hideTitle }: { stage: OrderStage; rows: OrderRow[]; note?: string; count?: number; hideTitle?: boolean }) {
   return (
     <section aria-label={ORDER_STAGE_LABEL[stage]} className="flex min-w-0 flex-col gap-3">
       {!hideTitle && (
         <h2 className="flex items-center justify-between text-sm font-semibold">
-          {stage === "done" ? "Done (recent)" : ORDER_STAGE_LABEL[stage]} <span className="text-xs font-normal text-muted">{rows.length}</span>
+          {stage === "done" ? "Done (recent)" : ORDER_STAGE_LABEL[stage]} <span className="text-xs font-normal text-muted">{count ?? rows.length}</span>
         </h2>
       )}
       {rows.map((o) => (

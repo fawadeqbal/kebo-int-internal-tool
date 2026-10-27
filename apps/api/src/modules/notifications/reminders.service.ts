@@ -11,6 +11,7 @@ import { SettingsService } from "../settings/settings.service";
 import { links, NotificationsService } from "./notifications.service";
 import { goodsOf } from "../orders/orders.service";
 import { InsightsService } from "../insights/insights.service";
+import { ordersWithMoneyDue } from "../money/due";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -98,7 +99,8 @@ export class RemindersService {
     //    the handler, then the managers once it is late enough. Orders on hold deals are left alone.
     const orders = await this.prisma.db.order.findMany({
       // Closed orders too: one closed with money still owed keeps being chased (orderNeeds decides).
-      where: { status: { in: ["open", "closed"] }, inquiry: { onHold: false } },
+      // Closed ones only while money is still owed on them (found in the database, not by reading every order).
+      where: { inquiry: { onHold: false }, OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma) } }] },
       include: {
         payments: { where: { voidedAt: null } },
         planItems: { orderBy: { sortOrder: "asc" } },

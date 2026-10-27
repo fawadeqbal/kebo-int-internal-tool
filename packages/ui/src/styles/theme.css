@@ -43,7 +43,8 @@
   --line-strong: #d3d3dc;
   --text: #16151c;
   --text-2: #4a4857;
-  --muted: #74727f;
+  /* Text colours pass WCAG AA (4.5:1) on every surface and soft background. */
+  --muted: #666471;
 
   --primary: #7c3aed;
   --primary-hover: #6d28d9;
@@ -58,13 +59,13 @@
   --trust-soft: #e6f7f5;
   --money: #a16207;
   --money-soft: #fdf4e3;
-  --ok: #15803d;
+  --ok: #12703a;
   --ok-soft: #e8f6ec;
-  --warn: #b45309;
+  --warn: #92400e;
   --warn-soft: #fef3e2;
-  --bad: #dc2626;
+  --bad: #c01c1c;
   --bad-soft: #fdecec;
-  --info: #2563eb;
+  --info: #1d4ed8;
   --info-soft: #eaf1fe;
 
   --ring: color-mix(in oklab, var(--primary) 45%, transparent);
@@ -88,10 +89,10 @@
   --line-strong: #34333f;
   --text: #f1f0f5;
   --text-2: #b9b7c6;
-  --muted: #8a889a;
+  --muted: #9391a3;
 
-  --primary: #8b5cf6;
-  --primary-hover: #9d74f8;
+  --primary: #a78bfa;
+  --primary-hover: #c4b5fd;
   --primary-soft: #221a38;
   --primary-fg: #ffffff;
   --primary-solid: #7c3aed;
@@ -249,5 +250,73 @@
   *::after {
     animation-duration: 1ms !important;
     transition-duration: 1ms !important;
+  }
+}
+
+/*
+ * Grid and flex children may shrink below their content, so a long name or a
+ * wide amount never pushes a card off a phone screen (the default min-width is
+ * "auto"). Zero specificity: an explicit min-w-* class still wins.
+ */
+@layer base {
+  :where(.grid) > *,
+  :where(.flex) > :where(.flex-1) {
+    min-width: 0;
+  }
+}
+
+/* Phones and tablets: 16px text in fields, or iOS Safari zooms the page in on every tap. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/*
+ * iOS Safari draws date and time fields at their own width (ignoring
+ * width: 100%), centred, and collapses them when empty. Make them behave like
+ * any other field.
+ */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    display: block;
+  }
+  input::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-height: 1.5em;
+  }
+}
+
+/* ScrollFade: the edge of a sideways-scrolling row with more to see fades out. */
+.scroll-fade[data-fade-r]:not([data-fade-l]) {
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.scroll-fade[data-fade-l]:not([data-fade-r]) {
+  mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+}
+.scroll-fade[data-fade-l][data-fade-r] {
+  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+}
+
+/*
+ * On a phone, a table with four or more columns showing keeps a readable
+ * width and scrolls sideways, instead of squeezing words one per line.
+ * Columns hidden on phones (class "hidden") are not counted.
+ */
+@media (max-width: 639px) {
+  table:has(> thead > tr > th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only)) {
+    min-width: 36rem;
+  }
+  table:has(> thead > tr > th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only)) {
+    min-width: 46rem;
   }
 }

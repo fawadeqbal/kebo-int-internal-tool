@@ -33,6 +33,7 @@ import { SettingsService } from "../settings/settings.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
+import { ordersWithMoneyDue } from "../money/due";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -463,24 +464,34 @@ export class OrdersService {
     }));
   }
 
+  /** How many orders there are with this status (mine, or all the person may see). */
+  async count(user: SessionUser, filter: { mine?: boolean; status?: "open" | "closed" | "cancelled" }) {
+    const count = await this.prisma.db.order.count({
+      where: { ...orderAccess(user), status: filter.status ?? "open", ...(filter.mine ? { inquiry: { assigneeId: user.id } } : {}) },
+    });
+    return { count };
+  }
+
   /**
    * Orders with their stage, money due and what each needs now.
    * status: open (the board: Confirmed, In production, Shipped), closed (Done) or cancelled.
    */
   async list(
     user: SessionUser,
-    filter: { mine?: boolean; status?: "open" | "closed" | "cancelled"; stage?: OrderStage; lateOnly?: boolean },
+    filter: { mine?: boolean; status?: "open" | "closed" | "cancelled"; stage?: OrderStage; lateOnly?: boolean; recent?: boolean; limit?: number; ids?: string[] },
   ) {
     const rows = await this.prisma.db.order.findMany({
       where: {
         ...orderAccess(user),
+        ...(filter.ids ? { id: { in: filter.ids } } : {}),
         status: filter.status ?? "open",
         ...(filter.stage ? { stage: filter.stage } : {}),
         ...(filter.mine ? { inquiry: { assigneeId: user.id } } : {}),
       },
       include: orderInclude,
-      orderBy: [{ stageSince: "asc" }],
-      take: 300,
+      // Waiting longest first on the board; the latest first for Done.
+      orderBy: [{ stageSince: filter.recent ? "desc" : "asc" }],
+      take: filter.limit ?? 300,
     });
     const days = (await this.settings.get()).reminders;
     const today = this.clock.today();
@@ -510,8 +521,10 @@ export class OrdersService {
 
   /** "My to-do": what each open order I handle needs, late ones first, then by date. */
   async todo(user: SessionUser) {
-    // Closed orders appear only while money is still owed on them.
-    const items = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed" }))].filter(
+    // Closed orders appear only while money is still owed on them: the database picks those, so years
+    // of finished orders are not read on every Home.
+    const due = await ordersWithMoneyDue(this.prisma);
+    const items = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed", ids: due }))].filter(
       (i) => i.needs,
     );
     return items.sort((a, b) => Number(b.needs!.late) - Number(a.needs!.late) || a.needs!.due.localeCompare(b.needs!.due));

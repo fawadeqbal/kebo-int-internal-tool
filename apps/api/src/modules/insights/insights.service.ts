@@ -1,14 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
 import { fromMinor, fxRate, roundHalfAway, settle, type Minor } from "@kebo/money";
-import { can, LOST_REASON_LABEL, planStatus, type InquiryChannel, type LostReason } from "@kebo/shared";
+import { can, LOST_REASON_LABEL, planStatus, type InquiryChannel, type InquiryStage, type LostReason } from "@kebo/shared";
 import { addDays, daysBetween, ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
+import { ReadCache } from "../../common/cache/read-cache";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { CashService } from "../money/cash.service";
 import { MoneyService } from "../money/money.service";
+import { ordersWithMoneyDue } from "../money/due";
 
 const convert = (minor: Minor, rate: number) => roundHalfAway(minor / rate);
 const ymOf = (d: ISODate) => d.slice(0, 7);
@@ -50,6 +52,35 @@ export function previousPeriod(from: ISODate, to: ISODate): { from: ISODate; to:
   const len = daysBetween(from, to) + 1;
   return { from: addDays(from, -len), to: addDays(from, -1) };
 }
+
+/** An order as Insights reads it: flat, with its goods cost in minor units of its currency. */
+type OrderRow = {
+  id: string;
+  currency: string;
+  totalMinor: number;
+  orderedOn: ISODate;
+  shipBy: ISODate | null;
+  shippedOn: ISODate | null;
+  customerId: string;
+  customerName: string;
+  country: string;
+  category: string;
+  channel: string;
+  assigneeId: string | null;
+  costMinor: number;
+};
+/** A deal as Insights reads it, with the day its first quotation went out. */
+type DealRow = {
+  id: string;
+  createdOn: ISODate;
+  closedOn: ISODate | null;
+  stage: InquiryStage;
+  lostReason: string | null;
+  channel: InquiryChannel;
+  category: string;
+  assigneeId: string | null;
+  firstSent: ISODate | null;
+};
 
 type Figures = {
   revenue: number;
@@ -107,14 +138,21 @@ export class InsightsService {
     private readonly clock: Clock,
     private readonly cash: CashService,
     private readonly money: MoneyService,
+    private readonly cache: ReadCache,
   ) {}
 
   private assert(user: SessionUser) {
     if (!can(user, "reports.view")) throw new ForbiddenError("Only managers can see insights.");
   }
 
+  /** The same answer for everyone with the same permissions, shared while nothing changes (ReadCache). */
   async overview(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     this.assert(user);
+    const key = `insights:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}:${[...user.permissions].sort().join(",")}`;
+    return this.cache.get(key, () => this.computeOverview(user, q));
+  }
+
+  private async computeOverview(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     const today = this.clock.today();
     const to = q.to && q.to < today ? q.to : today;
     const from = q.from && q.from <= to ? q.from : `${ymOf(to)}-01`;
@@ -135,118 +173,155 @@ export class InsightsService {
     // The 12 months up to the end of the period (or every month of a longer period), and the same months a year before.
     const seriesMonths = monthsList(ymOf(from) < ymOf(addMonths(to, -11)) ? ymOf(from) : ymOf(addMonths(to, -11)), ymOf(to));
     const loadFrom = [prev.from, `${ymOf(addMonths(`${seriesMonths[0]}-01`, -12))}-01`].sort()[0]!;
-    const span = { gte: toDbDate(loadFrom), lte: toDbDate(to) };
-    const spanTime = { gte: new Date(`${loadFrom}T00:00:00Z`), lt: new Date(`${addDays(to, 1)}T00:00:00Z`) };
 
     const [orders, expenses, payments, factoryPaid, deals, revisions, firstOrders, targets] = await Promise.all([
-      this.prisma.db.order.findMany({
-        where: { status: { not: "cancelled" }, orderedOn: span },
-        select: {
-          id: true,
-          currency: true,
-          total: true,
-          orderedOn: true,
-          shipBy: true,
-          shippedOn: true,
-          customerId: true,
-          customer: { select: { id: true, name: true, country: true } },
-          inquiry: { select: { category: true, channel: true, assigneeId: true } },
-          lines: {
-            select: {
-              unitCost: true,
-              quantity: true,
-              lineTotal: true,
-              quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } } } },
-            },
-          },
-        },
-      }),
-      seeMoney ? this.prisma.db.expense.findMany({ where: { voidedAt: null, spentOn: span }, select: { amount: true, rate: true, spentOn: true } }) : Promise.resolve([]),
-      this.prisma.db.payment.findMany({ where: { voidedAt: null, paidOn: span }, select: { amount: true, bankCharges: true, currency: true, paidOn: true } }),
+      // Flat rows from the database, with each order's goods cost added up there (the same rounding
+      // as costDocLines: each line's unit cost × quantity, half away from zero): years of orders stay quick.
+      this.prisma.db.$queryRaw<OrderRow[]>`
+        select o.id, o.currency, (o.total * 100)::float8 as "totalMinor", to_char(o.ordered_on, 'YYYY-MM-DD') as "orderedOn", to_char(o.ship_by, 'YYYY-MM-DD') as "shipBy", to_char(o.shipped_on, 'YYYY-MM-DD') as "shippedOn",
+               o.customer_id as "customerId", c.name as "customerName", c.country, i.category, i.channel::text as channel, i.assignee_id as "assigneeId",
+               coalesce(sum(sign(x.c) * floor(abs(x.c) + 0.5)), 0)::float8 as "costMinor"
+        from orders o
+        join customers c on c.id = o.customer_id
+        join inquiries i on i.id = o.inquiry_id
+        left join order_lines ol on ol.order_id = o.id and ol.unit_cost is not null
+        left join lateral (select (ol.unit_cost * 100)::float8 * ol.quantity::float8 as c) x on true
+        where o.status <> 'cancelled' and o.ordered_on between ${loadFrom}::date and ${to}::date
+        group by o.id, c.id, i.id`,
+      // Amounts in minor units and days as text straight from the database (no Decimal or Date objects to build).
       seeMoney
-        ? this.prisma.db.factoryPayment.findMany({ where: { voidedAt: null, paidOn: span }, select: { amount: true, rate: true, paidOn: true, order: { select: { currency: true } } } })
+        ? this.prisma.db.$queryRaw<{ on: ISODate; minor: number; rate: number }[]>`
+            select to_char(spent_on, 'YYYY-MM-DD') as "on", (amount * 100)::float8 as minor, rate::float8 as rate
+            from expenses where voided_at is null and spent_on between ${loadFrom}::date and ${to}::date`
         : Promise.resolve([]),
-      this.prisma.db.inquiry.findMany({
-        where: { deletedAt: null, OR: [{ createdAt: spanTime }, { closedAt: spanTime }] },
-        select: {
-          id: true,
-          createdAt: true,
-          closedAt: true,
-          stage: true,
-          lostReason: true,
-          channel: true,
-          category: true,
-          assigneeId: true,
-          quotation: { select: { revisions: { where: { deletedAt: null, sentOn: { not: null } }, orderBy: { sentOn: "asc" }, take: 1, select: { sentOn: true } } } },
-        },
-      }),
-      this.prisma.db.quotationRevision.findMany({
-        where: { deletedAt: null, sentOn: span, status: { notIn: ["draft"] } },
-        select: { sentOn: true, total: true, currency: true },
-      }),
+      this.prisma.db.$queryRaw<{ on: ISODate; minor: number; currency: string }[]>`
+        select to_char(paid_on, 'YYYY-MM-DD') as "on", (amount * 100)::float8 as minor, currency
+        from payments where voided_at is null and paid_on between ${loadFrom}::date and ${to}::date`,
+      seeMoney
+        ? this.prisma.db.$queryRaw<{ on: ISODate; minor: number; rate: number; currency: string }[]>`
+            select to_char(fp.paid_on, 'YYYY-MM-DD') as "on", (fp.amount * 100)::float8 as minor, fp.rate::float8 as rate, o.currency
+            from factory_payments fp join orders o on o.id = fp.order_id
+            where fp.voided_at is null and fp.paid_on between ${loadFrom}::date and ${to}::date`
+        : Promise.resolve([]),
+      // Deals received or closed in the span, with the day their first quotation went out.
+      // Timestamps are read and compared in the database's time zone without one (::timestamp, to_char
+      // with no zone): that is how the Prisma adapter writes and reads them, so the days agree with the
+      // rest of the app whatever the server's TimeZone is.
+      this.prisma.db.$queryRaw<DealRow[]>`
+        select i.id, to_char(i.created_at, 'YYYY-MM-DD') as "createdOn", to_char(i.closed_at, 'YYYY-MM-DD') as "closedOn", i.stage::text as stage, i.lost_reason::text as "lostReason",
+               i.channel::text as channel, i.category, i.assignee_id as "assigneeId",
+               (select to_char(min(r.sent_on), 'YYYY-MM-DD') from quotations q join quotation_revisions r on r.quotation_id = q.id
+                 where q.inquiry_id = i.id and r.deleted_at is null and r.sent_on is not null) as "firstSent"
+        from inquiries i
+        where i.deleted_at is null
+          and ((i.created_at >= ${loadFrom}::timestamp and i.created_at < ${addDays(to, 1)}::timestamp)
+            or (i.closed_at >= ${loadFrom}::timestamp and i.closed_at < ${addDays(to, 1)}::timestamp))`,
+      this.prisma.db.$queryRaw<{ on: ISODate; minor: number; currency: string }[]>`
+        select to_char(sent_on, 'YYYY-MM-DD') as "on", (total * 100)::float8 as minor, currency
+        from quotation_revisions where deleted_at is null and status <> 'draft' and sent_on between ${loadFrom}::date and ${to}::date`,
       this.prisma.db.order.groupBy({ by: ["customerId"], where: { status: { not: "cancelled" } }, _min: { orderedOn: true } }),
       this.prisma.db.salesTarget.findMany({ where: { month: { in: seriesMonths } } }),
     ]);
     const firstOrder = new Map(firstOrders.map((f) => [f.customerId, fromDbDate(f._min.orderedOn!)]));
-    const dayOf = (d: Date) => d.toISOString().slice(0, 10);
     const inRange = (d: ISODate, r: { from: ISODate; to: ISODate }) => d >= r.from && d <= r.to;
 
     // Per order, once: value and goods cost in the main currency.
-    const orderMoney = orders.map((o) => {
-      let cost = 0;
-      for (const l of o.lines) if (l.unitCost !== null) cost += roundHalfAway(decimalToMinor(l.unitCost) * Number(l.quantity));
-      return { o, on: fromDbDate(o.orderedOn), revenue: toMain(decimalToMinor(o.total), o.currency), cost: toMain(cost, o.currency) };
-    });
+    const orderMoney = orders.map((o) => ({ o, on: o.orderedOn, revenue: toMain(o.totalMinor, o.currency), cost: toMain(o.costMinor, o.currency) }));
 
+    // Every record once as a dated event that adds to the figures (dates turned into ISO once),
+    // so a period, the one before and each month of the series are cheap to add up.
+    type Event = { on: ISODate; add: (f: Figures) => void };
+    const events: Event[] = [];
+    for (const x of orderMoney) {
+      const first = firstOrder.get(x.o.customerId);
+      events.push({
+        on: x.on,
+        add: (f) => {
+          f.revenue += x.revenue;
+          f.goodsCost += x.cost;
+          f.orders += 1;
+          if (first === x.on) f.newCustomers += 1;
+          if (first && first < x.on) f.repeatOrders += 1;
+        },
+      });
+      const shipped = x.o.shippedOn;
+      const by = x.o.shipBy;
+      if (shipped && by)
+        events.push({
+          on: shipped,
+          add: (f) => {
+            f.shippedWithDate += 1;
+            if (shipped <= by) f.shippedOnTime += 1;
+          },
+        });
+    }
+    for (const e of expenses) {
+      const v = convert(e.minor, e.rate);
+      events.push({ on: e.on, add: (f) => (f.expenses += v) });
+    }
+    for (const p of payments) {
+      const v = toMain(p.minor, p.currency);
+      events.push({ on: p.on, add: (f) => (f.cashIn += v) });
+    }
+    for (const p of factoryPaid) {
+      const v = toMain(convert(p.minor, p.rate), p.currency);
+      events.push({ on: p.on, add: (f) => (f.cashOut += v) });
+    }
+    for (const d of deals) {
+      const created = d.createdOn;
+      events.push({ on: created, add: (f) => (f.received += 1) });
+      const closed = d.closedOn;
+      if (closed && d.stage === "won") {
+        const days = daysBetween(created, closed);
+        events.push({
+          on: closed,
+          add: (f) => {
+            f.won += 1;
+            f.closeDays.push(days);
+          },
+        });
+      } else if (closed && d.stage === "lost") events.push({ on: closed, add: (f) => (f.lost += 1) });
+      const sent = d.firstSent;
+      if (sent) {
+        const days = daysBetween(created, sent);
+        events.push({ on: sent, add: (f) => f.quoteDays.push(days) });
+      }
+    }
+    for (const q of revisions) {
+      const v = toMain(q.minor, q.currency);
+      events.push({
+        on: q.on,
+        add: (f) => {
+          f.quotesSent += 1;
+          f.quotesValue += v;
+        },
+      });
+    }
+    /** Money out includes the expenses. */
+    const done = (f: Figures) => ((f.cashOut += f.expenses), f);
     const figuresFor = (r: { from: ISODate; to: ISODate }): Figures => {
       const f = empty();
-      for (const x of orderMoney) {
-        if (!inRange(x.on, r)) continue;
-        f.revenue += x.revenue;
-        f.goodsCost += x.cost;
-        f.orders += 1;
-        const first = firstOrder.get(x.o.customerId);
-        if (first && inRange(first, r) && first === x.on) f.newCustomers += 1;
-        if (first && first < x.on) f.repeatOrders += 1;
-      }
-      for (const o of orders) {
-        const shipped = fromDbDateOrNull(o.shippedOn);
-        const by = fromDbDateOrNull(o.shipBy);
-        if (shipped && by && inRange(shipped, r)) {
-          f.shippedWithDate += 1;
-          if (shipped <= by) f.shippedOnTime += 1;
-        }
-      }
-      for (const e of expenses) if (inRange(fromDbDate(e.spentOn), r)) f.expenses += convert(decimalToMinor(e.amount), Number(e.rate));
-      for (const p of payments) if (inRange(fromDbDate(p.paidOn), r)) f.cashIn += toMain(decimalToMinor(p.amount), p.currency);
-      for (const p of factoryPaid) if (inRange(fromDbDate(p.paidOn), r)) f.cashOut += toMain(convert(decimalToMinor(p.amount), Number(p.rate)), p.order.currency);
-      f.cashOut += f.expenses;
-      for (const d of deals) {
-        const created = dayOf(d.createdAt);
-        if (inRange(created, r)) f.received += 1;
-        const closed = d.closedAt ? dayOf(d.closedAt) : null;
-        if (closed && inRange(closed, r)) {
-          if (d.stage === "won") {
-            f.won += 1;
-            f.closeDays.push(daysBetween(created, closed));
-          } else if (d.stage === "lost") f.lost += 1;
-        }
-        const sent = d.quotation?.revisions[0]?.sentOn;
-        if (sent && inRange(fromDbDate(sent), r)) f.quoteDays.push(daysBetween(created, fromDbDate(sent)));
-      }
-      for (const q of revisions) {
-        if (!q.sentOn || !inRange(fromDbDate(q.sentOn), r)) continue;
-        f.quotesSent += 1;
-        f.quotesValue += toMain(decimalToMinor(q.total), q.currency);
-      }
-      return f;
+      for (const e of events) if (inRange(e.on, r)) e.add(f);
+      return done(f);
     };
+    // Month by month in one pass (the series and the same months a year before).
+    const byMonth = new Map<string, Figures>();
+    for (const e of events) {
+      // A deal received in the period can close after it: the series stops at the period's end.
+      if (e.on > to) continue;
+      const m = e.on.slice(0, 7);
+      let f = byMonth.get(m);
+      if (!f) byMonth.set(m, (f = empty()));
+      e.add(f);
+    }
+    for (const f of byMonth.values()) done(f);
+    const monthFigures = (m: string) => byMonth.get(m) ?? empty();
     const cur = figuresFor({ from, to });
     const before = figuresFor(prev);
 
     /* ----- right now: cash, what customers owe (by age), what we owe factories, the pipeline */
     const openOrders = await this.prisma.db.order.findMany({
-      where: { status: { in: ["open", "closed"] } },
+      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma) } },
       select: {
         currency: true,
         total: true,
@@ -304,9 +379,9 @@ export class InsightsService {
 
     /* ----- month by month */
     const series = seriesMonths.map((m) => {
-      const r = { from: `${m}-01`, to: lastDayOf(m) < to ? lastDayOf(m) : to };
-      const f = figuresFor(r);
-      const ly = figuresFor({ from: addMonths(`${m}-01`, -12), to: lastDayOf(ymOf(addMonths(`${m}-01`, -12))) });
+      // Nothing after `to` is loaded, so the month so far is the month's bucket.
+      const f = monthFigures(m);
+      const ly = monthFigures(ymOf(addMonths(`${m}-01`, -12)));
       const target = targets.find((t) => t.month === m);
       return {
         month: m,
@@ -339,8 +414,8 @@ export class InsightsService {
       }
       return [...m.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
     };
-    const customerNames = new Map(inCur.map((x) => [x.o.customer.id, x.o.customer]));
-    const topCustomers = group((x) => x.o.customer.id)
+    const customerNames = new Map(inCur.map((x) => [x.o.customerId, { id: x.o.customerId, name: x.o.customerName, country: x.o.country }]));
+    const topCustomers = group((x) => x.o.customerId)
       .slice(0, 10)
       .map(([id, g]) => ({
         customer: customerNames.get(id)!,
@@ -352,16 +427,16 @@ export class InsightsService {
           return !!f && inRange(f, { from, to });
         })(),
       }));
-    const categories = group((x) => x.o.inquiry.category)
+    const categories = group((x) => x.o.category)
       .slice(0, 10)
       .map(([category, g]) => ({ category, revenue: fromMinor(g.revenue), grossProfit: fromMinor(g.revenue - g.cost), orders: g.orders }));
-    const countries = group((x) => x.o.customer.country).map(([country, g]) => ({ country, revenue: fromMinor(g.revenue), orders: g.orders, customers: g.customers.size }));
+    const countries = group((x) => x.o.country).map(([country, g]) => ({ country, revenue: fromMinor(g.revenue), orders: g.orders, customers: g.customers.size }));
 
-    const dealsCur = deals.filter((d) => inRange(dayOf(d.createdAt), { from, to }));
-    const closedCur = deals.filter((d) => d.closedAt && inRange(dayOf(d.closedAt), { from, to }));
+    const dealsCur = deals.filter((d) => inRange(d.createdOn, { from, to }));
+    const closedCur = deals.filter((d) => d.closedOn && inRange(d.closedOn, { from, to }));
     const funnel = {
       received: dealsCur.length,
-      quoted: dealsCur.filter((d) => d.quotation?.revisions.length).length,
+      quoted: dealsCur.filter((d) => d.firstSent).length,
       won: dealsCur.filter((d) => d.stage === "won").length,
     };
     const channels = new Map<InquiryChannel, { received: number; won: number }>();
@@ -385,25 +460,36 @@ export class InsightsService {
     for (const d of dealsCur) {
       const p = person(d.assigneeId);
       p.received += 1;
-      const sent = d.quotation?.revisions[0]?.sentOn;
-      if (sent) p.quoteDays.push(daysBetween(dayOf(d.createdAt), fromDbDate(sent)));
+      const sent = d.firstSent;
+      if (sent) p.quoteDays.push(daysBetween(d.createdOn, sent));
     }
     for (const d of closedCur) {
       if (d.stage === "won") person(d.assigneeId).won += 1;
       else if (d.stage === "lost") person(d.assigneeId).lost += 1;
     }
-    for (const x of inCur) person(x.o.inquiry.assigneeId).revenue += x.revenue;
+    for (const x of inCur) person(x.o.assigneeId).revenue += x.revenue;
 
+    // Who we buy from: the goods cost of the period's orders by factory (only those orders' lines are read).
     const factories = new Map<string, { factory: { id: string; name: string }; spend: number; orders: Set<string> }>();
-    for (const x of inCur)
-      for (const l of x.o.lines) {
-        const f = l.quoteLine?.factoryQuoteLine?.factoryQuote.factory;
-        if (!f || l.unitCost === null) continue;
-        const g = factories.get(f.id) ?? { factory: f, spend: 0, orders: new Set<string>() };
-        g.spend += toMain(roundHalfAway(decimalToMinor(l.unitCost) * Number(l.quantity)), x.o.currency);
-        g.orders.add(x.o.id);
-        factories.set(f.id, g);
-      }
+    const curCurrency = new Map(inCur.map((x) => [x.o.id, x.o.currency]));
+    const spendRows = curCurrency.size
+      ? await this.prisma.db.$queryRaw<{ orderId: string; id: string; name: string; costMinor: number }[]>`
+          select ol.order_id as "orderId", f.id, f.name, sum(sign(x.c) * floor(abs(x.c) + 0.5))::float8 as "costMinor"
+          from order_lines ol
+          join quote_lines ql on ql.id = ol.quote_line_id
+          join factory_quote_lines fql on fql.id = ql.factory_quote_line_id
+          join factory_quotes fq on fq.id = fql.factory_quote_id
+          join factories f on f.id = fq.factory_id
+          cross join lateral (select (ol.unit_cost * 100)::float8 * ol.quantity::float8 as c) x
+          where ol.unit_cost is not null and ol.order_id = any(${[...curCurrency.keys()]}::uuid[])
+          group by 1, 2, 3`
+      : [];
+    for (const r of spendRows) {
+      const g = factories.get(r.id) ?? { factory: { id: r.id, name: r.name }, spend: 0, orders: new Set<string>() };
+      g.spend += toMain(Number(r.costMinor), curCurrency.get(r.orderId)!);
+      g.orders.add(r.orderId);
+      factories.set(r.id, g);
+    }
 
     const monthTarget = targets.find((t) => t.month === ymOf(today));
     const monthRevenue = figuresFor({ from: `${ymOf(today)}-01`, to: today }).revenue;
@@ -482,7 +568,7 @@ export class InsightsService {
         .sort((a, b) => Number(b.revenue) - Number(a.revenue) || b.received - a.received),
       factories: [...factories.values()]
         .map((f) => ({ factory: f.factory, spend: fromMinor(f.spend), orders: f.orders.size }))
-        .sort((a, b) => Number(b.spend) - Number(a.spend))
+        .sort((a, b) => Number(b.spend) - Number(a.spend) || a.factory.name.localeCompare(b.factory.name))
         .slice(0, 10),
       missingRates: [...missing],
     };
@@ -519,7 +605,7 @@ export class InsightsService {
     if (!can(user, "payments.record") && !can(user, "expenses.manage")) throw new ForbiddenError("You do not record money.");
     const today = this.clock.today();
     const orders = await this.prisma.db.order.findMany({
-      where: { status: { in: ["open", "closed"] } },
+      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma) } },
       select: {
         id: true,
         refNo: true,

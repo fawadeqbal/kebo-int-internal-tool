@@ -128,7 +128,11 @@ export interface ExpenseList {
   byCategory: { category: ExpenseCategory; total: string; count: number }[];
   /** Ignores the customer filter. */
   byCustomer: { customer: { id: string; name: string }; total: string; count: number; orders: number }[];
+  /** One page of the list; `listed` is how many rows it has in all. */
   rows: ExpenseView[];
+  page: number;
+  pageSize: number;
+  listed: number;
 }
 
 /** GET /money/payables */

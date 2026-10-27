@@ -44,7 +44,7 @@ export function Sparkline({ values, tone = "primary" }: { values: number[]; tone
   return (
     <div className="h-10 w-full" aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }} accessibilityLayer={false}>
           <defs>
             <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={colour} stopOpacity={0.25} />

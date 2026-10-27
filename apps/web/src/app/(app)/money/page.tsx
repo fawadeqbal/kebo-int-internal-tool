@@ -29,6 +29,8 @@ import {
   Th,
   THead,
   Tr,
+  Pagination,
+  toPage,
 } from "@kebo/ui";
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -60,6 +62,7 @@ type Search = {
   mine?: string;
   acct?: string;
   cur?: string;
+  page?: string;
 };
 
 /**
@@ -132,7 +135,7 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
   const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.category ?? "") ? (sp.category as ExpenseCategory) : undefined;
 
   const [list, people, choices, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { from, to, kind, customerId: customer, category }),
+    api.get<ExpenseList>("/expenses", { from, to, kind, customerId: customer, category, page: String(toPage(sp.page)), pageSize: "50" }),
     api.get<Person[]>("/users/people"),
     api.get<ExpenseChoices>("/expenses/targets"),
     api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
@@ -296,6 +299,9 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
               <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} choices={choices} />
             ))}
           </ul>
+        )}
+        {list.listed > list.pageSize && (
+          <Pagination base="/money" params={{ tab: "expenses", p: sp.p, month: sp.month, kind, customer, category }} page={list.page} pageSize={list.pageSize} total={list.listed} />
         )}
       </Card>
     </div>

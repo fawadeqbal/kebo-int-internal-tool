@@ -31,6 +31,9 @@ const listQuery = z.object({
   late: flag,
   status: z.enum(["open", "closed", "cancelled"]).optional(),
   stage: z.enum(ORDER_STAGES).optional(),
+  /** The most recently moved first (the board's Done column), and at most this many. */
+  recent: flag,
+  limit: z.coerce.number().int().min(1).max(300).optional(),
 });
 
 @ApiTags("orders")
@@ -45,7 +48,13 @@ export class OrdersController {
   /** Orders with their stage, money due and what each needs now. ?status=open|closed|cancelled&stage=&mine=true&late=true */
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
-    return this.orders.list(user, { mine: q.mine, status: q.status, stage: q.stage, lateOnly: q.late });
+    return this.orders.list(user, { mine: q.mine, status: q.status, stage: q.stage, lateOnly: q.late, recent: q.recent, limit: q.limit });
+  }
+
+  /** How many orders: ?status=open|closed|cancelled&mine=true → { count }. */
+  @Get("count")
+  count(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
+    return this.orders.count(user, { mine: q.mine, status: q.status });
   }
 
   /** The order: stage, the next button, money, what it needs, history, documents. */

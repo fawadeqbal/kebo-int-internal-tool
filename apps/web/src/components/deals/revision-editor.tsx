@@ -427,7 +427,8 @@ export function RevisionEditor({
                 )}
               </div>
 
-              <div role="tablist" aria-label="Options" className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div role="tablist" aria-label="Options" className="contents">
                 {s.options.map((o, i) => {
                   const t = totalsOf(o);
                   return (
@@ -447,6 +448,7 @@ export function RevisionEditor({
                     </button>
                   );
                 })}
+                </div>
                 {addable.length > 0 && (
                   <Button size="sm" variant="ghost" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
                     <Plus aria-hidden /> Add an option

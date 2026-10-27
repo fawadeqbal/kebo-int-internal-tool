@@ -19,6 +19,7 @@ import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { checkAccount } from "./account-check";
+import { ordersOwingFactories } from "./due";
 import { fileView } from "./payment-file-view";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
@@ -505,8 +506,10 @@ export class MoneyService {
   /** What we still owe each factory across all orders that are not cancelled (people who see costs). */
   async payables(user: SessionUser, mine: boolean) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+    // Only orders where a factory may still be owed (worked out in the database), not every order ever.
+    const owing = await ordersOwingFactories(this.prisma);
     const orders = await this.prisma.db.order.findMany({
-      where: { status: { not: "cancelled" } },
+      where: { status: { not: "cancelled" }, id: { in: owing } },
       select: {
         id: true,
         refNo: true,
@@ -599,10 +602,17 @@ export class MoneyService {
       customerId?: string;
       category?: string;
       kind?: "order" | "customer" | "general";
+      /** The list comes a page at a time; the totals are always for the whole period. */
+      page?: number;
+      pageSize?: number;
     },
   ) {
     this.assertExpenses(user);
     const { sales } = await this.settings.get();
+    const page = q.page ?? 1;
+    const pageSize = q.pageSize ?? 100;
+    const orderBy: Prisma.ExpenseOrderByWithRelationInput[] = [{ spentOn: "desc" }, { createdAt: "desc" }];
+    // Light rows for the totals (every expense of the period), full ones only for the page shown.
     const rows = await this.prisma.db.expense.findMany({
       where: {
         ...(q.inquiryId ? { inquiryId: q.inquiryId } : {}),
@@ -618,16 +628,16 @@ export class MoneyService {
                 : {}),
         ...(q.from || q.to ? { spentOn: { ...(q.from ? { gte: toDbDate(q.from) } : {}), ...(q.to ? { lte: toDbDate(q.to) } : {}) } } : {}),
       },
-      include: expenseInclude,
-      orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
-      take: 5000,
+      select: { id: true, amount: true, rate: true, category: true, customerId: true, orderId: true, voidedAt: true, customer: { select: { id: true, name: true } } },
+      orderBy,
     });
-    const inMain = (e: ExpenseRow) => convert(decimalToMinor(e.amount), Number(e.rate));
+    type Light = (typeof rows)[number];
+    const inMain = (e: Light) => convert(decimalToMinor(e.amount), Number(e.rate));
     const live = rows.filter((r) => !r.voidedAt);
     const byCustomerFilter = live.filter((e) => !q.customerId || e.customerId === q.customerId);
     const byCategoryFilter = live.filter((e) => !q.category || e.category === q.category);
     const shown = byCustomerFilter.filter((e) => !q.category || e.category === q.category);
-    const sum = (list: ExpenseRow[]) => list.reduce((t, e) => t + inMain(e), 0);
+    const sum = (list: Light[]) => list.reduce((t, e) => t + inMain(e), 0);
 
     const categories = new Map<string, { total: number; count: number }>();
     for (const e of byCustomerFilter) {
@@ -658,9 +668,13 @@ export class MoneyService {
       byCustomer: [...customers.values()]
         .map((c) => ({ customer: c.customer, total: fromMinor(c.total), count: c.count, orders: c.orders.size }))
         .sort((a, b) => Number(b.total) - Number(a.total)),
-      rows: rows
-        .filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category))
-        .map((e) => this.expenseView(e)),
+      ...(await (async () => {
+        const listed = rows.filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category));
+        const ids = listed.slice((page - 1) * pageSize, page * pageSize).map((e) => e.id);
+        const full = ids.length ? await this.prisma.db.expense.findMany({ where: { id: { in: ids } }, include: expenseInclude, orderBy }) : [];
+        /** `listed`: how many rows the list has (removed ones included), for the page links. */
+        return { page, pageSize, listed: listed.length, rows: full.map((e) => this.expenseView(e)) };
+      })()),
     };
   }
 
