@@ -3,6 +3,7 @@ import { can } from "@kebo/shared";
 import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
+import { demoMode } from "@/lib/demo";
 import { AppShell, type NavGroup, type NavItem } from "@/components/shell/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
@@ -15,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const accounts = has("payments.record") || has("expenses.manage") ? await api.get<AccountOption[]>("/money/accounts").catch(() => []) : [];
 
   const work: NavItem[] = [
-    { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+    { href: "/dashboard", label: "Home", icon: "dashboard" },
     { href: "/deals", label: "Deals", icon: "deals" },
     { href: "/orders", label: "Orders", icon: "orders" },
     { href: "/customers", label: "Customers", icon: "customers" },
@@ -24,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const trade: NavItem[] = [
     ...(has("sourcing.manage") ? [{ href: "/factories", label: "Factories", icon: "factories" } as NavItem] : []),
     ...(has("sourcing.manage") ? [{ href: "/money", label: "Money", icon: "money" } as NavItem] : []),
-    ...(has("reports.view") ? [{ href: "/reports", label: "Reports", icon: "reports" } as NavItem] : []),
+    ...(has("reports.view") ? [{ href: "/insights", label: "Insights", icon: "reports" } as NavItem] : []),
   ];
   const admin: NavItem[] = [
     ...(has("users.manage") ? [{ href: "/users", label: "Users", icon: "users" } as NavItem] : []),
@@ -37,6 +38,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <AppShell groups={groups} companyName={settings.company.name} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
+        {demoMode() && (
+          <p className="no-print mb-4 rounded-xl border border-info/30 bg-info-soft px-3 py-2 text-sm text-info">
+            <strong className="font-semibold">Demo</strong> · everything here is sample data. Look around and change anything; it is reset regularly.
+          </p>
+        )}
         <AccountsProvider accounts={accounts}>{children}</AccountsProvider>
       </AppShell>
       <Suspense>

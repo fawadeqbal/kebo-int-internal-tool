@@ -99,6 +99,7 @@ services:
     restart: unless-stopped
     environment:
       API_URL: http://api:4000/api
+      DEMO_MODE: ${DEMO_MODE:-}
       APP_URL: ${APP_URL}
       APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Shanghai}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
