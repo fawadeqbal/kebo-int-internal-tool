@@ -108,7 +108,7 @@ export default async function QuotationPage({
                 {q.quotation?.refNo} R{draft.number} <RevisionBadge status="draft" />
               </span>
             }
-            description="Only drafts can change. When it is right, mark it as sent: from then on it is frozen."
+            description="A draft: only you see it, and it can still change. Check it, then mark it as sent: from then on it is frozen."
             actions={
               !manage ? (
                 <>
@@ -131,6 +131,7 @@ export default async function QuotationPage({
                 offers={offers}
                 loadOffers={loadOffers}
                 showCosts={showCosts}
+                summary={<RevisionSummary r={draft} />}
                 saveAction={updateRevisionAction.bind(null, d.id, draft.id)}
                 deleteAction={deleteRevisionAction.bind(null, d.id, draft.id)}
                 moveAction={move(draft)}
