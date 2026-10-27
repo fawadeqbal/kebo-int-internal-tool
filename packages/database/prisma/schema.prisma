@@ -222,6 +222,8 @@ model User {
   factoryPaid   FactoryPayment[]   @relation("FactoryPaymentPaidBy")
   expensesPaid  Expense[]          @relation("ExpensePaidBy")
 
+  reminderStates ReminderState[]
+
   @@map("users")
 }
 
@@ -1068,4 +1070,38 @@ model MoneyTransfer {
   @@index([toAccountId])
   @@index([transferredOn])
   @@map("money_transfers")
+}
+
+// ============================================================================
+// Insights: monthly sales targets, and each person's reminders done or snoozed
+// ============================================================================
+
+/**
+ * What the company aims to sell in a month (orders won), in the main currency then.
+ */
+model SalesTarget {
+  /// YYYY-MM
+  month       String   @id @db.Char(7)
+  amount      Decimal  @db.Decimal(14, 2)
+  currency    String   @db.Char(3)
+  updatedById String?  @map("updated_by") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("sales_targets")
+}
+
+/**
+ * A reminder a person marked done or put off. Reminders themselves are worked out from the data each time.
+ */
+model ReminderState {
+  userId       String    @map("user_id") @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// What it is about, e.g. "pay:<instalment id>" or "quote-expiring:<revision id>".
+  key          String    @db.VarChar(120)
+  snoozedUntil DateTime? @map("snoozed_until") @db.Date
+  doneAt       DateTime? @map("done_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@id([userId, key])
+  @@map("reminder_states")
 }
