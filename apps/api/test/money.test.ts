@@ -157,6 +157,10 @@ describe("money", () => {
   it("records what we pay the factory: paid by the person who looks after it, at the Settings rate", async () => {
     const pay = { factoryId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: today, reference: "FP-1" };
     await api(app, sana).post(`/orders/${orderId}/factory-payments`, pay).expect(403);
+    // We owe the factory in CNY: a payment in USD would not count against it, so it is refused.
+    expect((await api(app, manager).post(`/orders/${orderId}/factory-payments`, { ...pay, currency: "USD", amount: 477 }).expect(400)).body.error).toMatch(
+      /^We owe .+ in CNY\. Record the payment in CNY: a payment in USD would not count against what we owe\./,
+    );
     const m = (await api(app, manager).post(`/orders/${orderId}/factory-payments`, pay).expect(201)).body;
     expect(m.factories.rows[0]).toMatchObject({ paid: "3390.00", toPay: "7910.00" });
     const p = m.factories.payments[0];
@@ -170,6 +174,9 @@ describe("money", () => {
           .expect(409)
       ).body.code,
     ).toBe("reason_needed");
+    await api(app, manager)
+      .patch(`/factory-payments/${p.id}`, { ...pay, currency: "USD", amount: 479, reason: "Wrong currency" })
+      .expect(400);
     await api(app, manager)
       .patch(`/factory-payments/${p.id}`, { ...pay, amount: 3400, reason: "Wrong amount" })
       .expect(200);

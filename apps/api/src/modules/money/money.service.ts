@@ -321,10 +321,30 @@ export class MoneyService {
 
   /* ---------------------------------------------------------------- factory payments */
 
-  private async factoryPaymentData(o: { currency: string }, input: FactoryPaymentInput) {
+  /**
+   * The currencies we owe a factory in on this order (its offers' currencies).
+   * A payment only counts against what we owe in the same currency, so a
+   * payment in another one would leave the debt standing: refused.
+   */
+  private async checkFactoryCurrency(orderId: string, factory: { id: string; name: string }, currency: string, keep?: string) {
+    if (keep && keep === currency) return;
+    const lines = await this.prisma.db.orderLine.findMany({
+      where: { orderId, quoteLine: { factoryQuoteLine: { factoryQuote: { factoryId: factory.id } } } },
+      select: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { currency: true } } } } } } },
+    });
+    const owedIn = [...new Set(lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote.currency).filter((c): c is string => !!c))];
+    if (owedIn.length && !owedIn.includes(currency)) {
+      throw new DomainError(
+        `We owe ${factory.name} in ${owedIn.join(" and ")}. Record the payment in ${owedIn[0]}: a payment in ${currency} would not count against what we owe. If you sent ${currency}, enter the ${owedIn[0]} amount the factory received.`,
+      );
+    }
+  }
+
+  private async factoryPaymentData(o: { id: string; currency: string }, input: FactoryPaymentInput, keepCurrency?: string) {
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
     const f = await this.prisma.db.factory.findFirst({ where: { id: input.factoryId, deletedAt: null } });
     if (!f) throw new DomainError("That factory was removed. Choose another one.");
+    await this.checkFactoryCurrency(o.id, f, input.currency, keepCurrency);
     return {
       factoryId: f.id,
       kind: input.kind,
@@ -372,7 +392,8 @@ export class MoneyService {
   async editFactoryPayment(user: SessionUser, id: string, input: FactoryPaymentInput) {
     const { p, o } = await this.findFactoryPayment(user, id);
     const reason = requireReason(input.reason, "payment", "a recorded payment changes");
-    const { factoryName, ...data } = await this.factoryPaymentData(o, { ...input, rate: input.rate ?? Number(p.rate) });
+    // A payment already recorded in another currency (before this rule) may keep it.
+    const { factoryName, ...data } = await this.factoryPaymentData(o, { ...input, rate: input.rate ?? Number(p.rate) }, p.factoryId === input.factoryId ? p.currency : undefined);
     await this.prisma.tx(async (tx) => {
       await tx.factoryPayment.update({ where: { id }, data });
       await this.audit.record(tx, {
