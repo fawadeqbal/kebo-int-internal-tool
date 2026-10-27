@@ -2,8 +2,20 @@
 
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CornerDownRight, Lock, Plus, Trash2 } from "lucide-react";
-import { costSummary, documentTotals, formatMinor, fromMinor, marginPercent, priceForMargin, toMinor } from "@kebo/money";
-import { BALANCE_TERMS, BALANCE_TERMS_LABEL, INCOTERMS, optionLetter, type BalanceTerms, type Incoterm } from "@kebo/shared";
+import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
+import {
+  BALANCE_TERMS,
+  BALANCE_TERMS_LABEL,
+  BASIS_STEP_HINT,
+  BASIS_STEP_LABEL,
+  basisGap,
+  basisText,
+  INCOTERMS,
+  optionLetter,
+  type BalanceTerms,
+  type BasisStep,
+  type Incoterm,
+} from "@kebo/shared";
 import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -36,6 +48,14 @@ interface OptionState {
   /** Our price per line, by factory line id (or customer item id). */
   prices: Record<string, string>;
   charges: ChargeState[];
+  /** Costs between the factory's basis and ours, by step (to the port, sea freight…). */
+  costs: Partial<Record<BasisStep, CostState>>;
+}
+
+interface CostState {
+  amount: string;
+  currency: string;
+  note: string;
 }
 
 interface EditorState {
@@ -82,8 +102,43 @@ function fromDraft(d: RevisionDraft): EditorState {
         unitPrice: money2(Number(c.unitPrice)),
         unitCost: c.unitCost === null ? "" : money2(Number(c.unitCost)),
       })),
+      costs: Object.fromEntries((o.costs ?? []).map((c) => [c.step, { amount: money2(Number(c.amount)), currency: c.currency, note: c.note ?? "" }])),
     })),
   };
+}
+
+/** What the option's factory offer pays for vs the basis we sell on (null: no factory offer, or its basis is not said). */
+function gapOf(o: OptionState, offers: QuoteOffers, selling: Incoterm) {
+  if (!o.factoryQuoteId) return null;
+  return basisGap(offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.basis ?? null, selling);
+}
+
+/** The words a step gets when it is shown to the customer as its own line. */
+const STEP_LINE: Record<BasisStep, (place: string) => string> = {
+  to_port: () => "Transport to the port",
+  freight: (place) => `Sea freight${place ? ` to ${place}` : ""}`,
+  insurance: () => "Cargo insurance",
+  delivery: (place) => `Delivery${place ? ` to ${place}` : ""}`,
+  duties: () => "Import duties and taxes",
+};
+const asLineOf = (o: OptionState, step: BasisStep) => o.charges.some((c) => c.description.startsWith(STEP_LINE[step]("")));
+
+/** The costs to reach our basis in the quotation's currency; which are still empty; a currency without a rate. */
+function extraOf(o: OptionState, offers: QuoteOffers, selling: Incoterm, currency: string) {
+  const gap = gapOf(o, offers, selling);
+  const out = { minor: 0, empty: [] as BasisStep[], noRate: null as string | null, needed: gap?.needed ?? [] };
+  for (const step of out.needed) {
+    const c = o.costs[step];
+    const amount = c && valid(c.amount) ? Number(numberText(c.amount)) : 0;
+    if (!(amount > 0)) {
+      if (!asLineOf(o, step)) out.empty.push(step);
+      continue;
+    }
+    const rate = /^[A-Z]{3}$/.test(currency) ? fxRate(c!.currency, currency, offers.mainCurrency, offers.rates) : null;
+    if (rate === null) out.noRate = c!.currency;
+    else out.minor += convertMinor(toMinor(numberText(c!.amount)), rate);
+  }
+  return out;
 }
 
 /** The lines an option offers: the factory's (locked), or the customer's items when there are no factory prices. */
@@ -93,6 +148,10 @@ function linesOf(o: OptionState, offers: QuoteOffers): OfferLine[] | null {
 }
 
 function payload(s: EditorState, offers: QuoteOffers) {
+  const costsOf = (o: OptionState) =>
+    (gapOf(o, offers, s.incoterm)?.needed ?? [])
+      .filter((step) => valid(o.costs[step]?.amount ?? "") && Number(numberText(o.costs[step]!.amount)) > 0)
+      .map((step) => ({ step, amount: numberText(o.costs[step]!.amount), currency: o.costs[step]!.currency.trim().toUpperCase(), note: o.costs[step]!.note }));
   return {
     currency: s.currency.trim().toUpperCase(),
     incoterm: s.incoterm,
@@ -109,14 +168,25 @@ function payload(s: EditorState, offers: QuoteOffers) {
       discount: numberText(o.discount),
       prices: (linesOf(o, offers) ?? []).filter((l) => valid(o.prices[l.id] ?? "")).map((l) => ({ lineId: l.id, unitPrice: numberText(o.prices[l.id]!) })),
       charges: o.charges.map((c) => ({ type: c.type, description: c.description, quantity: numberText(c.quantity), unit: c.unit.trim() || "lot", unitPrice: numberText(c.unitPrice), unitCost: numberText(c.unitCost) || null })),
+      costs: costsOf(o),
     })),
   };
 }
 
-/** Prices for every line that has a cost, at a margin (lines without a cost keep what they have). */
-function priced(lines: OfferLine[], prices: Record<string, string>, margin: number) {
+/**
+ * Prices for every line that has a cost, at a margin, on the landed cost: the
+ * line's cost plus its share of the costs to reach our basis (freight…), so the
+ * prices cover them. Lines without a cost keep what they have.
+ */
+function priced(lines: OfferLine[], prices: Record<string, string>, margin: number, extraMinor = 0) {
   const next = { ...prices };
-  for (const l of lines) if (l.unitCost !== null) next[l.id] = fromMinor(priceForMargin(toMinor(l.unitCost), margin));
+  const landed = landedUnitCosts(
+    lines.map((l) => ({ unitCostMinor: l.unitCost === null ? null : toMinor(l.unitCost), quantity: numberText(l.quantity) || 0 })),
+    extraMinor,
+  );
+  lines.forEach((l, i) => {
+    if (landed[i] !== null) next[l.id] = fromMinor(priceForMargin(landed[i]!, margin));
+  });
   return next;
 }
 
@@ -202,11 +272,13 @@ export function RevisionEditor({
       ...o.charges.map((c) => ({ quantity: numberText(c.quantity) || 0, unitPrice: numberText(c.unitPrice) || 0, cost: valid(c.unitCost) ? numberText(c.unitCost) : null })),
     ];
     const totals = documentTotals(rows, numberText(o.discount) || 0);
+    const extra = extraOf(o, offers, s.incoterm, currency);
     const costing = costSummary(
       rows.map((r) => ({ quantity: r.quantity, unitPriceMinor: toMinor(r.unitPrice), unitCostMinor: r.cost === null || r.cost === undefined ? null : toMinor(r.cost) })),
       totals.discount,
+      extra.minor,
     );
-    return { lines, totals, costing };
+    return { lines, totals, costing, extra };
   };
 
   // What can still be added: offers not used yet, and the customer's items when no option uses them.
@@ -220,7 +292,7 @@ export function RevisionEditor({
     const lines = offer?.lines ?? offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
     setS((st) => ({
       ...st,
-      options: [...st.options, { key: rowKey(), factoryQuoteId, leadTime: offer?.leadTime ?? "", discount: "", prices: priced(lines, {}, marginOk ? marginNumber : offers.defaultMargin), charges: [] }],
+      options: [...st.options, { key: rowKey(), factoryQuoteId, leadTime: offer?.leadTime ?? "", discount: "", prices: priced(lines, {}, marginOk ? marginNumber : offers.defaultMargin), charges: [], costs: {} }],
     }));
     setActive(s.options.length);
     setAdding(false);
@@ -232,7 +304,11 @@ export function RevisionEditor({
     if (next) setOffers(next);
   };
 
-  const { lines, totals, costing } = totalsOf(opt);
+  const { lines, totals, costing, extra } = totalsOf(opt);
+  const landed = landedUnitCosts(
+    lines.map((l) => ({ unitCostMinor: l.unitCost === null ? null : toMinor(l.unitCost), quantity: numberText(l.quantity) || 0 })),
+    extra.minor,
+  );
   const offer = opt.factoryQuoteId ? offers.offers.find((o) => o.factoryQuoteId === opt.factoryQuoteId) : null;
   const coverage = opt.factoryQuoteId ? offer?.coverage : { covered: offers.items.filter((i) => !i.parentId).map((i) => i.no), missing: [] };
   const costed = lines.filter((l) => l.unitCost !== null).length;
@@ -309,7 +385,7 @@ export function RevisionEditor({
                         <span className="text-sm text-muted">%</span>
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => marginOk && setOption(at, (o) => ({ prices: priced(lines, o.prices, marginNumber) }))} disabled={!marginOk || costed === 0}>
+                    <Button size="sm" onClick={() => marginOk && setOption(at, (o) => ({ prices: priced(lines, o.prices, marginNumber, extraOf(o, offers, s.incoterm, currency).minor) }))} disabled={!marginOk || costed === 0}>
                       Price Option {optionLetter(at)} at {marginOk ? marginNumber : "…"}%
                     </Button>
                   </div>
@@ -425,7 +501,7 @@ export function RevisionEditor({
                         <th className="w-10 py-2 font-medium">No.</th>
                         <th className="py-2 font-medium">Description</th>
                         <th className="py-2 text-right font-medium">Qty</th>
-                        {showCosts && <th className="py-2 text-right font-medium">Cost</th>}
+                        {showCosts && <th className="py-2 text-right font-medium">{extra.minor > 0 ? "Landed cost" : "Cost"}</th>}
                         <th className="w-32 py-2 text-right font-medium">Unit price</th>
                         {showCosts && <th className="py-2 text-right font-medium">Margin</th>}
                         <th className="py-2 text-right font-medium">Total</th>
@@ -434,7 +510,9 @@ export function RevisionEditor({
                     <tbody>
                       {lines.map((l, i) => {
                         const price = opt.prices[l.id] ?? "";
-                        const m = showCosts && l.unitCost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), toMinor(l.unitCost)) : null;
+                        // On the landed cost: the factory's cost plus this line's share of the costs to reach our basis.
+                        const cost = landed[i] ?? null;
+                        const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
                         return (
                           <tr key={l.id} className="border-b border-line/70 align-top">
                             <td className="py-2 text-muted tabular">{l.no}</td>
@@ -450,7 +528,16 @@ export function RevisionEditor({
                             <td className="py-2 text-right whitespace-nowrap tabular">
                               {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
                             </td>
-                            {showCosts && <td className="py-2 text-right whitespace-nowrap text-text-2 tabular">{l.unitCost === null ? "—" : fmt(toMinor(l.unitCost))}</td>}
+                            {showCosts && (
+                              <td className="py-2 text-right whitespace-nowrap text-text-2 tabular">
+                                {cost === null ? "—" : fmt(cost)}
+                                {cost !== null && extra.minor > 0 && l.unitCost !== null && (
+                                  <span className="block text-xs text-muted" title={`Factory ${fmt(toMinor(l.unitCost))} + its share of the costs to reach ${s.incoterm}`}>
+                                    factory {fmt(toMinor(l.unitCost))}
+                                  </span>
+                                )}
+                              </td>
+                            )}
                             <td className="py-1.5 pl-2">
                               <Input
                                 aria-label={`Unit price for ${l.no}`}
@@ -474,6 +561,48 @@ export function RevisionEditor({
                   </table>
                 </div>
                 <p className="text-xs text-muted">The factory&apos;s lines cannot change here: change the offer on Factory prices.</p>
+                {showCosts && opt.factoryQuoteId && (
+                  <BasisCosts
+                    letter={optionLetter(at)}
+                    factoryBasis={offer?.basis ?? null}
+                    factoryPlace={offer?.basisPlace ?? null}
+                    selling={s.incoterm}
+                    sellingPlace={s.incotermPlace}
+                    currency={currency}
+                    known={[offers.mainCurrency, ...Object.keys(offers.rates)]}
+                    costs={opt.costs}
+                    extra={extra}
+                    asLine={(step) => asLineOf(opt, step)}
+                    convert={(c) => {
+                      const rate = /^[A-Z]{3}$/.test(currency) && valid(c.amount) ? fxRate(c.currency.trim().toUpperCase(), currency, offers.mainCurrency, offers.rates) : null;
+                      return rate === null ? null : convertMinor(toMinor(numberText(c.amount)), rate);
+                    }}
+                    fmt={fmt}
+                    onChange={(step, patch) =>
+                      setOption(at, (o) => ({
+                        costs: { ...o.costs, [step]: { ...(o.costs[step] ?? { amount: "", currency: currency === "—" ? "USD" : currency, note: "" }), ...patch } },
+                      }))
+                    }
+                    onAsLine={(step, costMinor) =>
+                      setOption(at, (o) => ({
+                        costs: { ...o.costs, [step]: { amount: "", currency: o.costs[step]?.currency ?? currency, note: "" } },
+                        charges: [
+                          ...o.charges,
+                          {
+                            key: rowKey(),
+                            parentKey: null,
+                            type: "charge",
+                            description: STEP_LINE[step](s.incotermPlace.trim()),
+                            quantity: "1",
+                            unit: "lot",
+                            unitCost: fromMinor(costMinor),
+                            unitPrice: fromMinor(priceForMargin(costMinor, marginOk ? marginNumber : offers.defaultMargin)),
+                          },
+                        ],
+                      }))
+                    }
+                  />
+                )}
                 <section aria-label="Charges" className="flex flex-col gap-1.5">
                   <h4 className="text-sm font-medium">
                     Charges <span className="text-xs font-normal text-muted">freight, inspection, insurance… our own price{showCosts ? ", and cost if known" : ""}</span>
@@ -531,7 +660,18 @@ export function RevisionEditor({
                         <dd className="tabular">{fmt(totals.total)}</dd>
                       </div>
                     </dl>
-                    {showCosts && <CostingBox currency={currency} cost={costing.costMinor} sales={costing.salesMinor} profit={costing.profitMinor} margin={costing.marginPercent} uncosted={costing.uncostedLines} />}
+                    {showCosts && (
+                      <CostingBox
+                        currency={currency}
+                        cost={costing.costMinor}
+                        sales={costing.salesMinor}
+                        profit={costing.profitMinor}
+                        margin={costing.marginPercent}
+                        uncosted={costing.uncostedLines}
+                        extra={costing.extraCostMinor}
+                        extraLabel={`incl. costs to reach ${s.incoterm}`}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -601,7 +741,26 @@ export function CoverageBadge({ missing }: { missing: string[] }) {
 }
 
 /** Cost, sales, profit and margin of an option. Internal: never printed. */
-export function CostingBox({ currency, cost, sales, profit, margin, uncosted }: { currency: string; cost: number; sales: number; profit: number; margin: number | null; uncosted: number }) {
+export function CostingBox({
+  currency,
+  cost,
+  sales,
+  profit,
+  margin,
+  uncosted,
+  extra = 0,
+  extraLabel,
+}: {
+  currency: string;
+  cost: number;
+  sales: number;
+  profit: number;
+  margin: number | null;
+  uncosted: number;
+  /** Part of the cost: freight and the like to reach the basis we sell on. */
+  extra?: number;
+  extraLabel?: string;
+}) {
   const fmt = (minor: number) => formatMinor(minor, currency);
   return (
     <div className="rounded-lg border border-dashed border-money/40 bg-money-soft/50 p-3 text-sm">
@@ -613,6 +772,12 @@ export function CostingBox({ currency, cost, sales, profit, margin, uncosted }: 
           <dt className="text-text-2">Cost</dt>
           <dd className="tabular">{fmt(cost)}</dd>
         </div>
+        {extra > 0 && (
+          <div className="flex justify-between pb-0.5 pl-3 text-xs text-muted">
+            <dt>{extraLabel ?? "incl. costs to reach our basis"}</dt>
+            <dd className="tabular">{fmt(extra)}</dd>
+          </div>
+        )}
         <div className="flex justify-between py-0.5">
           <dt className="text-text-2" title="After the discount">
             Sales <span className="text-xs text-muted">after discount</span>
@@ -634,5 +799,159 @@ export function CostingBox({ currency, cost, sales, profit, margin, uncosted }: 
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Between the factory's price basis and the one we sell on: the costs to add
+ * (to the port, sea freight…), each in its own currency, or as a line the
+ * customer sees. Warns when the basis is not said, when a cost is still empty,
+ * and when the factory's price pays for something we do not sell.
+ */
+function BasisCosts({
+  letter,
+  factoryBasis,
+  factoryPlace,
+  selling,
+  sellingPlace,
+  currency,
+  known,
+  costs,
+  extra,
+  asLine,
+  convert,
+  fmt,
+  onChange,
+  onAsLine,
+}: {
+  letter: string;
+  factoryBasis: Incoterm | null;
+  factoryPlace: string | null;
+  selling: Incoterm;
+  sellingPlace: string;
+  currency: string;
+  known: string[];
+  costs: Partial<Record<BasisStep, CostState>>;
+  extra: ReturnType<typeof extraOf>;
+  asLine: (step: BasisStep) => boolean;
+  convert: (c: CostState) => number | null;
+  fmt: (minor: number) => string;
+  onChange: (step: BasisStep, patch: Partial<CostState>) => void;
+  onAsLine: (step: BasisStep, costMinor: number) => void;
+}) {
+  const ours = basisText(selling, sellingPlace.trim() || null);
+  const gap = basisGap(factoryBasis, selling);
+  return (
+    <section aria-label={`Getting it to ${ours}`} className="flex flex-col gap-2 rounded-lg border border-line p-3">
+      <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
+        Getting it to {ours}
+        <span className="text-xs font-normal text-muted">
+          the factory&apos;s price is {factoryBasis ? basisText(factoryBasis, factoryPlace) : "on a basis not said"} · internal
+        </span>
+      </h4>
+      {!gap ? (
+        <p className="flex items-start gap-1.5 rounded-md bg-warn-soft px-3 py-2 text-xs text-text">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+          The offer does not say its price basis (EXW, FOB…), so the costs to reach {selling} cannot be worked out. Set it on Factory prices → Details, or add
+          freight and the like as charges.
+        </p>
+      ) : (
+        <>
+          {gap.extra.length > 0 && (
+            <p className="flex items-start gap-1.5 rounded-md bg-warn-soft px-3 py-2 text-xs text-text">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+              Their {factoryBasis} price already pays for {gap.extra.map((x) => BASIS_STEP_LABEL[x].toLowerCase()).join(" and ")}, which you do not sell on {selling}: ask
+              them for a {selling} price, or you pay for it.
+            </p>
+          )}
+          {gap.needed.length === 0 ? (
+            <p className="flex items-center gap-1.5 text-xs text-ok">
+              <CheckCircle2 className="size-3.5" aria-hidden /> Their price already covers {selling}: nothing to add.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {gap.needed.map((step) => {
+                const c = costs[step] ?? { amount: "", currency: currency === "—" ? "USD" : currency, note: "" };
+                const minor = convert(c);
+                const filled = valid(c.amount) && Number(numberText(c.amount)) > 0;
+                return (
+                  <li key={step} className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_7rem_4.5rem_minmax(0,1fr)_auto] sm:items-center">
+                    <span className="min-w-0">
+                      <span className="block text-sm">{BASIS_STEP_LABEL[step]}</span>
+                      <span className="block text-xs text-muted">{BASIS_STEP_HINT[step]}</span>
+                    </span>
+                    <Input
+                      aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} cost`}
+                      inputMode="decimal"
+                      className="h-8 text-right tabular"
+                      placeholder={asLine(step) ? "as a line" : "0.00"}
+                      value={c.amount}
+                      onChange={(e) => onChange(step, { amount: e.target.value })}
+                    />
+                    <Input
+                      aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} currency`}
+                      className="h-8 uppercase"
+                      maxLength={3}
+                      list="basis-currencies"
+                      value={c.currency}
+                      onChange={(e) => onChange(step, { currency: e.target.value.toUpperCase() })}
+                    />
+                    <Input
+                      aria-label={`Option ${letter}: ${BASIS_STEP_LABEL[step]} note`}
+                      className="h-8"
+                      maxLength={200}
+                      placeholder="Note, e.g. forwarder's quote"
+                      value={c.note}
+                      onChange={(e) => onChange(step, { note: e.target.value })}
+                    />
+                    <span className="flex items-center justify-end gap-2 text-xs whitespace-nowrap">
+                      {filled ? (
+                        minor === null ? (
+                          <span className="text-warn">No rate for {c.currency}</span>
+                        ) : (
+                          <>
+                            {c.currency !== currency && <span className="text-muted tabular">≈ {fmt(minor)}</span>}
+                            <Button size="xs" variant="ghost" onClick={() => onAsLine(step, minor)} title="Show it to the customer as its own line (a charge) instead of inside the prices">
+                              As a line
+                            </Button>
+                          </>
+                        )
+                      ) : asLine(step) ? (
+                        <span className="text-muted">Shown as a line below</span>
+                      ) : (
+                        <span className="text-warn">Not entered yet</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {gap.needed.length > 0 && (
+            <p className="text-xs text-muted">
+              {extra.minor > 0 ? (
+                <>
+                  <span className="font-medium text-text">{fmt(extra.minor)}</span> added to Option {letter}&apos;s cost. &ldquo;Price Option {letter}&rdquo; spreads it
+                  over the lines, so the prices cover it.
+                </>
+              ) : (
+                "Enter what each step costs (a forwarder's quote is fine): it is added to the cost and spread over the prices."
+              )}
+              {extra.noRate && <span className="ml-1 text-warn">There is no exchange rate for {extra.noRate} in Settings.</span>}
+              {gap.needed.some((x) => asLine(x)) && (
+                <span className="mt-1 block text-warn">
+                  A cost shown as its own line is no longer spread into the prices: press &ldquo;Price Option {letter}&rdquo; again if you priced before moving it.
+                </span>
+              )}
+            </p>
+          )}
+          <datalist id="basis-currencies">
+            {known.map((k) => (
+              <option key={k} value={k} />
+            ))}
+          </datalist>
+        </>
+      )}
+    </section>
   );
 }

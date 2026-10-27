@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { multiplyMinor, toMinor, formatMinor } from "@kebo/money";
+import { basisText } from "@kebo/shared";
 import { Alert, Badge, buttonClass, Card, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -41,7 +42,10 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
   ]);
   const canEdit = d.allowed.source;
   // Only an offer that covers everything and has a price on every line can be "cheapest".
-  const cheapest = Math.min(...s.quotes.filter((q) => q.totalCost !== null && !q.coverage.missing.length && !q.unpriced && q.lines.length).map((q) => Number(q.totalCost)));
+  // Offers on different price bases (EXW vs CFR) cannot be compared on cost alone.
+  const bases = [...new Set(s.quotes.filter((q) => q.lines.length).map((q) => q.basis ?? "?"))];
+  const mixedBases = bases.length > 1;
+  const cheapest = mixedBases ? NaN : Math.min(...s.quotes.filter((q) => q.totalCost !== null && !q.coverage.missing.length && !q.unpriced && q.lines.length).map((q) => Number(q.totalCost)));
 
   return (
     <div className="flex flex-col gap-5">
@@ -63,7 +67,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
         <Card>
           <CardHeader
             title="Compare offers"
-            description={`What each whole offer costs us in ${s.currency} (factory prices plus tax) and which of the customer's items it covers. Each offer can go to the customer as an option.`}
+            description={`What each whole offer costs us in ${s.currency} (factory prices plus tax, on each factory's own price basis) and which of the customer's items it covers. Freight and the like to reach your basis are added in the quotation.`}
             actions={
               <Link href={`/deals/${d.id}/quotation`} className={buttonClass("primary", "sm")}>
                 Go to the quotation
@@ -75,6 +79,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
               <tr>
                 <Th>Factory</Th>
                 {s.items.length > 0 && <Th>Covers</Th>}
+                <Th>Price basis</Th>
                 <Th className="text-right">Lines</Th>
                 <Th className="text-right">Cost to us</Th>
                 <Th>Lead time</Th>
@@ -104,6 +109,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                         <CoverageBadge missing={q.coverage.missing} />
                       </Td>
                     )}
+                    <Td className="text-sm whitespace-nowrap">{q.basis ? basisText(q.basis, q.basisPlace) : <span className="text-xs text-warn">Not said</span>}</Td>
                     <Td className="text-right tabular">{q.lines.length}</Td>
                     <Td className="text-right font-medium whitespace-nowrap tabular">{q.totalCost === null ? <span className="text-xs font-normal text-warn">No exchange rate</span> : money(q.totalCost, s.currency)}</Td>
                     <Td className="text-sm">{q.leadTime ?? <span className="text-muted">—</span>}</Td>
@@ -112,6 +118,12 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
                 ))}
             </tbody>
           </Table>
+          {mixedBases && (
+            <p className="border-t border-line px-4 py-2.5 text-xs text-warn">
+              These offers are on different price bases ({bases.map((b) => (b === "?" ? "not said" : b)).join(", ")}), so their costs are not like for like: the
+              quotation adds freight and the like to each before comparing margins.
+            </p>
+          )}
         </Card>
       )}
 

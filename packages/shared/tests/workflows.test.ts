@@ -288,3 +288,19 @@ describe("proforma numbers", () => {
     expect(customerLetters("北京")).toBe("XX");
   });
 });
+
+describe("price basis", () => {
+  it("says which costs to add between the factory's basis and ours", async () => {
+    const { basisGap, basisText } = await import("../src");
+    expect(basisGap("EXW", "FOB")).toEqual({ needed: ["to_port"], extra: [] });
+    expect(basisGap("EXW", "CFR")).toEqual({ needed: ["to_port", "freight"], extra: [] });
+    expect(basisGap("FOB", "CIF")).toEqual({ needed: ["freight", "insurance"], extra: [] });
+    expect(basisGap("FOB", "DDP")).toEqual({ needed: ["freight", "delivery", "duties"], extra: [] });
+    expect(basisGap("FOB", "FOB")).toEqual({ needed: [], extra: [] });
+    // The factory quoted CFR but we sell FOB: their price pays for freight we do not sell.
+    expect(basisGap("CFR", "FOB")).toEqual({ needed: [], extra: ["freight"] });
+    expect(basisGap(null, "FOB")).toBeNull();
+    expect(basisText("EXW", "Zhangjiagang")).toBe("EXW Zhangjiagang");
+    expect(basisText(null, "Delivered to our warehouse")).toBe("Delivered to our warehouse");
+  });
+});

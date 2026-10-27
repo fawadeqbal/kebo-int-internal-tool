@@ -280,3 +280,15 @@ describe("settings", () => {
     expect(problems[0]).toMatch(/^notifications/);
   });
 });
+
+describe("price basis from the old text", () => {
+  it("reads the Incoterm and keeps the rest as the place", async () => {
+    const { basisFromText } = await import("../scripts/import-legacy/map");
+    expect(basisFromText("EXW factory")).toEqual({ basis: "EXW", place: "factory" });
+    expect(basisFromText("fob Qingdao")).toEqual({ basis: "FOB", place: "Qingdao" });
+    expect(basisFromText("CFR")).toEqual({ basis: "CFR", place: null });
+    expect(basisFromText("C&F Mombasa")).toEqual({ basis: "CFR", place: "Mombasa" });
+    expect(basisFromText("Delivered to our warehouse")).toEqual({ basis: null, place: "Delivered to our warehouse" });
+    expect(basisFromText(null)).toEqual({ basis: null, place: null });
+  });
+});

@@ -310,7 +310,19 @@ export interface RevisionDoc {
     total: string;
     lines: DocLine[];
     /** For people who may see factory costs. */
-    costing?: { cost: string; sales: string; profit: string; marginPercent: number | null; uncostedLines: number } | null;
+    costing?: {
+      cost: string;
+      sales: string;
+      profit: string;
+      marginPercent: number | null;
+      uncostedLines: number;
+      costMinor: number;
+      /** Part of the cost: freight and the like to reach the basis we sell on. */
+      extraCostMinor: number;
+      extraCost: string;
+    } | null;
+    factoryBasis?: Incoterm | null;
+    factoryBasisPlace?: string | null;
   }[];
 }
 

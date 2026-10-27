@@ -410,3 +410,11 @@ export function mapSettings(old: Record<string, unknown> | null | undefined): Se
   const dropped = Object.keys(o).filter((k) => !OLD_KEYS_USED.has(k));
   return { values: values as Settings, dropped, problems };
 }
+
+/** "EXW factory" → { basis: "EXW", place: "factory" }; text without an Incoterm stays as the place. */
+export function basisFromText(text: string | null | undefined): { basis: Incoterm | null; place: string | null } {
+  const t = (text ?? "").trim();
+  const p = parseIncoterm(t);
+  if (!p) return { basis: null, place: t ? t.slice(0, 60) : null };
+  return { basis: p.incoterm, place: p.place?.slice(0, 60) ?? null };
+}
