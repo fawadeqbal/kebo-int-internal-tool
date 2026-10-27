@@ -22,6 +22,12 @@ class CustomersController {
     return this.customers.list(user, q);
   }
 
+  /** Every customer the person may see, by name: [{ id, name }] for pickers. */
+  @Get("names")
+  names(@CurrentUser() user: SessionUser) {
+    return this.customers.names(user);
+  }
+
   @Get(":id")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.customers.get(user, id);

@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { can, EXPENSE_CATEGORY_LABEL, ORDER_STAGE_LABEL, type OrderStage } from "@kebo/shared";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { can, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, ORDER_STAGE_LABEL, type ExpenseCategory, type OrderStage } from "@kebo/shared";
 import {
   Alert,
-  Badge,
   buildHref,
   Card,
   CardBody,
   CardHeader,
   cn,
   EmptyState,
+  FilterChip,
   LinkTabs,
   PageHeader,
   Segmented,
@@ -21,11 +22,12 @@ import {
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
-import { date, money } from "@/lib/format";
+import { money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { ExpenseList, Payable, ProfitAndLoss } from "@/lib/types-money";
-import { EditExpense, NewExpense, VoidForm } from "@/components/money/forms";
-import { expenseAction, voidExpenseAction } from "./actions";
+import { NewExpense, type ExpenseChoices } from "@/components/money/forms";
+import { ExpenseRecord } from "@/components/money/expense-record";
+import { expenseAction } from "./actions";
 
 export const metadata = { title: "Money" };
 
@@ -34,7 +36,7 @@ const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC"
 const monthName = (ym: string) => MONTH.format(new Date(`${ym}-01T00:00:00Z`));
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
-type Search = { tab?: string; year?: string; view?: string; month?: string; kind?: string; mine?: string };
+type Search = { tab?: string; year?: string; view?: string; month?: string; p?: string; kind?: string; customer?: string; category?: string; mine?: string };
 
 /**
  * The company's money: profit & loss by month (earned and cash), expenses
@@ -242,7 +244,7 @@ async function ProfitTab({ sp, today }: { sp: Search; today: string }) {
         <Card>
           <CardHeader
             title={`Orders shipped in ${year}`}
-            description="Most profit first. The company's own expenses are not shared out over orders."
+            description="Most profit first. Other expenses are not shared out over orders."
           />
           {pnl.orders.length === 0 ? (
             <CardBody>
@@ -287,117 +289,246 @@ async function ProfitTab({ sp, today }: { sp: Search; today: string }) {
 
 /* ---------------------------------------------------------------- expenses */
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const percent = (part: string, whole: string) => (Number(whole) > 0 ? Math.round((Number(part) / Number(whole)) * 100) : 0);
+
+/**
+ * Every cost in a month or a year: what the company spends to run (rent,
+ * salaries, bills) and what is spent on each customer (tickets, hotels,
+ * dinners, samples, and their orders' freight and inspection), with totals by
+ * kind and by customer. Clicking a kind or a customer narrows the list.
+ */
 async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
-  const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : today.slice(0, 7);
-  const kind = sp.kind === "order" || sp.kind === "general" ? sp.kind : undefined;
-  const from = `${month}-01`;
-  const next = addDays(`${month}-28`, 4).slice(0, 7);
-  const to = addDays(`${next}-01`, -1);
-  const prev = addDays(from, -1).slice(0, 7);
-  const [list, people, orders, settings] = await Promise.all([
-    api.get<ExpenseList>("/expenses", { from, to, kind }),
+  const thisMonth = today.slice(0, 7);
+  const asked = sp.p ?? sp.month ?? "";
+  const period = /^\d{4}(-\d{2})?$/.test(asked) && asked <= thisMonth ? asked : thisMonth;
+  const isYear = period.length === 4;
+  const from = isYear ? `${period}-01-01` : `${period}-01`;
+  const to = isYear ? `${period}-12-31` : addDays(`${addDays(`${period}-28`, 4).slice(0, 7)}-01`, -1);
+  const prev = isYear ? String(Number(period) - 1) : addDays(from, -1).slice(0, 7);
+  const next = isYear ? String(Number(period) + 1) : addDays(`${period}-28`, 4).slice(0, 7);
+  const hasNext = isYear ? next <= today.slice(0, 4) : next <= thisMonth;
+  const kind = sp.kind === "general" || sp.kind === "customer" ? sp.kind : undefined;
+  const customer = UUID.test(sp.customer ?? "") ? sp.customer : undefined;
+  const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.category ?? "") ? (sp.category as ExpenseCategory) : undefined;
+
+  const [list, people, orders, customers, settings] = await Promise.all([
+    api.get<ExpenseList>("/expenses", { from, to, kind, customerId: customer, category }),
     api.get<Person[]>("/users/people"),
-    api.get<{ id: string; refNo: string; customer: { name: string } }[]>("/orders", { status: "open" }),
+    api.get<{ id: string; refNo: string; customer: { id: string; name: string } }[]>("/orders", { status: "open" }),
+    api.get<{ id: string; name: string }[]>("/customers/names"),
     api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
   ]);
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const openOrders = orders.map((o) => ({ id: o.id, refNo: o.refNo, label: o.customer.name }));
-  const keep = { tab: "expenses", month: month === today.slice(0, 7) ? undefined : month, kind };
+  const choices: ExpenseChoices = {
+    customers,
+    orders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customerId: o.customer.id, customer: o.customer.name })),
+  };
   const c = list.currency;
+  const keep = { tab: "expenses", p: period === thisMonth ? undefined : period, kind, customer, category };
+  const href = (change: Record<string, string | undefined>) => buildHref("/money", keep, change);
+  const periodName = isYear ? period : MONTH_YEAR.format(new Date(`${period}-01T00:00:00Z`));
+  const customerName = customer ? (list.byCustomer.find((x) => x.customer.id === customer)?.customer.name ?? customers.find((x) => x.id === customer)?.name) : undefined;
+  const kindsTotal = list.byCategory.reduce((t, k) => t + Number(k.total), 0);
+  const customersTotal = list.byCustomer.reduce((t, k) => t + Number(k.total), 0);
+  const biggest = list.byCategory[0];
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          <nav aria-label="Period" className="inline-flex items-center rounded-lg border border-line bg-surface-2 p-0.5">
+            <Link href={href({ p: prev })} className="inline-flex size-7 items-center justify-center rounded-md text-muted hover:text-text" aria-label={`Previous ${isYear ? "year" : "month"}`}>
+              <ChevronLeft className="size-4" aria-hidden />
+            </Link>
+            <span className="min-w-28 px-2 text-center text-sm font-medium">{periodName}</span>
+            {hasNext ? (
+              <Link href={href({ p: next === thisMonth ? undefined : next })} className="inline-flex size-7 items-center justify-center rounded-md text-muted hover:text-text" aria-label={`Next ${isYear ? "year" : "month"}`}>
+                <ChevronRight className="size-4" aria-hidden />
+              </Link>
+            ) : (
+              <span className="inline-flex size-7 items-center justify-center text-line-strong" aria-hidden>
+                <ChevronRight className="size-4" />
+              </span>
+            )}
+          </nav>
           <Segmented
-            label="Month"
+            label="Show a month or a year"
             options={[
-              { href: buildHref("/money", keep, { month: prev }), label: "←", active: false },
-              {
-                href: buildHref("/money", keep, { month: undefined }),
-                label: MONTH_YEAR.format(new Date(`${month}-01T00:00:00Z`)),
-                active: true,
-              },
-              ...(month < today.slice(0, 7) ? [{ href: buildHref("/money", keep, { month: next }), label: "→", active: false }] : []),
-            ]}
-          />
-          <Segmented
-            label="Which expenses"
-            options={[
-              { href: buildHref("/money", keep, { kind: undefined }), label: "All", active: !kind },
-              { href: buildHref("/money", keep, { kind: "order" }), label: "Orders", active: kind === "order" },
-              { href: buildHref("/money", keep, { kind: "general" }), label: "Company", active: kind === "general" },
+              { href: href({ p: isYear ? (period === today.slice(0, 4) ? undefined : `${period}-12`) : period === thisMonth ? undefined : period }), label: "Month", active: !isYear },
+              { href: href({ p: period.slice(0, 4) }), label: "Year", active: isYear },
             ]}
           />
         </div>
-        <p className="text-sm">
-          Total <span className="font-semibold tabular">{money(list.total, c)}</span>
-        </p>
+        <Segmented
+          label="Which expenses"
+          options={[
+            { href: href({ kind: undefined }), label: "All", active: !kind },
+            { href: href({ kind: "general", customer: undefined }), label: "Company", active: kind === "general" },
+            { href: href({ kind: "customer" }), label: "On customers", active: kind === "customer" },
+          ]}
+        />
       </div>
-      <NewExpense
-        action={expenseAction.bind(null, null, null)}
-        people={people}
-        mainCurrency={settings.sales.currency}
-        fx={fx}
-        today={today}
-        orders={openOrders}
-      />
-      <Card className="overflow-hidden p-0">
+
+      <NewExpense action={expenseAction.bind(null, null, null)} people={people} mainCurrency={c} fx={fx} today={today} choices={choices} />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Tile label={`Spent in ${periodName}`} value={money(list.total, c)} hint={`${list.count} expense${list.count === 1 ? "" : "s"}`} />
+        <Tile
+          label="Running the company"
+          value={money(list.company, c)}
+          hint="Rent, salaries, bills, office"
+          href={kind === "general" ? undefined : href({ kind: "general", customer: undefined })}
+        />
+        <Tile
+          label="Spent on customers"
+          value={money(list.customers, c)}
+          hint={`${list.byCustomer.length} customer${list.byCustomer.length === 1 ? "" : "s"}, with their orders`}
+          href={kind === "customer" ? undefined : href({ kind: "customer" })}
+        />
+        <Tile
+          small
+          label="Biggest kind"
+          value={biggest ? EXPENSE_CATEGORY_LABEL[biggest.category] : "—"}
+          hint={biggest ? `${money(biggest.total, c)} · ${percent(biggest.total, String(kindsTotal))}%` : "Nothing spent yet"}
+          href={biggest && category !== biggest.category ? href({ category: biggest.category }) : undefined}
+        />
+      </div>
+
+      {(customer || category) && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted">Showing only</span>
+          {customerName && (
+            <FilterChip href={href({ customer: undefined })} active>
+              {customerName} <X className="size-3" aria-label="Show every customer" />
+            </FilterChip>
+          )}
+          {category && (
+            <FilterChip href={href({ category: undefined })} active>
+              {EXPENSE_CATEGORY_LABEL[category]} <X className="size-3" aria-label="Show every kind" />
+            </FilterChip>
+          )}
+          {customer && (
+            <Link href={`/customers/${customer}`} className="text-xs text-primary hover:underline">
+              Open the customer
+            </Link>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="By kind" description={customerName ? `Spent on ${customerName}` : "Click a kind to see only those"} />
+          {list.byCategory.length === 0 ? (
+            <CardBody>
+              <p className="text-sm text-muted">Nothing spent in {periodName}.</p>
+            </CardBody>
+          ) : (
+            <ul className="flex flex-col p-2">
+              {list.byCategory.map((k) => (
+                <BarRow
+                  key={k.category}
+                  href={href({ category: category === k.category ? undefined : k.category })}
+                  active={category === k.category}
+                  label={EXPENSE_CATEGORY_LABEL[k.category]}
+                  sub={`${k.count} expense${k.count === 1 ? "" : "s"}`}
+                  amount={money(k.total, c)}
+                  share={percent(k.total, String(kindsTotal))}
+                />
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card>
+          <CardHeader title="By customer" description={category ? `${EXPENSE_CATEGORY_LABEL[category]} only` : "Everything spent on each customer, with their orders"} />
+          {list.byCustomer.length === 0 ? (
+            <CardBody>
+              <p className="text-sm text-muted">{kind === "general" ? "Company costs are not on a customer." : `Nothing spent on a customer in ${periodName}.`}</p>
+            </CardBody>
+          ) : (
+            <ul className="flex flex-col p-2">
+              {list.byCustomer.slice(0, 10).map((x) => (
+                <BarRow
+                  key={x.customer.id}
+                  href={href({ customer: customer === x.customer.id ? undefined : x.customer.id, kind: kind === "general" ? undefined : kind })}
+                  active={customer === x.customer.id}
+                  label={x.customer.name}
+                  sub={`${x.count} expense${x.count === 1 ? "" : "s"}${x.orders ? ` · ${x.orders} order${x.orders === 1 ? "" : "s"}` : ""}`}
+                  amount={money(x.total, c)}
+                  share={percent(x.total, String(customersTotal))}
+                />
+              ))}
+              {list.byCustomer.length > 10 && <li className="px-2 py-1.5 text-xs text-muted">and {list.byCustomer.length - 10} more</li>}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Expenses"
+          description={`${list.count} in ${periodName}${customerName ? ` for ${customerName}` : ""}${category ? ` · ${EXPENSE_CATEGORY_LABEL[category]}` : ""}. Click one for its details and receipt.`}
+          actions={<span className="text-sm font-semibold tabular">{money(list.total, c)}</span>}
+        />
         {list.rows.length === 0 ? (
           <EmptyState
-            title="No expenses this month"
-            description="Add rent, salaries and other company costs here. Costs of one order are best added on the order."
+            title={`No expenses in ${periodName}`}
+            description="Add tickets, hotels, dinners and samples on the customer they were for, and rent, salaries and bills on the company."
           />
         ) : (
-          <ul className="flex flex-col divide-y divide-line">
+          <ul className="flex flex-col divide-y divide-line" aria-label="Expenses">
             {list.rows.map((e) => (
-              <li
-                key={e.id}
-                className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3 text-sm", e.voided && "text-muted")}
-              >
-                <div className="min-w-0">
-                  <p>
-                    <span className={cn("font-medium tabular", e.voided && "line-through")}>{money(e.amount, e.currency)}</span>{" "}
-                    <span className="text-text-2">{e.description}</span>{" "}
-                    {e.order ? (
-                      <Link href={`/orders/${e.order.id}`} className="text-xs text-primary hover:underline">
-                        {e.order.refNo}
-                      </Link>
-                    ) : (
-                      <Badge tone="neutral">Company</Badge>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {EXPENSE_CATEGORY_LABEL[e.category]} · {date(e.spentOn)}
-                    {e.currency !== c && ` · ≈ ${money(e.inMain, c)}`}
-                    {e.paidBy && ` · paid by ${e.paidBy.name}`}
-                    {e.reference && ` · ${e.reference}`}
-                  </p>
-                  {e.voided && (
-                    <p className="text-xs">
-                      <Badge tone="bad">Removed</Badge> {e.voided.reason}
-                    </p>
-                  )}
-                </div>
-                {!e.voided && (
-                  <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
-                    <EditExpense
-                      action={expenseAction.bind(null, null, e.id)}
-                      people={people}
-                      mainCurrency={c}
-                      fx={fx}
-                      today={today}
-                      expense={e}
-                      orders={openOrders}
-                    />
-                    <VoidForm action={voidExpenseAction.bind(null, e.orderId, e.id)} label="the expense" />
-                  </div>
-                )}
-              </li>
+              <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} choices={choices} />
             ))}
           </ul>
         )}
       </Card>
     </div>
+  );
+}
+
+/** A total at the top of Expenses; two across on a phone. Links narrow the list. */
+function Tile({ label, value, hint, href, small }: { label: string; value: string; hint: string; href?: string; small?: boolean }) {
+  const body = (
+    <div className={cn("h-full rounded-xl border border-line bg-surface p-3 transition-colors sm:p-4", href && "hover:border-line-strong")}>
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className={cn("mt-1 truncate font-semibold tabular", small ? "text-base sm:text-lg" : "text-lg sm:text-2xl")} title={value}>
+        {value}
+      </p>
+      <p className="mt-0.5 text-xs text-muted">{hint}</p>
+    </div>
+  );
+  return href ? (
+    <Link href={href} className="block">
+      {body}
+    </Link>
+  ) : (
+    body
+  );
+}
+
+/** A line with a share bar, that filters the list when clicked. */
+function BarRow({ href, active, label, sub, amount, share }: { href: string; active: boolean; label: string; sub: string; amount: string; share: number }) {
+  return (
+    <li>
+      <Link
+        href={href}
+        aria-current={active ? "true" : undefined}
+        className={cn("flex flex-col gap-1.5 rounded-lg px-2 py-2 transition-colors hover:bg-surface-2/70", active && "bg-primary-soft hover:bg-primary-soft")}
+      >
+        <span className="flex items-baseline justify-between gap-3 text-sm">
+          <span className="min-w-0 truncate">
+            <span className="font-medium">{label}</span> <span className="text-xs text-muted">{sub}</span>
+          </span>
+          <span className="shrink-0 tabular">
+            {amount} <span className="text-xs text-muted">{share}%</span>
+          </span>
+        </span>
+        <span className="h-1.5 rounded-full bg-surface-2" aria-hidden>
+          <span className="block h-1.5 rounded-full bg-primary" style={{ width: `${Math.max(share, 1)}%` }} />
+        </span>
+      </Link>
+    </li>
   );
 }
 

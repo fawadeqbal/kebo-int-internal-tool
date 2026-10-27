@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
 import {
@@ -15,6 +17,7 @@ import {
 import { BALANCE_TERMS_LABEL, can, planStatus, type ExpenseInput, type FactoryPaymentInput, type PaymentPlanInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
+import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
 import { Clock } from "../../common/time/clock.service";
@@ -47,11 +50,20 @@ type FactoryRow = { id: string; name: string; owner: { id: string; name: string 
 /** Amount ÷ rate (units of its currency per one unit of the target), rounded to cents. */
 const convert = (minor: Minor, rate: number) => roundHalfAway(minor / rate);
 
+const expenseInclude = {
+  paidBy: person,
+  order: { select: { id: true, refNo: true } },
+  customer: { select: { id: true, name: true } },
+} satisfies Prisma.ExpenseInclude;
+type ExpenseRow = Prisma.ExpenseGetPayload<{ include: typeof expenseInclude }>;
+
+const RECEIPT_EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "webp", "gif", "heic"]);
+
 /**
  * Money around orders and the company (Step 2):
  * - the customer's payment plan on each order (instalments, ticked off as money comes in);
  * - what we owe each factory for an order, and what we paid it;
- * - expenses, for an order or for the company (managers and the super admin only);
+ * - expenses, for an order, spent on a customer or for the company, with receipts (managers and the super admin only);
  * - profit & loss per order and per month, earned and cash.
  */
 @Injectable()
@@ -62,6 +74,7 @@ export class MoneyService {
     private readonly clock: Clock,
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
+    private readonly storage: StorageService,
   ) {}
 
   private assertExpenses(user: SessionUser) {
@@ -120,7 +133,7 @@ export class MoneyService {
           orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
           include: { factory: { select: { id: true, name: true } }, paidBy: person },
         },
-        expenses: { orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }], include: { paidBy: person } },
+        expenses: { orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }], include: expenseInclude },
       },
     });
     const s = await this.settings.get();
@@ -511,13 +524,12 @@ export class MoneyService {
 
   /* ---------------------------------------------------------------- expenses */
 
-  private expenseView(
-    e: Prisma.ExpenseGetPayload<{ include: { paidBy: typeof person } }> & { order?: { id: string; refNo: string } | null },
-  ) {
+  private expenseView(e: ExpenseRow) {
     return {
       id: e.id,
       order: e.order ?? null,
       orderId: e.orderId,
+      customer: e.customer ?? null,
       category: e.category,
       description: e.description,
       amount: e.amount.toFixed(2),
@@ -529,12 +541,22 @@ export class MoneyService {
       paidBy: e.paidBy,
       reference: e.reference,
       note: e.note,
+      receipt: e.receiptKey ? { name: e.receiptName ?? "receipt", type: e.receiptType ?? "application/octet-stream", size: e.receiptSize ?? 0 } : null,
       voided: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,
     };
   }
 
-  /** ?from=&to= (dates), ?orderId=, ?kind=order|general */
-  async listExpenses(user: SessionUser, q: { from?: ISODate; to?: ISODate; orderId?: string; kind?: "order" | "general" }) {
+  /**
+   * Expenses for a period with their totals: ?from=&to= (dates), ?orderId=,
+   * ?customerId=, ?category=, ?kind=order|customer|general (general: the
+   * company's own, on no customer). The breakdown by kind leaves out the kind
+   * filter and the one by customer the customer filter, so each still shows the
+   * whole picture for the rest.
+   */
+  async listExpenses(
+    user: SessionUser,
+    q: { from?: ISODate; to?: ISODate; orderId?: string; customerId?: string; category?: string; kind?: "order" | "customer" | "general" },
+  ) {
     this.assertExpenses(user);
     const { sales } = await this.settings.get();
     const rows = await this.prisma.db.expense.findMany({
@@ -543,33 +565,79 @@ export class MoneyService {
           ? { orderId: q.orderId }
           : q.kind === "order"
             ? { orderId: { not: null } }
-            : q.kind === "general"
-              ? { orderId: null }
-              : {}),
+            : q.kind === "customer"
+              ? { customerId: { not: null } }
+              : q.kind === "general"
+                ? { customerId: null, orderId: null }
+                : {}),
         ...(q.from || q.to ? { spentOn: { ...(q.from ? { gte: toDbDate(q.from) } : {}), ...(q.to ? { lte: toDbDate(q.to) } : {}) } } : {}),
       },
-      include: { paidBy: person, order: { select: { id: true, refNo: true } } },
+      include: expenseInclude,
       orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
-      take: 500,
+      take: 5000,
     });
+    const inMain = (e: ExpenseRow) => convert(decimalToMinor(e.amount), Number(e.rate));
     const live = rows.filter((r) => !r.voidedAt);
-    const total = live.reduce((t, e) => t + convert(decimalToMinor(e.amount), Number(e.rate)), 0);
-    return { currency: sales.currency, total: fromMinor(total), rows: rows.map((e) => this.expenseView(e)) };
+    const byCustomerFilter = live.filter((e) => !q.customerId || e.customerId === q.customerId);
+    const byCategoryFilter = live.filter((e) => !q.category || e.category === q.category);
+    const shown = byCustomerFilter.filter((e) => !q.category || e.category === q.category);
+    const sum = (list: ExpenseRow[]) => list.reduce((t, e) => t + inMain(e), 0);
+
+    const categories = new Map<string, { total: number; count: number }>();
+    for (const e of byCustomerFilter) {
+      const c = categories.get(e.category) ?? { total: 0, count: 0 };
+      c.total += inMain(e);
+      c.count += 1;
+      categories.set(e.category, c);
+    }
+    const customers = new Map<string, { customer: { id: string; name: string }; total: number; count: number; orders: Set<string> }>();
+    for (const e of byCategoryFilter) {
+      if (!e.customer) continue;
+      const c = customers.get(e.customer.id) ?? { customer: e.customer, total: 0, count: 0, orders: new Set<string>() };
+      c.total += inMain(e);
+      c.count += 1;
+      if (e.orderId) c.orders.add(e.orderId);
+      customers.set(e.customer.id, c);
+    }
+    return {
+      currency: sales.currency,
+      total: fromMinor(sum(shown)),
+      count: shown.length,
+      /** The company's own costs (on no customer) and the costs spent on customers, in what is shown. */
+      company: fromMinor(sum(shown.filter((e) => !e.customerId))),
+      customers: fromMinor(sum(shown.filter((e) => e.customerId))),
+      byCategory: [...categories.entries()]
+        .map(([category, c]) => ({ category, total: fromMinor(c.total), count: c.count }))
+        .sort((a, b) => Number(b.total) - Number(a.total)),
+      byCustomer: [...customers.values()]
+        .map((c) => ({ customer: c.customer, total: fromMinor(c.total), count: c.count, orders: c.orders.size }))
+        .sort((a, b) => Number(b.total) - Number(a.total)),
+      rows: rows
+        .filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category))
+        .map((e) => this.expenseView(e)),
+    };
   }
 
   private async expenseData(user: SessionUser, input: ExpenseInput) {
     if (input.spentOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
     let order: { id: string; refNo: string } | null = null;
+    let customerId = input.customerId ?? null;
     if (input.orderId) {
       const o = await this.orders.load(user, input.orderId);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+      if (customerId && customerId !== o.customerId) throw new DomainError(`Order ${o.refNo} is for another customer.`);
       order = { id: o.id, refNo: o.refNo };
+      customerId = o.customerId;
+    } else if (customerId) {
+      const c = await this.prisma.db.customer.findFirst({ where: { id: customerId, deletedAt: null }, select: { id: true } });
+      if (!c) throw new DomainError("That customer is not in the system any more.");
     }
     const { sales } = await this.settings.get();
     return {
       order,
       data: {
         orderId: order?.id ?? null,
+        customerId,
         category: input.category,
         description: input.description,
         amount: input.amount,
@@ -589,7 +657,7 @@ export class MoneyService {
     const e = await this.prisma.tx(async (tx) => {
       const row = await tx.expense.create({
         data: { ...data, recordedById: user.id },
-        include: { paidBy: person, order: { select: { id: true, refNo: true } } },
+        include: expenseInclude,
       });
       await this.expenseAudit(tx, user, row.id, order, `Expense ${input.currency} ${data.amount}: ${input.description}`, "expense");
       return row;
@@ -619,7 +687,7 @@ export class MoneyService {
 
   private async findExpense(user: SessionUser, id: string) {
     this.assertExpenses(user);
-    const e = await this.prisma.db.expense.findUnique({ where: { id }, include: { order: { select: { id: true, refNo: true } } } });
+    const e = await this.prisma.db.expense.findUnique({ where: { id }, include: expenseInclude });
     if (!e) throw new NotFoundError("Expense");
     if (e.voidedAt) throw new DomainError("This expense was removed.");
     return e;
@@ -634,7 +702,7 @@ export class MoneyService {
       const updated = await tx.expense.update({
         where: { id },
         data,
-        include: { paidBy: person, order: { select: { id: true, refNo: true } } },
+        include: expenseInclude,
       });
       await this.expenseAudit(tx, user, id, order ?? e.order, `changed the expense "${e.description}"`, "expense_edit", {
         reason,
@@ -643,6 +711,7 @@ export class MoneyService {
           category: e.category,
           spentOn: fromDbDate(e.spentOn),
           order: e.order?.refNo ?? null,
+          customer: e.customer?.name ?? null,
           description: e.description,
         },
         newValues: {
@@ -650,6 +719,7 @@ export class MoneyService {
           category: data.category,
           spentOn: input.spentOn,
           order: order?.refNo ?? null,
+          customer: updated.customer?.name ?? null,
           description: data.description,
         },
       });
@@ -672,6 +742,53 @@ export class MoneyService {
         { reason },
       );
     });
+    return { ok: true };
+  }
+
+  /* ---------------------------------------------------------------- receipts */
+
+  /** A photo or PDF of the receipt or ticket; a new one replaces the old. */
+  async attachReceipt(user: SessionUser, id: string, file: { originalname: string; mimetype: string; size: number; buffer: Buffer }) {
+    const e = await this.findExpense(user, id);
+    const ext = file.originalname.split(".").pop()?.toLowerCase() ?? "";
+    if (!RECEIPT_EXTENSIONS.has(ext)) throw new DomainError("A receipt can be a photo (JPG, PNG, WEBP) or a PDF.");
+    if (file.size > this.storage.maxBytes) throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
+    const name = safeFileName(file.originalname);
+    const key = `expenses/${id}/${randomUUID()}-${name}`;
+    await this.storage.put(key, file.buffer, file.mimetype);
+    try {
+      const row = await this.prisma.tx(async (tx) => {
+        const updated = await tx.expense.update({
+          where: { id },
+          data: { receiptKey: key, receiptName: name, receiptType: file.mimetype || "application/octet-stream", receiptSize: file.size },
+          include: expenseInclude,
+        });
+        await this.expenseAudit(tx, user, id, e.order, `${e.receiptKey ? "replaced" : "added"} the receipt of "${e.description}"`, "expense_receipt");
+        return updated;
+      });
+      if (e.receiptKey) await this.storage.delete(e.receiptKey).catch(() => undefined);
+      return this.expenseView(row);
+    } catch (error) {
+      await this.storage.delete(key).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async receipt(user: SessionUser, id: string): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
+    this.assertExpenses(user);
+    const e = await this.prisma.db.expense.findUnique({ where: { id } });
+    if (!e?.receiptKey) throw new NotFoundError("Receipt");
+    return { stream: await this.storage.get(e.receiptKey), fileName: e.receiptName ?? "receipt", mimeType: e.receiptType ?? "application/octet-stream", size: e.receiptSize ?? 0 };
+  }
+
+  async removeReceipt(user: SessionUser, id: string) {
+    const e = await this.findExpense(user, id);
+    if (!e.receiptKey) return { ok: true };
+    await this.prisma.tx(async (tx) => {
+      await tx.expense.update({ where: { id }, data: { receiptKey: null, receiptName: null, receiptType: null, receiptSize: null } });
+      await this.expenseAudit(tx, user, id, e.order, `removed the receipt of "${e.description}"`, "expense_receipt");
+    });
+    await this.storage.delete(e.receiptKey).catch(() => undefined);
     return { ok: true };
   }
 

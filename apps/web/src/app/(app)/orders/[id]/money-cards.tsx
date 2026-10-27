@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { EXPENSE_CATEGORY_LABEL, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
+import { PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
 import { Badge, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { date, dateTime, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { OrderMoney } from "@/lib/types-money";
-import { EditExpense, EditFactoryPayment, NewExpense, NewFactoryPayment, VoidForm } from "@/components/money/forms";
+import { EditFactoryPayment, NewExpense, NewFactoryPayment, VoidForm } from "@/components/money/forms";
+import { ExpenseRecord } from "@/components/money/expense-record";
 import type { Fx } from "@/lib/fx";
 import { CheckCircle2 } from "lucide-react";
 import { PaymentRecord } from "@/components/money/payment-record";
-import { expenseAction, factoryPaymentAction, voidExpenseAction, voidFactoryPaymentAction } from "../../money/actions";
+import { expenseAction, factoryPaymentAction, voidFactoryPaymentAction } from "../../money/actions";
 
 /**
  * What we owe each factory for this order (their prices plus tax × the
@@ -181,7 +182,7 @@ export function ProfitCard({ m, people, today, mainCurrency, fx }: { m: OrderMon
     <Card>
       <CardHeader
         title="Expenses and profit"
-        description="Managers only. Expenses are freight, inspection and other costs of this order."
+        description="Managers only. Freight, inspection, tickets and other costs of this order; they also count on the customer."
       />
       <CardBody className="flex flex-col gap-4">
         {m.missingRate && (
@@ -225,41 +226,7 @@ export function ProfitCard({ m, people, today, mainCurrency, fx }: { m: OrderMon
         {m.expenses && m.expenses.length > 0 && (
           <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Expenses">
             {m.expenses.map((e) => (
-              <li
-                key={e.id}
-                className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-3 py-2.5 text-sm", e.voided && "text-muted")}
-              >
-                <div className="min-w-0">
-                  <p>
-                    <span className={cn("font-medium tabular", e.voided && "line-through")}>{money(e.amount, e.currency)}</span>{" "}
-                    <span className="text-text-2">{e.description}</span>
-                  </p>
-                  <p className="text-xs text-muted">
-                    {EXPENSE_CATEGORY_LABEL[e.category]} · {date(e.spentOn)}
-                    {e.currency !== mainCurrency && ` · ≈ ${money(e.inMain, mainCurrency)}`}
-                    {e.paidBy && ` · paid by ${e.paidBy.name}`}
-                    {e.reference && ` · ${e.reference}`}
-                  </p>
-                  {e.voided && (
-                    <p className="text-xs">
-                      <Badge tone="bad">Removed</Badge> {e.voided.reason}
-                    </p>
-                  )}
-                </div>
-                {!e.voided && !m.cancelled && (
-                  <div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
-                    <EditExpense
-                      action={expenseAction.bind(null, m.orderId, e.id)}
-                      people={people}
-                      mainCurrency={mainCurrency}
-                      fx={fx}
-                      today={today}
-                      expense={e}
-                    />
-                    <VoidForm action={voidExpenseAction.bind(null, m.orderId, e.id)} label="the expense" />
-                  </div>
-                )}
-              </li>
+              <ExpenseRecord key={e.id} e={e} mainCurrency={mainCurrency} people={people} fx={fx} today={today} showFor={false} canChange={!m.cancelled} />
             ))}
           </ul>
         )}
