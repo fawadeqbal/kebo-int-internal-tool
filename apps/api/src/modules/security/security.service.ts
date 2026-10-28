@@ -4,6 +4,7 @@ import {
   deviceOf,
   PERMISSION_GROUPS,
   PRESET_ROLE_KEYS,
+  permissionInPlan,
   permissionsOfRole,
   roleKeyOf,
   type Permission,
@@ -58,11 +59,13 @@ export class SecurityService {
   /** For Security (all details) and for People (the role picker). */
   async roles(actor: SessionUser) {
     if (!can(actor, "security.manage") && !can(actor, "users.manage")) throw new ForbiddenError();
-    const [roles, mine, counts] = await Promise.all([
+    const [roles, mine, counts, features] = await Promise.all([
       this.prisma.db.role.findMany({ orderBy: [{ superAdmin: "desc" }, { createdAt: "asc" }, { name: "asc" }] }),
       this.prisma.db.role.findFirst({ where: { key: actor.role } }),
       this.prisma.db.user.groupBy({ by: ["role"], where: { isSystem: false, isActive: true }, _count: true }),
+      this.limits.features(),
     ]);
+    const customRoles = !features || features.includes("custom_roles");
     const without = await this.prisma.db.user.groupBy({
       by: ["role"],
       where: { isSystem: false, isActive: true, totpEnabledAt: null },
@@ -70,15 +73,22 @@ export class SecurityService {
     });
     return roles.map((r) => {
       const permissions = permissionsOfRole(r);
-      // People may give a role only when it allows nothing more than their own.
-      const givable = !!mine?.superAdmin || (!r.superAdmin && permissions.every((p) => actor.permissions.includes(p)));
+      const preset = (PRESET_ROLE_KEYS as readonly string[]).includes(r.key);
+      // A role the company made, while its plan leaves out custom roles: its people keep working, but it cannot be changed or given.
+      const frozen = !preset && !customRoles;
+      // People may give a role only when it allows nothing more than their own (counting what the plan includes).
+      const givable =
+        !frozen && (!!mine?.superAdmin || (!r.superAdmin && permissions.every((p) => !permissionInPlan(p, features) || actor.permissions.includes(p))));
       return {
         key: r.key,
         name: r.name,
         description: r.description,
         permissions,
         superAdmin: r.superAdmin,
-        preset: (PRESET_ROLE_KEYS as readonly string[]).includes(r.key),
+        preset,
+        frozen,
+        /** Saved in the role but not in the company's plan: nobody has them until the plan includes them again. */
+        notInPlan: r.superAdmin ? [] : permissions.filter((p) => !permissionInPlan(p, features)),
         requireTwoStep: r.requireTwoStep,
         people: counts.find((c) => c.role === r.key)?._count ?? 0,
         withoutTwoStep: without.find((c) => c.role === r.key)?._count ?? 0,
@@ -103,12 +113,16 @@ export class SecurityService {
   private async checkWithin(actor: SessionUser, permissions: readonly Permission[]) {
     const mine = await this.prisma.db.role.findFirst({ where: { key: actor.role } });
     if (mine?.superAdmin) return;
-    const more = permissions.filter((p) => !actor.permissions.includes(p));
+    // What the plan leaves out nobody has, so it is not counted (it stays in the role as saved).
+    const features = await this.limits.features();
+    const more = permissions.filter((p) => permissionInPlan(p, features) && !actor.permissions.includes(p));
     if (more.length) throw new ForbiddenError(`You can only give what your own role allows. Not yours: ${labels(more)}.`);
   }
 
   async createRole(actor: SessionUser, input: RoleInput) {
-    const permissions = [...new Set(input.permissions)];
+    // Only what the company's plan includes can go into a new role.
+    const features = await this.limits.features();
+    const permissions = [...new Set(input.permissions)].filter((p) => permissionInPlan(p, features));
     await this.checkWithin(actor, permissions);
     if (await this.prisma.db.role.findFirst({ where: { name: { equals: input.name, mode: "insensitive" } } }))
       throw new ConflictError("There is already a role with this name.");
@@ -137,7 +151,13 @@ export class SecurityService {
     // The Super Admin keeps its name and every permission; only its description and two-step rule change.
     // So does every role while the company's plan leaves out custom roles: shaping roles is that feature.
     const shaping = !role.superAdmin && (await this.limits.allows("custom_roles"));
-    const permissions = role.superAdmin ? [] : shaping ? [...new Set(input.permissions)] : (role.permissions as Permission[]);
+    // What the plan leaves out cannot be ticked or unticked: it stays as saved, for when the plan includes it again.
+    const features = await this.limits.features();
+    const permissions = role.superAdmin
+      ? []
+      : shaping
+        ? [...new Set([...input.permissions.filter((p) => permissionInPlan(p, features)), ...before.filter((p) => !permissionInPlan(p, features))])]
+        : (role.permissions as Permission[]);
     const name = shaping ? input.name : role.name;
     if (!role.superAdmin) {
       // Only roles within one's own may be changed, and only towards what one has.

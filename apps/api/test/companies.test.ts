@@ -407,6 +407,62 @@ describe("companies: isolation and the platform", () => {
     expect((await mine.get(`/orders/${order.id}/money`).expect(200)).body.expenses).not.toBeNull();
   });
 
+  it("roles and permissions follow the plan, down and back up, without losing anything", async () => {
+    const plans = (await plat().get("/plans").expect(200)).body as { id: string; name: string }[];
+    const starter = plans.find((p) => p.name === "Starter")!;
+    const business = plans.find((p) => p.name === "Business")!;
+    const c = await makeCompany(`perm-${tag}`, { sampleData: false, planId: business.id });
+    const mine = api(app, c.token);
+    type RoleRow = { key: string; permissions: string[]; frozen: boolean; notInPlan: string[]; givable: boolean };
+    const roleOf = async (key: string) => ((await mine.get("/roles").expect(200)).body as RoleRow[]).find((r) => r.key === key)!;
+    const perms = async (who = mine) => (await who.get("/auth/me").expect(200)).body.permissions as string[];
+
+    // Business: a role of their own, with someone in it.
+    const made = (await mine.post("/roles", { name: "Accounts", permissions: ["dashboard.view", "expenses.manage", "reports.view"], requireTwoStep: false }).expect(201))
+      .body as { key: string };
+    await mine.post("/users", { name: "Acc Person", email: `acc@perm-${tag}.test`, role: made.key, password: "Accounts12345" }).expect(201);
+    const acc = api(app, await signIn(app, `acc@perm-${tag}.test`, "Accounts12345"));
+    expect(await perms(acc)).toEqual(expect.arrayContaining(["expenses.manage", "reports.view"]));
+    expect(await perms()).toEqual(expect.arrayContaining(["expenses.manage", "reports.view", "audit.view"]));
+
+    // Down to Starter: nobody has what the plan leaves out (the Super Admin neither); the roles keep it saved.
+    await plat().patch(`/companies/${c.id}`, { planId: starter.id }).expect(200);
+    for (const p of await perms()) expect(["expenses.manage", "reports.view", "audit.view"]).not.toContain(p);
+    expect(await perms(acc)).toEqual(["dashboard.view"]);
+    await acc.get("/expenses").expect(403);
+    const frozen = await roleOf(made.key);
+    expect(frozen.frozen).toBe(true);
+    expect(frozen.givable).toBe(false);
+    expect(frozen.notInPlan.sort()).toEqual(["expenses.manage", "reports.view"]);
+    expect((await roleOf("manager")).notInPlan).toEqual(expect.arrayContaining(["expenses.manage", "reports.view", "audit.view"]));
+    expect((await roleOf("manager")).frozen).toBe(false);
+    // A frozen role cannot be given; a built-in one can (a Manager has more than the plan, which is not counted).
+    const extra = await mine.post("/users", { name: "Second", email: `second@perm-${tag}.test`, role: made.key, password: "Second12345678" });
+    expect(extra.status).toBe(403);
+    expect(extra.body.code).toBe("plan_feature");
+    await mine.post("/users", { name: "Second", email: `second@perm-${tag}.test`, role: "manager", password: "Second12345678" }).expect(201);
+
+    // Back up to Business: everything as it was, at once.
+    await plat().patch(`/companies/${c.id}`, { planId: business.id }).expect(200);
+    expect(await perms(acc)).toEqual(expect.arrayContaining(["expenses.manage", "reports.view"]));
+    await acc.get("/expenses").expect(200);
+    expect(await perms()).toEqual(expect.arrayContaining(["expenses.manage", "reports.view", "audit.view"]));
+    expect((await roleOf(made.key)).frozen).toBe(false);
+    expect((await roleOf(made.key)).notInPlan).toEqual([]);
+
+    // A plan with custom roles but not expenses or insights: new roles get only what the plan has, and an edit keeps what it does not.
+    const lean = (await plat().post("/plans", { name: `Roles only ${tag}`, price: 20, features: ["custom_roles"] }).expect(201)).body as { id: string };
+    await plat().patch(`/companies/${c.id}`, { planId: lean.id }).expect(200);
+    const fresh = (await mine.post("/roles", { name: "Lean", permissions: ["dashboard.view", "expenses.manage"], requireTwoStep: false }).expect(201)).body as {
+      key: string;
+    };
+    expect((await roleOf(fresh.key)).permissions).toEqual(["dashboard.view"]);
+    await mine.put(`/roles/${made.key}`, { name: "Accounts", permissions: ["dashboard.view", "customers.manage"], requireTwoStep: false }).expect(200);
+    expect((await roleOf(made.key)).permissions.sort()).toEqual(["customers.manage", "dashboard.view", "expenses.manage", "reports.view"]);
+    expect(await perms(acc)).toEqual(expect.arrayContaining(["customers.manage", "dashboard.view"]));
+    expect(await perms(acc)).not.toContain("expenses.manage");
+  });
+
   it("read-only lets people look but not change; off lets nobody in", async () => {
     const c = await makeCompany(`ro-${tag}`, { sampleData: false });
     await plat().post(`/companies/${c.id}/status`, { status: "read_only" }).expect(200);

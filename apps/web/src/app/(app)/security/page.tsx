@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { hasFeature } from "@/lib/session";
+import { getCompany, hasFeature } from "@/lib/session";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { PERMISSIONS } from "@kebo/shared";
+import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
 import { Alert, Badge, ButtonLink, Card, CardHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
@@ -11,7 +11,10 @@ export const metadata = { title: "Security · Roles" };
 
 /** How people stand (signed in, two-step sign-in, failed attempts) and the roles: what each allows and whether it needs two-step sign-in. */
 export default async function SecurityPage() {
-  const [o, roles] = await Promise.all([api.get<SecurityOverview>("/security/overview"), api.get<RoleRow[]>("/roles")]);
+  const [o, roles, company] = await Promise.all([api.get<SecurityOverview>("/security/overview"), api.get<RoleRow[]>("/roles"), getCompany()]);
+  // Permissions follow the company's plan: what it leaves out nobody has, and it is not counted.
+  const available = PERMISSIONS.filter((p) => permissionInPlan(p, company?.features ?? null)).length;
+  const frozen = roles.filter((r) => r.frozen);
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -47,6 +50,19 @@ export default async function SecurityPage() {
         </Alert>
       )}
 
+      {frozen.length > 0 && (
+        <Alert tone="info">
+          <p className="font-medium">
+            {frozen.length === 1 ? `The role ${frozen[0]!.name} is` : `${frozen.length} roles your company made are`} frozen: your plan
+            {company?.plan ? ` (${company.plan.name})` : ""} does not include custom roles.
+          </p>
+          <p className="mt-0.5 text-text-2">
+            Their people keep working with what the plan includes. They cannot be changed or given to anyone else; move people to Super Admin, Manager or Staff, or ask for a
+            plan with custom roles.
+          </p>
+        </Alert>
+      )}
+
       <Card className="overflow-hidden p-0">
         <CardHeader
           title="Roles"
@@ -77,12 +93,16 @@ export default async function SecurityPage() {
                     <span className="flex items-center gap-2 font-medium group-hover:text-primary">
                       {r.name}
                       {r.superAdmin ? <Badge tone="primary">Everything</Badge> : r.preset ? <Badge tone="outline">Built in</Badge> : null}
+                      {r.frozen && <Badge tone="warn">Frozen: not in your plan</Badge>}
                     </span>
                     {r.description && <span className="block text-xs text-muted">{r.description}</span>}
                   </Link>
                 </Td>
                 <Td className="text-right tabular">{r.people}</Td>
-                <Td className="text-xs whitespace-nowrap text-text-2 tabular">{r.superAdmin ? "Every permission" : `${r.permissions.length} of ${PERMISSIONS.length} permissions`}</Td>
+                <Td className="text-xs whitespace-nowrap text-text-2 tabular">
+                  {r.superAdmin ? "Every permission" : `${r.permissions.length - r.notInPlan.length} of ${available} permissions`}
+                  {r.notInPlan.length > 0 && <span className="block text-muted">+{r.notInPlan.length} kept for a bigger plan</span>}
+                </Td>
                 <Td>
                   {r.requireTwoStep ? (
                     <span className="inline-flex flex-col">

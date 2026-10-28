@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { can, PERMISSION_GROUPS, permissionsOfRole, PRESET_ROLES } from "@kebo/shared";
+import { can, PERMISSION_GROUPS, permissionsInPlan, PRESET_ROLES } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -102,7 +102,8 @@ export class UsersService {
     if (!role) throw new DomainError("That role no longer exists. Reload and choose another.");
     if (mine?.superAdmin) return role;
     if (role.superAdmin) throw new ForbiddenError(`Only a Super Admin can ${doing(role.name)}.`);
-    const more = permissionsOfRole(role).filter((p) => !actor.permissions.includes(p));
+    // Counting only what the company's plan includes: nobody has the rest.
+    const more = permissionsInPlan(role, await this.limits.features()).filter((p) => !actor.permissions.includes(p));
     if (more.length)
       throw new ForbiddenError(
         `You cannot ${doing(role.name)}: that role allows more than yours (${more.map((p) => LABEL.get(p) ?? p).join(", ")}).`,

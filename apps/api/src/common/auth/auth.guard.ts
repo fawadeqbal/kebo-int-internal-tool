@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { can, isMobileApp, permissionsOfRole, planFeatureName, type Permission } from "@kebo/shared";
+import { can, isMobileApp, permissionsInPlan, planFeatureName, type Permission } from "@kebo/shared";
 import { ForbiddenError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { CompaniesService } from "../company/companies.service";
@@ -92,13 +92,16 @@ export class AuthGuard implements CanActivate {
     }
     this.markActive(company.id, now, !!session.user.platformAdminId);
     const u = session.user;
+    // The company's plan, read on every request (cached briefly): permissions and features follow it at once.
+    const plan = await this.companies.plan(company);
     const user: SessionUser = {
       id: u.id,
       name: u.name,
       email: u.email,
       role: u.role,
       roleName: u.access.name,
-      permissions: permissionsOfRole(u.access),
+      // The role's permissions the plan includes: a smaller plan takes some away, a bigger one gives them back.
+      permissions: permissionsInPlan(u.access, plan ? plan.features : null),
       twoStepSetupRequired: u.access.requireTwoStep && !u.totpEnabledAt && !u.platformAdminId,
       sessionId: session.id,
       companyId: company.id,
@@ -121,7 +124,6 @@ export class AuthGuard implements CanActivate {
     const phone = !user.viaPlatform && (isMobileApp(req.headers["user-agent"]) || isMobileApp(session.userAgent));
     const needed = [feature, phone ? "mobile_app" : undefined].filter((f): f is string => !!f);
     if (needed.length) {
-      const plan = await this.companies.plan(company);
       const off = plan ? needed.find((f) => !plan.features.includes(f)) : undefined;
       if (off) throw new ForbiddenError(`Your plan does not include ${planFeatureName(off).toLowerCase()}. Ask the platform admin to switch it on.`, "plan_feature");
     }

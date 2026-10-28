@@ -1,4 +1,5 @@
 import type { PresetRoleKey } from "./enums";
+import type { PlanFeature } from "./platform";
 
 /**
  * Access is by permission. Roles are rows in the database (made and edited
@@ -153,6 +154,28 @@ export const PRESET_ROLES: Record<
 /** What a role allows: every permission for the Super Admin; otherwise its known permissions, in the usual order. */
 export const permissionsOfRole = (role: { superAdmin: boolean; permissions: readonly string[] }): Permission[] =>
   role.superAdmin ? [...PERMISSIONS] : PERMISSIONS.filter((p) => role.permissions.includes(p));
+
+/**
+ * Permissions that belong to a plan feature. A role keeps them as saved, but
+ * nobody has them while the company's plan leaves the feature out (Super Admin
+ * included); they come back as they were when the plan includes it again.
+ */
+export const PERMISSION_FEATURE: Partial<Record<Permission, PlanFeature>> = {
+  "expenses.manage": "expenses",
+  "reports.view": "insights",
+  "audit.view": "audit_log",
+  "customers.export": "excel",
+};
+
+/** Whether a plan with these features includes the permission (null: no plan, so every one). */
+export const permissionInPlan = (permission: Permission, features: readonly string[] | null): boolean => {
+  const f = PERMISSION_FEATURE[permission];
+  return !f || !features || features.includes(f);
+};
+
+/** What a role allows under the company's plan: the role's permissions the plan includes. */
+export const permissionsInPlan = (role: { superAdmin: boolean; permissions: readonly string[] }, features: readonly string[] | null): Permission[] =>
+  permissionsOfRole(role).filter((p) => permissionInPlan(p, features));
 
 /** Whether the signed-in person (as the API describes them) may do something. */
 export const can = (who: { permissions: readonly string[] } | null | undefined, permission: Permission): boolean =>
