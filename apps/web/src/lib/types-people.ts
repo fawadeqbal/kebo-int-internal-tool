@@ -113,6 +113,10 @@ export interface RoleRow {
   superAdmin: boolean;
   /** Admin, Manager, Staff: cannot be removed. */
   preset: boolean;
+  /** Made by the company, while its plan leaves out custom roles: its people keep working, but it cannot be changed or given. */
+  frozen: boolean;
+  /** Saved in the role but not in the company's plan: nobody has them until the plan includes them again. */
+  notInPlan: Permission[];
   requireTwoStep: boolean;
   /** Active people in it, and how many of them have no two-step sign-in. */
   people: number;

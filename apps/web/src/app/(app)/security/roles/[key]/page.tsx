@@ -29,6 +29,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
             <span className="flex items-center gap-2">
               {r.name}
               {r.superAdmin ? <Badge tone="primary">Everything</Badge> : r.preset ? <Badge tone="outline">Built in</Badge> : null}
+              {r.frozen && <Badge tone="warn">Frozen: not in your plan</Badge>}
             </span>
           }
           description={r.key === me.role ? "This is your own role." : undefined}

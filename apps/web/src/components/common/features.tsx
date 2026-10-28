@@ -18,5 +18,8 @@ export function useFeature(feature: string) {
   return !f || f.includes(feature);
 }
 
+/** The plan's features (null: unknown or no plan, so every one). */
+export const useFeatures = () => useContext(Features);
+
 /** Excel is a plan feature. */
 export const useExcelAllowed = () => useFeature("excel");

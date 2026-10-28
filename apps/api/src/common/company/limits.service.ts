@@ -76,6 +76,12 @@ export class LimitsService {
     };
   }
 
+  /** The features of the company's plan (null: no plan, so every feature). */
+  async features(company: CompanyInfo = CompanyContext.require()): Promise<string[] | null> {
+    const plan = await this.companies.plan(company);
+    return plan ? plan.features : null;
+  }
+
   /** Whether the company's plan includes a feature (no plan: every feature). */
   async allows(feature: PlanFeature, company: CompanyInfo = CompanyContext.require()) {
     const plan = await this.companies.plan(company);

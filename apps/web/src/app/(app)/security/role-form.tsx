@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
-import { PERMISSION_GROUPS, type Permission } from "@kebo/shared";
+import { PERMISSION_FEATURE, PERMISSION_GROUPS, permissionInPlan, planFeatureName, type Permission } from "@kebo/shared";
 import { Alert, buttonClass, Checkbox, cn, Field, Input, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { useFeatures } from "@/components/common/features";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -38,7 +39,10 @@ export function RoleForm({
   const superAdmin = !!role?.superAdmin;
   const fixed = superAdmin || locked;
   const [picked, setPicked] = useState<Set<Permission>>(() => new Set(role?.permissions ?? ["dashboard.view"]));
-  const may = (p: Permission) => !mine || mine.includes(p) || picked.has(p);
+  // Permissions follow the company's plan: what it leaves out cannot be ticked or unticked (a saved tick stays for a bigger plan).
+  const features = useFeatures();
+  const inPlan = (p: Permission) => permissionInPlan(p, features);
+  const may = (p: Permission) => inPlan(p) && (!mine || mine.includes(p) || picked.has(p));
   const toggle = (p: Permission, on: boolean) =>
     setPicked((s) => {
       const n = new Set(s);
@@ -101,23 +105,30 @@ export function RoleForm({
                     <ul className="flex flex-col">
                       {g.items.map((i) => {
                         const id = `perm-${i.permission}`;
-                        const blocked = !fixed && !may(i.permission);
+                        const off = !inPlan(i.permission);
+                        const blocked = !fixed && !off && !may(i.permission);
                         const keep = !fixed && isMine && i.permission === "security.manage";
                         return (
                           <li key={i.permission} className="border-b border-line last:border-b-0">
-                            <label htmlFor={id} className={cn("flex items-start gap-3 px-3 py-2", (blocked || fixed || keep) && "cursor-not-allowed")}>
+                            <label htmlFor={id} className={cn("flex items-start gap-3 px-3 py-2", (blocked || fixed || keep || off) && "cursor-not-allowed")}>
                               <Checkbox
                                 id={id}
                                 name="permissions"
                                 value={i.permission}
                                 checked={superAdmin || picked.has(i.permission)}
-                                disabled={fixed || blocked}
+                                disabled={fixed || blocked || off}
                                 onChange={(e) => !keep && toggle(i.permission, e.target.checked)}
                                 className="mt-0.5"
                               />
                               <span className="min-w-0 text-sm">
-                                <span className={cn("font-medium", blocked && "text-muted")}>{i.label}</span>
+                                <span className={cn("font-medium", (blocked || off) && "text-muted")}>{i.label}</span>
                                 {i.hint && <span className="block text-xs text-muted">{i.hint}</span>}
+                                {off && (
+                                  <span className="block text-xs text-warn">
+                                    Not in your plan ({planFeatureName(PERMISSION_FEATURE[i.permission] ?? "")}).{" "}
+                                    {superAdmin || picked.has(i.permission) ? "Kept for when the plan includes it." : "Comes with a bigger plan."}
+                                  </span>
+                                )}
                                 {blocked && <span className="block text-xs text-muted">Your own role does not have this, so you cannot give it.</span>}
                                 {keep && <span className="block text-xs text-muted">Stays: this is your own role.</span>}
                               </span>

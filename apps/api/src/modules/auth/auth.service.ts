@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import bcrypt from "bcryptjs";
-import { isMobileApp, permissionsOfRole, type SignInResult } from "@kebo/shared";
+import { isMobileApp, permissionsInPlan, type SignInResult } from "@kebo/shared";
 import { LimitsService } from "../../common/company/limits.service";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -183,7 +183,7 @@ export class AuthService {
       twoStepRequired: twoStep,
       /** Signed in, but their role needs two-step sign-in: set it up before anything else. */
       twoStepSetupRequired: setup,
-      user: twoStep ? null : this.profileOf(user, session.id),
+      user: twoStep ? null : await this.profileOf(user, session.id),
       company: { slug: company.slug, name: company.name },
     };
   }
@@ -226,7 +226,7 @@ export class AuthService {
       detail: result.usedRecovery ? `with a recovery code, ${result.recoveryLeft} left` : "with a two-step code",
     });
     return {
-      user: this.profileOf(session.user, session.id),
+      user: await this.profileOf(session.user, session.id),
       recoveryCodesLeft: result.recoveryLeft,
       usedRecoveryCode: result.usedRecovery,
     };
@@ -267,7 +267,7 @@ export class AuthService {
     };
   }
 
-  private profileOf(
+  private async profileOf(
     u: {
       id: string;
       name: string;
@@ -280,13 +280,15 @@ export class AuthService {
     },
     sessionId: string,
   ) {
+    const company = await this.companies.byId(u.companyId);
+    const features = company ? await this.limits.features(company) : null;
     return this.profile({
       id: u.id,
       name: u.name,
       email: u.email,
       role: u.role,
       roleName: u.access.name,
-      permissions: permissionsOfRole(u.access),
+      permissions: permissionsInPlan(u.access, features),
       twoStepSetupRequired: u.access.requireTwoStep && !u.totpEnabledAt && !u.platformAdminId,
       sessionId,
       companyId: u.companyId,
