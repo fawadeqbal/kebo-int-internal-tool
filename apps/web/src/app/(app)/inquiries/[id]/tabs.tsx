@@ -15,7 +15,7 @@ export function DealTabs({
   managers: boolean;
 }) {
   const path = usePathname();
-  const base = `/deals/${id}`;
+  const base = `/inquiries/${id}`;
   const tabs = [
     { href: base, label: "Overview" },
     ...(source ? [{ href: `${base}/sourcing`, label: "Factory prices" }] : []),
@@ -25,6 +25,6 @@ export function DealTabs({
     ...(orderId ? [{ href: `/orders/${orderId}`, label: "Order →" }] : []),
   ];
   return (
-    <LinkTabs label="Deal sections" tabs={tabs.map((t) => ({ ...t, active: t.href === base ? path === base : path.startsWith(t.href) }))} />
+    <LinkTabs label="Inquiry sections" tabs={tabs.map((t) => ({ ...t, active: t.href === base ? path === base : path.startsWith(t.href) }))} />
   );
 }

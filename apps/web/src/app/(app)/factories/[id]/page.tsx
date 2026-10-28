@@ -53,14 +53,14 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
       />
       {tab === "prices" && (
           <Card>
-            <CardHeader title="Price quotes" description="Prices this factory gave on our deals, newest first" />
+            <CardHeader title="Price quotes" description="Prices this factory gave on our inquiries, newest first" />
             {f.quotes.length === 0 ? (
-              <EmptyState title="No prices yet" description="Prices are recorded on a deal, under Factory prices." className="py-8" />
+              <EmptyState title="No prices yet" description="Prices are recorded on an inquiry, under Factory prices." className="py-8" />
             ) : (
               <Table>
                 <THead>
                   <tr>
-                    <Th>Deal</Th>
+                    <Th>Inquiry</Th>
                     <Th className="text-right">Lines</Th>
                     <Th className="text-right">Currency</Th>
                     <Th className="text-right">Received</Th>
@@ -70,7 +70,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
                   {f.quotes.map((q) => (
                     <Tr key={q.id} className="hover:bg-surface-2/50">
                       <Td>
-                        <Link href={`/deals/${q.inquiry.id}/sourcing`} className="font-medium hover:text-primary">
+                        <Link href={`/inquiries/${q.inquiry.id}/sourcing`} className="font-medium hover:text-primary">
                           {q.inquiry.refNo}
                         </Link>
                         <span className="block max-w-80 truncate text-xs text-muted">{q.inquiry.title}</span>
@@ -114,7 +114,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
                     </Td>
                     <Td className="text-sm">
                       {e.deal ? (
-                        <Link href={`/deals/${e.deal.id}`} className="hover:text-primary">
+                        <Link href={`/inquiries/${e.deal.id}`} className="hover:text-primary">
                           {e.deal.refNo}
                         </Link>
                       ) : e.order ? (
@@ -171,7 +171,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
           </Card>
           {canRemove && (
             <Card>
-              <CardHeader title="Remove factory" description="Hides it from lists and pickers. Its past prices stay on their deals." />
+              <CardHeader title="Remove factory" description="Hides it from lists and pickers. Its past prices stay on their inquiries." />
               <CardBody>
                 <ConfirmAction
                   action={removeFactoryAction.bind(null, f.id)}

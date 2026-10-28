@@ -7,7 +7,7 @@ import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib
 import type { Paged } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 
-const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
+const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
 export async function moveStageAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
@@ -136,5 +136,5 @@ export async function saveDealAction(id: string | null, _prev: ActionState, form
   if (!r.ok) return r;
   const newId = id ?? (r.data as { id: string }).id;
   refresh(newId);
-  redirect(`/deals/${newId}`);
+  redirect(`/inquiries/${newId}`);
 }

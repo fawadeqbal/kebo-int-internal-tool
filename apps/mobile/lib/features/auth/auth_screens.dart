@@ -39,7 +39,7 @@ class AuthFrame extends ConsumerWidget {
                       gap24,
                       Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children))),
                       gap16,
-                      Text('Deals, quotations and orders, from the first message to shipment.', textAlign: TextAlign.center, style: context.t.bodySmall),
+                      Text('Inquiries, quotations and orders, from the first message to shipment.', textAlign: TextAlign.center, style: context.t.bodySmall),
                     ],
                   ),
                 ),

@@ -89,7 +89,7 @@ export class RemindersService {
           const changed = await tx.quotationRevision.updateMany({ where: { id: r.id, status: "sent" }, data: { status: "expired", answeredOn: toDbDate(today) } });
           if (changed.count) await this.audit.record(tx, { userId: null, action: "status_change", entityType: "quotation", entityId: r.id, summary: `${label}: sent → expired (valid until ${until})` });
         });
-        await note([...who, ...managers], { type: "reminder.quotationExpired", title: `${label} expired without a reply — follow up or mark the deal lost`, body: r.quotation.inquiry.title, link: links.deal(r.quotation.inquiry.id), dedupeKey: `quote-expired:${r.id}` });
+        await note([...who, ...managers], { type: "reminder.quotationExpired", title: `${label} expired without a reply — follow up or mark the inquiry lost`, body: r.quotation.inquiry.title, link: links.deal(r.quotation.inquiry.id), dedupeKey: `quote-expired:${r.id}` });
       } else {
         await note(who, { type: "reminder.quotationDue", title: `${label} is valid until ${until} — follow up with the customer`, link: links.deal(r.quotation.inquiry.id), dedupeKey: `quote-due:${r.id}:${today}` });
       }
@@ -218,7 +218,7 @@ export class RemindersService {
       rows: [
         ["New inquiries (since yesterday)", String(newDeals)],
         ["Won / lost since yesterday", `${won} / ${lost}`],
-        ["Open deals", String(open)],
+        ["Open inquiries", String(open)],
         ["Open orders", String(overdueOrders)],
         ["Sales this month", m(i?.kpis.revenue.value as string | null)],
         ["Monthly target", target],

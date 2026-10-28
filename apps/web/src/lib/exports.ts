@@ -55,10 +55,10 @@ async function deals(q: Q): Promise<SheetSpec> {
   const stage = q.stage ?? "open";
   const rows = await allPages<DealRow>("/inquiries", { stage: stage === "all" ? undefined : stage, q: q.q, assignee: q.assignee, customerId: q.customer, sort: q.sort });
   return {
-    name: `Deals ${stamp()}`,
-    title: "Deals",
+    name: `Inquiries ${stamp()}`,
+    title: "Inquiries",
     columns: [
-      text("Deal no.", 14),
+      text("Inquiry no.", 14),
       text("Title", 36),
       text("Customer", 28),
       text("Country", 14),
@@ -111,8 +111,8 @@ async function orders(q: Q): Promise<SheetSpec> {
       text("Order no.", 14),
       text("Customer", 28),
       text("Country", 14),
-      text("Deal", 14),
-      text("Deal title", 30),
+      text("Inquiry", 14),
+      text("Inquiry title", 30),
       text("Handled by", 16),
       text("Stage", 13),
       text("Ordered on", 12),
@@ -151,7 +151,7 @@ async function customers(q: Q): Promise<SheetSpec> {
   return {
     name: `Customers ${stamp()}`,
     title: "Customers",
-    columns: [text("Customer name", 32), text("Type", 11), text("Country", 18), text("Contact name", 22), text("Position"), text("Email", 26), text("Phone", 18), text("WhatsApp", 18), text("WeChat"), count("Open deals"), count("Open orders")],
+    columns: [text("Customer name", 32), text("Type", 11), text("Country", 18), text("Contact name", 22), text("Position"), text("Email", 26), text("Phone", 18), text("WhatsApp", 18), text("WeChat"), count("Open inquiries"), count("Open orders")],
     rows: rows.map((c): Cell[] => [
       c.name,
       CUSTOMER_TYPE_LABEL[c.type],
@@ -302,7 +302,7 @@ async function expenses(q: Q): Promise<SheetSpec> {
       text("Category", 18),
       text("Description", 36),
       text("Customer", 24),
-      text("Deal", 14),
+      text("Inquiry", 14),
       text("Order", 14),
       text("Factory", 22),
       text("Paid by"),
@@ -360,7 +360,7 @@ async function report(q: Q): Promise<SheetSpec[]> {
       columns: [count("Received"), count("Quoted"), count("Won"), count("Lost"), count("Win rate %"), money(`Won value ${cur}`)],
       rows: [[r.funnel.received, r.funnel.quoted, r.funnel.won, r.funnel.lost, r.funnel.winRatePercent, num(r.wonValue)]],
     },
-    { name, title: "Lost reasons", columns: [text("Reason", 28), count("Deals")], rows: r.lostReasons.map((x) => [LOST_REASON_LABEL[x.reason], x.count]) },
+    { name, title: "Lost reasons", columns: [text("Reason", 28), count("Inquiries")], rows: r.lostReasons.map((x) => [LOST_REASON_LABEL[x.reason], x.count]) },
     { name, title: "By channel", columns: [text("Channel", 16), count("Inquiries")], rows: r.byChannel.map((x) => [CHANNEL_LABEL[x.key] ?? x.key, x.count]) },
     { name, title: "By category", columns: [text("Category", 24), count("Inquiries")], rows: r.byCategory.map((x) => [x.key, x.count]) },
     { name, title: "Win rate by person", columns: [text("Person", 20), count("Won"), count("Lost"), count("Win rate %")], rows: r.people.map((x) => [x.person, x.won, x.lost, x.winRatePercent]) },
@@ -433,7 +433,7 @@ async function quotation(q: Q): Promise<SheetSpec> {
 }
 
 export const EXPORTS = {
-  deals,
+  inquiries: deals,
   orders,
   customers,
   factories,

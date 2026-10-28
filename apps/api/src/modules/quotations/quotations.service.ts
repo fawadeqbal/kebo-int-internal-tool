@@ -323,7 +323,7 @@ export class QuotationsService {
         editable: isEditable(r.status),
       })),
       canStartRevision: canQuote(inquiry.stage) && start.ok,
-      whyNotStart: !canQuote(inquiry.stage) ? "This deal is closed. Reopen it to quote again." : start.ok ? null : start.reason,
+      whyNotStart: !canQuote(inquiry.stage) ? "This inquiry is closed. Reopen it to quote again." : start.ok ? null : start.reason,
     };
   }
 
@@ -467,7 +467,7 @@ export class QuotationsService {
           where: { id: o.factoryQuoteId, inquiryId, deletedAt: null },
           include: { lines: { orderBy: { sortOrder: "asc" } } },
         });
-        if (!q) throw new DomainError(`Option ${letter}: that factory offer is no longer on this deal. Reload the page.`);
+        if (!q) throw new DomainError(`Option ${letter}: that factory offer is no longer on this inquiry. Reload the page.`);
         basis = { factoryBasis: q.basis, factoryBasisPlace: q.basisPlace };
         const rate = fxRate(q.currency, input.currency, sales.currency, sales.exchangeRates);
         for (const l of q.lines) {
@@ -573,7 +573,7 @@ export class QuotationsService {
     const id = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${inquiryId}::uuid for update`;
       const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
-      if (!canQuote(inquiry.stage)) throw new DomainError("This deal is closed. Reopen it to quote again.");
+      if (!canQuote(inquiry.stage)) throw new DomainError("This inquiry is closed. Reopen it to quote again.");
       let q = await tx.quotation.findUnique({
         where: { inquiryId },
         include: { revisions: { where: { deletedAt: null }, select: { number: true, status: true } } },
@@ -715,7 +715,7 @@ export class QuotationsService {
 
       if (to === "sent") {
         if (r.number !== latestRevision(refs)!.number) throw new GateError("Only the newest revision can be sent.", "not_latest");
-        if (!canQuote(inquiry.stage)) throw new DomainError("This deal is closed. Reopen it to quote again.");
+        if (!canQuote(inquiry.stage)) throw new DomainError("This inquiry is closed. Reopen it to quote again.");
         const settings = await this.settings.get();
         await tx.quotationRevision.update({
           where: { id: r.id },

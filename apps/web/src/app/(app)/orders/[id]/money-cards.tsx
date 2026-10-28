@@ -7,7 +7,7 @@ import type { OrderMoney } from "@/lib/types-money";
 import { EditFactoryPayment, VoidForm } from "@/components/money/forms";
 import { ExpenseRecord } from "@/components/money/expense-record";
 import type { Fx } from "@/lib/fx";
-import { CheckCircle2, Lock, Paperclip } from "lucide-react";
+import { CheckCircle2, Paperclip } from "lucide-react";
 import { RecordTable } from "@/components/money/payment-record";
 import { factoryPaymentAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../money/actions";
 import { AttachedFile } from "@/components/money/attachment";
@@ -23,9 +23,6 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
   const paidTotal = f.payments.filter((p) => !p.voided).reduce((t, p) => t + Number(p.amount), 0);
   return (
     <div className="flex flex-col gap-5">
-      <p className="flex items-center gap-1.5 text-xs text-muted">
-        <Lock className="size-3.5" aria-hidden /> Internal: never on the customer&apos;s documents.
-      </p>
       <section aria-label="What we owe each factory" className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">What we owe</h3>
         {f.rows.length === 0 ? (
@@ -85,13 +82,13 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
         )}
       </section>
 
-      <section aria-label="Payments to factories" className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Payments to factories</h3>
+      <section aria-label="Payments made to the factory" className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">Payments made</h3>
         {f.payments.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing paid to a factory for this order yet.</p>
         ) : (
           <RecordTable
-            label="Payments to factories"
+            label="Payments made to the factory"
             columns={[
               { label: "Date", width: "w-28" },
               { label: "Factory" },
@@ -99,7 +96,7 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
               { label: "Method · reference", hideBelow: "md" },
               { label: "Paid by", hideBelow: "md" },
               { label: "Amount", align: "right" },
-              { label: "Proof", hideBelow: "sm", width: "w-16" },
+              { label: "Bank slip", hideBelow: "sm", width: "w-20" },
             ]}
             rows={f.payments.map((p) => {
               const owedRow = f.rows.find((r) => r.factory.id === p.factory.id && r.currency === p.currency);
@@ -119,7 +116,7 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                   </span>,
                   <span key="b" className={p.paidBy ? "text-text-2" : "text-muted"}>{p.paidBy?.name ?? "—"}</span>,
                   <span key="a" className="font-semibold whitespace-nowrap">{money(p.amount, p.currency)}</span>,
-                  p.file ? <Paperclip key="p" className="size-4 text-text-2" aria-label="Proof kept" /> : <span key="p" className="text-muted">—</span>,
+                  p.file ? <Paperclip key="p" className="size-4 text-text-2" aria-label="Bank slip" /> : <span key="p" className="text-muted">—</span>,
                 ],
                 fields: [
                   { label: "Factory", value: <Link href={`/factories/${p.factory.id}`} className="hover:text-primary">{p.factory.name}</Link> },
@@ -159,15 +156,15 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                   },
                   ...(p.note ? [{ label: "Note", value: <span className="whitespace-pre-line">{p.note}</span>, wide: true }] : []),
                   {
-                    label: "Proof of payment",
+                    label: "Bank slip",
                     value: (
                       <AttachedFile
                         src={`/files/factory-payments/${p.id}`}
                         file={p.file}
-                        what="Proof of payment"
+                        what="Bank slip"
                         canChange={f.canRecord && !p.voided}
                         remove={removePaymentFileAction.bind(null, "out", p.id, m.orderId)}
-                        empty="No bank slip kept"
+                        empty="No bank slip"
                       />
                     ),
                     wide: true,
@@ -216,12 +213,12 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
         <>
           <section aria-label="Profit at a glance" className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-line bg-surface p-4">
-              <p className="text-xs text-muted">Profit on this order</p>
+              <p className="text-xs text-muted">Expected profit</p>
               <p className={cn("text-xl font-bold tabular", Number(p.earned) < 0 ? "text-bad" : "text-ok")}>{money(p.earned, c)}</p>
               {p.marginPercent !== null && <p className="text-xs text-text-2">{p.marginPercent}% of the order value</p>}
             </div>
             <div className="rounded-xl border border-line bg-surface p-4">
-              <p className="text-xs text-muted">Cash in hand so far</p>
+              <p className="text-xs text-muted">Cash so far</p>
               <p className={cn("text-xl font-bold tabular", Number(p.cash) < 0 && "text-bad")}>{money(p.cash, c)}</p>
               <p className="text-xs text-text-2">received minus what was paid out</p>
             </div>
@@ -234,20 +231,20 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
               </div>
             ) : (
               <div className="rounded-xl border border-line bg-surface p-4">
-                <p className="text-xs text-muted">Expenses</p>
+                <p className="text-xs text-muted">Costs</p>
                 <p className="text-xl font-bold tabular">{money(p.expenses, c)}</p>
-                <p className="text-xs text-text-2">freight, inspection, tickets…</p>
+                <p className="text-xs text-text-2">freight, inspection, tickets</p>
               </div>
             )}
           </section>
           <div className="grid gap-3 sm:grid-cols-2">
             <SumTable
-              title="Earned (the whole order)"
+              title="Expected profit (the whole order)"
               rows={[
                 ["Order value", money(p.revenue, c)],
                 ["Goods from the factories", `− ${money(p.goodsCost, c)}`],
-                ["Expenses", `− ${money(p.expenses, c)}`],
-                ...(Number(p.beforeSale) > 0 ? ([["Spent on the deal before the sale", `− ${money(p.beforeSale, c)}`]] as [string, string][]) : []),
+                ["Costs", `− ${money(p.expenses, c)}`],
+                ...(Number(p.beforeSale) > 0 ? ([["Costs before the order", `− ${money(p.beforeSale, c)}`]] as [string, string][]) : []),
               ]}
               total={Number(p.beforeSale) > 0 ? ["Profit after everything", money(p.net, c), Number(p.net) < 0] : ["Profit", money(p.earned, c), Number(p.earned) < 0]}
             />
@@ -256,33 +253,31 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
               rows={[
                 ["From the customer", money(p.received, c)],
                 ["Paid to factories", `− ${money(p.factoryPaid, c)}`],
-                ["Expenses", `− ${money(p.expenses, c)}`],
+                ["Costs", `− ${money(p.expenses, c)}`],
               ]}
               total={["In hand", money(p.cash, c), Number(p.cash) < 0]}
             />
           </div>
         </>
       )}
-      <section aria-label="Expenses" className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">
-          Expenses <span className="font-normal text-muted">· freight, inspection, tickets and other costs of this order; they also count on the customer</span>
-        </h3>
+      <section aria-label="Costs on this order" className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">Costs on this order</h3>
         {m.expenses && m.expenses.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface" aria-label="Expenses">
+          <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface" aria-label="Costs on this order">
             {m.expenses.map((e) => (
               <ExpenseRecord key={e.id} e={e} mainCurrency={mainCurrency} people={people} fx={fx} today={today} showFor={false} canChange={!m.cancelled} />
             ))}
           </ul>
         ) : (
-          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">No expenses yet. Add one when you pay for freight, an inspection or a ticket.</p>
+          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">No costs yet. Add one when you pay for freight, an inspection or a ticket.</p>
         )}
       </section>
       {m.dealExpenses && m.dealExpenses.length > 0 && (
-        <section aria-label="Spent on the deal before the order" className="flex flex-col gap-2">
+        <section aria-label="Costs before the order" className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold">
-            Spent on the deal before the order ·{" "}
-            <Link href={`/deals/${m.deal.id}`} className="font-normal text-primary hover:underline">
-              open the deal
+            Costs before the order ·{" "}
+            <Link href={`/inquiries/${m.deal.id}`} className="font-normal text-primary hover:underline">
+              open the inquiry
             </Link>
           </h3>
           <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">

@@ -14,7 +14,7 @@ Goal: sell Kebo RFQ Desk to other trading companies. Each company works in its o
 
 ## Roles
 
-- **Platform admin** (new, top level): companies, plans, demos, trials, usage. Works in its own area (`admin.rfq.fawadiqbal.dev`). Does **not** see a company's deals by default; opening a company's workspace for support is an explicit action, logged in the company's audit log.
+- **Platform admin** (new, top level): companies, plans, demos, trials, usage. Works in its own area (`admin.rfq.fawadiqbal.dev`). Does **not** see a company's inquiries by default; opening a company's workspace for support is an explicit action, logged in the company's audit log.
 - **Company admin**: today's "Super Admin" becomes the admin of their own company only: roles, users, settings, money, security for that company.
 - **Managers and staff**: as today, inside one company.
 
@@ -22,7 +22,7 @@ Goal: sell Kebo RFQ Desk to other trading companies. Each company works in its o
 
 ### Database
 - **Platform schema** (`platform`): companies, plans, platform admins, subdomains, demo and trial dates, usage counters, sign-up requests, platform audit log.
-- **One schema per company** (`co_<slug>`): today's 36 tables, unchanged in shape: users, roles, sessions, settings, counters, customers, factories, deals, quotations, orders, payments, expenses, accounts, targets, notifications, audit log…
+- **One schema per company** (`co_<slug>`): today's 36 tables, unchanged in shape: users, roles, sessions, settings, counters, customers, factories, inquiries, quotations, orders, payments, expenses, accounts, targets, notifications, audit log…
 - Per request, the API picks the company from the subdomain and uses a database connection whose `search_path` is that company's schema. The 34 raw SQL queries keep working unchanged.
 - One Prisma client per active company, created on first use and closed when idle (limit how many are open at once).
 - **Migrations** run for the platform schema, then for every company schema, on each deploy. A company that fails to migrate is switched to read-only and reported; the others carry on.
@@ -49,8 +49,8 @@ Goal: sell Kebo RFQ Desk to other trading companies. Each company works in its o
 3. **Self sign-up with a trial**: public page with company name, subdomain, name, email and password. Email verification, rate limits and a bot check. Trial of N days (e.g. 14), starting empty or with sample data (their choice). At the end it becomes read-only until a plan is set. The platform admin is told about every sign-up.
 
 ## Plans and limits
-- Plan fields: name, max users, max storage (GB), max active deals per month (optional), trial days, features on/off (e.g. Insights, multi-currency).
-- Each company's usage is counted (users, files, deals this month) and shown to its admin (Settings → Plan) and to the platform admin.
+- Plan fields: name, max users, max storage (GB), max active inquiries per month (optional), trial days, features on/off (e.g. Insights, multi-currency).
+- Each company's usage is counted (users, files, inquiries this month) and shown to its admin (Settings → Plan) and to the platform admin.
 - Near a limit: warning banner. At the limit: new users and uploads are refused with a clear message; nothing is deleted.
 - No online payment yet; the platform admin changes plans by hand. Payment (e.g. Stripe or a local gateway) comes later.
 

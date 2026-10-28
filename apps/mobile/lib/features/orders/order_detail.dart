@@ -229,7 +229,7 @@ class _StageCard extends ConsumerWidget {
             ),
           ),
         ],
-        if (!canMove && cancelled == null) ...[gap12, Text('Only the people handling this deal can move the order.', style: context.t.bodySmall)],
+        if (!canMove && cancelled == null) ...[gap12, Text('Only the people handling this inquiry can move the order.', style: context.t.bodySmall)],
       ]),
     );
   }

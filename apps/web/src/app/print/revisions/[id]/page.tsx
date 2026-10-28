@@ -117,7 +117,7 @@ export default async function QuotationPrint({
     <>
       <PrintToolbar
         title={`Quotation ${numberOf(r)}`}
-        backHref={backTo(sp.back, `/deals/${r.quotation.inquiryId}/quotation`)}
+        backHref={backTo(sp.back, `/inquiries/${r.quotation.inquiryId}/quotation`)}
         pdfHref={`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`}
         excelHref={`/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}`}
         copies={{

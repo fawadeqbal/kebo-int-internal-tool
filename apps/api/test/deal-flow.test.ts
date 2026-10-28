@@ -162,7 +162,7 @@ describe("a whole deal through the API", () => {
 
   it("asks why a deal is lost, and lists deals by stage", async () => {
     const res = await api(app, staff).post(`/inquiries/${inquiryId}/stage`, { to: "lost" }).expect(422);
-    expect(res.body.error).toBe("Choose why the deal was lost");
+    expect(res.body.error).toBe("Choose why the inquiry was lost");
     await api(app, staff).post(`/inquiries/${inquiryId}/hold`, { onHold: true, note: "Waiting for new drawings" }).expect(200);
     const held = await api(app, staff).get("/inquiries?stage=on_hold&assignee=me").expect(200);
     expect(held.body.rows.map((r: { id: string }) => r.id)).toContain(inquiryId);

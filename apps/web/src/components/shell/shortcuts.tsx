@@ -19,7 +19,7 @@ export function KeyboardShortcuts({ canCreate }: { canCreate: boolean }) {
         }
       } else if (e.key === "n" && canCreate) {
         e.preventDefault();
-        router.push("/deals/new");
+        router.push("/inquiries/new");
       }
     };
     window.addEventListener("keydown", onKey);

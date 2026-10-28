@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, Pencil } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind } from "@kebo/shared";
 import { Alert, Button, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
@@ -225,7 +225,24 @@ export function DetailsForm({
 /* ---------------------------------------------------------------- payments */
 
 /** "Record a payment" (managers): suggests the deposit still missing, else what is still due. */
-export function PaymentForm({ action, currency, depositDue, due, today }: { action: Action; currency: string; depositDue: string; due: string; today: string }) {
+export function PaymentForm({
+  action,
+  currency,
+  depositDue,
+  due,
+  today,
+  label = "Record a payment",
+  quiet,
+}: {
+  action: Action;
+  currency: string;
+  depositDue: string;
+  due: string;
+  today: string;
+  /** The button's words, and a plain (not violet) button. */
+  label?: string;
+  quiet?: boolean;
+}) {
   const first: PaymentKind = Number(depositDue) > 0 ? "deposit" : "balance";
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<PaymentKind>(first);
@@ -252,7 +269,7 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
         {fileError && <Alert tone="error">{fileError}</Alert>}
         <Button
           className="w-fit"
-          variant="primary"
+          variant={quiet ? "secondary" : "primary"}
           size="sm"
           onClick={() => {
             setKind(first);
@@ -260,7 +277,7 @@ export function PaymentForm({ action, currency, depositDue, due, today }: { acti
             setOpen(true);
           }}
         >
-          Record a payment
+          {quiet && <Plus aria-hidden />} {label}
         </Button>
       </div>
     );

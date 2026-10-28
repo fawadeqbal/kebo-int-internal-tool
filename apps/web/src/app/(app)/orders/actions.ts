@@ -121,7 +121,7 @@ export async function orderNoteAction(orderId: string, dealId: string, _prev: Ac
   const r = await attempt(form, () => api.post(`/inquiries/${dealId}/notes`, { body: v.body }));
   if (r.ok) {
     revalidatePath(`/orders/${orderId}`, "layout");
-    revalidatePath(`/deals/${dealId}`);
+    revalidatePath(`/inquiries/${dealId}`);
   }
   return r;
 }
@@ -136,7 +136,7 @@ export async function orderRemoveFileAction(
   const r = await attempt(null, () => api.delete(`/files/${fileId}`), "File removed.");
   if (r.ok) {
     revalidatePath(`/orders/${orderId}`, "layout");
-    revalidatePath(`/deals/${dealId}`);
+    revalidatePath(`/inquiries/${dealId}`);
   }
   return r;
 }

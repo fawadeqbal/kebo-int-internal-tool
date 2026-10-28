@@ -55,7 +55,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
     return Scaffold(
       appBar: tabBar(context, 'Deals'),
       floatingActionButton: session.can('inquiries.create')
-          ? FloatingActionButton(onPressed: () => context.push('/deals/new'), tooltip: 'New deal', child: const Icon(Icons.add_rounded))
+          ? FloatingActionButton(onPressed: () => context.push('/deals/new'), tooltip: 'New inquiry', child: const Icon(Icons.add_rounded))
           : null,
       body: PagedList(
         key: ValueKey(key),
@@ -87,7 +87,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
         ],
         empty: EmptyState(
           icon: Icons.inbox_outlined,
-          title: 'No deals here',
+          title: 'No inquiries here',
           message: _q.isNotEmpty ? 'Try clearing the search.' : 'New RFQs from the website, WhatsApp and email show up here.',
         ),
         itemBuilder: (context, r) => DealRow(r),

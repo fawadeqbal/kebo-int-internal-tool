@@ -61,7 +61,7 @@ class MoreScreen extends ConsumerWidget {
           ]),
         ),
         const Overline('On the web'),
-        WebNote('Use the web app for: ${onWeb.join('; ')}. The phone follows the same deals and orders, moves orders through their stages and opens their PDFs.'),
+        WebNote('Use the web app for: ${onWeb.join('; ')}. The phone follows the same inquiries and orders, moves orders through their stages and opens their PDFs.'),
         const Overline('App'),
         Card(
           child: Padding(

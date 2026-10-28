@@ -109,7 +109,7 @@ export class RemindersListService {
           title: `${label} expires ${until === today ? "today" : `on ${until}`}: no answer yet`,
           detail: `${d.customer.name} · follow up, or give a new validity`,
           due: until,
-          href: `/deals/${d.id}/quotation`,
+          href: `/inquiries/${d.id}/quotation`,
           action: "Follow up",
           who: nameOf(d.assignee),
         });
@@ -121,7 +121,7 @@ export class RemindersListService {
           title: `${label}: no answer for ${daysBetween(sent, today)} days`,
           detail: `${d.customer.name} · a short follow-up message often wins it`,
           due: addDays(sent, 5),
-          href: `/deals/${d.id}/quotation`,
+          href: `/inquiries/${d.id}/quotation`,
           action: "Follow up",
           who: nameOf(d.assignee),
         });
@@ -143,7 +143,7 @@ export class RemindersListService {
           title: `${d.refNo}: nobody handles it yet`,
           detail: `${d.customer.name} · ${d.title}`,
           due: created,
-          href: `/deals/${d.id}`,
+          href: `/inquiries/${d.id}`,
           action: "Assign someone",
           who: null,
         });
@@ -155,7 +155,7 @@ export class RemindersListService {
           title: `${d.refNo}: not started after ${daysBetween(created, today)} days`,
           detail: `${d.customer.name} · get factory prices`,
           due: addDays(created, s.reminders.newDays),
-          href: `/deals/${d.id}/sourcing`,
+          href: `/inquiries/${d.id}/sourcing`,
           action: "Get prices",
           who: nameOf(d.assignee),
         });
@@ -167,8 +167,8 @@ export class RemindersListService {
           title: `${d.refNo}: the customer needed it by ${needed}`,
           detail: `${d.customer.name} · ${d.title}`,
           due: needed,
-          href: `/deals/${d.id}`,
-          action: "Open the deal",
+          href: `/inquiries/${d.id}`,
+          action: "Open the inquiry",
           who: nameOf(d.assignee),
         });
     }
@@ -188,7 +188,7 @@ export class RemindersListService {
           title: `${f.inquiry.refNo}: ${f.factory.name}'s price ${until < today ? "ran out" : "runs out"} ${until === today ? "today" : `on ${until}`}`,
           detail: "Confirm it with the factory, or get a new price",
           due: until,
-          href: `/deals/${f.inquiry.id}/sourcing`,
+          href: `/inquiries/${f.inquiry.id}/sourcing`,
           action: "Check the price",
           who: nameOf(f.inquiry.assignee),
         });

@@ -45,10 +45,10 @@ export async function DealExpensesCard({
   return (
     <Card>
       <CardHeader
-        title="Spent on this deal"
+        title="Spent on this inquiry"
         description={
           deal.stage === "lost"
-            ? "Managers only. What this lost deal cost us: trips, samples, visits to factories."
+            ? "Managers only. What this lost inquiry cost us: trips, samples, visits to factories."
             : deal.order
               ? `Managers only. Spent before the order; it comes off ${deal.order.refNo}'s profit.`
               : "Managers only. Trips to check products, samples, visits to factories. Won: it comes off the order's profit."
@@ -57,20 +57,20 @@ export async function DealExpensesCard({
       />
       <CardBody className="flex flex-col gap-3">
         {rows.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Spent on this deal">
+          <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Spent on this inquiry">
             {rows.map((e) => (
               <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} choices={choices} showFor={false} />
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted">Nothing spent on this deal yet.</p>
+          <p className="text-sm text-muted">Nothing spent on this inquiry yet.</p>
         )}
         {deal.order && (
           <Link href={`/orders/${deal.order.id}/money`} className="text-sm text-primary hover:underline">
             The order&apos;s own costs and profit
           </Link>
         )}
-        <NewExpense action={expenseAction.bind(null, null, null)} people={people} mainCurrency={c} fx={fx} today={today} choices={choices} label="Add an expense for this deal" />
+        <NewExpense action={expenseAction.bind(null, null, null)} people={people} mainCurrency={c} fx={fx} today={today} choices={choices} label="Add an expense for this inquiry" />
       </CardBody>
     </Card>
   );

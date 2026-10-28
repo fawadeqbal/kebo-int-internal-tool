@@ -76,7 +76,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                 ? "Try part of the name, or add it as a new factory."
                 : mine
                   ? "Choose “Looked after by” on a factory to make it yours."
-                  : "Factories are added here, or when you record a factory's prices on a deal."
+                  : "Factories are added here, or when you record a factory's prices on an inquiry."
             }
             action={<ButtonLink href="/factories/new">New factory</ButtonLink>}
           />

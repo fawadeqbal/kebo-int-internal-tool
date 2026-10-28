@@ -26,12 +26,12 @@ export async function CustomerHistoryNote({ customerId, dealId }: { customerId: 
       className={cn("mb-4 rounded-xl border px-4 py-3 text-sm", net < 0 ? "border-bad/30 bg-bad-soft/40" : "border-info/30 bg-info-soft/40")}
     >
       <p className="font-medium">
-        {a.customer.name} has been here before: {others.length} other deal{others.length === 1 ? "" : "s"} · {won} won · {lost.length} lost
+        {a.customer.name} has been here before: {others.length} other {others.length === 1 ? "inquiry" : "inquiries"} · {won} won · {lost.length} lost
         {a.winRate !== null && ` · ${a.winRate}% won`}
       </p>
       <p className="mt-0.5 text-text-2">
         Spent on them so far {money(a.totals.spent, c)}
-        {Number(a.totals.lostDeals) > 0 && <>, of it {money(a.totals.lostDeals, c)} on deals we lost</>}. Net result{" "}
+        {Number(a.totals.lostDeals) > 0 && <>, of it {money(a.totals.lostDeals, c)} on inquiries we lost</>}. Net result{" "}
         <span className={cn("font-medium tabular", net < 0 ? "text-bad" : "text-ok")}>{money(a.totals.net, c)}</span>.
       </p>
       {lost.length > 0 && (

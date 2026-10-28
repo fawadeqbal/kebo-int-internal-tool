@@ -162,7 +162,7 @@ function ProfitBody({
         <div className="min-w-0 rounded-xl border border-line bg-surface p-4">
           <p className="text-xs text-muted">Spent on them</p>
           <p className="truncate text-xl font-bold tabular">{spent > 0 ? `− ${money(spent, c)}` : money(0, c)}</p>
-          <p className="text-xs text-text-2">trips, meals, deals we lost</p>
+          <p className="text-xs text-text-2">trips, meals, inquiries we lost</p>
         </div>
         <div
           className={cn(
@@ -180,7 +180,7 @@ function ProfitBody({
       </section>
 
       <p className="text-sm text-text-2">
-        {a.deals.total} deal{a.deals.total === 1 ? "" : "s"} · {a.deals.won} won · {a.deals.lost} lost · {a.deals.open} open
+        {a.deals.total} {a.deals.total === 1 ? "inquiry" : "inquiries"} · {a.deals.won} won · {a.deals.lost} lost · {a.deals.open} open
         {a.winRate !== null && (
           <>
             {" "}
@@ -190,14 +190,14 @@ function ProfitBody({
         {t.sellingCostPerWin !== null && <> · selling cost per order won {money(t.sellingCostPerWin, c)}</>}
       </p>
 
-      <section aria-label="Deal by deal" className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Deal by deal</h2>
+      <section aria-label="Inquiry by inquiry" className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Inquiry by inquiry</h2>
         <div className="overflow-hidden rounded-lg border border-line bg-surface">
           <table data-fit="" className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-surface-2 text-left text-xs text-text-2">
                 <th scope="col" className={th}>
-                  Deal
+                  Inquiry
                 </th>
                 <th scope="col" className={cn(th, "hidden sm:table-cell")}>
                   Result
@@ -234,7 +234,7 @@ function ProfitBody({
                 return (
                   <tr key={d.id} className="border-t border-line">
                     <td className={td}>
-                      <Link href={`/deals/${d.id}`} className="font-medium hover:text-primary">
+                      <Link href={`/inquiries/${d.id}`} className="font-medium hover:text-primary">
                         {d.refNo}
                       </Link>
                       <span className="block max-w-72 truncate text-xs text-muted">{d.title}</span>
@@ -271,7 +271,7 @@ function ProfitBody({
               {Number(t.otherCosts) > 0 && (
                 <tr className="border-t border-line">
                   <td className={td}>
-                    <span className="font-medium">Not tied to a deal</span>
+                    <span className="font-medium">Not tied to an inquiry</span>
                     <span className="block text-xs text-muted">visits, meals, gifts for them</span>
                   </td>
                   <td className={cn(td, "hidden sm:table-cell")} />

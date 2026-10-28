@@ -12,7 +12,7 @@ import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRo
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, money as amount } from "@/lib/format";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
-import type { OfferLineResult } from "@/app/(app)/deals/[id]/sourcing/actions";
+import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { FileDrop, send, type Staged } from "./documents-panel";
 import { OfferHeaderForm } from "./factory-quote-form";
 import { CoverageBadge } from "./revision-editor";

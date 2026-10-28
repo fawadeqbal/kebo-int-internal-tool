@@ -28,7 +28,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     <div>
       <PageHeader
         title="Customers"
-        description={can(me, "inquiries.viewAll") ? "Every buyer, their contacts and what is open with them." : "The customers of the deals you handle or created."}
+        description={can(me, "inquiries.viewAll") ? "Every buyer, their contacts and what is open with them." : "The customers of the inquiries you handle or created."}
         actions={
           <>
             <PartyExcel kind="customers" importAction={canAdd ? importCustomersAction : undefined} exportHref={buildHref("/sheets/export/customers", {}, keep)} />
@@ -81,7 +81,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     </span>
                   </span>
                   <span className="shrink-0 text-right text-xs text-muted tabular">
-                    {c.openDeals} deal{c.openDeals === 1 ? "" : "s"}
+                    {c.openDeals} {c.openDeals === 1 ? "inquiry" : "inquiries"}
                     <span className="block">
                       {c.openOrders} order{c.openOrders === 1 ? "" : "s"}
                     </span>
@@ -96,7 +96,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <Th>Customer</Th>
                 <Th>Country</Th>
                 <Th>Primary contact</Th>
-                <Th className="text-right">Open deals</Th>
+                <Th className="text-right">Open inquiries</Th>
                 <Th className="text-right">Open orders</Th>
               </tr>
             </THead>
@@ -135,7 +135,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     </Td>
                     <Td className="text-right tabular">
                       {c.openDeals ? (
-                        <Link href={`/deals?customer=${c.id}`} className="hover:text-primary">
+                        <Link href={`/inquiries?customer=${c.id}`} className="hover:text-primary">
                           {c.openDeals}
                         </Link>
                       ) : (

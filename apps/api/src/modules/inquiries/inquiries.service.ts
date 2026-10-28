@@ -175,7 +175,7 @@ export class InquiriesService {
   /** A deal the person may change, or 403/404. */
   async findWorkable(user: SessionUser, id: string, db: Tx | PrismaService["db"] = this.prisma.db) {
     const i = await this.find(user, id, db);
-    if (!canWorkOn(user, i)) throw new ForbiddenError("Only the person handling this deal or a manager can change it.");
+    if (!canWorkOn(user, i)) throw new ForbiddenError("Only the person handling this inquiry or a manager can change it.");
     return i;
   }
 
@@ -309,7 +309,7 @@ export class InquiriesService {
       const p = parentOf[n];
       if (p === null) continue;
       if (p === -1 || p === n || p >= items.length || parentOf[p] !== null)
-        throw new DomainError(`"${item.description.split("\n")[0]}" is a part of an item that is not on this deal any more. Remove the part or keep its item.`);
+        throw new DomainError(`"${item.description.split("\n")[0]}" is a part of an item that is not on this inquiry any more. Remove the part or keep its item.`);
     }
     const order = items.map((_, n) => n).filter((n) => parentOf[n] === null).flatMap((t) => [t, ...items.map((_, n) => n).filter((n) => parentOf[n] === t)]);
     const keep = items.map((i) => i.id).filter((id): id is string => !!id && existing.has(id));
@@ -404,13 +404,13 @@ export class InquiriesService {
 
   async update(user: SessionUser, id: string, input: InquiryInput) {
     const existing = await this.findWorkable(user, id);
-    if (!isOpen(existing.stage)) throw new DomainError("This deal is closed. Reopen it to change the details.");
+    if (!isOpen(existing.stage)) throw new DomainError("This inquiry is closed. Reopen it to change the details.");
     const changes: string[] = [];
     if (input.customerId !== existing.customerId) {
       const sent = await this.prisma.db.quotationRevision.count({
         where: { quotation: { inquiryId: id }, status: { not: "draft" }, deletedAt: null },
       });
-      if (sent) throw new DomainError("A quotation was already sent to this customer, so the deal cannot move to another customer.");
+      if (sent) throw new DomainError("A quotation was already sent to this customer, so the inquiry cannot move to another customer.");
       if (await this.prisma.db.factoryQuote.count({ where: { inquiryId: id, deletedAt: null } })) changes.push("moved to another customer");
     }
     changes.push(...(await this.pricedItemChanges(id, input.items)));
@@ -466,7 +466,7 @@ export class InquiriesService {
       const i = await this.findWorkable(user, id, tx);
       const reason =
         i.stage === "lost" && input.to !== "lost"
-          ? requireReason(input.reason ?? input.note, "reopen", "the deal is reopened")
+          ? requireReason(input.reason ?? input.note, "reopen", "the inquiry is reopened")
           : (input.reason ?? null);
       return this.stages.manual(
         tx,
@@ -483,10 +483,10 @@ export class InquiriesService {
   async hold(user: SessionUser, id: string, input: { onHold: boolean; note: string | null; reason?: string | null }) {
     await this.prisma.tx(async (tx) => {
       const i = await this.findWorkable(user, id, tx);
-      if (input.onHold && !canHold(i.stage)) throw new DomainError("Only an open deal can be put on hold.");
+      if (input.onHold && !canHold(i.stage)) throw new DomainError("Only an open inquiry can be put on hold.");
       if (i.onHold === input.onHold) return;
       const reason = input.onHold
-        ? requireReason(input.reason ?? input.note, "hold", "the deal goes on hold")
+        ? requireReason(input.reason ?? input.note, "hold", "the inquiry goes on hold")
         : (input.reason ?? input.note ?? null);
       await tx.inquiry.update({ where: { id }, data: { onHold: input.onHold } });
       if (input.note)
@@ -517,7 +517,7 @@ export class InquiriesService {
       await this.assertAssignable(user, assigneeId);
       if (i.assigneeId === assigneeId) return [];
       // Taking work over from someone needs a reason; first assignment does not.
-      const reason = i.assigneeId ? requireReason(reasonInput, "reassign", "the deal moves to another person") : (reasonInput ?? null);
+      const reason = i.assigneeId ? requireReason(reasonInput, "reassign", "the inquiry moves to another person") : (reasonInput ?? null);
       await tx.inquiry.update({ where: { id }, data: { assigneeId } });
       await tx.inquiryAssignment.create({ data: { inquiryId: id, assigneeId, assignedById: user.id } });
       await this.audit.record(tx, {
@@ -552,7 +552,7 @@ export class InquiriesService {
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from inquiries where id = ${id}::uuid for update`;
       const i = await this.findWorkable(user, id, tx);
-      if (!isOpen(i.stage)) throw new DomainError("This deal is closed. Reopen it to change its items.");
+      if (!isOpen(i.stage)) throw new DomainError("This inquiry is closed. Reopen it to change its items.");
       const item = await tx.requestedItem.findFirst({
         where: { id: itemId, inquiryId: id },
         include: { _count: { select: { factoryLines: { where: { factoryQuote: { deletedAt: null } } } } } },
@@ -613,7 +613,7 @@ export class InquiriesService {
     if (!can(user, "inquiries.delete")) throw new ForbiddenError();
     const i = await this.find(user, id);
     if (await this.prisma.db.order.count({ where: { inquiryId: id } }))
-      throw new ConflictError("This deal has an order, so it cannot be removed.");
+      throw new ConflictError("This inquiry has an order, so it cannot be removed.");
     await this.prisma.tx(async (tx) => {
       await tx.inquiry.update({ where: { id }, data: { deletedAt: new Date() } });
       await this.audit.record(tx, {
@@ -639,7 +639,7 @@ export class InquiriesService {
     if (meta.factoryQuoteId) {
       if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
       const q = await this.prisma.db.factoryQuote.findFirst({ where: { id: meta.factoryQuoteId, inquiryId: id, deletedAt: null } });
-      if (!q) throw new DomainError("That factory offer is not on this deal any more.");
+      if (!q) throw new DomainError("That factory offer is not on this inquiry any more.");
     }
     if (!this.storage.isAllowed(file.originalname))
       throw new DomainError("This kind of file is not allowed. Use PDF, Office, images, CAD drawings or zip files.");
@@ -697,7 +697,7 @@ export class InquiriesService {
     const a = await this.fileFor(user, attachmentId);
     const i = await this.find(user, a.inquiryId);
     if (!(canWorkOn(user, i) || a.uploadedById === user.id))
-      throw new ForbiddenError("Only the uploader, the person handling the deal or a manager can change this file.");
+      throw new ForbiddenError("Only the uploader, the person handling the inquiry or a manager can change this file.");
     return this.prisma.tx(async (tx) => {
       const row = await tx.attachment.update({ where: { id: attachmentId }, data: { kind: input.kind, note: input.note ?? null } });
       await this.audit.record(tx, {
@@ -718,7 +718,7 @@ export class InquiriesService {
     const i = await this.find(user, id);
     // The deal's own documents; factory offers' files stay on Factory prices.
     const files = await this.prisma.db.attachment.findMany({ where: { inquiryId: id, deletedAt: null, factoryQuoteId: null }, orderBy: [{ createdAt: "asc" }] });
-    if (!files.length) throw new DomainError("There are no files on this deal yet.");
+    if (!files.length) throw new DomainError("There are no files on this inquiry yet.");
     const total = files.reduce((t, f) => t + f.size, 0);
     if (total > 300 * 1024 * 1024) throw new DomainError("These files are over 300 MB together. Download them one by one.");
     const used = new Set<string>();
@@ -739,7 +739,7 @@ export class InquiriesService {
     const a = await this.fileFor(user, attachmentId);
     const i = await this.find(user, a.inquiryId);
     if (!(canWorkOn(user, i) || a.uploadedById === user.id))
-      throw new ForbiddenError("Only the uploader, the person handling the deal or a manager can remove this file.");
+      throw new ForbiddenError("Only the uploader, the person handling the inquiry or a manager can remove this file.");
     await this.prisma.tx(async (tx) => {
       await tx.attachment.update({ where: { id: attachmentId }, data: { deletedAt: new Date() } });
       await this.audit.record(tx, {

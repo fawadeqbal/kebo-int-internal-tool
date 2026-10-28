@@ -14,7 +14,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
   const [c, settings] = await Promise.all([load(() => api.get<CustomerDetail>(`/customers/${id}`)), api.get<SalesCurrencies>("/settings")]);
   return (
     <div className="max-w-4xl">
-      <PageHeader backHref={`/customers/${c.id}`} backLabel={c.name} title={`Edit ${c.name}`} description="Removing a contact keeps them on past deals; they just stop appearing in pickers." />
+      <PageHeader backHref={`/customers/${c.id}`} backLabel={c.name} title={`Edit ${c.name}`} description="Removing a contact keeps them on past inquiries; they just stop appearing in pickers." />
       <CustomerForm action={saveCustomerAction.bind(null, c.id)} customer={c} currencies={currenciesFrom(settings)} cancelHref={`/customers/${c.id}`} />
     </div>
   );

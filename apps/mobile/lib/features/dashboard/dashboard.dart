@@ -33,7 +33,7 @@ class DashboardScreen extends ConsumerWidget {
     return Scaffold(
       appBar: tabBar(context, 'Home'),
       floatingActionButton: session.can('inquiries.create')
-          ? FloatingActionButton.extended(onPressed: () => context.push('/deals/new'), icon: const Icon(Icons.add_rounded), label: const Text('New deal'))
+          ? FloatingActionButton.extended(onPressed: () => context.push('/deals/new'), icon: const Icon(Icons.add_rounded), label: const Text('New inquiry'))
           : null,
       body: RefreshIndicator(
         onRefresh: () async => ref.read(dataVersionProvider.notifier).bump(),
@@ -83,8 +83,8 @@ class _Body extends StatelessWidget {
           more: () => context.go('/orders'),
         ),
         StatGrid([
-          StatTile(label: 'Open deals', value: '$open', hint: '${counts.i('new')} new · ${counts.i('sourcing')} sourcing · ${counts.i('quoted')} quoted', icon: Icons.inbox_outlined, onTap: () => context.go('/deals?stage=open')),
-          StatTile(label: 'Past needed-by', value: '${counts.i('overdue')}', hint: 'open deals', tone: counts.i('overdue') > 0 ? Tone.bad : null, icon: Icons.schedule_rounded, onTap: () => context.go('/deals?stage=open')),
+          StatTile(label: 'Open inquiries', value: '$open', hint: '${counts.i('new')} new · ${counts.i('sourcing')} sourcing · ${counts.i('quoted')} quoted', icon: Icons.inbox_outlined, onTap: () => context.go('/deals?stage=open')),
+          StatTile(label: 'Past needed-by', value: '${counts.i('overdue')}', hint: 'open inquiries', tone: counts.i('overdue') > 0 ? Tone.bad : null, icon: Icons.schedule_rounded, onTap: () => context.go('/deals?stage=open')),
           StatTile(label: 'On hold', value: '${counts.i('onHold')}', hint: 'waiting on the customer', icon: Icons.pause_circle_outline_rounded, onTap: () => context.go('/deals?stage=on_hold')),
           if (session.isManager)
             StatTile(label: 'Not assigned', value: '${counts.i('unassigned')}', hint: 'nobody has it yet', tone: counts.i('unassigned') > 0 ? Tone.warn : null, icon: Icons.person_off_outlined, onTap: () => context.go('/deals?stage=new'))
@@ -92,17 +92,17 @@ class _Body extends StatelessWidget {
             StatTile(label: 'Quoted', value: '${counts.i('quoted')}', hint: stageHint['quoted'], icon: Icons.request_quote_outlined, onTap: () => context.go('/deals?stage=quoted')),
         ]),
         _ListCard(
-          title: 'My open deals',
-          empty: 'No open deals are assigned to you.',
+          title: 'My open inquiries',
+          empty: 'No open inquiries are assigned to you.',
           rows: d.l('myDeals'),
           row: (r) => DealRow(r),
           more: () => context.go('/deals?stage=open'),
         ),
         if (session.isManager)
           _ListCard(
-            title: 'New deals',
+            title: 'New inquiries',
             subtitle: 'Nobody has started yet, newest first',
-            empty: 'No new deals.',
+            empty: 'No new inquiries.',
             rows: d.l('newDeals'),
             row: (r) => DealRow(r),
             more: () => context.go('/deals?stage=new'),
@@ -137,7 +137,7 @@ class _Body extends StatelessWidget {
         if (d.l('workload').isNotEmpty)
           SectionCard(
             title: 'Team',
-            subtitle: 'Open deals and orders per person',
+            subtitle: 'Open inquiries and orders per person',
             padding: EdgeInsets.zero,
             child: CardList(children: [
               for (final p in d.l('workload'))
@@ -146,7 +146,7 @@ class _Body extends StatelessWidget {
                   title: p.s('name'),
                   subtitle: Text(roleLabel[p.s('role')] ?? p.s('role')),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    ToneBadge('${p.i('openDeals')} deals', tone: Tone.info),
+                    ToneBadge('${p.i('openDeals')} inquiries', tone: Tone.info),
                     gap4,
                     ToneBadge('${p.i('openOrders')} orders', tone: Tone.outline),
                   ]),

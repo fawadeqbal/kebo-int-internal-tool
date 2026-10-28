@@ -46,7 +46,7 @@ const lostReasonLabel = {
 
 /// Why a stage changed (stage history `cause`).
 const stageCauseLabel = {
-  'created': 'Deal created',
+  'created': 'Inquiry created',
   'assigned': 'Someone was assigned',
   'factory_price_added': 'Factory price added',
   'quotation_sent': 'Quotation sent',

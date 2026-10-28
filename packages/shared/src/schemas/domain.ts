@@ -148,7 +148,7 @@ export const stageMoveInput = z
     note: optionalText(2000),
     reason: reasonField,
   })
-  .refine((v) => v.to !== "lost" || !!v.lostReason, { message: "Choose why the deal was lost", path: ["lostReason"] });
+  .refine((v) => v.to !== "lost" || !!v.lostReason, { message: "Choose why the inquiry was lost", path: ["lostReason"] });
 export type StageMoveInput = z.infer<typeof stageMoveInput>;
 
 export const holdInput = z.object({ onHold: bool, note: optionalText(2000), reason: reasonField });

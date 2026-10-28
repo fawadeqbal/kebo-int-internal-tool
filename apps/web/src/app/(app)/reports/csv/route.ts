@@ -23,7 +23,7 @@ function toCsv(r: ReportView) {
     row(r.funnel.received, r.funnel.quoted, r.funnel.won, r.funnel.lost, r.funnel.winRatePercent, r.wonValue),
     "",
     row("Lost reasons"),
-    row("Reason", "Deals"),
+    row("Reason", "Inquiries"),
     ...r.lostReasons.map((x) => row(LOST_REASON_LABEL[x.reason], x.count)),
     "",
     row("By channel"),

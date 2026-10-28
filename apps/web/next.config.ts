@@ -9,6 +9,13 @@ const config: NextConfig = {
   transpilePackages: ["@kebo/ui"],
   poweredByHeader: false,
   serverExternalPackages: ["puppeteer-core", "exceljs"],
+  // Inquiries used to be called deals: old links and bookmarks still open.
+  async redirects() {
+    return [
+      { source: "/deals", destination: "/inquiries", permanent: true },
+      { source: "/deals/:path*", destination: "/inquiries/:path*", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

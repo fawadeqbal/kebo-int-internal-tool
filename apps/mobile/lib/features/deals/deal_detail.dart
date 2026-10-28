@@ -156,7 +156,7 @@ class _Actions extends ConsumerWidget {
           icon: d.b('onHold') ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded,
           style: BusyStyle.outlined,
           onPressed: () async {
-            final note = await _askNote(context, d.b('onHold') ? 'Resume this deal' : 'Put this deal on hold', d.b('onHold') ? 'Optional: what changed.' : 'Optional: what you are waiting for (drawings, budget…). Reminders skip deals on hold.');
+            final note = await _askNote(context, d.b('onHold') ? 'Resume this inquiry' : 'Put this inquiry on hold', d.b('onHold') ? 'Optional: what changed.' : 'Optional: what you are waiting for (drawings, budget…). Reminders skip inquiries on hold.');
             if (note == null) return;
             await ref.mutate(() => repo.hold(id, !d.b('onHold'), note: note));
             if (context.mounted) toast(context, d.b('onHold') ? 'Resumed.' : 'On hold.');

@@ -6,7 +6,7 @@ import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib
 import type { DealDetail } from "@/lib/types";
 import type { QuoteOffers } from "@/lib/types-deals";
 
-const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
+const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
 /** Start the next revision as a draft (JSON in `payload`, from …/quotation/draft and the person's changes). */
 export async function createRevisionAction(dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
@@ -31,7 +31,7 @@ export async function deleteRevisionAction(dealId: string, revisionId: string, _
 }
 
 const DONE: Record<string, string> = {
-  sent: "Marked as sent. The deal is now Quoted.",
+  sent: "Marked as sent. The inquiry is now Quoted.",
   accepted: "Accepted. The order was created.",
   rejected: "Recorded: the customer rejected it.",
   expired: "Marked expired.",

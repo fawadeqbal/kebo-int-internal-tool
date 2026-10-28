@@ -21,8 +21,8 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
     return (
       <Alert tone="warning">
         {d.stage === "won" || d.stage === "lost"
-          ? "This deal is closed. Reopen it to change the details."
-          : "Only the person handling this deal or a manager can change it."}
+          ? "This inquiry is closed. Reopen it to change the details."
+          : "Only the person handling this inquiry or a manager can change it."}
       </Alert>
     );
 
@@ -59,7 +59,7 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
     <div className="max-w-4xl">
       <h2 className="mb-1 text-base font-semibold">Edit the inquiry</h2>
       <p className="mb-4 text-sm text-muted">
-        Factory prices stay linked to the items you keep; prices for a removed item are no longer compared. Who handles the deal is changed
+        Factory prices stay linked to the items you keep; prices for a removed item are no longer compared. Who handles the inquiry is changed
         on the Overview tab.
       </p>
       <DealForm
@@ -75,7 +75,7 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
         itemsFromExcel={!sent}
         searchCustomers={searchCustomersAction}
         loadContacts={customerContactsAction}
-        cancelHref={`/deals/${d.id}`}
+        cancelHref={`/inquiries/${d.id}`}
       />
     </div>
   );

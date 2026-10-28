@@ -9,7 +9,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { DealFile } from "@/lib/types";
-import { RemoveFile } from "@/app/(app)/deals/[id]/panels";
+import { RemoveFile } from "@/app/(app)/inquiries/[id]/panels";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -52,7 +52,7 @@ export function send(dealId: string, s: Staged, onProgress: (p: number) => void,
     for (const [k, v] of Object.entries(extra)) body.set(k, v);
     if (s.note.trim()) body.set("note", s.note.trim());
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `/files/deals/${dealId}`);
+    xhr.open("POST", `/files/inquiries/${dealId}`);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) return resolve(null);
@@ -108,7 +108,7 @@ export function DocumentsPanel({ dealId, files, canUpload }: { dealId: string; f
         <>
           {files.length > 1 && (
             <div>
-              <a href={`/files/deals/${dealId}`} className={buttonClass("secondary", "sm")}>
+              <a href={`/files/inquiries/${dealId}`} className={buttonClass("secondary", "sm")}>
                 <Download aria-hidden /> Download all ({files.length})
               </a>
             </div>

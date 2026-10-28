@@ -363,16 +363,16 @@ export function AppShell({
         >
           <MenuIcon aria-hidden />
         </button>
-        <form action="/deals" role="search" className="relative w-full max-w-sm">
+        <form action="/inquiries" role="search" className="relative w-full max-w-sm">
           <label htmlFor="global-search" className="sr-only">
-            Search deals
+            Search inquiries
           </label>
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
           <input
             id="global-search"
             name="q"
             type="search"
-            placeholder="Search deals…"
+            placeholder="Search inquiries…"
             className="h-8 w-full rounded-lg border border-line bg-surface pr-10 pl-9 text-sm text-text shadow-card transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
           />
           <input type="hidden" name="status" value="all" />
@@ -382,7 +382,7 @@ export function AppShell({
         </form>
         <div className="ml-auto flex items-center gap-1.5">
           {canCreate && (
-            <Link href="/deals/new" className={cn(buttonClass("primary", "sm"), "mr-1 hidden lg:inline-flex")} title="New inquiry (N)">
+            <Link href="/inquiries/new" className={cn(buttonClass("primary", "sm"), "mr-1 hidden lg:inline-flex")} title="New inquiry (N)">
               <Plus aria-hidden /> New inquiry
             </Link>
           )}
@@ -409,11 +409,11 @@ export function AppShell({
         className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
         {tab("/dashboard", "Home", LayoutDashboard)}
-        {tab("/deals", "Deals", ClipboardList)}
+        {tab("/inquiries", "Inquiries", ClipboardList)}
         {canCreate ? (
           <div className="flex flex-1 items-start justify-center">
             <Link
-              href="/deals/new"
+              href="/inquiries/new"
               aria-label="New inquiry"
               className="-mt-5 grid size-14 place-items-center rounded-full bg-primary-solid text-primary-fg shadow-pop ring-4 ring-bg active:scale-95"
             >
