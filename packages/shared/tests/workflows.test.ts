@@ -31,9 +31,9 @@ describe("inquiry stages", () => {
   });
 
   it("needs a reason to lose and a manager to reopen", () => {
-    expect(checkManualMove("quoted", "lost", { canReopen: false })).toEqual(["Choose why the deal was lost."]);
+    expect(checkManualMove("quoted", "lost", { canReopen: false })).toEqual(["Choose why the inquiry was lost."]);
     expect(checkManualMove("quoted", "lost", { lostReason: "price_too_high", canReopen: false })).toEqual([]);
-    expect(checkManualMove("lost", "sourcing", { canReopen: false })).toEqual(["Only a manager can reopen a closed deal."]);
+    expect(checkManualMove("lost", "sourcing", { canReopen: false })).toEqual(["Only a manager can reopen a closed inquiry."]);
     expect(checkManualMove("won", "lost", { lostReason: "other", canReopen: true })[0]).toMatch(/cannot be moved/);
   });
 });
@@ -168,7 +168,7 @@ describe("input schemas", () => {
     const messages = bad.error!.issues.map((i) => i.message);
     // The list of items is optional; the requirement then has to say what is needed.
     expect(messages).toEqual(expect.arrayContaining(["Choose a customer", "Choose a category", "Write what the customer needs, or add their list of items"]));
-    expect(stageMoveInput.safeParse({ to: "lost" }).error?.issues[0].message).toBe("Choose why the deal was lost");
+    expect(stageMoveInput.safeParse({ to: "lost" }).error?.issues[0].message).toBe("Choose why the inquiry was lost");
   });
 });
 
