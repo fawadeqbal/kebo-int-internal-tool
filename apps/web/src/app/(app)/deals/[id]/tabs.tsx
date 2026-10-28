@@ -7,14 +7,11 @@ export function DealTabs({
   id,
   source,
   orderId,
-  files,
   managers,
 }: {
   id: string;
   source: boolean;
   orderId: string | null;
-  /** Notes and files on the deal, shown on its tab. */
-  files: number;
   managers: boolean;
 }) {
   const path = usePathname();
@@ -23,7 +20,6 @@ export function DealTabs({
     { href: base, label: "Overview" },
     ...(source ? [{ href: `${base}/sourcing`, label: "Factory prices" }] : []),
     { href: `${base}/quotation`, label: "Quotation" },
-    { href: `${base}/files`, label: "Files & notes", count: files || undefined },
     ...(managers ? [{ href: `${base}/costs`, label: "Costs" }] : []),
     { href: `${base}/history`, label: "History" },
     ...(orderId ? [{ href: `/orders/${orderId}`, label: "Order →" }] : []),

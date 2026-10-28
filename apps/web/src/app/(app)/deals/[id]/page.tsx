@@ -3,10 +3,11 @@ import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { Card, CardBody, CardHeader, DetailList } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { dateTime, qty } from "@/lib/format";
+import { date, dateTime, qty } from "@/lib/format";
 import type { DealDetail, Person } from "@/lib/types";
-import { assignAction, holdAction, moveStageAction } from "../actions";
-import { AssignPanel, HoldPanel, StagePanel } from "./panels";
+import { assignAction, describeFileAction, holdAction, moveStageAction, noteAction, removeFileAction } from "../actions";
+import { AssignPanel, HoldPanel, NoteForm, StagePanel } from "./panels";
+import { DocumentsPanel } from "@/components/deals/documents-panel";
 import { CustomerHistoryNote } from "@/components/money/customer-account";
 
 export const metadata = { title: "Deal" };
@@ -70,8 +71,45 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
             </CardBody>
           </Card>
 
+          <Card>
+            <CardHeader
+              title="URS & documents"
+              description="The customer's URS, drawings, photos and specifications. Also shown on the order."
+            />
+            <CardBody>
+              <DocumentsPanel
+                dealId={d.id}
+                canUpload
+                files={d.attachments.map((f) => ({
+                  ...f,
+                  uploadedBy: name(f.uploadedById),
+                  when: date(f.createdAt),
+                  canChange: f.uploadedById === me.id || d.canWork,
+                  describe: describeFileAction.bind(null, d.id, f.id),
+                  remove: removeFileAction.bind(null, d.id, f.id),
+                }))}
+              />
+            </CardBody>
+          </Card>
 
-
+          <Card id="notes">
+            <CardHeader title="Notes" />
+            <CardBody className="flex flex-col gap-4">
+              <NoteForm action={noteAction.bind(null, d.id)} />
+              {d.notes.length > 0 && (
+                <ul className="flex flex-col gap-3">
+                  {d.notes.map((n) => (
+                    <li key={n.id} className="rounded-lg border border-line p-3">
+                      <p className="text-sm whitespace-pre-line">{n.body}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {name(n.authorId)} · {dateTime(n.createdAt)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
         </div>
 
         <aside className="flex flex-col gap-5">
