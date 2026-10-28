@@ -105,8 +105,8 @@ export function ExpenseRecord({
             </>
           ) : e.deal ? (
             <>
-              <Link href={`/deals/${e.deal.id}`} className="font-medium hover:text-primary">
-                Deal {e.deal.refNo}
+              <Link href={`/inquiries/${e.deal.id}`} className="font-medium hover:text-primary">
+                Inquiry {e.deal.refNo}
               </Link>{" "}
               <Badge tone={INQUIRY_STAGE_TONE[e.deal.stage]}>{INQUIRY_STAGE_LABEL[e.deal.stage]}</Badge>
               <span className="block truncate text-xs text-muted">{e.deal.title}</span>

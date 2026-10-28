@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const work: NavItem[] = [
     { href: "/dashboard", label: "Home", icon: "dashboard" },
-    { href: "/deals", label: "Deals", icon: "deals" },
+    { href: "/inquiries", label: "Inquiries", icon: "deals" },
     { href: "/orders", label: "Orders", icon: "orders" },
     { href: "/customers", label: "Customers", icon: "customers" },
     { href: "/notifications", label: "Notifications", icon: "notifications", badge: unread },

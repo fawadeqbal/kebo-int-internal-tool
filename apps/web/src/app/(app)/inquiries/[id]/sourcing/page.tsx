@@ -52,8 +52,8 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
       {!canEdit && (
         <Alert tone="info">
           {d.stage === "won" || d.stage === "lost"
-            ? "This deal is closed, so its factory prices can no longer change."
-            : "Only the person handling this deal (or a manager) can change its factory prices."}
+            ? "This inquiry is closed, so its factory prices can no longer change."
+            : "Only the person handling this inquiry (or a manager) can change its factory prices."}
         </Alert>
       )}
       {s.missingRates.length > 0 && (
@@ -69,7 +69,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
             title="Compare offers"
             description={`What each whole offer costs us in ${s.currency} (factory prices plus tax, on each factory's own price basis) and which of the customer's items it covers. Freight and the like to reach your basis are added in the quotation.`}
             actions={
-              <Link href={`/deals/${d.id}/quotation`} className={buttonClass("primary", "sm")}>
+              <Link href={`/inquiries/${d.id}/quotation`} className={buttonClass("primary", "sm")}>
                 Go to the quotation
               </Link>
             }

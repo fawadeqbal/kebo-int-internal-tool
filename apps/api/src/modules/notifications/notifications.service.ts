@@ -19,7 +19,7 @@ export interface NewNotification {
 }
 
 export const links = {
-  deal: (id: string) => `/deals/${id}`,
+  deal: (id: string) => `/inquiries/${id}`,
   order: (id: string) => `/orders/${id}`,
   /** The order's Money tab (payments in, the plan, factory payments). */
   orderMoney: (id: string) => `/orders/${id}/money`,
@@ -126,7 +126,7 @@ export class NotificationsService implements OnModuleInit {
       ],
       body: e.to === "lost" ? deal?.lostNote : null,
       link: links.deal(e.inquiryId),
-      linkLabel: "Open the deal",
+      linkLabel: "Open the inquiry",
     });
   }
 

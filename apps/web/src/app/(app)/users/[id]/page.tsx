@@ -82,7 +82,7 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
                 <div className="flex flex-col gap-3 border-t border-line pt-4">
                   {u.isActive ? (
                     <div>
-                      <p className="mb-2 text-xs text-muted">They stop being able to sign in and are signed out everywhere. Their deals and history stay.</p>
+                      <p className="mb-2 text-xs text-muted">They stop being able to sign in and are signed out everywhere. Their inquiries and history stay.</p>
                       <ConfirmAction action={setActiveAction.bind(null, u.id, false)} confirm={`Switch off ${u.name}? They will be signed out everywhere.`} label="Switch off" pendingText="Switching off…" variant="danger" />
                     </div>
                   ) : (

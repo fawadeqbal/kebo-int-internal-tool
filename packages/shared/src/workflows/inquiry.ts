@@ -73,10 +73,10 @@ export function checkManualMove(
   input: { lostReason?: LostReason | null; canReopen: boolean },
 ): string[] {
   const move = manualMove(from, to);
-  if (!move) return [`A deal that is ${from} cannot be moved to ${to} by hand.`];
+  if (!move) return [`An inquiry that is ${from} cannot be moved to ${to} by hand.`];
   const problems: string[] = [];
-  if (move.needsReason && !input.lostReason) problems.push("Choose why the deal was lost.");
-  if (move.reopen && !input.canReopen) problems.push("Only a manager can reopen a closed deal.");
+  if (move.needsReason && !input.lostReason) problems.push("Choose why the inquiry was lost.");
+  if (move.reopen && !input.canReopen) problems.push("Only a manager can reopen a closed inquiry.");
   return problems;
 }
 

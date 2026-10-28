@@ -13,7 +13,7 @@ import type { AuditRow } from "@/lib/types-people";
 export const metadata = { title: "Audit log" };
 
 const ENTITY_LABEL: Record<string, string> = {
-  inquiry: "Deal",
+  inquiry: "Inquiry",
   customer: "Customer",
   factory: "Factory",
   factory_quote: "Factory prices",
@@ -36,7 +36,7 @@ function entityHref(r: AuditRow, canUsers: boolean): string | null {
   if (!r.entityId) return null;
   switch (r.entityType) {
     case "inquiry":
-      return `/deals/${r.entityId}`;
+      return `/inquiries/${r.entityId}`;
     case "customer":
       return `/customers/${r.entityId}`;
     case "factory":

@@ -106,12 +106,12 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
           title="Sales report"
           number={`${date(r.range.from)} – ${date(r.range.to)}`}
           meta={[
-            { label: "Deals of", value: person ? person.name : "Everyone" },
+            { label: "Inquiries of", value: person ? person.name : "Everyone" },
             { label: "Amounts in", value: `${r.currency}, at today's rates` },
           ]}
         />
 
-        <H2>Deals in the period</H2>
+        <H2>Inquiries in the period</H2>
         <Tiles
           items={[
             { label: "Received", value: f.received, hint: "New inquiries" },
@@ -140,13 +140,13 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
         <Profit title="By person" rows={r.profit.byPerson} currency={r.currency} />
 
         <div className="grid grid-cols-2 gap-x-6">
-          <Counts title="Why deals were lost" rows={r.lostReasons.map((x) => ({ label: LOST_REASON_LABEL[x.reason], count: x.count }))} empty="No deals lost in this period." />
+          <Counts title="Why inquiries were lost" rows={r.lostReasons.map((x) => ({ label: LOST_REASON_LABEL[x.reason], count: x.count }))} empty="No inquiries lost in this period." />
           <Counts title="By channel" rows={r.byChannel.map((x) => ({ label: CHANNEL_LABEL[x.key] ?? x.key, count: x.count }))} empty="No inquiries in this period." />
           <Counts title="By category" rows={r.byCategory.map((x) => ({ label: x.key, count: x.count }))} empty="No inquiries in this period." />
           <div className="min-w-0 break-inside-avoid">
             <H2>Win rate by person</H2>
             {r.people.length === 0 ? (
-              <p className="text-[#64748b]">No deals closed in this period.</p>
+              <p className="text-[#64748b]">No inquiries closed in this period.</p>
             ) : (
               <LinesTable
                 rows={r.people}

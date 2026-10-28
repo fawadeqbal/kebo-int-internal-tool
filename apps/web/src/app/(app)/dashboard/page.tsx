@@ -41,7 +41,7 @@ function DealList({ rows, empty }: { rows: DealLine[]; empty: string }) {
     <ul className="flex flex-col divide-y divide-line">
       {rows.map((d) => (
         <li key={d.id}>
-          <Link href={`/deals/${d.id}`} className="flex items-center gap-3 py-2.5 hover:text-primary">
+          <Link href={`/inquiries/${d.id}`} className="flex items-center gap-3 py-2.5 hover:text-primary">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
                 {d.refNo} · {d.title}
@@ -106,13 +106,13 @@ export default async function DashboardPage() {
             </Suspense>
           )}
           <Card className="rounded-2xl">
-            <CardHeader title="Deals now" description="Open deals by stage" />
+            <CardHeader title="Inquiries now" description="Open inquiries by stage" />
             <CardBody className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ["New", d.counts.new, "/deals?stage=new", d.counts.unassigned ? `${d.counts.unassigned} not assigned` : "Not started"],
-                  ["Sourcing", d.counts.sourcing, "/deals?stage=sourcing", "Getting prices"],
-                  ["Quoted", d.counts.quoted, "/deals?stage=quoted", "Waiting for answers"],
+                  ["New", d.counts.new, "/inquiries?stage=new", d.counts.unassigned ? `${d.counts.unassigned} not assigned` : "Not started"],
+                  ["Sourcing", d.counts.sourcing, "/inquiries?stage=sourcing", "Getting prices"],
+                  ["Quoted", d.counts.quoted, "/inquiries?stage=quoted", "Waiting for answers"],
                 ] as const
               ).map(([label, value, href, hint]) => (
                 <Link key={label} href={href} className="rounded-xl border border-line p-3 transition-colors hover:border-line-strong">
@@ -124,25 +124,25 @@ export default async function DashboardPage() {
             </CardBody>
           </Card>
           <Card className="rounded-2xl">
-            <CardHeader title="My open deals" description="Earliest needed-by first" />
+            <CardHeader title="My open inquiries" description="Earliest needed-by first" />
             <CardBody>
-              <DealList rows={d.myDeals} empty="No open deals assigned to you." />
+              <DealList rows={d.myDeals} empty="No open inquiries assigned to you." />
             </CardBody>
           </Card>
           {d.workload && (
             <Card className="rounded-2xl">
-              <CardHeader title="Team" description="Open deals and orders per person" />
+              <CardHeader title="Team" description="Open inquiries and orders per person" />
               <CardBody>
                 <ul className="flex flex-col gap-2">
                   {d.workload.map((p) => (
                     <li key={p.id}>
                       <Link
-                        href={`/deals?assignee=${p.id}`}
+                        href={`/inquiries?assignee=${p.id}`}
                         className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-sm hover:border-line-strong"
                       >
                         <span className="font-medium">{p.name}</span>
                         <span className="text-xs text-muted tabular">
-                          {p.openDeals} deal{p.openDeals === 1 ? "" : "s"} · {p.openOrders} order{p.openOrders === 1 ? "" : "s"}
+                          {p.openDeals} {p.openDeals === 1 ? "inquiry" : "inquiries"} · {p.openOrders} order{p.openOrders === 1 ? "" : "s"}
                         </span>
                       </Link>
                     </li>

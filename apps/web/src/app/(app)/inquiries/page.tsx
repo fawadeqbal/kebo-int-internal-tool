@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/session";
 import { date, money, timeAgo } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 
-export const metadata = { title: "Deals" };
+export const metadata = { title: "Inquiries" };
 
 type Params = Record<string, string | undefined>;
 
@@ -26,14 +26,14 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   });
   const c = data.counts;
   const keep = { q: sp.q, assignee: sp.assignee, customer: sp.customer, sort: sp.sort };
-  const tab = (value: string, label: string, count?: number) => ({ href: buildHref("/deals", keep, { stage: value === "open" ? undefined : value }), label, count, active: stage === value });
+  const tab = (value: string, label: string, count?: number) => ({ href: buildHref("/inquiries", keep, { stage: value === "open" ? undefined : value }), label, count, active: stage === value });
   const open = (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0);
   return (
     <div>
-      <PageHeader title="Deals" description="Every RFQ from first message to won or lost." actions={
+      <PageHeader title="Inquiries" description="Every RFQ from first message to won or lost." actions={
           <>
-            <ExportLink what="deals" query={{ stage, q: sp.q, assignee: sp.assignee, customer: sp.customer, sort: sp.sort }} />
-            <ButtonLink href="/deals/new" variant="primary">
+            <ExportLink what="inquiries" query={{ stage, q: sp.q, assignee: sp.assignee, customer: sp.customer, sort: sp.sort }} />
+            <ButtonLink href="/inquiries/new" variant="primary">
               New inquiry
             </ButtonLink>
           </>
@@ -56,7 +56,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
       <FilterBar className="mb-4">
         <form className="flex flex-1 flex-wrap items-center gap-2">
           {stage !== "open" && <input type="hidden" name="stage" value={stage} />}
-          <SearchField defaultValue={sp.q} placeholder="Search RFQ no., customer, item, model…" clearHref={buildHref("/deals", { ...keep, stage: stage === "open" ? undefined : stage }, { q: undefined })} className="min-w-64 flex-1" />
+          <SearchField defaultValue={sp.q} placeholder="Search RFQ no., customer, item, model…" clearHref={buildHref("/inquiries", { ...keep, stage: stage === "open" ? undefined : stage }, { q: undefined })} className="min-w-64 flex-1" />
           <select name="assignee" defaultValue={sp.assignee ?? ""} className="h-9 rounded-md border border-line bg-surface px-2 text-sm" aria-label="Handled by">
             <option value="">Anyone</option>
             <option value="me">Me</option>
@@ -73,13 +73,13 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
         </form>
       </FilterBar>
       {data.rows.length === 0 ? (
-        <EmptyState title={sp.q ? `Nothing matches "${sp.q}"` : "No deals here"} description="New inquiries from the website arrive here by themselves." action={<ButtonLink href="/deals/new">New inquiry</ButtonLink>} />
+        <EmptyState title={sp.q ? `Nothing matches "${sp.q}"` : "No inquiries here"} description="New inquiries from the website arrive here by themselves." action={<ButtonLink href="/inquiries/new">New inquiry</ButtonLink>} />
       ) : (
         <Card className="overflow-x-auto p-0">
           <Table>
             <THead>
               <tr>
-                <Th>Deal</Th>
+                <Th>Inquiry</Th>
                 <Th>Customer</Th>
                 <Th>Stage</Th>
                 <Th>Quotation</Th>
@@ -91,7 +91,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
               {data.rows.map((d) => (
                 <Tr key={d.id}>
                   <Td>
-                    <Link href={`/deals/${d.id}`} className="font-medium hover:text-primary">
+                    <Link href={`/inquiries/${d.id}`} className="font-medium hover:text-primary">
                       {d.refNo}
                     </Link>
                     <span className="block max-w-80 truncate text-xs text-muted">
@@ -133,7 +133,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           </Table>
         </Card>
       )}
-      {data.total > data.pageSize && <Pagination base="/deals" params={{ ...keep, stage: stage === "open" ? undefined : stage }} page={data.page} pageSize={data.pageSize} total={data.total} />}
+      {data.total > data.pageSize && <Pagination base="/inquiries" params={{ ...keep, stage: stage === "open" ? undefined : stage }} page={data.page} pageSize={data.pageSize} total={data.total} />}
     </div>
   );
 }

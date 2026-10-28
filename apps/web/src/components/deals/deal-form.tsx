@@ -11,7 +11,7 @@ import { ActionForm } from "@/components/common/action-form";
 import { CountrySelect } from "@/components/people/country-select";
 import type { ActionState } from "@/lib/actions";
 import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } from "@/lib/types-deals";
-import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/deals/actions";
+import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/actions";
 import { CustomerPicker } from "./customer-picker";
 import { FileDrop, send, type Staged } from "./documents-panel";
 import { LineTable, type LineColumn } from "@/components/lines/line-table";
@@ -164,7 +164,7 @@ export function DealForm({
         return { ok: true };
       }
     }
-    router.push(`/deals/${id}`);
+    router.push(`/inquiries/${id}`);
     return { ok: true, message: "Inquiry created." };
   };
 
@@ -180,7 +180,7 @@ export function DealForm({
             <li key={f}>{f}</li>
           ))}
         </ul>
-        <Link href={`/deals/${created.id}`} className={buttonClass("primary", "sm", "mt-3")}>
+        <Link href={`/inquiries/${created.id}`} className={buttonClass("primary", "sm", "mt-3")}>
           Open the inquiry and try them again
         </Link>
       </Alert>
@@ -303,7 +303,7 @@ export function DealForm({
 
 
             <Card>
-              <CardHeader title="The deal" />
+              <CardHeader title="The inquiry" />
               <CardBody className="grid gap-4 md:grid-cols-2">
                 <Field label="Category" htmlFor="category" error={s.errors?.category}>
                   <Select

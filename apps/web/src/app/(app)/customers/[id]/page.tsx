@@ -40,16 +40,16 @@ const ORDER_STATUS: Record<OrderStatus, { label: string; tone: "info" | "ok" | "
 
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 
-type Tab = "overview" | "deals" | "orders" | "money" | "history";
+type Tab = "overview" | "inquiries" | "orders" | "money" | "history";
 
 export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; view?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
   const managers = can(me, "expenses.manage");
-  const tabs: Tab[] = ["overview", "deals", "orders", "money", "history"];
+  const tabs: Tab[] = ["overview", "inquiries", "orders", "money", "history"];
   // Old links: ?tab=payments and ?tab=account (now the Money tab's two views).
-  const asked = sp.tab === "payments" ? "money" : sp.tab === "account" ? "money" : sp.tab;
+  const asked = sp.tab === "deals" ? "inquiries" : sp.tab === "payments" ? "money" : sp.tab === "account" ? "money" : sp.tab;
   const tab: Tab = tabs.includes(asked as Tab) ? (asked as Tab) : "overview";
   const moneyView = sp.view === "profit" || sp.tab === "account" ? "profit" : "payments";
   const c = await load(() => api.get<CustomerDetail>(`/customers/${id}`));
@@ -72,7 +72,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         description={
           <>
             {c.country === UNKNOWN_COUNTRY ? <span className="text-warn">Country not set</span> : countryName(c.country)} · {openDeals} open
-            deal{openDeals === 1 ? "" : "s"} · {openOrders} open order{openOrders === 1 ? "" : "s"}
+            {openDeals === 1 ? "inquiry" : "inquiries"} · {openOrders} open order{openOrders === 1 ? "" : "s"}
           </>
         }
         actions={
@@ -102,7 +102,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         className="mb-5"
         tabs={[
           { href: `/customers/${c.id}`, label: "Overview", active: tab === "overview" },
-          { href: `/customers/${c.id}?tab=deals`, label: "Deals", count: c.inquiries.length, active: tab === "deals" },
+          { href: `/customers/${c.id}?tab=inquiries`, label: "Inquiries", count: c.inquiries.length, active: tab === "inquiries" },
           { href: `/customers/${c.id}?tab=orders`, label: "Orders", count: c.orders.length, active: tab === "orders" },
           { href: `/customers/${c.id}?tab=money`, label: "Money", active: tab === "money" },
           { href: `/customers/${c.id}?tab=history`, label: "History", active: tab === "history" },
@@ -197,7 +197,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
               <Card>
                 <CardHeader
                   title="Remove customer"
-                  description="Hides them from lists and pickers. Past deals and orders keep their name. Not possible while an order is open."
+                  description="Hides them from lists and pickers. Past inquiries and orders keep their name. Not possible while an order is open."
                 />
                 <CardBody>
                   <ConfirmAction
@@ -213,10 +213,10 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           </div>
         </div>
       )}
-      {tab === "deals" && (
+      {tab === "inquiries" && (
           <Card>
             <CardHeader
-              title="Deals"
+              title="Inquiries"
               description={
                 can(me, "inquiries.viewAll")
                   ? "Every inquiry from this customer, newest first"
@@ -224,12 +224,12 @@ export default async function CustomerPage({ params, searchParams }: { params: P
               }
             />
             {c.inquiries.length === 0 ? (
-              <EmptyState title="No deals yet" description="Inquiries from this customer will show here." className="py-8" />
+              <EmptyState title="No inquiries yet" description="Inquiries from this customer will show here." className="py-8" />
             ) : (
               <Table>
                 <THead>
                   <tr>
-                    <Th>Deal</Th>
+                    <Th>Inquiry</Th>
                     <Th>Stage</Th>
                     <Th>Handled by</Th>
                     <Th className="text-right">Received</Th>
@@ -239,7 +239,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
                   {c.inquiries.map((d) => (
                     <Tr key={d.id} className="hover:bg-surface-2/50">
                       <Td>
-                        <Link href={`/deals/${d.id}`} className="font-medium hover:text-primary">
+                        <Link href={`/inquiries/${d.id}`} className="font-medium hover:text-primary">
                           {d.refNo}
                         </Link>
                         <span className="block max-w-80 truncate text-xs text-muted">{d.title}</span>

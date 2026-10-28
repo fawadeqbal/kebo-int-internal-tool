@@ -144,8 +144,8 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
               label="Pipeline"
               icon={<ChartLine className="size-3.5" />}
               value={<Headline amount={i.now.pipeline} currency={c} />}
-              note={`${i.now.pipelineDeals} quoted deal${i.now.pipelineDeals === 1 ? "" : "s"}${i.now.weightedPipeline ? ` · likely ${money(i.now.weightedPipeline, c)}` : ""}`}
-              href="/deals?stage=quoted"
+              note={`${i.now.pipelineDeals} quoted ${i.now.pipelineDeals === 1 ? "inquiry" : "inquiries"}${i.now.weightedPipeline ? ` · likely ${money(i.now.weightedPipeline, c)}` : ""}`}
+              href="/inquiries?stage=quoted"
             />
           </div>
 
@@ -166,7 +166,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
               </Card>
             )}
             <Card className="rounded-2xl">
-              <CardHeader title="From inquiry to order" description="Deals received in the period, how many got a quotation, how many were won" />
+              <CardHeader title="From inquiry to order" description="Inquiries received in the period, how many got a quotation, how many were won" />
               <CardBody className="flex flex-col gap-5">
                 <Funnel
                   steps={[
@@ -237,12 +237,12 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
 
           <div className="grid gap-5 lg:grid-cols-2">
             <Card className="rounded-2xl">
-              <CardHeader title="Why we lose deals" description="Deals lost in the period" />
+              <CardHeader title="Why we lose inquiries" description="Inquiries lost in the period" />
               <CardBody>
                 {i.lostReasons.length ? (
                   <Donut data={i.lostReasons.map((r) => ({ label: r.label, value: r.count }))} centre={String(i.lostReasons.reduce((t, r) => t + r.count, 0))} centreLabel="lost" />
                 ) : (
-                  <p className="text-sm text-muted">No deal lost in this period.</p>
+                  <p className="text-sm text-muted">No inquiry lost in this period.</p>
                 )}
               </CardBody>
             </Card>
@@ -288,7 +288,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
               </CardBody>
             </Card>
             <Card className="rounded-2xl">
-              <CardHeader title="From inquiry to order" description="Deals received in the period" />
+              <CardHeader title="From inquiry to order" description="Inquiries received in the period" />
               <CardBody>
                 <Funnel
                   steps={[
@@ -301,7 +301,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             </Card>
           </div>
           <Card className="overflow-hidden rounded-2xl">
-            <CardHeader title="The team" description="Deals each person received in the period, won and lost, their sales and how fast they quote" />
+            <CardHeader title="The team" description="Inquiries each person received in the period, won and lost, their sales and how fast they quote" />
             <div className="overflow-x-auto">
               <Table>
                 <THead>
@@ -318,7 +318,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                 <tbody>
                   {i.people.map((p) => (
                     <Tr key={p.id ?? "nobody"}>
-                      <Td className="font-medium">{p.id ? <Link href={`/deals?assignee=${p.id}`} className="hover:text-primary">{p.name}</Link> : <span className="text-muted">{p.name}</span>}</Td>
+                      <Td className="font-medium">{p.id ? <Link href={`/inquiries?assignee=${p.id}`} className="hover:text-primary">{p.name}</Link> : <span className="text-muted">{p.name}</span>}</Td>
                       <Td className="text-right tabular">{p.received}</Td>
                       <Td className="text-right tabular">{p.won}</Td>
                       <Td className="text-right tabular">{p.lost}</Td>

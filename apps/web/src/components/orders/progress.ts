@@ -4,7 +4,7 @@ import type { FactoryOwed } from "@/lib/types-money";
 import type { OrderView, PaymentsView } from "@/lib/types-orders";
 
 /** The order's tabs (the overview is the order's own address). */
-export type OrderTab = "" | "goods" | "packing" | "money" | "documents" | "history";
+export type OrderTab = "" | "goods" | "packing" | "money" | "money#factory" | "documents" | "history";
 
 /**
  * done: recorded · now: the one to do next · late: the one to do next, past its date ·
@@ -117,7 +117,7 @@ export function orderProgress(o: OrderView, p: PaymentsView, factories: FactoryO
       label: "Factory deposit paid",
       detail: rows.every((f) => Number(f.paid) > 0) ? factoryNote(rows, (f) => `${money(f.paid, f.currency)} paid`) : factoryNote(rows, (f) => `${f.factory.name}: nothing paid yet`),
       done: rows.every((f) => Number(f.paid) > 0),
-      tab: "money",
+      tab: "money#factory",
       action: "Pay the factory",
     });
 
@@ -145,7 +145,7 @@ export function orderProgress(o: OrderView, p: PaymentsView, factories: FactoryO
       label: "Factory paid in full",
       detail: rows.every((f) => Number(f.toPay) <= 0) ? "nothing left to pay" : factoryNote(rows, (f) => `${money(f.toPay, f.currency)} to pay`),
       done: rows.every((f) => Number(f.toPay) <= 0),
-      tab: "money",
+      tab: "money#factory",
       action: "Pay the factory",
     });
   list.push({ stage: "shipped", key: "shipped", label: "Shipped", detail: o.shippedOn ? date(o.shippedOn) : null, done: at >= 2 && !!o.shippedOn, tab: "", action: "" });

@@ -130,7 +130,7 @@ export async function expenseAction(
   if (r.ok) {
     const saved = r.data as { customer?: { id: string } | null; deal?: { id: string } | null } | undefined;
     refresh(body.orderId, saved?.customer?.id ?? body.customerId);
-    if (saved?.deal) revalidatePath(`/deals/${saved.deal.id}`, "layout");
+    if (saved?.deal) revalidatePath(`/inquiries/${saved.deal.id}`, "layout");
   }
   return r;
 }

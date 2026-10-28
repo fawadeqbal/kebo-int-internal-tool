@@ -1,6 +1,6 @@
 # Revamp plan
 
-Move from the single Next.js + Drizzle app to a pnpm/Turborepo monorepo with a NestJS API, Prisma, and shared packages, built around the new domain model (deal stages, quotation revisions, orders in four stages, payments from customers).
+Move from the single Next.js + Drizzle app to a pnpm/Turborepo monorepo with a NestJS API, Prisma, and shared packages, built around the new domain model (inquiry stages, quotation revisions, orders in four stages, payments from customers).
 
 Production keeps running `main` until the switch. Each step ends with tests passing in CI.
 

@@ -68,7 +68,7 @@ class NotificationsScreen extends ConsumerWidget {
           data: (d) {
             final items = d.l('items');
             if (items.isEmpty) {
-              return ListView(children: const [EmptyState(icon: Icons.notifications_none_rounded, title: 'No notifications', message: 'Assignments, reminders and updates on your deals and orders show up here.')]);
+              return ListView(children: const [EmptyState(icon: Icons.notifications_none_rounded, title: 'No notifications', message: 'Assignments, reminders and updates on your inquiries and orders show up here.')]);
             }
             return ListView(padding: pagePadding, children: [
               Card(

@@ -632,7 +632,11 @@ export function FactoryPaymentForm({
 }
 
 /** "Record a payment to a factory" button that opens the form. */
-export function NewFactoryPayment(props: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose" | "payment" | "onFileError">) {
+export function NewFactoryPayment({
+  label = "Record a payment to a factory",
+  quiet,
+  ...props
+}: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose" | "payment" | "onFileError"> & { label?: string; quiet?: boolean }) {
   const [open, setOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   if (!open)
@@ -642,14 +646,14 @@ export function NewFactoryPayment(props: Omit<Parameters<typeof FactoryPaymentFo
         <Button
           className="w-fit"
           size="sm"
-          variant="primary"
+          variant={quiet ? "secondary" : "primary"}
           onClick={() => {
             setFileError(null);
             setOpen(true);
           }}
           disabled={!props.factories.length}
         >
-          Record a payment to a factory
+          {quiet && <Plus aria-hidden />} {label}
         </Button>
       </div>
     );
@@ -777,13 +781,13 @@ export function ExpenseForm({
   const forOptions: { value: ForWhom; label: string }[] = fixedCustomer
     ? [
         { value: "customer", label: "This customer" },
-        { value: "deal", label: "One of their deals" },
+        { value: "deal", label: "One of their inquiries" },
         { value: "order", label: "One of their orders" },
       ]
     : [
         { value: "company", label: "The company" },
         { value: "customer", label: "A customer" },
-        { value: "deal", label: "A deal" },
+        { value: "deal", label: "An inquiry" },
         { value: "order", label: "An order" },
       ];
 
@@ -848,9 +852,9 @@ export function ExpenseForm({
                   </Field>
                 )}
                 {forWhom === "deal" && (
-                  <Field label="Deal" htmlFor="ex-deal" error={s.errors?.inquiryId} hint={deals.length === 0 ? "No deal for this customer" : "Won, lost or still open"}>
+                  <Field label="Inquiry" htmlFor="ex-deal" error={s.errors?.inquiryId} hint={deals.length === 0 ? "No inquiry for this customer" : "Won, lost or still open"}>
                     <Select id="ex-deal" value={dealId} onChange={(e) => pickDeal(e.target.value)}>
-                      <option value="">Choose the deal…</option>
+                      <option value="">Choose the inquiry…</option>
                       {deals.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.refNo} · {INQUIRY_STAGE_LABEL[d.stage]}
@@ -875,11 +879,11 @@ export function ExpenseForm({
                 )}
               </div>
               {forWhom === "company" && <p className="text-xs text-muted">Rent, salaries, bills and other costs of running the company.</p>}
-              {forWhom === "customer" && <p className="text-xs text-muted">Dinners, gifts and visits for the customer, not for one deal.</p>}
+              {forWhom === "customer" && <p className="text-xs text-muted">Dinners, gifts and visits for the customer, not for one inquiry.</p>}
               {forWhom === "deal" && (
                 <p className="text-xs text-muted">
-                  Trips to check products, samples and visits for one request. If the deal is won it comes off that order&apos;s profit; if it is lost it shows as the
-                  cost of a lost deal.
+                  Trips to check products, samples and visits for one request. If the inquiry is won it comes off that order&apos;s profit; if it is lost it shows as the
+                  cost of a lost inquiry.
                 </p>
               )}
             </div>
@@ -1007,7 +1011,7 @@ function Notice({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   );
 }
 
-export function NewExpense(props: Omit<Parameters<typeof ExpenseForm>[0], "onClose" | "expense" | "onReceiptError"> & { label?: string }) {
+export function NewExpense({ quiet, ...props }: Omit<Parameters<typeof ExpenseForm>[0], "onClose" | "expense" | "onReceiptError"> & { label?: string; quiet?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   return (
@@ -1017,7 +1021,7 @@ export function NewExpense(props: Omit<Parameters<typeof ExpenseForm>[0], "onClo
         <ExpenseForm {...props} onClose={() => setOpen(false)} onReceiptError={setNotice} />
       ) : (
         <div>
-          <Button size={props.template ? "xs" : "sm"} variant={props.template ? "ghost" : "primary"} onClick={() => setOpen(true)}>
+          <Button size={props.template ? "xs" : "sm"} variant={props.template ? "ghost" : quiet ? "secondary" : "primary"} onClick={() => setOpen(true)}>
             {props.template ? <Copy aria-hidden /> : <Plus aria-hidden />} {props.label ?? "Add an expense"}
           </Button>
         </div>

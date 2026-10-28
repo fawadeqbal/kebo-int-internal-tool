@@ -70,7 +70,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "defaultIncoterm", label: "Usual Incoterm", kind: "select", options: INCOTERMS.map((i) => ({ value: i, label: i })), hint: "Who pays freight and insurance. FOB: we deliver onto the ship at the Chinese port." },
       { name: "defaultPaymentTerms", label: "Payment terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the deposit and balance, e.g. By T/T; L/C at sight accepted" },
       { name: "defaultDeliveryTerms", label: "Delivery terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the delivery time, e.g. packing, inspection, warranty" },
-      { name: "categories", label: "Product categories", kind: "lines", wide: true, hint: "One per line. Every deal is filed under one of these." },
+      { name: "categories", label: "Product categories", kind: "lines", wide: true, hint: "One per line. Every inquiry is filed under one of these." },
     ],
   },
   {
@@ -79,9 +79,9 @@ export const SETTING_GROUPS: SettingGroup[] = [
     description: "When the app nudges people about work that is waiting.",
     save: "Save reminders",
     fields: [
-      days("newDays", "Remind about a new deal after", "If a deal is still New after this many days, the person handling it (or the managers) gets a reminder"),
-      days("sourcingDays", "Remind about sourcing after", "If a deal has been in Sourcing this long without a quotation"),
-      days("dueSoonDays", "Warn about due dates", "How many days ahead to warn about quotations expiring and deals' needed-by dates"),
+      days("newDays", "Remind about a new inquiry after", "If an inquiry is still New after this many days, the person handling it (or the managers) gets a reminder"),
+      days("sourcingDays", "Remind about sourcing after", "If an inquiry has been in Sourcing this long without a quotation"),
+      days("dueSoonDays", "Warn about due dates", "How many days ahead to warn about quotations expiring and inquiries' needed-by dates"),
       days("depositDays", "Remind when an order waits for its deposit", "If an order is still Confirmed without the deposit after this many days, the person handling it is reminded"),
       days("productionDays", "Remind when production has no ready date", "If an order has been In production this long and the factory gave no ready date, ask them for one"),
       days("balanceDays", "Remind about the balance after shipping", "If money is still due this many days after the goods were shipped, chase the customer for the balance"),
@@ -96,9 +96,9 @@ export const SETTING_GROUPS: SettingGroup[] = [
     fields: [
       { name: "emails", label: "Send to", kind: "lines", wide: true, hint: "Email addresses, one per line (up to 20). They get the emails switched on below.", placeholder: "boss@keboint.com" },
       { name: "newInquiry", label: "A new inquiry arrives", kind: "bool", hint: "From the website or entered by someone" },
-      { name: "dealWonOrLost", label: "A deal is won or lost", kind: "bool" },
+      { name: "dealWonOrLost", label: "An inquiry is won or lost", kind: "bool" },
       { name: "paymentReceived", label: "A customer payment is recorded", kind: "bool" },
-      { name: "dailySummary", label: "Daily summary", kind: "bool", hint: "Each morning: new deals, late orders and money due" },
+      { name: "dailySummary", label: "Daily summary", kind: "bool", hint: "Each morning: new inquiries, late orders and money due" },
     ],
   },
 ];

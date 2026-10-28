@@ -67,7 +67,7 @@ class _RevisionCardState extends ConsumerState<RevisionCard> {
   Future<void> _move(String to) async {
     final r = widget.r;
     final (title, message, action) = switch (to) {
-      'sent' => ('Mark R${r.i('number')} as sent?', 'The deal moves to Quoted and any older sent revision is replaced.', 'Mark as sent'),
+      'sent' => ('Mark R${r.i('number')} as sent?', 'The inquiry moves to Quoted and any older sent revision is replaced.', 'Mark as sent'),
       'accepted' => ('Customer accepted R${r.i('number')}?', 'This makes the order (Confirmed, waiting for the deposit). Acceptance is final; cancelling later needs a manager.', 'Customer accepted'),
       _ => ('Customer rejected R${r.i('number')}?', 'You can still make a new revision on the web.', 'Customer rejected'),
     };

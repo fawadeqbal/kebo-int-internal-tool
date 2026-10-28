@@ -139,7 +139,7 @@ class _DealFormScreenState extends ConsumerState<DealFormScreen> {
     final e = _error;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New deal')),
+      appBar: AppBar(title: const Text('New inquiry')),
       body: ListView(
         padding: pagePadding,
         children: [

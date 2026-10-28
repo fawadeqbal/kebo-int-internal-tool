@@ -687,14 +687,14 @@ export class MoneyService {
       const o = await this.orders.load(user, input.orderId);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
       if (customerId && customerId !== o.customerId) throw new DomainError(`Order ${o.refNo} is for another customer.`);
-      if (inquiryId && inquiryId !== o.inquiryId) throw new DomainError(`Order ${o.refNo} is from another deal.`);
+      if (inquiryId && inquiryId !== o.inquiryId) throw new DomainError(`Order ${o.refNo} is from another inquiry.`);
       order = { id: o.id, refNo: o.refNo };
       customerId = o.customerId;
       inquiryId = o.inquiryId;
     } else if (inquiryId) {
       const d = await this.prisma.db.inquiry.findFirst({ where: { id: inquiryId, deletedAt: null }, select: { refNo: true, customerId: true } });
-      if (!d) throw new DomainError("That deal is not in the system any more.");
-      if (customerId && customerId !== d.customerId) throw new DomainError(`Deal ${d.refNo} is for another customer.`);
+      if (!d) throw new DomainError("That inquiry is not in the system any more.");
+      if (customerId && customerId !== d.customerId) throw new DomainError(`Inquiry ${d.refNo} is for another customer.`);
       customerId = d.customerId;
     } else if (customerId) {
       const c = await this.prisma.db.customer.findFirst({ where: { id: customerId, deletedAt: null }, select: { id: true } });

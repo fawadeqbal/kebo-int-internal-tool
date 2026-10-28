@@ -11,7 +11,7 @@ import { date } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { DocumentsPanel } from "@/components/deals/documents-panel";
-import { describeFileAction } from "../../../deals/actions";
+import { describeFileAction } from "../../../inquiries/actions";
 import { issueProformaAction, orderRemoveFileAction } from "../../actions";
 import { docHref } from "../shared";
 
@@ -83,7 +83,7 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
 
       {deal && (
         <Card>
-          <CardHeader title="URS and documents" description={`From deal ${deal.refNo}, kept with the order`} />
+          <CardHeader title="URS and documents" description={`From inquiry ${deal.refNo}, kept with the order`} />
           <div className="px-4 py-4">
             <DocumentsPanel
               dealId={deal.id}

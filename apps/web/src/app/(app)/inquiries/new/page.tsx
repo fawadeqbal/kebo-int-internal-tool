@@ -38,8 +38,8 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader
-        backHref="/deals"
-        backLabel="Deals"
+        backHref="/inquiries"
+        backLabel="Inquiries"
         title="New inquiry"
         description="What the customer asked for, with their URS. Factory prices and the quotation come next."
       />
@@ -56,7 +56,7 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
         addCustomer={quickCustomerAction}
         searchCustomers={searchCustomersAction}
         loadContacts={customerContactsAction}
-        cancelHref="/deals"
+        cancelHref="/inquiries"
       />
     </div>
   );

@@ -276,7 +276,7 @@ export class LeaksService {
         warnings.push({
           level: "warn",
           text: `${d.refNo} (${d.customer.name}): ${show(spent)} spent, ${pct(spent, value)}% of its quotation, and not won yet.`,
-          href: `/deals/${d.id}`,
+          href: `/inquiries/${d.id}`,
         });
     }
 

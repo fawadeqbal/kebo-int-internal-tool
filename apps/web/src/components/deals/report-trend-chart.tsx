@@ -8,7 +8,7 @@ const monthLabel = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateStri
 export function ReportTrendChart({ data }: { data: { month: string; received: number; won: number }[] }) {
   const rows = data.map((d) => ({ ...d, label: monthLabel(d.month) }));
   return (
-    <div className="h-64 w-full" role="img" aria-label={`Deals received and won per month: ${rows.map((r) => `${r.label} ${r.received} received, ${r.won} won`).join("; ")}`}>
+    <div className="h-64 w-full" role="img" aria-label={`Inquiries received and won per month: ${rows.map((r) => `${r.label} ${r.received} received, ${r.won} won`).join("; ")}`}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }} barGap={2} barCategoryGap="22%">
           <CartesianGrid vertical={false} stroke="var(--line)" />

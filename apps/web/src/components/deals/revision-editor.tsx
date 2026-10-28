@@ -528,7 +528,7 @@ export function RevisionEditor({
                 </div>
 
                 {lines.length === 0 && opt.factoryQuoteId && !offer && (
-                  <p className="rounded-md bg-warn-soft px-3 py-2 text-sm">This factory offer was removed from the deal. Remove this option or choose another offer.</p>
+                  <p className="rounded-md bg-warn-soft px-3 py-2 text-sm">This factory offer was removed from the inquiry. Remove this option or choose another offer.</p>
                 )}
 
                 <div className="relative overflow-x-auto rounded-lg border border-line bg-surface">

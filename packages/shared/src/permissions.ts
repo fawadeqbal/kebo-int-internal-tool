@@ -44,22 +44,22 @@ export const isPermission = (p: string): p is Permission => (PERMISSIONS as read
 /** How the role editor shows the permissions: grouped, each with a name and what it allows. */
 export const PERMISSION_GROUPS: { title: string; items: { permission: Permission; label: string; hint?: string }[] }[] = [
   {
-    title: "Deals",
+    title: "Inquiries",
     items: [
-      { permission: "inquiries.create", label: "Start deals", hint: "Add a customer's request as a new deal." },
+      { permission: "inquiries.create", label: "Start inquiries", hint: "Add a customer's request as a new inquiry." },
       {
         permission: "inquiries.viewAll",
-        label: "See every deal",
-        hint: "Without it, they see only the deals they handle or started, and those deals' customers and orders. They also get the managers' reminders.",
+        label: "See every inquiry",
+        hint: "Without it, they see only the inquiries they handle or started, and those inquiries' customers and orders. They also get the managers' reminders.",
       },
-      { permission: "inquiries.updateAny", label: "Change anyone's deals", hint: "Work on deals handled by others, and remove factories." },
+      { permission: "inquiries.updateAny", label: "Change anyone's inquiries", hint: "Work on inquiries handled by others, and remove factories." },
       {
         permission: "inquiries.assign",
-        label: "Hand deals to others",
-        hint: "Without it, they can only take unassigned deals themselves.",
+        label: "Hand inquiries to others",
+        hint: "Without it, they can only take unassigned inquiries themselves.",
       },
-      { permission: "inquiries.reopen", label: "Reopen lost deals" },
-      { permission: "inquiries.delete", label: "Delete deals" },
+      { permission: "inquiries.reopen", label: "Reopen lost inquiries" },
+      { permission: "inquiries.delete", label: "Delete inquiries" },
     ],
   },
   {
@@ -87,7 +87,7 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
       {
         permission: "orders.update",
         label: "Move orders along",
-        hint: "Next stage, dates, goods received, packing and the proforma, on deals they work on.",
+        hint: "Next stage, dates, goods received, packing and the proforma, on inquiries they work on.",
       },
       { permission: "orders.manage", label: "Cancel orders, remove payments, ship with money due" },
       { permission: "payments.record", label: "Record customer payments" },
@@ -144,7 +144,7 @@ export const PRESET_ROLES: Record<
   },
   staff: {
     name: "Staff",
-    description: "Works the deals and orders they handle; sees only their own customers.",
+    description: "Works the inquiries and orders they handle; sees only their own customers.",
     permissions: STAFF,
     superAdmin: false,
   },

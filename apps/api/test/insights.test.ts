@@ -46,9 +46,9 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     const customer = (await api(app, staff).get("/customers?pageSize=1").expect(200)).body.rows[0];
     const created = (await api(app, staff).post("/inquiries", { customerId: customer.id, category: "Machinery", items: [{ description: "Notify test item", quantity: 1 }] }).expect(201)).body;
     const n = (await api(app, manager).get("/notifications").expect(200)).body;
-    expect(n.items.some((x: { type: string; link: string }) => x.type === "inquiry.created" && x.link === `/deals/${created.id}`)).toBe(true);
+    expect(n.items.some((x: { type: string; link: string }) => x.type === "inquiry.created" && x.link === `/inquiries/${created.id}`)).toBe(true);
     const own = (await api(app, staff).get("/notifications").expect(200)).body;
-    expect(own.items.some((x: { link: string; type: string }) => x.type === "inquiry.created" && x.link === `/deals/${created.id}`)).toBe(false);
+    expect(own.items.some((x: { link: string; type: string }) => x.type === "inquiry.created" && x.link === `/inquiries/${created.id}`)).toBe(false);
     await api(app, manager).post("/notifications/read", { ids: "all" }).expect(200);
     expect((await api(app, manager).get("/notifications").expect(200)).body.unread).toBe(0);
   });

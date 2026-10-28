@@ -7,7 +7,7 @@ import { attempt, formBody, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
 import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 
-const refresh = (id: string) => revalidatePath(`/deals/${id}`, "layout");
+const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
 /** Factory picker: search the factory list by name or contact person. */
 export async function searchFactoriesAction(q: string): Promise<FactoryOption[]> {

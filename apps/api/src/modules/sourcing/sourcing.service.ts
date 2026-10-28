@@ -234,7 +234,7 @@ export class SourcingService {
     const ids: string[] = [];
     for (const [n, l] of lines.entries()) {
       if (l.requestedItemId && !own.has(l.requestedItemId))
-        throw new DomainError("A price is linked to an item that is not on this deal. Reload and try again.");
+        throw new DomainError("A price is linked to an item that is not on this inquiry. Reload and try again.");
       const row = {
         requestedItemId: l.requestedItemId,
         description: l.description,
@@ -427,7 +427,7 @@ export class SourcingService {
     const wanted = ids.filter((x): x is string => !!x);
     if (!wanted.length) return;
     const own = await tx.requestedItem.count({ where: { inquiryId, id: { in: wanted } } });
-    if (own !== new Set(wanted).size) throw new DomainError("A line is linked to an item that is not on this deal. Reload and try again.");
+    if (own !== new Set(wanted).size) throw new DomainError("A line is linked to an item that is not on this inquiry. Reload and try again.");
   }
 
   /** Lines typed or pasted in: after a line (or at the end), at that line's level or as parts of `parentId`. */
@@ -616,7 +616,7 @@ export class SourcingService {
       const { q, inquiry } = await this.findQuote(user, quoteId, tx);
       if (input.fromQuoteId === quoteId) throw new DomainError("Choose another factory's offer.");
       const from = await tx.factoryQuote.findFirst({ where: { id: input.fromQuoteId, inquiryId: q.inquiryId, deletedAt: null }, include: { factory: true } });
-      if (!from) throw new DomainError("That offer is not on this deal any more.");
+      if (!from) throw new DomainError("That offer is not on this inquiry any more.");
       const source = await this.linesOf(tx, from.id);
       if (!source.length) throw new DomainError(`${from.factory.name}'s offer has no lines yet.`);
       const existing = await tx.factoryQuoteLine.count({ where: { factoryQuoteId: quoteId } });

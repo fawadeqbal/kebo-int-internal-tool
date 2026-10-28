@@ -26,7 +26,7 @@ export default async function OrderHistory({ params }: { params: Promise<{ id: s
       </Card>
       {can(me, "orders.manage") && o.status !== "cancelled" && (
         <Card className="border-bad/25">
-          <CardHeader title="Cancel the order" description="Only if the customer called it off. The deal becomes lost and can be reopened." />
+          <CardHeader title="Cancel the order" description="Only if the customer called it off. The inquiry becomes lost and can be reopened." />
           <CardBody>
             <CancelOrderForm action={cancelOrderAction.bind(null, o.id)} />
           </CardBody>

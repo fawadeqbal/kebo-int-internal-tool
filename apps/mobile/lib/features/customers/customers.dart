@@ -40,10 +40,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         load: (page) => repo.customers(q: _q, page: page),
         header: [
           SearchBox(hint: 'Search name, contact, phone, email…', initial: _q, onChanged: (v) => setState(() => _q = v)),
-          if (!session.isManager) const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 0), child: Text('Customers you added, or whose deals you handle.')),
+          if (!session.isManager) const Padding(padding: EdgeInsets.fromLTRB(16, 0, 16, 0), child: Text('Customers you added, or whose inquiries you handle.')),
           gap12,
         ],
-        empty: const EmptyState(icon: Icons.people_outline_rounded, title: 'No customers found', message: 'Customers are added with their first deal, or here.'),
+        empty: const EmptyState(icon: Icons.people_outline_rounded, title: 'No customers found', message: 'Customers are added with their first inquiry, or here.'),
         itemBuilder: (context, c) => CustomerRow(c),
       ),
     );
@@ -62,7 +62,7 @@ class CustomerRow extends StatelessWidget {
       subtitle: Text([countryName(c.s('country')), if (contact.isNotEmpty) contact.s('name'), if (contact.sn('phone') != null) contact.s('phone')].join(' · ')),
       trailing: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Text('${c.i('openDeals')}', style: context.t.titleSmall),
-        Text(c.i('openDeals') == 1 ? 'open deal' : 'open deals', style: context.t.bodySmall),
+        Text(c.i('openDeals') == 1 ? 'open inquiry' : 'open inquiries', style: context.t.bodySmall),
       ]),
       onTap: () => context.push('/customers/${c.s('id')}'),
     );
@@ -93,7 +93,7 @@ class CustomerDetailScreen extends ConsumerWidget {
         return Scaffold(
           appBar: AppBar(title: const Text('Customer')),
           floatingActionButton: session.can('inquiries.create')
-              ? FloatingActionButton.extended(onPressed: () => context.push('/deals/new?customer=$id'), icon: const Icon(Icons.add_rounded), label: const Text('New deal'))
+              ? FloatingActionButton.extended(onPressed: () => context.push('/deals/new?customer=$id'), icon: const Icon(Icons.add_rounded), label: const Text('New inquiry'))
               : null,
           body: RefreshIndicator(
             onRefresh: () async => ref.read(dataVersionProvider.notifier).bump(),
@@ -132,10 +132,10 @@ class CustomerDetailScreen extends ConsumerWidget {
               ),
               if (c.sn('notes') != null) SectionCard(title: 'Notes', child: Text(c.s('notes'), style: context.t.bodyMedium!.copyWith(color: context.c.text2))),
               SectionCard(
-                title: 'Deals (${deals.length})',
+                title: 'Inquiries (${deals.length})',
                 padding: EdgeInsets.zero,
                 child: deals.isEmpty
-                    ? Padding(padding: const EdgeInsets.all(16), child: Text('No deals yet.', style: context.t.bodySmall))
+                    ? Padding(padding: const EdgeInsets.all(16), child: Text('No inquiries yet.', style: context.t.bodySmall))
                     : CardList(children: [for (final r in deals) DealRow(r)]),
               ),
               if (c.l('orders').isNotEmpty)

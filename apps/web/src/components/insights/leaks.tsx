@@ -35,7 +35,7 @@ function GroupTable({ title, description, rows, c }: { title: string; descriptio
       <CardHeader title={title} description={description} />
       {rows.length === 0 ? (
         <CardBody>
-          <p className="text-sm text-muted">No deal was won or lost in this period.</p>
+          <p className="text-sm text-muted">No inquiry was won or lost in this period.</p>
         </CardBody>
       ) : (
         <div className="overflow-x-auto">
@@ -111,7 +111,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
   return (
     <div>
       <section aria-label="Summary" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Figure label="Deals lost" value={String(s.lostDeals)} hint={`${money(s.lostSpent, c)} spent on them`} tone={s.lostDeals ? "bad" : undefined} />
+        <Figure label="Inquiries lost" value={String(s.lostDeals)} hint={`${money(s.lostSpent, c)} spent on them`} tone={s.lostDeals ? "bad" : undefined} />
         <Figure label="Win rate" value={s.winRate === null ? "—" : `${s.winRate}%`} hint="Won ÷ (won + lost)" />
         <Figure label="Profit planned" value={money(s.planned, c)} hint="Orders placed: value less goods" />
         <Figure
@@ -128,7 +128,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
         className="mb-5"
         tabs={[
           { href: href("attention"), label: "Needs attention", count: r.warnings.length || undefined, alert: r.warnings.some((w) => w.level === "bad"), active: view === "attention" },
-          { href: href("deals"), label: "Deals we lose", active: view === "deals" },
+          { href: href("deals"), label: "Inquiries we lose", active: view === "deals" },
           { href: href("orders"), label: "Profit kept", active: view === "orders" },
           { href: href("customers"), label: "Customers", active: view === "customers" },
           { href: href("spending"), label: "Spending and cash", active: view === "spending" },
@@ -137,7 +137,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
       {view === "attention" && (
         <>
       <Card className="mb-5">
-        <CardHeader title="Needs attention" description="Raised when a deal, an order or a customer crosses a line" />
+        <CardHeader title="Needs attention" description="Raised when an inquiry, an order or a customer crosses a line" />
         {r.warnings.length === 0 ? (
           <CardBody>
             <p className="flex items-center gap-2 text-sm text-ok">
@@ -167,10 +167,10 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
         <>
       <div className="mb-5 grid gap-5 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Why we lose deals" description="Deals lost in the period and what we had spent on them" />
+          <CardHeader title="Why we lose inquiries" description="Inquiries lost in the period and what we had spent on them" />
           {r.lostReasons.length === 0 ? (
             <CardBody>
-              <p className="text-sm text-muted">No deal lost in this period.</p>
+              <p className="text-sm text-muted">No inquiry lost in this period.</p>
             </CardBody>
           ) : (
             <ul className="flex flex-col gap-3 p-4">
@@ -178,7 +178,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
                 <li key={x.reason} className="text-sm">
                   <span className="flex justify-between gap-3">
                     <span>
-                      <span className="font-medium">{x.label}</span> <span className="text-xs text-muted">{x.deals} deal{x.deals === 1 ? "" : "s"}</span>
+                      <span className="font-medium">{x.label}</span> <span className="text-xs text-muted">{x.deals} {x.deals === 1 ? "inquiry" : "inquiries"}</span>
                     </span>
                     <span className="tabular">{money(x.spent, c)} spent</span>
                   </span>
@@ -189,10 +189,10 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
           )}
         </Card>
         <Card>
-          <CardHeader title="Lost deals that cost the most" description="Trips, samples and visits spent on deals we did not win" />
+          <CardHeader title="Lost inquiries that cost the most" description="Trips, samples and visits spent on inquiries we did not win" />
           {r.lostDeals.filter((d) => Number(d.spent) > 0).length === 0 ? (
             <CardBody>
-              <p className="text-sm text-muted">Nothing was spent on the deals lost in this period.</p>
+              <p className="text-sm text-muted">Nothing was spent on the inquiries lost in this period.</p>
             </CardBody>
           ) : (
             <ul className="flex flex-col divide-y divide-line">
@@ -200,7 +200,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
                 .filter((d) => Number(d.spent) > 0)
                 .map((d) => (
                   <li key={d.id}>
-                    <Link href={`/deals/${d.id}`} className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
+                    <Link href={`/inquiries/${d.id}`} className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60">
                       <span className="min-w-0">
                         <span className="font-medium">{d.refNo}</span> <span className="text-text-2">{d.customer.name}</span>
                         <span className="block truncate text-xs text-muted">
@@ -287,7 +287,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
       {view === "deals" && (
         <>
       <div className="mb-5 grid gap-5 xl:grid-cols-2">
-        <GroupTable title="By person" description="Deals they won and lost, and what was spent to win them" rows={r.byPerson} c={c} />
+        <GroupTable title="By person" description="Inquiries they won and lost, and what was spent to win them" rows={r.byPerson} c={c} />
         <GroupTable title="By product category" description="Where we win, and what winning costs" rows={r.byCategory} c={c} />
       </div>
 

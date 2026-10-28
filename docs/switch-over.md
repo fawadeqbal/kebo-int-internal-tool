@@ -43,7 +43,7 @@ docker exec global-caddy caddy reload --config /etc/caddy/Caddyfile
 docker compose -p kebo-rfq stop
 ```
 
-Then open https://rfq.fawadiqbal.dev, sign in as the admin, and in **Settings → Company** check the details and upload the company stamp. Add the team in **Users**. Try one deal end to end and download its PDFs.
+Then open https://rfq.fawadiqbal.dev, sign in as the admin, and in **Settings → Company** check the details and upload the company stamp. Add the team in **Users**. Try one inquiry end to end and download its PDFs.
 
 **Undo**: put the old `rfq.fawadiqbal.dev` block back in the Caddyfile, reload Caddy, `docker compose -p kebo-rfq start`.
 
@@ -117,7 +117,7 @@ docker compose up -d web worker
 
 Add a site block for the test address to `/opt/global-proxy/Caddyfile` from `deploy/Caddyfile.site` (replace `__DOMAIN__` with `desk.fawadiqbal.dev`), `docker exec global-caddy caddy validate --config /etc/caddy/Caddyfile`, then `docker exec global-caddy caddy reload --config /etc/caddy/Caddyfile`.
 
-Sign in with your usual email and password (two-step codes keep working because AUTH_SECRET is the same). Check: dashboard, a won deal and its order (stage, money, documents), a quotation PDF and an invoice PDF, a customer, the reports.
+Sign in with your usual email and password (two-step codes keep working because AUTH_SECRET is the same). Check: dashboard, a won inquiry and its order (stage, money, documents), a quotation PDF and an invoice PDF, a customer, the reports.
 
 ## 6. The switch (about 10 minutes)
 

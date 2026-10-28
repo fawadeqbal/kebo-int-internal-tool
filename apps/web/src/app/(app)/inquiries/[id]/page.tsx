@@ -10,7 +10,7 @@ import { AssignPanel, HoldPanel, NoteForm, StagePanel } from "./panels";
 import { DocumentsPanel } from "@/components/deals/documents-panel";
 import { CustomerHistoryNote } from "@/components/money/customer-account";
 
-export const metadata = { title: "Deal" };
+export const metadata = { title: "Inquiry" };
 
 export default async function DealOverview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -12,7 +12,7 @@ export function AuthShell({ children, wide = false }: { children: ReactNode; wid
           <img src="/brand/kebo-logo-96.png" alt="" width={48} height={48} className="size-12 shrink-0" />
           <div className="leading-tight">
             <p className="font-semibold text-text">Kebo International</p>
-            <p className="text-xs text-muted">Deal desk · staff only</p>
+            <p className="text-xs text-muted">RFQ desk · staff only</p>
           </div>
         </div>
         <Card className="p-6">{children}</Card>

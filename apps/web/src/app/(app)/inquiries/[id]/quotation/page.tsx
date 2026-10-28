@@ -61,7 +61,7 @@ export default async function QuotationPage({
       offers={offers}
       loadOffers={loadOffers}
       allowed={manage && q.canStartRevision && !!startValues}
-      whyNot={q.whyNotStart ?? (!manage ? "Only the person handling this deal (or a manager) can quote." : null)}
+      whyNot={q.whyNotStart ?? (!manage ? "Only the person handling this inquiry (or a manager) can quote." : null)}
       showCosts={showCosts}
       first={q.revisions.length === 0}
     />
@@ -95,7 +95,7 @@ export default async function QuotationPage({
             description="Each option you offer is one factory's offer from the Factory prices tab, with your prices. The customer accepts one option."
           />
           <CardBody className="flex flex-col gap-3">
-            {quoter ? start : <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this deal makes the quotation."}</p>}
+            {quoter ? start : <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this inquiry makes the quotation."}</p>}
           </CardBody>
         </Card>
       )}
@@ -228,7 +228,7 @@ export default async function QuotationPage({
                       `R${r.number}`
                     ) : (
                       <Link
-                        href={`/deals/${d.id}/quotation?r=${r.number}`}
+                        href={`/inquiries/${d.id}/quotation?r=${r.number}`}
                         className="hover:text-primary"
                         aria-current={viewing?.id === r.id ? "true" : undefined}
                       >

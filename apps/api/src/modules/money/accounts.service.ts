@@ -207,8 +207,8 @@ export class AccountsService {
 
     const events: Event[] = [];
     for (const d of deals) {
-      events.push({ on: d.createdAt.toISOString().slice(0, 10), kind: "deal", text: `${d.refNo} received: ${d.title}`, href: `/deals/${d.id}` });
-      if (d.closedAt && d.stage === "lost") events.push({ on: d.closedAt.toISOString().slice(0, 10), kind: "lost", text: `${d.refNo} lost`, href: `/deals/${d.id}` });
+      events.push({ on: d.createdAt.toISOString().slice(0, 10), kind: "deal", text: `${d.refNo} received: ${d.title}`, href: `/inquiries/${d.id}` });
+      if (d.closedAt && d.stage === "lost") events.push({ on: d.closedAt.toISOString().slice(0, 10), kind: "lost", text: `${d.refNo} lost`, href: `/inquiries/${d.id}` });
       for (const o of d.orders) {
         events.push({ on: fromDbDate(o.orderedOn), kind: "order", text: `${d.refNo} won: order ${o.refNo}`, amount: o.total.toFixed(2), currency: o.currency, href: `/orders/${o.id}` });
         const shipped = fromDbDateOrNull(o.shippedOn);
