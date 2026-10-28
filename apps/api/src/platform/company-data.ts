@@ -42,7 +42,9 @@ export class CompanyDataService {
     this.order ??= (async () => {
       const db = this.prisma.platform;
       const tables = (
-        await db.$queryRaw<{ t: string }[]>`select c.relname as t from pg_class c where c.relrowsecurity and c.relkind = 'r' and c.relnamespace = current_schema()::regnamespace order by 1`
+        await db.$queryRaw<
+          { t: string }[]
+        >`select c.relname as t from pg_class c where c.relrowsecurity and c.relkind = 'r' and c.relnamespace = current_schema()::regnamespace order by 1`
       ).map((r) => r.t);
       const edges = await db.$queryRaw<{ child: string; parent: string }[]>`
         select cl.relname as child, pa.relname as parent from pg_constraint k
@@ -137,9 +139,13 @@ export class CompanyDataService {
           true,
         );
         for (const t of [...order].reverse()) {
-          const rows = await this.prisma.platform.$queryRawUnsafe<Record<string, unknown>[]>(`select * from ${q(t)} where company_id = $1::uuid`, companyId);
+          const rows = await this.prisma.platform.$queryRawUnsafe<Record<string, unknown>[]>(
+            `select * from ${q(t)} where company_id = $1::uuid`,
+            companyId,
+          );
           // Never hand out sign-in secrets.
-          if (t === "users") for (const r of rows) for (const k of ["password_hash", "totp_secret", "recovery_codes", "totp_last_step"]) delete r[k];
+          if (t === "users")
+            for (const r of rows) for (const k of ["password_hash", "totp_secret", "recovery_codes", "totp_last_step"]) delete r[k];
           const entry = new ZipDeflate(`data/${t}.json`, { level: 6 });
           zip.add(entry);
           entry.push(enc.encode(JSON.stringify(rows, (_k, v) => (typeof v === "bigint" ? v.toString() : v), 1)), true);
@@ -165,8 +171,12 @@ export class CompanyDataService {
   async usageAll() {
     const db = this.prisma.platform;
     const [users, inquiries, storage] = await Promise.all([
-      db.$queryRaw<{ company_id: string; n: bigint }[]>`select company_id, count(*) as n from users where not is_system and platform_admin_id is null and is_active group by 1`,
-      db.$queryRaw<{ company_id: string; n: bigint }[]>`select company_id, count(*) as n from inquiries where deleted_at is null group by 1`,
+      db.$queryRaw<
+        { company_id: string; n: bigint }[]
+      >`select company_id, count(*) as n from users where not is_system and platform_admin_id is null and is_active group by 1`,
+      db.$queryRaw<
+        { company_id: string; n: bigint }[]
+      >`select company_id, count(*) as n from inquiries where deleted_at is null group by 1`,
       db.$queryRaw<{ company_id: string; bytes: bigint }[]>`
         select company_id, sum(b)::bigint as bytes from (
           select company_id, size::bigint as b from attachments
@@ -187,11 +197,19 @@ export class CompanyDataService {
     const db = this.prisma.platform;
     const since = new Date(Date.now() - 30 * 86_400_000);
     const [signIns, lastSignIn, created, orders, people] = await Promise.all([
-      db.$queryRaw<{ n: bigint }[]>`select count(*) as n from sign_ins where company_id = ${companyId}::uuid and result = 'signed_in' and at >= ${since}`,
-      db.$queryRaw<{ at: Date | null; email: string | null }[]>`select at, email from sign_ins where company_id = ${companyId}::uuid and result = 'signed_in' order by at desc limit 1`,
-      db.$queryRaw<{ total: bigint; recent: bigint }[]>`select count(*) as total, count(*) filter (where created_at >= ${since}) as recent from inquiries where company_id = ${companyId}::uuid and deleted_at is null`,
+      db.$queryRaw<
+        { n: bigint }[]
+      >`select count(*) as n from sign_ins where company_id = ${companyId}::uuid and result = 'signed_in' and at >= ${since}`,
+      db.$queryRaw<
+        { at: Date | null; email: string | null }[]
+      >`select at, email from sign_ins where company_id = ${companyId}::uuid and result = 'signed_in' order by at desc limit 1`,
+      db.$queryRaw<
+        { total: bigint; recent: bigint }[]
+      >`select count(*) as total, count(*) filter (where created_at >= ${since}) as recent from inquiries where company_id = ${companyId}::uuid and deleted_at is null`,
       db.$queryRaw<{ n: bigint }[]>`select count(*) as n from orders where company_id = ${companyId}::uuid and status <> 'cancelled'`,
-      db.$queryRaw<{ id: string; name: string; email: string; is_active: boolean; last_login_at: Date | null; role: string; super_admin: boolean }[]>`
+      db.$queryRaw<
+        { id: string; name: string; email: string; is_active: boolean; last_login_at: Date | null; role: string; super_admin: boolean }[]
+      >`
         select u.id, u.name, u.email, u.is_active, u.last_login_at, r.name as role, r.super_admin
           from users u join roles r on r.company_id = u.company_id and r.key = u.role
          where u.company_id = ${companyId}::uuid and not u.is_system and u.platform_admin_id is null
@@ -203,7 +221,15 @@ export class CompanyDataService {
       inquiries: Number(created[0]?.total ?? 0),
       inquiriesLast30Days: Number(created[0]?.recent ?? 0),
       orders: Number(orders[0]?.n ?? 0),
-      people: people.map((p) => ({ id: p.id, name: p.name, email: p.email, active: p.is_active, lastLoginAt: p.last_login_at, role: p.role, tenantAdmin: p.super_admin })),
+      people: people.map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        active: p.is_active,
+        lastLoginAt: p.last_login_at,
+        role: p.role,
+        tenantAdmin: p.super_admin,
+      })),
     };
   }
 }

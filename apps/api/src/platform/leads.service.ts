@@ -40,7 +40,8 @@ export class LeadsService {
     if (this.hits.size > 20_000) this.hits.clear();
     const h = this.hits.get(key);
     if (!h || h.resetAt < now) return void this.hits.set(key, { count: 1, resetAt: now + windowMs });
-    if (++h.count > max) throw new HttpException({ message: "Too many requests. Please try again a little later." }, HttpStatus.TOO_MANY_REQUESTS);
+    if (++h.count > max)
+      throw new HttpException({ message: "Too many requests. Please try again a little later." }, HttpStatus.TOO_MANY_REQUESTS);
   }
 
   /** Cloudflare Turnstile ("not a robot"), when TURNSTILE_SECRET_KEY is set. */
@@ -50,7 +51,11 @@ export class LeadsService {
     if (typeof token !== "string" || !token || token.length > 4000) return false;
     try {
       const body = new URLSearchParams({ secret, response: token, remoteip: ip });
-      const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body, signal: AbortSignal.timeout(5000) });
+      const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        body,
+        signal: AbortSignal.timeout(5000),
+      });
       return !!((await res.json()) as { success?: boolean }).success;
     } catch (e) {
       this.logger.warn(`Turnstile unreachable, accepting: ${(e as Error).message}`);
@@ -65,11 +70,24 @@ export class LeadsService {
     if (input.website) return { ok: true };
     this.limit(`lead:${ip}`, 5, 60 * 60_000);
     this.limit("lead:all", 60, 60 * 60_000);
-    if (!(await this.human(input.botToken, ip))) throw new DomainError("We could not confirm you are not a robot. Reload the page and try again.");
+    if (!(await this.human(input.botToken, ip)))
+      throw new DomainError("We could not confirm you are not a robot. Reload the page and try again.");
     const lead = await this.db.lead.create({
-      data: { companyName: input.companyName, name: input.name, email: input.email, phone: input.phone, country: input.country, teamSize: input.teamSize, message: input.message, source: "form", ip: ip.slice(0, 64) },
+      data: {
+        companyName: input.companyName,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        country: input.country,
+        teamSize: input.teamSize,
+        message: input.message,
+        source: "form",
+        ip: ip.slice(0, 64),
+      },
     });
-    await this.companies.log(null, "lead", `New demo request: ${input.name} <${input.email}> from ${input.companyName}`, { leadId: lead.id });
+    await this.companies.log(null, "lead", `New demo request: ${input.name} <${input.email}> from ${input.companyName}`, {
+      leadId: lead.id,
+    });
     await this.mail.toAdmins({
       subject: `Demo request: ${input.companyName}`,
       heading: "New demo request",
@@ -95,17 +113,28 @@ export class LeadsService {
       where: {
         status: filter.status ? (filter.status as never) : undefined,
         OR: filter.q
-          ? [{ companyName: { contains: filter.q, mode: "insensitive" } }, { name: { contains: filter.q, mode: "insensitive" } }, { email: { contains: filter.q, mode: "insensitive" } }]
+          ? [
+              { companyName: { contains: filter.q, mode: "insensitive" } },
+              { name: { contains: filter.q, mode: "insensitive" } },
+              { email: { contains: filter.q, mode: "insensitive" } },
+            ]
           : undefined,
       },
-      include: { company: { select: { id: true, slug: true, name: true, kind: true, status: true, endsAt: true } }, _count: { select: { notes: true } } },
+      include: {
+        company: { select: { id: true, slug: true, name: true, kind: true, status: true, endsAt: true } },
+        _count: { select: { notes: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 500,
     });
     return rows.map((l) => this.view(l));
   }
 
-  private view(l: Prisma.LeadGetPayload<{ include: { company: { select: { id: true; slug: true; name: true; kind: true; status: true; endsAt: true } } } }> & { _count?: { notes: number } }) {
+  private view(
+    l: Prisma.LeadGetPayload<{
+      include: { company: { select: { id: true; slug: true; name: true; kind: true; status: true; endsAt: true } } };
+    }> & { _count?: { notes: number } },
+  ) {
     return {
       id: l.id,
       companyName: l.companyName,
@@ -127,7 +156,10 @@ export class LeadsService {
   }
 
   async get(id: string) {
-    const l = await this.db.lead.findUnique({ where: { id }, include: { company: { select: { id: true, slug: true, name: true, kind: true, status: true, endsAt: true } } } });
+    const l = await this.db.lead.findUnique({
+      where: { id },
+      include: { company: { select: { id: true, slug: true, name: true, kind: true, status: true, endsAt: true } } },
+    });
     if (!l) throw new NotFoundError("Lead");
     const [notes, log] = await Promise.all([
       this.db.leadNote.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }),
@@ -158,8 +190,12 @@ export class LeadsService {
     };
     await this.db.lead.update({ where: { id }, data });
     const said = [
-      input.status && input.status !== l.status ? `status ${l.status} → ${input.status}${input.status === "lost" && input.lostReason ? ` (${input.lostReason})` : ""}` : null,
-      input.followUpOn !== undefined && input.followUpOn !== fromDbDateOrNull(l.followUpOn) ? `follow up ${input.followUpOn ?? "cleared"}` : null,
+      input.status && input.status !== l.status
+        ? `status ${l.status} → ${input.status}${input.status === "lost" && input.lostReason ? ` (${input.lostReason})` : ""}`
+        : null,
+      input.followUpOn !== undefined && input.followUpOn !== fromDbDateOrNull(l.followUpOn)
+        ? `follow up ${input.followUpOn ?? "cleared"}`
+        : null,
     ].filter(Boolean);
     if (said.length) await this.companies.log(actor, "lead_update", `${l.name} (${l.companyName}): ${said.join("; ")}`, { leadId: id });
     return this.get(id);
@@ -180,12 +216,17 @@ export class LeadsService {
   }
 
   /** One click: a demo for this lead (its own short name ending in -demo, sample data, a few days). */
-  async giveDemo(actor: Actor, id: string, opts: { days?: number | null; sampleData?: boolean; slug?: string | null; planId?: string | null }) {
+  async giveDemo(
+    actor: Actor,
+    id: string,
+    opts: { days?: number | null; sampleData?: boolean; slug?: string | null; planId?: string | null },
+  ) {
     const l = await this.db.lead.findUnique({ where: { id } });
     if (!l) throw new NotFoundError("Lead");
     if (l.companyId) {
       const existing = await this.db.company.findUnique({ where: { id: l.companyId } });
-      if (existing && existing.status !== "deleted") throw new ConflictError(`${l.companyName} already has ${existing.kind === "client" ? "a company" : "a demo"} (${existing.slug}).`);
+      if (existing && existing.status !== "deleted")
+        throw new ConflictError(`${l.companyName} already has ${existing.kind === "client" ? "a company" : "a demo"} (${existing.slug}).`);
     }
     const slug = opts.slug ? opts.slug : await this.companies.freeSlug(`${suggestSlug(l.companyName).slice(0, 25)}-demo`);
     return this.companies.create(actor, {
@@ -215,7 +256,8 @@ export class LeadsService {
     if (input.website) return { ok: true };
     this.limit(`signup:${ip}`, 5, 60 * 60_000);
     this.limit("signup:all", 40, 60 * 60_000);
-    if (!(await this.human(input.botToken, ip))) throw new DomainError("We could not confirm you are not a robot. Reload the page and try again.");
+    if (!(await this.human(input.botToken, ip)))
+      throw new DomainError("We could not confirm you are not a robot. Reload the page and try again.");
     const taken = await this.companies.slugTaken(input.slug);
     if (taken) throw new ConflictError(taken);
     const token = randomBytes(32).toString("base64url");
@@ -235,7 +277,10 @@ export class LeadsService {
       to: input.email,
       subject: "Confirm your email to start your RFQ Desk trial",
       heading: "Confirm your email",
-      rows: [["Company", input.companyName], ["Your email", input.email]],
+      rows: [
+        ["Company", input.companyName],
+        ["Your email", input.email],
+      ],
       body: `Press the button to confirm your email. Your ${LIFECYCLE.trialDays}-day trial starts right away. The link works for 24 hours.`,
       link: this.mail.url(`/sign-up/confirm?token=${encodeURIComponent(token)}`),
       linkLabel: "Confirm and start",
@@ -251,7 +296,9 @@ export class LeadsService {
       return { slug: c?.slug ?? s.slug, email: s.email, already: true };
     }
     const slug = (await this.companies.slugTaken(s.slug)) ? await this.companies.freeSlug(s.slug) : s.slug;
-    const lead = await this.db.lead.create({ data: { companyName: s.companyName, name: s.name, email: s.email, source: "sign_up", status: "demo", ip: s.ip } });
+    const lead = await this.db.lead.create({
+      data: { companyName: s.companyName, name: s.name, email: s.email, source: "sign_up", status: "demo", ip: s.ip },
+    });
     const made = await this.companies.create(null, {
       name: s.companyName,
       slug,
@@ -270,7 +317,11 @@ export class LeadsService {
     await this.mail.toAdmins({
       subject: `New trial: ${s.companyName}`,
       heading: "Someone started a trial",
-      rows: [["Company", `${s.companyName} (${slug})`], ["Name", s.name], ["Email", s.email]],
+      rows: [
+        ["Company", `${s.companyName} (${slug})`],
+        ["Name", s.name],
+        ["Email", s.email],
+      ],
       link: this.mail.url(`/platform/companies/${made.id}`),
       linkLabel: "Open in the platform",
     });

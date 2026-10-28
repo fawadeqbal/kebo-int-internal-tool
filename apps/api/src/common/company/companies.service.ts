@@ -55,8 +55,15 @@ export class CompaniesService {
     if (!this.defaultId || Date.now() - this.defaultId.at > TTL_MS) {
       const value = (
         this.env.DEFAULT_COMPANY
-          ? this.prisma.platform.company.findFirst({ where: { slug: this.env.DEFAULT_COMPANY, status: { not: "deleted" } }, select: { id: true } })
-          : this.prisma.platform.company.findFirst({ where: { status: { not: "deleted" } }, orderBy: { createdAt: "asc" }, select: { id: true } })
+          ? this.prisma.platform.company.findFirst({
+              where: { slug: this.env.DEFAULT_COMPANY, status: { not: "deleted" } },
+              select: { id: true },
+            })
+          : this.prisma.platform.company.findFirst({
+              where: { status: { not: "deleted" } },
+              orderBy: { createdAt: "asc" },
+              select: { id: true },
+            })
       ).then((c) => c?.id ?? null);
       this.defaultId = { at: Date.now(), value };
     }

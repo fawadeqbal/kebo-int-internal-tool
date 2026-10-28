@@ -38,6 +38,12 @@ x-server-env: &server-env
   TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
   PUBLIC_INQUIRIES_PER_HOUR: ${PUBLIC_INQUIRIES_PER_HOUR:-40}
   FCM_SERVICE_ACCOUNT_FILE: /app/secrets/firebase.json
+  # Companies (see docs/companies.md): the company of old sessions and the website form,
+  # where client inquiries are emailed, whether self sign-up is open.
+  DEFAULT_COMPANY: ${DEFAULT_COMPANY:-}
+  PLATFORM_EMAIL: ${PLATFORM_EMAIL:-}
+  SIGN_UP_OPEN: ${SIGN_UP_OPEN:-false}
+  COMPANY_POOL_SIZE: ${COMPANY_POOL_SIZE:-4}
 
 services:
   db:

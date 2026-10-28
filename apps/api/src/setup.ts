@@ -30,7 +30,7 @@ export function configureApp(app: INestApplication, env: Env) {
   });
   app.enableShutdownHooks();
   if (env.NODE_ENV !== "production") {
-    const doc = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("Kebo API").setVersion("1").addBearerAuth().build());
+    const doc = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle("RFQ Desk API").setVersion("1").addBearerAuth().build());
     SwaggerModule.setup("api/docs", app, doc);
   }
   return app;

@@ -55,9 +55,18 @@ export class AccountsService {
     const { company, user } = await this.fromLink(token);
     await CompanyContext.run(company, () =>
       this.prisma.tx(async (tx) => {
-        await tx.user.update({ where: { id: user.id }, data: { passwordHash: await bcrypt.hash(password, 12), failedLogins: 0, lockedUntil: null, isActive: true } });
+        await tx.user.update({
+          where: { id: user.id },
+          data: { passwordHash: await bcrypt.hash(password, 12), failedLogins: 0, lockedUntil: null, isActive: true },
+        });
         await tx.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
-        await this.audit.record(tx, { userId: user.id, action: "password_set", entityType: "user", entityId: user.id, summary: `${user.email} set a password with a link` });
+        await this.audit.record(tx, {
+          userId: user.id,
+          action: "password_set",
+          entityType: "user",
+          entityId: user.id,
+          summary: `${user.email} set a password with a link`,
+        });
       }),
     );
     return { email: user.email, company: company.slug };
@@ -87,15 +96,28 @@ export class AccountsService {
       const name = `${admin.name} (platform admin)`;
       let user = await db.user.findFirst({ where: { platformAdminId: admin.id } });
       if (!user) user = await db.user.create({ data: { email, name, role: role.key, passwordHash: "!", platformAdminId: admin.id } });
-      else if (user.name !== name || user.role !== role.key || !user.isActive) user = await db.user.update({ where: { id: user.id }, data: { name, role: role.key, isActive: true } });
+      else if (user.name !== name || user.role !== role.key || !user.isActive)
+        user = await db.user.update({ where: { id: user.id }, data: { name, role: role.key, isActive: true } });
       const session = await this.prisma.tx(async (tx) => {
         const s = await tx.session.create({
-          data: { userId: user.id, expiresAt: new Date(Date.now() + Math.min(VISIT_HOURS * 3600, SESSION_TTL_SECONDS) * 1000), ip: meta.ip.slice(0, 64), userAgent: meta.userAgent?.slice(0, 300) },
+          data: {
+            userId: user.id,
+            expiresAt: new Date(Date.now() + Math.min(VISIT_HOURS * 3600, SESSION_TTL_SECONDS) * 1000),
+            ip: meta.ip.slice(0, 64),
+            userAgent: meta.userAgent?.slice(0, 300),
+          },
         });
-        await this.audit.record(tx, { userId: user.id, action: "platform_open", entityType: "company", summary: `${admin.name} (platform admin) opened the company` });
+        await this.audit.record(tx, {
+          userId: user.id,
+          action: "platform_open",
+          entityType: "company",
+          summary: `${admin.name} (platform admin) opened the company`,
+        });
         return s;
       });
-      await this.prisma.platform.platformLog.create({ data: { adminId: admin.id, adminName: admin.name, action: "open", companyId, summary: `Opened ${company.name}` } });
+      await this.prisma.platform.platformLog.create({
+        data: { adminId: admin.id, adminName: admin.name, action: "open", companyId, summary: `Opened ${company.name}` },
+      });
       return { token: await this.tokens.sign(user.id, session.id, companyId), expiresInSeconds: VISIT_HOURS * 3600, slug: company.slug };
     });
   }

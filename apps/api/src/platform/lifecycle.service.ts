@@ -34,8 +34,12 @@ export class LifecycleService {
     for (const c of all) await this.apply(c).catch((e) => this.log.error(`rules for ${c.slug} failed: ${(e as Error).stack ?? e}`));
     // Deleted companies' short names are free again after the hold.
     const held = new Date(Date.now() - LIFECYCLE.nameHoldDays * DAY);
-    const freed = await this.prisma.platform.company.findMany({ where: { status: "deleted", deletedAt: { lt: held }, NOT: { slug: { startsWith: "deleted-" } } }, select: { id: true } });
-    for (const f of freed) await this.prisma.platform.company.update({ where: { id: f.id }, data: { slug: `deleted-${f.id.slice(0, 8)}` } });
+    const freed = await this.prisma.platform.company.findMany({
+      where: { status: "deleted", deletedAt: { lt: held }, NOT: { slug: { startsWith: "deleted-" } } },
+      select: { id: true },
+    });
+    for (const f of freed)
+      await this.prisma.platform.company.update({ where: { id: f.id }, data: { slug: `deleted-${f.id.slice(0, 8)}` } });
     // Sign-ups never confirmed are dropped after a week.
     await this.prisma.platform.signUp.deleteMany({ where: { verifiedAt: null, createdAt: { lt: new Date(Date.now() - 7 * DAY) } } });
   }
@@ -48,7 +52,14 @@ export class LifecycleService {
   private async apply(c: CompanyModel) {
     const now = new Date();
     const step = lifecycleStep(
-      { kind: c.kind, status: c.status, statusManual: c.statusManual, endsAt: c.endsAt, renewsOn: fromDbDateOrNull(c.renewsOn), endingNoticeFor: c.endingNoticeFor },
+      {
+        kind: c.kind,
+        status: c.status,
+        statusManual: c.statusManual,
+        endsAt: c.endsAt,
+        renewsOn: fromDbDateOrNull(c.renewsOn),
+        endingNoticeFor: c.endingNoticeFor,
+      },
       now,
       todayIn(this.env.APP_TIME_ZONE, now),
     );
@@ -59,13 +70,16 @@ export class LifecycleService {
 
     if (step.do === "ending_notice") {
       await db.company.update({ where: { id: c.id }, data: { endingNoticeFor: c.endsAt } });
-      const ends = c.endsAt!.toUTCString();
+      const ends = this.mail.when(c.endsAt!);
       if (c.contactEmail) {
         await this.mail.send({
           to: c.contactEmail,
           subject: `Your RFQ Desk ${what} ends tomorrow`,
           heading: `Your ${what} ends tomorrow`,
-          rows: [["Company", c.name], ["Ends", ends]],
+          rows: [
+            ["Company", c.name],
+            ["Ends", ends],
+          ],
           body: `After it ends you can still look at everything for ${LIFECYCLE.readOnlyDays} days, but not change anything. To keep using RFQ Desk, reply to this email or contact us.`,
           link: this.mail.url("/login"),
           linkLabel: "Open RFQ Desk",
@@ -74,7 +88,11 @@ export class LifecycleService {
       await this.mail.toAdmins({
         subject: `${c.name}: ${what} ends tomorrow`,
         heading: `A ${what} ends tomorrow`,
-        rows: [["Company", `${c.name} (${c.slug})`], ["Contact", c.contactEmail ? `${c.contactName ?? ""} <${c.contactEmail}>` : null], ["Ends", ends]],
+        rows: [
+          ["Company", `${c.name} (${c.slug})`],
+          ["Contact", c.contactEmail ? `${c.contactName ?? ""} <${c.contactEmail}>` : null],
+          ["Ends", ends],
+        ],
         link: this.mail.url(`/platform/companies/${c.id}`),
         linkLabel: "Open in the platform",
       });
@@ -91,7 +109,10 @@ export class LifecycleService {
     }
 
     await db.company.update({ where: { id: c.id }, data: { status: step.status, statusReason: step.reason } });
-    await note("status", `${c.name}: ${step.status === "active" ? "switched on" : step.status === "off" ? "switched off" : "now read-only"}${step.reason ? ` (${step.reason})` : ""}`);
+    await note(
+      "status",
+      `${c.name}: ${step.status === "active" ? "switched on" : step.status === "off" ? "switched off" : "now read-only"}${step.reason ? ` (${step.reason})` : ""}`,
+    );
     this.companies.forget(c.id);
     if (step.status === "read_only" && c.contactEmail) {
       await this.mail.send({
@@ -109,7 +130,10 @@ export class LifecycleService {
       await this.mail.toAdmins({
         subject: `${c.name}: ${step.status === "off" ? "switched off" : "read-only"} (${step.reason})`,
         heading: `${c.name} is ${step.status === "off" ? "switched off" : "read-only"}`,
-        rows: [["Company", `${c.name} (${c.slug})`], ["Why", step.reason]],
+        rows: [
+          ["Company", `${c.name} (${c.slug})`],
+          ["Why", step.reason],
+        ],
         link: this.mail.url(`/platform/companies/${c.id}`),
         linkLabel: "Open in the platform",
       });

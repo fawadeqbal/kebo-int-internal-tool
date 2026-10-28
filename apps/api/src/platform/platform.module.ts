@@ -12,7 +12,17 @@ import { PlatformMail } from "./platform-mail";
 /** The platform: companies, plans, client inquiries, demos and trials, and the platform admins. */
 @Module({
   controllers: [PlatformAuthController, PlatformPublicController, PlatformController],
-  providers: [PlatformAuthService, PlatformGuard, AccountsService, PlatformCompaniesService, CompanyDataService, LeadsService, LifecycleService, PlansService, PlatformMail],
+  providers: [
+    PlatformAuthService,
+    PlatformGuard,
+    AccountsService,
+    PlatformCompaniesService,
+    CompanyDataService,
+    LeadsService,
+    LifecycleService,
+    PlansService,
+    PlatformMail,
+  ],
   exports: [PlatformAuthService, AccountsService, LifecycleService],
 })
 export class PlatformModule {}

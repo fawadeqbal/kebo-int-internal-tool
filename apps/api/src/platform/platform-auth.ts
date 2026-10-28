@@ -65,7 +65,8 @@ export class PlatformAuthService {
     if (this.attempts.size > 10_000) this.attempts.clear();
     const e = this.attempts.get(ip);
     if (!e || e.resetAt < now) return void this.attempts.set(ip, { count: 1, resetAt: now + 15 * 60_000 });
-    if (++e.count > 15) throw new HttpException({ message: "Too many sign-in attempts. Try again in a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
+    if (++e.count > 15)
+      throw new HttpException({ message: "Too many sign-in attempts. Try again in a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
   }
 
   async login(email: string, password: string, meta: { ip: string; userAgent?: string }) {
@@ -75,7 +76,8 @@ export class PlatformAuthService {
     const ok = await bcrypt.compare(password, admin?.passwordHash ?? DUMMY_HASH).catch(() => false);
     const wrong = new HttpException({ message: "Wrong email or password." }, HttpStatus.UNAUTHORIZED);
     if (!admin || !admin.isActive) throw wrong;
-    if (admin.lockedUntil && admin.lockedUntil > new Date()) throw new HttpException({ message: "Too many wrong attempts. Locked for a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
+    if (admin.lockedUntil && admin.lockedUntil > new Date())
+      throw new HttpException({ message: "Too many wrong attempts. Locked for a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
     if (!ok) {
       await this.failure(admin.id, admin.failedLogins);
       throw wrong;
@@ -90,7 +92,10 @@ export class PlatformAuthService {
         userAgent: meta.userAgent?.slice(0, 300),
       },
     });
-    await db.platformAdmin.update({ where: { id: admin.id }, data: { failedLogins: 0, lockedUntil: null, ...(twoStep ? {} : { lastLoginAt: new Date() }) } });
+    await db.platformAdmin.update({
+      where: { id: admin.id },
+      data: { failedLogins: 0, lockedUntil: null, ...(twoStep ? {} : { lastLoginAt: new Date() }) },
+    });
     if (!twoStep) await this.log(admin, "sign_in", `Signed in from ${meta.ip} (two-step sign-in still to set up)`);
     const token = await this.tokens.signPurpose("platform_session", { aid: admin.id, sid: session.id }, `${SESSION_DAYS}d`);
     return { token, expiresInSeconds: SESSION_DAYS * 86_400, twoStepRequired: twoStep, twoStepSetupRequired: !twoStep };
@@ -113,11 +118,15 @@ export class PlatformAuthService {
       throw new HttpException({ message: "Sign in with your password again." }, HttpStatus.UNAUTHORIZED);
     }
     const a = session.admin;
-    if (a.lockedUntil && a.lockedUntil > new Date()) throw new HttpException({ message: "Too many wrong attempts. Locked for a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
+    if (a.lockedUntil && a.lockedUntil > new Date())
+      throw new HttpException({ message: "Too many wrong attempts. Locked for a few minutes." }, HttpStatus.TOO_MANY_REQUESTS);
     const step = a.totpSecret ? verifyTotp(openSecret(a.totpSecret, this.env.AUTH_SECRET), code, a.totpLastStep) : null;
     let detail = "with a two-step code";
     if (step !== null) {
-      const won = await db.platformAdmin.updateMany({ where: { id: a.id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] }, data: { totpLastStep: step } });
+      const won = await db.platformAdmin.updateMany({
+        where: { id: a.id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
+        data: { totpLastStep: step },
+      });
       if (won.count !== 1) throw new HttpException({ message: "That code was just used. Wait for the next one." }, HttpStatus.UNAUTHORIZED);
     } else {
       const left = consumeRecoveryCode(a.recoveryCodes, code);
@@ -139,11 +148,25 @@ export class PlatformAuthService {
     const claims = await this.tokens.verifyPurpose("platform_session", token);
     if (!claims) return null;
     const session = await this.prisma.platform.platformSession.findUnique({ where: { id: String(claims.sid) }, include: { admin: true } });
-    if (!session || session.adminId !== claims.aid || session.revokedAt || session.pendingTwoStep || session.expiresAt < new Date() || !session.admin.isActive) return null;
+    if (
+      !session ||
+      session.adminId !== claims.aid ||
+      session.revokedAt ||
+      session.pendingTwoStep ||
+      session.expiresAt < new Date() ||
+      !session.admin.isActive
+    )
+      return null;
     if (Date.now() - session.lastSeenAt.getTime() > 3_600_000) {
       await this.prisma.platform.platformSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
     }
-    return { id: session.admin.id, name: session.admin.name, email: session.admin.email, sessionId: session.id, twoStepOn: !!session.admin.totpEnabledAt };
+    return {
+      id: session.admin.id,
+      name: session.admin.name,
+      email: session.admin.email,
+      sessionId: session.id,
+      twoStepOn: !!session.admin.totpEnabledAt,
+    };
   }
 
   async logout(admin: PlatformAdminUser) {
@@ -153,7 +176,10 @@ export class PlatformAuthService {
   async startTwoStep(admin: PlatformAdminUser) {
     if (admin.twoStepOn) throw new DomainError("Two-step sign-in is already on.");
     const secret = newTotpSecret();
-    await this.prisma.platform.platformAdmin.update({ where: { id: admin.id }, data: { totpSecret: sealSecret(secret, this.env.AUTH_SECRET), totpLastStep: null } });
+    await this.prisma.platform.platformAdmin.update({
+      where: { id: admin.id },
+      data: { totpSecret: sealSecret(secret, this.env.AUTH_SECRET), totpLastStep: null },
+    });
     return { secret, otpauthUrl: otpauthUrl("RFQ Desk platform", admin.email, secret) };
   }
 
@@ -162,9 +188,13 @@ export class PlatformAuthService {
     if (a.totpEnabledAt) throw new DomainError("Two-step sign-in is already on.");
     if (!a.totpSecret) throw new DomainError("Start the setup again.");
     const step = verifyTotp(openSecret(a.totpSecret, this.env.AUTH_SECRET), code, null);
-    if (step === null) throw new DomainError("That code is not right. Check your phone's time is set automatically and enter the newest code.");
+    if (step === null)
+      throw new DomainError("That code is not right. Check your phone's time is set automatically and enter the newest code.");
     const { codes, hashes } = newRecoveryCodes();
-    await this.prisma.platform.platformAdmin.update({ where: { id: a.id }, data: { totpEnabledAt: new Date(), totpLastStep: step, recoveryCodes: hashes, lastLoginAt: new Date() } });
+    await this.prisma.platform.platformAdmin.update({
+      where: { id: a.id },
+      data: { totpEnabledAt: new Date(), totpLastStep: step, recoveryCodes: hashes, lastLoginAt: new Date() },
+    });
     await this.log(a, "two_step_on", "Turned on two-step sign-in");
     return { recoveryCodes: codes };
   }
@@ -173,7 +203,10 @@ export class PlatformAuthService {
     const a = await this.prisma.platform.platformAdmin.findUniqueOrThrow({ where: { id: admin.id } });
     if (!(await bcrypt.compare(current, a.passwordHash))) throw new DomainError("Your current password is not right.");
     await this.prisma.platform.platformAdmin.update({ where: { id: a.id }, data: { passwordHash: await bcrypt.hash(next, 12) } });
-    await this.prisma.platform.platformSession.updateMany({ where: { adminId: a.id, id: { not: admin.sessionId }, revokedAt: null }, data: { revokedAt: new Date() } });
+    await this.prisma.platform.platformSession.updateMany({
+      where: { adminId: a.id, id: { not: admin.sessionId }, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
     await this.log(a, "password_change", "Changed own password (signed out elsewhere)");
   }
 
@@ -187,8 +220,12 @@ export class PlatformAuthService {
   async setPassword(token: string, password: string) {
     const claims = await this.tokens.verifyPurpose("platform_password", token);
     const a = claims && (await this.prisma.platform.platformAdmin.findUnique({ where: { id: String(claims.aid) } }));
-    if (!a || claims.pw !== fingerprint(a.passwordHash)) throw new DomainError("This link has expired or was already used. Ask for a new one.");
-    await this.prisma.platform.platformAdmin.update({ where: { id: a.id }, data: { passwordHash: await bcrypt.hash(password, 12), failedLogins: 0, lockedUntil: null } });
+    if (!a || claims.pw !== fingerprint(a.passwordHash))
+      throw new DomainError("This link has expired or was already used. Ask for a new one.");
+    await this.prisma.platform.platformAdmin.update({
+      where: { id: a.id },
+      data: { passwordHash: await bcrypt.hash(password, 12), failedLogins: 0, lockedUntil: null },
+    });
     await this.prisma.platform.platformSession.updateMany({ where: { adminId: a.id, revokedAt: null }, data: { revokedAt: new Date() } });
     await this.log(a, "password_set", "Set a password with a link");
     return { email: a.email };
@@ -225,5 +262,7 @@ export const PlatformSetupAllowed = () => (target: object, key: string | symbol,
   Reflect.defineMetadata("platform:setup", true, descriptor.value);
   return descriptor;
 };
-export const CurrentAdmin = createParamDecorator((_: unknown, ctx: ExecutionContext): PlatformAdminUser => ctx.switchToHttp().getRequest().platformAdmin);
+export const CurrentAdmin = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext): PlatformAdminUser => ctx.switchToHttp().getRequest().platformAdmin,
+);
 export { platformToken };

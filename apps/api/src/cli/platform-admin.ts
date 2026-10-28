@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- a command line tool: it prints its answers */
 import "../load-env";
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
@@ -30,8 +31,14 @@ async function main() {
   try {
     if (cmd === "add" && email) {
       const name = rest.join(" ").trim() || email.split("@")[0];
-      const admin = await prisma.platform.platformAdmin.upsert({ where: { email }, update: { isActive: true }, create: { email, name, passwordHash: "!" } });
-      console.log(`Platform admin ${admin.name} <${admin.email}>. Set the password (link works once, for 2 days):\n${await auth.passwordLink(admin.id)}`);
+      const admin = await prisma.platform.platformAdmin.upsert({
+        where: { email },
+        update: { isActive: true },
+        create: { email, name, passwordHash: "!" },
+      });
+      console.log(
+        `Platform admin ${admin.name} <${admin.email}>. Set the password (link works once, for 2 days):\n${await auth.passwordLink(admin.id)}`,
+      );
     } else if (cmd === "link" && email) {
       const admin = await prisma.platform.platformAdmin.findUniqueOrThrow({ where: { email } });
       console.log(await auth.passwordLink(admin.id));

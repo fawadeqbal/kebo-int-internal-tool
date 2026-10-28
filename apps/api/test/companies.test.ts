@@ -37,10 +37,28 @@ describe("companies: isolation and the platform", () => {
   /** A company made by the platform admin, its tenant admin's password set from the emailed link. */
   const makeCompany = async (slug: string, opts: { sampleData?: boolean; kind?: "client" | "demo"; planId?: string } = {}) => {
     const email = `boss@${slug}.test`;
-    const made = (await plat().post("/companies", { name: `Company ${slug}`, slug, adminName: `Boss ${slug}`, adminEmail: email, sampleData: opts.sampleData ?? true, kind: opts.kind ?? "client", planId: opts.planId ?? null }).expect(201)).body;
+    const made = (
+      await plat()
+        .post("/companies", {
+          name: `Company ${slug}`,
+          slug,
+          adminName: `Boss ${slug}`,
+          adminEmail: email,
+          sampleData: opts.sampleData ?? true,
+          kind: opts.kind ?? "client",
+          planId: opts.planId ?? null,
+        })
+        .expect(201)
+    ).body;
     expect(made.link).toContain("/set-password?token=");
     const token = decodeURIComponent(made.link.split("token=")[1]);
-    expect((await request(app.getHttpServer()).get(`/api/platform/public/set-password?token=${encodeURIComponent(token)}`).expect(200)).body).toMatchObject({ email, company: `Company ${slug}` });
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get(`/api/platform/public/set-password?token=${encodeURIComponent(token)}`)
+          .expect(200)
+      ).body,
+    ).toMatchObject({ email, company: `Company ${slug}` });
     await request(app.getHttpServer()).post("/api/platform/public/set-password").send({ token, password: "Boss12345678" }).expect(200);
     // The link works once.
     await request(app.getHttpServer()).post("/api/platform/public/set-password").send({ token, password: "Boss12345678" }).expect(400);
@@ -52,13 +70,25 @@ describe("companies: isolation and the platform", () => {
     prisma = app.get(PrismaService);
     const email = `platform-${tag}@example.com`;
     await prisma.platform.platformAdmin.create({
-      data: { email, name: "Fawad Test", passwordHash: await bcrypt.hash("Platform12345", 10), totpSecret: sealSecret(secret, process.env.AUTH_SECRET!), totpEnabledAt: new Date() },
+      data: {
+        email,
+        name: "Fawad Test",
+        passwordHash: await bcrypt.hash("Platform12345", 10),
+        totpSecret: sealSecret(secret, process.env.AUTH_SECRET!),
+        totpEnabledAt: new Date(),
+      },
     });
-    const login = (await request(app.getHttpServer()).post("/api/platform/auth/login").send({ email, password: "Platform12345" }).expect(200)).body;
+    const login = (
+      await request(app.getHttpServer()).post("/api/platform/auth/login").send({ email, password: "Platform12345" }).expect(200)
+    ).body;
     expect(login.twoStepRequired).toBe(true);
     // Not usable before the code.
     await plat(login.token).get("/companies").expect(401);
-    await request(app.getHttpServer()).post("/api/platform/auth/two-step").set("authorization", `Bearer ${login.token}`).send({ code: totpAt(secret, ++step + 2) }).expect(200);
+    await request(app.getHttpServer())
+      .post("/api/platform/auth/two-step")
+      .set("authorization", `Bearer ${login.token}`)
+      .send({ code: totpAt(secret, ++step + 2) })
+      .expect(200);
     platform = login.token;
     keboManager = await signIn(app, "manager@example.com", "Manager@12345");
   });
@@ -135,25 +165,38 @@ describe("companies: isolation and the platform", () => {
   it("the database itself keeps companies apart, on every company table", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const tables = (
-      await prisma.platform.$queryRaw<{ t: string }[]>`select relname as t from pg_class where relrowsecurity and relkind = 'r' and relnamespace = current_schema()::regnamespace`
+      await prisma.platform.$queryRaw<
+        { t: string }[]
+      >`select relname as t from pg_class where relrowsecurity and relkind = 'r' and relnamespace = current_schema()::regnamespace`
     ).map((r) => r.t);
     expect(tables.length).toBeGreaterThanOrEqual(36);
     // Every table with a company column is under row-level security, except the platform's own.
     const withCompany = (
-      await prisma.platform.$queryRaw<{ t: string }[]>`select table_name as t from information_schema.columns where table_schema = current_schema() and column_name = 'company_id'`
+      await prisma.platform.$queryRaw<
+        { t: string }[]
+      >`select table_name as t from information_schema.columns where table_schema = current_schema() and column_name = 'company_id'`
     ).map((r) => r.t);
     expect(withCompany.filter((t) => !tables.includes(t)).sort()).toEqual(["leads", "platform_log", "sign_ups", "subscription_payments"]);
     const db = prisma.company(b.id);
     for (const t of tables) {
-      const [row] = await db.$queryRawUnsafe<{ other: bigint }[]>(`select count(*) filter (where company_id <> $1::uuid) as other from "${t}"`, b.id);
+      const [row] = await db.$queryRawUnsafe<{ other: bigint }[]>(
+        `select count(*) filter (where company_id <> $1::uuid) as other from "${t}"`,
+        b.id,
+      );
       expect(Number(row.other), t).toBe(0);
     }
     // Writing a row for another company is refused by the database.
-    await expect(db.$executeRawUnsafe(`insert into counters (company_id, key, value) values ($1::uuid, 'x', 1)`, FIRST_COMPANY_ID)).rejects.toThrow(/row-level security/);
+    await expect(
+      db.$executeRawUnsafe(`insert into counters (company_id, key, value) values ($1::uuid, 'x', 1)`, FIRST_COMPANY_ID),
+    ).rejects.toThrow(/row-level security/);
     // A link from one company's row to another company's row is refused too.
     const keboCustomer = (await prisma.company(FIRST_COMPANY_ID).customer.findFirstOrThrow()).id;
-    await expect(db.$executeRawUnsafe(`update inquiries set customer_id = $1::uuid where id = (select id from inquiries limit 1)`, keboCustomer)).rejects.toThrow(/another company/);
-    await expect(prisma.platform.$executeRawUnsafe(`update inquiries set customer_id = $1::uuid where company_id = $2::uuid`, keboCustomer, b.id)).rejects.toThrow(/another company/);
+    await expect(
+      db.$executeRawUnsafe(`update inquiries set customer_id = $1::uuid where id = (select id from inquiries limit 1)`, keboCustomer),
+    ).rejects.toThrow(/another company/);
+    await expect(
+      prisma.platform.$executeRawUnsafe(`update inquiries set customer_id = $1::uuid where company_id = $2::uuid`, keboCustomer, b.id),
+    ).rejects.toThrow(/another company/);
     // The platform tables are out of reach.
     await expect(db.$queryRawUnsafe(`select count(*) from companies`)).rejects.toThrow(/permission denied/);
     // With no company set, nothing at all.
@@ -163,21 +206,41 @@ describe("companies: isolation and the platform", () => {
   it("an email in two companies: the password decides, or the person chooses", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const bAdmin = await signIn(app, `boss@iso-${tag}.test`, "Boss12345678");
-    await api(app, bAdmin).post("/users", { name: "Same Person", email: "manager@example.com", role: "manager", password: "Manager@12345" }).expect(201);
-    const both = await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Manager@12345" }).expect(409);
+    await api(app, bAdmin)
+      .post("/users", { name: "Same Person", email: "manager@example.com", role: "manager", password: "Manager@12345" })
+      .expect(201);
+    const both = await request(app.getHttpServer())
+      .post("/api/auth/login")
+      .send({ email: "manager@example.com", password: "Manager@12345" })
+      .expect(409);
     expect(both.body.code).toBe("choose_company");
     expect(both.body.companies.map((c: { slug: string }) => c.slug).sort()).toEqual(["kebo", b.slug].sort());
-    const inB = (await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Manager@12345", company: b.slug }).expect(200)).body;
+    const inB = (
+      await request(app.getHttpServer())
+        .post("/api/auth/login")
+        .send({ email: "manager@example.com", password: "Manager@12345", company: b.slug })
+        .expect(200)
+    ).body;
     expect(inB.company.slug).toBe(b.slug);
     const me = (await api(app, inB.token).get("/auth/me").expect(200)).body;
     expect(me.company.slug).toBe(b.slug);
     // A different password in B: only Kebo's fits, so no question.
     const other = (await api(app, bAdmin).get("/users").expect(200)).body.find((u: { email: string }) => u.email === "manager@example.com");
-    await api(app, bAdmin).post(`/users/${other.id}/password`, { password: "Different123" }).expect((r) => expect(r.status).toBeLessThan(300));
-    const kebo = (await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Manager@12345" }).expect(200)).body;
+    await api(app, bAdmin)
+      .post(`/users/${other.id}/password`, { password: "Different123" })
+      .expect((r) => expect(r.status).toBeLessThan(300));
+    const kebo = (
+      await request(app.getHttpServer())
+        .post("/api/auth/login")
+        .send({ email: "manager@example.com", password: "Manager@12345" })
+        .expect(200)
+    ).body;
     expect(kebo.company.slug).toBe("kebo");
     // A wrong password in both: the usual answer, nothing more.
-    const wrong = await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Nope12345678" }).expect(401);
+    const wrong = await request(app.getHttpServer())
+      .post("/api/auth/login")
+      .send({ email: "manager@example.com", password: "Nope12345678" })
+      .expect(401);
     expect(wrong.body.companies).toBeUndefined();
   });
 
@@ -186,7 +249,14 @@ describe("companies: isolation and the platform", () => {
     const opened = (await plat().post(`/companies/${b.id}/open`).expect(200)).body;
     const me = (await api(app, opened.token).get("/auth/me").expect(200)).body;
     expect(me).toMatchObject({ viaPlatform: true, name: "Fawad Test (platform admin)", company: { slug: b.slug } });
-    const customer = (await api(app, opened.token).post("/customers", { name: `Opened ${tag}`, type: "company", country: "PK", contacts: [{ name: "X", isPrimary: true, email: "x@opened.test" }] })).body;
+    const customer = (
+      await api(app, opened.token).post("/customers", {
+        name: `Opened ${tag}`,
+        type: "company",
+        country: "PK",
+        contacts: [{ name: "X", isPrimary: true, email: "x@opened.test" }],
+      })
+    ).body;
     expect(customer.id, JSON.stringify(customer)).toBeTruthy();
     const audit = (await api(app, opened.token).get("/audit").expect(200)).body;
     const rows = (audit.rows ?? audit) as { summary: string; user?: { name: string } | null; userName?: string }[];
@@ -196,11 +266,29 @@ describe("companies: isolation and the platform", () => {
     const people = (await api(app, bAdmin).get("/users").expect(200)).body as { name: string }[];
     expect(people.some((p) => p.name.includes("platform admin"))).toBe(false);
     // It cannot be signed in to with a password.
-    await request(app.getHttpServer()).post("/api/auth/login").send({ email: `platform-${(await prisma.platform.platformAdmin.findFirstOrThrow({ where: { name: "Fawad Test" } })).id.slice(0, 8)}@platform.invalid`, password: "!" }).expect(401);
+    await request(app.getHttpServer())
+      .post("/api/auth/login")
+      .send({
+        email: `platform-${(await prisma.platform.platformAdmin.findFirstOrThrow({ where: { name: "Fawad Test" } })).id.slice(0, 8)}@platform.invalid`,
+        password: "!",
+      })
+      .expect(401);
   });
 
   it("plans: limits warn, then block; features switch parts off", async () => {
-    const plan = (await plat().post("/plans", { name: `Small ${tag}`, price: 49, currency: "USD", period: "month", maxUsers: 2, maxStorageMb: 50, features: ["excel"] }).expect(201)).body;
+    const plan = (
+      await plat()
+        .post("/plans", {
+          name: `Small ${tag}`,
+          price: 49,
+          currency: "USD",
+          period: "month",
+          maxUsers: 2,
+          maxStorageMb: 50,
+          features: ["excel"],
+        })
+        .expect(201)
+    ).body;
     const c = await makeCompany(`plan-${tag}`, { sampleData: false, planId: plan.id });
     const mine = api(app, c.token);
     const company = (await mine.get("/company").expect(200)).body;
@@ -209,7 +297,9 @@ describe("companies: isolation and the platform", () => {
     await mine.post("/users", { name: "Two", email: `two@plan-${tag}.test`, role: "staff", password: "Welcome123x" }).expect(201);
     const full = (await mine.get("/company").expect(200)).body;
     expect(full.notices.some((n: { text: string }) => /reached your plan's 2 people/.test(n.text))).toBe(true);
-    const third = await mine.post("/users", { name: "Three", email: `three@plan-${tag}.test`, role: "staff", password: "Welcome123x" }).expect(400);
+    const third = await mine
+      .post("/users", { name: "Three", email: `three@plan-${tag}.test`, role: "staff", password: "Welcome123x" })
+      .expect(400);
     expect(third.body.error).toMatch(/allows 2 people/);
     // Insights is not in the plan.
     const insights = await mine.get("/insights").expect(403);
@@ -228,15 +318,32 @@ describe("companies: isolation and the platform", () => {
     const token = await signIn(app, c.email, "Boss12345678");
     await plat().post(`/companies/${c.id}/status`, { status: "off" }).expect(200);
     expect((await api(app, token).get("/customers").expect(403)).body.code).toBe("company_off");
-    expect((await request(app.getHttpServer()).post("/api/auth/login").send({ email: c.email, password: "Boss12345678" }).expect(403)).body.code).toBe("company_off");
+    expect(
+      (await request(app.getHttpServer()).post("/api/auth/login").send({ email: c.email, password: "Boss12345678" }).expect(403)).body.code,
+    ).toBe("company_off");
     await plat().post(`/companies/${c.id}/status`, { status: "auto" }).expect(200);
-    await api(app, await signIn(app, c.email, "Boss12345678")).get("/customers").expect(200);
+    await api(app, await signIn(app, c.email, "Boss12345678"))
+      .get("/customers")
+      .expect(200);
   });
 
   it("a demo request becomes a lead, the lead a demo; the demo ends, goes read-only, off, and is deleted", async () => {
-    await request(app.getHttpServer()).post("/api/platform/public/demo-request").send({ companyName: `Lead Co ${tag}`, name: "Lena", email: `lena-${tag}@lead.test`, phone: "+92 300 0000000", teamSize: "6-20", message: "Show me" }).expect(200);
+    await request(app.getHttpServer())
+      .post("/api/platform/public/demo-request")
+      .send({
+        companyName: `Lead Co ${tag}`,
+        name: "Lena",
+        email: `lena-${tag}@lead.test`,
+        phone: "+92 300 0000000",
+        teamSize: "6-20",
+        message: "Show me",
+      })
+      .expect(200);
     // A bot (the hidden field filled in) is thanked and forgotten.
-    await request(app.getHttpServer()).post("/api/platform/public/demo-request").send({ companyName: "Bot", name: "Bot", email: "bot@bot.test", website: "http://spam" }).expect(200);
+    await request(app.getHttpServer())
+      .post("/api/platform/public/demo-request")
+      .send({ companyName: "Bot", name: "Bot", email: "bot@bot.test", website: "http://spam" })
+      .expect(200);
     const leads = (await plat().get(`/leads?q=${tag}`).expect(200)).body as { id: string; status: string; email: string }[];
     expect(leads.map((l) => l.email)).toEqual([`lena-${tag}@lead.test`]);
     const demo = (await plat().post(`/leads/${leads[0].id}/demo`, { sampleData: true }).expect(201)).body;
@@ -260,7 +367,9 @@ describe("companies: isolation and the platform", () => {
     const gone = await prisma.platform.company.findUniqueOrThrow({ where: { id: demo.id } });
     expect(gone.status).toBe("deleted");
     expect(await prisma.company(demo.id).inquiry.count()).toBe(0);
-    expect(Number((await prisma.platform.$queryRaw<{ n: bigint }[]>`select count(*) as n from users where company_id = ${demo.id}::uuid`)[0].n)).toBe(0);
+    expect(
+      Number((await prisma.platform.$queryRaw<{ n: bigint }[]>`select count(*) as n from users where company_id = ${demo.id}::uuid`)[0].n),
+    ).toBe(0);
     // Its name stays taken for a while.
     expect((await request(app.getHttpServer()).get(`/api/platform/public/slug?slug=${demo.slug}`).expect(200)).body.free).toBe(false);
   });
@@ -271,14 +380,25 @@ describe("companies: isolation and the platform", () => {
     await plat().post(`/companies/${d.id}/make-real`, { keepData: false }).expect(200);
     expect(await prisma.company(d.id).inquiry.count()).toBe(0);
     expect(await prisma.company(d.id).user.count({ where: { email: { in: ["bilal@example.com", "sana@example.com"] } } })).toBe(0);
-    await api(app, await signIn(app, d.email, "Boss12345678")).get("/inquiries").expect(200);
+    await api(app, await signIn(app, d.email, "Boss12345678"))
+      .get("/inquiries")
+      .expect(200);
     const today = new Date().toISOString().slice(0, 10);
     const past = new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10);
     await plat().patch(`/companies/${d.id}`, { renewsOn: past }).expect(200);
     const after = (await plat().get(`/companies/${d.id}`).expect(200)).body;
     expect(after.status).toBe("read_only");
     expect(after.billing).toBe("overdue");
-    const paid = (await plat().post(`/companies/${d.id}/payments`, { amount: 199, currency: "USD", paidOn: today, paidUntil: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10) }).expect(201)).body;
+    const paid = (
+      await plat()
+        .post(`/companies/${d.id}/payments`, {
+          amount: 199,
+          currency: "USD",
+          paidOn: today,
+          paidUntil: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+        })
+        .expect(201)
+    ).body;
     expect(paid.status).toBe("active");
     expect(paid.billing).toBe("active");
     expect(paid.payments).toHaveLength(1);

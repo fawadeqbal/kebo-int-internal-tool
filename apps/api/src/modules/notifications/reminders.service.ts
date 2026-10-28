@@ -213,7 +213,7 @@ export class RemindersService {
     const i = await this.insights(`${today.slice(0, 7)}-01`, today);
     const m = (v: string | null | undefined) => (i && v !== null && v !== undefined ? `${i.currency} ${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null);
     const target = i?.target.amount ? `${m(i.target.reached)} of ${m(i.target.amount)} (${i.target.percent}%)` : null;
-    await this.notifications.emailAdmins("dailySummary", `Kebo summary for ${today}`, {
+    await this.notifications.emailAdmins("dailySummary", `${(await this.settings.get()).company.name}: summary for ${today}`, {
       heading: `Summary for ${today}`,
       rows: [
         ["New inquiries (since yesterday)", String(newDeals)],
@@ -245,7 +245,7 @@ export class RemindersService {
       .slice(0, 5)
       .map((c, n) => `${n + 1}. ${c.customer.name}: ${m(c.revenue)}`)
       .join("\n");
-    await this.notifications.emailAdmins("dailySummary", `Kebo: ${name} in numbers`, {
+    await this.notifications.emailAdmins("dailySummary", `${(await this.settings.get()).company.name}: ${name} in numbers`, {
       heading: `${name} in numbers`,
       rows: [
         ["Sales (orders won)", `${m(k.revenue.value)}${ch(k.revenue.change)}`],

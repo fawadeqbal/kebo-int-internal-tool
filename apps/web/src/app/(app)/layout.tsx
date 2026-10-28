@@ -2,7 +2,10 @@ import { Suspense } from "react";
 import { can } from "@kebo/shared";
 import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
-import { requireUser } from "@/lib/session";
+import { getCompany, requireUser } from "@/lib/session";
+import { Alert } from "@kebo/ui";
+import { ExcelAllowedProvider } from "@/components/sheets/excel-allowed";
+import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
 import { AppShell, type NavGroup, type NavItem } from "@/components/shell/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
@@ -10,7 +13,12 @@ import { AccountsProvider, type AccountOption } from "@/components/money/account
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const me = await requireUser();
-  const [{ unread }, settings] = await Promise.all([api.get<{ unread: number }>("/notifications", { take: 1 }), api.get<{ company: { name: string } }>("/settings")]);
+  const [{ unread }, settings, company] = await Promise.all([
+    api.get<{ unread: number }>("/notifications", { take: 1 }),
+    api.get<{ company: { name: string } }>("/settings"),
+    getCompany(),
+  ]);
+  const feature = (f: string) => !company || company.features.includes(f);
   const has = (p: Parameters<typeof can>[1]) => can(me, p);
   // Our money accounts, for every form that records money (payments, factory payments, expenses).
   const accounts = has("payments.record") || has("expenses.manage") ? await api.get<AccountOption[]>("/money/accounts").catch(() => []) : [];
@@ -25,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const trade: NavItem[] = [
     ...(has("sourcing.manage") ? [{ href: "/factories", label: "Factories", icon: "factories" } as NavItem] : []),
     ...(has("sourcing.manage") ? [{ href: "/money", label: "Money", icon: "money" } as NavItem] : []),
-    ...(has("reports.view") ? [{ href: "/insights", label: "Insights", icon: "reports" } as NavItem] : []),
+    ...(has("reports.view") && feature("insights") ? [{ href: "/insights", label: "Insights", icon: "reports" } as NavItem] : []),
   ];
   const admin: NavItem[] = [
     ...(has("users.manage") ? [{ href: "/users", label: "Users", icon: "users" } as NavItem] : []),
@@ -37,13 +45,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      <AppShell groups={groups} companyName={settings.company.name} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
+      <AppShell groups={groups} companyName={settings.company.name} logo={company?.slug === "kebo" || !company ? "/brand/kebo-logo-96.png" : undefined} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
+        {me.viaPlatform && (
+          <form action={leaveCompanyAction} className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
+            <span>
+              <strong className="font-semibold">Platform admin</strong> · you are working in {company?.name ?? "this company"}. Everything you do is in its history under your name.
+            </span>
+            <button type="submit" className="text-sm font-medium text-primary hover:underline">
+              Back to the platform
+            </button>
+          </form>
+        )}
+        {company?.notices.map((n) => (
+          <Alert key={n.text} tone={n.tone === "danger" ? "error" : n.tone === "warn" ? "warning" : "info"} className="no-print mb-4">
+            {n.text}
+          </Alert>
+        ))}
         {demoMode() && (
           <p className="no-print mb-4 rounded-xl border border-info/30 bg-info-soft px-3 py-2 text-sm text-info">
             <strong className="font-semibold">Demo</strong> · everything here is sample data. Look around and change anything; it is reset regularly.
           </p>
         )}
-        <AccountsProvider accounts={accounts}>{children}</AccountsProvider>
+        <ExcelAllowedProvider allowed={feature("excel")}>
+          <AccountsProvider accounts={accounts}>{children}</AccountsProvider>
+        </ExcelAllowedProvider>
       </AppShell>
       <Suspense>
         <Toast />

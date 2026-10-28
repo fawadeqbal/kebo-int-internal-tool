@@ -32,7 +32,14 @@ import { PlatformCompaniesService } from "./companies.platform";
 import { CompanyDataService } from "./company-data";
 import { LeadsService } from "./leads.service";
 import { PlansService } from "./plans.service";
-import { CurrentAdmin, PlatformAuthService, PlatformRoute, PlatformSetupAllowed, platformToken, type PlatformAdminUser } from "./platform-auth";
+import {
+  CurrentAdmin,
+  PlatformAuthService,
+  PlatformRoute,
+  PlatformSetupAllowed,
+  platformToken,
+  type PlatformAdminUser,
+} from "./platform-auth";
 
 const clientIp = (req: Request) => req.ip || req.socket.remoteAddress || "local";
 const loginInput = z.object({ email: z.string().trim().min(1, "Enter your email"), password: z.string().min(1, "Enter your password") });
@@ -44,7 +51,10 @@ const giveDemoInput = z.object({
   slug: slugField.nullish(),
   planId: z.uuid().nullish(),
 });
-const deleteInput = z.object({ confirm: z.string().trim().min(1, "Type the company's short name to confirm"), reason: z.string().trim().max(200).nullish() });
+const deleteInput = z.object({
+  confirm: z.string().trim().min(1, "Type the company's short name to confirm"),
+  reason: z.string().trim().max(200).nullish(),
+});
 const tokenInput = z.object({ token: z.string().min(10).max(2000) });
 
 /** Public pages of the platform: request a demo, sign up, confirm, set a password from a link. */
@@ -225,21 +235,33 @@ export class PlatformController {
 
   @PlatformRoute()
   @Patch("companies/:id")
-  update(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(companyUpdateInput)) body: z.infer<typeof companyUpdateInput>) {
+  update(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(companyUpdateInput)) body: z.infer<typeof companyUpdateInput>,
+  ) {
     return this.companies.update(admin, id, body);
   }
 
   @PlatformRoute()
   @Post("companies/:id/status")
   @HttpCode(200)
-  status(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(companyStatusInput)) body: z.infer<typeof companyStatusInput>) {
+  status(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(companyStatusInput)) body: z.infer<typeof companyStatusInput>,
+  ) {
     return this.companies.setStatus(admin, id, body);
   }
 
   @PlatformRoute()
   @Post("companies/:id/extend")
   @HttpCode(200)
-  extend(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(extendInput)) body: { days: number }) {
+  extend(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(extendInput)) body: { days: number },
+  ) {
     return this.companies.extend(admin, id, body.days);
   }
 
@@ -253,13 +275,21 @@ export class PlatformController {
   @PlatformRoute()
   @Post("companies/:id/make-real")
   @HttpCode(200)
-  makeReal(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(makeRealInput)) body: z.infer<typeof makeRealInput>) {
+  makeReal(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(makeRealInput)) body: z.infer<typeof makeRealInput>,
+  ) {
     return this.companies.makeReal(admin, id, body);
   }
 
   @PlatformRoute()
   @Delete("companies/:id")
-  async remove(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(deleteInput)) body: z.infer<typeof deleteInput>) {
+  async remove(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(deleteInput)) body: z.infer<typeof deleteInput>,
+  ) {
     const c = await this.companies.get(id);
     if (body.confirm.trim().toLowerCase() !== c.slug) throw new DomainError(`Type ${c.slug} to confirm.`);
     return this.companies.remove(admin, id, body.reason ?? undefined);
@@ -277,7 +307,11 @@ export class PlatformController {
   @PlatformRoute()
   @Post("companies/:id/admin-password")
   @HttpCode(200)
-  adminPassword(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(z.object({ userId: z.uuid().nullish() }))) body: { userId?: string | null }) {
+  adminPassword(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(z.object({ userId: z.uuid().nullish() }))) body: { userId?: string | null },
+  ) {
     return this.companies.resetAdminPassword(admin, id, body.userId ?? undefined);
   }
 
@@ -291,13 +325,21 @@ export class PlatformController {
 
   @PlatformRoute()
   @Post("companies/:id/payments")
-  pay(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(subscriptionPaymentInput)) body: z.infer<typeof subscriptionPaymentInput>) {
+  pay(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(subscriptionPaymentInput)) body: z.infer<typeof subscriptionPaymentInput>,
+  ) {
     return this.companies.recordPayment(admin, id, body);
   }
 
   @PlatformRoute()
   @Delete("companies/:id/payments/:paymentId")
-  unpay(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Param("paymentId", ParseUUIDPipe) paymentId: string) {
+  unpay(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("paymentId", ParseUUIDPipe) paymentId: string,
+  ) {
     return this.companies.removePayment(admin, id, paymentId);
   }
 
@@ -349,19 +391,31 @@ export class PlatformController {
 
   @PlatformRoute()
   @Patch("leads/:id")
-  updateLead(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(leadUpdateInput)) body: z.infer<typeof leadUpdateInput>) {
+  updateLead(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(leadUpdateInput)) body: z.infer<typeof leadUpdateInput>,
+  ) {
     return this.leads.update(admin, id, body);
   }
 
   @PlatformRoute()
   @Post("leads/:id/notes")
-  note(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(leadNoteInput)) body: { text: string }) {
+  note(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(leadNoteInput)) body: { text: string },
+  ) {
     return this.leads.addNote(admin, id, body.text);
   }
 
   @PlatformRoute()
   @Post("leads/:id/demo")
-  giveDemo(@CurrentAdmin() admin: PlatformAdminUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(giveDemoInput)) body: z.infer<typeof giveDemoInput>) {
+  giveDemo(
+    @CurrentAdmin() admin: PlatformAdminUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(giveDemoInput)) body: z.infer<typeof giveDemoInput>,
+  ) {
     return this.leads.giveDemo(admin, id, body);
   }
 

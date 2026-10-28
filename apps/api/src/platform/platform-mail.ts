@@ -28,6 +28,11 @@ export class PlatformMail {
     return this.mailer.enabled;
   }
 
+  /** A moment as people read it, in the business time zone ("31 Oct 2026, 14:00"). */
+  when(d: Date) {
+    return `${new Intl.DateTimeFormat("en-GB", { timeZone: this.env.APP_TIME_ZONE, dateStyle: "medium", timeStyle: "short" }).format(d)} (${this.env.APP_TIME_ZONE})`;
+  }
+
   /** The app's address (links in emails). */
   url(path = "/") {
     return `${this.env.APP_URL.replace(/\/$/, "")}${path}`;
@@ -35,7 +40,14 @@ export class PlatformMail {
 
   async send(e: PlatformEmail): Promise<boolean> {
     try {
-      const { html, text } = renderEmail({ heading: e.heading, rows: e.rows, body: e.body, link: e.link, linkLabel: e.linkLabel, footer: "RFQ Desk" });
+      const { html, text } = renderEmail({
+        heading: e.heading,
+        rows: e.rows,
+        body: e.body,
+        link: e.link,
+        linkLabel: e.linkLabel,
+        footer: "RFQ Desk",
+      });
       await this.mailer.send({ to: e.to, subject: e.subject, html, text });
       return this.mailer.enabled;
     } catch (err) {
@@ -46,7 +58,10 @@ export class PlatformMail {
 
   /** The platform admins' inbox: PLATFORM_EMAIL, else every active platform admin. */
   async admins(): Promise<string[]> {
-    if (this.env.PLATFORM_EMAIL) return this.env.PLATFORM_EMAIL.split(",").map((s) => s.trim()).filter(Boolean);
+    if (this.env.PLATFORM_EMAIL)
+      return this.env.PLATFORM_EMAIL.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     return (await this.prisma.platform.platformAdmin.findMany({ where: { isActive: true }, select: { email: true } })).map((a) => a.email);
   }
 

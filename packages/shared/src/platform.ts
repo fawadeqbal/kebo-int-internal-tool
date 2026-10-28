@@ -48,10 +48,57 @@ export type LeadStatusKey = (typeof LEAD_STATUSES)[number];
 
 /** Names nobody can take: they are, or may become, the platform's own addresses. */
 export const RESERVED_SLUGS = new Set([
-  "admin", "www", "api", "app", "mail", "email", "smtp", "demo", "demos", "support", "help", "status", "docs", "blog",
-  "platform", "login", "signin", "signup", "sign-up", "register", "account", "accounts", "billing", "pay", "payments",
-  "static", "assets", "cdn", "files", "media", "ftp", "test", "staging", "dev", "internal", "root", "system", "rfq",
-  "dashboard", "console", "portal", "auth", "sso", "oauth", "webhook", "webhooks", "ns1", "ns2", "mx", "info", "news",
+  "admin",
+  "www",
+  "api",
+  "app",
+  "mail",
+  "email",
+  "smtp",
+  "demo",
+  "demos",
+  "support",
+  "help",
+  "status",
+  "docs",
+  "blog",
+  "platform",
+  "login",
+  "signin",
+  "signup",
+  "sign-up",
+  "register",
+  "account",
+  "accounts",
+  "billing",
+  "pay",
+  "payments",
+  "static",
+  "assets",
+  "cdn",
+  "files",
+  "media",
+  "ftp",
+  "test",
+  "staging",
+  "dev",
+  "internal",
+  "root",
+  "system",
+  "rfq",
+  "dashboard",
+  "console",
+  "portal",
+  "auth",
+  "sso",
+  "oauth",
+  "webhook",
+  "webhooks",
+  "ns1",
+  "ns2",
+  "mx",
+  "info",
+  "news",
 ]);
 
 export const SLUG_RULE = "3 to 30 characters: small letters, numbers and dashes (not at the start or end)";
@@ -73,7 +120,11 @@ export function suggestSlug(name: string): string {
     .replace(/_/g, " ")
     .split(/[\s-]+/)
     .filter((w) => w && !["co", "ltd", "llc", "inc", "limited", "company", "corp", "the", "pvt", "gmbh"].includes(w));
-  let s = words.join("-").replace(/[^a-z0-9-]/g, "").slice(0, 30).replace(/-+$/, "");
+  let s = words
+    .join("-")
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 30)
+    .replace(/-+$/, "");
   if (s.length < 3) s = (s + "-co").replace(/^-/, "").padEnd(3, "x");
   return RESERVED_SLUGS.has(s) ? `${s}-co` : s;
 }
@@ -123,11 +174,14 @@ export function lifecycleStep(c: LifecycleInput, now: Date, today: ISODate): Lif
     if (!c.endsAt) return want("active", null);
     const ended = now.getTime() - c.endsAt.getTime();
     if (ended < 0) {
-      if (-ended <= LIFECYCLE.endingNoticeHours * 3_600_000 && c.endingNoticeFor?.getTime() !== c.endsAt.getTime()) return { do: "ending_notice" };
+      if (-ended <= LIFECYCLE.endingNoticeHours * 3_600_000 && c.endingNoticeFor?.getTime() !== c.endsAt.getTime())
+        return { do: "ending_notice" };
       return want("active", null);
     }
     if (ended >= (LIFECYCLE.readOnlyDays + LIFECYCLE.deleteAfterOffDays) * DAY) {
-      return c.statusManual && c.status === "active" ? { do: "nothing" } : { do: "delete", reason: `The ${what} ended ${LIFECYCLE.readOnlyDays + LIFECYCLE.deleteAfterOffDays} days ago` };
+      return c.statusManual && c.status === "active"
+        ? { do: "nothing" }
+        : { do: "delete", reason: `The ${what} ended ${LIFECYCLE.readOnlyDays + LIFECYCLE.deleteAfterOffDays} days ago` };
     }
     if (ended >= LIFECYCLE.readOnlyDays * DAY) return want("off", `The ${what} has ended`);
     return want("read_only", `The ${what} has ended`);
@@ -139,7 +193,10 @@ export function lifecycleStep(c: LifecycleInput, now: Date, today: ISODate): Lif
 }
 
 /** The subscription's state as the platform admin reads it. */
-export function billingState(c: { kind: string; status: string; renewsOn: ISODate | null }, today: ISODate): "trial" | "active" | "overdue" | "off" {
+export function billingState(
+  c: { kind: string; status: string; renewsOn: ISODate | null },
+  today: ISODate,
+): "trial" | "active" | "overdue" | "off" {
   if (c.status === "off" || c.status === "deleted") return "off";
   if (c.kind !== "client") return "trial";
   if (c.renewsOn && today > c.renewsOn) return "overdue";
@@ -165,7 +222,10 @@ export const demoRequestInput = z.object({
   email,
   phone: optionalText(40),
   country: optionalText(80),
-  teamSize: z.enum(["1-5", "6-20", "21-50", "51+"]).nullish().transform((v) => v ?? null),
+  teamSize: z
+    .enum(["1-5", "6-20", "21-50", "51+"])
+    .nullish()
+    .transform((v) => v ?? null),
   message: optionalText(2000),
   /** Bot check token (Cloudflare Turnstile) when it is switched on. */
   botToken: z.string().max(4000).nullish(),
@@ -187,7 +247,10 @@ export const leadUpdateInput = z.object({
 });
 export const leadNoteInput = z.object({ text: text(4000, "Write the note") });
 
-const optionalInt = z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number().int().min(1).max(1_000_000).nullable());
+const optionalInt = z.preprocess(
+  (v) => (v === "" || v === null || v === undefined ? null : v),
+  z.coerce.number().int().min(1).max(1_000_000).nullable(),
+);
 
 export const planInput = z.object({
   name: text(60, "Name the plan"),
@@ -207,7 +270,10 @@ export const companyCreateInput = z.object({
   name: text(120, "Enter the company's name"),
   slug: slugField,
   kind: z.enum(["client", "demo"]).default("client"),
-  planId: z.uuid().nullish().transform((v) => v ?? null),
+  planId: z
+    .uuid()
+    .nullish()
+    .transform((v) => v ?? null),
   adminName: text(120, "Enter the tenant admin's name"),
   adminEmail: email,
   /** Demos: fill with sample customers, factories and inquiries. */
@@ -216,7 +282,10 @@ export const companyCreateInput = z.object({
   days: z.coerce.number().int().min(1).max(60).nullish(),
   /** Clients: paid until. */
   renewsOn: optionalDate,
-  leadId: z.uuid().nullish().transform((v) => v ?? null),
+  leadId: z
+    .uuid()
+    .nullish()
+    .transform((v) => v ?? null),
   notes: optionalText(2000),
 });
 export type CompanyCreateInput = z.infer<typeof companyCreateInput>;
@@ -227,7 +296,16 @@ export const companyUpdateInput = z.object({
   planId: z.uuid().nullish(),
   renewsOn: optionalDate.optional(),
   contactName: optionalText(120).optional(),
-  contactEmail: z.string().trim().toLowerCase().email().max(254).nullish().or(z.literal("")).transform((v) => v || null).optional(),
+  contactEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email()
+    .max(254)
+    .nullish()
+    .or(z.literal(""))
+    .transform((v) => v || null)
+    .optional(),
   notes: optionalText(2000).optional(),
 });
 
@@ -238,7 +316,14 @@ export const companyStatusInput = z.object({
 });
 
 export const extendInput = z.object({ days: z.coerce.number().int().min(1).max(90) });
-export const makeRealInput = z.object({ keepData: z.boolean(), planId: z.uuid().nullish().transform((v) => v ?? null), renewsOn: optionalDate });
+export const makeRealInput = z.object({
+  keepData: z.boolean(),
+  planId: z
+    .uuid()
+    .nullish()
+    .transform((v) => v ?? null),
+  renewsOn: optionalDate,
+});
 
 export const subscriptionPaymentInput = z.object({
   amount: z.coerce.number().positive("Enter the amount").max(10_000_000),

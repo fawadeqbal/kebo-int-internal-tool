@@ -57,7 +57,15 @@ export class PlatformCompaniesService {
 
   log(actor: Actor, action: string, summary: string, extra: { companyId?: string | null; leadId?: string | null; details?: unknown } = {}) {
     return this.db.platformLog.create({
-      data: { adminId: actor?.id ?? null, adminName: actor?.name ?? null, action, summary, companyId: extra.companyId ?? null, leadId: extra.leadId ?? null, details: (extra.details ?? undefined) as Prisma.InputJsonValue | undefined },
+      data: {
+        adminId: actor?.id ?? null,
+        adminName: actor?.name ?? null,
+        action,
+        summary,
+        companyId: extra.companyId ?? null,
+        leadId: extra.leadId ?? null,
+        details: (extra.details ?? undefined) as Prisma.InputJsonValue | undefined,
+      },
     });
   }
 
@@ -101,7 +109,13 @@ export class PlatformCompaniesService {
       where: {
         status: filter.status === "deleted" ? "deleted" : filter.status ? (filter.status as never) : { not: "deleted" },
         kind: filter.kind ? (filter.kind as never) : undefined,
-        OR: filter.q ? [{ name: { contains: filter.q, mode: "insensitive" } }, { slug: { contains: filter.q.toLowerCase() } }, { contactEmail: { contains: filter.q, mode: "insensitive" } }] : undefined,
+        OR: filter.q
+          ? [
+              { name: { contains: filter.q, mode: "insensitive" } },
+              { slug: { contains: filter.q.toLowerCase() } },
+              { contactEmail: { contains: filter.q, mode: "insensitive" } },
+            ]
+          : undefined,
       },
       include: { plan: { select: { id: true, name: true, maxUsers: true, maxStorageMb: true } } },
       orderBy: [{ createdAt: "desc" }],
@@ -113,7 +127,10 @@ export class PlatformCompaniesService {
     }));
   }
 
-  private view(c: Prisma.CompanyGetPayload<{ include: { plan: { select: { id: true; name: true; maxUsers: true; maxStorageMb: true } } } }>, today: ISODate) {
+  private view(
+    c: Prisma.CompanyGetPayload<{ include: { plan: { select: { id: true; name: true; maxUsers: true; maxStorageMb: true } } } }>,
+    today: ISODate,
+  ) {
     const renewsOn = fromDbDateOrNull(c.renewsOn);
     return {
       id: c.id,
@@ -139,7 +156,10 @@ export class PlatformCompaniesService {
   }
 
   async get(id: string) {
-    const c = await this.db.company.findUnique({ where: { id }, include: { plan: { select: { id: true, name: true, maxUsers: true, maxStorageMb: true } } } });
+    const c = await this.db.company.findUnique({
+      where: { id },
+      include: { plan: { select: { id: true, name: true, maxUsers: true, maxStorageMb: true } } },
+    });
     if (!c) throw new NotFoundError("Company");
     const live = c.status !== "deleted";
     const [summary, activity, payments, log, leads] = await Promise.all([
@@ -154,7 +174,15 @@ export class PlatformCompaniesService {
       usage: summary?.usage ?? null,
       warnings: summary?.warnings ?? [],
       activity,
-      payments: payments.map((p) => ({ id: p.id, amountMinor: p.amountMinor, currency: p.currency, paidOn: fromDbDateOrNull(p.paidOn), paidUntil: fromDbDateOrNull(p.paidUntil), note: p.note, createdAt: p.createdAt })),
+      payments: payments.map((p) => ({
+        id: p.id,
+        amountMinor: p.amountMinor,
+        currency: p.currency,
+        paidOn: fromDbDateOrNull(p.paidOn),
+        paidUntil: fromDbDateOrNull(p.paidUntil),
+        note: p.note,
+        createdAt: p.createdAt,
+      })),
       log,
       leads,
     };
@@ -170,7 +198,8 @@ export class PlatformCompaniesService {
     const taken = await this.slugTaken(input.slug);
     if (taken) throw new ConflictError(taken);
     if (input.planId && !(await this.db.plan.findUnique({ where: { id: input.planId } }))) throw new NotFoundError("Plan");
-    const days = input.kind === "demo" ? (input.days ?? LIFECYCLE.demoDays) : input.kind === "trial" ? (input.days ?? LIFECYCLE.trialDays) : null;
+    const days =
+      input.kind === "demo" ? (input.days ?? LIFECYCLE.demoDays) : input.kind === "trial" ? (input.days ?? LIFECYCLE.trialDays) : null;
     const company = await this.db.company.create({
       data: {
         slug: input.slug,
@@ -189,7 +218,10 @@ export class PlatformCompaniesService {
     try {
       const db = this.prisma.company(company.id);
       const hash = input.passwordHash ?? "!";
-      const people = await seedCompanyBase(db, { admin: { email: input.adminEmail, name: input.adminName, role: "admin", passwordHash: hash }, companyName: input.name });
+      const people = await seedCompanyBase(db, {
+        admin: { email: input.adminEmail, name: input.adminName, role: "admin", passwordHash: hash },
+        companyName: input.name,
+      });
       adminId = people.admin.id;
       if (input.sampleData) await seedDemoData(db, people, { timeZone: this.env.APP_TIME_ZONE, samplePasswordHash: "!" });
     } catch (e) {
@@ -200,12 +232,19 @@ export class PlatformCompaniesService {
       throw new DomainError("The company could not be made. Nothing was kept; try again.");
     }
     const what = input.kind === "demo" ? "demo" : input.kind === "trial" ? "trial" : "company";
-    await this.log(actor, "create", `Made the ${what} ${company.name} (${company.slug}) for ${input.adminName} <${input.adminEmail}>${days ? `, ${days} days` : ""}`, {
-      companyId: company.id,
-      leadId: input.leadId,
-    });
+    await this.log(
+      actor,
+      "create",
+      `Made the ${what} ${company.name} (${company.slug}) for ${input.adminName} <${input.adminEmail}>${days ? `, ${days} days` : ""}`,
+      {
+        companyId: company.id,
+        leadId: input.leadId,
+      },
+    );
     if (input.leadId) {
-      await this.db.lead.update({ where: { id: input.leadId }, data: { companyId: company.id, status: input.kind === "client" ? "client" : "demo" } }).catch(() => undefined);
+      await this.db.lead
+        .update({ where: { id: input.leadId }, data: { companyId: company.id, status: input.kind === "client" ? "client" : "demo" } })
+        .catch(() => undefined);
     }
     // The tenant admin: a link to set a password (not needed when they chose one at sign-up).
     const link = input.passwordHash ? null : await this.accounts.setPasswordLink(company.id, adminId);
@@ -218,7 +257,7 @@ export class PlatformCompaniesService {
             ["Company", company.name],
             ["Your email", input.adminEmail],
             ["Your role", "Tenant admin (Super Admin)"],
-            ...(company.endsAt ? ([["Demo ends", company.endsAt.toUTCString()]] as [string, string][]) : []),
+            ...(company.endsAt ? ([["Demo ends", this.mail.when(company.endsAt)]] as [string, string][]) : []),
           ],
           body:
             input.kind === "demo"
@@ -251,7 +290,11 @@ export class PlatformCompaniesService {
     if (input.slug !== undefined && input.slug !== c.slug) {
       const taken = await this.slugTaken(input.slug, id);
       if (taken) throw new ConflictError(taken);
-      Object.assign(data, { slug: input.slug, previousSlug: c.slug, previousSlugUntil: new Date(Date.now() + LIFECYCLE.renameRedirectDays * DAY) });
+      Object.assign(data, {
+        slug: input.slug,
+        previousSlug: c.slug,
+        previousSlugUntil: new Date(Date.now() + LIFECYCLE.renameRedirectDays * DAY),
+      });
       said.push(`short name from ${c.slug} to ${input.slug} (the old one works for ${LIFECYCLE.renameRedirectDays} days)`);
     }
     if (input.planId !== undefined && input.planId !== c.planId) {
@@ -284,9 +327,20 @@ export class PlatformCompaniesService {
       await this.applyRules(id);
       return this.get(id);
     }
-    const reason = input.reason ?? (input.status === "off" ? "Switched off by the platform admin" : input.status === "read_only" ? "Made read-only by the platform admin" : null);
+    const reason =
+      input.reason ??
+      (input.status === "off"
+        ? "Switched off by the platform admin"
+        : input.status === "read_only"
+          ? "Made read-only by the platform admin"
+          : null);
     await this.db.company.update({ where: { id }, data: { status: input.status, statusManual: true, statusReason: reason } });
-    await this.log(actor, "status", `${c.name}: ${input.status === "active" ? "switched on" : input.status === "off" ? "switched off" : "made read-only"}${input.reason ? ` (${input.reason})` : ""}`, { companyId: id });
+    await this.log(
+      actor,
+      "status",
+      `${c.name}: ${input.status === "active" ? "switched on" : input.status === "off" ? "switched off" : "made read-only"}${input.reason ? ` (${input.reason})` : ""}`,
+      { companyId: id },
+    );
     this.companies.forget(id);
     return this.get(id);
   }
@@ -297,8 +351,16 @@ export class PlatformCompaniesService {
     if (c.kind === "client") throw new DomainError("Only demos and trials have an end.");
     const from = Math.max(c.endsAt?.getTime() ?? 0, Date.now());
     const endsAt = new Date(from + days * DAY);
-    await this.db.company.update({ where: { id }, data: { endsAt, endingNoticeFor: null, status: c.statusManual ? c.status : "active", statusReason: c.statusManual ? c.statusReason : null } });
-    await this.log(actor, "extend", `${c.name}: ${days} more days, now ends ${endsAt.toUTCString()}`, { companyId: id });
+    await this.db.company.update({
+      where: { id },
+      data: {
+        endsAt,
+        endingNoticeFor: null,
+        status: c.statusManual ? c.status : "active",
+        statusReason: c.statusManual ? c.statusReason : null,
+      },
+    });
+    await this.log(actor, "extend", `${c.name}: ${days} more days, now ends ${this.mail.when(endsAt)}`, { companyId: id });
     this.companies.forget(id);
     return this.get(id);
   }
@@ -335,7 +397,9 @@ export class PlatformCompaniesService {
       },
     });
     await this.db.lead.updateMany({ where: { companyId: id }, data: { status: "client" } });
-    await this.log(actor, "make_real", `${c.name} became a client${input.keepData ? " (data kept)" : " (sample data cleared)"}`, { companyId: id });
+    await this.log(actor, "make_real", `${c.name} became a client${input.keepData ? " (data kept)" : " (sample data cleared)"}`, {
+      companyId: id,
+    });
     this.companies.forget(id);
     return this.get(id);
   }
@@ -344,8 +408,13 @@ export class PlatformCompaniesService {
   async remove(actor: Actor, id: string, reason?: string) {
     const c = await this.one(id);
     const { files } = await this.data.clear(id, true);
-    await this.db.company.update({ where: { id }, data: { status: "deleted", statusManual: false, statusReason: reason ?? "Deleted", deletedAt: new Date() } });
-    await this.log(actor, "delete", `Deleted ${c.name} (${c.slug}): all its data and ${files} file(s)${reason ? ` — ${reason}` : ""}`, { companyId: id });
+    await this.db.company.update({
+      where: { id },
+      data: { status: "deleted", statusManual: false, statusReason: reason ?? "Deleted", deletedAt: new Date() },
+    });
+    await this.log(actor, "delete", `Deleted ${c.name} (${c.slug}): all its data and ${files} file(s)${reason ? ` — ${reason}` : ""}`, {
+      companyId: id,
+    });
     this.companies.forget(id);
     return { ok: true };
   }
@@ -355,14 +424,18 @@ export class PlatformCompaniesService {
     const c = await this.one(id);
     const admins = await this.accounts.tenantAdmins(id);
     const who = userId ? admins.find((a) => a.id === userId) : admins[0];
-    if (!who) throw new DomainError(userId ? "That person is not one of the company's tenant admins." : "This company has no tenant admin.");
+    if (!who)
+      throw new DomainError(userId ? "That person is not one of the company's tenant admins." : "This company has no tenant admin.");
     // A new link only: the current password keeps working until the new one is set.
     const link = await this.accounts.setPasswordLink(id, who.id);
     const emailed = await this.mail.send({
       to: who.email,
       subject: `Set a new password for RFQ Desk`,
       heading: "Set a new password",
-      rows: [["Company", c.name], ["Your email", who.email]],
+      rows: [
+        ["Company", c.name],
+        ["Your email", who.email],
+      ],
       body: "The platform admin sent you a link to set a new password. It works once, for 7 days.",
       link,
       linkLabel: "Set a new password",
@@ -375,10 +448,23 @@ export class PlatformCompaniesService {
   async recordPayment(actor: Actor, id: string, input: z.infer<typeof subscriptionPaymentInput>) {
     const c = await this.one(id);
     await this.db.subscriptionPayment.create({
-      data: { companyId: id, amountMinor: Math.round(input.amount * 100), currency: input.currency, paidOn: toDbDate(input.paidOn), paidUntil: toDbDate(input.paidUntil), note: input.note, recordedBy: actor?.id ?? null },
+      data: {
+        companyId: id,
+        amountMinor: Math.round(input.amount * 100),
+        currency: input.currency,
+        paidOn: toDbDate(input.paidOn),
+        paidUntil: toDbDate(input.paidUntil),
+        note: input.note,
+        recordedBy: actor?.id ?? null,
+      },
     });
     await this.db.company.update({ where: { id }, data: { renewsOn: toDbDate(input.paidUntil) } });
-    await this.log(actor, "payment", `${c.name} paid ${input.currency} ${input.amount.toFixed(2)} on ${input.paidOn}; paid until ${input.paidUntil}`, { companyId: id });
+    await this.log(
+      actor,
+      "payment",
+      `${c.name} paid ${input.currency} ${input.amount.toFixed(2)} on ${input.paidOn}; paid until ${input.paidUntil}`,
+      { companyId: id },
+    );
     this.companies.forget(id);
     await this.applyRules(id);
     return this.get(id);
@@ -388,7 +474,12 @@ export class PlatformCompaniesService {
     const p = await this.db.subscriptionPayment.findFirst({ where: { id: paymentId, companyId } });
     if (!p) throw new NotFoundError("Payment");
     await this.db.subscriptionPayment.delete({ where: { id: p.id } });
-    await this.log(actor, "payment_removed", `Removed a payment of ${p.currency} ${(p.amountMinor / 100).toFixed(2)} (paid ${fromDbDateOrNull(p.paidOn)})`, { companyId });
+    await this.log(
+      actor,
+      "payment_removed",
+      `Removed a payment of ${p.currency} ${(p.amountMinor / 100).toFixed(2)} (paid ${fromDbDateOrNull(p.paidOn)})`,
+      { companyId },
+    );
     return this.get(companyId);
   }
 
@@ -404,15 +495,35 @@ export class PlatformCompaniesService {
     const [byStatus, newLeads, followUps, ending, overdue, recent] = await Promise.all([
       this.db.company.groupBy({ by: ["kind", "status"], _count: true, where: { status: { not: "deleted" } } }),
       this.db.lead.count({ where: { status: "new" } }),
-      this.db.lead.findMany({ where: { followUpOn: { lte: toDbDate(today) }, status: { in: ["new", "contacted", "demo"] } }, orderBy: { followUpOn: "asc" }, take: 20 }),
-      this.db.company.findMany({ where: { kind: { in: ["demo", "trial"] }, status: { not: "deleted" }, endsAt: { lte: soon, gt: new Date(Date.now() - LIFECYCLE.readOnlyDays * DAY) } }, orderBy: { endsAt: "asc" } }),
-      this.db.company.findMany({ where: { kind: "client", status: { not: "deleted" }, renewsOn: { lt: toDbDate(addDays(today, 7)) } }, orderBy: { renewsOn: "asc" } }),
+      this.db.lead.findMany({
+        where: { followUpOn: { lte: toDbDate(today) }, status: { in: ["new", "contacted", "demo"] } },
+        orderBy: { followUpOn: "asc" },
+        take: 20,
+      }),
+      this.db.company.findMany({
+        where: {
+          kind: { in: ["demo", "trial"] },
+          status: { not: "deleted" },
+          endsAt: { lte: soon, gt: new Date(Date.now() - LIFECYCLE.readOnlyDays * DAY) },
+        },
+        orderBy: { endsAt: "asc" },
+      }),
+      this.db.company.findMany({
+        where: { kind: "client", status: { not: "deleted" }, renewsOn: { lt: toDbDate(addDays(today, 7)) } },
+        orderBy: { renewsOn: "asc" },
+      }),
       this.db.platformLog.findMany({ orderBy: { at: "desc" }, take: 15 }),
     ]);
     return {
       counts: byStatus.map((r) => ({ kind: r.kind, status: r.status, count: r._count })),
       newLeads,
-      followUps: followUps.map((l) => ({ id: l.id, name: l.name, companyName: l.companyName, status: l.status, followUpOn: fromDbDateOrNull(l.followUpOn) })),
+      followUps: followUps.map((l) => ({
+        id: l.id,
+        name: l.name,
+        companyName: l.companyName,
+        status: l.status,
+        followUpOn: fromDbDateOrNull(l.followUpOn),
+      })),
       ending: ending.map((c) => ({ id: c.id, name: c.name, slug: c.slug, kind: c.kind, status: c.status, endsAt: c.endsAt })),
       renewals: overdue.map((c) => ({ id: c.id, name: c.name, slug: c.slug, status: c.status, renewsOn: fromDbDateOrNull(c.renewsOn) })),
       recent,

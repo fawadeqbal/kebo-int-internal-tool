@@ -48,16 +48,27 @@ export class LimitsService {
     const warnings: string[] = [];
     const storageMb = usage.storageBytes / MB;
     if (plan?.maxUsers) {
-      if (usage.users >= plan.maxUsers) warnings.push(`You have reached your plan's ${plan.maxUsers} people: switch someone off or ask for a bigger plan to add more.`);
+      if (usage.users >= plan.maxUsers)
+        warnings.push(`You have reached your plan's ${plan.maxUsers} people: switch someone off or ask for a bigger plan to add more.`);
       else if (usage.users >= plan.maxUsers * NEAR) warnings.push(`${usage.users} of your plan's ${plan.maxUsers} people are in use.`);
     }
     if (plan?.maxStorageMb) {
-      if (storageMb >= plan.maxStorageMb) warnings.push(`Your files have reached your plan's ${fmtMb(plan.maxStorageMb)}: new files cannot be added.`);
-      else if (storageMb >= plan.maxStorageMb * NEAR) warnings.push(`Files use ${fmtMb(storageMb)} of your plan's ${fmtMb(plan.maxStorageMb)}.`);
+      if (storageMb >= plan.maxStorageMb)
+        warnings.push(`Your files have reached your plan's ${fmtMb(plan.maxStorageMb)}: new files cannot be added.`);
+      else if (storageMb >= plan.maxStorageMb * NEAR)
+        warnings.push(`Files use ${fmtMb(storageMb)} of your plan's ${fmtMb(plan.maxStorageMb)}.`);
     }
     return {
       plan: plan
-        ? { name: plan.name, maxUsers: plan.maxUsers, maxStorageMb: plan.maxStorageMb, features: plan.features, priceMinor: plan.priceMinor, currency: plan.currency, period: plan.period }
+        ? {
+            name: plan.name,
+            maxUsers: plan.maxUsers,
+            maxStorageMb: plan.maxStorageMb,
+            features: plan.features,
+            priceMinor: plan.priceMinor,
+            currency: plan.currency,
+            period: plan.period,
+          }
         : null,
       features: plan ? plan.features : [...PLAN_FEATURE_KEYS],
       usage: { users: usage.users, storageMb: Math.round(storageMb * 10) / 10 },
@@ -72,7 +83,9 @@ export class LimitsService {
     if (!plan?.maxUsers) return;
     const { users } = await this.usage(company.id);
     if (users + adding > plan.maxUsers) {
-      throw new DomainError(`Your plan allows ${plan.maxUsers} people and ${users} are in use. Switch someone off, or ask for a bigger plan.`);
+      throw new DomainError(
+        `Your plan allows ${plan.maxUsers} people and ${users} are in use. Switch someone off, or ask for a bigger plan.`,
+      );
     }
   }
 
@@ -83,7 +96,9 @@ export class LimitsService {
     if (!plan?.maxStorageMb) return;
     const { storageBytes } = await this.usage(company.id);
     if (storageBytes + bytes > plan.maxStorageMb * MB) {
-      throw new DomainError(`Your plan has room for ${fmtMb(plan.maxStorageMb)} of files and ${fmtMb(storageBytes / MB)} are used. Remove old files, or ask for a bigger plan.`);
+      throw new DomainError(
+        `Your plan has room for ${fmtMb(plan.maxStorageMb)} of files and ${fmtMb(storageBytes / MB)} are used. Remove old files, or ask for a bigger plan.`,
+      );
     }
   }
 }

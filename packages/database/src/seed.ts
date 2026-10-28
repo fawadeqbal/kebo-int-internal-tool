@@ -46,14 +46,24 @@ export async function seedCompanyBase(
   const log = opts.log ?? (() => undefined);
   for (const [key, r] of Object.entries(PRESET_ROLES)) {
     if (await db.role.findFirst({ where: { key }, select: { key: true } })) continue;
-    await db.role.create({ data: { key, name: r.name, description: r.description, permissions: r.superAdmin ? [] : [...r.permissions], superAdmin: r.superAdmin } });
+    await db.role.create({
+      data: {
+        key,
+        name: r.name,
+        description: r.description,
+        permissions: r.superAdmin ? [] : [...r.permissions],
+        superAdmin: r.superAdmin,
+      },
+    });
   }
   const admin = await ensureUser(db, opts.admin, log);
   const manager = opts.manager ? await ensureUser(db, opts.manager, log) : admin;
   const staff = opts.staff ? await ensureUser(db, opts.staff, log) : admin;
   // The account website inquiries are recorded under; it can never sign in.
   if (!(await db.user.findFirst({ where: { email: "website-form@system.local" }, select: { id: true } }))) {
-    await db.user.create({ data: { email: "website-form@system.local", name: "Website form", role: "staff", isSystem: true, isActive: false, passwordHash: "!" } });
+    await db.user.create({
+      data: { email: "website-form@system.local", name: "Website form", role: "staff", isSystem: true, isActive: false, passwordHash: "!" },
+    });
   }
   const stored = Object.fromEntries((await db.setting.findMany()).map((s) => [s.key, s.value])) as Partial<Record<SettingsKey, unknown>>;
   const complete = readSettings(stored);
@@ -73,16 +83,31 @@ function companyProfile(name: string, defaults: Record<string, unknown>) {
   for (const [k, v] of Object.entries(defaults)) out[k] = typeof v === "string" ? "" : v;
   out.name = name;
   // Proforma numbers start with the company's letters (1 to 6).
-  out.proformaPrefix = (name.toUpperCase().match(/[A-Z]+/g) ?? ["CO"]).map((w) => w[0]).join("").slice(0, 3).padEnd(2, "X");
+  out.proformaPrefix = (name.toUpperCase().match(/[A-Z]+/g) ?? ["CO"])
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 3)
+    .padEnd(2, "X");
   return out;
 }
 
 /* ---------------------------------------------------------------- sample data (demos, development) */
 
-type Line = { description: string; model?: string; quantity: number; unit?: string; factoryPrice: number; factory: number; type?: "goods" | "charge" };
+type Line = {
+  description: string;
+  model?: string;
+  quantity: number;
+  unit?: string;
+  factoryPrice: number;
+  factory: number;
+  type?: "goods" | "charge";
+};
 
-
-export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZone: string; samplePasswordHash: string; log?: (m: string) => void }) {
+export async function seedDemoData(
+  db: SeedDb,
+  people: SeedPeople,
+  opts: { timeZone: string; samplePasswordHash: string; log?: (m: string) => void },
+) {
   const log = opts.log ?? (() => undefined);
   const tz = opts.timeZone;
   if ((await db.inquiry.count()) > 0) {
@@ -91,7 +116,11 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
   }
   const today = todayIn(tz);
   const year = Number(today.slice(0, 4));
-  const bilal = await ensureUser(db, { email: "bilal@example.com", name: "Bilal", role: "staff", passwordHash: opts.samplePasswordHash }, log);
+  const bilal = await ensureUser(
+    db,
+    { email: "bilal@example.com", name: "Bilal", role: "staff", passwordHash: opts.samplePasswordHash },
+    log,
+  );
   const sana = await ensureUser(db, { email: "sana@example.com", name: "Sana", role: "staff", passwordHash: opts.samplePasswordHash }, log);
 
   const customers = await Promise.all(
@@ -102,13 +131,20 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
       { name: "Nairobi Agro Supplies", country: "KE", contact: "Grace Wanjiru", phone: "+254712345678" },
     ].map((c) =>
       db.customer.create({
-        data: { name: c.name, country: c.country, createdById: people.manager.id, contacts: { create: { name: c.contact, phone: c.phone, whatsapp: c.phone, isPrimary: true } } },
+        data: {
+          name: c.name,
+          country: c.country,
+          createdById: people.manager.id,
+          contacts: { create: { name: c.contact, phone: c.phone, whatsapp: c.phone, isPrimary: true } },
+        },
         include: { contacts: true },
       }),
     ),
   );
   const factories = await Promise.all(
-    ["Jinan Pharma Machinery", "Wenzhou Valve Works", "Qingdao Packaging Co."].map((name) => db.factory.create({ data: { name, createdById: people.manager.id } })),
+    ["Jinan Pharma Machinery", "Wenzhou Valve Works", "Qingdao Packaging Co."].map((name) =>
+      db.factory.create({ data: { name, createdById: people.manager.id } }),
+    ),
   );
   const settings = readSettings({});
   const rate = settings.sales.exchangeRates.CNY ?? 7.1;
@@ -142,13 +178,26 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
         createdById: people.staff.id,
         createdAt: toDbDate(created),
         closedAt: o.stage === "won" || o.stage === "lost" ? toDbDate(addDays(created, 6)) : null,
-        items: { create: o.lines.filter((l) => l.type !== "charge").map((l, i) => ({ description: l.description, model: l.model, quantity: l.quantity, unit: l.unit ?? "pcs", sortOrder: i })) },
+        items: {
+          create: o.lines
+            .filter((l) => l.type !== "charge")
+            .map((l, i) => ({ description: l.description, model: l.model, quantity: l.quantity, unit: l.unit ?? "pcs", sortOrder: i })),
+        },
         stageChanges: { create: { toStage: "new", cause: "created", changedById: people.staff.id, changedAt: toDbDate(created) } },
       },
       include: { items: true },
     });
     if (o.stage !== "new") {
-      await db.inquiryStageChange.create({ data: { inquiryId: inquiry.id, fromStage: "new", toStage: o.stage, cause: o.stage === "lost" ? "manual" : "demo", lostReason: o.lostReason, changedById: people.manager.id } });
+      await db.inquiryStageChange.create({
+        data: {
+          inquiryId: inquiry.id,
+          fromStage: "new",
+          toStage: o.stage,
+          cause: o.stage === "lost" ? "manual" : "demo",
+          lostReason: o.lostReason,
+          changedById: people.manager.id,
+        },
+      });
     }
     if (o.stage === "new") return;
 
@@ -165,7 +214,18 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
           currency: "CNY",
           leadTime: "35 days after deposit",
           createdById: o.assignee ?? people.staff.id,
-          lines: { create: mine.map(([i, l], k) => ({ requestedItemId: inquiry.items[i]?.id, description: l.description, model: l.model, quantity: l.quantity, unit: l.unit ?? "pcs", unitPrice: l.factoryPrice, taxRate: 13, sortOrder: k })) },
+          lines: {
+            create: mine.map(([i, l], k) => ({
+              requestedItemId: inquiry.items[i]?.id,
+              description: l.description,
+              model: l.model,
+              quantity: l.quantity,
+              unit: l.unit ?? "pcs",
+              unitPrice: l.factoryPrice,
+              taxRate: 13,
+              sortOrder: k,
+            })),
+          },
         },
         include: { lines: { orderBy: { sortOrder: "asc" } } },
       });
@@ -186,7 +246,10 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
         const unitPrice = cost ? priceForMargin(cost.costMinor, margin) : toMinor(l.factoryPrice);
         return { l, i, unitPrice, cost };
       });
-      const totals = documentTotals(lines.map((x) => ({ quantity: x.l.quantity, unitPrice: fromMinor(x.unitPrice) })), 0);
+      const totals = documentTotals(
+        lines.map((x) => ({ quantity: x.l.quantity, unitPrice: fromMinor(x.unitPrice) })),
+        0,
+      );
       const header = { subtotal: fromMinor(totals.subtotal), total: fromMinor(totals.total) };
       const rev = await db.quotationRevision.create({
         data: {
@@ -237,7 +300,14 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
     const orderedOn = addDays(created, 6);
     const terms = o.order.terms ?? "before_shipment";
     const shippedOn = o.order.shippedAfterDays === undefined ? null : addDays(orderedOn, o.order.shippedAfterDays);
-    const stageSince = o.order.stage === "confirmed" ? orderedOn : o.order.stage === "in_production" ? addDays(orderedOn, 5) : o.order.stage === "shipped" ? shippedOn! : addDays(shippedOn ?? orderedOn, 10);
+    const stageSince =
+      o.order.stage === "confirmed"
+        ? orderedOn
+        : o.order.stage === "in_production"
+          ? addDays(orderedOn, 5)
+          : o.order.stage === "shipped"
+            ? shippedOn!
+            : addDays(shippedOn ?? orderedOn, 10);
     const order = await db.order.create({
       data: {
         refNo: await nextReference(db, "order", year),
@@ -274,22 +344,53 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
             sortOrder: l.sortOrder,
             // Goods that already left came in from the factory and were packed.
             ...(shippedOn && l.type === "goods"
-              ? { receivedQty: l.quantity, receivedOn: toDbDate(addDays(shippedOn, -5)), packages: Math.max(1, Math.ceil(Number(l.quantity) / 50)), packageType: "Carton", netWeightKg: "480.00", grossWeightKg: "512.50", cbm: "2.400" }
+              ? {
+                  receivedQty: l.quantity,
+                  receivedOn: toDbDate(addDays(shippedOn, -5)),
+                  packages: Math.max(1, Math.ceil(Number(l.quantity) / 50)),
+                  packageType: "Carton",
+                  netWeightKg: "480.00",
+                  grossWeightKg: "512.50",
+                  cbm: "2.400",
+                }
               : {}),
           })),
         },
-        ...(shippedOn ? { packedAt: new Date(`${addDays(shippedOn, -2)}T09:00:00Z`), containerNo: "TGHU 882741-3", shippingMarks: `${customer.name.toUpperCase()}\nMADE IN CHINA` } : {}),
+        ...(shippedOn
+          ? {
+              packedAt: new Date(`${addDays(shippedOn, -2)}T09:00:00Z`),
+              containerNo: "TGHU 882741-3",
+              shippingMarks: `${customer.name.toUpperCase()}\nMADE IN CHINA`,
+            }
+          : {}),
       },
     });
     // Its history: each stage it went through, in order.
     const flow: OrderStage[] = ["confirmed", "in_production", "shipped", "done"];
     for (const [i, st] of flow.slice(0, flow.indexOf(o.order.stage) + 1).entries()) {
-      const at = st === "confirmed" ? orderedOn : st === "in_production" ? addDays(orderedOn, 5) : st === "shipped" ? shippedOn! : stageSince;
-      await db.orderStageChange.create({ data: { orderId: order.id, fromStage: i === 0 ? null : flow[i - 1], toStage: st, byId: i === 0 ? people.manager.id : o.assignee ?? people.manager.id, at: new Date(`${at}T09:00:00Z`) } });
+      const at =
+        st === "confirmed" ? orderedOn : st === "in_production" ? addDays(orderedOn, 5) : st === "shipped" ? shippedOn! : stageSince;
+      await db.orderStageChange.create({
+        data: {
+          orderId: order.id,
+          fromStage: i === 0 ? null : flow[i - 1],
+          toStage: st,
+          byId: i === 0 ? people.manager.id : (o.assignee ?? people.manager.id),
+          at: new Date(`${at}T09:00:00Z`),
+        },
+      });
     }
     // The customer's plan from the terms; the balance is dated once shipped.
     for (const [k, p] of defaultPlan(accepted.total, 30, orderedOn, 7).entries()) {
-      await db.paymentPlanItem.create({ data: { orderId: order.id, label: p.label, amount: fromMinor(p.amountMinor), dueOn: p.dueOn ? toDbDate(p.dueOn) : shippedOn ? toDbDate(addDays(shippedOn, 14)) : null, sortOrder: k } });
+      await db.paymentPlanItem.create({
+        data: {
+          orderId: order.id,
+          label: p.label,
+          amount: fromMinor(p.amountMinor),
+          dueOn: p.dueOn ? toDbDate(p.dueOn) : shippedOn ? toDbDate(addDays(shippedOn, 14)) : null,
+          sortOrder: k,
+        },
+      });
     }
     // What we paid the factories: 30% once production started, the rest before shipping (CNY, with tax).
     const owed = new Map<number, number>();
@@ -299,59 +400,208 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
     }
     for (const [f, cny] of owed) {
       const pay = async (kind: "deposit" | "balance", minor: number, on: string) =>
-        db.factoryPayment.create({ data: { orderId: order.id, factoryId: factories[f].id, kind, amount: fromMinor(minor), currency: "CNY", rate, paidOn: toDbDate(on), reference: `FP-DEMO-${kind}`, recordedById: people.manager.id, paidById: o.assignee ?? people.manager.id } });
+        db.factoryPayment.create({
+          data: {
+            orderId: order.id,
+            factoryId: factories[f].id,
+            kind,
+            amount: fromMinor(minor),
+            currency: "CNY",
+            rate,
+            paidOn: toDbDate(on),
+            reference: `FP-DEMO-${kind}`,
+            recordedById: people.manager.id,
+            paidById: o.assignee ?? people.manager.id,
+          },
+        });
       if (o.order.stage !== "confirmed") await pay("deposit", Math.round(cny * 0.3), addDays(orderedOn, 6));
       if (shippedOn) await pay("balance", cny - Math.round(cny * 0.3), addDays(shippedOn, -3));
     }
     if (shippedOn) {
-      await db.expense.create({ data: { orderId: order.id, inquiryId: order.inquiryId, customerId: customer.id, category: "inland_transport", description: "Truck from the factory to Qingdao port", amount: "3200.00", currency: "CNY", rate, spentOn: toDbDate(addDays(shippedOn, -2)), paidById: o.assignee ?? people.manager.id, recordedById: people.manager.id } });
-      await db.expense.create({ data: { orderId: order.id, inquiryId: order.inquiryId, customerId: customer.id, category: "inspection", description: "Pre-shipment inspection", amount: "280.00", currency: "USD", rate: 1, spentOn: toDbDate(addDays(shippedOn, -4)), recordedById: people.manager.id } });
+      await db.expense.create({
+        data: {
+          orderId: order.id,
+          inquiryId: order.inquiryId,
+          customerId: customer.id,
+          category: "inland_transport",
+          description: "Truck from the factory to Qingdao port",
+          amount: "3200.00",
+          currency: "CNY",
+          rate,
+          spentOn: toDbDate(addDays(shippedOn, -2)),
+          paidById: o.assignee ?? people.manager.id,
+          recordedById: people.manager.id,
+        },
+      });
+      await db.expense.create({
+        data: {
+          orderId: order.id,
+          inquiryId: order.inquiryId,
+          customerId: customer.id,
+          category: "inspection",
+          description: "Pre-shipment inspection",
+          amount: "280.00",
+          currency: "USD",
+          rate: 1,
+          spentOn: toDbDate(addDays(shippedOn, -4)),
+          recordedById: people.manager.id,
+        },
+      });
     }
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     if (o.order.paid !== "none") {
       await db.payment.create({
-        data: { kind: "deposit", orderId: order.id, customerId: customer.id, amount: fromMinor(deposit - 2500), bankCharges: "25.00", currency: "USD", paidOn: toDbDate(addDays(orderedOn, 4)), reference: "TT-DEMO-1", recordedById: people.manager.id },
+        data: {
+          kind: "deposit",
+          orderId: order.id,
+          customerId: customer.id,
+          amount: fromMinor(deposit - 2500),
+          bankCharges: "25.00",
+          currency: "USD",
+          paidOn: toDbDate(addDays(orderedOn, 4)),
+          reference: "TT-DEMO-1",
+          recordedById: people.manager.id,
+        },
       });
     }
     if (o.order.paid === "full") {
       await db.payment.create({
-        data: { kind: "balance", orderId: order.id, customerId: customer.id, amount: fromMinor(balance), currency: "USD", paidOn: toDbDate(addDays(shippedOn ?? orderedOn, 3)), reference: "TT-DEMO-2", recordedById: people.manager.id },
+        data: {
+          kind: "balance",
+          orderId: order.id,
+          customerId: customer.id,
+          amount: fromMinor(balance),
+          currency: "USD",
+          paidOn: toDbDate(addDays(shippedOn ?? orderedOn, 3)),
+          reference: "TT-DEMO-2",
+          recordedById: people.manager.id,
+        },
       });
     }
   }
 
   let blSerial = 240_118;
-  await deal({ customer: 0, stage: "new", category: "Machinery", daysAgo: 0, lines: [{ description: "Rotary tablet press, 35 stations", quantity: 1, factoryPrice: 0, factory: 0 }] });
-  await deal({ customer: 3, stage: "new", category: "Chemicals", daysAgo: 3, lines: [{ description: "Urea 46% granular", quantity: 50, unit: "ton", factoryPrice: 0, factory: 2 }] });
-  await deal({ customer: 1, assignee: bilal.id, stage: "sourcing", category: "Machinery", daysAgo: 2, lines: [{ description: "Gate valve DN100 PN16", quantity: 120, factoryPrice: 410, factory: 1 }] });
-  await deal({ customer: 2, assignee: sana.id, stage: "quoted", category: "Building materials", daysAgo: 8, revisions: ["sent"], lines: [{ description: "PVC pipe 110mm, 6m", quantity: 800, factoryPrice: 58, factory: 2 }] });
-  await deal({ customer: 0, assignee: bilal.id, stage: "quoted", category: "Machinery", daysAgo: 12, revisions: ["superseded", "sent"], lines: [{ description: "Blister packing machine DPP-260", quantity: 1, factoryPrice: 98000, factory: 0 }, { description: "Sea freight to Lagos", quantity: 1, factoryPrice: 2400, factory: 0, type: "charge" }] });
-  await deal({ customer: 1, assignee: sana.id, stage: "lost", lostReason: "price_too_high", category: "Packaging", daysAgo: 20, revisions: ["rejected"], lines: [{ description: "Shrink film 25 micron", quantity: 10, unit: "ton", factoryPrice: 11000, factory: 2 }] });
   await deal({
-    customer: 0, assignee: bilal.id, stage: "won", category: "Machinery", daysAgo: 25, revisions: ["superseded", "accepted"],
-    order: { stage: "in_production", paid: "deposit", readyInDays: 15 },
-    lines: [{ description: "Capsule filling machine NJP-1200", quantity: 2, factoryPrice: 125000, factory: 0 }, { description: "Spare parts kit", quantity: 2, factoryPrice: 6000, factory: 0 }],
+    customer: 0,
+    stage: "new",
+    category: "Machinery",
+    daysAgo: 0,
+    lines: [{ description: "Rotary tablet press, 35 stations", quantity: 1, factoryPrice: 0, factory: 0 }],
   });
   await deal({
-    customer: 2, assignee: sana.id, stage: "won", category: "Machinery", daysAgo: 30, revisions: ["accepted"],
+    customer: 3,
+    stage: "new",
+    category: "Chemicals",
+    daysAgo: 3,
+    lines: [{ description: "Urea 46% granular", quantity: 50, unit: "ton", factoryPrice: 0, factory: 2 }],
+  });
+  await deal({
+    customer: 1,
+    assignee: bilal.id,
+    stage: "sourcing",
+    category: "Machinery",
+    daysAgo: 2,
+    lines: [{ description: "Gate valve DN100 PN16", quantity: 120, factoryPrice: 410, factory: 1 }],
+  });
+  await deal({
+    customer: 2,
+    assignee: sana.id,
+    stage: "quoted",
+    category: "Building materials",
+    daysAgo: 8,
+    revisions: ["sent"],
+    lines: [{ description: "PVC pipe 110mm, 6m", quantity: 800, factoryPrice: 58, factory: 2 }],
+  });
+  await deal({
+    customer: 0,
+    assignee: bilal.id,
+    stage: "quoted",
+    category: "Machinery",
+    daysAgo: 12,
+    revisions: ["superseded", "sent"],
+    lines: [
+      { description: "Blister packing machine DPP-260", quantity: 1, factoryPrice: 98000, factory: 0 },
+      { description: "Sea freight to Lagos", quantity: 1, factoryPrice: 2400, factory: 0, type: "charge" },
+    ],
+  });
+  await deal({
+    customer: 1,
+    assignee: sana.id,
+    stage: "lost",
+    lostReason: "price_too_high",
+    category: "Packaging",
+    daysAgo: 20,
+    revisions: ["rejected"],
+    lines: [{ description: "Shrink film 25 micron", quantity: 10, unit: "ton", factoryPrice: 11000, factory: 2 }],
+  });
+  await deal({
+    customer: 0,
+    assignee: bilal.id,
+    stage: "won",
+    category: "Machinery",
+    daysAgo: 25,
+    revisions: ["superseded", "accepted"],
+    order: { stage: "in_production", paid: "deposit", readyInDays: 15 },
+    lines: [
+      { description: "Capsule filling machine NJP-1200", quantity: 2, factoryPrice: 125000, factory: 0 },
+      { description: "Spare parts kit", quantity: 2, factoryPrice: 6000, factory: 0 },
+    ],
+  });
+  await deal({
+    customer: 2,
+    assignee: sana.id,
+    stage: "won",
+    category: "Machinery",
+    daysAgo: 30,
+    revisions: ["accepted"],
     order: { stage: "confirmed", paid: "none", terms: "against_bl_copy" },
     lines: [{ description: "Butterfly valve DN200", quantity: 60, factoryPrice: 780, factory: 1 }],
   });
   await deal({
-    customer: 3, assignee: bilal.id, stage: "won", category: "Packaging", daysAgo: 90, revisions: ["accepted"],
+    customer: 3,
+    assignee: bilal.id,
+    stage: "won",
+    category: "Packaging",
+    daysAgo: 90,
+    revisions: ["accepted"],
     order: { stage: "done", paid: "full", shippedAfterDays: 35 },
     lines: [{ description: "Woven PP bags 50kg", quantity: 100000, factoryPrice: 1.15, factory: 2 }],
   });
   await deal({
-    customer: 1, assignee: sana.id, stage: "won", category: "Machinery", daysAgo: 60, revisions: ["accepted"],
+    customer: 1,
+    assignee: sana.id,
+    stage: "won",
+    category: "Machinery",
+    daysAgo: 60,
+    revisions: ["accepted"],
     order: { stage: "shipped", paid: "deposit", terms: "against_bl_copy", shippedAfterDays: 38 },
     lines: [{ description: "Ball valve DN50, stainless", quantity: 300, factoryPrice: 165, factory: 1 }],
   });
   // Company costs for the last two months.
   for (const back of [0, 1]) {
     const on = addDays(today, -back * 30);
-    await db.expense.create({ data: { category: "rent", description: "Office rent, Jining", amount: "8000.00", currency: "CNY", rate, spentOn: toDbDate(on), recordedById: people.manager.id } });
-    await db.expense.create({ data: { category: "utilities", description: "Phone and internet", amount: "450.00", currency: "CNY", rate, spentOn: toDbDate(on), recordedById: people.manager.id } });
+    await db.expense.create({
+      data: {
+        category: "rent",
+        description: "Office rent, Jining",
+        amount: "8000.00",
+        currency: "CNY",
+        rate,
+        spentOn: toDbDate(on),
+        recordedById: people.manager.id,
+      },
+    });
+    await db.expense.create({
+      data: {
+        category: "utilities",
+        description: "Phone and internet",
+        amount: "450.00",
+        currency: "CNY",
+        rate,
+        spentOn: toDbDate(on),
+        recordedById: people.manager.id,
+      },
+    });
   }
   // Spent on customers before or around their orders: visits, dinners, samples.
   const onCustomer = [
@@ -364,29 +614,75 @@ export async function seedDemoData(db: SeedDb, people: SeedPeople, opts: { timeZ
   ] as const;
   // Spent on deals: a factory trip for a deal we then lost, and a visit before a deal we won.
   const lostDeal = await db.inquiry.findFirst({ where: { stage: "lost" }, select: { id: true, customerId: true } });
-  const wonDeal = await db.inquiry.findFirst({ where: { stage: "won", orders: { some: { status: { not: "cancelled" } } } }, orderBy: { createdAt: "asc" }, select: { id: true, customerId: true } });
+  const wonDeal = await db.inquiry.findFirst({
+    where: { stage: "won", orders: { some: { status: { not: "cancelled" } } } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, customerId: true },
+  });
   if (lostDeal)
     await db.expense.create({
-      data: { inquiryId: lostDeal.id, customerId: lostDeal.customerId, factoryId: factories[2].id, category: "travel", description: "Train to the film factory to check samples", amount: "1650.00", currency: "CNY", rate, spentOn: toDbDate(addDays(today, -22)), paidById: people.manager.id, recordedById: people.manager.id },
+      data: {
+        inquiryId: lostDeal.id,
+        customerId: lostDeal.customerId,
+        factoryId: factories[2].id,
+        category: "travel",
+        description: "Train to the film factory to check samples",
+        amount: "1650.00",
+        currency: "CNY",
+        rate,
+        spentOn: toDbDate(addDays(today, -22)),
+        paidById: people.manager.id,
+        recordedById: people.manager.id,
+      },
     });
   if (wonDeal)
     await db.expense.create({
-      data: { inquiryId: wonDeal.id, customerId: wonDeal.customerId, factoryId: factories[0].id, category: "travel", description: "Visit to the factory with the customer's engineer", amount: "2400.00", currency: "CNY", rate, spentOn: toDbDate(addDays(today, -40)), paidById: people.manager.id, recordedById: people.manager.id },
+      data: {
+        inquiryId: wonDeal.id,
+        customerId: wonDeal.customerId,
+        factoryId: factories[0].id,
+        category: "travel",
+        description: "Visit to the factory with the customer's engineer",
+        amount: "2400.00",
+        currency: "CNY",
+        rate,
+        spentOn: toDbDate(addDays(today, -40)),
+        paidById: people.manager.id,
+        recordedById: people.manager.id,
+      },
     });
   for (const e of onCustomer) {
     await db.expense.create({
-      data: { customerId: customers[e.customer].id, category: e.category, description: e.description, amount: e.amount, currency: e.currency, rate: e.currency === "USD" ? 1 : rate, spentOn: toDbDate(addDays(today, -e.back)), paidById: people.manager.id, recordedById: people.manager.id },
+      data: {
+        customerId: customers[e.customer].id,
+        category: e.category,
+        description: e.description,
+        amount: e.amount,
+        currency: e.currency,
+        rate: e.currency === "USD" ? 1 : rate,
+        spentOn: toDbDate(addDays(today, -e.back)),
+        paidById: people.manager.id,
+        recordedById: people.manager.id,
+      },
     });
   }
   // Our accounts, with the demo money put on them by currency (a few expenses left off, to show what still needs an account).
   const opened = toDbDate(addDays(today, -120));
-  const usd = await db.moneyAccount.create({ data: { name: "Bank Alfalah USD", kind: "bank", currency: "USD", openingBalance: "20000.00", openingOn: opened } });
-  const cny = await db.moneyAccount.create({ data: { name: "ICBC Jining CNY", kind: "bank", currency: "CNY", openingBalance: "400000.00", openingOn: opened } });
-  await db.moneyAccount.create({ data: { name: "Office cash PKR", kind: "cash", currency: "PKR", openingBalance: "150000.00", openingOn: opened } });
+  const usd = await db.moneyAccount.create({
+    data: { name: "Bank Alfalah USD", kind: "bank", currency: "USD", openingBalance: "20000.00", openingOn: opened },
+  });
+  const cny = await db.moneyAccount.create({
+    data: { name: "ICBC Jining CNY", kind: "bank", currency: "CNY", openingBalance: "400000.00", openingOn: opened },
+  });
+  await db.moneyAccount.create({
+    data: { name: "Office cash PKR", kind: "cash", currency: "PKR", openingBalance: "150000.00", openingOn: opened },
+  });
   await db.payment.updateMany({ where: { currency: "USD" }, data: { accountId: usd.id } });
   await db.factoryPayment.updateMany({ where: { currency: "CNY" }, data: { accountId: cny.id } });
-  await db.expense.updateMany({ where: { currency: "CNY", category: { in: ["rent", "utilities", "inland_transport", "travel"] } }, data: { accountId: cny.id } });
+  await db.expense.updateMany({
+    where: { currency: "CNY", category: { in: ["rent", "utilities", "inland_transport", "travel"] } },
+    data: { accountId: cny.id },
+  });
   await db.expense.updateMany({ where: { currency: "USD", category: { in: ["inspection", "travel"] } }, data: { accountId: usd.id } });
   log("demo data created: 4 customers, 3 factories, 10 inquiries (orders: 1 confirmed, 1 in production, 1 shipped, 1 done)");
 }
-

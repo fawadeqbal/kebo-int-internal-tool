@@ -7,6 +7,7 @@ import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { ENV, type Env } from "../../config/env";
 import { LimitsService } from "../../common/company/limits.service";
+import { CompanyContext } from "../../common/company/company-context";
 import { consumeRecoveryCode, newRecoveryCodes, newTotpSecret, openSecret, otpauthUrl, sealSecret, verifyTotp } from "../../common/auth/totp";
 import type { SessionUser } from "../../common/auth/session-user";
 
@@ -240,7 +241,7 @@ export class UsersService {
     if (u.totpEnabledAt) throw new DomainError("Two-step sign-in is already on.");
     const secret = newTotpSecret();
     await this.prisma.db.user.update({ where: { id: actor.id }, data: { totpSecret: sealSecret(secret, this.env.AUTH_SECRET), totpLastStep: null } });
-    return { secret, otpauthUrl: otpauthUrl("Kebo", u.email, secret) };
+    return { secret, otpauthUrl: otpauthUrl(`RFQ Desk (${CompanyContext.require().name})`, u.email, secret) };
   }
 
   /** The first code from the app turns it on; returns the recovery codes (shown once). */
