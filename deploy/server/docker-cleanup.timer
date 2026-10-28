@@ -1,0 +1,11 @@
+[Unit]
+Description=Trim Docker every night
+
+[Timer]
+# 03:30 GMT (08:30 in Pakistan), after the 02:00 backups.
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -19,6 +19,8 @@ main() {
   echo "Deploying $(git log -1 --format='%h %s')"
   sudo docker compose up -d --build --wait --wait-timeout 900
   sudo docker compose ps --format '{{.Service}}: {{.Status}}'
+  # The images this rebuild replaced are now unnamed leftovers: remove them (never a used one).
+  sudo docker image prune -f >/dev/null || true
   echo "$(date -Is) deployed $(git rev-parse --short HEAD)" >>"$HOME/kebo-deploys.log"
 }
 

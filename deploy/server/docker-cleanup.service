@@ -1,0 +1,10 @@
+[Unit]
+Description=Trim Docker build cache and unused images (all projects)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/docker-cleanup.sh
+Nice=10
+IOSchedulingClass=idle

@@ -64,3 +64,4 @@ Merging into `main` deploys by itself: when the **CI** workflow passes for the n
 - Secrets (Settings › Secrets and variables › Actions): `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (a key used only for this), `DEPLOY_KNOWN_HOSTS` (the server's host key line).
 - On the server, that key may only run the deploy: its line in `~/.ssh/authorized_keys` has a forced command (see the top of `deploy/ci-deploy.sh`). A log of deploys is in `~/kebo-deploys.log`.
 - Deploy by hand as before: `cd /opt/kebo-desk && git pull && sudo docker compose up -d --build`.
+- Disk: a nightly job on the server (`docker-cleanup.timer`, 03:30 GMT) keeps Docker's build cache to the most recent 20 GB and removes images no container uses after 7 days; volumes are never touched. It logs what it freed (`journalctl -u docker-cleanup`) and warns when the disk is over 80%. Files and setup: `deploy/server/`.
