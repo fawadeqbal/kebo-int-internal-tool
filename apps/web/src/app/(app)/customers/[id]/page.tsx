@@ -26,6 +26,7 @@ import type { CustomerDetail } from "@/lib/types-people";
 import type { HistoryEntry } from "@/lib/types";
 import { HistoryList } from "@/components/common/history-list";
 import { CustomerAccountCard } from "@/components/money/customer-account";
+import { CustomerPaymentsView } from "@/components/money/customer-payments";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeCustomerAction } from "../actions";
 
@@ -40,14 +41,14 @@ const ORDER_STATUS: Record<OrderStatus, { label: string; tone: "info" | "ok" | "
 
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 
-type Tab = "overview" | "deals" | "orders" | "account" | "history";
+type Tab = "overview" | "deals" | "orders" | "payments" | "account" | "history";
 
 export default async function CustomerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
   const managers = can(me, "expenses.manage");
-  const tabs: Tab[] = ["overview", "deals", "orders", ...(managers ? (["account"] as const) : []), "history"];
+  const tabs: Tab[] = ["overview", "deals", "orders", "payments", ...(managers ? (["account"] as const) : []), "history"];
   const tab: Tab = tabs.includes(sp.tab as Tab) ? (sp.tab as Tab) : "overview";
   const c = await load(() => api.get<CustomerDetail>(`/customers/${id}`));
   const history = tab === "history" ? await api.get<HistoryEntry[]>("/history", { type: "customer", id }) : [];
@@ -101,6 +102,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           { href: `/customers/${c.id}`, label: "Overview", active: tab === "overview" },
           { href: `/customers/${c.id}?tab=deals`, label: "Deals", count: c.inquiries.length, active: tab === "deals" },
           { href: `/customers/${c.id}?tab=orders`, label: "Orders", count: c.orders.length, active: tab === "orders" },
+          { href: `/customers/${c.id}?tab=payments`, label: "Payments", active: tab === "payments" },
           ...(managers ? [{ href: `/customers/${c.id}?tab=account`, label: "Account", active: tab === "account" }] : []),
           { href: `/customers/${c.id}?tab=history`, label: "History", active: tab === "history" },
         ]}
@@ -290,6 +292,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             )}
           </Card>
       )}
+      {tab === "payments" && <CustomerPaymentsView customerId={c.id} />}
       {tab === "account" && managers && <CustomerAccountCard customerId={c.id} customerName={c.name} />}
       {tab === "history" && (
           <Card>

@@ -288,4 +288,17 @@ describe("money", () => {
     await api(app, sana).post(`/orders/${orderId}/stage`, { to: "shipped", shippedOn: today, confirm: true }).expect(200);
     expect((await money()).plan.items[2].dueOn).toBe(today); // balance before shipment: due by the ship date
   });
+
+  it("lists a customer's orders with what was received and is due, and every payment", async () => {
+    const o = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body;
+    const pays = (await api(app, sana).get(`/orders/${orderId}/payments`).expect(200)).body;
+    const r = (await api(app, sana).get(`/payments?customerId=${o.customer.id}`).expect(200)).body;
+    expect(r.orders).toEqual([
+      expect.objectContaining({ id: orderId, refNo: o.refNo, currency: "USD", total: pays.total, received: pays.received, due: pays.due, payStatus: pays.status }),
+    ]);
+    expect(r.totals).toEqual([{ currency: "USD", orders: 1, total: pays.total, received: pays.received, due: pays.due }]);
+    expect(r.payments.map((p: { id: string }) => p.id).sort()).toEqual(pays.payments.map((p: { id: string }) => p.id).sort());
+    expect(r.payments[0]).toEqual(expect.objectContaining({ order: { id: orderId, refNo: o.refNo }, hasFile: expect.any(Boolean), voided: expect.any(Boolean) }));
+    await api(app, sana).get("/payments?customerId=not-a-uuid").expect(422);
+  });
 });

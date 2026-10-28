@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, CircleDot, Package, ReceiptText, Ship, Trophy, XCircle } from "lucide-react";
 import { INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import { Badge, Card, CardBody, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, money } from "@/lib/format";
@@ -19,7 +20,7 @@ const EVENT_ICON = { deal: CircleDot, won: Trophy, lost: XCircle, order: Package
 
 function Figure({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "ok" | "bad" }) {
   return (
-    <div className="min-w-0 rounded-lg border border-line p-3">
+    <div className="min-w-0 rounded-xl border border-line bg-surface p-4">
       <p className="text-xs text-muted">{label}</p>
       <p className={cn("mt-0.5 truncate text-lg font-semibold tabular", tone === "bad" && "text-bad", tone === "ok" && "text-ok")} title={value}>
         {value}
@@ -56,13 +57,17 @@ export async function CustomerAccountCard({ customerId, customerName }: { custom
   const winning = Number(t.beforeSale) + Number(t.lostDeals) + Number(t.openDeals) + Number(t.otherCosts);
   const shown = list.rows.slice(0, 6);
 
+  const keyNumbers: [string, ReactNode, boolean?][] = [
+    ["Deals", `${a.deals.total} · ${a.deals.won} won · ${a.deals.lost} lost · ${a.deals.open} open`],
+    ["Win rate", a.winRate === null ? "—" : `${a.winRate}%`],
+    ["Spent on deals we lost", money(t.lostDeals, c), Number(t.lostDeals) > 0],
+    ["Selling cost for each order won", t.sellingCostPerWin === null ? "—" : money(t.sellingCostPerWin, c)],
+    ["Spent on deals still open", money(t.openDeals, c)],
+    ["Cash so far (in − factories − spent)", money(t.cash, c), Number(t.cash) < 0],
+  ];
   return (
-    <Card>
-      <CardHeader
-        title="Account with this customer"
-        description={`Managers only. Everything earned from them and spent on them since ${date(a.customer.since)}, in ${c}.`}
-      />
-      <CardBody className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
+        <p className="text-sm text-muted">Managers only. Everything earned from them and spent on them since {date(a.customer.since)}, in {c}.</p>
         {a.missingRates.length > 0 && (
           <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
             There is no exchange rate for {a.missingRates.join(", ")} in Settings, so some amounts are left out.
@@ -75,53 +80,56 @@ export async function CustomerAccountCard({ customerId, customerName }: { custom
           <Figure label="Net result" value={money(t.net, c)} hint={Number(t.net) < 0 ? "They have cost us so far" : "What they are worth so far"} tone={Number(t.net) < 0 ? "bad" : "ok"} />
         </div>
 
-        <dl className="grid gap-y-1.5 text-sm">
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-2">Deals</dt>
-            <dd className="tabular">
-              {a.deals.total} · {a.deals.won} won · {a.deals.lost} lost · {a.deals.open} open
-            </dd>
+        <div className={cn("grid items-start gap-3", a.lostReasons.length > 0 && "lg:grid-cols-2")}>
+          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-surface-2 text-left text-xs text-text-2">
+                  <th scope="colgroup" colSpan={2} className="px-3 py-2 font-medium">
+                    Key numbers
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {keyNumbers.map(([l, v, bad]) => (
+                  <tr key={l} className="border-t border-line">
+                    <td className="px-3 py-2 text-text-2">{l}</td>
+                    <td className={cn("px-3 py-2 text-right tabular", bad && "text-bad")}>{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-2">Win rate</dt>
-            <dd className="tabular">{a.winRate === null ? "—" : `${a.winRate}%`}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-2">Spent on deals we lost</dt>
-            <dd className={cn("tabular", Number(t.lostDeals) > 0 && "text-bad")}>{money(t.lostDeals, c)}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-2">Selling cost for each order won</dt>
-            <dd className="tabular">{t.sellingCostPerWin === null ? "—" : money(t.sellingCostPerWin, c)}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-2">Spent on deals still open</dt>
-            <dd className="tabular">{money(t.openDeals, c)}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-text-2">Cash so far (in − factories − spent)</dt>
-            <dd className={cn("tabular", Number(t.cash) < 0 && "text-bad")}>{money(t.cash, c)}</dd>
-          </div>
-        </dl>
-
-        {a.lostReasons.length > 0 && (
-          <div className="rounded-lg border border-bad/30 bg-bad-soft/40 px-3 py-2.5 text-sm">
-            <p className="font-medium">Why we lost their deals</p>
-            <ul className="mt-1 flex flex-col gap-0.5">
-              {a.lostReasons.map((r) => (
-                <li key={r.reason} className="flex justify-between gap-3">
-                  <span>
-                    {lostReasonLabel(r.reason)} <span className="text-xs text-muted">· {r.deals} deal{r.deals === 1 ? "" : "s"}</span>
-                  </span>
-                  <span className="tabular">{money(r.spent, c)} spent</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          {a.lostReasons.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-line bg-surface">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-surface-2 text-left text-xs text-text-2">
+                    <th scope="col" className="px-3 py-2 font-medium">Why we lost their deals</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Deals</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Spent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {a.lostReasons.map((r) => (
+                    <tr key={r.reason} className="border-t border-line">
+                      <td className="px-3 py-2">{lostReasonLabel(r.reason)}</td>
+                      <td className="px-3 py-2 text-right tabular">{r.deals}</td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap text-bad tabular">{money(r.spent, c)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         {a.rows.length > 0 && (
-          <div className="-mx-4 overflow-x-auto">
+          <section aria-label="Their deals" className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold">
+            Their deals <span className="font-normal text-muted">· what each cost and earned</span>
+          </h2>
+          <div className="overflow-x-auto rounded-lg border border-line bg-surface">
             <Table>
               <THead>
                 <tr>
@@ -167,6 +175,7 @@ export async function CustomerAccountCard({ customerId, customerName }: { custom
               </tbody>
             </Table>
           </div>
+          </section>
         )}
         {Number(t.uncostedRevenue) > 0 && (
           <p className="text-xs text-warn">
@@ -175,15 +184,15 @@ export async function CustomerAccountCard({ customerId, customerName }: { custom
         )}
 
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium tracking-wide text-muted uppercase">Latest expenses</p>
+          <h2 className="text-sm font-semibold">Latest expenses</h2>
           {shown.length > 0 ? (
-            <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Latest expenses">
+            <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface" aria-label="Latest expenses">
               {shown.map((e) => (
                 <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} choices={choices} showFor={Boolean(e.order || e.deal)} />
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted">Nothing spent on them yet.</p>
+            <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing spent on them yet.</p>
           )}
           {list.rows.length > shown.length && (
             <Link href={`/money?tab=expenses&p=${today.slice(0, 4)}&customer=${customerId}`} className="text-sm text-primary hover:underline">
@@ -194,7 +203,7 @@ export async function CustomerAccountCard({ customerId, customerName }: { custom
         </div>
 
         {a.timeline.length > 0 && (
-          <details className="group rounded-lg border border-line">
+          <details className="group rounded-lg border border-line bg-surface">
             <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium select-none">Timeline · {a.timeline.length} events</summary>
             <ol className="flex flex-col border-t border-line">
               {a.timeline.map((e, i) => {
@@ -238,8 +247,7 @@ export async function CustomerAccountCard({ customerId, customerName }: { custom
         <p className="flex items-center gap-1.5 text-xs text-muted">
           <ReceiptText className="size-3.5" aria-hidden /> Orders count at their value; costs at the rates used when paid.
         </p>
-      </CardBody>
-    </Card>
+    </div>
   );
 }
 
