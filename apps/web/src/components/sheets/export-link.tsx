@@ -3,7 +3,7 @@
 import { FileSpreadsheet } from "lucide-react";
 import { buildHref, buttonClass, cn } from "@kebo/ui";
 import type { ExportKind } from "@/lib/exports";
-import { useExcelAllowed } from "./excel-allowed";
+import { useExcelAllowed } from "@/components/common/features";
 
 /** "Export to Excel" for a list: every row with the filters on screen, as an .xlsx file. */
 export function ExportLink({

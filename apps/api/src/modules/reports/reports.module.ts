@@ -34,6 +34,7 @@ class ReportsController {
   }
 
   /** ?from=YYYY-MM-DD&to=YYYY-MM-DD&staff=<id> (defaults: this month). */
+  @RequireFeature("insights")
   @Get("reports")
   @RequirePermissions("reports.view")
   report(@CurrentUser() user: SessionUser, @Query(Validate(rangeQuery)) q: z.infer<typeof rangeQuery>) {

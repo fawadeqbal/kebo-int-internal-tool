@@ -4,7 +4,7 @@ import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { getCompany, requireUser } from "@/lib/session";
 import { Alert } from "@kebo/ui";
-import { FeaturesProvider } from "@/components/sheets/excel-allowed";
+import { FeaturesProvider } from "@/components/common/features";
 import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
 import { AppShell, type NavGroup, type NavItem } from "@/components/shell/nav";

@@ -123,7 +123,12 @@ export class AuthGuard implements CanActivate {
 
     // Plan features: the route's own, and the phone app as a whole.
     const feature = this.reflector.getAllAndOverride<string | undefined>(FEATURE, targets);
-    const needed = [feature, isMobileApp(req.headers["user-agent"]) && !user.viaPlatform ? "mobile_app" : undefined].filter((f): f is string => !!f);
+    const needed = [
+      feature,
+      isMobileApp(req.headers["user-agent"]) && !user.viaPlatform ? "mobile_app" : undefined,
+      // Putting money on one of our accounts (payments, factory payments, expenses) is the cash book.
+      req.method !== "GET" && req.body && typeof req.body === "object" && (req.body as { accountId?: unknown }).accountId ? "cash_book" : undefined,
+    ].filter((f): f is string => !!f);
     if (needed.length) {
       const plan = await this.companies.plan(company);
       const off = plan ? needed.find((f) => !plan.features.includes(f)) : undefined;

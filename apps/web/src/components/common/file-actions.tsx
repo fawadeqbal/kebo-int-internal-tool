@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Download, FileSpreadsheet, FolderDown, Printer } from "lucide-react";
 import { buttonClass, cn } from "@kebo/ui";
-import { useExcelAllowed } from "@/components/sheets/excel-allowed";
+import { useExcelAllowed } from "@/components/common/features";
 
 /**
  * Excel, print and download, the same everywhere: at the top right of what

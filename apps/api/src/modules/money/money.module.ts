@@ -38,6 +38,7 @@ import {
 import { isISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
+import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { MoneyService } from "./money.service";
@@ -82,9 +83,11 @@ class MoneyController {
     private readonly cash: CashService,
     private readonly leaks: LeaksService,
     private readonly paymentFiles: PaymentFilesService,
+    private readonly limits: LimitsService,
   ) {}
 
   /** Managers: where we lose money in a period (?from&to, default this year), with warnings. */
+  @RequireFeature("insights")
   @Get("reports/leaks")
   leaksReport(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: string; to?: string }) {
     return this.leaks.report(user, q);
@@ -92,8 +95,9 @@ class MoneyController {
 
   /** Our accounts (cash, banks, wallets): to choose from when recording money; managers also get balances. */
   @Get("money/accounts")
-  moneyAccounts(@CurrentUser() user: SessionUser) {
-    return this.cash.accounts(user);
+  async moneyAccounts(@CurrentUser() user: SessionUser) {
+    // The cash book is a plan feature: without it there are no accounts to choose.
+    return (await this.limits.allows("cash_book")) ? this.cash.accounts(user) : [];
   }
 
   @RequireFeature("cash_book")
@@ -130,6 +134,7 @@ class MoneyController {
   }
 
   /** Put a payment, a factory payment or an expense on an account afterwards: { accountId | null }. */
+  @RequireFeature("cash_book")
   @Put("money/entries/:kind/:id/account")
   setAccount(
     @CurrentUser() user: SessionUser,
@@ -149,6 +154,7 @@ class MoneyController {
   }
 
   /** Managers only: a customer's deals, what they earned us, everything spent on them, and a timeline. */
+  @RequireFeature("expenses")
   @Get("customers/:id/account")
   customerAccount(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.accounts.customerAccount(user, id);
@@ -316,6 +322,7 @@ class MoneyController {
   }
 
   /** Managers only: the year month by month, earned and cash, in the main currency. */
+  @RequireFeature("insights")
   @Get("money/profit-and-loss")
   pnl(@CurrentUser() user: SessionUser, @Query(Validate(yearQuery)) q: z.infer<typeof yearQuery>) {
     return this.money.profitAndLoss(user, q.year);
