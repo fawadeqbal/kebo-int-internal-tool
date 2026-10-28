@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Banknote, ChartLine, Coins, Download, FileDown, HandCoins, Percent, Target, TrendingUp, Trophy, Users } from "lucide-react";
+import { Banknote, ChartLine, Coins, FileDown, HandCoins, Percent, Target, TrendingUp, Trophy, Users } from "lucide-react";
 import { CHANNEL_LABEL } from "@kebo/shared";
 import { Alert, Badge, buildHref, buttonClass, Card, CardBody, CardHeader, cn, LinkTabs, PageHeader, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
+import { ExportLink } from "@/components/sheets/export-link";
 import { requirePermission } from "@/lib/session";
 import { money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
@@ -345,9 +346,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             </Card>
           </div>
           <div className="no-print flex flex-wrap gap-2">
-            <a href={buildHref("/reports/csv", {}, { from: i.range.from, to: i.range.to })} className={buttonClass("secondary", "sm")} download>
-              <Download aria-hidden /> Download CSV
-            </a>
+            <ExportLink what="report" query={{ from: i.range.from, to: i.range.to }} label="Report in Excel" />
             <a href={buildHref("/pdf/report/summary", {}, { from: i.range.from, to: i.range.to })} className={buttonClass("secondary", "sm")}>
               <FileDown aria-hidden /> Sales report PDF
             </a>

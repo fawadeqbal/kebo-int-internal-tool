@@ -39,19 +39,25 @@ export async function readSheetFile(file: File): Promise<{ ok: true; sheet: Read
   }
 }
 
-function Item({ icon, title, hint, onClick }: { icon: React.ReactNode; title: string; hint: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="flex items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-2 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted"
-    >
+const itemClass = "flex items-start gap-2.5 rounded-md px-2.5 py-2 text-left text-sm hover:bg-surface-2 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted";
+
+function Item({ icon, title, hint, onClick, href }: { icon: React.ReactNode; title: string; hint: string; onClick: () => void; href?: string }) {
+  const body = (
+    <>
       {icon}
       <span className="min-w-0">
         <span className="block font-medium">{title}</span>
         <span className="block text-xs text-muted">{hint}</span>
       </span>
+    </>
+  );
+  return href ? (
+    <a role="menuitem" href={href} download onClick={onClick} className={itemClass}>
+      {body}
+    </a>
+  ) : (
+    <button type="button" role="menuitem" onClick={onClick} className={itemClass}>
+      {body}
     </button>
   );
 }
@@ -65,6 +71,7 @@ export function ExcelMenu({
   template,
   onUpload,
   exportSheet,
+  exportHref,
   noun = "rows",
   className,
 }: {
@@ -72,8 +79,9 @@ export function ExcelMenu({
   template?: () => SheetSpec;
   /** The rows read from an uploaded file, to show for checking. */
   onUpload?: (sheet: ReadSheet, fileName: string) => void;
-  /** What is on screen, as a file. */
+  /** What is on screen, as a file (made in the page, or by a link: every row of a list). */
   exportSheet?: () => SheetSpec;
+  exportHref?: string;
   /** "lines", "customers": used in the hints. */
   noun?: string;
   className?: string;
@@ -83,7 +91,7 @@ export function ExcelMenu({
   const [error, setError] = useState<string | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const picker = useRef<HTMLInputElement>(null);
-  if (!template && !onUpload && !exportSheet) return null;
+  if (!template && !onUpload && !exportSheet && !exportHref) return null;
 
   const download = async (make: () => SheetSpec) => {
     setOpen(false);
@@ -144,6 +152,9 @@ export function ExcelMenu({
             />
           )}
           {exportSheet && <Item icon={<Table2 aria-hidden />} title="Export to Excel" hint={`The ${noun} as they are now.`} onClick={() => void download(exportSheet)} />}
+          {!exportSheet && exportHref && (
+            <Item icon={<Table2 aria-hidden />} title="Export to Excel" hint={`Every one of the ${noun} shown, with the filters on.`} href={exportHref} onClick={() => setOpen(false)} />
+          )}
         </FloatingMenu>
       )}
     </span>

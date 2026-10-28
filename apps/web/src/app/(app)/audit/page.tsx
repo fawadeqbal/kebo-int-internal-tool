@@ -4,6 +4,7 @@ import { can } from "@kebo/shared";
 import { Badge, ButtonLink, Card, cn, EmptyState, FilterBar, PageHeader, Pagination, toPage } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
+import { ExportLink } from "@/components/sheets/export-link";
 import { requirePermission } from "@/lib/session";
 import { dateTime, timeAgo } from "@/lib/format";
 import type { Paged, Person } from "@/lib/types";
@@ -79,7 +80,11 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const filtered = !!(sp.type || sp.person);
   return (
     <div>
-      <PageHeader title="Audit log" description="Every change anyone made, newest first. Entries cannot be edited or removed." />
+      <PageHeader
+        title="Audit log"
+        description="Every change anyone made, newest first. Entries cannot be edited or removed."
+        actions={<ExportLink what="audit" query={{ type: sp.type, person: sp.person }} />}
+      />
       <Card className="overflow-hidden p-0">
         <FilterBar end={<span className="text-xs text-muted tabular">{data.total.toLocaleString("en-US")} entries</span>}>
           <form className="flex flex-1 flex-wrap items-center gap-2">

@@ -40,7 +40,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         description="The suppliers we source from. Prices and costs here are never shown to customers."
         actions={
           <>
-            <PartyExcel kind="factories" importAction={importFactoriesAction} />
+            <PartyExcel kind="factories" importAction={importFactoriesAction} exportHref={buildHref("/sheets/export/factories", {}, keep)} />
             <ButtonLink href="/factories/new" variant="primary">
               New factory
             </ButtonLink>
