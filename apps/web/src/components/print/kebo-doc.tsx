@@ -129,6 +129,8 @@ const titleCase = (t: string) =>
     .split(/\s+/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(" ");
+/** "Invoice.NO." → "Invoice No." */
+const numberText = (l: string) => l.replace(/\.?\s*no\.?\s*:?\s*$/i, " No.").trim();
 const noColon = (t: string) => t.replace(/\s*:\s*$/, "");
 /** A string inside a CSS content: "…". */
 const cssString = (t: string) => `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ")}"`;
@@ -152,6 +154,7 @@ export function KeboDoc<T>({
   company,
   customer,
   title,
+  numberLabel = "NO.",
   number,
   date,
   meta = [],
@@ -173,7 +176,7 @@ export function KeboDoc<T>({
   customer: CustomerSnapshot;
   /** "QUOTATION", "PROFORMA  INVOICE" (shown as "Proforma Invoice"). */
   title: string;
-  /** Kept for the callers; the number shows under the title. */
+  /** "Invoice.NO.", shown before the number under the title (as "Invoice No."). */
   numberLabel?: string;
   number: string;
   date: string;
@@ -328,7 +331,9 @@ export function KeboDoc<T>({
       <section style={{ marginTop: "30px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "24px" }}>
         <div>
           <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 800, fontSize: "34px", color: NAVY, lineHeight: 1 }}>{titleCase(title)}</h1>
-          <div style={{ marginTop: "8px", fontSize: "13px", color: TEXT_2 }}>{number}</div>
+          <div style={{ marginTop: "8px", fontSize: "13px", color: TEXT_2 }}>
+            {numberText(numberLabel)} <span style={{ color: INK, fontWeight: 600 }}>{number}</span>
+          </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${details.length}, auto)`, gap: "22px", lineHeight: 1.45 }}>
           {details.map((d) => (
