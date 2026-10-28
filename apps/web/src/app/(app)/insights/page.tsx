@@ -6,12 +6,12 @@ import { Alert, Badge, buildHref, buttonClass, Card, CardBody, CardHeader, cn, L
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
-import { money, whole } from "@/lib/format";
+import { money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import type { Insights } from "@/lib/types-insights";
 import type { LeaksReport } from "@/lib/types-money";
 import { CashFlowChart, Donut, RevenueChart } from "@/components/insights/charts";
-import { Change, flag, Funnel, KpiCard, ShareBars, TargetRing } from "@/components/insights/kpi";
+import { Change, flag, Funnel, Headline, KpiCard, ShareBars, TargetRing } from "@/components/insights/kpi";
 import { PeriodPicker } from "@/components/insights/period";
 import { TargetEditor } from "@/components/insights/targets";
 import { PrintButton } from "@/components/insights/print-button";
@@ -75,11 +75,11 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         <div className="flex flex-col gap-5">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <KpiCard label="Sales" icon={<TrendingUp className="size-3.5" />} value={whole(k.revenue.value ?? 0, c)} kpi={k.revenue} note={`${k.orders.value} order${k.orders.value === 1 ? "" : "s"}`} spark={spark("revenue")} href={href({ tab: "sales" })} />
+              <KpiCard label="Sales" icon={<TrendingUp className="size-3.5" />} value={<Headline amount={k.revenue.value ?? 0} currency={c} />} kpi={k.revenue} note={`${k.orders.value} order${k.orders.value === 1 ? "" : "s"}`} spark={spark("revenue")} href={href({ tab: "sales" })} />
               <KpiCard
                 label="Gross profit"
                 icon={<Coins className="size-3.5" />}
-                value={whole(k.grossProfit.value ?? 0, c)}
+                value={<Headline amount={k.grossProfit.value ?? 0} currency={c} />}
                 kpi={k.grossProfit}
                 note={k.margin.value !== null ? `${n(k.margin.value, "%")} margin` : undefined}
                 spark={spark("grossProfit")}
@@ -89,14 +89,14 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                 <KpiCard
                   label="Profit after expenses"
                   icon={<Banknote className="size-3.5" />}
-                  value={whole(k.netProfit.value ?? 0, c)}
+                  value={<Headline amount={k.netProfit.value ?? 0} currency={c} />}
                   kpi={k.netProfit}
                   tone={Number(k.netProfit.value) < 0 ? "bad" : undefined}
                   spark={spark("netProfit")}
                   href={href({ tab: "profit" })}
                 />
               ) : (
-                <KpiCard label="Average order" icon={<Banknote className="size-3.5" />} value={whole(k.avgOrder.value ?? 0, c)} kpi={k.avgOrder} />
+                <KpiCard label="Average order" icon={<Banknote className="size-3.5" />} value={<Headline amount={k.avgOrder.value ?? 0} currency={c} />} kpi={k.avgOrder} />
               )}
               <KpiCard
                 label="Win rate"
@@ -125,24 +125,24 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
           </div>
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiCard label="Money in" icon={<HandCoins className="size-3.5" />} value={whole(k.cashIn.value ?? 0, c)} kpi={k.cashIn} note="From customers" spark={spark("cashIn")} />
+            <KpiCard label="Money in" icon={<HandCoins className="size-3.5" />} value={<Headline amount={k.cashIn.value ?? 0} currency={c} />} kpi={k.cashIn} note="From customers" spark={spark("cashIn")} />
             <KpiCard
               label="Customers owe us"
               icon={<Users className="size-3.5" />}
-              value={whole(i.now.toReceive, c)}
+              value={<Headline amount={i.now.toReceive} currency={c} />}
               note={Number(i.now.overdue) > 0 ? <span className="font-medium text-bad">{money(i.now.overdue, c)} overdue</span> : "Nothing overdue"}
               tone={Number(i.now.overdue) > 0 ? "warn" : undefined}
               href="/money?tab=receive"
             />
             {i.now.cashInHand !== null ? (
-              <KpiCard label="In our accounts" icon={<Banknote className="size-3.5" />} value={whole(i.now.cashInHand, c)} note={i.now.toPay !== null ? `We owe factories ${money(i.now.toPay, c)}` : undefined} href="/money?tab=cash" />
+              <KpiCard label="In our accounts" icon={<Banknote className="size-3.5" />} value={<Headline amount={i.now.cashInHand} currency={c} />} note={i.now.toPay !== null ? `We owe factories ${money(i.now.toPay, c)}` : undefined} href="/money?tab=cash" />
             ) : (
               <KpiCard label="Quotations sent" value={String(k.quotesSent.value ?? 0)} kpi={k.quotesSent} note={money(k.quotesValue.value ?? 0, c)} />
             )}
             <KpiCard
               label="Pipeline"
               icon={<ChartLine className="size-3.5" />}
-              value={whole(i.now.pipeline, c)}
+              value={<Headline amount={i.now.pipeline} currency={c} />}
               note={`${i.now.pipelineDeals} quoted deal${i.now.pipelineDeals === 1 ? "" : "s"}${i.now.weightedPipeline ? ` · likely ${money(i.now.weightedPipeline, c)}` : ""}`}
               href="/deals?stage=quoted"
             />
@@ -273,7 +273,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             <KpiCard label="Inquiries received" value={String(k.received.value)} kpi={k.received} spark={nums(i.series.slice(-12).map((s) => s.received))} />
             <KpiCard label="Quotations sent" value={String(k.quotesSent.value)} kpi={k.quotesSent} note={money(k.quotesValue.value ?? 0, c)} />
             <KpiCard label="Orders won" value={String(k.won.value)} kpi={k.won} note={money(k.revenue.value ?? 0, c)} spark={nums(i.series.slice(-12).map((s) => s.won))} />
-            <KpiCard label="Average order" value={whole(k.avgOrder.value ?? 0, c)} kpi={k.avgOrder} />
+            <KpiCard label="Average order" value={<Headline amount={k.avgOrder.value ?? 0} currency={c} />} kpi={k.avgOrder} />
             <KpiCard label="Win rate" icon={<Percent className="size-3.5" />} value={n(k.winRate.value, "%")} kpi={k.winRate} points note="Won ÷ (won + lost)" />
             <KpiCard label="Days to send a quotation" value={n(k.quoteDays.value)} kpi={k.quoteDays} goodWhenUp={false} note="From the inquiry" />
             <KpiCard label="Days to win" value={n(k.closeDays.value)} kpi={k.closeDays} goodWhenUp={false} note="Inquiry to order" />
@@ -361,7 +361,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             <KpiCard label="New customers" value={String(k.newCustomers.value)} kpi={k.newCustomers} note="First order in the period" />
             <KpiCard label="Orders from returning customers" value={n(k.repeatShare.value, "%")} kpi={k.repeatShare} points note="They came back" />
             <KpiCard label="Orders" value={String(k.orders.value)} kpi={k.orders} />
-            <KpiCard label="Average order" value={whole(k.avgOrder.value ?? 0, c)} kpi={k.avgOrder} />
+            <KpiCard label="Average order" value={<Headline amount={k.avgOrder.value ?? 0} currency={c} />} kpi={k.avgOrder} />
           </div>
           <Card className="overflow-hidden rounded-2xl">
             <CardHeader title="Customers by sales" description="Click one for their account: what they earned us and what was spent on them" />
@@ -415,10 +415,10 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
       {tab === "profit" && (
         <div className="flex flex-col gap-5">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiCard label="Gross profit" value={whole(k.grossProfit.value ?? 0, c)} kpi={k.grossProfit} spark={spark("grossProfit")} />
+            <KpiCard label="Gross profit" value={<Headline amount={k.grossProfit.value ?? 0} currency={c} />} kpi={k.grossProfit} spark={spark("grossProfit")} />
             <KpiCard label="Margin" value={n(k.margin.value, "%")} kpi={k.margin} points note="Gross profit ÷ sales" />
-            {k.expenses && <KpiCard label="Expenses" value={whole(k.expenses.value ?? 0, c)} kpi={k.expenses} goodWhenUp={false} spark={spark("expenses")} href="/money?tab=expenses" />}
-            {k.netProfit && <KpiCard label="Profit after expenses" value={whole(k.netProfit.value ?? 0, c)} kpi={k.netProfit} tone={Number(k.netProfit.value) < 0 ? "bad" : undefined} spark={spark("netProfit")} />}
+            {k.expenses && <KpiCard label="Expenses" value={<Headline amount={k.expenses.value ?? 0} currency={c} />} kpi={k.expenses} goodWhenUp={false} spark={spark("expenses")} href="/money?tab=expenses" />}
+            {k.netProfit && <KpiCard label="Profit after expenses" value={<Headline amount={k.netProfit.value ?? 0} currency={c} />} kpi={k.netProfit} tone={Number(k.netProfit.value) < 0 ? "bad" : undefined} spark={spark("netProfit")} />}
           </div>
           <p className="-mt-2 px-1 text-xs text-muted">The cards count each order in the month it was won. The table below counts it in the month it shipped, so the two can differ.</p>
           {i.seeMoney ? (

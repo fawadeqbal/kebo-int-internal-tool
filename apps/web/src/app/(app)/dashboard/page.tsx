@@ -5,10 +5,10 @@ import { can, type InquiryStage, type Priority } from "@kebo/shared";
 import { Badge, Card, CardBody, CardHeader, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { date, money, whole } from "@/lib/format";
+import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { Insights, Reminders } from "@/lib/types-insights";
-import { KpiCard, TargetRing } from "@/components/insights/kpi";
+import { Headline, KpiCard, TargetRing } from "@/components/insights/kpi";
 import { RevenueChart } from "@/components/insights/charts";
 import { TargetEditor } from "@/components/insights/targets";
 import { ReminderList } from "@/components/insights/reminder-list";
@@ -184,7 +184,7 @@ async function MonthStrip() {
         <KpiCard
           label="Sales this month"
           icon={<TrendingUp className="size-3.5" />}
-          value={whole(i.kpis.revenue.value ?? 0, i.currency)}
+          value={<Headline amount={i.kpis.revenue.value ?? 0} currency={i.currency} />}
           kpi={i.kpis.revenue}
           note={`${i.kpis.orders.value} order${i.kpis.orders.value === 1 ? "" : "s"}`}
           href="/insights"
@@ -193,7 +193,7 @@ async function MonthStrip() {
           <KpiCard
             label="Profit after expenses"
             icon={<Coins className="size-3.5" />}
-            value={whole(i.kpis.netProfit.value ?? 0, i.currency)}
+            value={<Headline amount={i.kpis.netProfit.value ?? 0} currency={i.currency} />}
             kpi={i.kpis.netProfit}
             tone={Number(i.kpis.netProfit.value) < 0 ? "bad" : undefined}
             href="/insights?tab=profit"
@@ -202,7 +202,7 @@ async function MonthStrip() {
           <KpiCard
             label="Gross profit"
             icon={<Coins className="size-3.5" />}
-            value={whole(i.kpis.grossProfit.value ?? 0, i.currency)}
+            value={<Headline amount={i.kpis.grossProfit.value ?? 0} currency={i.currency} />}
             kpi={i.kpis.grossProfit}
             href="/insights?tab=profit"
           />
@@ -210,7 +210,7 @@ async function MonthStrip() {
         <KpiCard
           label="Customers owe us"
           icon={<Users className="size-3.5" />}
-          value={whole(i.now.toReceive, i.currency)}
+          value={<Headline amount={i.now.toReceive} currency={i.currency} />}
           note={
             Number(i.now.overdue) > 0 ? (
               <span className="font-medium text-bad">{money(i.now.overdue, i.currency)} overdue</span>
@@ -225,7 +225,7 @@ async function MonthStrip() {
           <KpiCard
             label="In our accounts"
             icon={<Banknote className="size-3.5" />}
-            value={whole(i.now.cashInHand, i.currency)}
+            value={<Headline amount={i.now.cashInHand} currency={i.currency} />}
             note="Cash, banks and wallets"
             href="/money?tab=cash"
           />

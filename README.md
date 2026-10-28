@@ -52,5 +52,6 @@ Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up
 | `pnpm db:deploy` | Apply migrations |
 | `pnpm db:seed [--demo]` | Starting accounts and settings (`--demo` adds sample deals; refused on a non-local database) |
 | `pnpm db:reset` | Empty the local database, apply all migrations and seed it again with the demo data |
+| `pnpm db:load-data [-- --years N --deals N --people N]` | A year (or N years) of realistic history on top of the seed, to see Insights, Home and the money pages with a working company's data: about 1,200 deals a year, growing month by month, targets, accounts. Adds, never deletes; local databases only. Sales people sign in as sales1@example.com… with Demo@12345 |
 
 The API tests run against a real database: migrate and seed with `--demo` first (CI does this).
