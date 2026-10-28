@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Download, FileSpreadsheet, FolderDown, Printer } from "lucide-react";
 import { buttonClass, cn } from "@kebo/ui";
+import { useExcelAllowed } from "@/components/sheets/excel-allowed";
 
 /**
  * Excel, print and download, the same everywhere: at the top right of what
@@ -33,6 +36,8 @@ export function FileActions({
   of?: string;
   className?: string;
 }) {
+  // Excel is a plan feature.
+  if (!useExcelAllowed()) excelHref = undefined;
   if (!excel && !excelHref && !viewHref && !pdfHref && !allHref) return null;
   const b = buttonClass("secondary", "sm");
   return (

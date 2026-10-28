@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { apiFetch, SESSION_COOKIE } from "@/lib/api";
+import { addressCompany, apiFetch, SESSION_COOKIE } from "@/lib/api";
 import type { ActionState } from "@/lib/actions";
 import { localPath } from "@/lib/paths";
 
@@ -12,9 +12,13 @@ const safeNext = (v: unknown) => localPath(v, "/dashboard");
 
 export async function loginAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const email = String(form.get("email") ?? "");
-  const res = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ email, password: String(form.get("password") ?? "") }), auth: false });
+  // At a company's own address only its accounts count; otherwise the person may have chosen one.
+  const company = (await addressCompany()) ?? (String(form.get("company") ?? "") || undefined);
+  const res = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ email, password: String(form.get("password") ?? ""), company }), auth: false });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) return { ok: false, message: body.error ?? "Could not sign in.", errors: body.fieldErrors, values: { email } };
+  // Their email and password fit more than one company: they choose (and type the password again).
+  if (res.status === 409 && body.code === "choose_company") return { ok: false, code: "choose_company", message: body.error, values: { email }, data: body.companies };
+  if (!res.ok) return { ok: false, message: body.error ?? "Could not sign in.", errors: body.fieldErrors, values: { email, ...(company ? { company } : {}) } };
   (await cookies()).set(SESSION_COOKIE, body.token, cookieOptions(body.expiresInSeconds));
   redirect(body.twoStepRequired ? `/login/two-step?next=${encodeURIComponent(safeNext(form.get("next")))}` : body.twoStepSetupRequired ? "/login/set-up-two-step" : safeNext(form.get("next")));
 }

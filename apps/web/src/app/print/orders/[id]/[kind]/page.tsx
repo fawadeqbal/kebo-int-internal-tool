@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PAYMENT_KIND_LABEL, type PaymentKind } from "@kebo/shared";
 import { api } from "@/lib/api";
-import { load } from "@/lib/session";
+import { docBrand, load } from "@/lib/session";
 import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo, customerOr } from "@/components/print/data";
@@ -245,6 +245,7 @@ export default async function OrderDocumentPrint({
     <>
       {toolbar}
       <KeboDoc
+        brand={await docBrand()}
         company={d.company}
         customer={customer}
         title={TITLE[d.kind]}

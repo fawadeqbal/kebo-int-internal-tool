@@ -5,7 +5,8 @@ import { CHANNEL_LABEL } from "@kebo/shared";
 import { Alert, Badge, buildHref, Card, CardBody, CardHeader, cn, LinkTabs, PageHeader, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { requirePermission } from "@/lib/session";
+import { hasFeature, requirePermission } from "@/lib/session";
+import { PlanOff } from "@/components/common/plan-off";
 import { money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import type { Insights } from "@/lib/types-insights";
@@ -38,6 +39,7 @@ type Search = { tab?: string; from?: string; to?: string; sub?: string; year?: s
  */
 export default async function InsightsPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requirePermission("reports.view");
+  if (!(await hasFeature("insights"))) return <PlanOff title="Insights" what="Insights (sales, profit and team reports)" />;
   const sp = await searchParams;
   const today = todayIn(TZ);
   const tab: Tab = (TABS as readonly string[]).includes(sp.tab ?? "") ? (sp.tab as Tab) : "overview";

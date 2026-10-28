@@ -3,27 +3,53 @@ import "reflect-metadata";
 import { Logger, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { EnvModule } from "./config/env";
-import { PrismaModule } from "./database/prisma.service";
+import { PrismaModule, PrismaService } from "./database/prisma.service";
 import { CommonModule } from "./common/common.module";
 import { EventsModule } from "./common/events/event-bus";
+import { CompaniesModule } from "./common/company/companies.service";
+import { LimitsModule } from "./common/company/limits.service";
+import { toInfo } from "./common/company/companies.service";
+import { CompanyContext } from "./common/company/company-context";
 import { SettingsModule } from "./modules/settings/settings.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { RemindersService } from "./modules/notifications/reminders.service";
+import { PlatformJobsModule } from "./platform/platform-jobs.module";
+import { LifecycleService } from "./platform/lifecycle.service";
 
-/** The background worker: the reminder job on a schedule (REMINDER_INTERVAL_MINUTES, default 60). */
-@Module({ imports: [EnvModule, PrismaModule, CommonModule, EventsModule, SettingsModule, NotificationsModule] })
+/**
+ * The background worker, on a schedule (REMINDER_INTERVAL_MINUTES, default 60):
+ * the automatic rules for companies (demos and trials ending, overdue payments),
+ * then each active company's reminders, one company at a time and each inside
+ * its own company.
+ */
+@Module({ imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, EventsModule, SettingsModule, NotificationsModule, PlatformJobsModule] })
 class WorkerModule {}
 
 async function main() {
   const app = await NestFactory.createApplicationContext(WorkerModule, { logger: ["log", "warn", "error"] });
   app.enableShutdownHooks();
+  const prisma = app.get(PrismaService);
   const reminders = app.get(RemindersService);
+  const lifecycle = app.get(LifecycleService);
   const minutes = Math.max(Number(process.env.REMINDER_INTERVAL_MINUTES) || 60, 1);
   const log = new Logger("Worker");
-  const tick = () => reminders.run().catch((e) => log.error(`reminders failed: ${(e as Error).stack ?? e}`));
-  log.log(`reminders every ${minutes} minute(s)`);
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      await lifecycle.run().catch((e) => log.error(`company rules failed: ${(e as Error).stack ?? e}`));
+      const companies = await prisma.platform.company.findMany({ where: { status: "active" }, orderBy: { createdAt: "asc" } });
+      for (const c of companies) {
+        await CompanyContext.run(toInfo(c), () => reminders.run()).catch((e) => log.error(`reminders for ${c.slug} failed: ${(e as Error).stack ?? e}`));
+      }
+    } finally {
+      running = false;
+    }
+  };
+  log.log(`company rules and reminders every ${minutes} minute(s)`);
   await tick();
-  setInterval(tick, minutes * 60_000);
+  setInterval(() => void tick(), minutes * 60_000);
 }
 
 void main();

@@ -29,10 +29,17 @@ export class ErrorFilter implements ExceptionFilter {
     if (error instanceof DomainError) return send(400, { error: error.message });
     if (isDbError(error, DB_ERROR.notFound)) return send(404, { error: "This record no longer exists. Reload and try again." });
     if (isDbError(error, DB_ERROR.uniqueViolation)) return send(409, { error: "That already exists (someone may have just saved it). Reload and try again." });
+    // Another company's row (row-level security refused it): as if it did not exist.
+    if (error instanceof Error && /row-level security/i.test(error.message)) return send(404, { error: "This record no longer exists. Reload and try again." });
     if (error instanceof HttpException) {
       const r = error.getResponse();
       const message = typeof r === "string" ? r : ((r as { message?: string | string[] }).message ?? error.message);
-      return send(error.getStatus(), { error: Array.isArray(message) ? message[0] : message });
+      const extra = typeof r === "object" && r ? (r as { code?: string; companies?: unknown }) : {};
+      return send(error.getStatus(), {
+        error: Array.isArray(message) ? message[0] : message,
+        ...(extra.code ? { code: extra.code } : {}),
+        ...(extra.companies ? { companies: extra.companies } : {}),
+      });
     }
     this.log.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
     return send(500, { error: "Something went wrong. Please try again." });

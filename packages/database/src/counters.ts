@@ -12,7 +12,7 @@ export async function nextReference(db: Db, kind: DocumentKind, year: number): P
   const key = counterKey(kind, year);
   const rows = await db.$queryRaw<{ value: number }[]>`
     insert into counters (key, value) values (${key}, 1)
-    on conflict (key) do update set value = counters.value + 1
+    on conflict (company_id, key) do update set value = counters.value + 1
     returning value`;
   return formatReference(kind, year, rows[0].value);
 }

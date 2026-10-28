@@ -1,6 +1,7 @@
 #!/bin/sh
 # Nightly backup of the database and the MinIO file store, kept for BACKUP_RETENTION_DAYS.
 # Restore: gunzip -c db-YYYY-MM-DD.sql.gz | docker compose exec -T db psql -U kebo -d kebo
+#   (into a new database server, first: docker compose exec -T db psql -U kebo -d kebo -c "create role kebo_app nologin")
 set -eu
 # Backups hold every customer, price and file: readable by root and by the
 # off-site uploader only (group BACKUP_GID, which nothing else on the server uses).

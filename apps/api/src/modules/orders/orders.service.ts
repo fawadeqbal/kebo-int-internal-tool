@@ -254,7 +254,7 @@ export class OrdersService {
       for (let tries = 0; tries < 20 && !number; tries++) {
         const [row] = await tx.$queryRaw<{ value: number }[]>`
           insert into counters (key, value) values (${key}, 1)
-          on conflict (key) do update set value = counters.value + 1
+          on conflict (company_id, key) do update set value = counters.value + 1
           returning value`;
         const candidate = proformaNumber(company.proformaPrefix, today, letters, row!.value);
         if (!(await tx.order.findFirst({ where: { proformaNo: candidate }, select: { id: true } }))) number = candidate;

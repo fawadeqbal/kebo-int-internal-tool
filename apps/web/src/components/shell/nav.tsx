@@ -216,13 +216,17 @@ function AccountMenu({ user }: { user: { name: string; email: string; role: stri
 
 /* ------------------------------------------------------------------ Sidebar */
 
-function SidebarContent({ groups, companyName, roleLabel }: { groups: NavGroup[]; companyName: string; roleLabel: string }) {
+function SidebarContent({ groups, companyName, roleLabel, logo }: { groups: NavGroup[]; companyName: string; roleLabel: string; logo?: string }) {
   const pathname = usePathname();
   return (
     <>
       <Link href="/dashboard" className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line px-4">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
-        <img src="/brand/kebo-logo-96.png" alt="" width={32} height={32} className="size-8 shrink-0" />
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a small static logo
+          <img src={logo} alt="" width={32} height={32} className="size-8 shrink-0" />
+        ) : (
+          <Avatar name={companyName} size={32} className="shrink-0" />
+        )}
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold text-text">{companyName}</span>
           <span className="block text-[11px] text-muted">RFQ Desk</span>
@@ -280,10 +284,13 @@ export function AppShell({
   user,
   unread = 0,
   canCreate = false,
+  logo,
   children,
 }: {
   groups: NavGroup[];
   companyName: string;
+  /** The company's logo (none: its initials). */
+  logo?: string;
   user: { name: string; email: string; role: string };
   unread?: number;
   canCreate?: boolean;
@@ -333,7 +340,7 @@ export function AppShell({
 
       {/* Desktop sidebar */}
       <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-surface lg:flex">
-        <SidebarContent groups={groups} companyName={companyName} roleLabel={user.role} />
+        <SidebarContent groups={groups} companyName={companyName} roleLabel={user.role} logo={logo} />
       </aside>
 
       {/* Phone / tablet drawer */}
@@ -348,7 +355,7 @@ export function AppShell({
             >
               <X className="size-4" />
             </button>
-            <SidebarContent groups={groups} companyName={companyName} roleLabel={user.role} />
+            <SidebarContent groups={groups} companyName={companyName} roleLabel={user.role} logo={logo} />
           </aside>
         </div>
       )}

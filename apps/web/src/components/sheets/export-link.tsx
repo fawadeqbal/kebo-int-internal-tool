@@ -1,6 +1,9 @@
+"use client";
+
 import { FileSpreadsheet } from "lucide-react";
 import { buildHref, buttonClass, cn } from "@kebo/ui";
 import type { ExportKind } from "@/lib/exports";
+import { useExcelAllowed } from "./excel-allowed";
 
 /** "Export to Excel" for a list: every row with the filters on screen, as an .xlsx file. */
 export function ExportLink({
@@ -14,6 +17,7 @@ export function ExportLink({
   label?: string;
   className?: string;
 }) {
+  if (!useExcelAllowed()) return null;
   return (
     <a href={buildHref(`/sheets/export/${what}`, {}, query)} download className={cn(buttonClass("secondary", "sm"), "no-print", className)} title="Export to Excel">
       <FileSpreadsheet aria-hidden /> {label}

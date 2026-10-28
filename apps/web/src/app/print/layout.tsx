@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: { default: "Document", template: "%s · Kebo" } };
+export const metadata: Metadata = { title: { default: "Document", template: "%s · RFQ Desk" } };
 
 /**
  * Printable documents: no app shell, a grey desk around the A4 sheet on

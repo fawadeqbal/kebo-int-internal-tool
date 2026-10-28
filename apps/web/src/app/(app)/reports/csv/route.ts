@@ -16,7 +16,7 @@ const row = (...cells: (string | number | null | undefined)[]) => cells.map(cell
 function toCsv(r: ReportView) {
   const p = r.profit;
   const lines = [
-    row("Kebo report", `${r.range.from} to ${r.range.to}`, `Amounts in ${r.currency}`),
+    row("Report", `${r.range.from} to ${r.range.to}`, `Amounts in ${r.currency}`),
     "",
     row("Funnel"),
     row("Received", "Quoted", "Won", "Lost", "Win rate %", "Won value"),

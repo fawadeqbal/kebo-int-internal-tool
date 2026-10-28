@@ -1,6 +1,7 @@
 import { ApiError } from "@/lib/api";
 import { ExportNotFound, EXPORTS, type ExportKind } from "@/lib/exports";
 import { writeSheet } from "@/lib/sheets";
+import { excelRefusal } from "../../guard";
 
 /**
  * A list as an Excel file, with the filters on screen (?q=…&stage=…): every
@@ -9,6 +10,8 @@ import { writeSheet } from "@/lib/sheets";
 export async function GET(req: Request, { params }: { params: Promise<{ what: string }> }) {
   const { what } = await params;
   if (!Object.hasOwn(EXPORTS, what)) return new Response("Not found", { status: 404 });
+  const refused = await excelRefusal();
+  if (refused) return new Response("Excel is not in your company's plan.", { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } });
   const query: Record<string, string> = {};
   for (const [k, v] of new URL(req.url).searchParams) if (v && v.length <= 200) query[k] = v;
   try {

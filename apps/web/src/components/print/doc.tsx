@@ -31,7 +31,10 @@ export function Letterhead({
   title,
   number,
   meta,
+  logo,
 }: {
+  /** The company's logo; none: its name only. */
+  logo?: string | null;
   company: CompanySnapshot;
   title: string;
   number: ReactNode;
@@ -41,7 +44,7 @@ export function Letterhead({
   return (
     <header className="flex items-start justify-between gap-8 border-b-[2.5px] border-kebo pb-4">
       <div className="flex min-w-0 gap-3">
-        <img src="/brand/kebo-logo.png" alt="" width={52} height={52} className="size-[52px] shrink-0 object-contain" />
+        {logo && <img src={logo} alt="" width={52} height={52} className="size-[52px] shrink-0 object-contain" />}
         <div className="min-w-0">
           <p className="font-doc-display text-[13pt] leading-tight font-bold text-kebo-deep">{company.name}</p>
           {company.nameLocal && <p className="text-[9pt] text-[#475569]">{company.nameLocal}</p>}

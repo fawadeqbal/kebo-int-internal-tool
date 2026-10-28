@@ -63,7 +63,7 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
                         size="sm"
                         variant="primary"
                         pendingText="Issuing…"
-                        message="Issue the proforma now? It gets its number dated today (KEB, the date, the customer's letters, the handler's count) and the number does not change afterwards."
+                        message="Issue the proforma now? It gets its number dated today (your letters, the date, the customer's letters, the handler's count) and the number does not change afterwards."
                       >
                         Issue the proforma
                       </ConfirmSubmit>

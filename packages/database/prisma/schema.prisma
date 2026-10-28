@@ -172,8 +172,11 @@ enum PaymentMethod {
 
 /// A set of permissions people are given (Security). The key never changes; presets: admin (Super Admin), manager, staff.
 model Role {
-  key            String   @id @db.VarChar(40)
-  name           String   @unique @db.VarChar(60)
+  key            String   @db.VarChar(40)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId      String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company        Company  @relation(fields: [companyId], references: [id])
+  name           String   @db.VarChar(60)
   description    String?  @db.VarChar(300)
   /// Permission names (@kebo/shared PERMISSIONS); ignored for the Super Admin, who has every one.
   permissions    String[] @default([])
@@ -185,31 +188,38 @@ model Role {
 
   users User[]
 
+  @@id([companyId, key])
+  @@unique([companyId, name])
   @@map("roles")
 }
 
 model User {
-  id            String    @id @default(uuid()) @db.Uuid
-  name          String    @db.VarChar(120)
-  email         String    @unique @db.VarChar(254)
-  passwordHash  String    @map("password_hash")
+  id              String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId       String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company         Company   @relation(fields: [companyId], references: [id])
+  /// Set on the hidden account a platform admin works through when they open this company.
+  platformAdminId String?   @map("platform_admin_id") @db.Uuid
+  name            String    @db.VarChar(120)
+  email           String    @db.VarChar(254)
+  passwordHash    String    @map("password_hash")
   /// The role's key.
-  role          String    @db.VarChar(40)
-  access        Role      @relation(fields: [role], references: [key], onUpdate: Cascade)
-  isActive      Boolean   @default(true) @map("is_active")
+  role            String    @db.VarChar(40)
+  access          Role      @relation(fields: [companyId, role], references: [companyId, key], onUpdate: Cascade)
+  isActive        Boolean   @default(true) @map("is_active")
   /// Built-in account that records website inquiries; can never sign in.
-  isSystem      Boolean   @default(false) @map("is_system")
-  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamptz
-  failedLogins  Int       @default(0) @map("failed_logins")
-  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz
+  isSystem        Boolean   @default(false) @map("is_system")
+  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz
+  failedLogins    Int       @default(0) @map("failed_logins")
+  lockedUntil     DateTime? @map("locked_until") @db.Timestamptz
   /// Two-step sign-in: encrypted authenticator secret; on once totpEnabledAt is set.
-  totpSecret    String?   @map("totp_secret")
-  totpEnabledAt DateTime? @map("totp_enabled_at") @db.Timestamptz
-  totpLastStep  Int?      @map("totp_last_step")
+  totpSecret      String?   @map("totp_secret")
+  totpEnabledAt   DateTime? @map("totp_enabled_at") @db.Timestamptz
+  totpLastStep    Int?      @map("totp_last_step")
   /// sha256 hashes of unused recovery codes.
-  recoveryCodes String[]  @default([]) @map("recovery_codes")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  recoveryCodes   String[]  @default([]) @map("recovery_codes")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   sessions      Session[]
   signIns       SignIn[]
@@ -224,12 +234,16 @@ model User {
 
   reminderStates ReminderState[]
 
+  @@unique([companyId, email])
   @@map("users")
 }
 
 /// One row per signed-in browser or phone; the token only carries this id, so sign-out and deactivation end sessions at once.
 model Session {
   id             String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId      String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company        Company   @relation(fields: [companyId], references: [id])
   userId         String    @map("user_id") @db.Uuid
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -244,12 +258,16 @@ model Session {
   devices DeviceToken[]
 
   @@index([userId])
+  @@index([companyId])
   @@map("sessions")
 }
 
 /// Every sign-in attempt, right or wrong (Security → Sign-ins; My account shows a person's own).
 model SignIn {
   id        String       @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String       @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company      @relation(fields: [companyId], references: [id])
   /// Null when the email is not anyone's.
   userId    String?      @map("user_id") @db.Uuid
   user      User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -263,12 +281,16 @@ model SignIn {
 
   @@index([at])
   @@index([userId, at])
+  @@index([companyId])
   @@map("sign_ins")
 }
 
 /// Phones that receive push notifications.
 model DeviceToken {
   id         String   @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId  String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company    Company  @relation(fields: [companyId], references: [id])
   userId     String   @map("user_id") @db.Uuid
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionId  String?  @map("session_id") @db.Uuid
@@ -279,11 +301,15 @@ model DeviceToken {
   lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
 
   @@index([userId])
+  @@index([companyId])
   @@map("device_tokens")
 }
 
 model Notification {
   id        String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company   @relation(fields: [companyId], references: [id])
   userId    String    @map("user_id") @db.Uuid
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String    @db.VarChar(60)
@@ -297,12 +323,16 @@ model Notification {
 
   @@unique([userId, dedupeKey])
   @@index([userId, readAt])
+  @@index([companyId])
   @@map("notifications")
 }
 
 /// Who changed what, with old and new values.
 model AuditLog {
   id         String   @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId  String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company    Company  @relation(fields: [companyId], references: [id])
   userId     String?  @map("user_id") @db.Uuid
   action     String   @db.VarChar(60)
   entityType String   @map("entity_type") @db.VarChar(60)
@@ -316,23 +346,32 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([companyId])
   @@map("audit_logs")
 }
 
 /// Company profile, defaults, reminder rules, plan timings: one JSON value per key.
 model Setting {
-  key       String   @id @db.VarChar(100)
+  key       String   @db.VarChar(100)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company  @relation(fields: [companyId], references: [id])
   value     Json
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  @@id([companyId, key])
   @@map("settings")
 }
 
 /// Gap-free yearly counters for document numbers (RFQ-2026-0001, SO-2026-0001…).
 model Counter {
-  key   String @id @db.VarChar(50)
-  value Int    @default(0)
+  key       String  @db.VarChar(50)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String  @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id])
+  value     Int     @default(0)
 
+  @@id([companyId, key])
   @@map("counters")
 }
 
@@ -342,6 +381,9 @@ model Counter {
 
 model Customer {
   id              String       @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId       String       @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company         Company      @relation(fields: [companyId], references: [id])
   type            CustomerType @default(company)
   name            String       @db.VarChar(200)
   /// ISO 3166-1 alpha-2 (e.g. NG, AE): where the goods go. China (CN) means a domestic sale with VAT.
@@ -368,11 +410,15 @@ model Customer {
 
   @@index([name])
   @@index([country])
+  @@index([companyId])
   @@map("customers")
 }
 
 model Contact {
   id         String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId  String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company    Company   @relation(fields: [companyId], references: [id])
   customerId String    @map("customer_id") @db.Uuid
   customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   name       String    @db.VarChar(120)
@@ -392,11 +438,15 @@ model Contact {
   @@index([email])
   @@index([phone])
   @@index([whatsapp])
+  @@index([companyId])
   @@map("contacts")
 }
 
 model Factory {
   id            String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId     String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company       Company   @relation(fields: [companyId], references: [id])
   name          String    @db.VarChar(200)
   contactPerson String?   @map("contact_person") @db.VarChar(120)
   phone         String?   @db.VarChar(40)
@@ -419,6 +469,7 @@ model Factory {
 
   @@index([name])
   @@index([ownerId])
+  @@index([companyId])
   @@map("factories")
 }
 
@@ -428,8 +479,11 @@ model Factory {
 
 model Inquiry {
   id           String         @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String         @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company      Company        @relation(fields: [companyId], references: [id])
   /// RFQ-2026-0001
-  refNo        String         @unique @map("ref_no") @db.VarChar(30)
+  refNo        String         @map("ref_no") @db.VarChar(30)
   customerId   String         @map("customer_id") @db.Uuid
   customer     Customer       @relation(fields: [customerId], references: [id])
   contactId    String?        @map("contact_id") @db.Uuid
@@ -466,6 +520,7 @@ model Inquiry {
   orders        Order[]
   expenses      Expense[]
 
+  @@unique([companyId, refNo])
   @@index([stage])
   @@index([assigneeId])
   @@index([customerId])
@@ -475,6 +530,9 @@ model Inquiry {
 
 model RequestedItem {
   id          String          @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String          @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company     Company         @relation(fields: [companyId], references: [id])
   inquiryId   String          @map("inquiry_id") @db.Uuid
   inquiry     Inquiry         @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   /// A part of another item, split at factory pricing (numbered 3.1, 3.2 under item 3). One level only.
@@ -493,12 +551,16 @@ model RequestedItem {
 
   @@index([inquiryId])
   @@index([parentId])
+  @@index([companyId])
   @@map("requested_items")
 }
 
 /// Every stage move, automatic or by hand; turnaround and time-in-stage come from here.
 model InquiryStageChange {
   id          String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company     Company       @relation(fields: [companyId], references: [id])
   inquiryId   String        @map("inquiry_id") @db.Uuid
   inquiry     Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   fromStage   InquiryStage? @map("from_stage")
@@ -511,11 +573,15 @@ model InquiryStageChange {
   changedAt   DateTime      @default(now()) @map("changed_at") @db.Timestamptz
 
   @@index([inquiryId])
+  @@index([companyId])
   @@map("inquiry_stage_changes")
 }
 
 model InquiryAssignment {
   id           String   @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company      Company  @relation(fields: [companyId], references: [id])
   inquiryId    String   @map("inquiry_id") @db.Uuid
   inquiry      Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   assigneeId   String?  @map("assignee_id") @db.Uuid
@@ -523,11 +589,15 @@ model InquiryAssignment {
   assignedAt   DateTime @default(now()) @map("assigned_at") @db.Timestamptz
 
   @@index([inquiryId])
+  @@index([companyId])
   @@map("inquiry_assignments")
 }
 
 model InquiryNote {
   id        String   @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company  @relation(fields: [companyId], references: [id])
   inquiryId String   @map("inquiry_id") @db.Uuid
   inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   body      String
@@ -535,12 +605,16 @@ model InquiryNote {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([inquiryId])
+  @@index([companyId])
   @@map("inquiry_notes")
 }
 
 /// Files on a deal. Optionally tied to an order step (inspection report, payment slip, B/L copy).
 model Attachment {
   id             String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId      String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company        Company       @relation(fields: [companyId], references: [id])
   inquiryId      String        @map("inquiry_id") @db.Uuid
   inquiry        Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   /// The factory offer this file is evidence for (its quotation, catalogue, WeChat screenshots). Internal: only people who see factory prices.
@@ -559,6 +633,7 @@ model Attachment {
 
   @@index([inquiryId])
   @@index([factoryQuoteId])
+  @@index([companyId])
   @@map("attachments")
 }
 
@@ -568,6 +643,9 @@ model Attachment {
 
 model FactoryQuote {
   id           String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company      Company   @relation(fields: [companyId], references: [id])
   inquiryId    String    @map("inquiry_id") @db.Uuid
   inquiry      Inquiry   @relation(fields: [inquiryId], references: [id])
   factoryId    String    @map("factory_id") @db.Uuid
@@ -596,11 +674,15 @@ model FactoryQuote {
 
   @@index([inquiryId])
   @@index([factoryId])
+  @@index([companyId])
   @@map("factory_quotes")
 }
 
 model FactoryQuoteLine {
   id              String             @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId       String             @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company         Company            @relation(fields: [companyId], references: [id])
   factoryQuoteId  String             @map("factory_quote_id") @db.Uuid
   factoryQuote    FactoryQuote       @relation(fields: [factoryQuoteId], references: [id], onDelete: Cascade)
   /// The customer's item this answers (empty for extras the factory added).
@@ -627,6 +709,7 @@ model FactoryQuoteLine {
   @@index([factoryQuoteId])
   @@index([parentId])
   @@index([productKey])
+  @@index([companyId])
   @@map("factory_quote_lines")
 }
 
@@ -636,19 +719,26 @@ model FactoryQuoteLine {
 
 model Quotation {
   id        String   @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company  @relation(fields: [companyId], references: [id])
   /// QUO-2026-0007 (revisions print as QUO-2026-0007 R2)
-  refNo     String   @unique @map("ref_no") @db.VarChar(30)
+  refNo     String   @map("ref_no") @db.VarChar(30)
   inquiryId String   @unique @map("inquiry_id") @db.Uuid
   inquiry   Inquiry  @relation(fields: [inquiryId], references: [id])
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   revisions QuotationRevision[]
 
+  @@unique([companyId, refNo])
   @@map("quotations")
 }
 
 model QuotationRevision {
   id               String         @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId        String         @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company          Company        @relation(fields: [companyId], references: [id])
   quotationId      String         @map("quotation_id") @db.Uuid
   quotation        Quotation      @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   number           Int
@@ -684,6 +774,7 @@ model QuotationRevision {
 
   @@unique([quotationId, number])
   @@index([status])
+  @@index([companyId])
   @@map("quotation_revisions")
 }
 
@@ -691,6 +782,9 @@ model QuotationRevision {
 /// or, without factory prices, the customer's own items priced by hand.
 model QuotationOption {
   id                String            @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId         String            @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company           Company           @relation(fields: [companyId], references: [id])
   revisionId        String            @map("revision_id") @db.Uuid
   revision          QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
   /// A, B, C…
@@ -712,29 +806,37 @@ model QuotationOption {
 
   @@unique([revisionId, letter])
   @@index([factoryQuoteId])
+  @@index([companyId])
   @@map("quotation_options")
 }
 
 /// A cost between the factory's price basis and the one we sell on (EXW → FOB: to the port…), part of the option's cost.
 model OptionCost {
-  id       String          @id @default(uuid()) @db.Uuid
-  optionId String          @map("option_id") @db.Uuid
-  option   QuotationOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  step     BasisStep
+  id        String          @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String          @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company         @relation(fields: [companyId], references: [id])
+  optionId  String          @map("option_id") @db.Uuid
+  option    QuotationOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  step      BasisStep
   /// As entered, in its own currency.
-  amount   Decimal         @db.Decimal(14, 2)
-  currency String          @db.Char(3)
+  amount    Decimal         @db.Decimal(14, 2)
+  currency  String          @db.Char(3)
   /// In the quotation's currency, at the rate when saved.
-  cost     Decimal         @db.Decimal(14, 2)
-  fxRate   Decimal?        @map("fx_rate") @db.Decimal(18, 8)
-  note     String?         @db.VarChar(200)
+  cost      Decimal         @db.Decimal(14, 2)
+  fxRate    Decimal?        @map("fx_rate") @db.Decimal(18, 8)
+  note      String?         @db.VarChar(200)
 
   @@unique([optionId, step])
+  @@index([companyId])
   @@map("option_costs")
 }
 
 model QuoteLine {
   id                 String            @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId          String            @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company            Company           @relation(fields: [companyId], references: [id])
   revisionId         String            @map("revision_id") @db.Uuid
   revision           QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
   optionId           String            @map("option_id") @db.Uuid
@@ -760,6 +862,7 @@ model QuoteLine {
 
   @@index([revisionId])
   @@index([optionId])
+  @@index([companyId])
   @@map("quote_lines")
 }
 
@@ -769,8 +872,11 @@ model QuoteLine {
 
 model Order {
   id               String            @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId        String            @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company          Company           @relation(fields: [companyId], references: [id])
   /// SO-2026-0001
-  refNo            String            @unique @map("ref_no") @db.VarChar(30)
+  refNo            String            @map("ref_no") @db.VarChar(30)
   inquiryId        String            @map("inquiry_id") @db.Uuid
   inquiry          Inquiry           @relation(fields: [inquiryId], references: [id])
   revisionId       String            @unique @map("revision_id") @db.Uuid
@@ -783,7 +889,7 @@ model Order {
   stageSince       DateTime          @default(now()) @map("stage_since") @db.Timestamptz
   orderedOn        DateTime          @map("ordered_on") @db.Date
   /// The proforma invoice's number once issued, e.g. KEB260916TN07 (prefix, issue date, customer letters, the handler's count this year).
-  proformaNo       String?           @unique @map("proforma_no") @db.VarChar(40)
+  proformaNo       String?           @map("proforma_no") @db.VarChar(40)
   proformaIssuedOn DateTime?         @map("proforma_issued_on") @db.Date
   /// Ship date promised to the customer.
   shipBy           DateTime?         @map("ship_by") @db.Date
@@ -819,6 +925,8 @@ model Order {
   factoryPaid  FactoryPayment[]
   expenses     Expense[]
 
+  @@unique([companyId, refNo])
+  @@unique([companyId, proformaNo])
   @@index([inquiryId])
   @@index([status])
   @@index([stage])
@@ -829,6 +937,9 @@ model Order {
 /// The accepted lines, frozen; shipped and invoiced quantities are tracked against them.
 model OrderLine {
   id          String     @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String     @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company     Company    @relation(fields: [companyId], references: [id])
   orderId     String     @map("order_id") @db.Uuid
   order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   quoteLineId String?    @map("quote_line_id") @db.Uuid
@@ -854,6 +965,7 @@ model OrderLine {
   cbm           Decimal?  @db.Decimal(10, 3)
 
   @@index([orderId])
+  @@index([companyId])
   @@map("order_lines")
 }
 
@@ -861,6 +973,9 @@ model OrderLine {
 /// Every move of an order between stages, with who and why.
 model OrderStageChange {
   id        String      @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String      @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company     @relation(fields: [companyId], references: [id])
   orderId   String      @map("order_id") @db.Uuid
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   fromStage OrderStage? @map("from_stage")
@@ -873,6 +988,7 @@ model OrderStageChange {
   at        DateTime    @default(now()) @db.Timestamptz
 
   @@index([orderId, at])
+  @@index([companyId])
   @@map("order_stage_changes")
 }
 
@@ -884,6 +1000,9 @@ model OrderStageChange {
 /// up to the order total; money received pays the earliest first.
 model PaymentPlanItem {
   id        String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company   @relation(fields: [companyId], references: [id])
   orderId   String    @map("order_id") @db.Uuid
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   label     String    @db.VarChar(80)
@@ -894,12 +1013,16 @@ model PaymentPlanItem {
 
   @@index([orderId])
   @@index([dueOn])
+  @@index([companyId])
   @@map("payment_plan_items")
 }
 
 /// Money we sent a factory for an order, in the currency we paid in.
 model FactoryPayment {
   id           String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company      Company       @relation(fields: [companyId], references: [id])
   orderId      String        @map("order_id") @db.Uuid
   order        Order         @relation(fields: [orderId], references: [id])
   factoryId    String        @map("factory_id") @db.Uuid
@@ -934,6 +1057,7 @@ model FactoryPayment {
   @@index([factoryId])
   @@index([paidOn])
   @@index([accountId])
+  @@index([companyId])
   @@map("factory_payments")
 }
 
@@ -941,6 +1065,9 @@ model FactoryPayment {
 /// is empty (rent, salaries…). Only managers and the super admin see these.
 model Expense {
   id           String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company      Company       @relation(fields: [companyId], references: [id])
   orderId      String?       @map("order_id") @db.Uuid
   order        Order?        @relation(fields: [orderId], references: [id])
   /// Who it was spent on (a dinner, a ticket to visit them…); for a deal or an order always its customer. Empty: the company's own cost.
@@ -984,11 +1111,15 @@ model Expense {
   @@index([factoryId])
   @@index([spentOn])
   @@index([accountId])
+  @@index([companyId])
   @@map("expenses")
 }
 
 model Payment {
   id           String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company      Company       @relation(fields: [companyId], references: [id])
   kind         PaymentKind
   orderId      String        @map("order_id") @db.Uuid
   order        Order         @relation(fields: [orderId], references: [id])
@@ -1020,6 +1151,7 @@ model Payment {
   @@index([orderId])
   @@index([paidOn])
   @@index([accountId])
+  @@index([companyId])
   @@map("payments")
 }
 
@@ -1036,7 +1168,10 @@ model Payment {
  */
 model MoneyAccount {
   id             String           @id @default(uuid()) @db.Uuid
-  name           String           @unique @db.VarChar(80)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId      String           @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company        Company          @relation(fields: [companyId], references: [id])
+  name           String           @db.VarChar(80)
   kind           MoneyAccountKind @default(bank)
   currency       String           @db.Char(3)
   /// What was in it on `openingOn`; movements from that day on are added.
@@ -1053,6 +1188,7 @@ model MoneyAccount {
   transfersOut    MoneyTransfer[]  @relation("TransferFrom")
   transfersIn     MoneyTransfer[]  @relation("TransferTo")
 
+  @@unique([companyId, name])
   @@map("money_accounts")
 }
 
@@ -1061,6 +1197,9 @@ model MoneyAccount {
  */
 model MoneyTransfer {
   id            String       @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId     String       @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company       Company      @relation(fields: [companyId], references: [id])
   fromAccountId String       @map("from_account_id") @db.Uuid
   fromAccount   MoneyAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
   toAccountId   String       @map("to_account_id") @db.Uuid
@@ -1079,6 +1218,7 @@ model MoneyTransfer {
   @@index([fromAccountId])
   @@index([toAccountId])
   @@index([transferredOn])
+  @@index([companyId])
   @@map("money_transfers")
 }
 
@@ -1091,12 +1231,16 @@ model MoneyTransfer {
  */
 model SalesTarget {
   /// YYYY-MM
-  month       String   @id @db.Char(7)
+  month       String   @db.Char(7)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company     Company  @relation(fields: [companyId], references: [id])
   amount      Decimal  @db.Decimal(14, 2)
   currency    String   @db.Char(3)
   updatedById String?  @map("updated_by") @db.Uuid
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  @@id([companyId, month])
   @@map("sales_targets")
 }
 
@@ -1105,6 +1249,9 @@ model SalesTarget {
  */
 model ReminderState {
   userId       String    @map("user_id") @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company      Company   @relation(fields: [companyId], references: [id])
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// What it is about, e.g. "pay:<instalment id>" or "quote-expiring:<revision id>".
   key          String    @db.VarChar(120)
@@ -1113,5 +1260,276 @@ model ReminderState {
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@id([userId, key])
+  @@index([companyId])
   @@map("reminder_states")
+}
+
+// ============================================================================
+// Platform: the companies using the app, their plans and payments, client
+// inquiries (leads), platform admins. Not visible to company connections
+// (the kebo_app role has no access to these tables).
+// ============================================================================
+
+/// client: a paying company; demo: made by the platform admin to try it (a few days); trial: self sign-up.
+enum CompanyKind {
+  client
+  demo
+  trial
+}
+
+/// active: normal; read_only: can look but not change; off: nobody can sign in; deleted: data removed, name held.
+enum CompanyStatus {
+  active
+  read_only
+  off
+  deleted
+}
+
+enum LeadStatus {
+  new
+  contacted
+  demo
+  client
+  lost
+}
+
+enum LeadSource {
+  form
+  sign_up
+  manual
+}
+
+/// One company using the app. Every company row elsewhere carries its id.
+model Company {
+  id                String        @id @default(uuid()) @db.Uuid
+  /// Short name: the future address (name.rfq…); a-z, 0-9 and "-".
+  slug              String        @unique @db.VarChar(30)
+  name              String        @db.VarChar(120)
+  kind              CompanyKind   @default(client)
+  status            CompanyStatus @default(active)
+  /// Why it is read-only or off ("Demo ended", "Payment overdue", "Switched off by the platform admin").
+  statusReason      String?       @map("status_reason") @db.VarChar(200)
+  /// Set when the platform admin changed the status by hand: the automatic rules leave it alone.
+  statusManual      Boolean       @default(false) @map("status_manual")
+  planId            String?       @map("plan_id") @db.Uuid
+  plan              Plan?         @relation(fields: [planId], references: [id])
+  startsOn          DateTime      @default(dbgenerated("CURRENT_DATE")) @map("starts_on") @db.Date
+  /// Paid until (clients): after it the company is overdue.
+  renewsOn          DateTime?     @map("renews_on") @db.Date
+  /// Demos and trials: when it ends.
+  endsAt            DateTime?     @map("ends_at") @db.Timestamptz
+  /// Demo: "ends tomorrow" emails sent for this end date.
+  endingNoticeFor   DateTime?     @map("ending_notice_for") @db.Timestamptz
+  /// The previous short name, kept working until previousSlugUntil after a rename.
+  previousSlug      String?       @map("previous_slug") @db.VarChar(30)
+  previousSlugUntil DateTime?     @map("previous_slug_until") @db.Timestamptz
+  contactName       String?       @map("contact_name") @db.VarChar(120)
+  contactEmail      String?       @map("contact_email") @db.VarChar(254)
+  notes             String?
+  lastActiveAt      DateTime?     @map("last_active_at") @db.Timestamptz
+  deletedAt         DateTime?     @map("deleted_at") @db.Timestamptz
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  subscriptionPayments SubscriptionPayment[]
+  leads                Lead[]
+  platformLog          PlatformLog[]
+
+  roles               Role[]
+  users               User[]
+  sessions            Session[]
+  signIns             SignIn[]
+  deviceTokens        DeviceToken[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  settings            Setting[]
+  counters            Counter[]
+  customers           Customer[]
+  contacts            Contact[]
+  factories           Factory[]
+  inquiries           Inquiry[]
+  requestedItems      RequestedItem[]
+  inquiryStageChanges InquiryStageChange[]
+  inquiryAssignments  InquiryAssignment[]
+  inquiryNotes        InquiryNote[]
+  attachments         Attachment[]
+  factoryQuotes       FactoryQuote[]
+  factoryQuoteLines   FactoryQuoteLine[]
+  quotations          Quotation[]
+  quotationRevisions  QuotationRevision[]
+  quotationOptions    QuotationOption[]
+  optionCosts         OptionCost[]
+  quoteLines          QuoteLine[]
+  orders              Order[]
+  orderLines          OrderLine[]
+  orderStageChanges   OrderStageChange[]
+  paymentPlanItems    PaymentPlanItem[]
+  factoryPayments     FactoryPayment[]
+  expenses            Expense[]
+  payments            Payment[]
+  moneyAccounts       MoneyAccount[]
+  moneyTransfers      MoneyTransfer[]
+  salesTargets        SalesTarget[]
+  reminderStates      ReminderState[]
+
+  @@map("companies")
+}
+
+/// What a company pays for and what it may use.
+model Plan {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @unique @db.VarChar(60)
+  description  String?  @db.VarChar(300)
+  /// Price per period in minor units (cents) of currency.
+  priceMinor   Int      @default(0) @map("price_minor")
+  currency     String   @default("USD") @db.Char(3)
+  /// month or year
+  period       String   @default("month") @db.VarChar(10)
+  /// Null: no limit.
+  maxUsers     Int?     @map("max_users")
+  maxStorageMb Int?     @map("max_storage_mb")
+  /// Features switched on (@kebo/shared PLAN_FEATURES).
+  features     String[] @default([])
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  companies Company[]
+
+  @@map("plans")
+}
+
+/// A payment from a company, recorded by hand.
+model SubscriptionPayment {
+  id          String   @id @default(uuid()) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  amountMinor Int      @map("amount_minor")
+  currency    String   @db.Char(3)
+  paidOn      DateTime @map("paid_on") @db.Date
+  /// The company's new "paid until" date.
+  paidUntil   DateTime @map("paid_until") @db.Date
+  note        String?  @db.VarChar(300)
+  recordedBy  String?  @map("recorded_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([companyId])
+  @@map("subscription_payments")
+}
+
+/// Someone who asked about the app (demo request form, a self sign-up, or added by hand).
+model Lead {
+  id          String     @id @default(uuid()) @db.Uuid
+  companyName String     @map("company_name") @db.VarChar(160)
+  name        String     @db.VarChar(120)
+  email       String     @db.VarChar(254)
+  phone       String?    @db.VarChar(40)
+  country     String?    @db.VarChar(80)
+  teamSize    String?    @map("team_size") @db.VarChar(20)
+  message     String?
+  source      LeadSource @default(form)
+  status      LeadStatus @default(new)
+  lostReason  String?    @map("lost_reason") @db.VarChar(300)
+  followUpOn  DateTime?  @map("follow_up_on") @db.Date
+  /// The demo or company made for them.
+  companyId   String?    @map("company_id") @db.Uuid
+  company     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  ip          String?    @db.VarChar(64)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  notes LeadNote[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+model LeadNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  leadId    String   @map("lead_id") @db.Uuid
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  text      String
+  byId      String?  @map("by_id") @db.Uuid
+  byName    String?  @map("by_name") @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([leadId])
+  @@map("lead_notes")
+}
+
+/// The people who run the platform (not part of any company).
+model PlatformAdmin {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique @db.VarChar(254)
+  name          String    @db.VarChar(120)
+  passwordHash  String    @map("password_hash")
+  isActive      Boolean   @default(true) @map("is_active")
+  failedLogins  Int       @default(0) @map("failed_logins")
+  lockedUntil   DateTime? @map("locked_until") @db.Timestamptz
+  totpSecret    String?   @map("totp_secret")
+  totpEnabledAt DateTime? @map("totp_enabled_at") @db.Timestamptz
+  totpLastStep  Int?      @map("totp_last_step")
+  recoveryCodes String[]  @default([]) @map("recovery_codes")
+  lastLoginAt   DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions PlatformSession[]
+
+  @@map("platform_admins")
+}
+
+model PlatformSession {
+  id             String        @id @default(uuid()) @db.Uuid
+  adminId        String        @map("admin_id") @db.Uuid
+  admin          PlatformAdmin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt     DateTime      @default(now()) @map("last_seen_at") @db.Timestamptz
+  expiresAt      DateTime      @map("expires_at") @db.Timestamptz
+  revokedAt      DateTime?     @map("revoked_at") @db.Timestamptz
+  pendingTwoStep Boolean       @default(false) @map("pending_two_step")
+  ip             String?       @db.VarChar(64)
+  userAgent      String?       @map("user_agent") @db.VarChar(300)
+
+  @@index([adminId])
+  @@map("platform_sessions")
+}
+
+/// What platform admins (and the automatic rules) did: companies made, switched off, opened, payments…
+model PlatformLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// Null: done by the automatic rules.
+  adminId   String?  @map("admin_id") @db.Uuid
+  adminName String?  @map("admin_name") @db.VarChar(120)
+  action    String   @db.VarChar(60)
+  companyId String?  @map("company_id") @db.Uuid
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  leadId    String?  @map("lead_id") @db.Uuid
+  summary   String
+  details   Json?
+  at        DateTime @default(now()) @db.Timestamptz
+
+  @@index([companyId, at])
+  @@index([at])
+  @@map("platform_log")
+}
+
+/// Self sign-ups waiting for their email to be checked.
+model SignUp {
+  id           String    @id @default(uuid()) @db.Uuid
+  companyName  String    @map("company_name") @db.VarChar(160)
+  slug         String    @db.VarChar(30)
+  name         String    @db.VarChar(120)
+  email        String    @db.VarChar(254)
+  passwordHash String    @map("password_hash")
+  tokenHash    String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz
+  verifiedAt   DateTime? @map("verified_at") @db.Timestamptz
+  companyId    String?   @map("company_id") @db.Uuid
+  ip           String?   @db.VarChar(64)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([email])
+  @@map("sign_ups")
 }

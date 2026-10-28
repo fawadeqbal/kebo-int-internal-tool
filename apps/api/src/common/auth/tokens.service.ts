@@ -20,8 +20,9 @@ export class TokensService {
     this.key = new TextEncoder().encode(env.AUTH_SECRET);
   }
 
-  sign(userId: string, sessionId: string): Promise<string> {
-    return new SignJWT({ sid: sessionId })
+  /** A session token: who, which session, and which company it belongs to. */
+  sign(userId: string, sessionId: string, companyId: string): Promise<string> {
+    return new SignJWT({ sid: sessionId, cid: companyId })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(userId)
       .setIssuedAt()
@@ -31,11 +32,34 @@ export class TokensService {
       .sign(this.key);
   }
 
-  async verify(token: string | undefined): Promise<{ userId: string; sessionId: string } | null> {
+  /**
+   * companyId is null on tokens made before companies existed: those belong to the
+   * first company (the default one).
+   */
+  async verify(token: string | undefined): Promise<{ userId: string; sessionId: string; companyId: string | null } | null> {
     if (!token) return null;
     try {
       const { payload } = await jwtVerify(token, this.key, { algorithms: ["HS256"] });
-      return payload.sub && typeof payload.sid === "string" ? { userId: payload.sub, sessionId: payload.sid } : null;
+      if (!payload.sub || typeof payload.sid !== "string" || payload.typ) return null;
+      return { userId: payload.sub, sessionId: payload.sid, companyId: typeof payload.cid === "string" ? payload.cid : null };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * A short-lived signed token for one purpose (a set-password link, a platform
+   * admin opening a company, the platform session): never accepted as a sign-in token.
+   */
+  signPurpose(typ: string, claims: Record<string, string>, expires: string): Promise<string> {
+    return new SignJWT({ ...claims, typ }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(expires).sign(this.key);
+  }
+
+  async verifyPurpose(typ: string, token: string | undefined): Promise<Record<string, unknown> | null> {
+    if (!token) return null;
+    try {
+      const { payload } = await jwtVerify(token, this.key, { algorithms: ["HS256"] });
+      return payload.typ === typ ? (payload as Record<string, unknown>) : null;
     } catch {
       return null;
     }

@@ -35,7 +35,7 @@ import {
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
-import { requirePermission } from "@/lib/session";
+import { hasFeature, requirePermission } from "@/lib/session";
 import { redirect } from "next/navigation";
 import type { Receivables } from "@/lib/types-insights";
 import { date, money } from "@/lib/format";
@@ -77,7 +77,9 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   const managers = can(me, "expenses.manage");
   const recorders = managers || can(me, "payments.record");
   type Tab = "cash" | "expenses" | "receive" | "owe";
-  const allowed: Tab[] = [...(managers ? (["cash", "expenses"] as const) : []), ...(recorders ? (["receive"] as const) : []), "owe"];
+  // The cash book is a plan feature.
+  const cashBook = await hasFeature("cash_book");
+  const allowed: Tab[] = [...(managers && cashBook ? (["cash"] as const) : []), ...(managers ? (["expenses"] as const) : []), ...(recorders ? (["receive"] as const) : []), "owe"];
   // Old links to profit & loss now open on Insights.
   if (sp.tab === "pnl") redirect("/insights?tab=profit&sub=pnl");
   const tab: Tab = allowed.includes(sp.tab as Tab) ? (sp.tab as Tab) : allowed[0]!;
@@ -94,7 +96,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
             : "What customers owe us and what we still owe the factories."
         }
         actions={
-          can(me, "reports.view") ? (
+          can(me, "reports.view") && (await hasFeature("insights")) ? (
             <Link href="/insights?tab=profit" className={buttonClass("secondary", "sm")}>
               <ChartNoAxesCombined aria-hidden /> Profit on Insights
             </Link>

@@ -4,8 +4,8 @@ import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Kebo RFQ Desk", template: "%s · Kebo" },
-  description: "Kebo's internal desk for RFQs, quotations and orders",
+  title: { default: "RFQ Desk", template: "%s · RFQ Desk" },
+  description: "Every RFQ from first message to shipped and paid: inquiries, quotations, orders and money",
   robots: { index: false, follow: false },
 };
 

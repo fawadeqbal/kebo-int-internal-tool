@@ -40,13 +40,25 @@ export function LoginForm({ next, demo }: { next?: string; demo?: DemoLogin[] })
           <p className="pt-1 text-center text-xs text-muted">or sign in with an email</p>
         </div>
       )}
-      {state.message && <Alert tone="error">{state.message}</Alert>}
+      {state.message && <Alert tone={state.code === "choose_company" ? "info" : "error"}>{state.message}</Alert>}
       <input type="hidden" name="next" value={next ?? ""} />
+      {state.code === "choose_company" && Array.isArray(state.data) && (
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-sm font-medium">Company</legend>
+          {(state.data as { slug: string; name: string }[]).map((c, i) => (
+            <label key={c.slug} className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-line px-3 py-2.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft/40">
+              <input type="radio" name="company" value={c.slug} defaultChecked={i === 0} className="accent-[var(--color-primary)]" />
+              <span className="font-medium">{c.name}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {state.code !== "choose_company" && state.values?.company && <input type="hidden" name="company" value={state.values.company} />}
       <Field label="Email" htmlFor="email" error={state.errors?.email}>
         <Input id="email" name="email" type="email" autoComplete="username" autoFocus required defaultValue={state.values?.email ?? ""} />
       </Field>
       <Field label="Password" htmlFor="password" error={state.errors?.password}>
-        <Input id="password" name="password" type="password" autoComplete="current-password" required />
+        <Input id="password" name="password" type="password" autoComplete="current-password" required autoFocus={state.code === "choose_company"} />
       </Field>
       <SubmitButton pendingText="Signing in…" size="lg" className="w-full">
         Sign in

@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { customerImport, customerInput, factoryImport, factoryInput, listQuery, type CustomerImport, type CustomerInput, type FactoryImport, type FactoryInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomersService } from "./customers.service";
 import { FactoriesService } from "./factories.service";
@@ -41,6 +41,7 @@ class CustomersController {
   }
 
   /** New customers from an uploaded file: { added, skipped: [{ name, reason }] }. */
+  @RequireFeature("excel")
   @Post("import")
   @HttpCode(200)
   @RequirePermissions("customers.manage")
@@ -87,6 +88,7 @@ class FactoriesController {
   }
 
   /** New factories from an uploaded file: { added, skipped: [{ name, reason }] }. */
+  @RequireFeature("excel")
   @Post("import")
   @HttpCode(200)
   @RequirePermissions("sourcing.manage")

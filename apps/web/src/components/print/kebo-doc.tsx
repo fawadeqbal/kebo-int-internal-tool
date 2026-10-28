@@ -33,8 +33,14 @@ const TEXT_2 = "#444444";
 const LABEL_GREY = "#555555";
 /** Page margins (the footer sits in the bottom one). */
 const MARGIN = { top: 44, side: 52, bottom: 64 };
-/** The brand next to the company's name: the logo and its wordmark. */
-const BRAND = { logo: "/brand/kebo-logo.png", mark: "KEBO", tagline: "INTERNATIONAL TRADE" };
+/** A company's brand next to its name on documents: the logo and its wordmark. */
+export interface DocBrand {
+  logo: string;
+  mark: string;
+  tagline: string;
+}
+/** Kebo's (the first company). Other companies: their name, no logo, until they can upload their own. */
+export const KEBO_BRAND: DocBrand = { logo: "/brand/kebo-logo.png", mark: "KEBO", tagline: "INTERNATIONAL TRADE" };
 
 const exact: CSSProperties = { printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" };
 const label: CSSProperties = { fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
@@ -169,8 +175,9 @@ export function KeboDoc<T>({
   bullets,
   bank,
   internal,
-  internalBand = "INTERNAL COPY — FOR KEBO ONLY, NOT FOR THE CUSTOMER",
+  internalBand = "INTERNAL COPY — FOR OUR OWN USE, NOT FOR THE CUSTOMER",
   watermark,
+  brand = null,
 }: {
   company: CompanySnapshot;
   customer: CustomerSnapshot;
@@ -204,6 +211,8 @@ export function KeboDoc<T>({
   internal?: ReactNode;
   internalBand?: string;
   watermark?: string | null;
+  /** The company's logo and wordmark; none: its name as the letterhead. */
+  brand?: DocBrand | null;
 }) {
   const address = customer.address?.trim() || (isUnknownCountry(customer.country) ? "" : countryName(customer.country));
   const width = (c: DocColumn<T>) => (c.width ? `${c.width}pt` : undefined);
@@ -288,16 +297,24 @@ export function KeboDoc<T>({
       {/* Letterhead: the logo and name on the left, how to reach us on the right */}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- printed as is, also by the PDF renderer */}
-          <img src={BRAND.logo} alt="" style={{ width: "70px", height: "70px", objectFit: "contain", flexShrink: 0 }} />
+          {brand && (
+            // eslint-disable-next-line @next/next/no-img-element -- printed as is, also by the PDF renderer
+            <img src={brand.logo} alt="" style={{ width: "70px", height: "70px", objectFit: "contain", flexShrink: 0 }} />
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
-            <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "28px", letterSpacing: "0.14em", color: NAVY, lineHeight: 1 }}>{BRAND.mark}</div>
-            <div style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: "11.5px", letterSpacing: "0.18em", color: GOLD_TEXT }}>{BRAND.tagline}</div>
+            {brand ? (
+              <>
+                <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "28px", letterSpacing: "0.14em", color: NAVY, lineHeight: 1 }}>{brand.mark}</div>
+                <div style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: "11.5px", letterSpacing: "0.18em", color: GOLD_TEXT }}>{brand.tagline}</div>
+              </>
+            ) : (
+              <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "22px", letterSpacing: "0.04em", color: NAVY, lineHeight: 1.15 }}>{company.name}</div>
+            )}
             <div style={{ fontSize: "11.5px", color: TEXT_2, lineHeight: 1.35 }}>
-              {company.name}
+              {brand && company.name}
               {company.nameLocal && (
                 <>
-                  {" · "}
+                  {brand ? " · " : ""}
                   <span style={{ fontFamily: CJK, whiteSpace: "nowrap" }}>{company.nameLocal}</span>
                 </>
               )}

@@ -46,7 +46,7 @@ export class NotificationsService implements OnModuleInit {
   async managerIds(db: PrismaService["db"] | Tx = this.prisma.db) {
     return (
       await db.user.findMany({
-        where: { access: { OR: [{ superAdmin: true }, { permissions: { has: "inquiries.viewAll" } }] }, isActive: true, isSystem: false },
+        where: { access: { OR: [{ superAdmin: true }, { permissions: { has: "inquiries.viewAll" } }] }, isActive: true, isSystem: false, platformAdminId: null },
         select: { id: true },
       })
     ).map((u) => u.id);

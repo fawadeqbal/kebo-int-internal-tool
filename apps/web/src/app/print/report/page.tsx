@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { formatDuration } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, docBrand } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { PersonWithRole, ProfitRow, ReportView } from "@/lib/types-deals";
 import type { CompanySnapshot } from "@/lib/types-orders";
@@ -102,6 +102,7 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
       <PrintToolbar title={`Sales report ${date(r.range.from)} – ${date(r.range.to)}`} backHref={`/reports?${query}`} pdfHref={`/pdf/report/summary?${query}`} />
       <Sheet>
         <Letterhead
+          logo={(await docBrand())?.logo}
           company={settings.company}
           title="Sales report"
           number={`${date(r.range.from)} – ${date(r.range.to)}`}

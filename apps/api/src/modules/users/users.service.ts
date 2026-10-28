@@ -6,6 +6,8 @@ import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { ENV, type Env } from "../../config/env";
+import { LimitsService } from "../../common/company/limits.service";
+import { CompanyContext } from "../../common/company/company-context";
 import { consumeRecoveryCode, newRecoveryCodes, newTotpSecret, openSecret, otpauthUrl, sealSecret, verifyTotp } from "../../common/auth/totp";
 import type { SessionUser } from "../../common/auth/session-user";
 
@@ -54,6 +56,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(ENV) private readonly env: Env,
+    private readonly limits: LimitsService,
   ) {}
 
   /* ---------------------------------------------------------------- shared with sign-in */
@@ -78,12 +81,12 @@ export class UsersService {
   /* ---------------------------------------------------------------- admin */
 
   list() {
-    return this.prisma.db.user.findMany({ where: { isSystem: false }, select: publicUser, orderBy: [{ isActive: "desc" }, { name: "asc" }] });
+    return this.prisma.db.user.findMany({ where: { isSystem: false, platformAdminId: null }, select: publicUser, orderBy: [{ isActive: "desc" }, { name: "asc" }] });
   }
 
   /** Active people, for "assign to" pickers (anyone signed in may see names). */
   people() {
-    return this.prisma.db.user.findMany({ where: { isSystem: false, isActive: true }, select: { id: true, name: true, role: true }, orderBy: { name: "asc" } });
+    return this.prisma.db.user.findMany({ where: { isSystem: false, platformAdminId: null, isActive: true }, select: { id: true, name: true, role: true }, orderBy: { name: "asc" } });
   }
 
   /**
@@ -93,8 +96,8 @@ export class UsersService {
    */
   private async within(actor: SessionUser, key: string, doing: (roleName: string) => string) {
     const [role, mine] = await Promise.all([
-      this.prisma.db.role.findUnique({ where: { key } }),
-      this.prisma.db.role.findUnique({ where: { key: actor.role } }),
+      this.prisma.db.role.findFirst({ where: { key } }),
+      this.prisma.db.role.findFirst({ where: { key: actor.role } }),
     ]);
     if (!role) throw new DomainError("That role no longer exists. Reload and choose another.");
     if (mine?.superAdmin) return role;
@@ -114,14 +117,15 @@ export class UsersService {
   /** At least one active Super Admin stays. */
   private async keepASuperAdmin(userId: string) {
     const others = await this.prisma.db.user.count({
-      where: { access: { superAdmin: true }, isActive: true, isSystem: false, id: { not: userId } },
+      where: { access: { superAdmin: true }, isActive: true, isSystem: false, platformAdminId: null, id: { not: userId } },
     });
     if (others === 0) throw new DomainError("Keep at least one active Super Admin.");
   }
 
   async create(actor: SessionUser, input: z.infer<typeof newUserInput>) {
-    if (await this.prisma.db.user.findUnique({ where: { email: input.email } })) throw new ConflictError("Someone already uses this email.");
+    if (await this.prisma.db.user.findFirst({ where: { email: input.email } })) throw new ConflictError("Someone already uses this email.");
     const role = await this.checkAssignable(actor, input.role);
+    await this.limits.checkPeople(1);
     return this.prisma.tx(async (tx) => {
       const user = await tx.user.create({
         data: { name: input.name, email: input.email, role: input.role, passwordHash: await bcrypt.hash(input.password, 12) },
@@ -140,7 +144,7 @@ export class UsersService {
 
   /** Someone the actor may manage: not a system account, and in a role within the actor's own. */
   private async managed(actor: SessionUser, id: string) {
-    const user = await this.prisma.db.user.findFirst({ where: { id, isSystem: false } });
+    const user = await this.prisma.db.user.findFirst({ where: { id, isSystem: false, platformAdminId: null } });
     if (!user) throw new NotFoundError("User");
     if (user.id !== actor.id) await this.within(actor, user.role, (name) => `change the account of someone with the ${name} role`);
     return user;
@@ -151,7 +155,7 @@ export class UsersService {
     if (actor.id === id && input.role !== user.role) throw new DomainError("You cannot change your own role.");
     if (input.role !== user.role) {
       const next = await this.checkAssignable(actor, input.role);
-      const was = await this.prisma.db.role.findUniqueOrThrow({ where: { key: user.role } });
+      const was = await this.prisma.db.role.findFirstOrThrow({ where: { key: user.role } });
       if (was.superAdmin && !next.superAdmin && user.isActive) await this.keepASuperAdmin(id);
     }
     const clash = await this.prisma.db.user.findFirst({ where: { email: input.email, id: { not: id } } });
@@ -176,7 +180,8 @@ export class UsersService {
   async setActive(actor: SessionUser, id: string, active: boolean) {
     if (actor.id === id) throw new DomainError("You cannot switch off your own account.");
     const user = await this.managed(actor, id);
-    if (!active && (await this.prisma.db.role.findUnique({ where: { key: user.role } }))?.superAdmin) await this.keepASuperAdmin(id);
+    if (!active && (await this.prisma.db.role.findFirst({ where: { key: user.role } }))?.superAdmin) await this.keepASuperAdmin(id);
+    if (active && !user.isActive) await this.limits.checkPeople(1);
     await this.prisma.tx(async (tx) => {
       await tx.user.update({ where: { id }, data: { isActive: active } });
       if (!active) await this.revokeSessions(tx, id);
@@ -236,7 +241,7 @@ export class UsersService {
     if (u.totpEnabledAt) throw new DomainError("Two-step sign-in is already on.");
     const secret = newTotpSecret();
     await this.prisma.db.user.update({ where: { id: actor.id }, data: { totpSecret: sealSecret(secret, this.env.AUTH_SECRET), totpLastStep: null } });
-    return { secret, otpauthUrl: otpauthUrl("Kebo", u.email, secret) };
+    return { secret, otpauthUrl: otpauthUrl(`RFQ Desk (${CompanyContext.require().name})`, u.email, secret) };
   }
 
   /** The first code from the app turns it on; returns the recovery codes (shown once). */
@@ -274,7 +279,7 @@ export class UsersService {
   }
 
   async turnOffTwoStep(actor: SessionUser, code: string) {
-    const role = await this.prisma.db.role.findUniqueOrThrow({ where: { key: actor.role } });
+    const role = await this.prisma.db.role.findFirstOrThrow({ where: { key: actor.role } });
     if (role.requireTwoStep) throw new DomainError(`Your role (${role.name}) needs two-step sign-in, so it stays on.`);
     await this.checkOwnCode(actor.id, code);
     await this.prisma.tx(async (tx) => {

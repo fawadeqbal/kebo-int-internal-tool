@@ -1,6 +1,6 @@
-# Kebo RFQ Desk
+# RFQ Desk
 
-Internal tool for **Shandong Kebo International Trade Co., Ltd.** to run every RFQ from first message to closed order: sourcing from factories, quotations with revisions, and orders in four simple stages (Confirmed → In production → Shipped → Done) with the money received and the documents (proforma, invoice, packing list) as PDFs.
+Made for **Shandong Kebo International Trade Co., Ltd.**, now for any trading company: run every RFQ from first message to closed order: sourcing from factories, quotations with revisions, and orders in four simple stages (Confirmed → In production → Shipped → Done) with the money received and the documents (proforma, invoice, packing list) as PDFs.
 
 > **Status:** the rebuild is complete on `main`. The live server still runs the previous app until the switch-over in [docs/switch-over.md](docs/switch-over.md); the previous app's code is in the git history (before this cleanup), not in the tree.
 
@@ -20,6 +20,10 @@ packages/
 ```
 
 Dependencies only point downwards: `utils` and `money` know nothing about the business; `shared` holds the business rules as pure functions; `database` stores them; `api` enforces them; `ui`/`web` show them.
+
+## Companies
+
+Many companies run in one installation, each in its own space: one database, every row tagged with its company, and the database itself (row-level security) refusing anything of another company. A platform admin runs the companies at `/platform`: client inquiries, demos, plans, payments. Kebo is the first company. How it works, the automatic rules for demos and payments, and how to run it: [docs/companies.md](docs/companies.md).
 
 ## How an inquiry flows
 
@@ -43,6 +47,7 @@ pnpm dev                                          # API http://localhost:4000/ap
 ```
 
 Sign in at http://localhost:3000 with admin@example.com / Admin@12345, manager@example.com / Manager@12345, staff@example.com / Staff@12345, or the demo staff bilal@example.com / sana@example.com (Demo@12345).
+The platform area (`http://localhost:3000/platform`): make yourself a platform admin with `cd apps/api && pnpm build && node dist/cli/platform-admin.js add you@example.com "Your Name"` and open the link it prints. Request a demo as a visitor at `/request-a-demo`.
 Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up -d`) and run `pnpm dev`. After changing code in `packages/`, run `pnpm build` (the API and web pick it up).
 
 | Command | |

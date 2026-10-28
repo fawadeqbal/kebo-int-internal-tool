@@ -14,6 +14,33 @@ export interface Me {
   permissions: Permission[];
   /** Their role needs two-step sign-in and they have not set it up: only the setup page is open. */
   twoStepSetupRequired: boolean;
+  /** A platform admin working in this company. */
+  viaPlatform?: boolean;
+  company?: { slug: string; name: string; kind: "client" | "demo" | "trial"; status: "active" | "read_only" | "off" | "deleted"; statusReason: string | null; endsAt: string | null } | null;
+}
+
+/** The company the person is signed in to: its plan, usage, features and the notices to show. */
+export interface CompanyView {
+  slug: string;
+  name: string;
+  kind: "client" | "demo" | "trial";
+  status: "active" | "read_only" | "off" | "deleted";
+  statusReason: string | null;
+  endsAt: string | null;
+  renewsOn: string | null;
+  plan: { name: string; maxUsers: number | null; maxStorageMb: number | null; features: string[]; priceMinor: number; currency: string; period: string } | null;
+  features: string[];
+  usage: { users: number; storageMb: number };
+  notices: { tone: "info" | "warn" | "danger"; text: string }[];
+}
+
+/** The signed-in person's company (once per request). */
+export const getCompany = cache(async (): Promise<CompanyView | null> => api.get<CompanyView>("/company").catch(() => null));
+
+/** Whether the company's plan includes a feature (no answer: assume yes, the API still checks). */
+export async function hasFeature(feature: "insights" | "cash_book" | "excel") {
+  const c = await getCompany();
+  return !c || c.features.includes(feature);
 }
 
 export const TWO_STEP_SETUP_PATH = "/login/set-up-two-step";
@@ -49,4 +76,10 @@ export async function load<T>(fn: () => Promise<T>): Promise<T> {
     if (e instanceof ApiError && e.status === 401) redirect("/login");
     throw e;
   }
+}
+
+/** The company's brand on its documents: Kebo (the first company) has its logo; others print their name for now. */
+export async function docBrand() {
+  const { KEBO_BRAND } = await import("@/components/print/kebo-doc");
+  return (await getCompany())?.slug === "kebo" ? KEBO_BRAND : null;
 }

@@ -1,3 +1,4 @@
+import { FIRST_COMPANY_ID } from "@kebo/database";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { currentStep, totpAt } from "../src/common/auth/totp";
@@ -48,7 +49,7 @@ describe("people: users, two-step sign-in, customers, factories", () => {
     await api(app, admin).post("/users", { name: "Two Step", email, role: "manager", password: "Welcome123x" }).expect(201);
     const token = await signIn(app, email, "Welcome123x");
     const setup = await api(app, token).post("/me/two-step/setup").expect(200);
-    expect(setup.body.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Kebo/);
+    expect(setup.body.otpauthUrl).toMatch(/^otpauth:\/\/totp\/RFQ%20Desk%20\(Kebo\)/);
     await api(app, token).post("/me/two-step/confirm", { code: "000000" }).expect(400);
     const confirmed = await api(app, token).post("/me/two-step/confirm", { code: totpAt(setup.body.secret, currentStep() - 1) }).expect(200);
     expect(confirmed.body.recoveryCodes).toHaveLength(10);
@@ -67,7 +68,7 @@ describe("people: users, two-step sign-in, customers, factories", () => {
     await api(app, again.body.token).post("/auth/two-step", { code }).expect(401);
     const rec = await api(app, again.body.token).post("/auth/two-step", { code: confirmed.body.recoveryCodes[0] }).expect(200);
     expect(rec.body).toMatchObject({ usedRecoveryCode: true, recoveryCodesLeft: 9 });
-    await prisma.db.user.update({ where: { email }, data: { failedLogins: 0, lockedUntil: null } });
+    await prisma.company(FIRST_COMPANY_ID).user.update({ where: { companyId_email: { companyId: FIRST_COMPANY_ID, email } }, data: { failedLogins: 0, lockedUntil: null } });
   });
 
   it("warns about duplicate customers and saves anyway when asked", async () => {

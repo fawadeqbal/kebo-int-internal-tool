@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { fromMinor, landedUnitCosts, toMinor } from "@kebo/money";
 import { basisText, paymentSentenceOf } from "@kebo/shared";
 import { api } from "@/lib/api";
-import { load } from "@/lib/session";
+import { docBrand, load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
 import type { CompanySnapshot, DocLine, RevisionDoc } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
@@ -127,6 +127,7 @@ export default async function QuotationPrint({
         }}
       />
       <KeboDoc
+        brand={await docBrand()}
         company={{ ...company, stamp: now.stamp ?? null }}
         customer={customer}
         title="QUOTATION"

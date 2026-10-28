@@ -646,7 +646,7 @@ export class InquiriesService {
     if (file.size > this.storage.maxBytes)
       throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
     const name = safeFileName(file.originalname);
-    const key = `inquiries/${id}/${meta.factoryQuoteId ? `offers/${meta.factoryQuoteId}/` : ""}${randomUUID()}-${name}`;
+    const key = this.storage.keyFor(`inquiries/${id}/${meta.factoryQuoteId ? `offers/${meta.factoryQuoteId}/` : ""}${randomUUID()}-${name}`);
     await this.storage.put(key, file.buffer, file.mimetype);
     try {
       return await this.prisma.tx(async (tx) => {

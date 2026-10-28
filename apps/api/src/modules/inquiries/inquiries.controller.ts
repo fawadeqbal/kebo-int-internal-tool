@@ -7,6 +7,8 @@ import { assignInput, attachmentInput, holdInput, inquiryInput, inquiryListQuery
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, Public, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
+import { CompanyContext } from "../../common/company/company-context";
+import { companyRefusal } from "../../common/auth/auth.guard";
 import { InquiriesService } from "./inquiries.service";
 import { normalizeFields, websiteInquiry, WebsiteService } from "./website.service";
 
@@ -172,6 +174,11 @@ export class WebsiteController {
     if (origin && !this.origins().includes(origin)) {
       res.status(403);
       return { ok: false, message: "This website is not allowed to send inquiries." };
+    }
+    const company = CompanyContext.current();
+    if (!company || companyRefusal(company, "POST")) {
+      res.status(403);
+      return { ok: false, message: "Inquiries cannot be received right now. Please contact us on WhatsApp or by email." };
     }
     const ip = req.ip ?? "local";
     this.website.limit(`inquiry:${ip}`, 5, 10 * 60_000);

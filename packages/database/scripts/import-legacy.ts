@@ -21,7 +21,7 @@ import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
 import type { BalanceTerms, Incoterm, InquiryStage } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
-import { createPrismaClient, nextReference, toDbDate, type Prisma } from "../src";
+import { nextReference, openCompany, toDbDate, type Prisma } from "../src";
 import * as map from "./import-legacy/map";
 
 /* ---------------------------------------------------------------- arguments */
@@ -176,7 +176,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       updatedAt: u.updated_at,
     })),
   });
-  if (!(await tx.user.findUnique({ where: { email: SYSTEM_EMAIL } }))) {
+  if (!(await tx.user.findFirst({ where: { email: SYSTEM_EMAIL } }))) {
     await tx.user.create({ data: { email: SYSTEM_EMAIL, name: "Website form", role: "staff", isSystem: true, isActive: false, passwordHash: "!" } });
     report.judge("Added (not in the old data)", `system account ${SYSTEM_EMAIL} (records website inquiries; cannot sign in)`);
   }
@@ -186,7 +186,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
 
   /* ---- settings */
   for (const [key, value] of Object.entries(settings.values)) {
-    await tx.setting.upsert({ where: { key }, update: { value: value as Prisma.InputJsonValue }, create: { key, value: value as Prisma.InputJsonValue } });
+    await tx.setting.deleteMany({ where: { key } });
+    await tx.setting.create({ data: { key, value: value as Prisma.InputJsonValue } });
   }
   for (const d of settings.dropped) report.judge("Old settings with no place in the new ones (dropped)", d);
   for (const p of settings.problems) report.judge("Settings that could not be read (defaults used)", p);
@@ -738,7 +739,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     ["inquiry", "quotation"],
   );
   for (const [key, value] of counters) {
-    await tx.counter.upsert({ where: { key }, update: { value }, create: { key, value } });
+    await tx.counter.deleteMany({ where: { key } });
+    await tx.counter.create({ data: { key, value } });
   }
   const unused = old.counters.filter((c) => !counters.has(c.key));
   if (unused.length) report.judge("Old counters not carried over", unused.map((c) => `${c.key}=${c.value} (no new document uses that prefix: an order's documents take its number)`).join(", "));
@@ -827,7 +829,10 @@ async function main() {
   log(`[import] reading the old database ${new URL(from).host}${new URL(from).pathname}`);
   const old = await readLegacy(from);
 
-  const prisma = createPrismaClient({ url: target, poolSize: 2 });
+  // Into the first company (the data that was here before companies), or --company <short name>.
+  const companyArg = process.argv.indexOf("--company");
+  const { company, db: prisma } = await openCompany(target, companyArg > 0 ? process.argv[companyArg + 1] : undefined, 2);
+  log(`[import] into company ${company.slug}`);
   const report = new Report();
   try {
     const inquiries = await prisma.inquiry.count();

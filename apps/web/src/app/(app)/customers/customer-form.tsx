@@ -119,7 +119,7 @@ export function CustomerForm({ action, customer, currencies, cancelHref }: { act
                 htmlFor="initials"
                 optional
                 error={s.errors?.initials}
-                hint={`In proforma numbers, e.g. KEB260916${(draft.initials || customerLetters(draft.name || "Customer")).toUpperCase()}07. Empty: from the name (${customerLetters(draft.name || "Customer")}).`}
+                hint={`In proforma numbers, e.g. ABC260916${(draft.initials || customerLetters(draft.name || "Customer")).toUpperCase()}07. Empty: from the name (${customerLetters(draft.name || "Customer")}).`}
               >
                 <Input
                   form={DRAFT}

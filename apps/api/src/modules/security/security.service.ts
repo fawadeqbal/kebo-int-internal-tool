@@ -58,7 +58,7 @@ export class SecurityService {
     if (!can(actor, "security.manage") && !can(actor, "users.manage")) throw new ForbiddenError();
     const [roles, mine, counts] = await Promise.all([
       this.prisma.db.role.findMany({ orderBy: [{ superAdmin: "desc" }, { createdAt: "asc" }, { name: "asc" }] }),
-      this.prisma.db.role.findUnique({ where: { key: actor.role } }),
+      this.prisma.db.role.findFirst({ where: { key: actor.role } }),
       this.prisma.db.user.groupBy({ by: ["role"], where: { isSystem: false, isActive: true }, _count: true }),
     ]);
     const without = await this.prisma.db.user.groupBy({
@@ -90,7 +90,7 @@ export class SecurityService {
     const r = roles.find((x) => x.key === key);
     if (!r) throw new NotFoundError("Role");
     const people = await this.prisma.db.user.findMany({
-      where: { role: key, isSystem: false },
+      where: { role: key, isSystem: false, platformAdminId: null },
       select: { id: true, name: true, email: true, isActive: true, totpEnabledAt: true, lastLoginAt: true },
       orderBy: [{ isActive: "desc" }, { name: "asc" }],
     });
@@ -99,7 +99,7 @@ export class SecurityService {
 
   /** Only what the actor may do themselves can go into a role they make or change (a Super Admin may give anything). */
   private async checkWithin(actor: SessionUser, permissions: readonly Permission[]) {
-    const mine = await this.prisma.db.role.findUnique({ where: { key: actor.role } });
+    const mine = await this.prisma.db.role.findFirst({ where: { key: actor.role } });
     if (mine?.superAdmin) return;
     const more = permissions.filter((p) => !actor.permissions.includes(p));
     if (more.length) throw new ForbiddenError(`You can only give what your own role allows. Not yours: ${labels(more)}.`);
@@ -112,7 +112,7 @@ export class SecurityService {
       throw new ConflictError("There is already a role with this name.");
     const base = roleKeyOf(input.name);
     let key = base;
-    for (let n = 2; await this.prisma.db.role.findUnique({ where: { key } }); n++) key = `${base}-${n}`;
+    for (let n = 2; await this.prisma.db.role.findFirst({ where: { key } }); n++) key = `${base}-${n}`;
     return this.prisma.tx(async (tx) => {
       const r = await tx.role.create({
         data: { key, name: input.name, description: input.description, permissions, requireTwoStep: input.requireTwoStep },
@@ -129,7 +129,7 @@ export class SecurityService {
   }
 
   async updateRole(actor: SessionUser, key: string, input: RoleInput) {
-    const role = await this.prisma.db.role.findUnique({ where: { key } });
+    const role = await this.prisma.db.role.findFirst({ where: { key } });
     if (!role) throw new NotFoundError("Role");
     const before = permissionsOfRole(role);
     // The Super Admin keeps its name and every permission; only its description and two-step rule change.
@@ -142,7 +142,7 @@ export class SecurityService {
       if (key === actor.role && !permissions.includes("security.manage")) {
         throw new DomainError("This is your own role: keep Security in it, or you would lock yourself out of this page.");
       }
-    } else if ((await this.prisma.db.role.findUnique({ where: { key: actor.role } }))?.superAdmin !== true) {
+    } else if ((await this.prisma.db.role.findFirst({ where: { key: actor.role } }))?.superAdmin !== true) {
       throw new ForbiddenError("Only a Super Admin can change the Super Admin role.");
     }
     if (
@@ -156,7 +156,7 @@ export class SecurityService {
     const removed = before.filter((p) => !after.includes(p));
     return this.prisma.tx(async (tx) => {
       await tx.role.update({
-        where: { key },
+        where: { companyId_key: { companyId: actor.companyId, key } },
         data: { name, description: input.description, permissions, requireTwoStep: input.requireTwoStep },
       });
       const changes = [
@@ -183,7 +183,7 @@ export class SecurityService {
 
   async deleteRole(actor: SessionUser, key: string) {
     if (!can(actor, "security.manage")) throw new ForbiddenError();
-    const role = await this.prisma.db.role.findUnique({ where: { key } });
+    const role = await this.prisma.db.role.findFirst({ where: { key } });
     if (!role) throw new NotFoundError("Role");
     if ((PRESET_ROLE_KEYS as readonly string[]).includes(key))
       throw new DomainError(`${role.name} is one of the built-in roles. Change it instead.`);
@@ -194,7 +194,7 @@ export class SecurityService {
         `${people} ${people === 1 ? "person has" : "people have"} this role (switched-off people count too). Give them another role first.`,
       );
     await this.prisma.tx(async (tx) => {
-      await tx.role.delete({ where: { key } });
+      await tx.role.delete({ where: { companyId_key: { companyId: actor.companyId, key } } });
       await this.audit.record(tx, {
         userId: actor.id,
         action: "delete",
@@ -211,16 +211,16 @@ export class SecurityService {
     const day = new Date(Date.now() - 86_400_000);
     const [sessions, people, failed, blockedIps, missing] = await Promise.all([
       this.prisma.db.session.count({ where: { ...live(), pendingTwoStep: false, user: { isActive: true } } }),
-      this.prisma.db.user.count({ where: { isSystem: false, isActive: true } }),
+      this.prisma.db.user.count({ where: { isSystem: false, platformAdminId: null, isActive: true } }),
       this.prisma.db.signIn.count({ where: { at: { gte: day }, result: { in: [...FAILED] } } }),
       this.prisma.db.signIn.findMany({ where: { at: { gte: day }, result: "too_many" }, select: { ip: true }, distinct: ["ip"] }),
       this.prisma.db.user.findMany({
-        where: { isSystem: false, isActive: true, totpEnabledAt: null, access: { requireTwoStep: true } },
+        where: { isSystem: false, platformAdminId: null, isActive: true, totpEnabledAt: null, access: { requireTwoStep: true } },
         select: { id: true, name: true, access: { select: { name: true } } },
         orderBy: { name: "asc" },
       }),
     ]);
-    const withTwoStep = await this.prisma.db.user.count({ where: { isSystem: false, isActive: true, totpEnabledAt: { not: null } } });
+    const withTwoStep = await this.prisma.db.user.count({ where: { isSystem: false, platformAdminId: null, isActive: true, totpEnabledAt: { not: null } } });
     return {
       liveSessions: sessions,
       people,

@@ -83,7 +83,7 @@ export class PaymentFilesService {
     if (file.size > this.storage.maxBytes)
       throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
     const name = safeFileName(file.originalname);
-    const key = `payments/${side}/${id}/${randomUUID()}-${name}`;
+    const key = this.storage.keyFor(`payments/${side}/${id}/${randomUUID()}-${name}`);
     await this.storage.put(key, file.buffer, file.mimetype);
     try {
       const o = await this.orders.load(user, row.orderId);

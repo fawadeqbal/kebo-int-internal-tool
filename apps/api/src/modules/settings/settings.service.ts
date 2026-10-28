@@ -5,15 +5,16 @@ import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
+import { CompanyContext } from "../../common/company/company-context";
 
 const SETTING_LABEL = { exchangeRates: "exchange rates", defaultMarginPercent: "default margin", defaultDepositPercent: "default deposit", defaultBalanceTerms: "balance terms" } as const;
 
 const CACHE_MS = 30_000;
 
-/** Typed settings with defaults filled in; read often, so cached briefly per process. */
+/** Typed settings with defaults filled in; read often, so cached briefly per process (per company). */
 @Injectable()
 export class SettingsService {
-  private cache: { at: number; value: Settings } | null = null;
+  private readonly cache = new Map<string, { at: number; value: Settings }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -21,10 +22,12 @@ export class SettingsService {
   ) {}
 
   async get(): Promise<Settings> {
-    if (this.cache && Date.now() - this.cache.at < CACHE_MS) return this.cache.value;
+    const company = CompanyContext.require().id;
+    const hit = this.cache.get(company);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
     const rows = await this.prisma.db.setting.findMany();
     const value = readSettings(Object.fromEntries(rows.map((r) => [r.key, r.value])));
-    this.cache = { at: Date.now(), value };
+    this.cache.set(company, { at: Date.now(), value });
     return value;
   }
 
@@ -41,7 +44,11 @@ export class SettingsService {
     const changed = watched.filter((f) => JSON.stringify((before as Record<string, unknown>)[f]) !== JSON.stringify((value as Record<string, unknown>)[f]));
     const reason = changed.length ? requireReason(typeof given === "string" ? given.slice(0, 500) : null, "settings", "money settings change") : typeof given === "string" ? given.slice(0, 500) : null;
     await this.prisma.tx(async (tx) => {
-      await tx.setting.upsert({ where: { key }, create: { key, value: value as Prisma.InputJsonValue }, update: { value: value as Prisma.InputJsonValue } });
+      await tx.setting.upsert({
+        where: { companyId_key: { companyId: user.companyId, key } },
+        create: { key, value: value as Prisma.InputJsonValue },
+        update: { value: value as Prisma.InputJsonValue },
+      });
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",
@@ -52,7 +59,7 @@ export class SettingsService {
         reason,
       });
     });
-    this.cache = null;
+    this.cache.delete(user.companyId);
     return value;
   }
 }

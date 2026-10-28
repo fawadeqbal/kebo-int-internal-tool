@@ -1,3 +1,4 @@
+import { FIRST_COMPANY_ID } from "@kebo/database";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { currentStep, totpAt } from "../src/common/auth/totp";
@@ -193,7 +194,7 @@ describe("security: roles, two-step per role, sessions, sign-ins", () => {
     );
     expect(failed.rows.every((s: { result: string }) => s.result !== "signed_in")).toBe(true);
     await api(app, kim.token).get("/security/sign-ins").expect(403);
-    await prisma.db.user.update({ where: { email: kim.email }, data: { failedLogins: 0 } });
+    await prisma.company(FIRST_COMPANY_ID).user.update({ where: { companyId_email: { companyId: FIRST_COMPANY_ID, email: kim.email } }, data: { failedLogins: 0 } });
   });
 
   it("lists signed-in devices and signs them out", async () => {
