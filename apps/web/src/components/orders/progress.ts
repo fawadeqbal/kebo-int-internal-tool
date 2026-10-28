@@ -4,7 +4,7 @@ import type { FactoryOwed } from "@/lib/types-money";
 import type { OrderView, PaymentsView } from "@/lib/types-orders";
 
 /** The order's tabs (the overview is the order's own address). */
-export type OrderTab = "" | "goods" | "money" | "documents" | "history";
+export type OrderTab = "" | "goods" | "packing" | "money" | "documents" | "history";
 
 /**
  * done: recorded · now: the one to do next · late: the one to do next, past its date ·
@@ -134,7 +134,7 @@ export function orderProgress(o: OrderView, p: PaymentsView, factories: FactoryO
       tab: "goods",
       action: "Record goods",
     });
-    list.push({ stage: "in_production", key: "packed", label: "Packed", detail: o.goods.packedAt ? date(o.goods.packedAt) : "packing list not made", done: o.goods.packed, tab: "goods", action: "Make the packing list" });
+    list.push({ stage: "in_production", key: "packed", label: "Packed", detail: o.goods.packedAt ? date(o.goods.packedAt) : "packing list not made", done: o.goods.packed, tab: "packing", action: "Make the packing list" });
   }
 
   if (o.balanceTerms === "before_shipment") list.push({ ...balance, stage: "shipped" });
