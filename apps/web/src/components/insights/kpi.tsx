@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { cn } from "@kebo/ui";
-import { money } from "@/lib/format";
+import { money, whole } from "@/lib/format";
 import type { Kpi } from "@/lib/types-insights";
 import { Sparkline } from "./charts";
 
@@ -20,9 +20,22 @@ export function Change({ value, goodWhenUp = true, suffix = "%" }: { value: numb
       )}
     >
       <Icon className="size-3.5" aria-hidden />
-      {flat ? "same" : `${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 1 })}${suffix}`}
+      {/* From almost nothing, the percent means little: past 999 it just says so. */}
+      {flat ? "same" : Math.abs(value) >= 1000 ? `>999${suffix}` : `${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 1 })}${suffix}`}
     </span>
   );
+}
+
+/**
+ * A headline amount for a card: whole units, and from a million as "USD 46.67M"
+ * so it fits; the exact figure shows on hover.
+ */
+export function Headline({ amount, currency }: { amount: string | number | null | undefined; currency: string }) {
+  if (amount === null || amount === undefined) return <>—</>;
+  const n = Number(amount);
+  const exact = whole(n, currency);
+  if (Math.abs(n) < 1_000_000) return <>{exact}</>;
+  return <span title={exact}>{`${currency} ${(n / 1_000_000).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`}</span>;
 }
 
 /**

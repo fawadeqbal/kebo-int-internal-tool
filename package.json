@@ -16,6 +16,7 @@
     "db:deploy": "pnpm --filter @kebo/database db:deploy",
     "db:seed": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:seed",
     "db:reset": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:reset",
+    "db:load-data": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:load-data",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "dev:packages": "turbo run dev --filter=./packages/*"
   },
