@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { bool, listQuery, roleInput, type RoleInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SecurityService } from "./security.service";
 
@@ -27,6 +27,7 @@ export class RolesController {
     return this.security.role(actor, key);
   }
 
+  @RequireFeature("custom_roles")
   @Post()
   @RequirePermissions("security.manage")
   create(@CurrentUser() actor: SessionUser, @Body(Validate(roleInput)) body: RoleInput) {

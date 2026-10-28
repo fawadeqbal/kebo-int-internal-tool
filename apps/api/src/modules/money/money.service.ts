@@ -16,6 +16,7 @@ import {
 } from "@kebo/money";
 import { BALANCE_TERMS_LABEL, can, planStatus, type ExpenseInput, type FactoryPaymentInput, type PaymentPlanInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { LimitsService } from "../../common/company/limits.service";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { checkAccount } from "./account-check";
@@ -81,6 +82,7 @@ export class MoneyService {
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
     private readonly storage: StorageService,
+    private readonly limits: LimitsService,
   ) {}
 
   private assertExpenses(user: SessionUser) {
@@ -169,7 +171,8 @@ export class MoneyService {
     const next = plan.find((p) => p.status !== "paid") ?? null;
 
     const seeCosts = can(user, "sourcing.manage");
-    const seeExpenses = can(user, "expenses.manage");
+    // Expenses are a plan feature: without it the order shows no costs (and no profit after them).
+    const seeExpenses = can(user, "expenses.manage") && (await this.limits.allows("expenses"));
 
     // Factories: owed from the order's lines, paid from the factory payments (same currency only).
     const owed = this.owedByFactory(o.lines);

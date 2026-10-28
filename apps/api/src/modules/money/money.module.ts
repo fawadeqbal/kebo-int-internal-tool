@@ -142,6 +142,7 @@ class MoneyController {
   }
 
   /** Managers only: what an expense can be for (customers, deals, orders, factories). */
+  @RequireFeature("expenses")
   @Get("expenses/targets")
   expenseTargets(@CurrentUser() user: SessionUser) {
     return this.accounts.expenseTargets(user);
@@ -201,22 +202,26 @@ class MoneyController {
   }
 
   /** Managers only. ?from&to (dates), ?orderId, ?customerId, ?category, ?kind=order|customer|general; with totals by kind and by customer. */
+  @RequireFeature("expenses")
   @Get("expenses")
   expenses(@CurrentUser() user: SessionUser, @Query(Validate(expenseQuery)) q: z.infer<typeof expenseQuery>) {
     return this.money.listExpenses(user, q);
   }
 
+  @RequireFeature("expenses")
   @Post("expenses")
   createExpense(@CurrentUser() user: SessionUser, @Body(Validate(expenseInput)) body: ExpenseInput) {
     return this.money.createExpense(user, body);
   }
 
   /** Same body as adding, plus reason (always asked). */
+  @RequireFeature("expenses")
   @Patch("expenses/:id")
   editExpense(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(expenseInput)) body: ExpenseInput) {
     return this.money.editExpense(user, id, body);
   }
 
+  @RequireFeature("expenses")
   @Post("expenses/:id/void")
   @HttpCode(200)
   voidExpense(
@@ -228,6 +233,7 @@ class MoneyController {
   }
 
   /** multipart/form-data with one `file`: a photo or PDF of the receipt (replaces the one there). */
+  @RequireFeature("expenses")
   @Post("expenses/:id/receipt")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   attachReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
@@ -235,6 +241,7 @@ class MoneyController {
     return this.money.attachReceipt(user, id, file);
   }
 
+  @RequireFeature("expenses")
   @Get("expenses/:id/receipt")
   async receipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
     const f = await this.money.receipt(user, id);
@@ -248,6 +255,7 @@ class MoneyController {
     return new StreamableFile(f.stream);
   }
 
+  @RequireFeature("expenses")
   @Delete("expenses/:id/receipt")
   removeReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.money.removeReceipt(user, id);

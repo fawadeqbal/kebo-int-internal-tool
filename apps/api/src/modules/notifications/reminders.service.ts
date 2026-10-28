@@ -12,6 +12,7 @@ import { links, NotificationsService } from "./notifications.service";
 import { goodsOf } from "../orders/orders.service";
 import { InsightsService } from "../insights/insights.service";
 import { ordersWithMoneyDue } from "../money/due";
+import { LimitsService } from "../../common/company/limits.service";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -29,6 +30,7 @@ export class RemindersService {
     private readonly settings: SettingsService,
     private readonly notifications: NotificationsService,
     private readonly modules: ModuleRef,
+    private readonly limits: LimitsService,
   ) {}
 
   async run() {
@@ -174,12 +176,13 @@ export class RemindersService {
       }
     }
 
-    // 7. The morning summary email, once a day (the counter row is the "already sent" mark).
-    const claimed = await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`summary-${today}`}, 1) on conflict do nothing`;
+    // 7. The morning summary email, once a day (the counter row is the "already sent" mark). Email reports are a plan feature.
+    const reports = await this.limits.allows("email_reports");
+    const claimed = reports && (await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`summary-${today}`}, 1) on conflict do nothing`);
     if (claimed) await this.summary(today);
 
     // 8. On the 1st, last month's report, once.
-    if (today.endsWith("-01")) {
+    if (reports && today.endsWith("-01")) {
       const last = addDays(today, -1).slice(0, 7);
       const monthly = await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`monthly-${last}`}, 1) on conflict do nothing`;
       if (monthly) await this.monthly(last);

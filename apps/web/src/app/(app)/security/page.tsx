@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hasFeature } from "@/lib/session";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { PERMISSIONS } from "@kebo/shared";
 import { Alert, Badge, ButtonLink, Card, CardHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
@@ -51,9 +52,12 @@ export default async function SecurityPage() {
           title="Roles"
           description="Each person has one role. A change to a role applies to its people from their next click. The Super Admin always has everything."
           actions={
-            <ButtonLink href="/security/roles/new" variant="primary" size="sm">
-              New role
-            </ButtonLink>
+            // Roles beyond the three built in are a plan feature.
+            (await hasFeature("custom_roles")) && (
+              <ButtonLink href="/security/roles/new" variant="primary" size="sm">
+                New role
+              </ButtonLink>
+            )
           }
         />
         <Table>

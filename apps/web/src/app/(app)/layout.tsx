@@ -4,7 +4,7 @@ import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { getCompany, requireUser } from "@/lib/session";
 import { Alert } from "@kebo/ui";
-import { ExcelAllowedProvider } from "@/components/sheets/excel-allowed";
+import { FeaturesProvider } from "@/components/sheets/excel-allowed";
 import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
 import { AppShell, type NavGroup, type NavItem } from "@/components/shell/nav";
@@ -39,7 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ...(has("users.manage") ? [{ href: "/users", label: "Users", icon: "users" } as NavItem] : []),
     ...(has("security.manage") ? [{ href: "/security", label: "Security", icon: "security" } as NavItem] : []),
     ...(has("settings.manage") ? [{ href: "/settings", label: "Settings", icon: "settings" } as NavItem] : []),
-    ...(has("audit.view") ? [{ href: "/audit", label: "Audit log", icon: "audit" } as NavItem] : []),
+    ...(has("audit.view") && feature("audit_log") ? [{ href: "/audit", label: "Audit log", icon: "audit" } as NavItem] : []),
   ];
   const groups: NavGroup[] = [{ title: "Work", items: work }, ...(trade.length ? [{ title: "Trade", items: trade }] : []), ...(admin.length ? [{ title: "Administration", items: admin }] : [])];
 
@@ -66,9 +66,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <strong className="font-semibold">Demo</strong> · everything here is sample data. Look around and change anything; it is reset regularly.
           </p>
         )}
-        <ExcelAllowedProvider allowed={feature("excel")}>
+        <FeaturesProvider features={company?.features ?? null}>
           <AccountsProvider accounts={accounts}>{children}</AccountsProvider>
-        </ExcelAllowedProvider>
+        </FeaturesProvider>
       </AppShell>
       <Suspense>
         <Toast />

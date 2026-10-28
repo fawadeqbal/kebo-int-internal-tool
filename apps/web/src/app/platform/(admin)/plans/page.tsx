@@ -1,4 +1,5 @@
-import { PLAN_FEATURES } from "@kebo/shared";
+import { Check, Minus } from "lucide-react";
+import { PLAN_FEATURES, planFeatureName } from "@kebo/shared";
 import { Badge, Card, CardBody, CardHeader, PageHeader } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -35,12 +36,22 @@ export default async function PlansPage() {
                 {p.maxUsers ? `${p.maxUsers} people` : "Any number of people"} ·{" "}
                 {p.maxStorageMb ? `${Math.round((p.maxStorageMb / 1024) * 10) / 10} GB of files` : "no file limit"}
               </p>
-              <ul className="flex flex-wrap gap-1.5">
-                {Object.entries(PLAN_FEATURES).map(([k, label]) => (
-                  <li key={k}>
-                    <Badge tone={p.features.includes(k) ? "ok" : "outline"}>
-                      {p.features.includes(k) ? label.split(" (")[0] : `No ${label.split(" (")[0].toLowerCase()}`}
-                    </Badge>
+              <ul className="flex flex-col gap-1">
+                {Object.keys(PLAN_FEATURES).map((k) => (
+                  <li
+                    key={k}
+                    className={
+                      p.features.includes(k)
+                        ? "flex items-center gap-2"
+                        : "flex items-center gap-2 text-muted line-through decoration-line-strong"
+                    }
+                  >
+                    {p.features.includes(k) ? (
+                      <Check className="size-4 shrink-0 text-ok" aria-label="Included" />
+                    ) : (
+                      <Minus className="size-4 shrink-0" aria-label="Not included" />
+                    )}
+                    {planFeatureName(k)}
                   </li>
                 ))}
               </ul>

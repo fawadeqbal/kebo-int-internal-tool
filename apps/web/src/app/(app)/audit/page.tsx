@@ -5,7 +5,8 @@ import { Badge, ButtonLink, Card, cn, EmptyState, FilterBar, PageHeader, Paginat
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
-import { requirePermission } from "@/lib/session";
+import { hasFeature, requirePermission } from "@/lib/session";
+import { PlanOff } from "@/components/common/plan-off";
 import { dateTime, timeAgo } from "@/lib/format";
 import type { Paged, Person } from "@/lib/types";
 import type { AuditRow } from "@/lib/types-people";
@@ -70,6 +71,7 @@ const words = (key: string) => key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/
 /** Who changed what and when. Filter by kind of record and by person; open an entry to see old → new values. */
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const me = await requirePermission("audit.view");
+  if (!(await hasFeature("audit_log"))) return <PlanOff title="Audit log" what="The audit log" />;
   const sp = await searchParams;
   const [data, people] = await Promise.all([
     api.get<Paged<AuditRow>>("/audit", { entityType: sp.type, userId: sp.person, page: toPage(sp.page), pageSize: PAGE_SIZE }),

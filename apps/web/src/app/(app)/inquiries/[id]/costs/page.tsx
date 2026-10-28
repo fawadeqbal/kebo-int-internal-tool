@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
-import { requirePermission } from "@/lib/session";
+import { PlanOff } from "@/components/common/plan-off";
+import { requirePermission, hasFeature } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
 import { CustomerHistoryNote } from "@/components/money/customer-account";
 import { DealExpensesCard } from "@/components/money/deal-expenses";
@@ -10,6 +11,7 @@ export const metadata = { title: "Inquiry costs" };
 export default async function DealCosts({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requirePermission("expenses.manage");
+  if (!(await hasFeature("expenses"))) return <PlanOff title="Costs" what="Expenses" />;
   const d = await api.get<DealDetail>(`/inquiries/${id}`);
   const order = d.orders.find((o) => o.status !== "cancelled") ?? null;
   return (
