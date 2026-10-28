@@ -6,12 +6,14 @@ import { platformApi } from "@/lib/api";
 import { date, dateTime, timeAgo } from "@/lib/format";
 import type { Overview } from "@/lib/types-platform";
 import { CompanyStatusBadge, KindBadge, LeadStatusBadge } from "@/components/platform/badges";
+import { SiteNumbersCard } from "@/components/platform/site-numbers";
+import type { SiteNumbers } from "./website/types";
 
 export const metadata = { title: "Overview" };
 
 /** What needs the platform admin today: new client inquiries, follow-ups, demos ending, renewals. */
 export default async function PlatformOverviewPage() {
-  const o = await platformApi.get<Overview>("/overview");
+  const [o, site] = await Promise.all([platformApi.get<Overview>("/overview"), platformApi.get<SiteNumbers>("/site/numbers").catch(() => null)]);
   const count = (kind: string, status?: string) =>
     o.counts.filter((c) => c.kind === kind && (!status || c.status === status)).reduce((t, c) => t + c.count, 0);
   const tiles = [
@@ -64,6 +66,7 @@ export default async function PlatformOverviewPage() {
           </Link>
         ))}
       </div>
+      {site && <SiteNumbersCard n={site} />}
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <CardHeader title="Follow up today" description="Client inquiries with a follow-up date today or earlier" />

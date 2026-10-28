@@ -1,12 +1,14 @@
 "use client";
 
+import type { LeadOrigin } from "@kebo/shared";
+import { OriginFields } from "@/components/site/origin-fields";
 import { useActionState, useRef, useState } from "react";
 import { MailCheck } from "lucide-react";
 import { Alert, Field, Input } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { signUpAction, slugCheckAction } from "./actions";
 
-export function SignUpForm({ trialDays }: { trialDays: number }) {
+export function SignUpForm({ trialDays, origin }: { trialDays: number; origin: LeadOrigin }) {
   const [state, action] = useActionState(signUpAction, {});
   const [slug, setSlug] = useState(state.values?.slug ?? "");
   const [hint, setHint] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export function SignUpForm({ trialDays }: { trialDays: number }) {
         <Input id="password" name="password" type="password" autoComplete="new-password" required />
       </Field>
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
+      <OriginFields origin={origin} />
       <SubmitButton pendingText="Starting…" size="lg" className="w-full">
         Start my {trialDays}-day trial
       </SubmitButton>

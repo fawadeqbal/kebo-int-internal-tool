@@ -87,7 +87,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                   <Td>
                     <LeadStatusBadge status={l.status} />
                   </Td>
-                  <Td className="text-sm text-text-2">{LEAD_SOURCE_LABEL[l.source]}</Td>
+                  <Td className="text-sm text-text-2">
+                    {LEAD_SOURCE_LABEL[l.source]}
+                    {l.channel && <span className="block text-xs text-muted">{l.channel}</span>}
+                  </Td>
                   <Td>
                     {l.company ? (
                       <Link href={`/platform/companies/${l.company.id}`} className="flex items-center gap-1.5 text-sm hover:text-primary">

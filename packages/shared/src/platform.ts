@@ -2,6 +2,7 @@ import { z } from "zod";
 import { addDays, type ISODate } from "@kebo/utils";
 import { isoDate, optionalDate, optionalText, text } from "./schemas/common";
 import { CURRENCIES } from "./enums";
+import { leadOrigin } from "./site";
 
 /* ============================================================================
  * The platform: companies using the app, plans, client inquiries (leads),
@@ -83,7 +84,7 @@ export const LIFECYCLE = {
 export const COMPANY_KIND_LABEL = { client: "Client", demo: "Demo", trial: "Trial" } as const;
 export const COMPANY_STATUS_LABEL = { active: "Active", read_only: "Read-only", off: "Switched off", deleted: "Deleted" } as const;
 export const LEAD_STATUS_LABEL = { new: "New", contacted: "Contacted", demo: "Demo given", client: "Client", lost: "Lost" } as const;
-export const LEAD_SOURCE_LABEL = { form: "Demo request", sign_up: "Self sign-up", manual: "Added by hand" } as const;
+export const LEAD_SOURCE_LABEL = { form: "Demo request", sign_up: "Self sign-up", manual: "Added by hand", contact: "Question" } as const;
 export const LEAD_STATUSES = ["new", "contacted", "demo", "client", "lost"] as const;
 export type LeadStatusKey = (typeof LEAD_STATUSES)[number];
 
@@ -318,10 +319,12 @@ export const demoRequestInput = z.object({
   botToken: z.string().max(4000).nullish(),
   /** A hidden field people never fill in: bots do. */
   website: z.string().max(200).nullish(),
+  /** Where they came from (campaign tags, the referring site, the page and button). */
+  origin: leadOrigin,
 });
 export type DemoRequestInput = z.infer<typeof demoRequestInput>;
 
-export const leadInput = demoRequestInput.omit({ botToken: true, website: true });
+export const leadInput = demoRequestInput.omit({ botToken: true, website: true, origin: true });
 export const leadUpdateInput = z.object({
   status: z.enum(LEAD_STATUSES).optional(),
   lostReason: optionalText(300),
@@ -429,6 +432,7 @@ export const signUpInput = z.object({
   password: newPasswordField,
   botToken: z.string().max(4000).nullish(),
   website: z.string().max(200).nullish(),
+  origin: leadOrigin,
 });
 export type SignUpInput = z.infer<typeof signUpInput>;
 

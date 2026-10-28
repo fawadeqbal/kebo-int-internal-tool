@@ -97,7 +97,10 @@ export interface LeadRow {
   country: string | null;
   teamSize: string | null;
   message: string | null;
-  source: "form" | "sign_up" | "manual";
+  source: "form" | "sign_up" | "manual" | "contact";
+  /** Where they came from, in one word ("google.com", a campaign's source, "direct"); null for older leads. */
+  channel: string | null;
+  origin: { source?: string | null; medium?: string | null; campaign?: string | null; referrer?: string | null; page?: string | null; cta?: string | null } | null;
   status: LeadStatus;
   lostReason: string | null;
   followUpOn: string | null;

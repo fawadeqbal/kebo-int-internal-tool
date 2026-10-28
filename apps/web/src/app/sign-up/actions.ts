@@ -1,5 +1,6 @@
 "use server";
 
+import { originFromForm } from "@/lib/origin";
 import { apiFetch } from "@/lib/api";
 import { formValues, type ActionState } from "@/lib/actions";
 
@@ -17,6 +18,7 @@ export async function signUpAction(_prev: ActionState, form: FormData): Promise<
       password: v.password,
       website: v.website,
       botToken: v["cf-turnstile-response"],
+      origin: originFromForm(form),
     }),
   });
   const body = await res.json().catch(() => ({}));
