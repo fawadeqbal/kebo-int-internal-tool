@@ -286,7 +286,7 @@ function Offer({
         ),
     },
     { key: "taxRate", label: "Tax %", width: "3.5rem", input: "number", align: "right", initial: String(DEFAULT_TAX_RATE), phoneHidden: true },
-    { key: "total", label: "Total", width: "7.5rem", align: "right", format: lineTotal },
+    { key: "total", label: "Total", width: "9.5rem", align: "right", format: lineTotal },
   ];
 
   const startFromItems = async () => {

@@ -744,7 +744,7 @@ export function LineTable({
       {columns.map((c) => (
         <td
           key={c.key}
-          className={cn(cellBase, "p-0", sel?.row === "entry" && sel.col === c.key && "outline-2 -outline-offset-2 outline-primary")}
+          className={cn(cellBase, "p-0", sel?.row === "entry" && sel.col === c.key && "outline-2 -outline-offset-2 outline-primary has-[:focus]:outline-transparent")}
           onMouseDown={() => setSel({ row: "entry", col: c.key })}
         >
           {c.input ? (
@@ -1017,7 +1017,7 @@ export function LineTable({
                             cellBase,
                             isEditing ? "p-0" : "py-1",
                             c.align === "right" && "text-right tabular",
-                            isSel && "outline-2 -outline-offset-2 outline-primary",
+                            isSel && !isEditing && "outline-2 -outline-offset-2 outline-primary",
                             !readOnly && c.input && "cursor-cell",
                             !c.input && !isEditing && "bg-surface-2/40 text-text-2",
                           )}
