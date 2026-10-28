@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { CheckCircle2, Download, PackageCheck, Pencil, Printer } from "lucide-react";
-import { Button, buttonClass, cn, Field, Input, Textarea } from "@kebo/ui";
+import { useState } from "react";
+import { CheckCircle2, Download, PackageCheck, Pencil, Printer, Search } from "lucide-react";
+import { Badge, Button, buttonClass, cn, Field, Input, ScrollFade, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -33,8 +33,23 @@ export interface GoodsLine {
 
 /* ---------------------------------------------------------------- goods from the factory */
 
+type GoodsState = "waiting" | "partly" | "in";
+
+const stateOf = (l: GoodsLine): GoodsState => {
+  const got = Number(l.receivedQty);
+  return got >= Number(l.quantity) ? "in" : got > 0 ? "partly" : "waiting";
+};
+
+const STATE: Record<GoodsState, { label: string; tone: "neutral" | "warn" | "ok" }> = {
+  waiting: { label: "Waiting", tone: "neutral" },
+  partly: { label: "Partly in", tone: "warn" },
+  in: { label: "All in", tone: "ok" },
+};
+
 /**
- * What came in from the factory, line by line, with a small progress bar.
+ * What came in from the factory, as a sheet you can only look at: one row per
+ * goods line with what was ordered, what came in (with a small bar) and its
+ * status. Filter by status, or find a line when there are many.
  * "Record what came in" opens one number per line (the total so far);
  * "Mark all received" fills every line in one click.
  */
@@ -43,53 +58,10 @@ export function GoodsReceipt({ lines, canEdit, action, today }: { lines: GoodsLi
   const allIn = lines.every((l) => Number(l.receivedQty) >= Number(l.quantity));
   const all = JSON.stringify({ on: today, lines: lines.map((l) => ({ lineId: l.id, receivedQty: Number(l.quantity) })) });
 
-  const rows = (input?: (l: GoodsLine, i: number) => ReactNode) => (
-    <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Goods lines">
-      {lines.map((l, i) => {
-        const got = Number(l.receivedQty);
-        const of = Number(l.quantity);
-        const pct = of > 0 ? Math.min(100, Math.round((got / of) * 100)) : 0;
-        const done = got >= of;
-        return (
-          <li key={l.id} className="flex flex-col gap-1.5 px-3 py-2.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium break-words">
-                  <span className="mr-1.5 text-muted tabular">{l.no}</span>
-                  {head(l.description)}
-                </p>
-                <p className="text-xs text-muted">
-                  {[l.model && `Model ${l.model}`, l.factory && `from ${l.factory}`].filter(Boolean).join(" · ") || "Factory not recorded"}
-                </p>
-              </div>
-              <p className={cn("shrink-0 text-sm tabular", done ? "font-medium text-ok" : "text-text-2")}>
-                {n(got)} / {n(of)} {l.unit}
-              </p>
-            </div>
-            <div
-              className="h-1.5 overflow-hidden rounded-full bg-surface-3"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={of}
-              aria-valuenow={got}
-              aria-label={`${head(l.description)}: ${n(got)} of ${n(of)} ${l.unit} received`}
-            >
-              <div className={cn("h-full rounded-full", done ? "bg-ok" : "bg-primary")} style={{ width: `${pct}%` }} />
-            </div>
-            <p className="text-xs text-muted">
-              {got > 0 && l.receivedOn ? `${done ? "All in" : "Last came in"} on ${l.receivedOn}` : "Nothing in yet"}
-            </p>
-            {input?.(l, i)}
-          </li>
-        );
-      })}
-    </ul>
-  );
-
   if (!canEdit || !editing)
     return (
       <div className="flex flex-col gap-3">
-        {rows()}
+        <GoodsGrid lines={lines} />
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
             {!allIn && (
@@ -109,6 +81,157 @@ export function GoodsReceipt({ lines, canEdit, action, today }: { lines: GoodsLi
       </div>
     );
   return <ReceiptForm lines={lines} action={action} today={today} close={() => setEditing(false)} />;
+}
+
+function GoodsGrid({ lines }: { lines: GoodsLine[] }) {
+  const [show, setShow] = useState<GoodsState | "all">("all");
+  const [query, setQuery] = useState("");
+  const count = { waiting: 0, partly: 0, in: 0 } as Record<GoodsState, number>;
+  for (const l of lines) count[stateOf(l)]++;
+  const q = query.trim().toLowerCase();
+  const rows = lines.filter(
+    (l) =>
+      (show === "all" || stateOf(l) === show) &&
+      (!q || [l.no, l.description, l.model ?? "", l.factory ?? ""].some((v) => v.toLowerCase().includes(q))),
+  );
+  const cellBase = "h-9 border border-line px-1.5 align-middle text-sm sm:px-2";
+  const hd = "h-8 border border-t-0 border-line bg-surface-2 px-1.5 sm:px-2 text-left text-xs font-medium whitespace-nowrap text-text-2";
+  const chip = (key: GoodsState | "all", label: string, n: number) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => setShow(key)}
+      aria-pressed={show === key}
+      className={cn(
+        "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium",
+        show === key ? "border-primary bg-primary-soft text-primary" : "border-line text-text-2 hover:bg-surface-2",
+      )}
+    >
+      {label}
+      <span className="tabular opacity-80">{n}</span>
+    </button>
+  );
+  const done = count.in;
+  const pct = lines.length ? Math.round((done / lines.length) * 100) : 0;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Show">
+          {chip("all", "All", lines.length)}
+          {chip("waiting", "Waiting", count.waiting)}
+          {chip("partly", "Partly in", count.partly)}
+          {chip("in", "All in", count.in)}
+        </div>
+        {lines.length > 8 && (
+          <div className="relative sm:w-64">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Find in ${lines.length} lines…`}
+              aria-label="Find a line"
+              className="h-8 pl-8"
+            />
+          </div>
+        )}
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-surface-3"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={lines.length}
+        aria-valuenow={done}
+        aria-label={`${done} of ${lines.length} lines all in`}
+      >
+        <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <ScrollFade className="overflow-x-auto" role="region" aria-label="Goods lines">
+          {/* On a phone: the factory goes under the goods and "Ordered" into "Came in", so the status stays in view. */}
+          <table data-fit className="w-full table-fixed border-collapse [&_tr>*:first-child]:border-l-0 [&_tr>*:last-child]:border-r-0">
+            <thead>
+              <tr>
+                <th scope="col" className={cn(hd, "w-8 px-0.5 text-center sm:w-12 sm:px-1")}>
+                  No.
+                </th>
+                <th scope="col" className={hd}>
+                  Goods
+                </th>
+                <th scope="col" className={cn(hd, "hidden w-44 md:table-cell")}>
+                  Factory
+                </th>
+                <th scope="col" className={cn(hd, "hidden w-24 text-right sm:table-cell")}>
+                  Ordered
+                </th>
+                <th scope="col" className={cn(hd, "w-[5.25rem] text-right sm:w-28")}>
+                  Came in
+                </th>
+                <th scope="col" className={cn(hd, "w-[5.75rem] sm:w-32")}>
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-3 py-4 text-sm text-muted">
+                    {q ? <>Nothing matches &ldquo;{query}&rdquo;.</> : "No lines here."}
+                  </td>
+                </tr>
+              )}
+              {rows.map((l) => {
+                const got = Number(l.receivedQty);
+                const of = Number(l.quantity);
+                const st = stateOf(l);
+                const p = of > 0 ? Math.min(100, Math.round((got / of) * 100)) : 0;
+                return (
+                  <tr key={l.id} aria-label={`Line ${l.no}`}>
+                    <th scope="row" className={cn(cellBase, "bg-surface-2 px-0.5 text-center text-xs font-normal whitespace-nowrap text-muted tabular sm:px-1")}>
+                      {l.no}
+                    </th>
+                    <td className={cn(cellBase, "py-1.5")}>
+                      <span className="line-clamp-2 break-words">{head(l.description)}</span>
+                      {l.model && <span className="block truncate text-xs text-muted">Model {l.model}</span>}
+                      {l.factory && <span className="block truncate text-xs text-muted md:hidden">{l.factory}</span>}
+                    </td>
+                    <td className={cn(cellBase, "hidden text-text-2 md:table-cell")}>
+                      <span className="line-clamp-2">{l.factory ?? <span className="text-muted">—</span>}</span>
+                    </td>
+                    <td className={cn(cellBase, "hidden text-right whitespace-nowrap tabular sm:table-cell")}>
+                      {n(of)} {l.unit}
+                    </td>
+                    <td className={cn(cellBase, "py-1.5 text-right tabular")}>
+                      <span className={cn("block whitespace-nowrap", st === "in" ? "font-medium text-ok" : got > 0 ? "text-text" : "text-muted")}>
+                        {n(got)}{" "}
+                        <span className="text-xs text-muted">
+                          / {n(of)}
+                          <span className="sm:hidden"> {l.unit}</span>
+                        </span>
+                      </span>
+                      <span className="mt-1 block h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                        <span className={cn("block h-full rounded-full", st === "in" ? "bg-ok" : "bg-warn")} style={{ width: `${p}%` }} />
+                      </span>
+                    </td>
+                    <td className={cn(cellBase, "py-1.5")}>
+                      <Badge tone={STATE[st].tone} dot>
+                        {STATE[st].label}
+                      </Badge>
+                      {got > 0 && l.receivedOn && (
+                        <span className="mt-0.5 block truncate text-xs text-muted">
+                          {st === "in" ? "on" : "last"} {l.receivedOn}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </ScrollFade>
+      </div>
+    </div>
+  );
 }
 
 function ReceiptForm({ lines, action, today, close }: { lines: GoodsLine[]; action: Action; today: string; close: () => void }) {
