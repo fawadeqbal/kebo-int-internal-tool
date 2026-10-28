@@ -22,7 +22,7 @@ import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, priceForMargin, splitDeposit, toMinor, withTaxMinor } from "@kebo/money";
 import { defaultPlan, type OrderStage } from "@kebo/shared";
 import { addDays, daysBetween, todayIn, type ISODate } from "@kebo/utils";
-import { createPrismaClient, nextReference, toDbDate } from "../src";
+import { nextReference, openCompany, toDbDate, type PrismaClient } from "../src";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -33,12 +33,18 @@ const arg = (name: string, d: number) => {
   const v = i > 0 ? Number(process.argv[i + 1]) : NaN;
   return Number.isFinite(v) && v > 0 ? v : d;
 };
+const argText = (name: string) => {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > 0 ? process.argv[i + 1] : undefined;
+};
 const YEARS = arg("years", 1);
 const DAYS = Math.round(YEARS * 365);
 const DEALS = Math.round(arg("deals", 1200 * YEARS));
 const PEOPLE = Math.min(arg("people", 6), 50);
 const WORKERS = arg("workers", 8);
-const db = createPrismaClient({ url });
+/** The company the data goes into (--company <short name>, else the first one); set when main starts. */
+let db: PrismaClient;
+let companyId = "";
 const tz = process.env.APP_TIME_ZONE ?? "Asia/Shanghai";
 const today = todayIn(tz);
 /** Never after today. */
@@ -96,6 +102,10 @@ const LOST = ["price_too_high", "price_too_high", "no_reply", "factory_cannot_su
 const EXPENSE_ON_CUSTOMER = ["travel", "hotel", "meals", "samples", "gifts"] as const;
 
 async function main() {
+  const opened = await openCompany(url!, argText("company"), WORKERS + 2);
+  db = opened.db;
+  companyId = opened.company.id;
+  console.log(`[load] company ${opened.company.slug}`);
   const t0 = Date.now();
   const startedAt = new Date();
   const found = await db.user.findFirst({ where: { isSystem: false, isActive: true, role: { in: ["manager", "admin"] } }, orderBy: [{ role: "desc" }, { createdAt: "asc" }] });
@@ -105,7 +115,7 @@ async function main() {
   const pw = await bcrypt.hash("Demo@12345", 10);
   const team = [lead.id];
   for (let i = 1; i <= PEOPLE; i++) {
-    const u = await db.user.upsert({ where: { email: `sales${i}@example.com` }, update: {}, create: { email: `sales${i}@example.com`, name: `Sales ${i}`, passwordHash: pw, role: "staff" } });
+    const u = await db.user.upsert({ where: { companyId_email: { companyId, email: `sales${i}@example.com` } }, update: {}, create: { email: `sales${i}@example.com`, name: `Sales ${i}`, passwordHash: pw, role: "staff" } });
     team.push(u.id);
   }
   const rate = 7.1;
@@ -397,10 +407,10 @@ async function main() {
   }
 
   // Currencies: the PKR rate when it is missing (the demo has a PKR cash account).
-  const salesRow = await db.setting.findUnique({ where: { key: "sales" } });
+  const salesRow = await db.setting.findUnique({ where: { companyId_key: { companyId, key: "sales" } } });
   const sales = (salesRow?.value ?? {}) as { currency?: string; exchangeRates?: Record<string, number> };
   if (salesRow && !sales.exchangeRates?.PKR) {
-    await db.setting.update({ where: { key: "sales" }, data: { value: { ...sales, exchangeRates: { ...(sales.exchangeRates ?? {}), PKR: 280 } } } });
+    await db.setting.update({ where: { companyId_key: { companyId, key: "sales" } }, data: { value: { ...sales, exchangeRates: { ...(sales.exchangeRates ?? {}), PKR: 280 } } } });
     console.log("[load] PKR rate set to 280 per USD (it was missing)");
   }
 
@@ -413,7 +423,7 @@ async function main() {
   let targets = 0;
   for (let m = 0; m < months; m++) {
     const month = monthStart(m).slice(0, 7);
-    if (await db.salesTarget.findUnique({ where: { month } })) continue;
+    if (await db.salesTarget.findUnique({ where: { companyId_month: { companyId, month } } })) continue;
     const base = Math.max(sold.get(month) ?? 0, avg * 0.8);
     if (!base) continue;
     await db.salesTarget.create({ data: { month, amount: String(Math.ceil((base * (0.95 + rnd() * 0.3)) / 10_000) * 10_000), currency: sales.currency ?? "USD", updatedById: lead.id } });
@@ -432,4 +442,4 @@ main()
     console.error("[load] failed:", e instanceof Error ? e.message : e);
     process.exitCode = 1;
   })
-  .finally(() => db.$disconnect());
+  .finally(() => db?.$disconnect());

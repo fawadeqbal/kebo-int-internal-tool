@@ -591,7 +591,7 @@ export class InsightsService {
       return { month, amount: null };
     }
     const row = await this.prisma.db.salesTarget.upsert({
-      where: { month },
+      where: { companyId_month: { companyId: user.companyId, month } },
       create: { month, amount, currency: sales.currency, updatedById: user.id },
       update: { amount, currency: sales.currency, updatedById: user.id },
     });

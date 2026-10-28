@@ -36,13 +36,13 @@
     "@kebo/utils": "workspace:*",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "bcryptjs": "^3.0.3",
     "pg": "^8.23.1"
   },
   "devDependencies": {
     "@kebo/config": "workspace:*",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
-    "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.0",
     "eslint": "^10.13.0",
     "prisma": "7.10.1",

@@ -833,7 +833,7 @@ export class MoneyService {
     if (!RECEIPT_EXTENSIONS.has(ext)) throw new DomainError("A receipt can be a photo (JPG, PNG, WEBP) or a PDF.");
     if (file.size > this.storage.maxBytes) throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
     const name = safeFileName(file.originalname);
-    const key = `expenses/${id}/${randomUUID()}-${name}`;
+    const key = this.storage.keyFor(`expenses/${id}/${randomUUID()}-${name}`);
     await this.storage.put(key, file.buffer, file.mimetype);
     try {
       const row = await this.prisma.tx(async (tx) => {

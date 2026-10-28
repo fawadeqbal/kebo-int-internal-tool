@@ -1,3 +1,4 @@
+import { FIRST_COMPANY_ID } from "@kebo/database";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaService } from "../src/database/prisma.service";
@@ -11,11 +12,11 @@ describe("sign-in protection", () => {
   beforeAll(async () => {
     app = await startApp();
     prisma = app.get(PrismaService);
-    await prisma.db.user.update({ where: { email }, data: { failedLogins: 0, lockedUntil: null } });
+    await prisma.company(FIRST_COMPANY_ID).user.update({ where: { companyId_email: { companyId: FIRST_COMPANY_ID, email } }, data: { failedLogins: 0, lockedUntil: null } });
   });
 
   afterAll(async () => {
-    await prisma?.db.user.update({ where: { email }, data: { failedLogins: 0, lockedUntil: null } });
+    await prisma?.company(FIRST_COMPANY_ID).user.update({ where: { companyId_email: { companyId: FIRST_COMPANY_ID, email } }, data: { failedLogins: 0, lockedUntil: null } });
     await app?.close();
   });
 

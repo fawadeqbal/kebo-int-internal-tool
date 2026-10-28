@@ -37,7 +37,7 @@ import {
 } from "@kebo/shared";
 import { isISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { MoneyService } from "./money.service";
@@ -96,22 +96,26 @@ class MoneyController {
     return this.cash.accounts(user);
   }
 
+  @RequireFeature("cash_book")
   @Post("money/accounts")
   addAccount(@CurrentUser() user: SessionUser, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
     return this.cash.saveAccount(user, null, body);
   }
 
+  @RequireFeature("cash_book")
   @Patch("money/accounts/:id")
   changeAccount(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
     return this.cash.saveAccount(user, id, body);
   }
 
   /** Money moved between two of our accounts. */
+  @RequireFeature("cash_book")
   @Post("money/transfers")
   transfer(@CurrentUser() user: SessionUser, @Body(Validate(transferInput)) body: TransferInput) {
     return this.cash.transfer(user, body);
   }
 
+  @RequireFeature("cash_book")
   @Post("money/transfers/:id/void")
   @HttpCode(200)
   voidTransfer(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
@@ -119,6 +123,7 @@ class MoneyController {
   }
 
   /** Managers: every amount in and out between two dates; ?account=<id>|none, ?currency=, ?removed=true. */
+  @RequireFeature("cash_book")
   @Get("money/cash-book")
   cashBook(@CurrentUser() user: SessionUser, @Query(Validate(cashBookQuery)) q: z.infer<typeof cashBookQuery>) {
     return this.cash.cashBook(user, q);

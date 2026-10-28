@@ -19,3 +19,12 @@ export const AllowDuringTwoStepSetup = () => SetMetadata(SETUP_ALLOWED, true);
 export const RequirePermissions = (...permissions: Permission[]) => SetMetadata(PERMISSIONS, permissions);
 
 export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionContext): SessionUser => ctx.switchToHttp().getRequest().user);
+
+export const READ_ONLY_ALLOWED = "company:read-only-allowed";
+export const FEATURE = "company:feature";
+
+/** Still works while the company is read-only (signing out, two-step setup, marking notifications read…). */
+export const AllowWhenReadOnly = () => SetMetadata(READ_ONLY_ALLOWED, true);
+
+/** Only for companies whose plan includes this feature (@kebo/shared PLAN_FEATURES). */
+export const RequireFeature = (feature: string) => SetMetadata(FEATURE, feature);

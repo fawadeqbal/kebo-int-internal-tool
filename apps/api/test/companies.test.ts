@@ -1,0 +1,315 @@
+import type { INestApplication } from "@nestjs/common";
+import request from "supertest";
+import { unzipSync } from "fflate";
+import bcrypt from "bcryptjs";
+import { FIRST_COMPANY_ID } from "@kebo/database";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/auth/totp";
+import { PrismaService } from "../src/database/prisma.service";
+import { LifecycleService } from "../src/platform/lifecycle.service";
+import { api, signIn, startApp } from "./app";
+
+/**
+ * Companies: one database, every company's rows kept apart by row-level
+ * security. Signed in to one company, nothing of another can be seen or
+ * changed, by any route. Plus the platform admin's work: making companies and
+ * demos, opening a company, plans and limits, read-only and off, deleting.
+ */
+describe("companies: isolation and the platform", () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let platform: string;
+  let keboManager: string;
+  const tag = Date.now().toString(36);
+  const secret = newTotpSecret();
+  let step = currentStep() - 2;
+
+  const plat = (token = platform) => {
+    const server = app.getHttpServer();
+    const auth = (r: request.Test) => r.set("authorization", `Bearer ${token}`);
+    return {
+      get: (url: string) => auth(request(server).get(`/api/platform${url}`)),
+      post: (url: string, body?: object) => auth(request(server).post(`/api/platform${url}`)).send(body ?? {}),
+      patch: (url: string, body?: object) => auth(request(server).patch(`/api/platform${url}`)).send(body ?? {}),
+      delete: (url: string, body?: object) => auth(request(server).delete(`/api/platform${url}`)).send(body ?? {}),
+    };
+  };
+  /** A company made by the platform admin, its tenant admin's password set from the emailed link. */
+  const makeCompany = async (slug: string, opts: { sampleData?: boolean; kind?: "client" | "demo"; planId?: string } = {}) => {
+    const email = `boss@${slug}.test`;
+    const made = (await plat().post("/companies", { name: `Company ${slug}`, slug, adminName: `Boss ${slug}`, adminEmail: email, sampleData: opts.sampleData ?? true, kind: opts.kind ?? "client", planId: opts.planId ?? null }).expect(201)).body;
+    expect(made.link).toContain("/set-password?token=");
+    const token = decodeURIComponent(made.link.split("token=")[1]);
+    expect((await request(app.getHttpServer()).get(`/api/platform/public/set-password?token=${encodeURIComponent(token)}`).expect(200)).body).toMatchObject({ email, company: `Company ${slug}` });
+    await request(app.getHttpServer()).post("/api/platform/public/set-password").send({ token, password: "Boss12345678" }).expect(200);
+    // The link works once.
+    await request(app.getHttpServer()).post("/api/platform/public/set-password").send({ token, password: "Boss12345678" }).expect(400);
+    return { id: made.id as string, slug, email, token: await signIn(app, email, "Boss12345678") };
+  };
+
+  beforeAll(async () => {
+    app = await startApp();
+    prisma = app.get(PrismaService);
+    const email = `platform-${tag}@example.com`;
+    await prisma.platform.platformAdmin.create({
+      data: { email, name: "Fawad Test", passwordHash: await bcrypt.hash("Platform12345", 10), totpSecret: sealSecret(secret, process.env.AUTH_SECRET!), totpEnabledAt: new Date() },
+    });
+    const login = (await request(app.getHttpServer()).post("/api/platform/auth/login").send({ email, password: "Platform12345" }).expect(200)).body;
+    expect(login.twoStepRequired).toBe(true);
+    // Not usable before the code.
+    await plat(login.token).get("/companies").expect(401);
+    await request(app.getHttpServer()).post("/api/platform/auth/two-step").set("authorization", `Bearer ${login.token}`).send({ code: totpAt(secret, ++step + 2) }).expect(200);
+    platform = login.token;
+    keboManager = await signIn(app, "manager@example.com", "Manager@12345");
+  });
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it("keeps platform routes for platform admins, and company routes for company sessions", async () => {
+    await request(app.getHttpServer()).get("/api/platform/companies").expect(401);
+    await plat(keboManager).get("/companies").expect(401);
+    await api(app, platform).get("/inquiries").expect(401);
+    const me = (await plat().get("/auth/me").expect(200)).body;
+    expect(me.twoStepOn).toBe(true);
+  });
+
+  it("company B sees only its own data, and nothing of Kebo by any route", async () => {
+    const b = await makeCompany(`iso-${tag}`);
+    const kebo = api(app, keboManager);
+    const mine = api(app, b.token);
+
+    // Lists: B has its own sample data only.
+    const bInquiries = (await mine.get("/inquiries?pageSize=100").expect(200)).body.rows as { id: string; refNo: string }[];
+    const kInquiries = (await kebo.get("/inquiries?pageSize=100").expect(200)).body.rows as { id: string }[];
+    expect(bInquiries.length).toBe(10);
+    expect(bInquiries.map((r) => r.id).some((id) => kInquiries.some((k) => k.id === id))).toBe(false);
+    // Numbering starts again in each company.
+    expect(bInquiries.map((r) => r.refNo)).toContain(`RFQ-${new Date().getFullYear()}-0001`);
+
+    // Kebo's records by id: not found for B, whatever the route.
+    const kOrders = (await kebo.get("/orders").expect(200)).body as { id: string }[];
+    const kCustomers = (await kebo.get("/customers?pageSize=5").expect(200)).body.rows as { id: string }[];
+    const kFactories = (await kebo.get("/factories?pageSize=5").expect(200)).body.rows as { id: string }[];
+    const kQuote = (await kebo.get(`/inquiries/${kInquiries[0].id}/quotation`).expect(200)).body;
+    const reads = [
+      `/inquiries/${kInquiries[0].id}`,
+      `/inquiries/${kInquiries[0].id}/sourcing`,
+      `/orders/${kOrders[0].id}`,
+      `/orders/${kOrders[0].id}/money`,
+      `/customers/${kCustomers[0].id}`,
+      `/customers/${kCustomers[0].id}/account`,
+      `/factories/${kFactories[0].id}`,
+      ...(kQuote?.revisions?.[0] ? [`/revisions/${kQuote.revisions[0].id}`] : []),
+    ];
+    for (const path of reads) {
+      const res = await mine.get(path);
+      expect(res.status, `${path} → ${res.status}`).toBeGreaterThanOrEqual(400);
+      expect(res.status, `${path} → ${res.status}`).toBeLessThan(500);
+    }
+    // Changes to Kebo's records: refused, and nothing changed.
+    const before = (await kebo.get(`/inquiries/${kInquiries[0].id}`).expect(200)).body;
+    for (const [method, path, body] of [
+      ["post", `/inquiries/${kInquiries[0].id}/notes`, { body: "from B" }],
+      ["patch", `/customers/${kCustomers[0].id}`, { name: "Taken over" }],
+      ["post", `/orders/${kOrders[0].id}/payments`, { kind: "deposit", amount: "10", paidOn: "2026-01-01" }],
+      ["delete", `/inquiries/${kInquiries[0].id}`, undefined],
+    ] as const) {
+      const res = await (method === "delete" ? mine.delete(path) : mine[method](path, body));
+      expect(res.status, `${method} ${path} → ${res.status}`).toBeGreaterThanOrEqual(400);
+      expect(res.status, `${method} ${path} → ${res.status}`).toBeLessThan(500);
+    }
+    // A new inquiry in B for Kebo's customer: refused.
+    const res = await mine.post("/inquiries", { customerId: kCustomers[0].id, channel: "email", category: "Machinery", title: "Cross" });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    const after = (await kebo.get(`/inquiries/${kInquiries[0].id}`).expect(200)).body;
+    expect(after.notes?.length ?? 0).toBe(before.notes?.length ?? 0);
+
+    // A Kebo token with B named in the header still works in Kebo only.
+    const viaHeader = (await kebo.get("/inquiries?pageSize=100").set("x-company", b.slug).expect(200)).body.rows as { id: string }[];
+    expect(viaHeader.map((r) => r.id).sort()).toEqual(kInquiries.map((r) => r.id).sort());
+  });
+
+  it("the database itself keeps companies apart, on every company table", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const tables = (
+      await prisma.platform.$queryRaw<{ t: string }[]>`select relname as t from pg_class where relrowsecurity and relkind = 'r' and relnamespace = current_schema()::regnamespace`
+    ).map((r) => r.t);
+    expect(tables.length).toBeGreaterThanOrEqual(36);
+    // Every table with a company column is under row-level security, except the platform's own.
+    const withCompany = (
+      await prisma.platform.$queryRaw<{ t: string }[]>`select table_name as t from information_schema.columns where table_schema = current_schema() and column_name = 'company_id'`
+    ).map((r) => r.t);
+    expect(withCompany.filter((t) => !tables.includes(t)).sort()).toEqual(["leads", "platform_log", "sign_ups", "subscription_payments"]);
+    const db = prisma.company(b.id);
+    for (const t of tables) {
+      const [row] = await db.$queryRawUnsafe<{ other: bigint }[]>(`select count(*) filter (where company_id <> $1::uuid) as other from "${t}"`, b.id);
+      expect(Number(row.other), t).toBe(0);
+    }
+    // Writing a row for another company is refused by the database.
+    await expect(db.$executeRawUnsafe(`insert into counters (company_id, key, value) values ($1::uuid, 'x', 1)`, FIRST_COMPANY_ID)).rejects.toThrow(/row-level security/);
+    // A link from one company's row to another company's row is refused too.
+    const keboCustomer = (await prisma.company(FIRST_COMPANY_ID).customer.findFirstOrThrow()).id;
+    await expect(db.$executeRawUnsafe(`update inquiries set customer_id = $1::uuid where id = (select id from inquiries limit 1)`, keboCustomer)).rejects.toThrow(/another company/);
+    await expect(prisma.platform.$executeRawUnsafe(`update inquiries set customer_id = $1::uuid where company_id = $2::uuid`, keboCustomer, b.id)).rejects.toThrow(/another company/);
+    // The platform tables are out of reach.
+    await expect(db.$queryRawUnsafe(`select count(*) from companies`)).rejects.toThrow(/permission denied/);
+    // With no company set, nothing at all.
+    expect(Number((await prisma.platform.$queryRawUnsafe<{ n: bigint }[]>(`select count(*) as n from inquiries`))[0].n)).toBeGreaterThan(0);
+  });
+
+  it("an email in two companies: the password decides, or the person chooses", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const bAdmin = await signIn(app, `boss@iso-${tag}.test`, "Boss12345678");
+    await api(app, bAdmin).post("/users", { name: "Same Person", email: "manager@example.com", role: "manager", password: "Manager@12345" }).expect(201);
+    const both = await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Manager@12345" }).expect(409);
+    expect(both.body.code).toBe("choose_company");
+    expect(both.body.companies.map((c: { slug: string }) => c.slug).sort()).toEqual(["kebo", b.slug].sort());
+    const inB = (await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Manager@12345", company: b.slug }).expect(200)).body;
+    expect(inB.company.slug).toBe(b.slug);
+    const me = (await api(app, inB.token).get("/auth/me").expect(200)).body;
+    expect(me.company.slug).toBe(b.slug);
+    // A different password in B: only Kebo's fits, so no question.
+    const other = (await api(app, bAdmin).get("/users").expect(200)).body.find((u: { email: string }) => u.email === "manager@example.com");
+    await api(app, bAdmin).post(`/users/${other.id}/password`, { password: "Different123" }).expect((r) => expect(r.status).toBeLessThan(300));
+    const kebo = (await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Manager@12345" }).expect(200)).body;
+    expect(kebo.company.slug).toBe("kebo");
+    // A wrong password in both: the usual answer, nothing more.
+    const wrong = await request(app.getHttpServer()).post("/api/auth/login").send({ email: "manager@example.com", password: "Nope12345678" }).expect(401);
+    expect(wrong.body.companies).toBeUndefined();
+  });
+
+  it("the platform admin opens a company and works as themself, in its history", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const opened = (await plat().post(`/companies/${b.id}/open`).expect(200)).body;
+    const me = (await api(app, opened.token).get("/auth/me").expect(200)).body;
+    expect(me).toMatchObject({ viaPlatform: true, name: "Fawad Test (platform admin)", company: { slug: b.slug } });
+    const customer = (await api(app, opened.token).post("/customers", { name: `Opened ${tag}`, type: "company", country: "PK", contacts: [{ name: "X", isPrimary: true, email: "x@opened.test" }] })).body;
+    expect(customer.id, JSON.stringify(customer)).toBeTruthy();
+    const audit = (await api(app, opened.token).get("/audit").expect(200)).body;
+    const rows = (audit.rows ?? audit) as { summary: string; user?: { name: string } | null; userName?: string }[];
+    expect(JSON.stringify(rows)).toContain("Fawad Test (platform admin)");
+    // Hidden from the company's people.
+    const bAdmin = await signIn(app, `boss@iso-${tag}.test`, "Boss12345678");
+    const people = (await api(app, bAdmin).get("/users").expect(200)).body as { name: string }[];
+    expect(people.some((p) => p.name.includes("platform admin"))).toBe(false);
+    // It cannot be signed in to with a password.
+    await request(app.getHttpServer()).post("/api/auth/login").send({ email: `platform-${(await prisma.platform.platformAdmin.findFirstOrThrow({ where: { name: "Fawad Test" } })).id.slice(0, 8)}@platform.invalid`, password: "!" }).expect(401);
+  });
+
+  it("plans: limits warn, then block; features switch parts off", async () => {
+    const plan = (await plat().post("/plans", { name: `Small ${tag}`, price: 49, currency: "USD", period: "month", maxUsers: 2, maxStorageMb: 50, features: ["excel"] }).expect(201)).body;
+    const c = await makeCompany(`plan-${tag}`, { sampleData: false, planId: plan.id });
+    const mine = api(app, c.token);
+    const company = (await mine.get("/company").expect(200)).body;
+    expect(company.plan.name).toBe(`Small ${tag}`);
+    expect(company.features).toEqual(["excel"]);
+    await mine.post("/users", { name: "Two", email: `two@plan-${tag}.test`, role: "staff", password: "Welcome123x" }).expect(201);
+    const full = (await mine.get("/company").expect(200)).body;
+    expect(full.notices.some((n: { text: string }) => /reached your plan's 2 people/.test(n.text))).toBe(true);
+    const third = await mine.post("/users", { name: "Three", email: `three@plan-${tag}.test`, role: "staff", password: "Welcome123x" }).expect(400);
+    expect(third.body.error).toMatch(/allows 2 people/);
+    // Insights is not in the plan.
+    const insights = await mine.get("/insights").expect(403);
+    expect(insights.body.code).toBe("plan_feature");
+    // Kebo has no plan: everything.
+    await api(app, keboManager).get("/insights").expect(200);
+  });
+
+  it("read-only lets people look but not change; off lets nobody in", async () => {
+    const c = await makeCompany(`ro-${tag}`, { sampleData: false });
+    await plat().post(`/companies/${c.id}/status`, { status: "read_only" }).expect(200);
+    await api(app, c.token).get("/customers").expect(200);
+    const refused = await api(app, c.token).post("/customers", { name: "No", type: "company", country: "PK", contacts: [] }).expect(403);
+    expect(refused.body.code).toBe("company_read_only");
+    await api(app, c.token).post("/auth/logout").expect(200);
+    const token = await signIn(app, c.email, "Boss12345678");
+    await plat().post(`/companies/${c.id}/status`, { status: "off" }).expect(200);
+    expect((await api(app, token).get("/customers").expect(403)).body.code).toBe("company_off");
+    expect((await request(app.getHttpServer()).post("/api/auth/login").send({ email: c.email, password: "Boss12345678" }).expect(403)).body.code).toBe("company_off");
+    await plat().post(`/companies/${c.id}/status`, { status: "auto" }).expect(200);
+    await api(app, await signIn(app, c.email, "Boss12345678")).get("/customers").expect(200);
+  });
+
+  it("a demo request becomes a lead, the lead a demo; the demo ends, goes read-only, off, and is deleted", async () => {
+    await request(app.getHttpServer()).post("/api/platform/public/demo-request").send({ companyName: `Lead Co ${tag}`, name: "Lena", email: `lena-${tag}@lead.test`, phone: "+92 300 0000000", teamSize: "6-20", message: "Show me" }).expect(200);
+    // A bot (the hidden field filled in) is thanked and forgotten.
+    await request(app.getHttpServer()).post("/api/platform/public/demo-request").send({ companyName: "Bot", name: "Bot", email: "bot@bot.test", website: "http://spam" }).expect(200);
+    const leads = (await plat().get(`/leads?q=${tag}`).expect(200)).body as { id: string; status: string; email: string }[];
+    expect(leads.map((l) => l.email)).toEqual([`lena-${tag}@lead.test`]);
+    const demo = (await plat().post(`/leads/${leads[0].id}/demo`, { sampleData: true }).expect(201)).body;
+    expect(demo.slug).toMatch(/-demo$/);
+    const lead = (await plat().get(`/leads/${leads[0].id}`).expect(200)).body;
+    expect(lead.status).toBe("demo");
+    expect(lead.company.slug).toBe(demo.slug);
+
+    const lifecycle = app.get(LifecycleService);
+    const ago = (days: number) => new Date(Date.now() - days * 86_400_000);
+    await prisma.platform.company.update({ where: { id: demo.id }, data: { endsAt: ago(1) } });
+    await lifecycle.run();
+    expect((await prisma.platform.company.findUniqueOrThrow({ where: { id: demo.id } })).status).toBe("read_only");
+    await plat().post(`/companies/${demo.id}/extend`, { days: 2 }).expect(200);
+    expect((await prisma.platform.company.findUniqueOrThrow({ where: { id: demo.id } })).status).toBe("active");
+    await prisma.platform.company.update({ where: { id: demo.id }, data: { endsAt: ago(8) } });
+    await lifecycle.run();
+    expect((await prisma.platform.company.findUniqueOrThrow({ where: { id: demo.id } })).status).toBe("off");
+    await prisma.platform.company.update({ where: { id: demo.id }, data: { endsAt: ago(38) } });
+    await lifecycle.run();
+    const gone = await prisma.platform.company.findUniqueOrThrow({ where: { id: demo.id } });
+    expect(gone.status).toBe("deleted");
+    expect(await prisma.company(demo.id).inquiry.count()).toBe(0);
+    expect(Number((await prisma.platform.$queryRaw<{ n: bigint }[]>`select count(*) as n from users where company_id = ${demo.id}::uuid`)[0].n)).toBe(0);
+    // Its name stays taken for a while.
+    expect((await request(app.getHttpServer()).get(`/api/platform/public/slug?slug=${demo.slug}`).expect(200)).body.free).toBe(false);
+  });
+
+  it("a demo becomes a real company, its sample data cleared; payments set paid-until; overdue clients go read-only", async () => {
+    const d = await makeCompany(`real-${tag}`, { kind: "demo", sampleData: true });
+    expect(await prisma.company(d.id).inquiry.count()).toBe(10);
+    await plat().post(`/companies/${d.id}/make-real`, { keepData: false }).expect(200);
+    expect(await prisma.company(d.id).inquiry.count()).toBe(0);
+    expect(await prisma.company(d.id).user.count({ where: { email: { in: ["bilal@example.com", "sana@example.com"] } } })).toBe(0);
+    await api(app, await signIn(app, d.email, "Boss12345678")).get("/inquiries").expect(200);
+    const today = new Date().toISOString().slice(0, 10);
+    const past = new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10);
+    await plat().patch(`/companies/${d.id}`, { renewsOn: past }).expect(200);
+    const after = (await plat().get(`/companies/${d.id}`).expect(200)).body;
+    expect(after.status).toBe("read_only");
+    expect(after.billing).toBe("overdue");
+    const paid = (await plat().post(`/companies/${d.id}/payments`, { amount: 199, currency: "USD", paidOn: today, paidUntil: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10) }).expect(201)).body;
+    expect(paid.status).toBe("active");
+    expect(paid.billing).toBe("active");
+    expect(paid.payments).toHaveLength(1);
+  });
+
+  it("exports a company, and deletes it with all its data", async () => {
+    const c = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const zip = await plat()
+      .get(`/companies/${c.id}/export`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (d: Buffer) => chunks.push(d));
+        res.on("end", () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    const files = unzipSync(new Uint8Array(zip.body as Buffer));
+    const inquiries = JSON.parse(new TextDecoder().decode(files["data/inquiries.json"])) as { company_id: string }[];
+    expect(inquiries.length).toBe(10);
+    expect(inquiries.every((r) => r.company_id === c.id)).toBe(true);
+    const users = JSON.parse(new TextDecoder().decode(files["data/users.json"])) as Record<string, unknown>[];
+    expect(users.some((u) => "password_hash" in u)).toBe(false);
+
+    await plat().delete(`/companies/${c.id}`, { confirm: "wrong" }).expect(400);
+    await plat().delete(`/companies/${c.id}`, { confirm: c.slug }).expect(200);
+    const left = await prisma.platform.$queryRawUnsafe<{ n: bigint }[]>(
+      `select (select count(*) from inquiries where company_id = $1::uuid) + (select count(*) from users where company_id = $1::uuid) + (select count(*) from settings where company_id = $1::uuid) as n`,
+      c.id,
+    );
+    expect(Number(left[0].n)).toBe(0);
+    // Kebo is untouched.
+    expect((await api(app, keboManager).get("/inquiries?pageSize=5").expect(200)).body.rows.length).toBeGreaterThan(0);
+  });
+});

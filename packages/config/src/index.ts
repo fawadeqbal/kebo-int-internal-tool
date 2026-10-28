@@ -63,6 +63,12 @@ export const serverEnvSchema = z.object({
    * Only then is X-Forwarded-For trusted for the client's IP; 0 = use the socket address.
    */
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
+  /** The company used when a request does not say which (old sessions, the website form): its short name. Default: the first company. */
+  DEFAULT_COMPANY: z.string().trim().toLowerCase().optional(),
+  /** Database connections each active company may hold at once. */
+  COMPANY_POOL_SIZE: z.coerce.number().int().min(1).max(20).default(4),
+  /** Where new client inquiries (demo requests, sign-ups) and platform warnings are emailed. */
+  PLATFORM_EMAIL: z.string().trim().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

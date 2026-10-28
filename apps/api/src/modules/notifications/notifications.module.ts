@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Module, Post, Query } from "@n
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, AllowWhenReadOnly } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { NotificationsService } from "./notifications.service";
 import { RemindersService } from "./reminders.service";
@@ -24,18 +24,21 @@ class NotificationsController {
   }
 
   /** { ids: [...] | "all" } */
+  @AllowWhenReadOnly()
   @Post("notifications/read")
   @HttpCode(200)
   read(@CurrentUser() user: SessionUser, @Body(Validate(readInput)) body: z.infer<typeof readInput>) {
     return this.notifications.markRead(user, body.ids);
   }
 
+  @AllowWhenReadOnly()
   @Post("me/devices")
   @HttpCode(200)
   device(@CurrentUser() user: SessionUser, @Body(Validate(deviceInput)) body: z.infer<typeof deviceInput>) {
     return this.notifications.registerDevice(user, body.token, body.platform);
   }
 
+  @AllowWhenReadOnly()
   @Delete("me/devices")
   @HttpCode(200)
   forget(@CurrentUser() user: SessionUser, @Body(Validate(deviceInput.pick({ token: true }))) body: { token: string }) {

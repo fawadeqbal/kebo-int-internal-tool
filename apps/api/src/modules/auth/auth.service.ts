@@ -6,6 +6,9 @@ import { AuditService } from "../../common/audit/audit.service";
 import { SESSION_MAX_AGE_DAYS, SESSION_TTL_SECONDS, TokensService } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { UsersService } from "../users/users.service";
+import { CompaniesService } from "../../common/company/companies.service";
+import { CompanyContext } from "../../common/company/company-context";
+import { companyRefusal } from "../../common/auth/auth.guard";
 
 const IP_LIMIT = 20;
 const IP_WINDOW_MS = 15 * 60 * 1000;
@@ -25,6 +28,7 @@ export class AuthService {
     private readonly tokens: TokensService,
     private readonly audit: AuditService,
     private readonly users: UsersService,
+    private readonly companies: CompaniesService,
   ) {}
 
   private async limitIp(ip: string, attempt: { email: string; userId?: string | null; userAgent?: string }) {
@@ -55,6 +59,7 @@ export class AuthService {
     result: SignInResult;
     detail?: string;
   }) {
+    if (!CompanyContext.current()) return;
     await this.prisma.db.signIn
       .create({
         data: {
@@ -69,13 +74,47 @@ export class AuthService {
       .catch(() => undefined);
   }
 
-  async login(email: string, password: string, meta: { ip: string; userAgent?: string }) {
+  /**
+   * Which company the sign-in is for. The email decides: the companies where it
+   * is someone's account (a company chosen on the sign-in page narrows it).
+   * When it is in several, the password decides; if it fits more than one, the
+   * person chooses (only companies whose password fits are named, so the list
+   * never tells a stranger where an email has accounts).
+   */
+  private async companyFor(email: string, password: string, chosen?: string) {
+    const rows = await this.prisma.platform.$queryRaw<{ company_id: string; slug: string; name: string; password_hash: string }[]>`
+      select u.company_id, c.slug, c.name, u.password_hash
+      from users u join companies c on c.id = u.company_id
+      where u.email = ${email} and not u.is_system and u.platform_admin_id is null and c.status <> 'deleted'
+      order by c.created_at`;
+    const pool = chosen ? rows.filter((r) => r.slug === chosen.trim().toLowerCase()) : rows;
+    let pick = pool[0];
+    if (pool.length > 1) {
+      const fits: typeof pool = [];
+      for (const r of pool) if (await bcrypt.compare(password, r.password_hash).catch(() => false)) fits.push(r);
+      if (fits.length > 1) {
+        throw new HttpException(
+          { message: "Your email is in more than one company. Choose the one to sign in to.", code: "choose_company", companies: fits.map((r) => ({ slug: r.slug, name: r.name })) },
+          HttpStatus.CONFLICT,
+        );
+      }
+      pick = fits[0] ?? pool[0];
+    }
+    if (pick) return this.companies.byId(pick.company_id);
+    // Unknown email: carry on in the request's company, so the answer looks and takes the same.
+    return CompanyContext.current() ?? (await this.companies.defaultCompany());
+  }
+
+  async login(email: string, password: string, meta: { ip: string; userAgent?: string }, chosenCompany?: string) {
     await this.limitIp(meta.ip, { email, userAgent: meta.userAgent });
-    const user = await this.prisma.db.user.findUnique({ where: { email: email.trim().toLowerCase() }, include: { access: true } });
+    const company = await this.companyFor(email.trim().toLowerCase(), password, chosenCompany);
+    if (!company) throw new HttpException({ message: "Wrong email or password." }, HttpStatus.UNAUTHORIZED);
+    CompanyContext.set(company);
+    const user = await this.prisma.db.user.findFirst({ where: { email: email.trim().toLowerCase() }, include: { access: true } });
     const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH).catch(() => false);
     const wrong = new HttpException({ message: "Wrong email or password." }, HttpStatus.UNAUTHORIZED);
     const attempt = { email, userId: user && !user.isSystem ? user.id : null, ip: meta.ip, userAgent: meta.userAgent };
-    if (!user || user.isSystem) {
+    if (!user || user.isSystem || user.platformAdminId) {
       await this.record({ ...attempt, result: "unknown_email" });
       throw wrong;
     }
@@ -94,6 +133,11 @@ export class AuthService {
     if (!user.isActive) {
       await this.record({ ...attempt, result: "switched_off" });
       throw new HttpException({ message: "This account is switched off. Ask an admin." }, HttpStatus.FORBIDDEN);
+    }
+    const closed = companyRefusal(company, "GET");
+    if (closed) {
+      await this.record({ ...attempt, result: "switched_off", detail: "the company is switched off" });
+      throw closed;
     }
 
     const twoStep = !!user.totpEnabledAt;
@@ -125,7 +169,7 @@ export class AuthService {
       detail: setup ? "(asked to set up two-step sign-in)" : undefined,
     });
     await this.prisma.db.signIn.deleteMany({ where: { at: { lt: new Date(Date.now() - HISTORY_DAYS * 86_400_000) } } });
-    const token = await this.tokens.sign(user.id, session.id);
+    const token = await this.tokens.sign(user.id, session.id, company.id);
     return {
       token,
       expiresInSeconds: SESSION_TTL_SECONDS,
@@ -134,6 +178,7 @@ export class AuthService {
       /** Signed in, but their role needs two-step sign-in: set it up before anything else. */
       twoStepSetupRequired: setup,
       user: twoStep ? null : this.profileOf(user, session.id),
+      company: { slug: company.slug, name: company.name },
     };
   }
 
@@ -187,6 +232,7 @@ export class AuthService {
 
   /** What the apps know about the signed-in person: who, their role and what they may do. */
   profile(user: SessionUser) {
+    const c = CompanyContext.current();
     return {
       id: user.id,
       name: user.name,
@@ -195,6 +241,9 @@ export class AuthService {
       roleName: user.roleName,
       permissions: user.permissions,
       twoStepSetupRequired: user.twoStepSetupRequired,
+      /** A platform admin working in this company. */
+      viaPlatform: user.viaPlatform,
+      company: c ? { slug: c.slug, name: c.name, kind: c.kind, status: c.status, statusReason: c.statusReason, endsAt: c.endsAt } : null,
     };
   }
 
@@ -205,6 +254,8 @@ export class AuthService {
       email: string;
       role: string;
       totpEnabledAt: Date | null;
+      platformAdminId: string | null;
+      companyId: string;
       access: { name: string; superAdmin: boolean; permissions: string[]; requireTwoStep: boolean };
     },
     sessionId: string,
@@ -216,8 +267,10 @@ export class AuthService {
       role: u.role,
       roleName: u.access.name,
       permissions: permissionsOfRole(u.access),
-      twoStepSetupRequired: u.access.requireTwoStep && !u.totpEnabledAt,
+      twoStepSetupRequired: u.access.requireTwoStep && !u.totpEnabledAt && !u.platformAdminId,
       sessionId,
+      companyId: u.companyId,
+      viaPlatform: !!u.platformAdminId,
     });
   }
 }

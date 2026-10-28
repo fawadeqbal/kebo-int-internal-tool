@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
-import { AllowDuringTwoStepSetup, CurrentUser, Public } from "../../common/auth/decorators";
+import { AllowDuringTwoStepSetup, AllowWhenReadOnly, CurrentUser, Public } from "../../common/auth/decorators";
 import { SESSION_COOKIE, sessionCookieOptions, tokenFrom } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { AuthService } from "./auth.service";
@@ -13,6 +13,8 @@ const loginInput = z.object({
   password: z.string().min(1, "Enter your password"),
   /** Browsers get an httpOnly cookie as well as the token. */
   cookie: z.boolean().default(false),
+  /** The company's short name, when the person chose one (their email is in several). */
+  company: z.string().trim().max(30).nullish(),
 });
 
 /** The client's IP. Express reads X-Forwarded-For only when TRUST_PROXY says a proxy is in front, so it cannot be faked. */
@@ -27,7 +29,7 @@ export class AuthController {
   @Post("login")
   @HttpCode(200)
   async login(@Body(Validate(loginInput)) body: z.infer<typeof loginInput>, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.login(body.email, body.password, { ip: clientIp(req), userAgent: req.headers["user-agent"] });
+    const result = await this.auth.login(body.email, body.password, { ip: clientIp(req), userAgent: req.headers["user-agent"] }, body.company ?? undefined);
     if (body.cookie) {
       res.cookie(SESSION_COOKIE, result.token, sessionCookieOptions());
     }
@@ -46,6 +48,7 @@ export class AuthController {
   }
 
   @AllowDuringTwoStepSetup()
+  @AllowWhenReadOnly()
   @Post("logout")
   @HttpCode(200)
   async logout(@CurrentUser() user: SessionUser, @Res({ passthrough: true }) res: Response) {

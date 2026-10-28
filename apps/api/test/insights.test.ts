@@ -1,3 +1,4 @@
+import { FIRST_COMPANY_ID } from "@kebo/database";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaService } from "../src/database/prisma.service";
@@ -59,8 +60,8 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     expect(again.sent).toBe(0); // same day: nothing twice
     expect(first.sent).toBeGreaterThanOrEqual(0);
     const prisma = app.get(PrismaService);
-    const bilal = await prisma.db.user.findUniqueOrThrow({ where: { email: "bilal@example.com" } });
-    const late = await prisma.db.notification.findFirst({ where: { userId: bilal.id, type: "reminder.order" } });
+    const bilal = await prisma.company(FIRST_COMPANY_ID).user.findFirstOrThrow({ where: { email: "bilal@example.com" } });
+    const late = await prisma.company(FIRST_COMPANY_ID).notification.findFirst({ where: { userId: bilal.id, type: "reminder.order" } });
     expect(late?.title).toMatch(/Goods due from the factory|Get the|orders need you/);
     await api(app, staff).post("/admin/reminders/run").expect(403);
   });

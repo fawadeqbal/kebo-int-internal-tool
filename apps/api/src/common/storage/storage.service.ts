@@ -6,6 +6,8 @@ import { Readable } from "node:stream";
 import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { z } from "zod";
 import { loadEnv, envField } from "@kebo/config";
+import { CompanyContext } from "../company/company-context";
+import { LimitsService } from "../company/limits.service";
 
 /**
  * Where uploaded files live: any S3-compatible store (MinIO on our server, AWS
@@ -105,7 +107,7 @@ export class StorageService {
   private readonly driver: Driver;
   readonly maxBytes: number;
 
-  constructor() {
+  constructor(private readonly limits: LimitsService) {
     const env = loadEnv(storageEnv);
     const driver = env.STORAGE_DRIVER ?? (env.S3_BUCKET ? "s3" : "local");
     if (driver === "s3") {
@@ -121,7 +123,14 @@ export class StorageService {
     return ALLOWED_EXTENSIONS.has(fileName.split(".").pop()?.toLowerCase() ?? "");
   }
 
-  put(key: string, data: Buffer, contentType: string) {
+  /** Where a new file of the current company goes: each company's files under their own folder. */
+  keyFor(path: string) {
+    return `companies/${CompanyContext.require().id}/${path}`;
+  }
+
+  /** Keeps a file, if the company's plan has room for it. */
+  async put(key: string, data: Buffer, contentType: string) {
+    await this.limits.checkStorage(data.length);
     return this.driver.put(key, data, contentType);
   }
   get(key: string) {

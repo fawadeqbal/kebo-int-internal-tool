@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { isISODate, type ISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser } from "../../common/auth/decorators";
+import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { MoneyModule } from "../money/money.module";
@@ -23,17 +23,20 @@ class InsightsController {
   ) {}
 
   /** Managers: the business for a period (?from&to, default this month) against the period before. */
+  @RequireFeature("insights")
   @Get("insights")
   overview(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: ISODate; to?: ISODate }) {
     return this.insights.overview(user, q);
   }
 
+  @RequireFeature("insights")
   @Get("insights/targets")
   targets(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ year: z.coerce.number().int().min(2000).max(2100) }))) q: { year: number }) {
     return this.insights.targets(user, q.year);
   }
 
   /** { amount } in the main currency; 0 or null removes the month's target. */
+  @RequireFeature("insights")
   @Put("insights/targets/:month")
   setTarget(@CurrentUser() user: SessionUser, @Param("month") m: string, @Body(Validate(z.object({ amount: z.coerce.number().min(0).max(1e12).nullable() }))) body: { amount: number | null }) {
     return this.insights.setTarget(user, month.parse(m), body.amount);

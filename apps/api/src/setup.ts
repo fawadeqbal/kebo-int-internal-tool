@@ -4,6 +4,8 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { ErrorFilter } from "./common/http/error.filter";
 import { ReadCache } from "./common/cache/read-cache";
+import { CompanyResolver } from "./common/company/company-resolver";
+import { CompanyContext } from "./common/company/company-context";
 import type { Env } from "./config/env";
 
 /** Everything main.ts and the tests share: prefix, security headers, CORS, errors, API docs. */
@@ -17,10 +19,13 @@ export function configureApp(app: INestApplication, env: Env) {
   (app as NestExpressApplication).useBodyParser("json", { limit: "1mb" });
   app.enableCors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false, credentials: true });
   app.useGlobalFilters(new ErrorFilter());
-  // A change that went through drops the remembered heavy reads (see ReadCache).
+  // Which company the request works in; everything after runs inside it (see CompanyResolver).
+  app.use(app.get(CompanyResolver).middleware());
+  // A change that went through drops that company's remembered heavy reads (see ReadCache).
   const cache = app.get(ReadCache);
   app.use((req: { method: string }, res: { statusCode: number; on(event: "finish", fn: () => void): void }, next: () => void) => {
-    if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") res.on("finish", () => res.statusCode < 400 && cache.bump());
+    const company = CompanyContext.current()?.id;
+    if (company && req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") res.on("finish", () => res.statusCode < 400 && cache.bump(company));
     next();
   });
   app.enableShutdownHooks();
