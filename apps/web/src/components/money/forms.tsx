@@ -78,42 +78,12 @@ export function PaymentPlan({
 
   if (!editing)
     return (
-      <div className="flex flex-col gap-2">
+      <section aria-label="Payment schedule" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold">Payment plan</h3>
-          <span className="text-xs text-muted">{terms}</span>
-        </div>
-        {!plan.matchesTotal && (
-          <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
-            The instalments do not add up to the order total ({money(plan.difference, currency)}{" "}
-            {Number(plan.difference) > 0 ? "missing" : "too much"}). Edit the plan.
-          </p>
-        )}
-        <ol className="flex flex-col divide-y divide-line rounded-lg border border-line">
-          {plan.items.map((i) => (
-            <li key={i.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 text-sm">
-              <span className="min-w-0">
-                <span className="font-medium">{i.label}</span>
-                <span className="block text-xs text-muted">
-                  {i.dueOn ? `Due ${date(i.dueOn)}` : "Date set when the ship date is known"}
-                </span>
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-right tabular">
-                  {money(i.amount, currency)}
-                  {i.status !== "paid" && Number(i.paid) > 0 && (
-                    <span className="block text-xs text-muted">{money(i.paid, currency)} paid</span>
-                  )}
-                </span>
-                <Badge tone={STATUS_TONE[i.status]} dot>
-                  {INSTALMENT_STATUS_LABEL[i.status]}
-                </Badge>
-              </span>
-            </li>
-          ))}
-        </ol>
-        {plan.canEdit && (
-          <div>
+          <h3 className="text-sm font-semibold">
+            Schedule <span className="font-normal text-muted">· {terms}</span>
+          </h3>
+          {plan.canEdit && (
             <Button
               size="xs"
               variant="ghost"
@@ -122,11 +92,48 @@ export function PaymentPlan({
                 setEditing(true);
               }}
             >
-              <Pencil aria-hidden /> Change the plan
+              <Pencil aria-hidden /> Change the schedule
             </Button>
-          </div>
+          )}
+        </div>
+        {!plan.matchesTotal && (
+          <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+            The instalments do not add up to the order total ({money(plan.difference, currency)}{" "}
+            {Number(plan.difference) > 0 ? "missing" : "too much"}). Change the schedule.
+          </p>
         )}
-      </div>
+        <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <table data-fit="" className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-surface-2 text-left text-xs text-text-2">
+                <th scope="col" className="px-3 py-2 font-medium">Part</th>
+                <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">Due</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
+                <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">Received</th>
+                <th scope="col" className="px-3 py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plan.items.map((i) => (
+                <tr key={i.id} className="border-t border-line">
+                  <td className="px-3 py-2.5 align-top">
+                    <span className="font-medium">{i.label}</span>
+                    <span className="block text-xs text-muted sm:hidden">{i.dueOn ? `due ${date(i.dueOn)}` : "when the ship date is known"}</span>
+                  </td>
+                  <td className="hidden px-3 py-2.5 align-top text-text-2 sm:table-cell">{i.dueOn ? date(i.dueOn) : <span className="text-muted">When the ship date is known</span>}</td>
+                  <td className="px-3 py-2.5 text-right align-top tabular">{money(i.amount, currency)}</td>
+                  <td className={cn("hidden px-3 py-2.5 text-right align-top tabular sm:table-cell", Number(i.paid) > 0 ? "" : "text-muted")}>{money(i.paid, currency)}</td>
+                  <td className="px-3 py-2.5 align-top">
+                    <Badge tone={STATUS_TONE[i.status]} dot>
+                      {INSTALMENT_STATUS_LABEL[i.status]}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     );
 
   const body = {

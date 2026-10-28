@@ -47,7 +47,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
           },
         ]
       : []),
-    { href: `${base}/money`, label: "Money", hint: due > 0.005 ? `${money(o.money.due, o.currency)} due` : undefined, alert: latePlan },
+    { href: `${base}/money`, label: "Payments", hint: due > 0.005 ? `${money(o.money.due, o.currency)} due` : undefined, alert: latePlan },
     { href: `${base}/documents`, label: "Documents", hint: o.proforma ? undefined : "proforma not issued" },
     { href: `${base}/history`, label: "History" },
   ];
