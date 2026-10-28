@@ -56,6 +56,7 @@ export default async function OrderGoods({ params }: { params: Promise<{ id: str
               packed={o.goods.packed}
               totals={o.goods.totals}
               canEdit={canEdit}
+              canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
               action={packingAction.bind(null, o.id)}
               links={docHref(o, { kind: "packing-list", label: "Packing list" })}
             />

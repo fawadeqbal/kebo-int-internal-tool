@@ -25,6 +25,8 @@ import { lineNumbers } from "@kebo/shared";
 import { Button, cn, Input, Kbd, Textarea } from "@kebo/ui";
 import { parseList, type PastedItem } from "@/components/deals/paste-list";
 import { FloatingMenu } from "@/components/common/floating";
+import { ExcelMenu } from "@/components/sheets/excel-menu";
+import { lineExport, linesFromSheet, lineTemplate, type SheetLines } from "@/components/sheets/line-sheets";
 
 /* ---------------------------------------------------------------- types */
 
@@ -64,6 +66,8 @@ export interface LineColumn {
   required?: string;
   /** Hidden on phones in saved rows (shown when the row is opened). */
   phoneHidden?: boolean;
+  /** A choice column in an Excel file: each value as written there (by default each option's label). */
+  sheetChoices?: { value: string; text: string }[];
 }
 
 /** What a change returned: done, or a message; `reasonChoices` when the change needs a reason first. */
@@ -99,6 +103,12 @@ export interface LineTableProps {
   error?: string;
   /** No parts (charges): one level only. */
   flat?: boolean;
+  /**
+   * The Excel button: export the lines, and (when lines can be added here and
+   * `upload` is not false) download a template and upload a filled one. An
+   * upload only adds lines, after a look at them; it never changes the ones here.
+   */
+  sheet?: { name: string; upload?: boolean; templateRows?: { no: string; values: LineValues }[] };
 }
 
 /* ---------------------------------------------------------------- helpers */
@@ -179,6 +189,7 @@ export function LineTable({
   tools,
   error,
   flat,
+  sheet,
 }: LineTableProps) {
   const numbers = useMemo(() => lineNumbers(rows.map((r) => ({ key: r.key, parentKey: r.parentKey }))), [rows]);
   const editable = columns.filter((c) => c.input);
@@ -213,6 +224,7 @@ export function LineTable({
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [offer, setOffer] = useState<{ before: string; items: PastedItem[] } | null>(null);
+  const [fromFile, setFromFile] = useState<{ file: string; read: SheetLines } | null>(null);
   const focusNext = useRef<string | null>(null);
   /** Tab pressed while the line above was still being saved: it becomes a part once it is. */
   const partNext = useRef(false);
@@ -355,6 +367,16 @@ export function LineTable({
     } else setOffer({ before: entry.description ?? "", items });
   };
 
+  /** Adds the good rows of an uploaded file at the end (a part whose line was left out is left out too). */
+  const addFromFile = async (read: SheetLines) => {
+    const good = read.lines.filter((l) => !l.problem);
+    const index = new Map<number, number>();
+    good.forEach((l, n) => index.set(read.lines.indexOf(l), n));
+    const lines: NewLine[] = good.map((l) => ({ values: l.values, partOf: l.partOf === null ? null : (index.get(l.partOf) ?? null) }));
+    const r = await add(lines, { afterKey: null, parentKey: null });
+    if (r.ok) setFromFile(null);
+  };
+
   const addPasted = async (items: PastedItem[]) => {
     const under = entryAt.parentKey;
     const lines: NewLine[] = [];
@@ -401,6 +423,8 @@ export function LineTable({
       return !(r.parentKey && folded.has(r.parentKey));
     });
   const anyParts = rows.some((r) => r.parentKey);
+  /** Lines can come from an Excel file here (a template, then the filled file). */
+  const canUpload = !!sheet && !readOnly && sheet.upload !== false;
   const entryIndex = entryAt.afterKey ? rows.findIndex((r) => r.key === entryAt.afterKey) : -1;
   // An inline new row goes after its line (and the line's parts when it adds whole lines).
   const anchor = entryIndex < 0 ? null : entryAt.parentKey ? entryIndex : blockEnd(rows, entryIndex) - 1;
@@ -808,7 +832,7 @@ export function LineTable({
 
   return (
     <div className="flex flex-col gap-2">
-      {(rows.length > 8 || anyParts || tools || !readOnly) && (
+      {(rows.length > 8 || anyParts || tools || !readOnly || sheet) && (
         <div className="flex flex-wrap items-center gap-2">
           {rows.length > 8 && (
             <div className="relative min-w-0 flex-1 basis-48">
@@ -837,8 +861,39 @@ export function LineTable({
               <ClipboardPaste aria-hidden /> Paste a list
             </Button>
           )}
+          {sheet && (
+            <ExcelMenu
+              noun={`${noun}s`}
+              template={
+                canUpload
+                  ? () => lineTemplate({ name: `${sheet.name} - template`, columns, noun, flat, rows: sheet.templateRows })
+                  : undefined
+              }
+              onUpload={
+                canUpload
+                  ? (read, file) => {
+                      setPasteOpen(false);
+                      setFromFile({ file, read: linesFromSheet(read, { columns, flat, initial: (p) => initialValues(columns, p) }) });
+                    }
+                  : undefined
+              }
+              exportSheet={rows.length ? () => lineExport({ name: sheet.name, columns, rows, numbers }) : undefined}
+            />
+          )}
           {tools}
         </div>
+      )}
+
+      {fromFile && (
+        <FilePanel
+          file={fromFile.file}
+          read={fromFile.read}
+          noun={noun}
+          already={rows.length}
+          busy={busy === "entry"}
+          onAdd={() => void addFromFile(fromFile.read)}
+          onCancel={() => setFromFile(null)}
+        />
       )}
 
       {pasteOpen && (
@@ -1568,6 +1623,73 @@ function PastePanel({
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** The rows of an uploaded file, to look at before they are added (the good ones; each problem says why). */
+function FilePanel({
+  file,
+  read,
+  noun,
+  already,
+  busy,
+  onAdd,
+  onCancel,
+}: {
+  file: string;
+  read: SheetLines;
+  noun: string;
+  /** Lines already here: the new ones go after them. */
+  already: number;
+  busy: boolean;
+  onAdd: () => void;
+  onCancel: () => void;
+}) {
+  const good = read.lines.filter((l) => !l.problem).length;
+  const bad = read.lines.length - good;
+  const plural = (k: number) => `${k} ${noun}${k === 1 ? "" : "s"}`;
+  return (
+    <div role="region" aria-label={`Lines from ${file}`} className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary-soft/20 p-3">
+      <p className="text-sm font-medium">From {file}</p>
+      {read.error ? (
+        <p className="text-sm text-bad">{read.error}</p>
+      ) : (
+        <>
+          <p className="text-xs text-text-2">
+            {plural(good)} to add{already ? `, after the ${already} already here` : ""}.
+            {bad > 0 && <span className="text-bad"> {plural(bad)} with a problem {bad === 1 ? "is" : "are"} left out: fix the file and upload it again, or type {bad === 1 ? "it" : "them"} in.</span>}
+            {read.unused.length > 0 && <span className="text-muted"> Not used: {read.unused.map((h) => `“${h}”`).join(", ")}.</span>}
+          </p>
+          <ol className="max-h-72 overflow-auto rounded-md border border-line bg-surface text-sm">
+            {read.lines.map((l) => (
+              <li key={l.fileRow} className={cn("flex justify-between gap-3 border-b border-line px-2 py-1 last:border-0", l.problem && "bg-bad-soft/50")}>
+                <span className="min-w-0">
+                  <span className="mr-2 inline-block w-8 text-xs text-muted tabular">{l.problem ? "—" : l.no}</span>
+                  <span className={cn(l.partOf !== null && "pl-3")}>{(l.values.description ?? "").split("\n")[0] || <span className="text-muted">(no description)</span>}</span>
+                  {l.values.model && <span className="text-muted"> · {l.values.model}</span>}
+                  {l.problem && (
+                    <span className="block text-xs text-bad">
+                      Row {l.fileRow}: {l.problem}
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 text-muted tabular">{l.values.quantity ? `${l.values.quantity} ${l.values.unit ?? ""}`.trim() : ""}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+      <div className="flex gap-2">
+        {!read.error && (
+          <Button size="sm" variant="primary" onClick={onAdd} disabled={!good || busy}>
+            {busy ? "Adding…" : `Add ${plural(good)}`}
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          {read.error ? "Close" : "Cancel"}
         </Button>
       </div>
     </div>
