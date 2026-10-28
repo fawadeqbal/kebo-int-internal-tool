@@ -265,6 +265,7 @@ function Offer({
             width: "4.5rem",
             input: "select" as const,
             options: [{ value: "", label: "— extra" }, ...items.map((it) => ({ value: it.id, label: `${it.no} ${it.description.split("\n")[0]!.slice(0, 40)}` }))],
+            sheetChoices: [{ value: "", text: "extra" }, ...items.map((it) => ({ value: it.id, text: it.no }))],
             format: (v: LineValues) => items.find((it) => it.id === v.requestedItemId)?.no ?? <span className="text-muted">extra</span>,
           },
         ]
@@ -407,6 +408,15 @@ function Offer({
         columns={columns}
         noun="line"
         readOnly={!canEdit}
+        sheet={{
+          name: `Prices from ${q.factory.name}`,
+          // Lines from a file go into an offer no quotation is priced from yet.
+          upload: !q.lines.some((l) => l.used),
+          templateRows: items.map((it) => ({
+            no: it.no,
+            values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(DEFAULT_TAX_RATE) },
+          })),
+        }}
         onAdd={async (newLines: NewLine[], at, reason) =>
           result(
             await lines.add(q.id, {

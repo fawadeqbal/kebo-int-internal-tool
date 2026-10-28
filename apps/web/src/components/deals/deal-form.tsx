@@ -80,6 +80,7 @@ export function DealForm({
   addCustomer,
   cancelHref,
   mode,
+  itemsFromExcel = true,
 }: {
   /** Edit: saves and opens the deal. Create: returns the new id ({ data: { id } }); the form uploads the files, then opens it. */
   action: Action;
@@ -97,6 +98,8 @@ export function DealForm({
   addCustomer?: (v: QuickCustomer) => Promise<QuickCustomerResult>;
   cancelHref: string;
   mode: "create" | "edit";
+  /** Items can come from an Excel file (not once the deal is quoted). */
+  itemsFromExcel?: boolean;
 }) {
   const router = useRouter();
   const [v, setV] = useState<DealFormValues>(initial);
@@ -290,6 +293,7 @@ export function DealForm({
                   }))}
                   columns={ITEM_COLUMNS}
                   noun="item"
+                  sheet={{ name: "Customer items", upload: itemsFromExcel }}
                   error={s.errors?.items?.[0]}
                   empty="No list: the requirement above is enough."
                   {...itemHandlers}

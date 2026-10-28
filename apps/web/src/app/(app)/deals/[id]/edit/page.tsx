@@ -72,6 +72,7 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
         meId={me.id}
         canAssignOthers={can(me, "inquiries.assign")}
         customerLocked={sent ? "Already quoted: the customer cannot change" : undefined}
+        itemsFromExcel={!sent}
         searchCustomers={searchCustomersAction}
         loadContacts={customerContactsAction}
         cancelHref={`/deals/${d.id}`}

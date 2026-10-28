@@ -8,7 +8,7 @@ const config: NextConfig = {
   // The design system ships as TypeScript source; Next compiles it.
   transpilePackages: ["@kebo/ui"],
   poweredByHeader: false,
-  serverExternalPackages: ["puppeteer-core"],
+  serverExternalPackages: ["puppeteer-core", "exceljs"],
   async headers() {
     return [
       {
