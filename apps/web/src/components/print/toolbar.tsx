@@ -55,6 +55,11 @@ export function PrintToolbar({
               ))}
             </div>
           )}
+          {excelHref && (
+            <a href={excelHref} download className={buttonClass("secondary", "sm", "border-[#e4e4ea] bg-white text-[#16151c] hover:bg-[#f2f2f5]")}>
+              <FileSpreadsheet aria-hidden /> Excel
+            </a>
+          )}
           <a
             href={pdfHref}
             className={buttonClass("secondary", "sm", "border-[#e4e4ea] bg-white text-[#16151c] hover:bg-[#f2f2f5]")}
@@ -66,11 +71,6 @@ export function PrintToolbar({
           >
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />} Download PDF
           </a>
-          {excelHref && (
-            <a href={excelHref} download className={buttonClass("secondary", "sm", "border-[#e4e4ea] bg-white text-[#16151c] hover:bg-[#f2f2f5]")}>
-              <FileSpreadsheet aria-hidden /> Excel
-            </a>
-          )}
           <Button size="sm" variant="primary" onClick={() => window.print()}>
             <Printer aria-hidden /> Print
           </Button>

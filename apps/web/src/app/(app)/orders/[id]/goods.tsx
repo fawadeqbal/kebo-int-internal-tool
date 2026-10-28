@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { CheckCircle2, Download, PackageCheck, Pencil, Printer, Search } from "lucide-react";
-import { Badge, Button, buttonClass, cn, Field, Input, Textarea } from "@kebo/ui";
+import { CheckCircle2, PackageCheck, Pencil, Search } from "lucide-react";
+import { Badge, Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { LinePacking } from "@/lib/types-orders";
 import { Sheet, type SheetColumn } from "@/components/lines/sheet";
 import { ExcelMenu } from "@/components/sheets/excel-menu";
+import { FileActions } from "@/components/common/file-actions";
 import { headerKey, sheetNumber, type ReadSheet, type SheetSpec } from "@/lib/sheet-spec";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -101,6 +102,11 @@ const Progress = ({ done, of, label }: { done: number; of: number; label: string
 );
 
 /* ---------------------------------------------------------------- goods from the factory */
+
+/** Excel for the goods (export only), in the card's header. */
+export function GoodsExcel({ lines }: { lines: GoodsLine[] }) {
+  return <ExcelMenu noun="lines" exportSheet={() => goodsExport(lines)} />;
+}
 
 /** The goods lines with what came in, as a file. */
 const goodsExport = (lines: GoodsLine[]): SheetSpec => ({
@@ -239,7 +245,6 @@ export function GoodsReceipt({ lines, canEdit, action, today }: { lines: GoodsLi
         total={lines.length}
         query={query}
         setQuery={setQuery}
-        tools={<ExcelMenu noun="lines" exportSheet={() => goodsExport(lines)} />}
       />
       <Progress done={count.in} of={lines.length} label={`${count.in} of ${lines.length} lines all in`} />
       <Sheet
@@ -445,7 +450,13 @@ export function PackingList({
   canUpload,
   action,
   links,
+  title,
+  description,
+  badge,
 }: {
+  title: string;
+  description?: string;
+  badge: ReactNode;
   lines: GoodsLine[];
   containerNo: string | null;
   shippingMarks: string | null;
@@ -578,7 +589,6 @@ export function PackingList({
         total={lines.length}
         query={query}
         setQuery={setQuery}
-        tools={excel}
       />
       <Progress done={lines.length - missing} of={lines.length} label={`${lines.length - missing} of ${lines.length} lines have their packages`} />
       <Sheet
@@ -595,19 +605,25 @@ export function PackingList({
     </div>
   );
 
-  const docLinks: ReactNode = (
-    <span className="flex flex-wrap gap-2">
-      <a href={links.view} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
-        <Printer aria-hidden /> View / Print
-      </a>
-      <a href={links.pdf} className={buttonClass("ghost", "sm")}>
-        <Download aria-hidden /> Download PDF
-      </a>
-    </span>
+  // Excel, View / Print and the PDF at the top right of the card, as everywhere.
+  const card = (body: ReactNode) => (
+    <Card>
+      <CardHeader
+        title={title}
+        description={description}
+        actions={
+          <>
+            {badge}
+            <FileActions excel={excel} viewHref={started || packed ? links.view : undefined} pdfHref={started || packed ? links.pdf : undefined} />
+          </>
+        }
+      />
+      <CardBody>{body}</CardBody>
+    </Card>
   );
 
   if (!editing)
-    return (
+    return card(
       <div className="flex flex-col gap-3">
         {packed ? (
           <div role="status" className="flex flex-col gap-2 rounded-lg border border-ok/30 bg-ok-soft p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -618,13 +634,9 @@ export function PackingList({
                 <span className="block text-text-2 tabular">{summary}</span>
               </span>
             </p>
-            {docLinks}
           </div>
         ) : (
-          <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
-            {started ? `Started, not complete: ${summary}.` : "Not filled in yet."}
-            {!started && canUpload && excel}
-          </p>
+          <p className="text-sm text-muted">{started ? `Started, not complete: ${summary}.` : "Not filled in yet."}</p>
         )}
         {fileNote}
         {(started || packed) && sheet}
@@ -662,10 +674,10 @@ export function PackingList({
             </Button>
           </div>
         )}
-      </div>
+      </div>,
     );
 
-  return (
+  return card(
     <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
       <input type="hidden" name="payload" value={payload} />
       {started && !packed && <p className="text-xs text-warn">Not complete yet: every line needs its number of packages.</p>}
@@ -694,6 +706,6 @@ export function PackingList({
           </span>
         )}
       </div>
-    </ActionForm>
+    </ActionForm>,
   );
 }

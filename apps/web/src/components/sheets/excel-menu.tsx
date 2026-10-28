@@ -113,7 +113,7 @@ export function ExcelMenu({
 
   return (
     <span className={cn("inline-flex flex-wrap items-center gap-2", className)}>
-      <Button ref={button} size="xs" variant="ghost" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} disabled={busy}>
+      <Button ref={button} size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} disabled={busy}>
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <FileSpreadsheet aria-hidden />} Excel <ChevronDown aria-hidden />
       </Button>
       {onUpload && (

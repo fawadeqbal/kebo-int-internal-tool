@@ -759,9 +759,9 @@ async function OweTab({ mine }: { mine: boolean }) {
           ]}
         />
         <p className="flex flex-wrap items-center gap-3 text-sm">
-          {rows.length > 0 && <ExportLink what="payables" query={{ mine: mine ? "1" : undefined }} />}
           Still to pay{" "}
           <span className="font-semibold tabular">{[...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ") || "nothing"}</span>
+          {rows.length > 0 && <ExportLink what="payables" query={{ mine: mine ? "1" : undefined }} />}
         </p>
       </div>
       {rows.length === 0 ? (

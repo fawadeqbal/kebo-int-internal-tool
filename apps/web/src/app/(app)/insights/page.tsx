@@ -1,11 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Banknote, ChartLine, Coins, FileDown, HandCoins, Percent, Target, TrendingUp, Trophy, Users } from "lucide-react";
+import { Banknote, ChartLine, Coins, HandCoins, Percent, Target, TrendingUp, Trophy, Users } from "lucide-react";
 import { CHANNEL_LABEL } from "@kebo/shared";
-import { Alert, Badge, buildHref, buttonClass, Card, CardBody, CardHeader, cn, LinkTabs, PageHeader, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, Badge, buildHref, Card, CardBody, CardHeader, cn, LinkTabs, PageHeader, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { ExportLink } from "@/components/sheets/export-link";
 import { requirePermission } from "@/lib/session";
 import { money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
@@ -15,7 +14,7 @@ import { CashFlowChart, Donut, RevenueChart } from "@/components/insights/charts
 import { Change, flag, Funnel, Headline, KpiCard, ShareBars, TargetRing } from "@/components/insights/kpi";
 import { PeriodPicker } from "@/components/insights/period";
 import { TargetEditor } from "@/components/insights/targets";
-import { PrintButton } from "@/components/insights/print-button";
+import { FileActions } from "@/components/common/file-actions";
 import { LEAK_VIEWS, LeaksBody, type LeakView } from "@/components/insights/leaks";
 import { ProfitTable } from "@/components/insights/pnl";
 import { ReportTrendChart } from "@/components/deals/report-trend-chart";
@@ -56,7 +55,13 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="Insights"
         description={`How the business is doing. Amounts in ${c}: orders and payments at today's rates, costs at the rates used when paid.`}
-        actions={<PrintButton />}
+        actions={
+          <FileActions
+            excelHref={buildHref("/sheets/export/report", {}, { from: i.range.from, to: i.range.to })}
+            viewHref={buildHref("/print/report", {}, { from: i.range.from, to: i.range.to })}
+            pdfHref={buildHref("/pdf/report/summary", {}, { from: i.range.from, to: i.range.to })}
+          />
+        }
       />
       <LinkTabs
         label="Insights sections"
@@ -344,12 +349,6 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                 <ShareBars currency={c} rows={i.categories.map((x) => ({ key: x.category, label: x.category, sub: `${x.orders} order${x.orders === 1 ? "" : "s"}`, value: Number(x.revenue) }))} />
               </CardBody>
             </Card>
-          </div>
-          <div className="no-print flex flex-wrap gap-2">
-            <ExportLink what="report" query={{ from: i.range.from, to: i.range.to }} label="Report in Excel" />
-            <a href={buildHref("/pdf/report/summary", {}, { from: i.range.from, to: i.range.to })} className={buttonClass("secondary", "sm")}>
-              <FileDown aria-hidden /> Sales report PDF
-            </a>
           </div>
         </div>
       )}

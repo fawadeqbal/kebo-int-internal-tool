@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { CheckCircle2, Download, Printer } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Alert, buttonClass, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
+import { FileActions } from "@/components/common/file-actions";
 import { load, requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
@@ -110,16 +111,7 @@ export default async function QuotationPage({
             }
             description="A draft: only you see it, and it can still change. Check it, then mark it as sent: from then on it is frozen."
             actions={
-              !manage ? (
-                <>
-                  <Link href={printHref(draft)} target="_blank" className={buttonClass("secondary", "sm")}>
-                    <Printer aria-hidden /> Preview
-                  </Link>
-                  <a href={pdfHref(draft)} className={buttonClass("secondary", "sm")}>
-                    <Download aria-hidden /> Download PDF
-                  </a>
-                </>
-              ) : undefined
+              !manage ? <FileActions viewHref={printHref(draft)} pdfHref={pdfHref(draft)} /> : undefined
             }
           />
           <CardBody>
@@ -166,16 +158,7 @@ export default async function QuotationPage({
                     ? `Sent ${date(viewing.sentOn)}`
                     : undefined
             }
-            actions={
-              <>
-                <Link href={printHref(viewing)} target="_blank" className={buttonClass("secondary", "sm")}>
-                  <Printer aria-hidden /> View / Print
-                </Link>
-                <a href={pdfHref(viewing)} className={buttonClass("secondary", "sm")}>
-                  <Download aria-hidden /> Download PDF
-                </a>
-              </>
-            }
+            actions={<FileActions viewHref={printHref(viewing)} pdfHref={pdfHref(viewing)} />}
           />
           <CardBody className="flex flex-col gap-5">
             {viewing.canAnswer && manage && (

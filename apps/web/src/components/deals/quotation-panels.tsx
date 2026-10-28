@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRef, useState, type ReactNode } from "react";
-import { CheckCircle2, Clock, Download, FilePlus2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
-import { Button, buttonClass, cn, Field, Input } from "@kebo/ui";
+import { CheckCircle2, Clock, FilePlus2, Pencil, Send, Trash2, XCircle } from "lucide-react";
+import { Button, cn, Field, Input } from "@kebo/ui";
 import { money } from "@/lib/format";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { FileActions } from "@/components/common/file-actions";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { OptionView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
@@ -135,16 +136,11 @@ export function DraftPanel({
         <Button variant="primary" onClick={() => setEditing(true)}>
           <Pencil aria-hidden /> Edit
         </Button>
-        <Link href={printHref} target="_blank" className={buttonClass("secondary")}>
-          <Printer aria-hidden /> Preview
-        </Link>
-        <a href={pdfHref} className={buttonClass("secondary")}>
-          <Download aria-hidden /> Download PDF
-        </a>
         <Button variant={sending ? "primary" : "secondary"} onClick={() => setSending((v) => !v)} aria-expanded={sending}>
           <Send aria-hidden /> Mark as sent…
         </Button>
-        <ActionForm action={deleteAction} showSuccess={false} className="ml-auto">
+        <FileActions className="ml-auto" viewHref={printHref} pdfHref={pdfHref} />
+        <ActionForm action={deleteAction} showSuccess={false}>
           <ConfirmSubmit variant="danger-ghost" pendingText="Deleting…" message={`Delete the R${number} draft? This cannot be undone.`}>
             <Trash2 aria-hidden /> Delete draft
           </ConfirmSubmit>
