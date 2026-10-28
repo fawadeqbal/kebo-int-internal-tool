@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
-import { can, type FactoryInput, type ListQuery } from "@kebo/shared";
+import { can, type FactoryImport, type FactoryInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -82,6 +82,32 @@ export class FactoriesService {
       await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: f.id, summary: `Added factory ${f.name}` });
       return f;
     });
+  }
+
+  /** Factories from an uploaded file: a name already known is left out; the rest are added together, or none are. */
+  async importMany(user: SessionUser, input: FactoryImport): Promise<ImportResult> {
+    const known = new Set(
+      (await this.prisma.db.factory.findMany({ where: { deletedAt: null }, select: { name: true } })).map((f) => f.name.trim().toLowerCase()),
+    );
+    const skipped: ImportResult["skipped"] = [];
+    const fresh: FactoryInput[] = [];
+    for (const f of input.factories) {
+      const key = f.name.trim().toLowerCase();
+      if (known.has(key)) {
+        skipped.push({ name: f.name, reason: "already a factory" });
+        continue;
+      }
+      known.add(key);
+      fresh.push({ ...f, ownerId: null });
+    }
+    const from = input.fileName ? ` from ${input.fileName}` : " from a file";
+    await this.prisma.tx(async (tx) => {
+      for (const f of fresh) {
+        const row = await tx.factory.create({ data: { ...this.fields(f), createdById: user.id } });
+        await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: row.id, summary: `Added factory ${row.name}${from}` });
+      }
+    });
+    return { added: fresh.length, skipped };
   }
 
   async update(user: SessionUser, id: string, input: FactoryInput) {

@@ -87,6 +87,25 @@ export const factoryInput = z.object({
 });
 export type FactoryInput = z.infer<typeof factoryInput>;
 
+/** Customers or factories from an uploaded Excel file (the page has read and checked the rows). */
+export const customerImport = z.object({
+  customers: z.array(customerInput).min(1, "No customers to add").max(500, "Up to 500 customers at once"),
+  fileName: optionalText(200),
+});
+export type CustomerImport = z.infer<typeof customerImport>;
+
+export const factoryImport = z.object({
+  factories: z.array(factoryInput).min(1, "No factories to add").max(500, "Up to 500 factories at once"),
+  fileName: optionalText(200),
+});
+export type FactoryImport = z.infer<typeof factoryImport>;
+
+/** What an import did: how many were added, and which were left out and why. */
+export interface ImportResult {
+  added: number;
+  skipped: { name: string; reason: string }[];
+}
+
 /* ---------------------------------------------------------------- inquiries */
 
 export const requestedItemInput = z.object({

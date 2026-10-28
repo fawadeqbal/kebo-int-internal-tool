@@ -18,6 +18,8 @@ import {
   Tr,
 } from "@kebo/ui";
 import { api } from "@/lib/api";
+import { PartyExcel } from "@/components/sheets/party-excel";
+import { importFactoriesAction } from "./actions";
 import { requirePermission } from "@/lib/session";
 import type { Paged } from "@/lib/types";
 import type { FactoryRow } from "@/lib/types-people";
@@ -37,9 +39,12 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         title="Factories"
         description="The suppliers we source from. Prices and costs here are never shown to customers."
         actions={
-          <ButtonLink href="/factories/new" variant="primary">
-            New factory
-          </ButtonLink>
+          <>
+            <PartyExcel kind="factories" importAction={importFactoriesAction} />
+            <ButtonLink href="/factories/new" variant="primary">
+              New factory
+            </ButtonLink>
+          </>
         }
       />
       <LinkTabs
