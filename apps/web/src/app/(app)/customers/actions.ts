@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { customerInput } from "@kebo/shared";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import type { ImportResult, CustomerInput } from "@kebo/shared";
 import { attempt, formBody, type ActionState } from "@/lib/actions";
 
 /**
@@ -40,4 +41,16 @@ export async function removeCustomerAction(id: string, _prev: ActionState, _form
   if (!r.ok) return r;
   revalidatePath("/customers");
   redirect(`/customers?toast=${encodeURIComponent("Customer removed.")}`);
+}
+
+/** New customers from an uploaded Excel file (checked on the page; the API checks again and leaves out any already there). */
+export async function importCustomersAction(items: CustomerInput[], fileName: string): Promise<{ ok: true; result: ImportResult } | { ok: false; message: string }> {
+  try {
+    const result = await api.post<ImportResult>("/customers/import", { customers: items, fileName });
+    revalidatePath("/customers");
+    return { ok: true, result };
+  } catch (e) {
+    if (e instanceof ApiError) return { ok: false, message: e.status === 403 ? "You cannot add customers." : e.message };
+    throw e;
+  }
 }

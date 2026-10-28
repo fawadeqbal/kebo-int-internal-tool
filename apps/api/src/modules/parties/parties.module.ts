@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { customerInput, factoryInput, listQuery, type CustomerInput, type FactoryInput } from "@kebo/shared";
+import { customerImport, customerInput, factoryImport, factoryInput, listQuery, type CustomerImport, type CustomerInput, type FactoryImport, type FactoryInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -40,6 +40,14 @@ class CustomersController {
     return this.customers.create(user, body);
   }
 
+  /** New customers from an uploaded file: { added, skipped: [{ name, reason }] }. */
+  @Post("import")
+  @HttpCode(200)
+  @RequirePermissions("customers.manage")
+  importMany(@CurrentUser() user: SessionUser, @Body(Validate(customerImport)) body: CustomerImport) {
+    return this.customers.importMany(user, body);
+  }
+
   @Put(":id")
   @RequirePermissions("customers.manage")
   update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(customerInput)) body: CustomerInput) {
@@ -76,6 +84,14 @@ class FactoriesController {
   @RequirePermissions("sourcing.manage")
   create(@CurrentUser() user: SessionUser, @Body(Validate(factoryInput)) body: FactoryInput) {
     return this.factories.create(user, body);
+  }
+
+  /** New factories from an uploaded file: { added, skipped: [{ name, reason }] }. */
+  @Post("import")
+  @HttpCode(200)
+  @RequirePermissions("sourcing.manage")
+  importMany(@CurrentUser() user: SessionUser, @Body(Validate(factoryImport)) body: FactoryImport) {
+    return this.factories.importMany(user, body);
   }
 
   @Put(":id")

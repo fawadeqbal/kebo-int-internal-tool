@@ -4,6 +4,8 @@ import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { buildHref, ButtonLink, Card, EmptyState, FilterBar, FilterChip, PageHeader, Pagination, SearchField, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
+import { PartyExcel } from "@/components/sheets/party-excel";
+import { importCustomersAction } from "./actions";
 import { requireUser } from "@/lib/session";
 import { COUNTRIES, countryName } from "@/lib/countries";
 import type { Paged } from "@/lib/types";
@@ -27,7 +29,16 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="Customers"
         description={can(me, "inquiries.viewAll") ? "Every buyer, their contacts and what is open with them." : "The customers of the deals you handle or created."}
-        actions={canAdd && <ButtonLink href="/customers/new" variant="primary">New customer</ButtonLink>}
+        actions={
+          <>
+            <PartyExcel kind="customers" importAction={canAdd ? importCustomersAction : undefined} />
+            {canAdd && (
+              <ButtonLink href="/customers/new" variant="primary">
+                New customer
+              </ButtonLink>
+            )}
+          </>
+        }
       />
       <Card className="overflow-hidden p-0">
         <FilterBar>

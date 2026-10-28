@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
-import { can, type CustomerInput, type ListQuery } from "@kebo/shared";
+import { can, type CustomerImport, type CustomerInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { DomainError, DuplicateError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -157,6 +157,41 @@ export class CustomersService {
       await this.audit.record(tx, { userId: user.id, action: "create", entityType: "customer", entityId: c.id, summary: `Added customer ${c.name} (${c.country})` });
       return c;
     });
+  }
+
+  /**
+   * Customers from an uploaded file. Only new ones are added: a name already
+   * known, or a contact whose email or phone is on another customer, is left
+   * out and said why. The rest are added together, or none are.
+   */
+  async importMany(user: SessionUser, input: CustomerImport): Promise<ImportResult> {
+    const known = new Set(
+      (await this.prisma.db.customer.findMany({ where: { deletedAt: null }, select: { name: true } })).map((c) => c.name.trim().toLowerCase()),
+    );
+    const skipped: ImportResult["skipped"] = [];
+    const fresh: CustomerInput[] = [];
+    for (const c of input.customers) {
+      const key = c.name.trim().toLowerCase();
+      if (known.has(key)) {
+        skipped.push({ name: c.name, reason: "already a customer" });
+        continue;
+      }
+      const same = await this.duplicates(c);
+      if (same.length) {
+        skipped.push({ name: c.name, reason: `a contact's email or phone is on ${same[0]!.label}` });
+        continue;
+      }
+      known.add(key);
+      fresh.push(c);
+    }
+    const from = input.fileName ? ` from ${input.fileName}` : " from a file";
+    await this.prisma.tx(async (tx) => {
+      for (const c of fresh) {
+        const row = await tx.customer.create({ data: { ...this.fields(c), createdById: user.id, contacts: { create: this.contactRows(c) } } });
+        await this.audit.record(tx, { userId: user.id, action: "create", entityType: "customer", entityId: row.id, summary: `Added customer ${row.name} (${row.country})${from}` });
+      }
+    });
+    return { added: fresh.length, skipped };
   }
 
   /** Contacts keep their ids (deals point at them); removed ones are soft-deleted. */
