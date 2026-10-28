@@ -1,0 +1,54 @@
+name: Deploy
+
+# Every push to main deploys to rfq.fawadiqbal.dev once CI has passed for it.
+# "Run workflow" (on the Actions tab) deploys main by hand.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; a newer one waits for the running one to finish.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://rfq.fawadiqbal.dev
+    steps:
+      - name: Deploy on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          for v in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            [ -n "${!v}" ] || { echo "::error::The $v secret is missing (Settings › Secrets and variables › Actions)."; exit 1; }
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          echo "Deploying ${COMMIT::7}"
+          # The key may only run deploy/ci-deploy.sh (a forced command on the server).
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ConnectTimeout=20 \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$COMMIT"
+
+      - name: Check the site answers
+        run: curl -fsS -o /dev/null --retry 10 --retry-delay 6 --retry-all-errors https://rfq.fawadiqbal.dev/login
+
+      - name: Forget the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

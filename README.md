@@ -58,9 +58,9 @@ The API tests run against a real database: migrate and seed with `--demo` first 
 
 ## Deploy
 
-Merging into `main` deploys by itself. On the server, the `kebo-deploy.timer` checks every two minutes; once GitHub's **CI** has passed for the new commit on `main`, it pulls, rebuilds and restarts with `docker compose up -d --build --wait`, checks the site answers, and logs the result. If CI fails, nothing is deployed (a re-run that passes is). If the build fails, the site stays as it was and that commit is not retried until a newer one arrives.
+Merging into `main` deploys by itself: when the **CI** workflow passes for the new commit on `main`, the **Deploy** workflow (`.github/workflows/deploy.yml`) logs into the server over SSH and runs `deploy/ci-deploy.sh`, which brings `/opt/kebo-desk` up to `main`, rebuilds and restarts with `docker compose up -d --build --wait`, and fails if the containers are not healthy. Then it checks the site answers. CI failed: nothing is deployed. Build failed: the site stays as it was and the workflow shows red.
 
-- Logs: `journalctl -u kebo-deploy` on the server; the last result is in `~/.kebo-deploy/last.txt`.
-- Retry a commit whose build failed: `rm ~/.kebo-deploy/failed`.
+- See every deploy, and deploy `main` by hand (**Run workflow**), on the Actions tab › Deploy.
+- Secrets (Settings › Secrets and variables › Actions): `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (a key used only for this), `DEPLOY_KNOWN_HOSTS` (the server's host key line).
+- On the server, that key may only run the deploy: its line in `~/.ssh/authorized_keys` has a forced command (see the top of `deploy/ci-deploy.sh`). A log of deploys is in `~/kebo-deploys.log`.
 - Deploy by hand as before: `cd /opt/kebo-desk && git pull && sudo docker compose up -d --build`.
-- Setup (once, already done): `deploy/install-auto-deploy.sh` on the server. The script is `deploy/auto-deploy.sh`; the units are in `deploy/systemd/`.
