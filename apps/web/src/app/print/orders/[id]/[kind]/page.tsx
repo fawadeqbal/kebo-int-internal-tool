@@ -8,6 +8,8 @@ import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo, customerOr } from "@/components/print/data";
 import {
   docDate,
+  docFootCell,
+  docItem,
   docMoney,
   docQty,
   docWords,
@@ -104,12 +106,7 @@ export default async function OrderDocumentPrint({
   const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<Line> = {
     label: packing ? "Description of Goods" : "Equipment Description",
-    render: (l) => (
-      <>
-        {l.description}
-        {l.model ? `\nModel: ${l.model}` : ""}
-      </>
-    ),
+    render: (l) => docItem(l.description, l.model),
   };
   const qty: DocColumn<Line> = { label: "Qty.", width: internal ? 58 : 71.4, render: (l) => docQty(l.quantity, l.unit) };
 
@@ -177,21 +174,20 @@ export default async function OrderDocumentPrint({
 
   const packingTotals =
     packing && pk ? (
-      <tr style={{ fontWeight: 700, fontSize: "11pt", lineHeight: "13.8pt" }}>
-        <td colSpan={3} style={{ border: "0.5pt solid #000", padding: "0 5.6pt" }}>
-          Total :
-          <span style={{ display: "inline-block", width: "24pt" }} />
+      <tr style={{ breakInside: "avoid" }}>
+        <td colSpan={3} style={{ ...docFootCell(), paddingLeft: 0 }}>
+          Total:{" "}
           {d.lines.length} item{d.lines.length === 1 ? "" : "s"}
           {pk.totals.packages > 0 ? `, ${pk.totals.packages} packages` : ""}
         </td>
-        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt" }}>{pk.totals.packages || ""}</td>
-        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>
+        <td style={docFootCell()}>{pk.totals.packages || ""}</td>
+        <td style={docFootCell("right")}>
           {Number(pk.totals.netWeightKg) ? kg(pk.totals.netWeightKg) : ""}
         </td>
-        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>
+        <td style={docFootCell("right")}>
           {Number(pk.totals.grossWeightKg) ? kg(pk.totals.grossWeightKg) : ""}
         </td>
-        <td style={{ border: "0.5pt solid #000", padding: "0 5.6pt", textAlign: "right" }}>
+        <td style={{ ...docFootCell("right"), paddingRight: 0 }}>
           {Number(pk.totals.cbm) ? m3(pk.totals.cbm) : ""}
         </td>
       </tr>

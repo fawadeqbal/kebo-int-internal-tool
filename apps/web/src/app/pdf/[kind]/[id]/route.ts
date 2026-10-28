@@ -131,8 +131,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     await page.evaluate(() => document.fonts.ready);
     const pdf = await page.pdf(
       kind !== "report"
-        ? // Kebo's own document layout: its page margins, no footer (as the Word original).
-          { format: "A4", printBackground: true, margin: { top: "40pt", right: "21.2pt", bottom: "40pt", left: "14.2pt" } }
+        ? // Kebo's own document layout: its page margins and footer (page numbers) come from its @page rule.
+          { format: "A4", printBackground: true, preferCSSPageSize: true }
         : {
             format: "A4",
             printBackground: true,
