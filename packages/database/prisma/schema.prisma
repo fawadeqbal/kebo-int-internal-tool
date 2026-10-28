@@ -1297,6 +1297,8 @@ enum LeadSource {
   form
   sign_up
   manual
+  /// The "Questions?" form on the marketing site.
+  contact
 }
 
 /// One company using the app. Every company row elsewhere carries its id.
@@ -1435,6 +1437,10 @@ model Lead {
   companyId   String?    @map("company_id") @db.Uuid
   company     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
   ip          String?    @db.VarChar(64)
+  /// Where they came from, in one word for grouping: a campaign's source, the site that sent them, or "direct".
+  channel     String?    @db.VarChar(80)
+  /// The details: utm_source / medium / campaign, the referring site, the page and the button.
+  origin      Json?
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1442,6 +1448,7 @@ model Lead {
 
   @@index([status])
   @@index([createdAt])
+  @@index([channel])
   @@map("leads")
 }
 
@@ -1528,8 +1535,42 @@ model SignUp {
   verifiedAt   DateTime? @map("verified_at") @db.Timestamptz
   companyId    String?   @map("company_id") @db.Uuid
   ip           String?   @db.VarChar(64)
+  /// Where they came from (passed on to the lead).
+  origin       Json?
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([email])
   @@map("sign_ups")
+}
+
+/// The marketing site's words, one row per page ("marketing"): what is being edited, and what visitors see.
+model SiteContent {
+  key         String    @id @db.VarChar(40)
+  draft       Json
+  published   Json?
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedBy   String?   @map("updated_by") @db.VarChar(120)
+
+  @@map("site_content")
+}
+
+/// Marketing site visits per day and channel, counted without cookies.
+model SiteVisit {
+  day      DateTime @db.Date
+  channel  String   @db.VarChar(80)
+  views    Int      @default(0)
+  visitors Int      @default(0)
+
+  @@id([day, channel])
+  @@map("site_visits")
+}
+
+/// One visitor seen on a day (a one-way hash of the day, address and browser), so each counts once a day. Kept two days.
+model SiteVisitorMark {
+  day  DateTime @db.Date
+  hash String   @db.Char(32)
+
+  @@id([day, hash])
+  @@map("site_visitor_marks")
 }

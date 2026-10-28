@@ -51,6 +51,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                   { label: "Country", value: l.country },
                   { label: "Team size", value: l.teamSize },
                   { label: "Came in", value: dateTime(l.createdAt) },
+                  { label: "Came from", value: l.channel },
+                  ...(l.origin?.campaign ? [{ label: "Campaign", value: [l.origin.campaign, l.origin.medium].filter(Boolean).join(", ") }] : []),
+                  ...(l.origin?.cta ? [{ label: "Button pressed", value: l.origin.cta }] : []),
                 ]}
               />
               {l.message && <p className="rounded-lg bg-surface-2 p-3 text-sm whitespace-pre-wrap">{l.message}</p>}

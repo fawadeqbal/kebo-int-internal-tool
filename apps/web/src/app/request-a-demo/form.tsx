@@ -4,9 +4,11 @@ import { useActionState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Alert, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
+import type { LeadOrigin } from "@kebo/shared";
+import { OriginFields } from "@/components/site/origin-fields";
 import { requestDemoAction } from "./actions";
 
-export function RequestDemoForm() {
+export function RequestDemoForm({ origin }: { origin: LeadOrigin }) {
   const [state, action] = useActionState(requestDemoAction, {});
   if (state.ok)
     return (
@@ -50,6 +52,7 @@ export function RequestDemoForm() {
       </Field>
       {/* People never see or fill this; bots do. */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
+      <OriginFields origin={origin} />
       <SubmitButton pendingText="Sending…" size="lg" className="w-full">
         Request a demo
       </SubmitButton>

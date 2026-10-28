@@ -3,7 +3,17 @@ import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { z } from "zod";
 import { fromDbDateOrNull, toDbDateOrNull, type Prisma } from "@kebo/database";
-import { LIFECYCLE, suggestSlug, type DemoRequestInput, type leadInput, type leadUpdateInput, type SignUpInput } from "@kebo/shared";
+import {
+  channelOf,
+  LIFECYCLE,
+  suggestSlug,
+  type DemoRequestInput,
+  type LeadOrigin,
+  type leadInput,
+  type leadUpdateInput,
+  type SignUpInput,
+  type SiteContactInput,
+} from "@kebo/shared";
 import { ConflictError, DomainError, NotFoundError } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
@@ -83,6 +93,7 @@ export class LeadsService {
         message: input.message,
         source: "form",
         ip: ip.slice(0, 64),
+        ...this.originOf(input.origin),
       },
     });
     await this.companies.log(null, "lead", `New demo request: ${input.name} <${input.email}> from ${input.companyName}`, {
@@ -98,11 +109,94 @@ export class LeadsService {
         ["Phone / WhatsApp", input.phone],
         ["Country", input.country],
         ["Team size", input.teamSize],
+        ["Came from", this.cameFrom(input.origin)],
       ],
       body: input.message,
       link: this.mail.url(`/platform/leads/${lead.id}`),
       linkLabel: "Open the lead",
     });
+    return { ok: true };
+  }
+
+  /** Where a lead came from, as kept on it: one word to group by, and the details. */
+  private originOf(origin: LeadOrigin | null | undefined) {
+    const o = origin && Object.values(origin).some(Boolean) ? origin : null;
+    return { channel: channelOf(o), origin: (o ?? undefined) as Prisma.InputJsonValue | undefined };
+  }
+
+  /** "google.com · campaign spring · button hero", for the email to the platform admin. */
+  private cameFrom(origin: LeadOrigin | null | undefined) {
+    const parts = [channelOf(origin), origin?.campaign && `campaign ${origin.campaign}`, origin?.medium, origin?.cta && `button "${origin.cta}"`];
+    return parts.filter(Boolean).join(" · ");
+  }
+
+  /* ---------------------------------------------------------------- public: a question */
+
+  /** The "Questions?" form on the marketing page: a lead too, so it is answered and followed up. */
+  async contact(input: SiteContactInput, ip: string) {
+    if (input.website) return { ok: true };
+    this.limit(`lead:${ip}`, 5, 60 * 60_000);
+    this.limit("lead:all", 60, 60 * 60_000);
+    if (!(await this.human(input.botToken, ip)))
+      throw new DomainError("We could not confirm you are not a robot. Reload the page and try again.");
+    const lead = await this.db.lead.create({
+      data: {
+        companyName: input.companyName ?? "(not given)",
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        message: input.message,
+        source: "contact",
+        ip: ip.slice(0, 64),
+        ...this.originOf(input.origin),
+      },
+    });
+    await this.companies.log(null, "lead", `New question: ${input.name} <${input.email}>`, { leadId: lead.id });
+    await this.mail.toAdmins({
+      subject: `Question from ${input.name}${input.companyName ? ` (${input.companyName})` : ""}`,
+      heading: "New question from the website",
+      rows: [
+        ["Name", input.name],
+        ["Email", input.email],
+        ["Company", input.companyName],
+        ["Phone / WhatsApp", input.phone],
+        ["Came from", this.cameFrom(input.origin)],
+      ],
+      body: input.message,
+      link: this.mail.url(`/platform/leads/${lead.id}`),
+      linkLabel: "Open the lead",
+    });
+    return { ok: true };
+  }
+
+  /* ---------------------------------------------------------------- public: where do I sign in? */
+
+  /**
+   * "Sign in" on the marketing page: the addresses of the companies this email
+   * has an account in, sent to that email (so nobody learns who uses RFQ Desk).
+   */
+  async findCompany(email: string, ip: string) {
+    this.limit(`find:${ip}`, 5, 60 * 60_000);
+    this.limit(`find:${email}`, 3, 60 * 60_000);
+    const users = await this.db.user.findMany({
+      where: { email, isActive: true, isSystem: false, platformAdminId: null, company: { status: { notIn: ["off", "deleted"] } } },
+      select: { name: true, company: { select: { name: true, slug: true } } },
+      take: 20,
+    });
+    if (users.length) {
+      await this.mail.send({
+        to: email,
+        subject: "Where to sign in to RFQ Desk",
+        heading: "Your sign-in address",
+        rows: users.map((u) => [u.company.name, this.mail.companyUrl(u.company.slug, "/login")] as [string, string]),
+        body:
+          users.length === 1
+            ? "Sign in at your company's own address above. Bookmark it for next time."
+            : "You have an account in each of these companies. Sign in at the one you want; bookmark them for next time.",
+        link: this.mail.companyUrl(users[0]!.company.slug, "/login"),
+        linkLabel: users.length === 1 ? "Sign in" : `Sign in to ${users[0]!.company.name}`,
+      });
+    }
     return { ok: true };
   }
 
@@ -145,6 +239,8 @@ export class LeadsService {
       teamSize: l.teamSize,
       message: l.message,
       source: l.source,
+      channel: l.channel,
+      origin: l.origin as LeadOrigin | null,
       status: l.status,
       lostReason: l.lostReason,
       followUpOn: fromDbDateOrNull(l.followUpOn),
@@ -271,6 +367,7 @@ export class LeadsService {
         tokenHash: createHash("sha256").update(token).digest("hex"),
         expiresAt: new Date(Date.now() + 24 * 3_600_000),
         ip: ip.slice(0, 64),
+        origin: (input.origin ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     });
     await this.mail.send({
@@ -297,7 +394,15 @@ export class LeadsService {
     }
     const slug = (await this.companies.slugTaken(s.slug)) ? await this.companies.freeSlug(s.slug) : s.slug;
     const lead = await this.db.lead.create({
-      data: { companyName: s.companyName, name: s.name, email: s.email, source: "sign_up", status: "demo", ip: s.ip },
+      data: {
+        companyName: s.companyName,
+        name: s.name,
+        email: s.email,
+        source: "sign_up",
+        status: "demo",
+        ip: s.ip,
+        ...this.originOf(s.origin as LeadOrigin | null),
+      },
     });
     const made = await this.companies.create(null, {
       name: s.companyName,
@@ -321,6 +426,7 @@ export class LeadsService {
         ["Company", `${s.companyName} (${slug})`],
         ["Name", s.name],
         ["Email", s.email],
+        ["Came from", this.cameFrom(s.origin as LeadOrigin | null)],
       ],
       link: this.mail.url(`/platform/companies/${made.id}`),
       linkLabel: "Open in the platform",

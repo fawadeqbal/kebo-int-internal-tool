@@ -32,6 +32,7 @@ describe("companies: isolation and the platform", () => {
       get: (url: string) => auth(request(server).get(`/api/platform${url}`)),
       post: (url: string, body?: object) => auth(request(server).post(`/api/platform${url}`)).send(body ?? {}),
       patch: (url: string, body?: object) => auth(request(server).patch(`/api/platform${url}`)).send(body ?? {}),
+      put: (url: string, body?: object) => auth(request(server).put(`/api/platform${url}`)).send(body ?? {}),
       delete: (url: string, body?: object) => auth(request(server).delete(`/api/platform${url}`)).send(body ?? {}),
     };
   };
@@ -519,6 +520,69 @@ describe("companies: isolation and the platform", () => {
     await api(app, await signIn(app, c.email, "Boss12345678"))
       .get("/customers")
       .expect(200);
+  });
+
+  it("the marketing site: edited as a draft, published, visits counted without cookies, leads keep where they came from", async () => {
+    const pub = () => request(app.getHttpServer());
+    // Its own marker (the other tests find their leads by tag).
+    const mk = `mk${Math.random().toString(36).slice(2, 9)}`;
+    const live = (await pub().get("/api/platform/public/site").expect(200)).body as { content: { hero: { title: string } }; plans: { id: string; name: string }[] };
+    expect(live.plans.map((p) => p.name)).toEqual(expect.arrayContaining(["Starter", "Team", "Business", "Unlimited"]));
+    // A draft is not live until published.
+    const editor = (await plat().get("/site").expect(200)).body;
+    const starter = (editor.plans as { id: string; name: string }[]).find((p) => p.name === "Starter")!;
+    const draft = { ...editor.draft, hero: { ...editor.draft.hero, title: `Hello ${tag}` }, plans: { ...editor.draft.plans, hidden: [starter.id] } };
+    expect((await plat().put("/site", { draft }).expect(200)).body.unpublished).toBe(true);
+    expect((await pub().get("/api/platform/public/site").expect(200)).body.content.hero.title).toBe(live.content.hero.title);
+    await plat().put("/site", { draft: { ...draft, hero: { ...draft.hero, title: "" } } }).expect(422);
+    const done = (await plat().post("/site/publish").expect(200)).body;
+    expect(done.unpublished).toBe(false);
+    const after = (await pub().get("/api/platform/public/site").expect(200)).body;
+    expect(after.content.hero.title).toBe(`Hello ${tag}`);
+    expect(after.plans.map((p: { name: string }) => p.name)).not.toContain("Starter");
+    // Not for anyone else.
+    await pub().put("/api/platform/site").send({ draft }).expect(401);
+
+    // Visits: each visitor once a day per address and browser; bots not at all.
+    const browser = "Mozilla/5.0 (Windows NT 10.0) Chrome/130.0";
+    const visit = (ua: string, source?: string) =>
+      pub().post("/api/platform/public/visit").send({ path: "/", userAgent: ua, origin: source ? { source, campaign: "oct" } : { referrer: "www.google.com" } });
+    expect((await visit(browser, `fb${tag}`).expect(200)).body.counted).toBe(true);
+    await visit(browser, `fb${tag}`).expect(200);
+    expect((await visit("Googlebot/2.1", `fb${tag}`).expect(200)).body.counted).toBe(false);
+    await visit(browser).expect(200);
+
+    // Leads keep where they came from.
+    await pub()
+      .post("/api/platform/public/demo-request")
+      .send({ companyName: `Ad Co ${mk}`, name: "Ada", email: `ada-${mk}@ad.test`, origin: { source: `fb${tag}`, campaign: "oct", cta: "hero" } })
+      .expect(200);
+    await pub()
+      .post("/api/platform/public/contact")
+      .send({ name: "Quinn", email: `quinn-${mk}@q.test`, message: "Do you support CNY?", origin: { referrer: "www.google.com", page: "/" } })
+      .expect(200);
+    await pub().post("/api/platform/public/contact").send({ name: "", email: "x", message: "" }).expect(422);
+    const leads = (await plat().get(`/leads?q=${mk}`).expect(200)).body as { email: string; channel: string; source: string; origin: { campaign?: string } }[];
+    const ada = leads.find((l) => l.email === `ada-${mk}@ad.test`)!;
+    expect(ada).toMatchObject({ channel: `fb${tag}`, source: "form", origin: { campaign: "oct", cta: "hero" } });
+    expect(leads.find((l) => l.email === `quinn-${mk}@q.test`)).toMatchObject({ channel: "google.com", source: "contact" });
+
+    // The numbers: visitors and leads per channel.
+    const n = (await plat().get("/site/numbers").expect(200)).body;
+    const fb = n.now.channels.find((c: { channel: string }) => c.channel === `fb${tag}`);
+    expect(fb).toMatchObject({ visitors: 1, views: 2, leads: 1 });
+    // Same address and browser: a view from another channel, but not a second visitor that day.
+    expect(n.now.channels.find((c: { channel: string }) => c.channel === "google.com").views).toBeGreaterThanOrEqual(1);
+    expect(n.last30).toHaveLength(30);
+    expect(n.last30.at(-1).visitors).toBeGreaterThanOrEqual(1);
+
+    // "Sign in" by email: always the same answer.
+    expect((await pub().post("/api/platform/public/find-company").send({ email: "boss@kebo.test" }).expect(200)).body).toEqual({ ok: true });
+    expect((await pub().post("/api/platform/public/find-company").send({ email: "nobody@nowhere.test" }).expect(200)).body).toEqual({ ok: true });
+
+    // Back as it was, for the other tests.
+    await plat().put("/site", { draft: editor.draft }).expect(200);
+    await plat().post("/site/publish").expect(200);
   });
 
   it("a demo request becomes a lead, the lead a demo; the demo ends, goes read-only, off, and is deleted", async () => {

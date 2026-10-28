@@ -9,6 +9,7 @@ import {
   companyUpdateInput,
   demoRequestInput,
   extendInput,
+  findCompanyInput,
   leadInput,
   leadNoteInput,
   leadUpdateInput,
@@ -17,12 +18,17 @@ import {
   planInput,
   setPasswordInput,
   signUpInput,
+  siteContactInput,
+  siteContent,
+  siteVisitInput,
   slugField,
   subscriptionPaymentInput,
   type CompanyCreateInput,
   type DemoRequestInput,
   type PlanInput,
   type SignUpInput,
+  type SiteContactInput,
+  type SiteContent,
 } from "@kebo/shared";
 import { DomainError, NotFoundError } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
@@ -35,6 +41,7 @@ import { PlatformCompaniesService } from "./companies.platform";
 import { CompanyDataService } from "./company-data";
 import { LeadsService } from "./leads.service";
 import { PlansService } from "./plans.service";
+import { SiteService } from "./site.service";
 import {
   CurrentAdmin,
   PlatformAuthService,
@@ -69,8 +76,42 @@ export class PlatformPublicController {
     private readonly platform: PlatformCompaniesService,
     private readonly accounts: AccountsService,
     private readonly companies: CompaniesService,
+    private readonly site: SiteService,
     @Inject(ENV) private readonly env: Env,
   ) {}
+
+  /* ---------------------------------------------------------------- the marketing site */
+
+  /** The marketing page: its published words and the plans it shows. */
+  @Public()
+  @Get("site")
+  siteContent() {
+    return this.site.published();
+  }
+
+  /** A page view, from the web app's server (counted without cookies). */
+  @Public()
+  @Post("visit")
+  @HttpCode(200)
+  visit(@Body(Validate(siteVisitInput)) body: z.infer<typeof siteVisitInput>, @Req() req: Request) {
+    return this.site.visit({ ip: clientIp(req), userAgent: body.userAgent, origin: body.origin });
+  }
+
+  /** "Questions?" on the marketing page. */
+  @Public()
+  @Post("contact")
+  @HttpCode(200)
+  contact(@Body(Validate(siteContactInput)) body: SiteContactInput, @Req() req: Request) {
+    return this.leads.contact(body, clientIp(req));
+  }
+
+  /** "Sign in" on the marketing page: emails the addresses of the companies this email belongs to. */
+  @Public()
+  @Post("find-company")
+  @HttpCode(200)
+  findCompany(@Body(Validate(findCompanyInput)) body: { email: string }, @Req() req: Request) {
+    return this.leads.findCompany(body.email, clientIp(req));
+  }
 
   @Public()
   @Post("demo-request")
@@ -223,7 +264,42 @@ export class PlatformController {
     private readonly leads: LeadsService,
     private readonly plans: PlansService,
     private readonly prisma: PrismaService,
+    private readonly site: SiteService,
   ) {}
+
+  /* ---------------------------------------------------------------- the marketing site */
+
+  @PlatformRoute()
+  @Get("site")
+  siteEditor() {
+    return this.site.editor();
+  }
+
+  @PlatformRoute()
+  @Put("site")
+  saveSite(@CurrentAdmin() admin: PlatformAdminUser, @Body(Validate(z.object({ draft: siteContent }))) body: { draft: SiteContent }) {
+    return this.site.saveDraft(admin, body.draft);
+  }
+
+  @PlatformRoute()
+  @Post("site/publish")
+  @HttpCode(200)
+  publishSite(@CurrentAdmin() admin: PlatformAdminUser) {
+    return this.site.publish(admin);
+  }
+
+  @PlatformRoute()
+  @Post("site/discard")
+  @HttpCode(200)
+  discardSite(@CurrentAdmin() admin: PlatformAdminUser) {
+    return this.site.discard(admin);
+  }
+
+  @PlatformRoute()
+  @Get("site/numbers")
+  siteNumbers(@Query("month") month?: string) {
+    return this.site.numbers(month);
+  }
 
   @PlatformRoute()
   @Get("overview")

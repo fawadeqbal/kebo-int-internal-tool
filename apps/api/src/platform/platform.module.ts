@@ -8,6 +8,7 @@ import { PlansService } from "./plans.service";
 import { PlatformAuthService, PlatformGuard } from "./platform-auth";
 import { PlatformAuthController, PlatformController, PlatformPublicController } from "./platform.controller";
 import { PlatformMail } from "./platform-mail";
+import { SiteService } from "./site.service";
 
 /** The platform: companies, plans, client inquiries, demos and trials, and the platform admins. */
 @Module({
@@ -22,6 +23,7 @@ import { PlatformMail } from "./platform-mail";
     LifecycleService,
     PlansService,
     PlatformMail,
+    SiteService,
   ],
   exports: [PlatformAuthService, AccountsService, LifecycleService],
 })

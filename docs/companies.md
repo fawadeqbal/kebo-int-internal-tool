@@ -161,3 +161,14 @@ To switch on:
 3. **`.env`** on the server: `BASE_DOMAIN=rfq.fawadiqbal.dev` and `ROOT_COMPANY=kebo`, then `sudo docker compose up -d`.
 
 Switching off is the reverse of step 3: empty `BASE_DOMAIN`.
+
+## The marketing site (get.rfq.fawadiqbal.dev)
+
+The page people find RFQ Desk on: what it does, the plans, request a demo, ask a question, sign in. Without addresses per company it is at `/site`.
+
+- **Edited in the platform panel, Website**: headline, features, steps, which plans show (prices and features come from the plans themselves), customer words (real ones only), questions, the closing band, contact details, and the title, description and picture for search and sharing. Saving keeps a **draft**; "Look at the draft" shows it as visitors would see it; **Publish** puts it live; the draft can be thrown away. Until the first publish the page shows ready-made words (`DEFAULT_SITE` in `packages/shared/src/site.ts`).
+- **Leads**: the demo request, the question form and self sign-up all become client inquiries (Leads), with an email to the platform admins. Each keeps where it came from: the link's campaign tags (`utm_source`, `utm_medium`, `utm_campaign`), the site that sent them, the page and the button pressed; `channel` is one word to group by (the campaign source, else the referring site, else `direct`). Spam: a hidden field bots fill in, a limit per address (5 an hour) and for everyone, and Cloudflare Turnstile when `TURNSTILE_SECRET_KEY` is set.
+- **Sign in**: asks for the work email and emails the sign-in address of each company that email has an account in (the answer is the same whether or not it has one, so nobody learns who uses RFQ Desk).
+- **Numbers** (platform Overview, Website card): visitors, leads, how many reached a demo or trial and how many pay, this month against the last, the last 30 days, and per channel. Visits are counted by the web server without cookies: each visitor once a day, told apart by a one-way hash of the day, their address and browser, kept two days; crawlers and link previews are left out. Leads count in the month they came in, by how far they have got now.
+
+Tag the links in ads and posts so their visitors and leads show per source, e.g. `https://get.rfq.fawadiqbal.dev/?utm_source=facebook&utm_campaign=november`.

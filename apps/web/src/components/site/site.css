@@ -1,0 +1,103 @@
+/*
+ * The marketing site (get.<BASE_DOMAIN>). Its own small palette, always light:
+ * paper and violet ink like the app, and one red, kept for the company seal.
+ * One typeface, Archivo, whose width is the voice: expanded for headlines,
+ * normal for reading.
+ */
+@font-face {
+  font-family: "Site Archivo";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url("/fonts/archivo-latin-wdth.woff2") format("woff2-variations");
+}
+
+.site {
+  --s-ink: #1b1530;
+  --s-steel: #5d5872;
+  --s-line: #e4e0ee;
+  --s-mist: #f6f4fb;
+  --s-paper: #ffffff;
+  --s-violet: #6d28d9;
+  --s-violet-deep: #4c1d95;
+  --s-violet-soft: #ede7fb;
+  --s-seal: #c8102e;
+  color-scheme: light;
+  background: var(--s-paper);
+  color: var(--s-ink);
+  font-family: "Site Archivo", ui-sans-serif, system-ui, sans-serif;
+  font-stretch: 100%;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headlines: wide and heavy, like the lettering on a container. */
+.site .s-display {
+  font-stretch: 125%;
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.site .s-heading {
+  font-stretch: 118%;
+  font-weight: 750;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.site .s-narrow {
+  font-stretch: 82%;
+}
+.site .s-lead {
+  text-wrap: pretty;
+}
+
+.site a:focus-visible,
+.site button:focus-visible,
+.site summary:focus-visible,
+.site input:focus-visible,
+.site textarea:focus-visible {
+  outline: 3px solid color-mix(in oklab, var(--s-violet) 60%, white);
+  outline-offset: 2px;
+}
+
+/* The seal comes down once, the moment the page opens. */
+.site .s-seal {
+  animation: s-stamp 520ms cubic-bezier(0.2, 0.9, 0.25, 1.15) 700ms both;
+}
+@keyframes s-stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.9) rotate(-28deg);
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.92;
+    transform: scale(1) rotate(-12deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site .s-seal {
+    animation: none;
+    opacity: 0.92;
+    transform: rotate(-12deg);
+  }
+}
+
+.site details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.site details > summary::-webkit-details-marker {
+  display: none;
+}
+.site details[open] .s-plus {
+  transform: rotate(45deg);
+}
+.site .s-plus {
+  transition: transform 160ms ease;
+}

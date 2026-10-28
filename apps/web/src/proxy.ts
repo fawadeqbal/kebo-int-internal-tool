@@ -8,7 +8,8 @@ import { addressOf, adminOrigin, marketingOrigin } from "@kebo/shared";
  *    with every call (X-Company); a renamed company's old name redirects to the
  *    new one for a while; an unknown name shows "no company here".
  *  - admin.<BASE_DOMAIN>: the platform area (/platform).
- *  - get.<BASE_DOMAIN>: the marketing site (request a demo, sign up).
+ *  - get.<BASE_DOMAIN>: the marketing site (/ is app/site, /sign-in finds a
+ *    company's address by email; request a demo, sign up).
  *  - <BASE_DOMAIN>: sends people on to ROOT_COMPANY's own address (same page),
  *    except the marketing pages (to get.), set-password links from older emails,
  *    and the phone app's PDFs (Bearer, not a cookie). The API under /api is not
@@ -53,10 +54,14 @@ export async function proxy(req: NextRequest) {
   if (path.startsWith("/platform")) return NextResponse.redirect(`${admin}${path}${req.nextUrl.search}`);
   const marketing = marketingOrigin(base, "");
   if (a.kind === "marketing") {
-    if (isMarketingPath(path)) return pass();
-    // The marketing page itself comes next; until then its address opens "request a demo".
-    return NextResponse.redirect(`${marketing}/request-a-demo`);
+    if (isMarketingPath(path) || path.startsWith("/site")) return pass();
+    // The page itself and "Sign in" (find your company), at short paths.
+    if (path === "/") return NextResponse.rewrite(new URL(`/site${req.nextUrl.search}`, req.url), { request: { headers } });
+    if (path === "/sign-in") return NextResponse.rewrite(new URL(`/site/sign-in${req.nextUrl.search}`, req.url), { request: { headers } });
+    return NextResponse.redirect(`${marketing}/`);
   }
+  // The marketing site's pages live at its own address only.
+  if (path === "/site" || path.startsWith("/site/")) return NextResponse.redirect(`${marketing}${path.slice(5) || "/"}${req.nextUrl.search}`);
   if (a.kind === "company") {
     const slug = await companyAt(a.slug);
     if (!slug) return NextResponse.rewrite(new URL("/no-company", req.url));

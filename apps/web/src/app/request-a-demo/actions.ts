@@ -2,6 +2,7 @@
 
 import { apiFetch } from "@/lib/api";
 import { formValues, type ActionState } from "@/lib/actions";
+import { originFromForm } from "@/lib/origin";
 
 /** The public "Request a demo" form: becomes a lead for the platform admin. */
 export async function requestDemoAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -19,6 +20,7 @@ export async function requestDemoAction(_prev: ActionState, form: FormData): Pro
       message: v.message,
       website: v.website,
       botToken: v["cf-turnstile-response"],
+      origin: originFromForm(form),
     }),
   });
   const body = await res.json().catch(() => ({}));
