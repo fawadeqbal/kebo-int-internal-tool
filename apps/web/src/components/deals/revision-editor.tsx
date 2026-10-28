@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, CornerDownRight, Lock, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Lock, Plus, Trash2 } from "lucide-react";
 import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import {
   BALANCE_TERMS,
@@ -555,11 +555,8 @@ export function RevisionEditor({
                             <th scope="row" className={cn(CELL, "bg-surface-2 text-center text-xs font-normal text-muted tabular")}>
                               {l.no}
                             </th>
-                            <td className={cn(CELL, "py-1.5", l.parentId && "pl-5")}>
-                              <span className="flex items-start gap-1">
-                                {l.parentId && <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />}
-                                <span className="whitespace-pre-line">{l.description}</span>
-                              </span>
+                            <td className={cn(CELL, "py-1.5")}>
+                              <span className="block whitespace-pre-line">{l.description}</span>
                               <span className="block text-xs text-muted">
                                 {[l.model, opt.factoryQuoteId && l.answersNo ? `for item ${l.answersNo}` : null].filter(Boolean).join(" · ")}
                               </span>

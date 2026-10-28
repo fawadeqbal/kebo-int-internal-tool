@@ -54,9 +54,9 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
                 const inQty = Number(l.receivedQty);
                 const full = inQty >= Number(l.quantity);
                 return (
-                  <li key={l.id} className={cn("flex items-center justify-between gap-3 px-4 py-2 text-sm", l.no.includes(".") && "pl-9")}>
+                  <li key={l.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
                     <span className="min-w-0">
-                      <span className="mr-2 text-muted tabular">{l.no}</span>
+                      <span className="mr-2 inline-block w-8 text-muted tabular">{l.no}</span>
                       <span className="font-medium">{l.description.split("\n")[0]}</span>
                       <span className="text-muted">
                         {" "}

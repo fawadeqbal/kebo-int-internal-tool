@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
-import { Card, CardBody, CardHeader, cn, DetailList } from "@kebo/ui";
+import { Card, CardBody, CardHeader, DetailList } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { dateTime, qty } from "@/lib/format";
@@ -52,7 +52,7 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
             <CardBody className="flex flex-col gap-4">
               <ul className="divide-y divide-line rounded-lg border border-line">
                 {d.items.map((it) => (
-                  <li key={it.id} className={cn("flex items-start justify-between gap-3 px-3 py-2.5", it.parentId && "bg-surface-2/40 pl-8")}>
+                  <li key={it.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
                     <div className="flex min-w-0 gap-2.5">
                       <span className="w-7 shrink-0 text-sm text-muted tabular">{it.no}</span>
                       <div className="min-w-0">

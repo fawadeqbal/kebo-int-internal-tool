@@ -1,4 +1,3 @@
-import { CornerDownRight } from "lucide-react";
 import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, basisText, LINE_TYPE_LABEL } from "@kebo/shared";
 import { Badge, cn, DetailList, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { date, money, qty } from "@/lib/format";
@@ -102,11 +101,8 @@ function OptionSummary({ o, currency, incoterm, single }: { o: OptionView; curre
           {o.lines.map((l) => (
             <Tr key={l.id}>
               <Td className="text-muted tabular">{l.no}</Td>
-              <Td className={cn("min-w-52", l.no.includes(".") && "pl-6")}>
-                <span className="flex items-start gap-1">
-                  {l.no.includes(".") && <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />}
-                  <span className="block max-w-[28rem] text-sm whitespace-pre-line">{l.description}</span>
-                </span>
+              <Td className="min-w-52">
+                <span className="block max-w-[28rem] text-sm whitespace-pre-line">{l.description}</span>
                 <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
                   {l.type !== "goods" && <Badge tone="outline">{LINE_TYPE_LABEL[l.type]}</Badge>}
                   {l.model}
