@@ -88,7 +88,9 @@ export async function platformPasswordAction(_prev: ActionState, form: FormData)
 
 /** Open a company: its session replaces any company session in this browser, then its Home. */
 export async function openCompanyAction(id: string) {
-  const r = await platformApi.post<{ token: string; expiresInSeconds: number }>(`/companies/${id}/open`);
+  const r = await platformApi.post<{ token: string; expiresInSeconds: number; enterUrl: string | null }>(`/companies/${id}/open`);
+  // At the company's own address (companies with addresses): a one-time link carries the session there.
+  if (r.enterUrl) redirect(r.enterUrl);
   (await cookies()).set(SESSION_COOKIE, r.token, cookieOptions(r.expiresInSeconds));
   redirect("/dashboard");
 }
@@ -97,7 +99,8 @@ export async function openCompanyAction(id: string) {
 export async function leaveCompanyAction() {
   await api.post("/auth/logout").catch(() => undefined);
   (await cookies()).set(SESSION_COOKIE, "", cookieOptions(0));
-  redirect("/platform/companies");
+  const base = process.env.BASE_DOMAIN;
+  redirect(base ? `https://admin.${base}/platform/companies` : "/platform/companies");
 }
 
 /* ---------------------------------------------------------------- companies */

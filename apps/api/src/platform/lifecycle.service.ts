@@ -81,7 +81,7 @@ export class LifecycleService {
             ["Ends", ends],
           ],
           body: `After it ends you can still look at everything for ${LIFECYCLE.readOnlyDays} days, but not change anything. To keep using RFQ Desk, reply to this email or contact us.`,
-          link: this.mail.url("/login"),
+          link: this.mail.companyUrl(c.slug, "/login"),
           linkLabel: "Open RFQ Desk",
         });
       }

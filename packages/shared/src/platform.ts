@@ -138,6 +138,29 @@ export const slugField = z
     if (p) ctx.addIssue({ code: "custom", message: p });
   });
 
+/* ---------------------------------------------------------------- addresses */
+
+export type Address = { kind: "root" } | { kind: "admin" } | { kind: "company"; slug: string } | { kind: "other" };
+
+/**
+ * What a host name is, with addresses per company: the platform's own address
+ * (root), the platform admin's (admin.), a company's (<short name>.), or none of these.
+ */
+export function addressOf(host: string | null | undefined, baseDomain: string): Address {
+  const h = (host ?? "").toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
+  const base = baseDomain.toLowerCase();
+  if (h === base || h === `www.${base}`) return { kind: "root" };
+  if (!h.endsWith(`.${base}`)) return { kind: "other" };
+  const sub = h.slice(0, -base.length - 1);
+  if (sub === "admin") return { kind: "admin" };
+  if (sub.includes(".") || !/^[a-z0-9-]{1,63}$/.test(sub)) return { kind: "other" };
+  return { kind: "company", slug: sub };
+}
+
+/** A company's address ("https://acme.rfq.example.com"), or the one shared address when there are none. */
+export const companyOrigin = (slug: string, baseDomain: string | undefined, fallback: string) => (baseDomain ? `https://${slug}.${baseDomain}` : fallback.replace(/\/$/, ""));
+export const adminOrigin = (baseDomain: string | undefined, fallback: string) => (baseDomain ? `https://admin.${baseDomain}` : fallback.replace(/\/$/, ""));
+
 /* ---------------------------------------------------------------- lifecycle */
 
 export interface LifecycleInput {

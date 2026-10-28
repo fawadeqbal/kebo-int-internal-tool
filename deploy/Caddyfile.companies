@@ -1,0 +1,33 @@
+# Addresses per company (docs/companies.md › Addresses): <short name>.__DOMAIN__ for each
+# company and admin.__DOMAIN__ for the platform, next to the __DOMAIN__ block in Caddyfile.site.
+#
+# Certificates are made on demand, one per address, and only for addresses the API says
+# are real (the platform's own and existing companies'). That check goes in Caddy's
+# global options (the block at the very top of the server's Caddyfile):
+#
+#   {
+#   	on_demand_tls {
+#   		ask http://kebo-desk-api:4000/api/platform/public/domain-check
+#   	}
+#   }
+#
+# DNS: one record, *.__DOMAIN__ → the server (A record), besides the one for __DOMAIN__.
+*.__DOMAIN__ {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	request_body {
+		max_size 30MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	handle /api/* {
+		reverse_proxy kebo-desk-api:4000
+	}
+	handle {
+		reverse_proxy kebo-desk-web:3000
+	}
+}

@@ -67,6 +67,11 @@ export const serverEnvSchema = z.object({
   DEFAULT_COMPANY: z.string().trim().toLowerCase().optional(),
   /** Database connections each active company may hold at once. */
   COMPANY_POOL_SIZE: z.coerce.number().int().min(1).max(20).default(4),
+  /**
+   * Addresses per company (e.g. rfq.fawadiqbal.dev): each company at <short name>.<BASE_DOMAIN>, the
+   * platform at admin.<BASE_DOMAIN>. Empty: one address for everything (the email picks the company).
+   */
+  BASE_DOMAIN: z.string().trim().toLowerCase().optional(),
   /** Where new client inquiries (demo requests, sign-ups) and platform warnings are emailed. */
   PLATFORM_EMAIL: z.string().trim().optional(),
 });

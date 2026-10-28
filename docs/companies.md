@@ -110,6 +110,26 @@ git checkout <previous commit> && sudo docker compose up -d --build
 
 (The pre-deploy copy is from before the migrations, so it matches the previous code; the time zone reset gives the old code the database's old time zone back.)
 
-## Addresses (later)
+## Addresses per company (switched on last)
 
-Today every company works at the one address and the email picks the company; the platform area is `/platform`. Planned last: an address per company (`name.rfq.fawadiqbal.dev`), `admin.rfq.fawadiqbal.dev` for the platform, a wildcard DNS record, and Caddy's on-demand certificates with an "ask" check so only real companies get one. The short names already follow the rules for that (3–30 characters, a–z 0–9 and dashes, reserved names refused).
+Until switched on, every company works at the one address and the email picks the company; the platform area is `/platform`. Everything for addresses per company is built and tested, and stays off while `BASE_DOMAIN` is empty.
+
+When on (`BASE_DOMAIN=rfq.fawadiqbal.dev`):
+
+| Address | Is |
+|---|---|
+| `acme.rfq.fawadiqbal.dev` | the company with the short name `acme`: its sign-in page shows its name, only its accounts can sign in there, and a session from another company is refused. |
+| `admin.rfq.fawadiqbal.dev` | the platform area (`/platform` anywhere else is sent there). Opening a company takes the platform admin to the company's address with a one-time link (2 minutes). |
+| `rfq.fawadiqbal.dev` | with `ROOT_COMPANY=kebo`: Kebo, as today (bookmarks and the mobile app keep working); otherwise sign-in by email and the public pages. |
+| a renamed company's old name | redirects to the new one for 30 days |
+| an unknown name | "There is no company at this address" |
+
+Emails link to the company's own address. Short names follow the rules for addresses (3–30 characters, a–z 0–9 and dashes, reserved names refused).
+
+To switch on:
+
+1. **DNS**: an A record `*.rfq` → `145.241.156.60` (the one for `rfq` stays).
+2. **Caddy** (the shared server Caddy): the `on_demand_tls { ask … }` global option and the site block from `deploy/Caddyfile.companies` (with `__DOMAIN__` = `rfq.fawadiqbal.dev`); reload Caddy. Certificates are then made per company address the first time it is opened, and only for real companies (`/api/platform/public/domain-check`).
+3. **`.env`** on the server: `BASE_DOMAIN=rfq.fawadiqbal.dev` and `ROOT_COMPANY=kebo`, then `sudo docker compose up -d` (or a deploy).
+
+Switching off is the reverse of step 3: empty `BASE_DOMAIN`.

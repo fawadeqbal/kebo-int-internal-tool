@@ -261,8 +261,8 @@ export class PlatformCompaniesService {
           ],
           body:
             input.kind === "demo"
-              ? `Set your password with the button below, then sign in at ${this.mail.url("/login")}. The demo ${input.sampleData ? "has sample customers, factories and inquiries to try things with" : "starts empty"}.`
-              : `Set your password with the button below (the link works for 7 days), then sign in at ${this.mail.url("/login")}. You can add your team in Settings → People.`,
+              ? `Set your password with the button below, then sign in at ${this.mail.companyUrl(company.slug, "/login")}. The demo ${input.sampleData ? "has sample customers, factories and inquiries to try things with" : "starts empty"}.`
+              : `Set your password with the button below (the link works for 7 days), then sign in at ${this.mail.companyUrl(company.slug, "/login")}. You can add your team in Settings → People.`,
           link,
           linkLabel: "Set my password",
         })

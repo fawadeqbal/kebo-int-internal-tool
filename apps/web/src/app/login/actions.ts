@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { apiFetch, SESSION_COOKIE } from "@/lib/api";
+import { addressCompany, apiFetch, SESSION_COOKIE } from "@/lib/api";
 import type { ActionState } from "@/lib/actions";
 import { localPath } from "@/lib/paths";
 
@@ -12,7 +12,8 @@ const safeNext = (v: unknown) => localPath(v, "/dashboard");
 
 export async function loginAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const email = String(form.get("email") ?? "");
-  const company = String(form.get("company") ?? "") || undefined;
+  // At a company's own address only its accounts count; otherwise the person may have chosen one.
+  const company = (await addressCompany()) ?? (String(form.get("company") ?? "") || undefined);
   const res = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ email, password: String(form.get("password") ?? ""), company }), auth: false });
   const body = await res.json().catch(() => ({}));
   // Their email and password fit more than one company: they choose (and type the password again).

@@ -5,6 +5,7 @@ import { ForbiddenError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { CompaniesService } from "../company/companies.service";
 import { CompanyContext, type CompanyInfo } from "../company/company-context";
+import { COMPANY_HEADER } from "../company/company-resolver";
 import { FEATURE, IS_PUBLIC, PERMISSIONS, READ_ONLY_ALLOWED, SETUP_ALLOWED } from "./decorators";
 import {
   SESSION_COOKIE,
@@ -62,8 +63,10 @@ export class AuthGuard implements CanActivate {
     const claims = await this.tokens.verify(token);
     if (!claims) throw new UnauthorizedException("Please sign in.");
     const company = CompanyContext.current();
-    // The company the token belongs to is gone.
+    // The company the token belongs to is gone; or the token is used at another company's address.
     if (!company || (claims.companyId && claims.companyId !== company.id)) throw new UnauthorizedException("Please sign in.");
+    const named = req.headers[COMPANY_HEADER];
+    if (typeof named === "string" && named.trim() && named.trim().toLowerCase() !== company.slug) throw new UnauthorizedException("Please sign in.");
 
     const session = await this.prisma.db.session.findUnique({
       where: { id: claims.sessionId },

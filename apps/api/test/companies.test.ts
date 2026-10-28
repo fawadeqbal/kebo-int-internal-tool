@@ -66,6 +66,8 @@ describe("companies: isolation and the platform", () => {
   };
 
   beforeAll(async () => {
+    // Addresses per company are switched on for these tests (rfq.test).
+    process.env.BASE_DOMAIN = "rfq.test";
     app = await startApp();
     prisma = app.get(PrismaService);
     const email = `platform-${tag}@example.com`;
@@ -94,6 +96,7 @@ describe("companies: isolation and the platform", () => {
   });
 
   afterAll(async () => {
+    delete process.env.BASE_DOMAIN;
     await app?.close();
   });
 
@@ -157,9 +160,9 @@ describe("companies: isolation and the platform", () => {
     const after = (await kebo.get(`/inquiries/${kInquiries[0].id}`).expect(200)).body;
     expect(after.notes?.length ?? 0).toBe(before.notes?.length ?? 0);
 
-    // A Kebo token with B named in the header still works in Kebo only.
-    const viaHeader = (await kebo.get("/inquiries?pageSize=100").set("x-company", b.slug).expect(200)).body.rows as { id: string }[];
-    expect(viaHeader.map((r) => r.id).sort()).toEqual(kInquiries.map((r) => r.id).sort());
+    // A Kebo session used at B's address (B named in the header) is not accepted at all.
+    await kebo.get("/inquiries?pageSize=100").set("x-company", b.slug).expect(401);
+    await kebo.get("/inquiries?pageSize=5").set("x-company", "kebo").expect(200);
   });
 
   it("the database itself keeps companies apart, on every company table", async () => {
@@ -261,6 +264,16 @@ describe("companies: isolation and the platform", () => {
     const audit = (await api(app, opened.token).get("/audit").expect(200)).body;
     const rows = (audit.rows ?? audit) as { summary: string; user?: { name: string } | null; userName?: string }[];
     expect(JSON.stringify(rows)).toContain("Fawad Test (platform admin)");
+    // At the company's own address: a one-time link carries the session over.
+    expect(opened.enterUrl).toMatch(new RegExp(`^https://${b.slug}\\.rfq\\.test/enter\\?token=`));
+    const entered = (
+      await request(app.getHttpServer())
+        .post("/api/auth/enter")
+        .send({ token: decodeURIComponent(opened.enterUrl.split("token=")[1]) })
+        .expect(200)
+    ).body;
+    expect((await api(app, entered.token).get("/auth/me").expect(200)).body.viaPlatform).toBe(true);
+    await request(app.getHttpServer()).post("/api/auth/enter").send({ token: "not-a-token-at-all" }).expect(401);
     // Hidden from the company's people.
     const bAdmin = await signIn(app, `boss@iso-${tag}.test`, "Boss12345678");
     const people = (await api(app, bAdmin).get("/users").expect(200)).body as { name: string }[];
@@ -273,6 +286,16 @@ describe("companies: isolation and the platform", () => {
         password: "!",
       })
       .expect(401);
+  });
+
+  it("only real companies' addresses get a certificate", async () => {
+    const check = (domain: string) => request(app.getHttpServer()).get(`/api/platform/public/domain-check?domain=${domain}`);
+    await check("rfq.test").expect(200);
+    await check("admin.rfq.test").expect(200);
+    await check("kebo.rfq.test").expect(200);
+    await check("nobody-here.rfq.test").expect(404);
+    await check("a.b.rfq.test").expect(404);
+    await check("evil.example.com").expect(404);
   });
 
   it("plans: limits warn, then block; features switch parts off", async () => {

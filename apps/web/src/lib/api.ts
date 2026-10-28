@@ -58,6 +58,9 @@ async function client(): Promise<Record<string, string>> {
     const xff = h.get("x-forwarded-for");
     if (ua) out["user-agent"] = ua;
     if (xff) out["x-forwarded-for"] = xff;
+    // The company of this address (set by the proxy; only with addresses per company).
+    const company = process.env.BASE_DOMAIN ? h.get("x-company") : null;
+    if (company) out["x-company"] = company;
     return out;
   } catch {
     return {};
@@ -66,7 +69,7 @@ async function client(): Promise<Record<string, string>> {
 
 export async function apiFetch(path: string, init: RequestInit & { query?: Query; auth?: boolean; platform?: boolean } = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  for (const [k, v] of Object.entries(await client())) if (!headers.has(k)) headers.set(k, v);
+  for (const [k, v] of Object.entries(await client())) if (!headers.has(k) && !(init.platform && k === "x-company")) headers.set(k, v);
   const t = init.auth === false ? undefined : await token(init.platform);
   if (t) headers.set("authorization", `Bearer ${t}`);
   if (init.body && typeof init.body === "string") headers.set("content-type", "application/json");
@@ -101,3 +104,13 @@ export const platformApi = {
   patch: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(`/platform${path}`, { method: "PATCH", body: JSON.stringify(body ?? {}), platform: true }), true),
   delete: async <T>(path: string, body?: unknown) => parse<T>(await apiFetch(`/platform${path}`, { method: "DELETE", body: JSON.stringify(body ?? {}), platform: true }), true),
 };
+
+/** The company of this address, when companies have their own addresses (else null: the email decides). */
+export async function addressCompany(): Promise<string | null> {
+  if (!process.env.BASE_DOMAIN) return null;
+  try {
+    return (await headers()).get("x-company");
+  } catch {
+    return null;
+  }
+}

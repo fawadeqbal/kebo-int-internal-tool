@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, Res } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, Res } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {
+  addressOf,
   companyCreateInput,
   companyStatusInput,
   companyUpdateInput,
@@ -23,7 +24,9 @@ import {
   type PlanInput,
   type SignUpInput,
 } from "@kebo/shared";
-import { DomainError } from "@kebo/utils";
+import { DomainError, NotFoundError } from "@kebo/utils";
+import { ENV, type Env } from "../config/env";
+import { CompaniesService } from "../common/company/companies.service";
 import { Validate } from "../common/http/zod.pipe";
 import { Public } from "../common/auth/decorators";
 import { PrismaService } from "../database/prisma.service";
@@ -65,6 +68,8 @@ export class PlatformPublicController {
     private readonly leads: LeadsService,
     private readonly platform: PlatformCompaniesService,
     private readonly accounts: AccountsService,
+    private readonly companies: CompaniesService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   @Public()
@@ -102,6 +107,29 @@ export class PlatformPublicController {
     if (!s && name) return { suggestion: await this.platform.freeSlug(name) };
     const problem = await this.platform.slugTaken(s);
     return { slug: s, free: !problem, problem, suggestion: problem ? await this.platform.freeSlug(s || name || "company") : null };
+  }
+
+  /**
+   * Caddy asks before getting a certificate for a host (on-demand TLS): only the
+   * platform's own addresses and real companies' get one. 200 yes, 404 no.
+   */
+  @Public()
+  @Get("domain-check")
+  async domainCheck(@Query("domain") domain = "", @Res({ passthrough: true }) res: Response) {
+    const base = this.env.BASE_DOMAIN;
+    const a = base ? addressOf(domain, base) : { kind: "other" as const };
+    const ok = a.kind === "root" || a.kind === "admin" || (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
+    res.status(ok ? 200 : 404);
+    return { ok };
+  }
+
+  /** The company at an address (the web app's check before showing a company's pages). */
+  @Public()
+  @Get("company")
+  async company(@Query("slug") slug = "") {
+    const c = await this.companies.bySlug(slug);
+    if (!c) throw new NotFoundError("Company");
+    return { slug: c.slug, name: c.name, status: c.status };
   }
 
   @Public()

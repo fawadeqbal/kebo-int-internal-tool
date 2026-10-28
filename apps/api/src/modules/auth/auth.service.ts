@@ -226,6 +226,20 @@ export class AuthService {
     };
   }
 
+  /**
+   * The one-time link a platform admin follows into a company at its own
+   * address (made when they open it): the session it names, for this browser.
+   */
+  async enter(token: string) {
+    const claims = await this.tokens.verifyPurpose("enter", token);
+    const company = claims && (await this.companies.byId(String(claims.cid)));
+    const session = company && (await this.prisma.company(company.id).session.findUnique({ where: { id: String(claims.sid) } }));
+    if (!claims || !company || !session || session.userId !== claims.uid || session.revokedAt || session.expiresAt < new Date() || Date.now() - session.createdAt.getTime() > 5 * 60_000) {
+      throw new HttpException({ message: "This link has expired. Open the company again from the platform." }, HttpStatus.UNAUTHORIZED);
+    }
+    return { token: await this.tokens.sign(session.userId, session.id, company.id), expiresInSeconds: Math.max(60, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000)), slug: company.slug };
+  }
+
   async logout(user: SessionUser) {
     await this.prisma.db.session.update({ where: { id: user.sessionId }, data: { revokedAt: new Date() } });
   }

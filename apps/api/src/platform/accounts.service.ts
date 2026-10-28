@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { DomainError, NotFoundError } from "@kebo/utils";
+import { companyOrigin } from "@kebo/shared";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { TokensService } from "../common/auth/tokens.service";
@@ -118,7 +119,15 @@ export class AccountsService {
       await this.prisma.platform.platformLog.create({
         data: { adminId: admin.id, adminName: admin.name, action: "open", companyId, summary: `Opened ${company.name}` },
       });
-      return { token: await this.tokens.sign(user.id, session.id, companyId), expiresInSeconds: VISIT_HOURS * 3600, slug: company.slug };
+      return {
+        token: await this.tokens.sign(user.id, session.id, companyId),
+        expiresInSeconds: VISIT_HOURS * 3600,
+        slug: company.slug,
+        // With an address per company the session is made there: this one-time link (2 minutes) carries it over.
+        enterUrl: this.env.BASE_DOMAIN
+          ? `${companyOrigin(company.slug, this.env.BASE_DOMAIN, this.env.APP_URL)}/enter?token=${encodeURIComponent(await this.tokens.signPurpose("enter", { sid: session.id, uid: user.id, cid: companyId }, "2m"))}`
+          : null,
+      };
     });
   }
 }

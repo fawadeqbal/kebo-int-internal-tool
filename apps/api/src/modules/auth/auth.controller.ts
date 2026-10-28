@@ -47,6 +47,14 @@ export class AuthController {
     return this.auth.completeTwoStep(tokenFrom(req.headers), body.code, { ip: clientIp(req), userAgent: req.headers["user-agent"] });
   }
 
+  /** { token }: a platform admin's one-time link into a company (see AuthService.enter). */
+  @Public()
+  @Post("enter")
+  @HttpCode(200)
+  enter(@Body(Validate(z.object({ token: z.string().min(10).max(4000) }))) body: { token: string }) {
+    return this.auth.enter(body.token);
+  }
+
   @AllowDuringTwoStepSetup()
   @AllowWhenReadOnly()
   @Post("logout")
