@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { optionalDate } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/auth/decorators";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
@@ -40,6 +40,7 @@ class ReportsController {
     return this.reports.report(user, ReportsService.parseRange(q.from ?? undefined, q.to ?? undefined, this.clock.today()), q.staff);
   }
 
+  @RequireFeature("audit_log")
   @Get("audit")
   @RequirePermissions("audit.view")
   audit(@CurrentUser() user: SessionUser, @Query(Validate(auditQuery)) q: z.infer<typeof auditQuery>) {

@@ -331,6 +331,53 @@ describe("companies: isolation and the platform", () => {
     await api(app, keboManager).get("/insights").expect(200);
   });
 
+  it("each feature the plan leaves out is refused by the API, not only hidden", async () => {
+    const plans = (await plat().get("/plans").expect(200)).body as { id: string; name: string; features: string[] }[];
+    const starter = plans.find((p) => p.name === "Starter")!;
+    expect(starter.features).toEqual(["excel"]);
+    expect(plans.map((p) => p.name)).toEqual(expect.arrayContaining(["Starter", "Team", "Business", "Unlimited"]));
+    const c = await makeCompany(`feat-${tag}`, { sampleData: true, planId: starter.id });
+    const mine = api(app, c.token);
+    const off = async (res: request.Response) => {
+      expect(res.status, JSON.stringify(res.body)).toBe(403);
+      expect(res.body.code).toBe("plan_feature");
+    };
+    await off(await mine.get("/expenses"));
+    await off(await mine.post("/expenses", {}));
+    await off(await mine.get("/audit"));
+    await off(await mine.post("/roles", { name: "Extra", permissions: [] }));
+    await off(await mine.get("/money/cash-book"));
+    await off(await mine.get("/insights"));
+    // The order's money shows no costs.
+    const order = ((await mine.get("/orders").expect(200)).body as { id: string }[])[0];
+    expect((await mine.get(`/orders/${order.id}/money`).expect(200)).body.expenses).toBeNull();
+    // The phone app: no sign-in, and existing sessions stop.
+    const phone = await request(app.getHttpServer())
+      .post("/api/auth/login")
+      .set("user-agent", "Dart/3.5 (dart:io)")
+      .send({ email: c.email, password: "Boss12345678" });
+    expect(phone.status).toBe(403);
+    expect(phone.body.code).toBe("plan_feature");
+    await off(await mine.get("/customers").set("user-agent", "Dart/3.5 (dart:io)"));
+    // The website form.
+    const form = await request(app.getHttpServer())
+      .post(`/api/public/inquiries?company=${c.slug}`)
+      .send({
+        fullName: "Web Buyer",
+        email: "buyer@web.test",
+        phone: "+92 300 1234567",
+        category: "Valves",
+        requirements: "100 valves please",
+      });
+    expect(form.status).toBe(403);
+    // A bigger plan switches them on at once.
+    const business = plans.find((p) => p.name === "Business")!;
+    await plat().patch(`/companies/${c.id}`, { planId: business.id }).expect(200);
+    await mine.get("/expenses").expect(200);
+    await mine.get("/audit").expect(200);
+    expect((await mine.get(`/orders/${order.id}/money`).expect(200)).body.expenses).not.toBeNull();
+  });
+
   it("read-only lets people look but not change; off lets nobody in", async () => {
     const c = await makeCompany(`ro-${tag}`, { sampleData: false });
     await plat().post(`/companies/${c.id}/status`, { status: "read_only" }).expect(200);

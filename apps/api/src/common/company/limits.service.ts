@@ -1,6 +1,6 @@
 import { Global, Injectable, Module } from "@nestjs/common";
-import { DomainError } from "@kebo/utils";
-import { PLAN_FEATURE_KEYS } from "@kebo/shared";
+import { DomainError, ForbiddenError } from "@kebo/utils";
+import { PLAN_FEATURE_KEYS, planFeatureName, type PlanFeature } from "@kebo/shared";
 import { PrismaService } from "../../database/prisma.service";
 import { CompaniesService } from "./companies.service";
 import { CompanyContext, type CompanyInfo } from "./company-context";
@@ -74,6 +74,19 @@ export class LimitsService {
       usage: { users: usage.users, storageMb: Math.round(storageMb * 10) / 10 },
       warnings,
     };
+  }
+
+  /** Whether the company's plan includes a feature (no plan: every feature). */
+  async allows(feature: PlanFeature, company: CompanyInfo = CompanyContext.require()) {
+    const plan = await this.companies.plan(company);
+    return !plan || plan.features.includes(feature);
+  }
+
+  /** Refuse when the company's plan does not include the feature. */
+  async require(feature: PlanFeature, company?: CompanyInfo) {
+    if (!(await this.allows(feature, company))) {
+      throw new ForbiddenError(`Your plan does not include ${planFeatureName(feature).toLowerCase()}. Ask the platform admin to switch it on.`, "plan_feature");
+    }
   }
 
   /** Before someone is added or switched on. */

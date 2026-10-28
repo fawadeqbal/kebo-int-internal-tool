@@ -19,7 +19,7 @@ import {
   Tr,
 } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { load, requireUser } from "@/lib/session";
+import { load, requireUser, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import type { CustomerDetail } from "@/lib/types-people";
@@ -46,7 +46,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
-  const managers = can(me, "expenses.manage");
+  const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const tabs: Tab[] = ["overview", "inquiries", "orders", "money", "history"];
   // Old links: ?tab=payments and ?tab=account (now the Money tab's two views).
   const asked = sp.tab === "deals" ? "inquiries" : sp.tab === "payments" ? "money" : sp.tab === "account" ? "money" : sp.tab;

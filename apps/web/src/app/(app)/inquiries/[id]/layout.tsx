@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { can, CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { buttonClass, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { load, requireUser } from "@/lib/session";
+import { load, requireUser, hasFeature } from "@/lib/session";
 import { date } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import { DealTabs } from "./tabs";
@@ -86,7 +86,7 @@ export default async function DealLayout({ children, params }: { children: React
         id={d.id}
         source={can(me, "sourcing.manage")}
         orderId={order?.id ?? null}
-        managers={can(me, "expenses.manage")}
+        managers={can(me, "expenses.manage") && (await hasFeature("expenses"))}
       />
       <div className="mt-5">{children}</div>
     </div>

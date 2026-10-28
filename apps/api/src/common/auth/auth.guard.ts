@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { can, permissionsOfRole, type Permission } from "@kebo/shared";
+import { can, isMobileApp, permissionsOfRole, planFeatureName, type Permission } from "@kebo/shared";
 import { ForbiddenError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { CompaniesService } from "../company/companies.service";
@@ -121,10 +121,13 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenError(`Your role (${u.access.name}) needs two-step sign-in. Set it up to carry on.`, "two_step_setup");
     }
 
+    // Plan features: the route's own, and the phone app as a whole.
     const feature = this.reflector.getAllAndOverride<string | undefined>(FEATURE, targets);
-    if (feature) {
+    const needed = [feature, isMobileApp(req.headers["user-agent"]) && !user.viaPlatform ? "mobile_app" : undefined].filter((f): f is string => !!f);
+    if (needed.length) {
       const plan = await this.companies.plan(company);
-      if (plan && !plan.features.includes(feature)) throw new ForbiddenError("Your plan does not include this. Ask the platform admin to switch it on.", "plan_feature");
+      const off = plan ? needed.find((f) => !plan.features.includes(f)) : undefined;
+      if (off) throw new ForbiddenError(`Your plan does not include ${planFeatureName(off).toLowerCase()}. Ask the platform admin to switch it on.`, "plan_feature");
     }
 
     const required = this.reflector.getAllAndOverride<Permission[] | undefined>(PERMISSIONS, targets) ?? [];

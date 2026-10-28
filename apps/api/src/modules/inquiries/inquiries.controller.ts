@@ -9,6 +9,7 @@ import { CurrentUser, Public, RequirePermissions } from "../../common/auth/decor
 import type { SessionUser } from "../../common/auth/session-user";
 import { CompanyContext } from "../../common/company/company-context";
 import { companyRefusal } from "../../common/auth/auth.guard";
+import { LimitsService } from "../../common/company/limits.service";
 import { InquiriesService } from "./inquiries.service";
 import { normalizeFields, websiteInquiry, WebsiteService } from "./website.service";
 
@@ -146,7 +147,10 @@ export class FilesController {
 @ApiTags("public")
 @Controller("public/inquiries")
 export class WebsiteController {
-  constructor(private readonly website: WebsiteService) {}
+  constructor(
+    private readonly website: WebsiteService,
+    private readonly limits: LimitsService,
+  ) {}
 
   private origins() {
     return (process.env.PUBLIC_FORM_ORIGINS ?? "https://keboint.com,https://www.keboint.com").split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean);
@@ -176,7 +180,8 @@ export class WebsiteController {
       return { ok: false, message: "This website is not allowed to send inquiries." };
     }
     const company = CompanyContext.current();
-    if (!company || companyRefusal(company, "POST")) {
+    // The website form is a plan feature.
+    if (!company || companyRefusal(company, "POST") || !(await this.limits.allows("website_form", company))) {
       res.status(403);
       return { ok: false, message: "Inquiries cannot be received right now. Please contact us on WhatsApp or by email." };
     }

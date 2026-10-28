@@ -8,13 +8,56 @@ import { CURRENCIES } from "./enums";
  * demos and trials. Shared by the API (rules) and the web (forms, labels).
  * ========================================================================== */
 
-/** Features a plan can switch on or off. Companies without a plan have them all. */
+/**
+ * Features a plan can switch on or off (the plan's checklist). Inquiries,
+ * quotations, orders, payments and documents are in every plan. Companies
+ * without a plan have every feature. Each one is hidden in the apps and refused
+ * by the API when off.
+ */
 export const PLAN_FEATURES = {
-  insights: "Insights (sales, profit and team reports)",
-  cash_book: "Money accounts and cash book",
   excel: "Excel templates, uploads and exports",
+  mobile_app: "Mobile app (sign in from the phone app)",
+  expenses: "Expenses (costs per order, inquiry, customer and factory)",
+  insights: "Insights (sales, profit and team reports, targets)",
+  email_reports: "Email reports (daily summary, monthly numbers)",
+  cash_book: "Cash book (money accounts and transfers)",
+  custom_roles: "Custom roles (beyond Super Admin, Manager and Staff)",
+  audit_log: "Audit log (every change in one place)",
+  website_form: "Website form (inquiries straight from their own website)",
 } as const;
 export type PlanFeature = keyof typeof PLAN_FEATURES;
+/** A plan feature's short name ("Expenses"), for badges. */
+export const planFeatureName = (f: string) => (PLAN_FEATURES[f as PlanFeature] ?? f).split(" (")[0];
+
+/** The ready-made plans (made once by a migration; the platform admin changes them freely). */
+export const DEFAULT_PLANS = [
+  { name: "Starter", price: 49, maxUsers: 3, maxStorageMb: 2 * 1024, features: ["excel"] },
+  {
+    name: "Team",
+    price: 99,
+    maxUsers: 10,
+    maxStorageMb: 10 * 1024,
+    features: ["excel", "mobile_app", "expenses", "insights", "email_reports"],
+  },
+  {
+    name: "Business",
+    price: 199,
+    maxUsers: 25,
+    maxStorageMb: 50 * 1024,
+    features: ["excel", "mobile_app", "expenses", "insights", "email_reports", "cash_book", "custom_roles", "audit_log", "website_form"],
+  },
+  {
+    name: "Unlimited",
+    price: 399,
+    maxUsers: null,
+    maxStorageMb: null,
+    features: ["excel", "mobile_app", "expenses", "insights", "email_reports", "cash_book", "custom_roles", "audit_log", "website_form"],
+  },
+] as const;
+
+/** A request from the RFQ Desk phone app (its user agent), as opposed to a browser. */
+export const isMobileApp = (userAgent: string | null | undefined) => /Dart\/|okhttp|kebo app/i.test(userAgent ?? "");
+
 export const PLAN_FEATURE_KEYS = Object.keys(PLAN_FEATURES) as PlanFeature[];
 
 /** How long things last (days). */
@@ -158,8 +201,10 @@ export function addressOf(host: string | null | undefined, baseDomain: string): 
 }
 
 /** A company's address ("https://acme.rfq.example.com"), or the one shared address when there are none. */
-export const companyOrigin = (slug: string, baseDomain: string | undefined, fallback: string) => (baseDomain ? `https://${slug}.${baseDomain}` : fallback.replace(/\/$/, ""));
-export const adminOrigin = (baseDomain: string | undefined, fallback: string) => (baseDomain ? `https://admin.${baseDomain}` : fallback.replace(/\/$/, ""));
+export const companyOrigin = (slug: string, baseDomain: string | undefined, fallback: string) =>
+  baseDomain ? `https://${slug}.${baseDomain}` : fallback.replace(/\/$/, "");
+export const adminOrigin = (baseDomain: string | undefined, fallback: string) =>
+  baseDomain ? `https://admin.${baseDomain}` : fallback.replace(/\/$/, "");
 
 /* ---------------------------------------------------------------- lifecycle */
 

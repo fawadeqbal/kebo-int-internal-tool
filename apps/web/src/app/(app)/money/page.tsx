@@ -79,7 +79,8 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   type Tab = "cash" | "expenses" | "receive" | "owe";
   // The cash book is a plan feature.
   const cashBook = await hasFeature("cash_book");
-  const allowed: Tab[] = [...(managers && cashBook ? (["cash"] as const) : []), ...(managers ? (["expenses"] as const) : []), ...(recorders ? (["receive"] as const) : []), "owe"];
+  const expensesOn = await hasFeature("expenses");
+  const allowed: Tab[] = [...(managers && cashBook ? (["cash"] as const) : []), ...(managers && expensesOn ? (["expenses"] as const) : []), ...(recorders ? (["receive"] as const) : []), "owe"];
   // Old links to profit & loss now open on Insights.
   if (sp.tab === "pnl") redirect("/insights?tab=profit&sub=pnl");
   const tab: Tab = allowed.includes(sp.tab as Tab) ? (sp.tab as Tab) : allowed[0]!;

@@ -48,7 +48,30 @@ The companies test fails if a table with `company_id` is not under row-level sec
 - **Client inquiries**: the public page `/request-a-demo` (and every self sign-up) makes a lead and emails the platform admins (`PLATFORM_EMAIL`, else every platform admin). Status: new → contacted → demo given → client / lost (with a reason); notes; follow-up date (shown on the overview when due).
 - **Give a demo** (from a lead, or New company → demo): a company named `<name>-demo`, filled with sample data, for 3 days (or as chosen), with the person as tenant admin. Extend, end now, make it real (keep or clear the data), delete.
 - **Companies**: name, short name (renaming keeps the old one working 30 days; a deleted company's name is held 90 days), plan, paid-until date, contact. Switch on, read-only or off by hand (the automatic rules then leave it alone, until "back to the automatic rules"). Export (a zip of every table as JSON and every file), delete (all data and files; type the short name to confirm), send the tenant admin a set-password link, open the company.
-- **Plans**: price, people limit, files limit, features (Insights, cash book, Excel). No plan = no limits and every feature (Kebo). Near a limit people see a warning; at the limit adding people or files stops. Nothing is deleted.
+- **Plans**: price, people limit, files limit, and a checklist of features. Near a limit people see a warning; at the limit adding people or files stops. Nothing is deleted. No plan = no limits and every feature (Kebo).
+
+  Every feature that is off is hidden in the apps **and refused by the API** (code `plan_feature`); `test/companies.test.ts` checks each one.
+
+  | Feature | When off |
+  |---|---|
+  | Excel | no templates, uploads, exports or imports |
+  | Mobile app | the phone app cannot sign in, and its open sessions stop |
+  | Expenses | no expenses anywhere (orders, inquiries, customers, factories, Money) |
+  | Insights | no Insights pages or targets |
+  | Email reports | no daily summary or monthly email |
+  | Cash book | no cash book, accounts or transfers |
+  | Custom roles | only Super Admin, Manager and Staff (no new roles) |
+  | Audit log | no audit log page (each record's own history stays) |
+  | Website form | the company's website form is refused |
+
+  Ready-made plans (made by a migration; change or remove them freely):
+
+  | | Starter | Team | Business | Unlimited |
+  |---|---|---|---|---|
+  | Price / month | $49 | $99 | $199 | $399 |
+  | People | 3 | 10 | 25 | no limit |
+  | Files | 2 GB | 10 GB | 50 GB | no limit |
+  | Features | Excel | + mobile app, expenses, Insights, email reports | everything | everything |
 - **Payments**: recorded by hand; each sets the new paid-until date.
 
 ### Automatic rules (the worker, every hour)

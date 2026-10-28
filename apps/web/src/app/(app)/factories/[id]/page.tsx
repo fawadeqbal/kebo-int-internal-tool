@@ -2,7 +2,7 @@ import Link from "next/link";
 import { can, EXPENSE_CATEGORY_LABEL } from "@kebo/shared";
 import { ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, LinkTabs, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { load, requirePermission } from "@/lib/session";
+import { load, requirePermission, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { ExpenseList } from "@/lib/types-money";
 import type { FactoryDetail } from "@/lib/types-people";
@@ -19,7 +19,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
   const { id } = await params;
   const sp = await searchParams;
   const me = await requirePermission("sourcing.manage");
-  const managers = can(me, "expenses.manage");
+  const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const tabs: Tab[] = ["prices", ...(managers ? (["costs"] as const) : []), "details", "history"];
   const tab: Tab = tabs.includes(sp.tab as Tab) ? (sp.tab as Tab) : "prices";
   const f = await load(() => api.get<FactoryDetail>(`/factories/${id}`));

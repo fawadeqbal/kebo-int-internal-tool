@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { can, type Permission, type Role } from "@kebo/shared";
+import { can, type Permission, type PlanFeature, type Role } from "@kebo/shared";
 import { api, ApiError } from "./api";
 
 export interface Me {
@@ -38,7 +38,7 @@ export interface CompanyView {
 export const getCompany = cache(async (): Promise<CompanyView | null> => api.get<CompanyView>("/company").catch(() => null));
 
 /** Whether the company's plan includes a feature (no answer: assume yes, the API still checks). */
-export async function hasFeature(feature: "insights" | "cash_book" | "excel") {
+export async function hasFeature(feature: PlanFeature) {
   const c = await getCompany();
   return !c || c.features.includes(feature);
 }

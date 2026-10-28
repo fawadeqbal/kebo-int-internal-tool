@@ -2,11 +2,21 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-/** Whether the company's plan includes Excel (templates, uploads, exports). Set once by the app's layout. */
-const ExcelAllowed = createContext(true);
+/**
+ * The plan features the company has (see PLAN_FEATURES), for client components
+ * that hide what the plan does not include. Set once by the app's layout;
+ * null: unknown, so everything shows (the API still refuses what is off).
+ */
+const Features = createContext<string[] | null>(null);
 
-export function ExcelAllowedProvider({ allowed, children }: { allowed: boolean; children: ReactNode }) {
-  return <ExcelAllowed.Provider value={allowed}>{children}</ExcelAllowed.Provider>;
+export function FeaturesProvider({ features, children }: { features: string[] | null; children: ReactNode }) {
+  return <Features.Provider value={features}>{children}</Features.Provider>;
 }
 
-export const useExcelAllowed = () => useContext(ExcelAllowed);
+export function useFeature(feature: string) {
+  const f = useContext(Features);
+  return !f || f.includes(feature);
+}
+
+/** Excel is a plan feature. */
+export const useExcelAllowed = () => useFeature("excel");

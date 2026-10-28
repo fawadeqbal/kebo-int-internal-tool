@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import bcrypt from "bcryptjs";
-import { permissionsOfRole, type SignInResult } from "@kebo/shared";
+import { isMobileApp, permissionsOfRole, type SignInResult } from "@kebo/shared";
+import { LimitsService } from "../../common/company/limits.service";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { SESSION_MAX_AGE_DAYS, SESSION_TTL_SECONDS, TokensService } from "../../common/auth/tokens.service";
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly audit: AuditService,
     private readonly users: UsersService,
     private readonly companies: CompaniesService,
+    private readonly limits: LimitsService,
   ) {}
 
   private async limitIp(ip: string, attempt: { email: string; userId?: string | null; userAgent?: string }) {
@@ -138,6 +140,10 @@ export class AuthService {
     if (closed) {
       await this.record({ ...attempt, result: "switched_off", detail: "the company is switched off" });
       throw closed;
+    }
+    if (isMobileApp(meta.userAgent) && !(await this.limits.allows("mobile_app", company))) {
+      await this.record({ ...attempt, result: "switched_off", detail: "the plan has no mobile app" });
+      throw new HttpException({ message: "Your company's plan does not include the mobile app. Sign in on the website, or ask for a bigger plan.", code: "plan_feature" }, HttpStatus.FORBIDDEN);
     }
 
     const twoStep = !!user.totpEnabledAt;
