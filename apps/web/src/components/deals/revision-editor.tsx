@@ -250,7 +250,7 @@ export function RevisionEditor({
   const chargeColumns: LineColumn[] = [
     { key: "description", label: "Charge", width: "minmax(0,1fr)", input: "textarea", required: "Each charge needs a description", placeholder: "e.g. Sea freight to Mombasa" },
     { key: "quantity", label: "Qty", width: "4.5rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
-    { key: "unit", label: "Unit", width: "4.5rem", input: "text", initial: "lot", maxLength: 20 },
+    { key: "unit", label: "Unit", width: "5.5rem", input: "unit", initial: "lot", maxLength: 20 },
     ...(showCosts
       ? [
           {

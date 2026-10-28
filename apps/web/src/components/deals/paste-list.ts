@@ -31,6 +31,13 @@ const normalUnit = (u: string | undefined) => {
   if (/^(m2|m²|sqm)$/.test(x)) return "m²";
   if (/^(m3|m³|cbm)$/.test(x)) return "m³";
   if (/^(ctns?|cartons?)$/.test(x)) return "cartons";
+  // As named in the unit dropdown.
+  if (/^(meters?|metres?)$/.test(x)) return "m";
+  if (/^(kgs)$/.test(x)) return "kg";
+  if (/^(box|boxes)$/.test(x)) return "boxes";
+  if (/^(l|litres?|liters?)$/.test(x)) return "litres";
+  if (/^(rolls?|bags?|pairs?|drums?)$/.test(x)) return x.endsWith("s") ? x : `${x}s`;
+  if (/^lots?$/.test(x)) return "lot";
   return x;
 };
 
