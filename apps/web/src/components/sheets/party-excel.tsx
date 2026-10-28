@@ -6,22 +6,22 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, X } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 import type { CustomerInput, FactoryInput, ImportResult } from "@kebo/shared";
-import type { ReadSheet, SheetSpec } from "@/lib/sheet-spec";
+import type { ReadSheet } from "@/lib/sheet-spec";
 import { ExcelMenu } from "./excel-menu";
 import { customersFromSheet, customersTemplate, factoriesFromSheet, factoriesTemplate, type PartyRead } from "./party-sheets";
 
 type ImportAction<T> = (items: T[], fileName: string) => Promise<{ ok: true; result: ImportResult } | { ok: false; message: string }>;
 
 type Props =
-  | { kind: "customers"; importAction?: ImportAction<CustomerInput>; exportSheet?: () => SheetSpec }
-  | { kind: "factories"; importAction?: ImportAction<FactoryInput>; exportSheet?: () => SheetSpec };
+  | { kind: "customers"; importAction?: ImportAction<CustomerInput>; exportHref?: string }
+  | { kind: "factories"; importAction?: ImportAction<FactoryInput>; exportHref?: string };
 
 /**
  * The Excel button on the customers or factories list: a template, a filled
  * file shown to check (new ones only are added, together), and an export.
  */
 export function PartyExcel(props: Props) {
-  const { kind, importAction, exportSheet } = props;
+  const { kind, importAction, exportHref } = props;
   const [review, setReview] = useState<{ file: string; read: PartyRead<CustomerInput | FactoryInput> } | null>(null);
   const one = kind === "customers" ? "customer" : "factory";
   const many = kind;
@@ -35,7 +35,7 @@ export function PartyExcel(props: Props) {
         noun={many}
         template={importAction ? (kind === "customers" ? customersTemplate : factoriesTemplate) : undefined}
         onUpload={importAction ? upload : undefined}
-        exportSheet={exportSheet}
+        exportHref={exportHref}
       />
       {review && importAction && (
         <Review

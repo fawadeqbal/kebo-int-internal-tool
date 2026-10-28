@@ -119,6 +119,7 @@ export default async function QuotationPrint({
         title={`Quotation ${numberOf(r)}`}
         backHref={backTo(sp.back, `/deals/${r.quotation.inquiryId}/quotation`)}
         pdfHref={`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`}
+        excelHref={`/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}`}
         copies={{
           current: internal ? "internal" : "customer",
           customer: copyHref(r.id, sp.back, false),

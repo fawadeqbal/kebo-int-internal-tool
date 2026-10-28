@@ -50,12 +50,12 @@ export async function POST(req: Request) {
   const spec = specOf(await req.json().catch(() => null));
   if (!spec) return Response.json({ error: "Could not make the file." }, { status: 400 });
   const file = await writeSheet(spec);
-  const name = `${spec.name.replace(/[^\p{L}\p{N} ._-]+/gu, "-").trim() || "sheet"}.xlsx`;
+  const name = `${spec.name.replace(/[^\p{L}\p{N} ._()-]+/gu, "-").trim() || "sheet"}.xlsx`;
   const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "");
   return new Response(new Uint8Array(file), {
     headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "content-disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "content-disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name).replace(/[()'*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`,
       "cache-control": "private, no-store",
     },
   });

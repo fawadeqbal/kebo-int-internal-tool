@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CHANNEL_LABEL, INQUIRY_STAGE_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
 import { buildHref, ButtonLink, Card, EmptyState, FilterBar, LinkTabs, PageHeader, Pagination, PriorityBadge, SearchField, StageBadge, Table, Td, Th, THead, toPage, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
+import { ExportLink } from "@/components/sheets/export-link";
 import { requireUser } from "@/lib/session";
 import { date, money, timeAgo } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
@@ -29,7 +30,14 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   const open = (c.new ?? 0) + (c.sourcing ?? 0) + (c.quoted ?? 0);
   return (
     <div>
-      <PageHeader title="Deals" description="Every RFQ from first message to won or lost." actions={<ButtonLink href="/deals/new" variant="primary">New inquiry</ButtonLink>} />
+      <PageHeader title="Deals" description="Every RFQ from first message to won or lost." actions={
+          <>
+            <ExportLink what="deals" query={{ stage, q: sp.q, assignee: sp.assignee, customer: sp.customer, sort: sp.sort }} />
+            <ButtonLink href="/deals/new" variant="primary">
+              New inquiry
+            </ButtonLink>
+          </>
+        } />
       <LinkTabs
         label="Stage"
         className="mb-4"

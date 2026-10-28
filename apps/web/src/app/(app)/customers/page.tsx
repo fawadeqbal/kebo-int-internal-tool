@@ -31,7 +31,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         description={can(me, "inquiries.viewAll") ? "Every buyer, their contacts and what is open with them." : "The customers of the deals you handle or created."}
         actions={
           <>
-            <PartyExcel kind="customers" importAction={canAdd ? importCustomersAction : undefined} />
+            <PartyExcel kind="customers" importAction={canAdd ? importCustomersAction : undefined} exportHref={buildHref("/sheets/export/customers", {}, keep)} />
             {canAdd && (
               <ButtonLink href="/customers/new" variant="primary">
                 New customer

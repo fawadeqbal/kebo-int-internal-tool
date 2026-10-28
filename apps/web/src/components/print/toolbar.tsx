@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Download, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, Loader2, Printer } from "lucide-react";
 import { Button, buttonClass } from "@kebo/ui";
 
 /**
@@ -13,11 +13,14 @@ export function PrintToolbar({
   title,
   backHref,
   pdfHref,
+  excelHref,
   copies,
 }: {
   title: string;
   backHref: string;
   pdfHref: string;
+  /** The same document as an Excel file (a quotation). */
+  excelHref?: string;
   /** Priced documents: switch between the customer's copy (one total) and the internal one (every price, cost and payment). */
   copies?: { current: "customer" | "internal"; customer: string; internal: string };
 }) {
@@ -63,6 +66,11 @@ export function PrintToolbar({
           >
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />} Download PDF
           </a>
+          {excelHref && (
+            <a href={excelHref} download className={buttonClass("secondary", "sm", "border-[#e4e4ea] bg-white text-[#16151c] hover:bg-[#f2f2f5]")}>
+              <FileSpreadsheet aria-hidden /> Excel
+            </a>
+          )}
           <Button size="sm" variant="primary" onClick={() => window.print()}>
             <Printer aria-hidden /> Print
           </Button>

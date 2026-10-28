@@ -34,6 +34,7 @@ import {
 } from "@kebo/ui";
 import { addDays, todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
+import { ExportLink } from "@/components/sheets/export-link";
 import { requirePermission } from "@/lib/session";
 import { redirect } from "next/navigation";
 import type { Receivables } from "@/lib/types-insights";
@@ -286,7 +287,12 @@ async function ExpensesTab({ sp, today }: { sp: Search; today: string }) {
         <CardHeader
           title="Expenses"
           description={`${list.count} in ${periodName}${customerName ? ` for ${customerName}` : ""}${category ? ` · ${EXPENSE_CATEGORY_LABEL[category]}` : ""}. Click one for its details and receipt.`}
-          actions={<span className="text-sm font-semibold tabular">{money(list.total, c)}</span>}
+          actions={
+            <span className="flex items-center gap-3">
+              <span className="text-sm font-semibold tabular">{money(list.total, c)}</span>
+              {list.count > 0 && <ExportLink what="expenses" query={{ from, to, kind, customer, category }} />}
+            </span>
+          }
         />
         {list.rows.length === 0 ? (
           <EmptyState
@@ -531,6 +537,7 @@ async function CashTab({ sp, today }: { sp: Search; today: string }) {
                 ? "Choose the account each amount went through, so the balances match the bank and the cash box."
                 : "Money in from customers and out to factories and expenses. Moves between our accounts are shown but not counted."
           }
+          actions={book.rows.length > 0 ? <ExportLink what="cash-book" query={{ from: pr.from, to: pr.to, account: acct, currency: acct && acct !== "none" ? undefined : cur }} /> : undefined}
         />
         {book.rows.length === 0 ? (
           <EmptyState title={`Nothing in ${pr.name}`} description="Money recorded on orders and expenses shows here by its date." />
@@ -674,7 +681,11 @@ async function ReceiveTab() {
         ))}
       </div>
       <Card className="overflow-hidden">
-        <CardHeader title="To receive" description="Open orders with money still due. Overdue first: remind those customers today." />
+        <CardHeader
+          title="To receive"
+          description="Open orders with money still due. Overdue first: remind those customers today."
+          actions={r.rows.length > 0 ? <ExportLink what="receivables" /> : undefined}
+        />
         {r.rows.length === 0 ? (
           <EmptyState title="Nothing to receive" description="Every customer has paid what they owe." />
         ) : (
@@ -747,7 +758,8 @@ async function OweTab({ mine }: { mine: boolean }) {
             { href: "/money?tab=owe&mine=1", label: "My factories", active: mine },
           ]}
         />
-        <p className="text-sm">
+        <p className="flex flex-wrap items-center gap-3 text-sm">
+          {rows.length > 0 && <ExportLink what="payables" query={{ mine: mine ? "1" : undefined }} />}
           Still to pay{" "}
           <span className="font-semibold tabular">{[...totals.entries()].map(([cur, v]) => money(v, cur)).join(" + ") || "nothing"}</span>
         </p>

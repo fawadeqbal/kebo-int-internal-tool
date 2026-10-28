@@ -21,12 +21,23 @@ function cellValue(v: string | number | null | undefined, col: SheetCol): string
   return v;
 }
 
-/** The workbook for a template or an export. */
-export async function writeSheet(spec: SheetSpec): Promise<Buffer> {
+/** The workbook for a template or an export; several specs make several tabs (a report). */
+export async function writeSheet(specs: SheetSpec | SheetSpec[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "RFQ Desk";
   wb.created = new Date();
-  const ws = wb.addWorksheet(tabName(spec.title), { views: [{ state: "frozen", ySplit: 1 }] });
+  const used = new Set<string>();
+  for (const spec of Array.isArray(specs) ? specs : [specs]) {
+    let name = tabName(spec.title);
+    for (let n = 2; used.has(name.toLowerCase()); n++) name = `${tabName(spec.title).slice(0, 27)} (${n})`;
+    used.add(name.toLowerCase());
+    addSheet(wb, spec, name);
+  }
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+function addSheet(wb: ExcelJS.Workbook, spec: SheetSpec, name: string) {
+  const ws = wb.addWorksheet(name, { views: [{ state: "frozen", ySplit: 1 }] });
   ws.columns = spec.columns.map((c) => ({ header: c.header, width: c.width ?? Math.max(10, Math.min(48, c.header.length + 4)) }));
 
   const head = ws.getRow(1);
@@ -92,8 +103,6 @@ export async function writeSheet(spec: SheetSpec): Promise<Buffer> {
       if (n === 0) cell.font = { bold: true, size: 13 };
     });
   }
-
-  return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
 /* ---------------------------------------------------------------- reading */

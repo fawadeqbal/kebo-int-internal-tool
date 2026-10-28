@@ -3,6 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import { ORDER_STAGE_LABEL, STAGE_FLOW, type OrderStage } from "@kebo/shared";
 import { buildHref, Card, cn, EmptyState, FilterBar, FilterChip, LinkTabs, OrderStageBadge, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
+import { ExportLink } from "@/components/sheets/export-link";
 import { requireUser } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { OrderRow } from "@/lib/types-orders";
@@ -43,7 +44,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   return (
     <div>
-      <PageHeader title="Orders" description="Every order moves Confirmed → In production → Shipped → Done. Each card says what it needs now." />
+      <PageHeader
+        title="Orders"
+        description="Every order moves Confirmed → In production → Shipped → Done. Each card says what it needs now."
+        actions={<ExportLink what="orders" query={{ mine: mine ? "1" : undefined, view: cancelled ? "cancelled" : undefined }} />}
+      />
       <FilterBar className="mb-5 rounded-xl border bg-surface">
         <FilterChip href={buildHref("/orders", { view: keep.view }, {})} active={!mine}>
           All
