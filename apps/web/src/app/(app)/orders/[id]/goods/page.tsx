@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/session";
 import { orderOf } from "@/lib/order-data";
 import { today } from "@/components/orders/today";
 import { receiptAction } from "../../actions";
-import { GoodsReceipt } from "../goods";
+import { GoodsExcel, GoodsReceipt } from "../goods";
 import { goodsOf } from "../shared";
 
 export const metadata = { title: "Goods from the factory" };
@@ -27,7 +27,12 @@ export default async function OrderGoods({ params }: { params: Promise<{ id: str
             ? "Everything has come in."
             : `${o.goods.received} of ${o.goods.lines} item${o.goods.lines === 1 ? "" : "s"} complete. Record what comes in as it arrives.`
         }
-        actions={o.goods.allReceived ? <Badge tone="ok">All in</Badge> : undefined}
+        actions={
+          <>
+            {o.goods.allReceived && <Badge tone="ok">All in</Badge>}
+            <GoodsExcel lines={goods} />
+          </>
+        }
       />
       <CardBody>
         <GoodsReceipt key={goods.map((l) => l.receivedQty).join()} lines={goods} canEdit={canEdit} action={receiptAction.bind(null, o.id)} today={today()} />

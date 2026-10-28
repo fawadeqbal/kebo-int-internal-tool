@@ -106,13 +106,6 @@ export function DocumentsPanel({ dealId, files, canUpload }: { dealId: string; f
         <p className="text-sm text-muted">No files yet.</p>
       ) : (
         <>
-          {files.length > 1 && (
-            <div>
-              <a href={`/files/inquiries/${dealId}`} className={buttonClass("secondary", "sm")}>
-                <Download aria-hidden /> Download all ({files.length})
-              </a>
-            </div>
-          )}
           {groups.map((g) => (
             <section key={g.kind} aria-label={ATTACHMENT_KIND_LABEL[g.kind]}>
               <h3 className="mb-1 text-xs font-medium tracking-wide text-muted uppercase">

@@ -861,8 +861,10 @@ export function LineTable({
               <ClipboardPaste aria-hidden /> Paste a list
             </Button>
           )}
+          {tools}
           {sheet && (
             <ExcelMenu
+              className="ml-auto"
               noun={`${noun}s`}
               template={
                 canUpload
@@ -880,7 +882,6 @@ export function LineTable({
               exportSheet={rows.length ? () => lineExport({ name: sheet.name, columns, rows, numbers }) : undefined}
             />
           )}
-          {tools}
         </div>
       )}
 

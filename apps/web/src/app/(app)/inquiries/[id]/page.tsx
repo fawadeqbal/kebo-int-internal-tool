@@ -2,6 +2,7 @@ import Link from "next/link";
 import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { Card, CardBody, CardHeader, DetailList } from "@kebo/ui";
 import { api } from "@/lib/api";
+import { FileActions } from "@/components/common/file-actions";
 import { requireUser } from "@/lib/session";
 import { date, dateTime, qty } from "@/lib/format";
 import type { DealDetail, Person } from "@/lib/types";
@@ -75,6 +76,7 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
             <CardHeader
               title="URS & documents"
               description="The customer's URS, drawings, photos and specifications. Also shown on the order."
+              actions={d.attachments.length > 1 ? <FileActions allHref={`/files/inquiries/${d.id}`} allCount={d.attachments.length} /> : undefined}
             />
             <CardBody>
               <DocumentsPanel

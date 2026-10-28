@@ -1,10 +1,10 @@
-import Link from "next/link";
-import { Download, Eye, FileText, Printer } from "lucide-react";
+import { Eye, FileText } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, can } from "@kebo/shared";
 import { Badge, buttonClass, Card, CardHeader } from "@kebo/ui";
 import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { api } from "@/lib/api";
+import { FileActions } from "@/components/common/file-actions";
 import { requireUser } from "@/lib/session";
 import { orderOf } from "@/lib/order-data";
 import { date } from "@/lib/format";
@@ -56,6 +56,7 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
                   )}
                 </span>
                 <span className="flex flex-wrap gap-2">
+                  <FileActions viewHref={h.view} pdfHref={h.pdf} of={d.label.toLowerCase()} />
                   {d.kind === "proforma" && !o.proforma && canMove && (
                     <ActionForm action={issueProformaAction.bind(null, o.id)} className="inline-flex">
                       <ConfirmSubmit
@@ -68,12 +69,6 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
                       </ConfirmSubmit>
                     </ActionForm>
                   )}
-                  <Link href={h.view} target="_blank" className={buttonClass("secondary", "sm")} aria-label={`View or print the ${d.label.toLowerCase()}`}>
-                    <Printer aria-hidden /> View / Print
-                  </Link>
-                  <a href={h.pdf} className={buttonClass("ghost", "sm")} aria-label={`Download the ${d.label.toLowerCase()} as PDF`}>
-                    <Download aria-hidden /> Download PDF
-                  </a>
                 </span>
               </li>
             );
@@ -83,7 +78,11 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
 
       {deal && (
         <Card>
-          <CardHeader title="URS and documents" description={`From inquiry ${deal.refNo}, kept with the order`} />
+          <CardHeader
+            title="URS and documents"
+            description={`From inquiry ${deal.refNo}, kept with the order`}
+            actions={deal.attachments.length > 1 ? <FileActions allHref={`/files/inquiries/${deal.id}`} allCount={deal.attachments.length} /> : undefined}
+          />
           <div className="px-4 py-4">
             <DocumentsPanel
               dealId={deal.id}
