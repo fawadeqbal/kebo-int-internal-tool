@@ -159,7 +159,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
           <Card className="rounded-2xl">
             <CardHeader title="Sales and profit, month by month" description="Bars: sales (orders won). Lines: profit. Grey: the same month a year before. Dashed: the target." />
             <CardBody>
-              <RevenueChart data={i.series} currency={c} showNet={i.seeMoney} />
+              <RevenueChart data={i.series} currency={c} showNet={i.seeExpenses} />
             </CardBody>
           </Card>
 
@@ -421,7 +421,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             {k.netProfit && <KpiCard label="Profit after expenses" value={<Headline amount={k.netProfit.value ?? 0} currency={c} />} kpi={k.netProfit} tone={Number(k.netProfit.value) < 0 ? "bad" : undefined} spark={spark("netProfit")} />}
           </div>
           <p className="-mt-2 px-1 text-xs text-muted">The cards count each order in the month it was won. The table below counts it in the month it shipped, so the two can differ.</p>
-          {i.seeMoney ? (
+          {i.seeExpenses ? (
             <>
               <Segmented
                 label="Profit views"
@@ -442,7 +442,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
               )}
             </>
           ) : (
-            <p className="text-sm text-muted">Profit after expenses is for managers.</p>
+            <p className="text-sm text-muted">{i.seeMoney ? "Profit after expenses comes with Expenses, which is not in your company's plan." : "Profit after expenses is for managers."}</p>
           )}
         </div>
       )}
@@ -458,7 +458,7 @@ async function LeaksTab({ from, to, view, href }: { from: string; to: string; vi
 /** Who we buy from, money stuck with factories, and what visiting them cost. */
 async function FactoriesTab({ i, from, to }: { i: Insights; from: string; to: string }) {
   const c = i.currency;
-  const leaks = i.seeMoney ? await api.get<LeaksReport>("/reports/leaks", { from, to }) : null;
+  const leaks = i.seeExpenses ? await api.get<LeaksReport>("/reports/leaks", { from, to }) : null;
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-5 lg:grid-cols-2">

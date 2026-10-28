@@ -348,9 +348,30 @@ describe("companies: isolation and the platform", () => {
     await off(await mine.post("/roles", { name: "Extra", permissions: [] }));
     await off(await mine.get("/money/cash-book"));
     await off(await mine.get("/insights"));
+    await off(await mine.get("/reports"));
+    await off(await mine.get("/reports/leaks"));
+    await off(await mine.get("/money/profit-and-loss"));
+    const customer = ((await mine.get("/customers?pageSize=1").expect(200)).body.rows as { id: string }[])[0];
+    await off(await mine.get(`/customers/${customer.id}/account`));
+    // No accounts to choose, and money cannot be put on one.
+    expect((await mine.get("/money/accounts").expect(200)).body).toEqual([]);
+    await off(await mine.put(`/money/entries/in/${customer.id}/account`, { accountId: customer.id }));
     // The order's money shows no costs.
     const order = ((await mine.get("/orders").expect(200)).body as { id: string }[])[0];
     expect((await mine.get(`/orders/${order.id}/money`).expect(200)).body.expenses).toBeNull();
+    // A payment can be recorded; an account sent with it is left off (no cash book).
+    const payRes = await mine.post(`/orders/${order.id}/payments`, { kind: "deposit", amount: "10", currency: "USD", paidOn: "2026-01-01", accountId: customer.id });
+    expect(payRes.status, JSON.stringify(payRes.body)).toBe(201);
+    const paid = payRes.body as { createdId: string; payments: { id: string; account: unknown }[] };
+    expect(paid.payments.find((p) => p.id === paid.createdId)?.account).toBeNull();
+    // Roles: only the built-in ones can be given, and a role's permissions stay as they are.
+    const before = (await mine.get("/roles/staff").expect(200)).body as { name: string; permissions: string[]; requireTwoStep: boolean };
+    await mine.put("/roles/staff", { name: "Renamed", permissions: ["dashboard.view"], requireTwoStep: true }).expect(200);
+    const after = (await mine.get("/roles/staff").expect(200)).body as typeof before;
+    expect(after.name).toBe(before.name);
+    expect([...after.permissions].sort()).toEqual([...before.permissions].sort());
+    expect(after.requireTwoStep).toBe(true);
+    await off(await mine.post("/users", { name: "Extra Role", email: `extra-${tag}@x.test`, password: "Extra12345678", role: "custom-x" }));
     // The phone app: no sign-in, and existing sessions stop.
     const phone = await request(app.getHttpServer())
       .post("/api/auth/login")
@@ -360,16 +381,24 @@ describe("companies: isolation and the platform", () => {
     expect(phone.body.code).toBe("plan_feature");
     await off(await mine.get("/customers").set("user-agent", "Dart/3.5 (dart:io)"));
     // The website form.
-    const form = await request(app.getHttpServer())
-      .post(`/api/public/inquiries?company=${c.slug}`)
-      .send({
-        fullName: "Web Buyer",
-        email: "buyer@web.test",
-        phone: "+92 300 1234567",
-        category: "Valves",
-        requirements: "100 valves please",
-      });
+    const form = await request(app.getHttpServer()).post(`/api/public/inquiries?company=${c.slug}`).send({
+      fullName: "Web Buyer",
+      email: "buyer@web.test",
+      phone: "+92 300 1234567",
+      category: "Valves",
+      requirements: "100 valves please",
+    });
     expect(form.status).toBe(403);
+    // Insights without expenses: no expenses and no profit after them.
+    const insightsOnly = (
+      await plat()
+        .post("/plans", { name: `Insights only ${tag}`, price: 10, features: ["insights"] })
+        .expect(201)
+    ).body;
+    await plat().patch(`/companies/${c.id}`, { planId: insightsOnly.id }).expect(200);
+    const ins = (await mine.get("/insights").expect(200)).body;
+    expect(ins.kpis.netProfit).toBeNull();
+    expect(ins.kpis.expenses).toBeNull();
     // A bigger plan switches them on at once.
     const business = plans.find((p) => p.name === "Business")!;
     await plat().patch(`/companies/${c.id}`, { planId: business.id }).expect(200);

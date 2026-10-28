@@ -4,7 +4,7 @@ import { can } from "@kebo/shared";
 import { ShieldCheck } from "lucide-react";
 import { Avatar, Badge, Card, CardBody, CardHeader, DetailList, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { requirePermission } from "@/lib/session";
+import { hasFeature, requirePermission } from "@/lib/session";
 import { dateTime } from "@/lib/format";
 import type { RoleRow, UserRow } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
@@ -18,9 +18,11 @@ export const metadata = { title: "Person" };
 export default async function UserPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requirePermission("users.manage");
-  const [users, roles] = await Promise.all([api.get<UserRow[]>("/users"), api.get<RoleRow[]>("/roles")]);
+  const [users, all, custom] = await Promise.all([api.get<UserRow[]>("/users"), api.get<RoleRow[]>("/roles"), hasFeature("custom_roles")]);
   const u = users.find((x) => x.id === id);
   if (!u) notFound();
+  // Without custom roles (a plan feature) only the built-in roles can be given; the person's own stays listed.
+  const roles = all.filter((r) => custom || r.preset || r.key === u.role);
   const isMe = u.id === me.id;
   return (
     <div className="max-w-4xl">

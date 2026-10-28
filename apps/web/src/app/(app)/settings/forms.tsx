@@ -1,5 +1,6 @@
 "use client";
 
+import { useFeature } from "@/components/common/features";
 import { useState } from "react";
 import { restateRates } from "@kebo/money";
 import { CURRENCIES, CURRENCY_LABEL, type SettingsKey } from "@kebo/shared";
@@ -151,13 +152,16 @@ function Control({ f, text, checked, error }: { f: SettingField; text: string; c
 /** One settings group as its own form with its own Save button. */
 export function SettingsGroupForm({ groupKey, values, action }: { groupKey: SettingsKey; values: Record<string, unknown>; action: Action }) {
   const group = SETTING_GROUPS.find((g) => g.key === groupKey)!;
+  // The daily summary email is part of the plan's email reports.
+  const emailReports = useFeature("email_reports");
+  const fields = group.fields.filter((f) => emailReports || f.name !== "dailySummary");
   return (
     <ActionForm action={action}>
       {(s) => (
         <Card id={group.key} className="scroll-mt-20">
           <CardHeader title={group.title} description={group.description} />
           <CardBody className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
-            {group.fields.map((f) =>
+            {fields.map((f) =>
               f.kind === "currencies" ? (
                 <CurrenciesControl
                   key={`${f.name}-${s.values?.currency ?? values.currency}`}

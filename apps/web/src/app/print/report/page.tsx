@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { formatDuration } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { requirePermission, docBrand } from "@/lib/session";
+import { requirePermission, docBrand, hasFeature } from "@/lib/session";
+import { PlanOff } from "@/components/common/plan-off";
 import { date, money } from "@/lib/format";
 import type { PersonWithRole, ProfitRow, ReportView } from "@/lib/types-deals";
 import type { CompanySnapshot } from "@/lib/types-orders";
@@ -83,6 +84,7 @@ function Profit({ title, rows, currency }: { title: string; rows: (ProfitRow & {
  */
 export default async function ReportPrint({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requirePermission("reports.view");
+  if (!(await hasFeature("insights"))) return <PlanOff title="Sales report" what="Insights (sales, profit and team reports)" />;
   const sp = await searchParams;
   const from = isDay(sp.from) ? sp.from : undefined;
   const to = isDay(sp.to) ? sp.to : undefined;

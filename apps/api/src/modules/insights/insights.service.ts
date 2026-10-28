@@ -6,6 +6,7 @@ import { addDays, daysBetween, ForbiddenError, type ISODate } from "@kebo/utils"
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import { ReadCache } from "../../common/cache/read-cache";
+import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { CashService } from "../money/cash.service";
@@ -139,6 +140,7 @@ export class InsightsService {
     private readonly cash: CashService,
     private readonly money: MoneyService,
     private readonly cache: ReadCache,
+    private readonly limits: LimitsService,
   ) {}
 
   private assert(user: SessionUser) {
@@ -148,16 +150,20 @@ export class InsightsService {
   /** The same answer for everyone with the same permissions, shared while nothing changes (ReadCache). */
   async overview(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     this.assert(user);
-    const key = `insights:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}:${[...user.permissions].sort().join(",")}`;
-    return this.cache.get(key, () => this.computeOverview(user, q));
+    // Expenses are a plan feature: without it, no expenses and no profit after them.
+    const expensesOn = await this.limits.allows("expenses");
+    const cashBookOn = await this.limits.allows("cash_book");
+    const key = `insights:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}:${[...user.permissions].sort().join(",")}:${expensesOn}:${cashBookOn}`;
+    return this.cache.get(key, () => this.computeOverview(user, q, expensesOn, cashBookOn));
   }
 
-  private async computeOverview(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
+  private async computeOverview(user: SessionUser, q: { from?: ISODate; to?: ISODate }, expensesOn: boolean, cashBookOn: boolean) {
     const today = this.clock.today();
     const to = q.to && q.to < today ? q.to : today;
     const from = q.from && q.from <= to ? q.from : `${ymOf(to)}-01`;
     const prev = previousPeriod(from, to);
     const seeMoney = can(user, "expenses.manage");
+    const seeExpenses = seeMoney && expensesOn;
     const { sales } = await this.settings.get();
     const main = sales.currency;
     const missing = new Set<string>();
@@ -189,7 +195,7 @@ export class InsightsService {
         where o.status <> 'cancelled' and o.ordered_on between ${loadFrom}::date and ${to}::date
         group by o.id, c.id, i.id`,
       // Amounts in minor units and days as text straight from the database (no Decimal or Date objects to build).
-      seeMoney
+      seeExpenses
         ? this.prisma.db.$queryRaw<{ on: ISODate; minor: number; rate: number }[]>`
             select to_char(spent_on, 'YYYY-MM-DD') as "on", (amount * 100)::float8 as minor, rate::float8 as rate
             from expenses where voided_at is null and spent_on between ${loadFrom}::date and ${to}::date`
@@ -362,8 +368,9 @@ export class InsightsService {
     let cashInHand: number | null = null;
     let toPay: number | null = null;
     if (seeMoney) {
-      const accounts = (await this.cash.accounts(user)) as { archived: boolean; currency: string; balance?: string }[];
-      cashInHand = accounts.filter((a) => !a.archived && a.balance !== undefined).reduce((t, a) => t + toMain(Math.round(Number(a.balance) * 100), a.currency), 0);
+      // What is in our accounts: the cash book, a plan feature.
+      const accounts = cashBookOn ? ((await this.cash.accounts(user)) as { archived: boolean; currency: string; balance?: string }[]) : [];
+      cashInHand = !cashBookOn ? null : accounts.filter((a) => !a.archived && a.balance !== undefined).reduce((t, a) => t + toMain(Math.round(Number(a.balance) * 100), a.currency), 0);
       const payables = await this.money.payables(user, false);
       toPay = payables.reduce((t, p) => t + toMain(Math.round(Number(p.toPay) * 100), p.currency), 0);
     }
@@ -387,8 +394,8 @@ export class InsightsService {
         month: m,
         revenue: fromMinor(f.revenue),
         grossProfit: fromMinor(f.revenue - f.goodsCost),
-        expenses: seeMoney ? fromMinor(f.expenses) : null,
-        netProfit: seeMoney ? fromMinor(f.revenue - f.goodsCost - f.expenses) : null,
+        expenses: seeExpenses ? fromMinor(f.expenses) : null,
+        netProfit: seeExpenses ? fromMinor(f.revenue - f.goodsCost - f.expenses) : null,
         cashIn: fromMinor(f.cashIn),
         cashOut: seeMoney ? fromMinor(f.cashOut) : null,
         received: f.received,
@@ -506,12 +513,14 @@ export class InsightsService {
       previous: prev,
       currency: main,
       seeMoney,
+      /** Expenses and profit after them (managers, with the expenses feature). */
+      seeExpenses,
       kpis: {
         revenue: kpi(cur.revenue, before.revenue),
         grossProfit: kpi(cur.revenue - cur.goodsCost, before.revenue - before.goodsCost),
         margin: kpi(pct(cur.revenue - cur.goodsCost, cur.revenue), pct(before.revenue - before.goodsCost, before.revenue), false),
-        netProfit: seeMoney ? kpi(cur.revenue - cur.goodsCost - cur.expenses, before.revenue - before.goodsCost - before.expenses) : null,
-        expenses: seeMoney ? kpi(cur.expenses, before.expenses) : null,
+        netProfit: seeExpenses ? kpi(cur.revenue - cur.goodsCost - cur.expenses, before.revenue - before.goodsCost - before.expenses) : null,
+        expenses: seeExpenses ? kpi(cur.expenses, before.expenses) : null,
         cashIn: kpi(cur.cashIn, before.cashIn),
         cashOut: seeMoney ? kpi(cur.cashOut, before.cashOut) : null,
         orders: kpi(cur.orders, before.orders, false),

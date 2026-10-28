@@ -8,6 +8,7 @@ import { Clock } from "../../common/time/clock.service";
 import { ReadCache } from "../../common/cache/read-cache";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
+import { LimitsService } from "../../common/company/limits.service";
 
 const convert = (minor: Minor, rate: number) => roundHalfAway(minor / rate);
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : null);
@@ -75,15 +76,19 @@ export class LeaksService {
     private readonly settings: SettingsService,
     private readonly clock: Clock,
     private readonly cache: ReadCache,
+    private readonly limits: LimitsService,
   ) {}
 
   /** The same for every manager: shared while nothing changes (ReadCache). */
   async report(user: SessionUser, q: { from?: ISODate; to?: ISODate }) {
     if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can see where money is lost.");
-    return this.cache.get(`leaks:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}`, () => this.compute(q));
+    // Built on expenses (a plan feature); the cash book's warning only with the cash book.
+    await this.limits.require("expenses");
+    const cashBook = await this.limits.allows("cash_book");
+    return this.cache.get(`leaks:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}:${cashBook}`, () => this.compute(q, cashBook));
   }
 
-  private async compute(q: { from?: ISODate; to?: ISODate }) {
+  private async compute(q: { from?: ISODate; to?: ISODate }, cashBook: boolean) {
     const today = this.clock.today();
     const to = q.to ?? today;
     const from = q.from ?? `${to.slice(0, 4)}-01-01`;
@@ -333,7 +338,7 @@ export class LeaksService {
       (await this.prisma.db.factoryPayment.count({ where: { accountId: null, voidedAt: null, paidOn: range } })) +
       (await this.prisma.db.expense.count({ where: { accountId: null, voidedAt: null, spentOn: range } }));
     const hasAccounts = (await this.prisma.db.moneyAccount.count()) > 0;
-    if (hasAccounts && unassigned > 0)
+    if (cashBook && hasAccounts && unassigned > 0)
       warnings.push({ level: "warn", text: `${unassigned} amount${unassigned === 1 ? " is" : "s are"} not on an account, so the cash book cannot match the bank.`, href: "/money?tab=cash&acct=none" });
 
     const planned = leakRows.reduce((t, r) => t + r.plannedMinor, 0);

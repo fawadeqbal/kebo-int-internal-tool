@@ -3,7 +3,7 @@ import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { Card, CardBody, CardHeader, DetailList } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { FileActions } from "@/components/common/file-actions";
-import { requireUser } from "@/lib/session";
+import { hasFeature, requireUser } from "@/lib/session";
 import { date, dateTime, qty } from "@/lib/format";
 import type { DealDetail, Person } from "@/lib/types";
 import { assignAction, describeFileAction, holdAction, moveStageAction, noteAction, removeFileAction } from "../actions";
@@ -35,7 +35,8 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
     })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
-  const managers = can(me, "expenses.manage");
+  // The customer's account history comes with Expenses (a plan feature).
+  const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
 
   return (
     <>

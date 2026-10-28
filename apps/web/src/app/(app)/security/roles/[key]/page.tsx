@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { Avatar, Badge, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { load, requireUser } from "@/lib/session";
+import { hasFeature, load, requireUser } from "@/lib/session";
 import { timeAgo } from "@/lib/format";
 import type { RoleDetail, RoleRow } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
@@ -34,7 +34,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
           description={r.key === me.role ? "This is your own role." : undefined}
         />
         <CardBody>
-          <RoleForm action={updateRoleAction.bind(null, r.key)} role={r} mine={superAdmin ? null : me.permissions} isMine={r.key === me.role} submitLabel="Save the role" />
+          <RoleForm action={updateRoleAction.bind(null, r.key)} role={r} mine={superAdmin ? null : me.permissions} isMine={r.key === me.role} locked={!(await hasFeature("custom_roles"))} submitLabel="Save the role" />
         </CardBody>
       </Card>
       <div className="flex flex-col gap-5">

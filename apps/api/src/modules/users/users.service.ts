@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { can, PERMISSION_GROUPS, permissionsOfRole } from "@kebo/shared";
+import { can, PERMISSION_GROUPS, permissionsOfRole, PRESET_ROLES } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -110,7 +110,9 @@ export class UsersService {
     return role;
   }
 
-  private checkAssignable(actor: SessionUser, key: string) {
+  private async checkAssignable(actor: SessionUser, key: string) {
+    // Roles of the company's own making are a plan feature: without it only the ready-made ones can be given.
+    if (!Object.hasOwn(PRESET_ROLES, key)) await this.limits.require("custom_roles");
     return this.within(actor, key, (name) => `give the ${name} role`);
   }
 

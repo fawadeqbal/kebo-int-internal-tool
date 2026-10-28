@@ -5,7 +5,7 @@ import { ChevronDown, Download, FileSpreadsheet, FileUp, Loader2, Table2 } from 
 import { Button, cn } from "@kebo/ui";
 import { FloatingMenu } from "@/components/common/floating";
 import type { ReadSheet, SheetSpec } from "@/lib/sheet-spec";
-import { useExcelAllowed } from "./excel-allowed";
+import { useExcelAllowed } from "@/components/common/features";
 
 /** Makes the file on the server and saves it in the browser. Returns a message when it could not. */
 export async function downloadSheet(spec: SheetSpec): Promise<string | null> {

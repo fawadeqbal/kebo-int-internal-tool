@@ -11,6 +11,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess, OrdersService } from "./orders.service";
 import { requireReason } from "../../common/audit/reason";
 import { checkAccount } from "../money/account-check";
+import { LimitsService } from "../../common/company/limits.service";
 import { fileView } from "../money/payment-file-view";
 
 /**
@@ -26,6 +27,7 @@ export class PaymentsService {
     private readonly clock: Clock,
     private readonly events: EventBus,
     private readonly orders: OrdersService,
+    private readonly limits: LimitsService,
   ) {}
 
   async forOrder(user: SessionUser, orderId: string) {
@@ -157,6 +159,7 @@ export class PaymentsService {
   async record(user: SessionUser, orderId: string, input: PaymentInput) {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
+    const cashBook = await this.limits.allows("cash_book");
     let createdId = "";
     const event = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
@@ -181,7 +184,7 @@ export class PaymentsService {
           method: input.method,
           reference: input.reference,
           note: input.note,
-          accountId: await checkAccount(tx, input.accountId, input.currency),
+          accountId: await checkAccount(tx, input.accountId, input.currency, null, cashBook),
           recordedById: user.id,
         },
       });
@@ -200,6 +203,7 @@ export class PaymentsService {
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
     const p = await this.prisma.db.payment.findUnique({ where: { id: paymentId } });
     if (!p) throw new NotFoundError("Payment");
+    const cashBook = await this.limits.allows("cash_book");
     if (p.voidedAt) throw new DomainError("This payment was removed.");
     const reason = requireReason(input.reason, "payment", "a recorded payment changes");
     await this.prisma.tx(async (tx) => {
@@ -212,7 +216,7 @@ export class PaymentsService {
         Number(o.depositPercent),
       );
       if (toMinor(input.amount) + toMinor(input.bankCharges) > others.outstandingMinor) throw new DomainError(`That is more than is still due (${formatMinor(others.outstandingMinor, o.currency)}).`);
-      await tx.payment.update({ where: { id: p.id }, data: { kind: input.kind, amount: input.amount, bankCharges: input.bankCharges, paidOn: toDbDate(input.paidOn), method: input.method, reference: input.reference, note: input.note, accountId: await checkAccount(tx, input.accountId, input.currency, p.accountId) } });
+      await tx.payment.update({ where: { id: p.id }, data: { kind: input.kind, amount: input.amount, bankCharges: input.bankCharges, paidOn: toDbDate(input.paidOn), method: input.method, reference: input.reference, note: input.note, accountId: await checkAccount(tx, input.accountId, input.currency, p.accountId, cashBook) } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_edit",

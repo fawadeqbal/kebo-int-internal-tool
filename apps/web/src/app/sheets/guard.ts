@@ -10,11 +10,12 @@ export async function sheetGuard(req: Request): Promise<Response | null> {
   return excelRefusal();
 }
 
-/** Excel is a plan feature: a response to send when the company's plan does not include it. */
+/** Excel is a plan feature: a response to send when the company's plan does not include it (or that cannot be told). */
 export async function excelRefusal(): Promise<Response | null> {
   const res = await apiFetch("/company");
-  const company = res.ok ? ((await res.json().catch(() => null)) as { features?: string[] } | null) : null;
-  if (company?.features && !company.features.includes("excel")) {
+  if (!res.ok) return Response.json({ error: "Could not check your company's plan. Try again." }, { status: res.status === 401 ? 401 : 503 });
+  const company = (await res.json().catch(() => null)) as { features?: string[] } | null;
+  if (!Array.isArray(company?.features) || !company.features.includes("excel")) {
     return Response.json({ error: "Excel is not in your company's plan. Ask the platform admin to switch it on." }, { status: 403 });
   }
   return null;

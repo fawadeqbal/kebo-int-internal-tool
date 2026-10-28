@@ -1,5 +1,6 @@
 import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { apiFetch } from "@/lib/api";
+import { excelRefusal } from "@/app/sheets/guard";
 import type { ReportView } from "@/lib/types-deals";
 
 /** The report's tables as one CSV file (the API checks the person may see reports). */
@@ -57,6 +58,9 @@ function toCsv(r: ReportView) {
 }
 
 export async function GET(req: Request) {
+  // A spreadsheet file: Excel is a plan feature.
+  const refused = await excelRefusal();
+  if (refused) return refused;
   const sp = new URL(req.url).searchParams;
   const query: Record<string, string | undefined> = {};
   for (const k of ["from", "to", "staff"]) {

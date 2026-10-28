@@ -7,6 +7,7 @@ import { getMailer, renderEmail } from "../../common/notify/mailer";
 import { sendPush } from "../../common/notify/fcm";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
+import { LimitsService } from "../../common/company/limits.service";
 
 export interface NewNotification {
   type: string;
@@ -38,6 +39,7 @@ export class NotificationsService implements OnModuleInit {
     private readonly bus: EventBus,
     private readonly settings: SettingsService,
     @Inject(ENV) private readonly env: Env,
+    private readonly limits: LimitsService,
   ) {}
 
   /* ---------------------------------------------------------------- sending */
@@ -68,6 +70,8 @@ export class NotificationsService implements OnModuleInit {
 
   private async push(userIds: string[], n: NewNotification) {
     try {
+      // Phones get pushes only while the company's plan includes the phone app.
+      if (!(await this.limits.allows("mobile_app"))) return;
       const devices = await this.prisma.db.deviceToken.findMany({
         where: { userId: { in: userIds }, OR: [{ sessionId: null }, { session: { revokedAt: null, expiresAt: { gt: new Date() } } }] },
         select: { token: true },

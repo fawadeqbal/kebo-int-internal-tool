@@ -85,16 +85,10 @@ export class AuthGuard implements CanActivate {
     ) {
       throw new UnauthorizedException("Your session has ended. Please sign in again.");
     }
-    // A platform admin's visit: only while they are still an active platform admin, and it does not slide on.
+    // A platform admin's visit: only while they are still an active platform admin.
     if (session.user.platformAdminId) {
       const admin = await this.prisma.platform.platformAdmin.findUnique({ where: { id: session.user.platformAdminId }, select: { isActive: true } });
       if (!admin?.isActive) throw new UnauthorizedException("Your session has ended. Please sign in again.");
-    } else if (now - session.lastSeenAt.getTime() > SLIDE_EVERY_MS) {
-      await this.prisma.db.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date(now), expiresAt: new Date(now + SESSION_TTL_SECONDS * 1000) } });
-      // Browsers: push the cookie's own expiry forward too.
-      if (!String(req.headers.authorization ?? "").startsWith("Bearer ") && token) {
-        ctx.switchToHttp().getResponse().cookie(SESSION_COOKIE, token, sessionCookieOptions());
-      }
     }
     this.markActive(company.id, now, !!session.user.platformAdminId);
     const u = session.user;
@@ -121,9 +115,11 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenError(`Your role (${u.access.name}) needs two-step sign-in. Set it up to carry on.`, "two_step_setup");
     }
 
-    // Plan features: the route's own, and the phone app as a whole.
+    // Plan features: the route's own, and the phone app as a whole (a session the app signed in
+    // with, or a request from it). Refused before the session's expiry moves on below.
     const feature = this.reflector.getAllAndOverride<string | undefined>(FEATURE, targets);
-    const needed = [feature, isMobileApp(req.headers["user-agent"]) && !user.viaPlatform ? "mobile_app" : undefined].filter((f): f is string => !!f);
+    const phone = !user.viaPlatform && (isMobileApp(req.headers["user-agent"]) || isMobileApp(session.userAgent));
+    const needed = [feature, phone ? "mobile_app" : undefined].filter((f): f is string => !!f);
     if (needed.length) {
       const plan = await this.companies.plan(company);
       const off = plan ? needed.find((f) => !plan.features.includes(f)) : undefined;
@@ -133,6 +129,15 @@ export class AuthGuard implements CanActivate {
     const required = this.reflector.getAllAndOverride<Permission[] | undefined>(PERMISSIONS, targets) ?? [];
     const missing = required.filter((p) => !can(user, p));
     if (missing.length) throw new ForbiddenError();
+
+    // In use: the session's expiry moves on (not a platform admin's visit, and only for a request that was let through).
+    if (!session.user.platformAdminId && now - session.lastSeenAt.getTime() > SLIDE_EVERY_MS) {
+      await this.prisma.db.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date(now), expiresAt: new Date(now + SESSION_TTL_SECONDS * 1000) } });
+      // Browsers: push the cookie's own expiry forward too.
+      if (!String(req.headers.authorization ?? "").startsWith("Bearer ") && token) {
+        ctx.switchToHttp().getResponse().cookie(SESSION_COOKIE, token, sessionCookieOptions());
+      }
+    }
     return true;
   }
 

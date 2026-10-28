@@ -4,7 +4,7 @@ import { Banknote, Coins, TrendingUp, Users } from "lucide-react";
 import { can, type InquiryStage, type Priority } from "@kebo/shared";
 import { Badge, Card, CardBody, CardHeader, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { Insights, Reminders } from "@/lib/types-insights";
@@ -62,7 +62,7 @@ function DealList({ rows, empty }: { rows: DealLine[]; empty: string }) {
 
 export default async function DashboardPage() {
   const me = await requireUser();
-  const insights = can(me, "reports.view");
+  const insights = can(me, "reports.view") && (await hasFeature("insights"));
   // Only the deal counts are waited for; the month's figures and "Needs attention" stream in as they come.
   const d = await api.get<Dashboard>("/dashboard");
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: TZ }).format(new Date()));
