@@ -1,17 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { CheckCircle2, Download, PackageCheck, Pencil, Printer, Search } from "lucide-react";
-import { Badge, Button, buttonClass, cn, Field, Input, ScrollFade, Textarea } from "@kebo/ui";
+import { Badge, Button, buttonClass, cn, Field, Input, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { LinePacking } from "@/lib/types-orders";
-import { Sheet } from "@/components/lines/sheet";
+import { Sheet, type SheetColumn } from "@/components/lines/sheet";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-const framed = "flex flex-col gap-3 rounded-lg border border-line bg-surface-2/60 p-3";
 const n = (v: string | number, digits = 2) => Number(v).toLocaleString("en-US", { maximumFractionDigits: digits });
 /** The first line of a description (the rest is the specification). */
 const head = (d: string) => d.split("\n")[0] ?? d;
@@ -31,15 +30,72 @@ export interface GoodsLine {
   packing: LinePacking;
 }
 
+/** The goods cell: name, then model (and, on a phone, the factory) under it. */
+const goodsCell = (l: GoodsLine, factoryOnPhone = false) => (
+  <>
+    <span className="line-clamp-2 break-words text-text">{head(l.description)}</span>
+    {l.model && <span className="block truncate text-xs text-muted">Model {l.model}</span>}
+    {factoryOnPhone && l.factory && <span className="block truncate text-xs text-muted md:hidden">{l.factory}</span>}
+  </>
+);
+
+/** Filter chips with counts, and a find box when there are many lines. */
+function Filters<K extends string>({
+  chips,
+  show,
+  setShow,
+  total,
+  query,
+  setQuery,
+}: {
+  chips: { key: K; label: string; count: number }[];
+  show: K;
+  setShow: (k: K) => void;
+  total: number;
+  query: string;
+  setQuery: (q: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Show">
+        {chips.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            onClick={() => setShow(c.key)}
+            aria-pressed={show === c.key}
+            className={cn(
+              "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium",
+              show === c.key ? "border-primary bg-primary-soft text-primary" : "border-line text-text-2 hover:bg-surface-2",
+            )}
+          >
+            {c.label}
+            <span className="tabular opacity-80">{c.count}</span>
+          </button>
+        ))}
+      </div>
+      {total > 8 && (
+        <div className="relative sm:w-64">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Find in ${total} lines…`} aria-label="Find a line" className="h-8 pl-8" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const matches = (l: GoodsLine, q: string) => !q || [l.no, l.description, l.model ?? "", l.factory ?? ""].some((v) => v.toLowerCase().includes(q));
+
+const Progress = ({ done, of, label }: { done: number; of: number; label: string }) => (
+  <div className="h-1.5 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuemin={0} aria-valuemax={of} aria-valuenow={done} aria-label={label}>
+    <div className="h-full rounded-full bg-ok" style={{ width: `${of ? Math.round((done / of) * 100) : 0}%` }} />
+  </div>
+);
+
 /* ---------------------------------------------------------------- goods from the factory */
 
 type GoodsState = "waiting" | "partly" | "in";
-
-const stateOf = (l: GoodsLine): GoodsState => {
-  const got = Number(l.receivedQty);
-  return got >= Number(l.quantity) ? "in" : got > 0 ? "partly" : "waiting";
-};
-
+const stateOf = (got: number, of: number): GoodsState => (got >= of ? "in" : got > 0 ? "partly" : "waiting");
 const STATE: Record<GoodsState, { label: string; tone: "neutral" | "warn" | "ok" }> = {
   waiting: { label: "Waiting", tone: "neutral" },
   partly: { label: "Partly in", tone: "warn" },
@@ -47,21 +103,126 @@ const STATE: Record<GoodsState, { label: string; tone: "neutral" | "warn" | "ok"
 };
 
 /**
- * What came in from the factory, as a sheet you can only look at: one row per
- * goods line with what was ordered, what came in (with a small bar) and its
- * status. Filter by status, or find a line when there are many.
- * "Record what came in" opens one number per line (the total so far);
- * "Mark all received" fills every line in one click.
+ * What came in from the factory, in one sheet: looked at, or changed in place.
+ * "Record what came in" turns the "Came in" cells into boxes (the total so far
+ * for each line), with the date and Save under the sheet; the status follows
+ * what is typed. "Mark all received" fills every line in one click.
  */
 export function GoodsReceipt({ lines, canEdit, action, today }: { lines: GoodsLine[]; canEdit: boolean; action: Action; today: string }) {
   const [editing, setEditing] = useState(false);
+  const [qty, setQty] = useState<Record<string, string>>({});
+  const [on, setOn] = useState(today);
+  const [show, setShow] = useState<GoodsState | "all">("all");
+  const [query, setQuery] = useState("");
+
+  const gotOf = (l: GoodsLine) => (editing ? Number(qty[l.id] ?? l.receivedQty) || 0 : Number(l.receivedQty));
   const allIn = lines.every((l) => Number(l.receivedQty) >= Number(l.quantity));
+  const count: Record<GoodsState, number> = { waiting: 0, partly: 0, in: 0 };
+  for (const l of lines) count[stateOf(gotOf(l), Number(l.quantity))]++;
+  const q = query.trim().toLowerCase();
+  const rows = lines.filter((l) => (show === "all" || stateOf(gotOf(l), Number(l.quantity)) === show) && matches(l, q));
+
+  const start = () => {
+    setQty(Object.fromEntries(lines.map((l) => [l.id, String(Number(l.receivedQty))])));
+    setOn(today);
+    setShow("all");
+    setEditing(true);
+  };
   const all = JSON.stringify({ on: today, lines: lines.map((l) => ({ lineId: l.id, receivedQty: Number(l.quantity) })) });
+  const payload = JSON.stringify({ on, lines: lines.map((l) => ({ lineId: l.id, receivedQty: qty[l.id] ?? "" })) });
+
+  const columns: SheetColumn<GoodsLine>[] = [
+    { key: "goods", label: "Goods", show: (l) => goodsCell(l, true) },
+    { key: "factory", label: "Factory", width: "11rem", hideBelow: "md", show: (l) => <span className="line-clamp-2 text-text-2">{l.factory ?? "—"}</span> },
+    { key: "ordered", label: "Ordered", width: "6.5rem", align: "right", hideBelow: "sm", show: (l) => <span className="whitespace-nowrap">{`${n(l.quantity)} ${l.unit}`}</span> },
+    {
+      key: "received",
+      label: "Came in",
+      width: "7rem",
+      phoneWidth: "5.25rem",
+      align: "right",
+      input: "number",
+      maxLength: 14,
+      value: (l) => qty[l.id] ?? "",
+      aria: (l) => `${head(l.description)}: came in so far (${l.unit})`,
+      show: (l) => {
+        const got = Number(l.receivedQty);
+        const of = Number(l.quantity);
+        const st = stateOf(got, of);
+        return (
+          <>
+            <span className={cn("block whitespace-nowrap", st === "in" ? "font-medium text-ok" : got > 0 ? "text-text" : "text-muted")}>
+              {n(got)}{" "}
+              <span className="text-xs text-muted">
+                / {n(of)}
+                <span className="sm:hidden"> {l.unit}</span>
+              </span>
+            </span>
+            <span className="mt-1 block h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+              <span className={cn("block h-full rounded-full", st === "in" ? "bg-ok" : "bg-warn")} style={{ width: `${of > 0 ? Math.min(100, Math.round((got / of) * 100)) : 0}%` }} />
+            </span>
+          </>
+        );
+      },
+    },
+    {
+      key: "status",
+      label: "Status",
+      width: "8rem",
+      phoneWidth: "5.75rem",
+      show: (l) => {
+        const got = gotOf(l);
+        const st = stateOf(got, Number(l.quantity));
+        return (
+          <>
+            <Badge tone={STATE[st].tone} dot>
+              {STATE[st].label}
+            </Badge>
+            {!editing && got > 0 && l.receivedOn && (
+              <span className="mt-0.5 block truncate text-xs text-muted">
+                {st === "in" ? "on" : "last"} {l.receivedOn}
+              </span>
+            )}
+          </>
+        );
+      },
+    },
+  ];
+
+  const sheet = (
+    <div className="flex flex-col gap-2">
+      <Filters
+        chips={[
+          { key: "all", label: "All", count: lines.length },
+          { key: "waiting", label: "Waiting", count: count.waiting },
+          { key: "partly", label: "Partly in", count: count.partly },
+          { key: "in", label: "All in", count: count.in },
+        ]}
+        show={show}
+        setShow={setShow}
+        total={lines.length}
+        query={query}
+        setQuery={setQuery}
+      />
+      <Progress done={count.in} of={lines.length} label={`${count.in} of ${lines.length} lines all in`} />
+      <Sheet
+        label="Goods lines"
+        rows={rows}
+        rowKey={(l) => l.id}
+        rowNo={(l) => l.no}
+        columns={columns}
+        editing={editing}
+        onChange={(l, _k, v) => setQty((s) => ({ ...s, [l.id]: v }))}
+        fit
+        empty={q ? <>Nothing matches &ldquo;{query}&rdquo;.</> : "No lines here."}
+      />
+    </div>
+  );
 
   if (!canEdit || !editing)
     return (
       <div className="flex flex-col gap-3">
-        <GoodsGrid lines={lines} />
+        {sheet}
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
             {!allIn && (
@@ -73,210 +234,32 @@ export function GoodsReceipt({ lines, canEdit, action, today }: { lines: GoodsLi
                 </SubmitButton>
               </ActionForm>
             )}
-            <Button size="sm" variant={allIn ? "ghost" : "secondary"} onClick={() => setEditing(true)}>
+            <Button size="sm" variant={allIn ? "ghost" : "secondary"} onClick={start}>
               <Pencil aria-hidden /> {allIn ? "Change" : "Record what came in"}
             </Button>
           </div>
         )}
       </div>
     );
-  return <ReceiptForm lines={lines} action={action} today={today} close={() => setEditing(false)} />;
-}
-
-function GoodsGrid({ lines }: { lines: GoodsLine[] }) {
-  const [show, setShow] = useState<GoodsState | "all">("all");
-  const [query, setQuery] = useState("");
-  const count = { waiting: 0, partly: 0, in: 0 } as Record<GoodsState, number>;
-  for (const l of lines) count[stateOf(l)]++;
-  const q = query.trim().toLowerCase();
-  const rows = lines.filter(
-    (l) =>
-      (show === "all" || stateOf(l) === show) &&
-      (!q || [l.no, l.description, l.model ?? "", l.factory ?? ""].some((v) => v.toLowerCase().includes(q))),
-  );
-  const cellBase = "h-9 border border-line px-1.5 align-middle text-sm sm:px-2";
-  const hd = "h-8 border border-t-0 border-line bg-surface-2 px-1.5 sm:px-2 text-left text-xs font-medium whitespace-nowrap text-text-2";
-  const chip = (key: GoodsState | "all", label: string, n: number) => (
-    <button
-      key={key}
-      type="button"
-      onClick={() => setShow(key)}
-      aria-pressed={show === key}
-      className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium",
-        show === key ? "border-primary bg-primary-soft text-primary" : "border-line text-text-2 hover:bg-surface-2",
-      )}
-    >
-      {label}
-      <span className="tabular opacity-80">{n}</span>
-    </button>
-  );
-  const done = count.in;
-  const pct = lines.length ? Math.round((done / lines.length) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Show">
-          {chip("all", "All", lines.length)}
-          {chip("waiting", "Waiting", count.waiting)}
-          {chip("partly", "Partly in", count.partly)}
-          {chip("in", "All in", count.in)}
-        </div>
-        {lines.length > 8 && (
-          <div className="relative sm:w-64">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Find in ${lines.length} lines…`}
-              aria-label="Find a line"
-              className="h-8 pl-8"
-            />
-          </div>
-        )}
-      </div>
-      <div
-        className="h-1.5 overflow-hidden rounded-full bg-surface-3"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={lines.length}
-        aria-valuenow={done}
-        aria-label={`${done} of ${lines.length} lines all in`}
-      >
-        <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
-      </div>
-      <div className="overflow-hidden rounded-lg border border-line bg-surface">
-        <ScrollFade className="overflow-x-auto" role="region" aria-label="Goods lines">
-          {/* On a phone: the factory goes under the goods and "Ordered" into "Came in", so the status stays in view. */}
-          <table data-fit className="w-full table-fixed border-collapse [&_tr>*:first-child]:border-l-0 [&_tr>*:last-child]:border-r-0">
-            <thead>
-              <tr>
-                <th scope="col" className={cn(hd, "w-8 px-0.5 text-center sm:w-12 sm:px-1")}>
-                  No.
-                </th>
-                <th scope="col" className={hd}>
-                  Goods
-                </th>
-                <th scope="col" className={cn(hd, "hidden w-44 md:table-cell")}>
-                  Factory
-                </th>
-                <th scope="col" className={cn(hd, "hidden w-24 text-right sm:table-cell")}>
-                  Ordered
-                </th>
-                <th scope="col" className={cn(hd, "w-[5.25rem] text-right sm:w-28")}>
-                  Came in
-                </th>
-                <th scope="col" className={cn(hd, "w-[5.75rem] sm:w-32")}>
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-4 text-sm text-muted">
-                    {q ? <>Nothing matches &ldquo;{query}&rdquo;.</> : "No lines here."}
-                  </td>
-                </tr>
-              )}
-              {rows.map((l) => {
-                const got = Number(l.receivedQty);
-                const of = Number(l.quantity);
-                const st = stateOf(l);
-                const p = of > 0 ? Math.min(100, Math.round((got / of) * 100)) : 0;
-                return (
-                  <tr key={l.id} aria-label={`Line ${l.no}`}>
-                    <th scope="row" className={cn(cellBase, "bg-surface-2 px-0.5 text-center text-xs font-normal whitespace-nowrap text-muted tabular sm:px-1")}>
-                      {l.no}
-                    </th>
-                    <td className={cn(cellBase, "py-1.5")}>
-                      <span className="line-clamp-2 break-words">{head(l.description)}</span>
-                      {l.model && <span className="block truncate text-xs text-muted">Model {l.model}</span>}
-                      {l.factory && <span className="block truncate text-xs text-muted md:hidden">{l.factory}</span>}
-                    </td>
-                    <td className={cn(cellBase, "hidden text-text-2 md:table-cell")}>
-                      <span className="line-clamp-2">{l.factory ?? <span className="text-muted">—</span>}</span>
-                    </td>
-                    <td className={cn(cellBase, "hidden text-right whitespace-nowrap tabular sm:table-cell")}>
-                      {n(of)} {l.unit}
-                    </td>
-                    <td className={cn(cellBase, "py-1.5 text-right tabular")}>
-                      <span className={cn("block whitespace-nowrap", st === "in" ? "font-medium text-ok" : got > 0 ? "text-text" : "text-muted")}>
-                        {n(got)}{" "}
-                        <span className="text-xs text-muted">
-                          / {n(of)}
-                          <span className="sm:hidden"> {l.unit}</span>
-                        </span>
-                      </span>
-                      <span className="mt-1 block h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                        <span className={cn("block h-full rounded-full", st === "in" ? "bg-ok" : "bg-warn")} style={{ width: `${p}%` }} />
-                      </span>
-                    </td>
-                    <td className={cn(cellBase, "py-1.5")}>
-                      <Badge tone={STATE[st].tone} dot>
-                        {STATE[st].label}
-                      </Badge>
-                      {got > 0 && l.receivedOn && (
-                        <span className="mt-0.5 block truncate text-xs text-muted">
-                          {st === "in" ? "on" : "last"} {l.receivedOn}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </ScrollFade>
-      </div>
-    </div>
-  );
-}
-
-function ReceiptForm({ lines, action, today, close }: { lines: GoodsLine[]; action: Action; today: string; close: () => void }) {
-  const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(lines.map((l) => [l.id, String(Number(l.receivedQty))])));
-  const [on, setOn] = useState(today);
-  const payload = JSON.stringify({ on, lines: lines.map((l) => ({ lineId: l.id, receivedQty: qty[l.id] ?? "" })) });
-  return (
-    <ActionForm action={action} onDone={close} className={framed}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium">How many have come in so far, in total?</p>
-        <Button type="button" size="xs" variant="ghost" onClick={() => setQty(Object.fromEntries(lines.map((l) => [l.id, String(Number(l.quantity))])))}>
+    <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
+      <input type="hidden" name="payload" value={payload} />
+      <p className="text-sm text-text-2">Type how many of each have come in so far, in total. Enter goes down; you can paste a column from Excel.</p>
+      {sheet}
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Date" htmlFor="rcv-on" hint="When these came in">
+          <Input id="rcv-on" type="date" max={today} className="w-44" value={on} onChange={(e) => setOn(e.target.value)} />
+        </Field>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setQty(Object.fromEntries(lines.map((l) => [l.id, String(Number(l.quantity))])))}>
           <CheckCircle2 aria-hidden /> Everything ordered
         </Button>
       </div>
-      <input type="hidden" name="payload" value={payload} />
-      <Sheet
-        label="Goods that came in"
-        rows={lines}
-        rowKey={(l) => l.id}
-        rowNo={(l) => l.no}
-        onChange={(i, _k, v) => setQty((q) => ({ ...q, [lines[i]!.id]: v }))}
-        columns={[
-          { key: "goods", label: "Goods", show: (l) => <span className="line-clamp-2 text-text">{head(l.description)}</span> },
-          { key: "factory", label: "Factory", width: "10rem", show: (l) => <span className="truncate">{l.factory ?? "—"}</span> },
-          { key: "ordered", label: "Ordered", width: "7rem", align: "right", show: (l) => `${n(l.quantity)} ${l.unit}` },
-          {
-            key: "received",
-            label: "Came in so far",
-            width: "8rem",
-            align: "right",
-            input: "number",
-            maxLength: 14,
-            value: (l) => qty[l.id] ?? "",
-            aria: (l) => `${head(l.description)}: came in so far (${l.unit})`,
-          },
-        ]}
-      />
-      <Field label="Date" htmlFor="rcv-on" hint="When these came in">
-        <Input id="rcv-on" type="date" max={today} className="w-44" value={on} onChange={(e) => setOn(e.target.value)} />
-      </Field>
       <div className="flex gap-2">
         <SubmitButton size="sm" pendingText="Saving…">
           Save what came in
         </SubmitButton>
-        <Button type="button" size="sm" variant="ghost" onClick={close}>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
           Cancel
         </Button>
       </div>
@@ -295,26 +278,33 @@ interface PackRow {
   cbm: string;
 }
 
-const FIELDS: {
-  key: Exclude<keyof PackRow, "lineId">;
-  label: string;
-  short: string;
-  span: string;
-  mode: "numeric" | "decimal" | "text";
-}[] = [
-  { key: "packages", label: "Packages", short: "Pkgs", span: "col-span-2", mode: "numeric" },
-  { key: "packageType", label: "Package type", short: "Type", span: "col-span-4", mode: "text" },
-  { key: "netWeightKg", label: "Net kg", short: "Net kg", span: "col-span-2", mode: "decimal" },
-  { key: "grossWeightKg", label: "Gross kg", short: "Gross kg", span: "col-span-2", mode: "decimal" },
-  { key: "cbm", label: "CBM (m³)", short: "CBM", span: "col-span-2", mode: "decimal" },
+const FIELDS: { key: Exclude<keyof PackRow, "lineId">; label: string; mode: "numeric" | "decimal" | "text"; width: string; digits?: number }[] = [
+  { key: "packages", label: "Packages", mode: "numeric", width: "6rem", digits: 0 },
+  { key: "packageType", label: "Package type", mode: "text", width: "8rem" },
+  { key: "netWeightKg", label: "Net kg", mode: "decimal", width: "6.5rem" },
+  { key: "grossWeightKg", label: "Gross kg", mode: "decimal", width: "6.5rem" },
+  { key: "cbm", label: "CBM (m³)", mode: "decimal", width: "6.5rem", digits: 3 },
 ];
 
 const sum = (rows: PackRow[], k: keyof PackRow) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+const rowsOf = (lines: GoodsLine[]): PackRow[] =>
+  lines.map((l) => ({
+    lineId: l.id,
+    packages: l.packing.packages === null ? "" : String(l.packing.packages),
+    packageType: l.packing.packageType ?? "",
+    netWeightKg: l.packing.netWeightKg === null ? "" : String(Number(l.packing.netWeightKg)),
+    grossWeightKg: l.packing.grossWeightKg === null ? "" : String(Number(l.packing.grossWeightKg)),
+    cbm: l.packing.cbm === null ? "" : String(Number(l.packing.cbm)),
+  }));
+const withDefaults = (rows: PackRow[]) => rows.map((r) => ({ ...r, packageType: r.packageType || "Carton" }));
+
+type PackState = "missing" | "packed";
 
 /**
- * The packing list: packages, type, weights and volume per goods line, the
- * container and the shipping marks. Once every line has its packages it is
- * "ready" (green) with the document's View / Print and PDF links.
+ * The packing list, in the same sheet as the goods: packages, type, weights
+ * and volume per line, with totals. Looked at once made (green "ready" with the
+ * document's View / Print and PDF), and changed in place: the cells become
+ * boxes, with the container and the shipping marks under the sheet.
  */
 export function PackingList({
   lines,
@@ -335,8 +325,25 @@ export function PackingList({
   action: Action;
   links: { view: string; pdf: string };
 }) {
-  // Not made yet: the form is open. Made: the green "ready" panel, with "Change" to reopen the form.
-  const [editing, setEditing] = useState(false);
+  const saved = rowsOf(lines);
+  const started = totals.packages > 0;
+  // Not made yet: open for typing straight away. Made: looked at, with "Change".
+  const [editing, setEditing] = useState(canEdit && !packed);
+  const [rows, setRows] = useState<PackRow[]>(() => withDefaults(saved));
+  const [container, setContainer] = useState(containerNo ?? "");
+  const [marks, setMarks] = useState(shippingMarks ?? "");
+  const [show, setShow] = useState<PackState | "all">("all");
+  const [query, setQuery] = useState("");
+
+  const shown = editing ? rows : saved;
+  const rowOf = (l: GoodsLine) => shown[lines.indexOf(l)]!;
+  const stateOfLine = (l: GoodsLine): PackState => (Number(rowOf(l).packages) > 0 ? "packed" : "missing");
+  const missing = lines.filter((l) => stateOfLine(l) === "missing").length;
+  const q = query.trim().toLowerCase();
+  const visible = lines.filter((l) => (show === "all" || stateOfLine(l) === show) && matches(l, q));
+  const total = { packages: sum(shown, "packages"), net: sum(shown, "netWeightKg"), gross: sum(shown, "grossWeightKg"), cbm: sum(shown, "cbm") };
+  const payload = JSON.stringify({ containerNo: container, shippingMarks: marks, lines: rows });
+
   const summary = [
     `${n(totals.packages, 0)} package${totals.packages === 1 ? "" : "s"}`,
     Number(totals.netWeightKg) ? `net ${n(totals.netWeightKg)} kg` : null,
@@ -345,7 +352,69 @@ export function PackingList({
   ]
     .filter(Boolean)
     .join(" · ");
-  const docLinks = (
+
+  const columns: SheetColumn<GoodsLine>[] = [
+    {
+      key: "goods",
+      label: "Goods",
+      show: (l) => (
+        <>
+          {goodsCell(l)}
+          <span className="block text-xs text-muted tabular">
+            {n(l.quantity)} {l.unit}
+          </span>
+        </>
+      ),
+    },
+    ...FIELDS.map(
+      (f): SheetColumn<GoodsLine> => ({
+        key: f.key,
+        label: f.label,
+        width: f.width,
+        align: f.mode === "text" ? undefined : "right",
+        input: f.mode === "text" ? "text" : "number",
+        maxLength: f.mode === "text" ? 40 : 14,
+        value: (l) => rowOf(l)[f.key],
+        aria: (l) => `${head(l.description)}: ${f.label}`,
+        show: (l) => {
+          const v = rowOf(l)[f.key];
+          if (!v) return <span className="text-muted">—</span>;
+          return f.mode === "text" ? v : n(v, f.digits ?? 2);
+        },
+      }),
+    ),
+  ];
+
+  const sheet = (
+    <div className="flex flex-col gap-2">
+      <Filters
+        chips={[
+          { key: "all", label: "All", count: lines.length },
+          { key: "missing", label: "Without packages", count: missing },
+          { key: "packed", label: "Packed", count: lines.length - missing },
+        ]}
+        show={show}
+        setShow={setShow}
+        total={lines.length}
+        query={query}
+        setQuery={setQuery}
+      />
+      <Progress done={lines.length - missing} of={lines.length} label={`${lines.length - missing} of ${lines.length} lines have their packages`} />
+      <Sheet
+        label="Packing list"
+        rows={visible}
+        rowKey={(l) => l.id}
+        rowNo={(l) => l.no}
+        columns={columns}
+        editing={editing}
+        onChange={(l, k, v) => setRows((rs) => rs.map((r) => (r.lineId === l.id ? { ...r, [k]: v } : r)))}
+        foot={["Total", n(total.packages, 0), "", n(total.net), n(total.gross), n(total.cbm, 3)]}
+        empty={q ? <>Nothing matches &ldquo;{query}&rdquo;.</> : "No lines here."}
+      />
+    </div>
+  );
+
+  const docLinks: ReactNode = (
     <span className="flex flex-wrap gap-2">
       <a href={links.view} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
         <Printer aria-hidden /> View / Print
@@ -356,128 +425,68 @@ export function PackingList({
     </span>
   );
 
-  if (packed && !(editing && canEdit))
+  if (!editing)
     return (
       <div className="flex flex-col gap-3">
-        <div role="status" className="flex flex-col gap-2 rounded-lg border border-ok/30 bg-ok-soft p-3 text-sm">
-          <p className="flex items-start gap-2">
-            <PackageCheck className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden />
-            <span>
-              <span className="block font-medium text-ok">Packing list ready</span>
-              <span className="block text-text-2 tabular">{summary}</span>
-              {containerNo && <span className="block text-text-2">Container {containerNo}</span>}
-            </span>
-          </p>
-          {docLinks}
-        </div>
+        {packed ? (
+          <div role="status" className="flex flex-col gap-2 rounded-lg border border-ok/30 bg-ok-soft p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-start gap-2">
+              <PackageCheck className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden />
+              <span>
+                <span className="block font-medium text-ok">Packing list ready</span>
+                <span className="block text-text-2 tabular">{summary}</span>
+              </span>
+            </p>
+            {docLinks}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">{started ? `Started, not complete: ${summary}.` : "Not filled in yet."}</p>
+        )}
+        {(started || packed) && sheet}
+        {(containerNo || shippingMarks) && (
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            {containerNo && (
+              <div>
+                <dt className="text-xs text-muted">Container number</dt>
+                <dd>{containerNo}</dd>
+              </div>
+            )}
+            {shippingMarks && (
+              <div>
+                <dt className="text-xs text-muted">Shipping marks</dt>
+                <dd className="whitespace-pre-line">{shippingMarks}</dd>
+              </div>
+            )}
+          </dl>
+        )}
         {canEdit && (
           <div>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
-              <Pencil aria-hidden /> Change the packing list
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setRows(withDefaults(saved));
+                setContainer(containerNo ?? "");
+                setMarks(shippingMarks ?? "");
+                setShow("all");
+                setEditing(true);
+              }}
+            >
+              <Pencil aria-hidden /> {packed ? "Change the packing list" : "Fill in the packing list"}
             </Button>
           </div>
         )}
       </div>
     );
-  if (!canEdit)
-    return <p className="text-sm text-muted">{totals.packages > 0 ? `Started, not complete: ${summary}.` : "Not filled in yet."}</p>;
-  return (
-    <PackingForm
-      lines={lines}
-      containerNo={containerNo}
-      shippingMarks={shippingMarks}
-      packed={packed}
-      action={action}
-      close={() => setEditing(false)}
-      started={totals.packages > 0}
-    />
-  );
-}
-
-function PackingForm({
-  lines,
-  containerNo,
-  shippingMarks,
-  packed,
-  started,
-  action,
-  close,
-}: {
-  lines: GoodsLine[];
-  containerNo: string | null;
-  shippingMarks: string | null;
-  packed: boolean;
-  started: boolean;
-  action: Action;
-  close: () => void;
-}) {
-  const [rows, setRows] = useState<PackRow[]>(() =>
-    lines.map((l) => ({
-      lineId: l.id,
-      packages: l.packing.packages === null ? "" : String(l.packing.packages),
-      packageType: l.packing.packageType ?? "Carton",
-      netWeightKg: l.packing.netWeightKg === null ? "" : String(Number(l.packing.netWeightKg)),
-      grossWeightKg: l.packing.grossWeightKg === null ? "" : String(Number(l.packing.grossWeightKg)),
-      cbm: l.packing.cbm === null ? "" : String(Number(l.packing.cbm)),
-    })),
-  );
-  const [container, setContainer] = useState(containerNo ?? "");
-  const [marks, setMarks] = useState(shippingMarks ?? "");
-  const set = (i: number, k: keyof PackRow, v: string) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
-  const payload = JSON.stringify({ containerNo: container, shippingMarks: marks, lines: rows });
-  const total = {
-    packages: sum(rows, "packages"),
-    net: sum(rows, "netWeightKg"),
-    gross: sum(rows, "grossWeightKg"),
-    cbm: sum(rows, "cbm"),
-  };
-  const missing = rows.filter((r) => !(Number(r.packages) > 0)).length;
 
   return (
-    <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
+    <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
       <input type="hidden" name="payload" value={payload} />
       {started && !packed && <p className="text-xs text-warn">Not complete yet: every line needs its number of packages.</p>}
-      <Sheet
-        label="Packing list"
-        rows={lines}
-        rowKey={(l) => l.id}
-        rowNo={(l) => l.no}
-        onChange={(i, k, v) => set(i, k as keyof PackRow, v)}
-        columns={[
-          {
-            key: "goods",
-            label: "Goods",
-            show: (l) => (
-              <span className="block min-w-0">
-                <span className="line-clamp-1 text-text">{head(l.description)}</span>
-                <span className="text-xs text-muted tabular">
-                  {n(l.quantity)} {l.unit}
-                </span>
-              </span>
-            ),
-          },
-          ...FIELDS.map((f) => ({
-            key: f.key,
-            label: f.label,
-            width: f.mode === "text" ? "8rem" : "6.5rem",
-            align: f.mode === "text" ? undefined : ("right" as const),
-            input: f.mode === "text" ? ("text" as const) : ("number" as const),
-            maxLength: f.mode === "text" ? 40 : 14,
-            value: (l: GoodsLine) => rows[lines.indexOf(l)]![f.key],
-            aria: (l: GoodsLine) => `${head(l.description)}: ${f.label}`,
-          })),
-        ]}
-        foot={["Total", n(total.packages, 0), "", n(total.net), n(total.gross), n(total.cbm, 3)]}
-      />
+      {sheet}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Container number" htmlFor="pk-container" optional>
-          <Input
-            id="pk-container"
-            maxLength={120}
-            value={container}
-            onChange={(e) => setContainer(e.target.value)}
-            placeholder="e.g. TGHU 123456-7"
-          />
+          <Input id="pk-container" maxLength={120} value={container} onChange={(e) => setContainer(e.target.value)} placeholder="e.g. TGHU 123456-7" />
         </Field>
         <Field label="Shipping marks" htmlFor="pk-marks" optional hint="As printed on the cartons">
           <Textarea id="pk-marks" rows={2} className="min-h-0" maxLength={2000} value={marks} onChange={(e) => setMarks(e.target.value)} />
@@ -487,16 +496,14 @@ function PackingForm({
         <SubmitButton size="sm" pendingText="Saving…">
           Save the packing list
         </SubmitButton>
-        {packed && (
-          <Button type="button" size="sm" variant="ghost" onClick={close}>
+        {(packed || started) && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
             Cancel
           </Button>
         )}
         {missing > 0 && (
           <span className="text-xs text-muted">
-            {missing === rows.length
-              ? "Fill in the packages for each line."
-              : `${missing} line${missing === 1 ? "" : "s"} still without packages.`}
+            {missing === lines.length ? "Fill in the packages for each line." : `${missing} line${missing === 1 ? "" : "s"} still without packages.`}
           </span>
         )}
       </div>
