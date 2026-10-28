@@ -9,6 +9,7 @@ import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo, companyOr, customerOr } from "@/components/print/data";
 import {
   docDate,
+  docItem,
   docMoney,
   docQty,
   docWords,
@@ -80,7 +81,7 @@ export default async function QuotationPrint({
   const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<DocLine> = {
     label: "Equipment Description",
-    render: (l) => `${l.description}${l.model ? `\nModel: ${l.model}` : ""}`,
+    render: (l) => docItem(l.description, l.model),
   };
   const columns: DocColumn<DocLine>[] = internal
     ? [

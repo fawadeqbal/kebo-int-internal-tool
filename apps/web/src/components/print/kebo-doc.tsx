@@ -4,26 +4,40 @@ import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
 
 /**
- * Every Kebo document — quotation, proforma invoice and packing list — in one layout, the one the team makes in Word
- * (PI_FOR_LIQUID_SYRUP_COMPLETE_LINE): centred letterhead in Times, the
- * customer on the left and the document details on the right, a table with a
- * light-blue header, the total in words, then the terms, the bank details and
- * the company stamp in one box.
+ * Every Kebo document — quotation, proforma invoice and packing list — in one
+ * layout: the "Modern Minimal" design (logo and contacts at the top, a navy
+ * and gold rule, the title with the date and details beside it, the customer
+ * in a light-blue box, an open table, the total in a navy bar, the terms with
+ * the stamp, and a footer with the business licence and page numbers).
  *
  * Each priced document has two copies:
  *  - the customer's: the items and quantities, and one total at the end;
  *  - the internal one (never sent): unit prices, amounts, costs and margin,
  *    and every payment, under a red "internal copy" band.
  *
- * Measured from that PDF (A4 = 595.6 × 842 pt): the table runs from x 14.2 to
- * 574.4 pt, the No. column is 28.5 pt wide, text sits 5.6 pt inside the cells.
+ * Sizes are CSS pixels on an A4 sheet 794 px wide (as the design), so the
+ * screen and the PDF match.
  */
 
-export const TIMES = "'Times New Roman', 'Liberation Serif', Tinos, Times, serif";
-const ARIAL = "Arial, 'Liberation Sans', Arimo, Helvetica, sans-serif";
-const SONG = "SimSun, 'Songti SC', 'Noto Serif CJK SC', 'Noto Serif CJK', serif";
-const HEADER_BLUE = "#D9EAF7";
-const LINE = "0.5pt solid #000";
+const SANS = "'Kebo Inter', Inter, Arial, 'Liberation Sans', sans-serif";
+const DISPLAY = "'Kebo Jakarta', 'Plus Jakarta Sans', 'Kebo Inter', Inter, Arial, sans-serif";
+const CJK = "'Noto Sans CJK SC', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif";
+const NAVY = "#063C8C";
+const BLUE = "#0B5ED7";
+const GOLD = "#B08D3C";
+const GOLD_TEXT = "#8A6A22";
+const TINT = "#F5F9FE";
+const RULE = "#DCE8F5";
+const INK = "#1A1A1A";
+const TEXT_2 = "#444444";
+const LABEL_GREY = "#555555";
+/** Page margins (the footer sits in the bottom one). */
+const MARGIN = { top: 44, side: 52, bottom: 64 };
+/** The brand next to the company's name: the logo and its wordmark. */
+const BRAND = { logo: "/brand/kebo-logo.png", mark: "KEBO", tagline: "INTERNATIONAL TRADE" };
+
+const exact: CSSProperties = { printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" };
+const label: CSSProperties = { fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
 
 /* ---------------------------------------------------------------- formatting, as on Kebo's documents */
 
@@ -57,7 +71,7 @@ export function docQty(quantity: string | number, unit?: string | null) {
   return `${Number(quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${unit ?? ""}`.trim();
 }
 
-/** Free text (terms, notes) as bullets: one per line, without the "1." numbering people type. */
+/** Free text (terms, notes) as list items: one per line, without the "1." numbering people type. */
 export function textBullets(text: string | null | undefined) {
   return (text ?? "")
     .split(/\r?\n/)
@@ -71,23 +85,53 @@ export function portBullets(incoterm: string, place: string | null, portOfDischa
   const loading = loadingTerm ? place : null;
   const discharge = portOfDischarge ?? (loadingTerm ? null : place);
   return [
-    loading ? <Labelled key="pol" label="Port of loading:" gap="30pt" value={loading} /> : null,
-    discharge ? <Labelled key="pod" label="Port of discharge:" gap="6pt" value={discharge} /> : null,
+    loading ? <Labelled key="pol" label="Port of loading:" value={loading} /> : null,
+    discharge ? <Labelled key="pod" label="Port of discharge:" value={discharge} /> : null,
   ].filter(Boolean);
 }
 
-function Labelled({ label, value, gap = "6pt" }: { label: string; value: ReactNode; gap?: string }) {
+function Labelled({ label: l, value }: { label: string; value: ReactNode; gap?: string }) {
   return (
     <>
-      {label}
-      <span style={{ display: "inline-block", width: gap }} />
-      {value}
+      {l} {value}
     </>
   );
 }
 
-/** A bullet with a label, e.g. "B/L No.: QDLOS-77". */
-export const labelled = (label: string, value: ReactNode, gap?: string) => <Labelled label={label} value={value} gap={gap} />;
+/** A list item with a label, e.g. "B/L No.: QDLOS-77". */
+export const labelled = (l: string, value: ReactNode, gap?: string) => <Labelled label={l} value={value} gap={gap} />;
+
+/** An item's description cell: the first line as its name, the rest (specs) and the model under it. */
+export function docItem(description: string, model?: string | null) {
+  const [name, ...more] = description.split(/\r?\n/);
+  return (
+    <>
+      <div style={{ fontWeight: 600 }}>{name}</div>
+      {more.length > 0 && <div style={{ color: TEXT_2, fontSize: "12px", whiteSpace: "pre-line" }}>{more.join("\n")}</div>}
+      {model && <div style={{ color: LABEL_GREY, fontSize: "12px" }}>Model: {model}</div>}
+    </>
+  );
+}
+
+/** A cell in a row under the items (e.g. the packing list's totals). */
+export const docFootCell = (align: "left" | "right" = "left"): CSSProperties => ({
+  padding: "10px 6px",
+  borderTop: `1.5px solid ${INK}`,
+  fontWeight: 700,
+  textAlign: align,
+  verticalAlign: "top",
+});
+
+/** "PROFORMA  INVOICE" → "Proforma Invoice" */
+const titleCase = (t: string) =>
+  t
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+const noColon = (t: string) => t.replace(/\s*:\s*$/, "");
+/** A string inside a CSS content: "…". */
+const cssString = (t: string) => `"${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ")}"`;
 
 /* ---------------------------------------------------------------- the document */
 
@@ -101,13 +145,13 @@ export interface DocColumn<T> {
   render: (row: T, index: number) => ReactNode;
 }
 
-const cell: CSSProperties = { border: LINE, padding: "1.4pt 5.6pt", verticalAlign: "middle", textAlign: "left" };
+type Sum = { label: string; value: string };
+type Total = { label: string; words: string; amount: string };
 
 export function KeboDoc<T>({
   company,
   customer,
   title,
-  numberLabel = "NO.",
   number,
   date,
   meta = [],
@@ -127,57 +171,90 @@ export function KeboDoc<T>({
 }: {
   company: CompanySnapshot;
   customer: CustomerSnapshot;
-  /** Spaced as in the Word documents: "PROFORMA  INVOICE". */
+  /** "QUOTATION", "PROFORMA  INVOICE" (shown as "Proforma Invoice"). */
   title: string;
+  /** Kept for the callers; the number shows under the title. */
   numberLabel?: string;
   number: string;
   date: string;
-  /** More rows under the number on the right, e.g. "Valid until". */
+  /** More details beside the date, e.g. "Valid until". */
   meta?: { label: string; value: ReactNode }[];
   /** A heading row over the items, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE". */
   heading?: string | null;
   columns: DocColumn<T>[];
   rows: T[];
-  /** Bold rows before the total (subtotal, discount). */
-  sums?: { label: string; value: string }[];
-  /** "Total FOB Price : USD Ninety Thousand only   $ 90,000" */
-  total?: { label: string; words: string; amount: string } | null;
+  /** Lines before the total (subtotal, discount). */
+  sums?: Sum[];
+  /** "Total FOB Price", the amount in words and in figures. */
+  total?: Total | null;
   /**
    * Instead of rows / sums / total: several blocks in the same table, each
    * under its own heading with its own total — a quotation's options A, B…
    */
-  groups?: { heading: string; rows: T[]; sums?: { label: string; value: string }[]; total?: { label: string; words: string; amount: string } | null }[];
+  groups?: { heading: string; rows: T[]; sums?: Sum[]; total?: Total | null }[];
   /** Rows after the items instead of a money total (the packing list). */
   foot?: ReactNode;
   boxTitle?: string;
   bullets: ReactNode[];
   bank?: string | null;
-  /** The internal copy: a red band at the top and this section after the box. */
+  /** The internal copy: a red band at the top and this section after the terms. */
   internal?: ReactNode;
   internalBand?: string;
   watermark?: string | null;
 }) {
   const address = customer.address?.trim() || (isUnknownCountry(customer.country) ? "" : countryName(customer.country));
-  const widths = columns.map((c) => c.width);
+  const width = (c: DocColumn<T>) => (c.width ? `${c.width}pt` : undefined);
+  const contacts = [
+    company.phone ? { icon: <IconPhone />, text: company.phone } : null,
+    company.email ? { icon: <IconMail />, text: company.email } : null,
+    company.website ? { icon: <IconGlobe />, text: company.website, href: `https://${company.website.replace(/^https?:\/\//, "")}` } : null,
+    company.address ? { icon: <IconPin />, text: company.address } : null,
+  ].filter((x) => x !== null);
+  const details = [{ label: "Date", value: docDate(date) as ReactNode }, ...meta.map((m) => ({ label: noColon(m.label), value: m.value }))];
+  const footLeft = company.taxNo ? `Business License No. ${company.taxNo}` : "";
+  const thanks = "Thank you for your business";
+  const th = (c: DocColumn<T>, i: number): CSSProperties => ({
+    ...label,
+    color: TEXT_2,
+    padding: i === 0 ? "8px 6px 8px 0" : i === columns.length - 1 ? "8px 0 8px 6px" : "8px 6px",
+    textAlign: c.align ?? "left",
+    whiteSpace: "nowrap",
+  });
+  const td = (c: DocColumn<T>, i: number): CSSProperties => ({
+    padding: i === 0 ? "11px 6px 11px 0" : i === columns.length - 1 ? "11px 0 11px 6px" : "11px 6px",
+    verticalAlign: "top",
+    textAlign: c.align ?? "left",
+    whiteSpace: c.width && !c.wrap ? "nowrap" : "pre-line",
+    ...(i === 0 ? { color: BLUE, fontWeight: 700 } : null),
+    ...(i === columns.length - 1 && c.align === "right" ? { fontWeight: 600 } : null),
+  });
+
   return (
     <article
-      className="kebo-doc relative mx-auto bg-white text-black shadow-[0_1px_3px_rgba(16,24,40,.12),0_8px_24px_rgba(16,24,40,.08)] print:shadow-none"
+      className="kebo-doc relative mx-auto bg-white shadow-[0_1px_3px_rgba(16,24,40,.12),0_8px_24px_rgba(16,24,40,.08)] print:shadow-none"
       style={{
-        width: "595.6pt",
-        minHeight: "842pt",
-        padding: "40pt 21.2pt 40pt 14.2pt",
-        fontFamily: TIMES,
-        fontSize: "10pt",
-        lineHeight: 1.15,
+        width: "794px",
+        minHeight: "1123px",
+        boxSizing: "border-box",
+        padding: `${MARGIN.top}px ${MARGIN.side}px ${MARGIN.bottom + 20}px`,
+        color: INK,
+        fontFamily: SANS,
+        fontSize: "12.5px",
+        lineHeight: 1.45,
       }}
     >
-      {/* On paper the page margins come from @page (and the PDF route); the sheet only keeps the first-page offset. */}
-      <style>{`@page { size: A4; margin: 40pt 21.2pt 40pt 14.2pt; }
-@media print { .kebo-doc { width: auto !important; min-height: 0 !important; padding: 0 !important; } }
-@media screen and (max-width: 820px) { .kebo-doc { zoom: 0.78; } }
-@media screen and (max-width: 640px) { .kebo-doc { zoom: 0.58; } }
-@media screen and (max-width: 480px) { .kebo-doc { zoom: 0.48; } }
-@media screen and (max-width: 400px) { .kebo-doc { zoom: 0.43; } }
+      {/* On paper the margins come from @page, and the footer and page numbers are drawn in the bottom margin of every page. */}
+      <style>{`@page { size: A4; margin: ${MARGIN.top}px ${MARGIN.side}px ${MARGIN.bottom}px;
+  @bottom-left { content: ${cssString(footLeft)}; font: 11.5px ${SANS}; color: ${TEXT_2}; vertical-align: top; padding-top: 12px; border-top: 1px solid ${RULE}; }
+  @bottom-center { content: ${cssString(thanks)}; text-align: center; font: 11.5px ${SANS}; color: ${TEXT_2}; vertical-align: top; padding-top: 12px; border-top: 1px solid ${RULE}; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); text-align: right; font: 11.5px ${SANS}; color: ${TEXT_2}; vertical-align: top; padding-top: 12px; border-top: 1px solid ${RULE}; }
+}
+@media print { .kebo-doc { width: auto !important; min-height: 0 !important; padding: 0 !important; } .kebo-doc-foot { display: none !important; } }
+@media screen and (max-width: 820px) { .kebo-doc { zoom: 0.9; } }
+@media screen and (max-width: 720px) { .kebo-doc { zoom: 0.72; } }
+@media screen and (max-width: 600px) { .kebo-doc { zoom: 0.58; } }
+@media screen and (max-width: 480px) { .kebo-doc { zoom: 0.47; } }
+@media screen and (max-width: 400px) { .kebo-doc { zoom: 0.42; } }
 @media screen and (max-width: 360px) { .kebo-doc { zoom: 0.38; } }`}</style>
       {watermark && (
         <div aria-hidden className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -189,115 +266,129 @@ export function KeboDoc<T>({
       {internal && (
         <div
           style={{
-            marginBottom: "8pt",
+            ...exact,
+            marginBottom: "16px",
             background: "#B91C1C",
             color: "#fff",
-            fontFamily: ARIAL,
-            fontSize: "8.5pt",
+            borderRadius: "4px",
+            fontSize: "11px",
             fontWeight: 700,
-            letterSpacing: "0.06em",
+            letterSpacing: "0.08em",
             textAlign: "center",
-            padding: "3pt 0",
-            printColorAdjust: "exact",
-            WebkitPrintColorAdjust: "exact",
+            padding: "5px 0",
           }}
         >
           {internalBand}
         </div>
       )}
 
-      {/* Letterhead */}
-      <header style={{ textAlign: "center", fontSize: "12pt", lineHeight: "18.1pt", paddingTop: internal ? "0" : "13.5pt" }}>
-        {company.nameLocal && <div style={{ fontFamily: SONG, lineHeight: "15.5pt" }}>{company.nameLocal}</div>}
-        <div>{company.name}</div>
-        {company.address && <div>{company.address}</div>}
-        {company.phone && <div style={{ marginTop: "6.2pt", whiteSpace: "pre" }}>Tel: {company.phone}</div>}
-        <h1
-          style={{
-            margin: "2.3pt 0 0",
-            fontSize: "18pt",
-            lineHeight: "22pt",
-            fontWeight: 400,
-            textDecoration: "underline",
-            textUnderlineOffset: "2.4pt",
-            textDecorationThickness: "0.8pt",
-            whiteSpace: "pre",
-          }}
-        >
-          {title}
-        </h1>
+      {/* Letterhead: the logo and name on the left, how to reach us on the right */}
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- printed as is, also by the PDF renderer */}
+          <img src={BRAND.logo} alt="" style={{ width: "70px", height: "70px", objectFit: "contain", flexShrink: 0 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+            <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "28px", letterSpacing: "0.14em", color: NAVY, lineHeight: 1 }}>{BRAND.mark}</div>
+            <div style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: "11.5px", letterSpacing: "0.18em", color: GOLD_TEXT }}>{BRAND.tagline}</div>
+            <div style={{ fontSize: "11.5px", color: TEXT_2, lineHeight: 1.35 }}>
+              {company.name}
+              {company.nameLocal && (
+                <>
+                  {" · "}
+                  <span style={{ fontFamily: CJK, whiteSpace: "nowrap" }}>{company.nameLocal}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {contacts.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", color: "#333333", flexShrink: 0, maxWidth: "290px" }}>
+            {contacts.map((x) => (
+              <div key={x.text} style={{ display: "flex", alignItems: "flex-start", gap: "8px", lineHeight: 1.35 }}>
+                <span style={{ marginTop: "1px", flexShrink: 0, display: "flex" }}>{x.icon}</span>
+                {"href" in x && x.href ? (
+                  <a href={x.href} style={{ color: "inherit", textDecoration: "none" }}>
+                    {x.text}
+                  </a>
+                ) : (
+                  <span style={{ whiteSpace: "pre-line" }}>{x.text}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </header>
 
-      {/* Customer (left) and the document details (right) */}
-      <section style={{ display: "flex", justifyContent: "space-between", gap: "12pt", marginTop: "18.8pt" }}>
-        <div style={{ width: "214pt", fontFamily: ARIAL, fontSize: "11pt", lineHeight: "12.6pt" }}>
-          <div>
-            <span style={{ fontFamily: TIMES, fontSize: "12pt" }}>Customer: </span>
-            {customer.name}
-          </div>
-          {address && <div style={{ marginTop: "2.3pt", whiteSpace: "pre-line" }}>Address: {address}</div>}
-          {customer.taxNo && (
-            <div style={{ marginTop: "1.9pt" }}>
-              Business License Number: <b>{customer.taxNo}</b>
-            </div>
-          )}
-          {customer.regNo && (
-            <div style={{ marginTop: "2.1pt" }}>
-              Reg. Number: <b>{customer.regNo}</b>
-            </div>
-          )}
+      <div style={{ ...exact, marginTop: "22px", display: "flex", height: "3px" }}>
+        <div style={{ flex: 7, background: NAVY }} />
+        <div style={{ flex: 3, background: GOLD }} />
+      </div>
+
+      {/* The title and number, with the date and details beside them */}
+      <section style={{ marginTop: "30px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "24px" }}>
+        <div>
+          <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 800, fontSize: "34px", color: NAVY, lineHeight: 1 }}>{titleCase(title)}</h1>
+          <div style={{ marginTop: "8px", fontSize: "13px", color: TEXT_2 }}>{number}</div>
         </div>
-        <div style={{ width: "190pt", fontSize: "12pt", lineHeight: "14pt", paddingTop: "0.4pt" }}>
-          <div>DATE: {docDate(date)}</div>
-          <div style={{ marginTop: "0.7pt" }}>
-            {numberLabel} <b>{number}</b>
-          </div>
-          {meta.map((m) => (
-            <div key={m.label} style={{ marginTop: "0.7pt" }}>
-              {m.label} {m.value}
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${details.length}, auto)`, gap: "22px", lineHeight: 1.45 }}>
+          {details.map((d) => (
+            <div key={d.label}>
+              <div style={{ ...label, color: LABEL_GREY }}>{d.label}</div>
+              <div style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{d.value}</div>
             </div>
           ))}
-          {company.taxNo && (
-            <div style={{ fontFamily: ARIAL, fontSize: "11pt", lineHeight: "12.6pt", marginTop: "4.4pt", marginLeft: "-1.3pt" }}>
-              Business License No:
-              <br />
-              <b>{company.taxNo}</b>
-            </div>
-          )}
-          {company.website && (
-            <div style={{ marginTop: "1.2pt" }}>
-              <a
-                href={`https://${company.website.replace(/^https?:\/\//, "")}`}
-                style={{ color: "#0000FF", textDecoration: "underline", textDecorationThickness: "0.6pt" }}
-              >
-                {company.website}
-              </a>
-            </div>
-          )}
-          {company.email && <div style={{ marginTop: "-0.3pt" }}>Email:{company.email}</div>}
         </div>
       </section>
 
-      {/* The items */}
-      <table
+      {/* The customer */}
+      <section
         style={{
-          width: "100%",
-          marginTop: "13.6pt",
-          borderCollapse: "collapse",
-          tableLayout: "fixed",
-          fontSize: "10pt",
-          lineHeight: "11.5pt",
+          ...exact,
+          marginTop: "24px",
+          background: TINT,
+          borderRadius: "8px",
+          padding: "14px 18px",
+          display: "grid",
+          gridTemplateColumns: customer.taxNo || customer.regNo ? "repeat(2, minmax(0, 1fr))" : "1fr",
+          gap: "20px",
+          lineHeight: 1.5,
+          breakInside: "avoid",
         }}
       >
+        <div>
+          <div style={{ ...label, color: BLUE }}>Prepared for</div>
+          <div style={{ fontWeight: 700, fontSize: "14px" }}>{customer.name}</div>
+          {address && <div style={{ whiteSpace: "pre-line" }}>{address}</div>}
+        </div>
+        {(customer.taxNo || customer.regNo) && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {customer.taxNo && (
+              <div>
+                <div style={{ ...label, color: BLUE }}>Business License Number</div>
+                <div>{customer.taxNo}</div>
+              </div>
+            )}
+            {customer.regNo && (
+              <div>
+                <div style={{ ...label, color: BLUE }}>Reg. Number</div>
+                <div>{customer.regNo}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* The items */}
+      <table style={{ marginTop: "24px", width: "100%", borderCollapse: "collapse", tableLayout: "fixed", lineHeight: 1.35 }}>
         <colgroup>
-          {widths.map((w, i) => (
-            <col key={i} style={w ? { width: `${w}pt` } : undefined} />
+          {columns.map((c, i) => (
+            <col key={i} style={{ width: width(c) }} />
           ))}
         </colgroup>
         <thead style={{ display: "table-header-group" }}>
-          <tr style={{ background: HEADER_BLUE, fontWeight: 700, printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" }}>
-            {columns.map((c) => (
-              <th key={c.label} style={{ ...cell, paddingTop: 0, paddingBottom: 0, textAlign: c.align ?? "left" }}>
+          <tr style={{ borderBottom: `1.5px solid ${INK}` }}>
+            {columns.map((c, i) => (
+              <th key={c.label} style={th(c, i)}>
                 {c.label}
               </th>
             ))}
@@ -305,59 +396,37 @@ export function KeboDoc<T>({
         </thead>
         <tbody>
           {heading && (
-            <tr>
-              <td style={cell} />
+            <tr style={{ breakInside: "avoid", breakAfter: "avoid" }}>
               <td
-                colSpan={columns.length - 2}
-                style={{
-                  ...cell,
-                  textAlign: "center",
-                  fontWeight: 700,
-                  fontSize: "12pt",
-                  lineHeight: "13.9pt",
-                  padding: 0,
-                  textTransform: "uppercase",
-                }}
+                colSpan={columns.length}
+                style={{ padding: "10px 0 6px", textAlign: "center", fontFamily: DISPLAY, fontWeight: 700, fontSize: "13px", letterSpacing: "0.06em", color: NAVY, textTransform: "uppercase" }}
               >
                 {heading}
               </td>
-              <td style={cell} />
             </tr>
           )}
           {(groups ?? [{ heading: "", rows, sums, total }]).map((g, gi) => (
             <Fragment key={gi}>
               {g.heading && (
                 <tr style={{ breakInside: "avoid", breakAfter: "avoid" }}>
-                  <td colSpan={columns.length} style={{ ...cell, textAlign: "center", fontWeight: 700, fontSize: "11pt", lineHeight: "13pt", padding: "2pt 5.6pt", background: "#F3F4F6", printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" }}>
-                    {g.heading}
+                  <td colSpan={columns.length} style={{ padding: gi === 0 ? "12px 0 0" : "22px 0 0" }}>
+                    <div style={{ ...exact, ...label, color: NAVY, background: TINT, borderLeft: `3px solid ${NAVY}`, padding: "7px 12px" }}>{g.heading}</div>
                   </td>
                 </tr>
               )}
               {g.rows.map((r, i) => (
-                <tr key={i} style={{ breakInside: "avoid", height: "20.2pt" }}>
-                  {columns.map((c) => (
-                    <td key={c.label} style={{ ...cell, textAlign: c.align ?? "left", whiteSpace: c.width && !c.wrap ? "nowrap" : "pre-line" }}>
+                <tr key={i} style={{ breakInside: "avoid", borderBottom: `1px solid ${RULE}` }}>
+                  {columns.map((c, ci) => (
+                    <td key={c.label} style={td(c, ci)}>
                       {c.render(r, i)}
                     </td>
                   ))}
                 </tr>
               ))}
-              {(g.sums ?? []).map((s) => (
-                <tr key={s.label}>
-                  <td colSpan={columns.length - 1} style={{ ...cell, fontWeight: 700 }}>
-                    {s.label}
-                  </td>
-                  <td style={{ ...cell, fontWeight: 700, whiteSpace: "nowrap", textAlign: columns.at(-1)?.align ?? "left" }}>{s.value}</td>
-                </tr>
-              ))}
-              {g.total && (
-                <tr style={{ fontWeight: 700, fontSize: "12pt", lineHeight: "13.8pt", breakInside: "avoid" }}>
-                  <td colSpan={columns.length - 1} style={{ ...cell, padding: "0 5.6pt" }}>
-                    <span style={{ display: "inline-block", minWidth: "133.7pt" }}>{g.total.label}</span>
-                    {g.total.words}
-                  </td>
-                  <td style={{ ...cell, padding: "0 5.1pt", whiteSpace: "nowrap", textAlign: columns.at(-1)?.align ?? "left" }}>
-                    {g.total.amount}
+              {((g.sums ?? []).length > 0 || g.total) && (
+                <tr style={{ breakInside: "avoid" }}>
+                  <td colSpan={columns.length} style={{ padding: "16px 0 0" }}>
+                    <Totals sums={g.sums ?? []} total={g.total ?? null} />
                   </td>
                 </tr>
               )}
@@ -367,82 +436,138 @@ export function KeboDoc<T>({
         </tbody>
       </table>
 
-      {/* Terms, bank details and the stamp, in one box under the table */}
-      <section
-        style={{
-          position: "relative",
-          border: LINE,
-          borderTop: "none",
-          minHeight: company.stamp ? "150pt" : undefined,
-          padding: "15pt 5.6pt 24pt 5.6pt",
-          boxDecorationBreak: "clone",
-          WebkitBoxDecorationBreak: "clone",
-        }}
-      >
-        <div style={{ breakInside: "avoid" }}>
-          <div style={{ paddingLeft: "1.8pt" }}>{boxTitle}</div>
-          <ul
-            style={{
-              margin: "0.3pt 0 0",
-              paddingLeft: "22.4pt",
-              listStyle: "none",
-              lineHeight: "11.75pt",
-              maxWidth: company.stamp ? "380pt" : undefined,
-            }}
-          >
-            {bullets.map((b, i) => (
-              <li key={i} style={{ position: "relative", paddingLeft: "15pt", whiteSpace: "pre-line" }}>
-                <span aria-hidden style={{ position: "absolute", left: 0, fontFamily: "Symbol, 'Liberation Serif', serif" }}>
-                  •
-                </span>
-                {b}
-              </li>
-            ))}
-          </ul>
-        </div>
-        {bank && (
-          <div style={{ marginTop: "23.4pt", lineHeight: "11.5pt", position: "relative", zIndex: 1, breakInside: "avoid" }}>
-            <div style={{ fontWeight: 700 }}>BANK DETAILS:</div>
-            <div style={{ marginTop: "11.2pt", whiteSpace: "pre-line" }}>{bank}</div>
+      {/* Terms and bank details, with the stamp */}
+      <section style={{ marginTop: "26px", display: "flex", justifyContent: "space-between", gap: "24px", alignItems: "flex-end" }}>
+        <div style={{ lineHeight: 1.6, minWidth: 0, flex: 1 }}>
+          <div style={{ breakInside: "avoid" }}>
+            <div style={{ ...label, color: BLUE }}>{noColon(boxTitle)}</div>
+            <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
+              {bullets.map((b, i) => (
+                <li key={i} style={{ display: "flex", gap: "4px", whiteSpace: "pre-line" }}>
+                  <span style={{ flexShrink: 0 }}>{i + 1}.</span>
+                  <span style={{ minWidth: 0 }}>{b}</span>
+                </li>
+              ))}
+            </ol>
           </div>
-        )}
+          {bank && (
+            <div style={{ marginTop: "16px", breakInside: "avoid" }}>
+              <div style={{ ...label, color: BLUE }}>Bank details</div>
+              <div style={{ whiteSpace: "pre-line" }}>{bank}</div>
+            </div>
+          )}
+        </div>
         {company.stamp && (
           // eslint-disable-next-line @next/next/no-img-element -- a data URL from Settings, printed as is
-          <img
-            src={company.stamp}
-            alt="Company stamp"
-            style={{
-              position: "absolute",
-              left: "412.9pt",
-              top: "28.2pt",
-              width: "112.8pt",
-              height: "107.6pt",
-              objectFit: "contain",
-              mixBlendMode: "multiply",
-            }}
-          />
+          <img src={company.stamp} alt="Company stamp" style={{ width: "124px", height: "118px", objectFit: "contain", mixBlendMode: "multiply", flexShrink: 0, breakInside: "avoid" }} />
         )}
       </section>
 
-      {internal && <section style={{ marginTop: "14pt", breakInside: "avoid" }}>{internal}</section>}
+      {internal && <section style={{ marginTop: "22px", breakInside: "avoid" }}>{internal}</section>}
+
+      {/* On screen; on paper the same footer is in every page's bottom margin, with page numbers. */}
+      <footer
+        className="kebo-doc-foot"
+        style={{
+          position: "absolute",
+          left: `${MARGIN.side}px`,
+          right: `${MARGIN.side}px`,
+          bottom: "34px",
+          borderTop: `1px solid ${RULE}`,
+          paddingTop: "10px",
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
+          gap: "16px",
+          fontSize: "11.5px",
+          color: TEXT_2,
+        }}
+      >
+        <div>{footLeft}</div>
+        <div style={{ textAlign: "center" }}>{thanks}</div>
+        <div />
+      </footer>
     </article>
   );
 }
 
+/** The amount in words on the left; the sums and the total (in a navy bar) on the right. */
+function Totals({ sums, total }: { sums: Sum[]; total: Total | null }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: "24px", alignItems: "flex-start" }}>
+      <div style={{ fontSize: "12px", color: TEXT_2, maxWidth: "340px", paddingTop: "6px" }}>{total?.words}</div>
+      <div style={{ width: "290px", flexShrink: 0, fontSize: "13px" }}>
+        {sums.map((s) => (
+          <div key={s.label} style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "5px 0" }}>
+            <span style={{ color: TEXT_2 }}>{s.label}</span>
+            <span style={{ whiteSpace: "nowrap" }}>{s.value}</span>
+          </div>
+        ))}
+        {total && (
+          <div
+            style={{
+              ...exact,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "12px",
+              marginTop: sums.length ? "6px" : 0,
+              padding: "10px 14px",
+              background: NAVY,
+              color: "#FFFFFF",
+              borderRadius: "6px",
+            }}
+          >
+            <span style={{ fontWeight: 600 }}>{noColon(total.label)}</span>
+            <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "18px", whiteSpace: "nowrap" }}>{total.amount}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- icons (as in the design) */
+
+const icon = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: BLUE, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const IconPhone = () => (
+  <svg {...icon}>
+    <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" />
+  </svg>
+);
+const IconMail = () => (
+  <svg {...icon}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="m22 7-10 6L2 7" />
+  </svg>
+);
+const IconGlobe = () => (
+  <svg {...icon}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+const IconPin = () => (
+  <svg {...icon}>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
 /* ---------------------------------------------------------------- the internal copy's extra sections */
 
-/** A small bordered table in the documents' style, for the internal copy (money, payments, costing). */
+/** A small table in the documents' style, for the internal copy (money, payments, costing). */
 export function InternalTable({ title, head, rows, note }: { title: string; head?: string[]; rows: ReactNode[][]; note?: ReactNode }) {
-  const c: CSSProperties = { border: LINE, padding: "1.4pt 5.6pt", textAlign: "left", verticalAlign: "top" };
+  const c: CSSProperties = { padding: "6px 8px 6px 0", textAlign: "left", verticalAlign: "top", borderBottom: `1px solid ${RULE}` };
   return (
-    <div style={{ marginTop: "10pt", breakInside: "avoid" }}>
-      <div style={{ fontWeight: 700, color: "#B91C1C", marginBottom: "3pt" }}>{title}</div>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt", lineHeight: "11.5pt" }}>
+    <div style={{ marginTop: "14px", breakInside: "avoid" }}>
+      <div style={{ ...label, color: "#B91C1C", marginBottom: "4px" }}>{title}</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", lineHeight: 1.4 }}>
         {head && (
           <thead>
-            <tr style={{ background: HEADER_BLUE, fontWeight: 700, printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" }}>
+            <tr style={{ borderBottom: `1.5px solid ${INK}` }}>
               {head.map((h, i) => (
-                <th key={i} style={{ ...c, textAlign: i === head.length - 1 || i === 0 ? c.textAlign : "left" }}>
+                <th key={i} style={{ ...c, ...label, color: TEXT_2, borderBottom: "none" }}>
                   {h}
                 </th>
               ))}
@@ -453,7 +578,7 @@ export function InternalTable({ title, head, rows, note }: { title: string; head
           {rows.map((r, i) => (
             <tr key={i}>
               {r.map((v, j) => (
-                <td key={j} style={c}>
+                <td key={j} style={{ ...c, ...(j === 0 && !head ? { color: TEXT_2 } : null) }}>
                   {v}
                 </td>
               ))}
@@ -461,7 +586,7 @@ export function InternalTable({ title, head, rows, note }: { title: string; head
           ))}
         </tbody>
       </table>
-      {note && <div style={{ marginTop: "3pt", fontSize: "9pt" }}>{note}</div>}
+      {note && <div style={{ marginTop: "4px", fontSize: "11px", color: TEXT_2 }}>{note}</div>}
     </div>
   );
 }
