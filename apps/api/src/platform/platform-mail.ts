@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { getMailer, renderEmail } from "../common/notify/mailer";
-import { adminOrigin, companyOrigin } from "@kebo/shared";
+import { adminOrigin, companyOrigin, marketingOrigin } from "@kebo/shared";
 
 export interface PlatformEmail {
   to: string | string[];
@@ -34,9 +34,9 @@ export class PlatformMail {
     return `${new Intl.DateTimeFormat("en-GB", { timeZone: this.env.APP_TIME_ZONE, dateStyle: "medium", timeStyle: "short" }).format(d)} (${this.env.APP_TIME_ZONE})`;
   }
 
-  /** The app's address (links in emails): the platform admin's own address for /platform links. */
+  /** The app's address (links in emails): the platform admin's own for /platform links, else the marketing site's (sign-up). */
   url(path = "/") {
-    return `${path.startsWith("/platform") ? adminOrigin(this.env.BASE_DOMAIN, this.env.APP_URL) : this.env.APP_URL.replace(/\/$/, "")}${path}`;
+    return `${path.startsWith("/platform") ? adminOrigin(this.env.BASE_DOMAIN, this.env.APP_URL) : marketingOrigin(this.env.BASE_DOMAIN, this.env.APP_URL)}${path}`;
   }
 
   /** A link into a company (its own address, once companies have addresses). */

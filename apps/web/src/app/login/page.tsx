@@ -1,3 +1,4 @@
+import { Alert } from "@kebo/ui";
 import { AuthShell } from "./auth-shell";
 import { LoginForm } from "./forms";
 import { demoMode } from "@/lib/demo";
@@ -11,14 +12,19 @@ const DEMO_LOGINS = [
 
 export const metadata = { title: "Sign in" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; moved?: string }> }) {
+  const { next, moved } = await searchParams;
   // At a company's own address: its name over the form.
   const slug = await addressCompany();
   const res = slug ? await apiFetch(`/platform/public/company?slug=${encodeURIComponent(slug)}`, { auth: false }).catch(() => null) : null;
   const company = res?.ok ? ((await res.json()) as { name: string }).name : null;
   return (
     <AuthShell subtitle={company ?? undefined}>
+      {moved && (
+        <Alert tone="info" className="mb-4">
+          This is your company&apos;s new address. Sign in once more here, and bookmark it.
+        </Alert>
+      )}
       <h1 className="text-lg font-semibold">Sign in</h1>
       <p className="mt-1 text-sm text-muted">
         {demoMode()

@@ -13,6 +13,7 @@ import {
 import { createHash } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { DomainError, ForbiddenError } from "@kebo/utils";
+import { adminOrigin } from "@kebo/shared";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { Public } from "../common/auth/decorators";
@@ -214,7 +215,7 @@ export class PlatformAuthService {
   async passwordLink(adminId: string) {
     const a = await this.prisma.platform.platformAdmin.findUniqueOrThrow({ where: { id: adminId } });
     const token = await this.tokens.signPurpose("platform_password", { aid: a.id, pw: fingerprint(a.passwordHash) }, "2d");
-    return `${this.env.APP_URL.replace(/\/$/, "")}/platform/set-password?token=${encodeURIComponent(token)}`;
+    return `${adminOrigin(this.env.BASE_DOMAIN, this.env.APP_URL)}/platform/set-password?token=${encodeURIComponent(token)}`;
   }
 
   async setPassword(token: string, password: string) {

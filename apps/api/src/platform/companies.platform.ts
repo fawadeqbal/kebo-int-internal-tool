@@ -72,22 +72,8 @@ export class PlatformCompaniesService {
   /* ---------------------------------------------------------------- short names */
 
   /** Why this short name cannot be taken now (rules, in use, held after a rename or delete), or null. */
-  async slugTaken(slug: string, exceptCompanyId?: string): Promise<string | null> {
-    const rule = slugProblem(slug);
-    if (rule) return rule;
-    const now = new Date();
-    const clash = await this.db.company.findFirst({
-      where: {
-        id: exceptCompanyId ? { not: exceptCompanyId } : undefined,
-        OR: [
-          { slug, status: { not: "deleted" } },
-          { slug, status: "deleted", deletedAt: { gt: new Date(now.getTime() - LIFECYCLE.nameHoldDays * DAY) } },
-          { previousSlug: slug, previousSlugUntil: { gt: now } },
-        ],
-      },
-      select: { id: true },
-    });
-    return clash ? `"${slug}" is taken. Choose another.` : null;
+  slugTaken(slug: string, exceptCompanyId?: string): Promise<string | null> {
+    return this.companies.slugTaken(slug, exceptCompanyId);
   }
 
   /** A free short name close to this one. */
@@ -290,11 +276,7 @@ export class PlatformCompaniesService {
     if (input.slug !== undefined && input.slug !== c.slug) {
       const taken = await this.slugTaken(input.slug, id);
       if (taken) throw new ConflictError(taken);
-      Object.assign(data, {
-        slug: input.slug,
-        previousSlug: c.slug,
-        previousSlugUntil: new Date(Date.now() + LIFECYCLE.renameRedirectDays * DAY),
-      });
+      await this.companies.rename(id, c.slug, input.slug);
       said.push(`short name from ${c.slug} to ${input.slug} (the old one works for ${LIFECYCLE.renameRedirectDays} days)`);
     }
     if (input.planId !== undefined && input.planId !== c.planId) {

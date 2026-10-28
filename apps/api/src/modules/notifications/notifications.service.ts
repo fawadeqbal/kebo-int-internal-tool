@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, ORDER_STAGE_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { companyOrigin, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, ORDER_STAGE_LABEL, REVISION_STATUS_LABEL } from "@kebo/shared";
+import { CompanyContext } from "../../common/company/company-context";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { ENV, type Env } from "../../config/env";
@@ -88,7 +89,10 @@ export class NotificationsService implements OnModuleInit {
     const s = await this.settings.get();
     if (!s.notifications[kind] || !s.notifications.emails.length) return;
     try {
-      const { html, text } = renderEmail({ ...content, link: content.link ? new URL(content.link, this.env.APP_URL).toString() : undefined, footer: `${s.company.name} · you get this because your email is on the notification list in Settings.` });
+      // Links go to the company's own address (once companies have addresses).
+      const slug = CompanyContext.current()?.slug;
+      const origin = slug ? companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL) : this.env.APP_URL;
+      const { html, text } = renderEmail({ ...content, link: content.link ? new URL(content.link, origin).toString() : undefined, footer: `${s.company.name} · you get this because your email is on the notification list in Settings.` });
       await getMailer().send({ to: s.notifications.emails, subject, html, text });
     } catch (e) {
       this.log.warn(`email failed: ${(e as Error).message}`);

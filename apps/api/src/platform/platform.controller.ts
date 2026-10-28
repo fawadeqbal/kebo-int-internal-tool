@@ -118,7 +118,7 @@ export class PlatformPublicController {
   async domainCheck(@Query("domain") domain = "", @Res({ passthrough: true }) res: Response) {
     const base = this.env.BASE_DOMAIN;
     const a = base ? addressOf(domain, base) : { kind: "other" as const };
-    const ok = a.kind === "root" || a.kind === "admin" || (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
+    const ok = a.kind === "root" || a.kind === "admin" || a.kind === "marketing" || (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
     res.status(ok ? 200 : 404);
     return { ok };
   }

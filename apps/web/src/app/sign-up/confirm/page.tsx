@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { Alert, buttonClass } from "@kebo/ui";
+import { companyOrigin } from "@kebo/shared";
 import { apiFetch } from "@/lib/api";
 import { AuthShell } from "@/app/login/auth-shell";
 
@@ -12,7 +13,9 @@ export default async function ConfirmSignUpPage({ searchParams }: { searchParams
   const res = token
     ? await apiFetch("/platform/public/sign-up/confirm", { method: "POST", auth: false, body: JSON.stringify({ token }) }).catch(() => null)
     : null;
-  const body = res ? ((await res.json().catch(() => ({}))) as { email?: string; error?: string }) : {};
+  const body = res ? ((await res.json().catch(() => ({}))) as { email?: string; slug?: string; error?: string }) : {};
+  // The new company's own address (once companies have addresses).
+  const login = body.slug ? `${companyOrigin(body.slug, process.env.BASE_DOMAIN, "")}/login` : "/login";
   return (
     <AuthShell subtitle="Start your trial">
       {res?.ok ? (
@@ -20,9 +23,9 @@ export default async function ConfirmSignUpPage({ searchParams }: { searchParams
           <CheckCircle2 className="size-10 text-ok" aria-hidden />
           <h1 className="text-lg font-semibold">Your workspace is ready</h1>
           <p className="text-sm text-muted">Sign in with {body.email} and the password you chose.</p>
-          <Link href="/login" className={buttonClass("primary", "lg", "w-full")}>
+          <a href={login} className={buttonClass("primary", "lg", "w-full")}>
             Sign in
-          </Link>
+          </a>
         </div>
       ) : (
         <>

@@ -1,10 +1,12 @@
 import { Global, Inject, Injectable, Module } from "@nestjs/common";
 import type { CompanyModel as Company, PlanModel as Plan } from "@kebo/database";
+import { LIFECYCLE, slugProblem } from "@kebo/shared";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
 import type { CompanyInfo } from "./company-context";
 
 const TTL_MS = 15_000;
+const DAY = 86_400_000;
 
 export const toInfo = (c: Company): CompanyInfo => ({
   id: c.id,
@@ -48,6 +50,34 @@ export class CompaniesService {
       where: { OR: [{ slug: s }, { previousSlug: s, previousSlugUntil: { gt: new Date() } }], status: { not: "deleted" } },
     });
     return c ? toInfo(c) : null;
+  }
+
+  /** Why this short name (the company's address) cannot be taken now: the rules, in use, or held after a rename or delete. Null: free. */
+  async slugTaken(slug: string, exceptCompanyId?: string): Promise<string | null> {
+    const rule = slugProblem(slug);
+    if (rule) return rule;
+    const now = new Date();
+    const clash = await this.prisma.platform.company.findFirst({
+      where: {
+        id: exceptCompanyId ? { not: exceptCompanyId } : undefined,
+        OR: [
+          { slug, status: { not: "deleted" } },
+          { slug, status: "deleted", deletedAt: { gt: new Date(now.getTime() - LIFECYCLE.nameHoldDays * DAY) } },
+          { previousSlug: slug, previousSlugUntil: { gt: now } },
+        ],
+      },
+      select: { id: true },
+    });
+    return clash ? `"${slug}" is taken. Choose another.` : null;
+  }
+
+  /** A new short name: the old one keeps working (sending people on) and stays held for a while. */
+  async rename(id: string, from: string, to: string) {
+    await this.prisma.platform.company.update({
+      where: { id },
+      data: { slug: to, previousSlug: from, previousSlugUntil: new Date(Date.now() + LIFECYCLE.renameRedirectDays * DAY) },
+    });
+    this.forget(id);
   }
 
   /** The company for requests that do not say which (DEFAULT_COMPANY, else the first one made). */

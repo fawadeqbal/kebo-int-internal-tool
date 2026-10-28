@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { addressOf, adminOrigin } from "@kebo/shared";
+import { addressOf, adminOrigin, marketingOrigin } from "@kebo/shared";
 
 /**
  * Addresses per company (only when BASE_DOMAIN is set; otherwise everything is
@@ -8,9 +8,14 @@ import { addressOf, adminOrigin } from "@kebo/shared";
  *    with every call (X-Company); a renamed company's old name redirects to the
  *    new one for a while; an unknown name shows "no company here".
  *  - admin.<BASE_DOMAIN>: the platform area (/platform).
- *  - <BASE_DOMAIN>: ROOT_COMPANY's pages when set (the first company keeps its
- *    old address), else sign-in by email and the public pages.
+ *  - get.<BASE_DOMAIN>: the marketing site (request a demo, sign up).
+ *  - <BASE_DOMAIN>: sends people on to ROOT_COMPANY's own address (same page),
+ *    except the marketing pages (to get.), set-password links from older emails,
+ *    and the phone app's PDFs (Bearer, not a cookie). The API under /api is not
+ *    a page and is never sent anywhere, so the phone app keeps working.
  */
+const MARKETING_PATHS = ["/request-a-demo", "/sign-up"];
+const isMarketingPath = (path: string) => MARKETING_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 const known = new Map<string, { at: number; slug: string | null }>();
 
 async function companyAt(slug: string): Promise<string | null> {
@@ -46,6 +51,12 @@ export async function proxy(req: NextRequest) {
     return pass();
   }
   if (path.startsWith("/platform")) return NextResponse.redirect(`${admin}${path}${req.nextUrl.search}`);
+  const marketing = marketingOrigin(base, "");
+  if (a.kind === "marketing") {
+    if (isMarketingPath(path)) return pass();
+    // The marketing page itself comes next; until then its address opens "request a demo".
+    return NextResponse.redirect(`${marketing}/request-a-demo`);
+  }
   if (a.kind === "company") {
     const slug = await companyAt(a.slug);
     if (!slug) return NextResponse.rewrite(new URL("/no-company", req.url));
@@ -53,7 +64,13 @@ export async function proxy(req: NextRequest) {
     headers.set("x-company", slug);
     return pass();
   }
-  if (a.kind === "root" && process.env.ROOT_COMPANY) headers.set("x-company", process.env.ROOT_COMPANY);
+  if (a.kind === "root") {
+    if (isMarketingPath(path)) return NextResponse.redirect(`${marketing}${path}${req.nextUrl.search}`);
+    // Links from emails sent before the addresses (the token says which company) and the phone app's PDFs.
+    if (path === "/set-password" || (path.startsWith("/pdf/") && req.headers.has("authorization"))) return pass();
+    const root = process.env.ROOT_COMPANY;
+    return NextResponse.redirect(root ? `https://${root}.${base}${path}${req.nextUrl.search}` : `${marketing}/`);
+  }
   return pass();
 }
 

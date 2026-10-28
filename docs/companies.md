@@ -133,26 +133,31 @@ git checkout <previous commit> && sudo docker compose up -d --build
 
 (The pre-deploy copy is from before the migrations, so it matches the previous code; the time zone reset gives the old code the database's old time zone back.)
 
-## Addresses per company (switched on last)
+## Addresses per company
 
-Until switched on, every company works at the one address and the email picks the company; the platform area is `/platform`. Everything for addresses per company is built and tested, and stays off while `BASE_DOMAIN` is empty.
+Off while `BASE_DOMAIN` is empty: then every company works at the one address, the email picks the company, and the platform area is `/platform`.
 
-When on (`BASE_DOMAIN=rfq.fawadiqbal.dev`):
+When on (`BASE_DOMAIN=rfq.fawadiqbal.dev`, `ROOT_COMPANY=kebo`):
 
 | Address | Is |
 |---|---|
 | `acme.rfq.fawadiqbal.dev` | the company with the short name `acme`: its sign-in page shows its name, only its accounts can sign in there, and a session from another company is refused. |
 | `admin.rfq.fawadiqbal.dev` | the platform area (`/platform` anywhere else is sent there). Opening a company takes the platform admin to the company's address with a one-time link (2 minutes). |
-| `rfq.fawadiqbal.dev` | with `ROOT_COMPANY=kebo`: Kebo, as today (bookmarks and the mobile app keep working); otherwise sign-in by email and the public pages. |
-| a renamed company's old name | redirects to the new one for 30 days |
+| `get.rfq.fawadiqbal.dev` | the marketing site (request a demo, sign up). |
+| `rfq.fawadiqbal.dev` | sends every page on to `kebo.rfq.fawadiqbal.dev` (same path), except the marketing pages (to `get.`), set-password links from older emails, and the phone app's PDFs. `/api` is not a page: the phone app keeps working here. |
+| a renamed company's old name | sends people on to the new one for 30 days, and stays held that long |
 | an unknown name | "There is no company at this address" |
 
-Emails link to the company's own address. Short names follow the rules for addresses (3–30 characters, a–z 0–9 and dashes, reserved names refused).
+New companies get their address from the short name made when they are created. Short names follow the rules for addresses (3–30 characters, a–z 0–9 and dashes; reserved names such as `admin`, `www`, `api`, `get` refused). Emails link to the company's own address.
+
+**Changing the address**: Settings → Company address (a Super Admin; the platform admin anytime from the company's page). The new name is checked while it is typed (free, taken, not allowed). Everyone signs in again at the new address; the old one sends people there for 30 days and is then free. A company can change it once every 30 days.
+
+**Certificates**: Caddy makes one per address the first time it is opened (on-demand TLS), and only for addresses the API says are real (`/api/platform/public/domain-check`: the platform's own, the marketing site, existing companies and recently renamed ones). Let's Encrypt allows about 50 new certificates a week for the domain; past that, switch to one wildcard certificate (DNS challenge with the Namecheap API).
 
 To switch on:
 
 1. **DNS**: an A record `*.rfq` → `145.241.156.60` (the one for `rfq` stays).
-2. **Caddy** (the shared server Caddy): the `on_demand_tls { ask … }` global option and the site block from `deploy/Caddyfile.companies` (with `__DOMAIN__` = `rfq.fawadiqbal.dev`); reload Caddy. Certificates are then made per company address the first time it is opened, and only for real companies (`/api/platform/public/domain-check`).
-3. **`.env`** on the server: `BASE_DOMAIN=rfq.fawadiqbal.dev` and `ROOT_COMPANY=kebo`, then `sudo docker compose up -d` (or a deploy).
+2. **Caddy** (the shared server Caddy, `/opt/global-proxy/Caddyfile`): the `on_demand_tls { ask … }` global option at the very top, and the site block from `deploy/Caddyfile.companies` (with `__DOMAIN__` = `rfq.fawadiqbal.dev`); reload Caddy.
+3. **`.env`** on the server: `BASE_DOMAIN=rfq.fawadiqbal.dev` and `ROOT_COMPANY=kebo`, then `sudo docker compose up -d`.
 
 Switching off is the reverse of step 3: empty `BASE_DOMAIN`.
