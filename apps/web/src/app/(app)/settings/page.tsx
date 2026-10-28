@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { saveSettingsAction } from "./actions";
 import { SettingsGroupForm } from "./forms";
 import { SETTING_GROUPS } from "./groups";
+import { AddressCard } from "./address/card";
 
 export const metadata = { title: "Settings" };
 
@@ -14,6 +15,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   await requirePermission("settings.manage");
   const sp = await searchParams;
   const settings = await api.get<Settings>("/settings");
+  // The company's own address: only once companies have addresses.
+  const tabs: { key: string; title: string }[] = [...SETTING_GROUPS, ...(process.env.BASE_DOMAIN ? [{ key: "address", title: "Company address" }] : [])];
+  const address = sp.tab === "address" && !!process.env.BASE_DOMAIN;
   const group = SETTING_GROUPS.find((g) => g.key === sp.tab) ?? SETTING_GROUPS[0]!;
   return (
     <div>
@@ -24,8 +28,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="lg:sticky lg:top-20">
           <ul className="flex gap-1 overflow-x-auto border-b border-line pb-1 lg:flex-col lg:overflow-visible lg:border-0 [scrollbar-width:none]">
-            {SETTING_GROUPS.map((g) => {
-              const active = g.key === group.key;
+            {tabs.map((g) => {
+              const active = address ? g.key === "address" : g.key === group.key;
               return (
                 <li key={g.key} className="shrink-0">
                   <Link
@@ -44,7 +48,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </ul>
         </nav>
         <div className="flex max-w-3xl min-w-0 flex-col gap-6">
-          <SettingsGroupForm key={group.key} groupKey={group.key} values={settings[group.key] as Record<string, unknown>} action={saveSettingsAction.bind(null, group.key)} />
+          {address ? (
+            <AddressCard />
+          ) : (
+            <SettingsGroupForm key={group.key} groupKey={group.key} values={settings[group.key] as Record<string, unknown>} action={saveSettingsAction.bind(null, group.key)} />
+          )}
         </div>
       </div>
     </div>

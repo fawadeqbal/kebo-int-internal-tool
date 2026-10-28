@@ -142,6 +142,18 @@ export const RESERVED_SLUGS = new Set([
   "mx",
   "info",
   "news",
+  // The marketing site and words it may use later.
+  "get",
+  "go",
+  "try",
+  "start",
+  "pricing",
+  "home",
+  "site",
+  "web",
+  "contact",
+  "sales",
+  "hello",
 ]);
 
 export const SLUG_RULE = "3 to 30 characters: small letters, numbers and dashes (not at the start or end)";
@@ -183,11 +195,15 @@ export const slugField = z
 
 /* ---------------------------------------------------------------- addresses */
 
-export type Address = { kind: "root" } | { kind: "admin" } | { kind: "company"; slug: string } | { kind: "other" };
+export type Address = { kind: "root" } | { kind: "admin" } | { kind: "marketing" } | { kind: "company"; slug: string } | { kind: "other" };
+
+/** The marketing site's sub-address (get.<BASE_DOMAIN>): what RFQ Desk is, plans, request a demo, sign up. */
+export const MARKETING_SUB = "get";
 
 /**
  * What a host name is, with addresses per company: the platform's own address
- * (root), the platform admin's (admin.), a company's (<short name>.), or none of these.
+ * (root), the platform admin's (admin.), the marketing site (get.), a company's
+ * (<short name>.), or none of these.
  */
 export function addressOf(host: string | null | undefined, baseDomain: string): Address {
   const h = (host ?? "").toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
@@ -196,6 +212,7 @@ export function addressOf(host: string | null | undefined, baseDomain: string): 
   if (!h.endsWith(`.${base}`)) return { kind: "other" };
   const sub = h.slice(0, -base.length - 1);
   if (sub === "admin") return { kind: "admin" };
+  if (sub === MARKETING_SUB) return { kind: "marketing" };
   if (sub.includes(".") || !/^[a-z0-9-]{1,63}$/.test(sub)) return { kind: "other" };
   return { kind: "company", slug: sub };
 }
@@ -205,6 +222,8 @@ export const companyOrigin = (slug: string, baseDomain: string | undefined, fall
   baseDomain ? `https://${slug}.${baseDomain}` : fallback.replace(/\/$/, "");
 export const adminOrigin = (baseDomain: string | undefined, fallback: string) =>
   baseDomain ? `https://admin.${baseDomain}` : fallback.replace(/\/$/, "");
+export const marketingOrigin = (baseDomain: string | undefined, fallback: string) =>
+  baseDomain ? `https://${MARKETING_SUB}.${baseDomain}` : fallback.replace(/\/$/, "");
 
 /* ---------------------------------------------------------------- lifecycle */
 

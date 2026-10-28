@@ -1,12 +1,17 @@
-import { Controller, Get, Inject, Module } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Module, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { z } from "zod";
 import { fromDbDateOrNull } from "@kebo/database";
-import { LIFECYCLE } from "@kebo/shared";
-import { addDays, todayIn } from "@kebo/utils";
+import { companyOrigin, LIFECYCLE, slugField } from "@kebo/shared";
+import { addDays, ConflictError, DomainError, ForbiddenError, todayIn } from "@kebo/utils";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
-import { AllowDuringTwoStepSetup } from "../../common/auth/decorators";
+import { AllowDuringTwoStepSetup, CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import type { SessionUser } from "../../common/auth/session-user";
+import { Validate } from "../../common/http/zod.pipe";
+import { AuditService } from "../../common/audit/audit.service";
 import { CompanyContext } from "../../common/company/company-context";
+import { CompaniesService } from "../../common/company/companies.service";
 import { LimitsService } from "../../common/company/limits.service";
 
 /**
@@ -20,8 +25,74 @@ class CompanyController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly limits: LimitsService,
+    private readonly companies: CompaniesService,
+    private readonly audit: AuditService,
     @Inject(ENV) private readonly env: Env,
   ) {}
+
+  /* ---------------------------------------------------------------- address */
+
+  /** When the company may change its address again (one change per renameRedirectDays: the old one is held that long). */
+  private async nextChange(id: string) {
+    const row = await this.prisma.platform.company.findUniqueOrThrow({ where: { id }, select: { previousSlugUntil: true } });
+    return row.previousSlugUntil && row.previousSlugUntil > new Date() ? row.previousSlugUntil : null;
+  }
+
+  private async mayChange(user: SessionUser) {
+    if (user.viaPlatform) return true;
+    const role = await this.prisma.db.role.findFirst({ where: { key: user.role }, select: { superAdmin: true } });
+    return !!role?.superAdmin;
+  }
+
+  /** The company's address, and whether a new short name is free (?slug=, for the live check while typing). */
+  @Get("address")
+  @RequirePermissions("settings.manage")
+  async address(@CurrentUser() user: SessionUser, @Query("slug") wanted?: string) {
+    const c = CompanyContext.require();
+    const slug = wanted?.trim().toLowerCase().slice(0, 63);
+    const next = await this.nextChange(c.id);
+    return {
+      /** Only a Super Admin (or the platform admin visiting) changes it. */
+      canChange: await this.mayChange(user),
+      slug: c.slug,
+      url: companyOrigin(c.slug, this.env.BASE_DOMAIN, this.env.APP_URL),
+      baseDomain: this.env.BASE_DOMAIN || null,
+      /** Not before this (the last change is recent). */
+      nextChangeOn: next,
+      check: slug
+        ? { slug, url: companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL), problem: slug === c.slug ? "This is the address now." : await this.companies.slugTaken(slug, c.id) }
+        : null,
+    };
+  }
+
+  /** A new address (Super Admin): the old one sends people on for a while, then becomes free. */
+  @Put("address")
+  @RequirePermissions("settings.manage")
+  async changeAddress(@CurrentUser() user: SessionUser, @Body(Validate(z.object({ slug: slugField }))) body: { slug: string }) {
+    const c = CompanyContext.require();
+    if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can change the company's address.");
+    if (body.slug === c.slug) throw new DomainError("This is the address now.");
+    const next = await this.nextChange(c.id);
+    if (next && !user.viaPlatform) {
+      throw new DomainError(`The address was changed recently. It can change again on ${next.toISOString().slice(0, 10)}, or ask us to change it.`);
+    }
+    const taken = await this.companies.slugTaken(body.slug, c.id);
+    if (taken) throw new ConflictError(taken);
+    await this.companies.rename(c.id, c.slug, body.slug);
+    const days = LIFECYCLE.renameRedirectDays;
+    await this.prisma.tx((tx) =>
+      this.audit.record(tx, {
+        userId: user.id,
+        action: "update",
+        entityType: "settings",
+        summary: `Changed the company's address from ${c.slug} to ${body.slug} (the old one sends people on for ${days} days)`,
+      }),
+    );
+    await this.prisma.platform.platformLog.create({
+      data: { action: "update", adminName: `${user.name} (${c.name})`, summary: `${c.name} changed its address from ${c.slug} to ${body.slug}`, companyId: c.id },
+    });
+    return { slug: body.slug, url: companyOrigin(body.slug, this.env.BASE_DOMAIN, this.env.APP_URL) };
+  }
 
   @AllowDuringTwoStepSetup()
   @Get()

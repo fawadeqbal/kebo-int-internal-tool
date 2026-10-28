@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/auth/totp";
 import { PrismaService } from "../src/database/prisma.service";
 import { LifecycleService } from "../src/platform/lifecycle.service";
+import { AuthService } from "../src/modules/auth/auth.service";
 import { api, signIn, startApp } from "./app";
 
 /**
@@ -292,10 +293,48 @@ describe("companies: isolation and the platform", () => {
     const check = (domain: string) => request(app.getHttpServer()).get(`/api/platform/public/domain-check?domain=${domain}`);
     await check("rfq.test").expect(200);
     await check("admin.rfq.test").expect(200);
+    await check("get.rfq.test").expect(200);
     await check("kebo.rfq.test").expect(200);
     await check("nobody-here.rfq.test").expect(404);
     await check("a.b.rfq.test").expect(404);
     await check("evil.example.com").expect(404);
+  });
+
+  it("a company changes its own address: checked, held, sent on, once a month", async () => {
+    const c = await makeCompany(`addr-${tag}`, { sampleData: false });
+    const mine = api(app, c.token);
+    const view = (await mine.get("/company/address").expect(200)).body;
+    expect(view).toMatchObject({ canChange: true, slug: c.slug, url: `https://${c.slug}.rfq.test`, nextChangeOn: null, check: null });
+    // The live check: taken, reserved, against the rules, free.
+    expect((await mine.get("/company/address?slug=kebo").expect(200)).body.check.problem).toContain("taken");
+    expect((await mine.get("/company/address?slug=admin").expect(200)).body.check.problem).toContain("kept for the platform");
+    expect((await mine.get("/company/address?slug=get").expect(200)).body.check.problem).toContain("kept for the platform");
+    expect((await mine.get("/company/address?slug=a").expect(200)).body.check.problem).not.toBeNull();
+    const fresh = `moved-${tag}`;
+    expect((await mine.get(`/company/address?slug=${fresh}`).expect(200)).body.check).toEqual({ slug: fresh, url: `https://${fresh}.rfq.test`, problem: null });
+    // Someone who is not a Super Admin cannot.
+    await mine.post("/users", { name: "Mgr", email: `mgr@addr-${tag}.test`, role: "manager", password: "Manager12345" }).expect(201);
+    const mgr = api(app, await signIn(app, `mgr@addr-${tag}.test`, "Manager12345"));
+    await mgr.put("/company/address", { slug: fresh }).expect(403);
+    await mine.put("/company/address", { slug: "kebo" }).expect(409);
+    // Changed: the new address is theirs, the old one still finds them (and gets a certificate) and is held.
+    expect((await mine.put("/company/address", { slug: fresh }).expect(200)).body).toEqual({ slug: fresh, url: `https://${fresh}.rfq.test` });
+    const check = (domain: string) => request(app.getHttpServer()).get(`/api/platform/public/domain-check?domain=${domain}`);
+    await check(`${fresh}.rfq.test`).expect(200);
+    await check(`${c.slug}.rfq.test`).expect(200);
+    expect((await request(app.getHttpServer()).get(`/api/platform/public/company?slug=${c.slug}`).expect(200)).body.slug).toBe(fresh);
+    // Held for others: a new company cannot take the old address.
+    const clash = await plat().post("/companies", { name: "Clash", slug: c.slug, adminName: "Clash", adminEmail: `clash@${tag}.test`, sampleData: false, kind: "demo" });
+    expect(clash.status).toBe(409);
+    // Once a month.
+    const again = await mine.get("/company/address").expect(200);
+    expect(again.body.nextChangeOn).not.toBeNull();
+    expect((await mine.put("/company/address", { slug: `third-${tag}` }).expect(400)).body.error).toContain("changed recently");
+    // In the company's log and the platform's.
+    const audit = (await mine.get("/audit").expect(200)).body;
+    expect(JSON.stringify(audit)).toContain(`from ${c.slug} to ${fresh}`);
+    // Every sign-in here comes from one address: start the sign-in limit afresh for the tests after this one.
+    (app.get(AuthService) as unknown as { attempts: Map<string, unknown> }).attempts.clear();
   });
 
   it("plans: limits warn, then block; features switch parts off", async () => {
