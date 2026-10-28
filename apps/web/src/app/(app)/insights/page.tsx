@@ -208,7 +208,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                       ),
                       sub: `${x.orders} order${x.orders === 1 ? "" : "s"}`,
                       value: Number(x.revenue),
-                      href: `/customers/${x.customer.id}?tab=account`,
+                      href: `/customers/${x.customer.id}?tab=money&view=profit`,
                     }))}
                   />
                 ) : (
@@ -385,7 +385,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                     {i.topCustomers.map((x) => (
                       <Tr key={x.customer.id} className="hover:bg-surface-2/50">
                         <Td>
-                          <Link href={`/customers/${x.customer.id}?tab=account`} className="font-medium hover:text-primary">
+                          <Link href={`/customers/${x.customer.id}?tab=money&view=profit`} className="font-medium hover:text-primary">
                             {flag(x.customer.country)} {x.customer.name}
                           </Link>{" "}
                           {x.isNew && <Badge tone="ok">New</Badge>}

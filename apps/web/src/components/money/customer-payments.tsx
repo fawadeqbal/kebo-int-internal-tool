@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
 import { Badge, cn, EmptyState } from "@kebo/ui";
-import { api } from "@/lib/api";
 import { date, money } from "@/lib/format";
 import type { CustomerPayments } from "@/lib/types-money";
 
@@ -23,8 +22,7 @@ const td = "px-3 py-2.5 align-top";
  * payment they made. Each order opens on its Payments tab, where payments
  * are recorded and changed.
  */
-export async function CustomerPaymentsView({ customerId }: { customerId: string }) {
-  const d = await api.get<CustomerPayments>("/payments", { customerId });
+export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
   if (d.orders.length === 0)
     return <EmptyState title="No orders yet" description="Payments show here once this customer has an order." className="py-10" />;
   const one = d.totals.length === 1 ? d.totals[0]! : null;
@@ -34,33 +32,20 @@ export async function CustomerPaymentsView({ customerId }: { customerId: string 
       {d.totals.map((t) => {
         const pct = Number(t.total) > 0 ? Math.min(100, Math.round((Number(t.received) / Number(t.total)) * 100)) : 0;
         const due = Number(t.due) > 0.005;
+        const owing = d.orders.filter((o) => o.currency === t.currency && o.status !== "cancelled" && Number(o.due) > 0.005).length;
         return (
-          <section
-            key={t.currency}
-            aria-label={`Money in ${t.currency}`}
-            className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4 sm:p-5"
-          >
-            <dl className="grid grid-cols-3 gap-3 sm:flex sm:gap-10">
-              <div className="min-w-0">
-                <dt className="truncate text-xs text-muted">
-                  Ordered · {t.orders} order{t.orders === 1 ? "" : "s"}
-                </dt>
-                <dd className="truncate text-base font-bold tabular sm:text-xl">{money(t.total, t.currency)}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-xs text-muted">Received</dt>
-                <dd className="truncate text-base font-bold text-ok tabular sm:text-xl">{money(t.received, t.currency)}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-xs text-muted">Still due</dt>
-                <dd className={cn("truncate text-base font-bold tabular sm:text-xl", due ? "text-warn" : "text-ok")}>
-                  {money(t.due, t.currency)}
-                </dd>
-              </div>
-            </dl>
-            <div className="flex flex-col gap-1.5">
+          <section key={t.currency} aria-label={`Money in ${t.currency}`} className="grid gap-3 sm:grid-cols-3">
+            <div className="min-w-0 rounded-xl border border-line bg-surface p-4">
+              <p className="truncate text-xs text-muted">
+                Ordered · {t.orders} order{t.orders === 1 ? "" : "s"}
+              </p>
+              <p className="truncate text-xl font-bold tabular">{money(t.total, t.currency)}</p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-line bg-surface p-4">
+              <p className="text-xs text-muted">Received</p>
+              <p className="truncate text-xl font-bold text-ok tabular">{money(t.received, t.currency)}</p>
               <div
-                className="h-2.5 overflow-hidden rounded-full bg-surface-3"
+                className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3"
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={100}
@@ -69,9 +54,11 @@ export async function CustomerPaymentsView({ customerId }: { customerId: string 
               >
                 <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
               </div>
-              <p className="text-xs text-muted">
-                {pct}% of their orders received{d.orders.some((o) => o.status === "cancelled") ? " · cancelled orders not counted" : ""}
-              </p>
+            </div>
+            <div className="min-w-0 rounded-xl border border-line bg-surface p-4">
+              <p className="text-xs text-muted">Still due</p>
+              <p className={cn("truncate text-xl font-bold tabular", due ? "text-warn" : "text-ok")}>{money(t.due, t.currency)}</p>
+              <p className="text-xs text-text-2">{due ? `on ${owing} order${owing === 1 ? "" : "s"}` : "nothing owed"}</p>
             </div>
           </section>
         );
