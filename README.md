@@ -55,3 +55,12 @@ Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up
 | `pnpm db:load-data [-- --years N --deals N --people N]` | A year (or N years) of realistic history on top of the seed, to see Insights, Home and the money pages with a working company's data: about 1,200 inquiries a year, growing month by month, targets, accounts. Adds, never deletes; local databases only. Sales people sign in as sales1@example.com… with Demo@12345 |
 
 The API tests run against a real database: migrate and seed with `--demo` first (CI does this).
+
+## Deploy
+
+Merging into `main` deploys by itself. On the server, the `kebo-deploy.timer` checks every two minutes; once GitHub's **CI** has passed for the new commit on `main`, it pulls, rebuilds and restarts with `docker compose up -d --build --wait`, checks the site answers, and logs the result. If CI fails, nothing is deployed (a re-run that passes is). If the build fails, the site stays as it was and that commit is not retried until a newer one arrives.
+
+- Logs: `journalctl -u kebo-deploy` on the server; the last result is in `~/.kebo-deploy/last.txt`.
+- Retry a commit whose build failed: `rm ~/.kebo-deploy/failed`.
+- Deploy by hand as before: `cd /opt/kebo-desk && git pull && sudo docker compose up -d --build`.
+- Setup (once, already done): `deploy/install-auto-deploy.sh` on the server. The script is `deploy/auto-deploy.sh`; the units are in `deploy/systemd/`.
