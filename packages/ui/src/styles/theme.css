@@ -310,13 +310,14 @@
 /*
  * On a phone, a table with four or more columns showing keeps a readable
  * width and scrolls sideways, instead of squeezing words one per line.
- * Columns hidden on phones (class "hidden") are not counted.
+ * Columns hidden on phones (class "hidden") are not counted. A table made to
+ * fit a phone says so with data-fit.
  */
 @media (max-width: 639px) {
-  table:has(> thead > tr > th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only)) {
+  table:not([data-fit]):has(> thead > tr > th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only)) {
     min-width: 36rem;
   }
-  table:has(> thead > tr > th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only)) {
+  table:not([data-fit]):has(> thead > tr > th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only) ~ th:not(.hidden, .sr-only)) {
     min-width: 46rem;
   }
 }
