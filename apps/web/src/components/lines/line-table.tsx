@@ -9,10 +9,11 @@ import {
   ChevronRight,
   ClipboardPaste,
   Copy,
-  CornerDownRight,
   IndentDecrease,
   IndentIncrease,
   Loader2,
+  Keyboard,
+  ListPlus,
   MessageCircleQuestion,
   MoreHorizontal,
   Plus,
@@ -131,12 +132,26 @@ const initialOf = (c: LineColumn, parentKey: string | null) => (typeof c.initial
 const isBlank = (v: LineValues, columns: LineColumn[], parentKey: string | null = null) =>
   columns.every((c) => !c.input || c.input === "select" || !(v[c.key] ?? "").trim() || v[c.key] === initialOf(c, parentKey));
 
+/** How a pasted list will be numbered: 1, 1.1, 1.2, 2 … (a part before any line is a line). */
+const pastedNumbers = (items: PastedItem[]) => {
+  let top = 0;
+  let sub = 0;
+  return items.map((p) => {
+    if (p.part && top > 0) return `${top}.${++sub}`;
+    sub = 0;
+    return String(++top);
+  });
+};
+
 const missing = (v: LineValues, columns: LineColumn[]) => columns.find((c) => c.required && !v[c.key]?.trim());
 
 /* ---------------------------------------------------------------- the table */
 
 type Pending = { run: (reason: string) => Promise<LineResult>; message: string; choices: string[] };
 type Removed = { label: string; lines: NewLine[]; at: { afterKey: string | null; parentKey: string | null } };
+/** Something that can be done to a row; `short` is the toolbar's label, `hint` its key. */
+type RowActionKey = "below" | "part" | "out" | "in" | "up" | "down" | "dup" | "del";
+type RowAction = { key: RowActionKey; icon: ReactNode; label: string; short: string; hint?: string; disabled?: boolean; danger?: boolean };
 
 /**
  * Lines as a quick table for long lists (100+ lines). Saved lines are compact
@@ -174,6 +189,20 @@ export function LineTable({
   const [removed, setRemoved] = useState<Removed | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  /** A row's actions opened by a right-click (or the menu key), where the pointer was. */
+  const [ctx, setCtx] = useState<{ row: string; x: number; y: number } | null>(null);
+  const closeCtx = useCallback(() => setCtx(null), []);
+  const ctxAnchor = useCallback(
+    () =>
+      ctx
+        ? ({
+            getBoundingClientRect: () => new DOMRect(ctx.x, ctx.y, 0, 0),
+            contains: () => false,
+            focus: () => gridRef.current?.focus({ preventScroll: true }),
+          } as unknown as HTMLElement)
+        : null,
+    [ctx],
+  );
   const menuId = useId().replace(/:/g, "");
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
@@ -356,6 +385,8 @@ export function LineTable({
   const [shown, setShown] = useState<Map<string, string>>(new Map());
   const gridRef = useRef<HTMLDivElement>(null);
   const cellId = (row: string, col: string) => `${row}:${col}`;
+  const ctxRow = ctx ? (rows.find((x) => x.key === ctx.row) ?? null) : null;
+  const selRow = sel && sel.row !== "entry" ? (rows.find((r) => r.key === sel.row) ?? null) : null;
 
   const q = query.trim().toLowerCase();
   const matches = (r: LineRow) => !q || Object.values(r.values).some((v) => v.toLowerCase().includes(q));
@@ -482,6 +513,46 @@ export function LineTable({
     const row = rows.find((r) => r.key === sel.row);
     if (!col || !row) return;
     const k = e.key;
+    const i = rows.indexOf(row);
+    const mod = e.ctrlKey || e.metaKey;
+    // Row actions, with the keys spreadsheets use.
+    if (!readOnly) {
+      const siblings = rows.filter((x) => x.parentKey === row.parentKey);
+      const at = siblings.indexOf(row);
+      if (mod && k === "Enter") {
+        e.preventDefault();
+        insertBelow(row);
+        return;
+      }
+      if (e.altKey && e.shiftKey && (k === "ArrowRight" || k === "ArrowLeft")) {
+        e.preventDefault();
+        if (flat) return;
+        if (k === "ArrowRight" && canIndent(rows, i)) void move(row, "indent");
+        else if (k === "ArrowLeft" && row.parentKey) void move(row, "outdent");
+        return;
+      }
+      if (e.altKey && !e.shiftKey && (k === "ArrowUp" || k === "ArrowDown")) {
+        e.preventDefault();
+        if (k === "ArrowUp" ? at > 0 : at < siblings.length - 1) void move(row, k === "ArrowUp" ? "up" : "down");
+        return;
+      }
+      if (mod && k.toLowerCase() === "d") {
+        e.preventDefault();
+        void duplicate(row);
+        return;
+      }
+      if (mod && (k === "Delete" || k === "Backspace" || k === "-")) {
+        e.preventDefault();
+        void remove(row, i);
+        return;
+      }
+      if (k === "ContextMenu" || (e.shiftKey && k === "F10")) {
+        e.preventDefault();
+        const box = gridRef.current?.querySelector(`[data-cell="${CSS.escape(cellId(row.key, col.key))}"]`)?.getBoundingClientRect();
+        setCtx({ row: row.key, x: box ? box.left + 12 : 0, y: box ? box.bottom : 0 });
+        return;
+      }
+    }
     if (k === "ArrowUp" || k === "ArrowDown" || k === "ArrowLeft" || k === "ArrowRight") {
       e.preventDefault();
       step(sel, k === "ArrowUp" ? "up" : k === "ArrowDown" ? "down" : k === "ArrowLeft" ? "left" : "right");
@@ -508,6 +579,7 @@ export function LineTable({
 
   const remove = async (row: LineRow, i: number) => {
     setMenu(null);
+    setCtx(null);
     const block = [row, ...rows.filter((r) => r.parentKey === row.key)];
     const before = rows[i - 1];
     const removedRow = {
@@ -536,14 +608,90 @@ export function LineTable({
     await run("entry", (reason) => onAdd(lines, at, reason));
   };
 
+  const backToGrid = () => requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
+
   const move = async (row: LineRow, to: LineMove) => {
     setMenu(null);
+    setCtx(null);
     await run(row.key, (reason) => onMove(row.key, to, reason));
+    backToGrid();
   };
 
   const duplicate = async (row: LineRow) => {
     setMenu(null);
+    setCtx(null);
     await run(row.key, (reason) => onAdd([{ values: row.values, partOf: null }], { afterKey: row.key, parentKey: row.parentKey }, reason));
+    backToGrid();
+  };
+
+  /** Opens the new row right under this one (after its parts), at its level. */
+  const insertBelow = (row: LineRow) => {
+    setMenu(null);
+    setCtx(null);
+    setEntryAt({ afterKey: row.key, parentKey: row.parentKey });
+    setEntry(initialValues(columns, row.parentKey));
+    focus(entryCell(editable[0]!.key));
+  };
+
+  /** Opens the new row as the next part of this line. */
+  const addPartTo = (row: LineRow) => {
+    setMenu(null);
+    setCtx(null);
+    const lastPart = [...rows].reverse().find((x) => x.parentKey === row.key);
+    setEntryAt({ afterKey: lastPart?.key ?? row.key, parentKey: row.key });
+    setEntry(initialValues(columns, row.key));
+    focus(entryCell(editable[0]!.key));
+  };
+
+  /** Does a row action (from the ⋯ menu, the right-click menu or the toolbar). */
+  const act = (key: RowActionKey, r: LineRow) => {
+    if (key === "below") insertBelow(r);
+    else if (key === "part") addPartTo(r);
+    else if (key === "out") void move(r, "outdent");
+    else if (key === "in") void move(r, "indent");
+    else if (key === "up" || key === "down") void move(r, key);
+    else if (key === "dup") void duplicate(r);
+    else void remove(r, rows.indexOf(r));
+  };
+
+  /** Everything that can be done to a row: the same in the ⋯ menu, the right-click menu and the toolbar. */
+  const actionsFor = (r: LineRow): RowAction[] => {
+    const i = rows.indexOf(r);
+    const part = !!r.parentKey;
+    const parts = rows.filter((p) => p.parentKey === r.key).length;
+    const siblings = rows.filter((x) => x.parentKey === r.parentKey);
+    const at = siblings.indexOf(r);
+    const list: RowAction[] = [
+      { key: "below", icon: <Plus />, label: `Insert ${part ? "a part" : an(noun)} below`, short: "Insert below", hint: "Ctrl+Enter" },
+    ];
+    if (!flat && !part) list.push({ key: "part", icon: <ListPlus />, label: "Add a part to it", short: "Add a part" });
+    if (!flat)
+      list.push(
+        part
+          ? { key: "out", icon: <IndentDecrease />, label: `Make it ${an(noun)} of its own`, short: "Move out", hint: "Alt+Shift+←" }
+          : {
+              key: "in",
+              icon: <IndentIncrease />,
+              label: canIndent(rows, i) ? `Make it a part of ${numbers[rows.indexOf(lineAbove(rows, i)!)]}` : "Make it a part",
+              short: "Make a part",
+              hint: "Alt+Shift+→",
+              disabled: !canIndent(rows, i),
+            },
+      );
+    list.push(
+      { key: "up", icon: <ArrowUp />, label: "Move up", short: "Up", hint: "Alt+↑", disabled: at === 0 },
+      { key: "down", icon: <ArrowDown />, label: "Move down", short: "Down", hint: "Alt+↓", disabled: at === siblings.length - 1 },
+      { key: "dup", icon: <Copy />, label: "Duplicate", short: "Duplicate", hint: "Ctrl+D" },
+      {
+        key: "del",
+        icon: <Trash2 />,
+        label: `Delete${parts ? ` with its ${parts} part${parts === 1 ? "" : "s"}` : ""}`,
+        short: "Delete",
+        hint: "Ctrl+Del",
+        danger: true,
+      },
+    );
+    return list;
   };
 
   /* ---------- what is shown */
@@ -555,21 +703,38 @@ export function LineTable({
   const minWidth = `${3 + fixedRem + flexible * 16 + (readOnly ? 0 : 3)}rem`;
   const cellBase = "h-9 border border-line px-2 align-middle text-sm";
 
+  // The number the new row will get: "24", or "1.3" when it is a part (the number says it, as in a sheet).
+  const nextNo = (() => {
+    if (entryAt.parentKey) {
+      const kids = rows.filter((x) => x.parentKey === entryAt.parentKey);
+      const after = entryAt.afterKey === entryAt.parentKey ? -1 : entryAt.afterKey ? kids.findIndex((x) => x.key === entryAt.afterKey) : kids.length - 1;
+      return `${parentLabel(entryAt.parentKey)}.${after + 2}`;
+    }
+    const tops = rows.filter((x) => !x.parentKey);
+    if (entryAt.afterKey) {
+      const a = rows.find((x) => x.key === entryAt.afterKey);
+      const top = a?.parentKey ? rows.find((x) => x.key === a.parentKey) : a;
+      if (top) return String(tops.indexOf(top) + 2);
+    }
+    return String(tops.length + 1);
+  })();
+  const canBePart = !flat && (entryAt.parentKey !== null || lineAbove(rows, entryIndex >= 0 ? blockEnd(rows, entryIndex) : rows.length) !== null);
+
   const entryRow = readOnly ? null : (
     <tr key="entry" aria-label={`New ${entryAt.parentKey ? `part of ${parentLabel(entryAt.parentKey)}` : noun}`} className={cn(inline ? "bg-primary-soft/30" : "bg-surface")}>
-      <td className={cn(cellBase, "bg-surface-2 px-1 text-center text-xs text-muted")}>
-        {entryAt.parentKey ? (
+      <td className={cn(cellBase, "bg-surface-2 px-1 text-center text-xs tabular")}>
+        {canBePart ? (
           <button
             type="button"
-            onClick={() => toPart(false)}
-            className="inline-flex items-center gap-0.5 rounded px-1 text-primary hover:bg-primary-soft"
-            title="Make it a whole line (Shift+Tab)"
+            onClick={() => toPart(!entryAt.parentKey)}
+            className={cn("rounded px-1 font-medium hover:bg-primary-soft", entryAt.parentKey ? "text-primary" : "text-muted")}
+            title={entryAt.parentKey ? `Part ${nextNo}: click (or Shift+Tab) to make it ${an(noun)} of its own` : `New ${noun} ${nextNo}: click (or Tab) to make it a part of the ${noun} above`}
+            aria-label={entryAt.parentKey ? `New part ${nextNo}; make it ${an(noun)} of its own` : `New ${noun} ${nextNo}; make it a part`}
           >
-            <CornerDownRight className="size-3.5" aria-hidden />
-            {parentLabel(entryAt.parentKey)}.
+            {nextNo}
           </button>
         ) : (
-          <Plus className="mx-auto size-4" aria-hidden />
+          <span className="text-muted">{nextNo}</span>
         )}
       </td>
       {columns.map((c) => (
@@ -683,6 +848,37 @@ export function LineTable({
         />
       )}
 
+      {!readOnly && (
+        // Like a sheet's toolbar: what can be done to the selected row, always in the same place.
+        <div
+          role="toolbar"
+          aria-label={selRow ? `Actions for ${rowLabel(rows.indexOf(selRow))}` : "Row actions"}
+          className="flex min-h-9 flex-wrap items-center gap-0.5 rounded-lg border border-line bg-surface-2/60 px-1.5 py-1"
+        >
+          {selRow ? (
+            <>
+              <span className="mr-1 px-1 text-xs font-medium text-text-2 tabular">{rowLabel(rows.indexOf(selRow))}</span>
+              {actionsFor(selRow).map((a) => (
+                <Button
+                  key={a.key}
+                  size="xs"
+                  variant={a.danger ? "danger-ghost" : "ghost"}
+                  onClick={() => act(a.key, selRow)}
+                  disabled={a.disabled || busy === selRow.key}
+                  title={a.hint ? `${a.label} (${a.hint})` : a.label}
+                  aria-label={a.label}
+                >
+                  {a.icon}
+                  <span className="hidden sm:inline">{a.short}</span>
+                </Button>
+              ))}
+            </>
+          ) : (
+            <span className="px-1 text-xs text-muted">Select a row (click its number) or right-click it to insert, make a part, move, duplicate or delete.</span>
+          )}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
         <div
           ref={gridRef}
@@ -745,23 +941,45 @@ export function LineTable({
               )}
               {visible.map(({ r, i }) => {
                 const no = numbers[i]!;
-                const part = !!r.parentKey;
                 const label = rowLabel(i);
                 const parts = rows.filter((p) => p.parentKey === r.key).length;
-                const siblings = rows.filter((x) => x.parentKey === r.parentKey);
-                const at = siblings.indexOf(r);
                 const rowSelected = sel?.row === r.key;
                 return [
-                  <tr key={r.key} aria-label={label} aria-rowindex={i + 1} className={cn("group", part && "bg-surface-2/30", rowSelected && "bg-primary-soft/20")}>
+                  <tr
+                    key={r.key}
+                    aria-label={label}
+                    aria-rowindex={i + 1}
+                    className={cn("group", rowSelected && "bg-primary-soft/20")}
+                    onContextMenu={(e) => {
+                      if (readOnly || cell) return;
+                      e.preventDefault();
+                      setSel((s) => (s?.row === r.key ? s : { row: r.key, col: (editable[0] ?? columns[0]!).key }));
+                      setCtx({ row: r.key, x: e.clientX, y: e.clientY });
+                    }}
+                  >
                     <th
                       scope="row"
-                      className={cn(cellBase, "bg-surface-2 px-1 text-center text-xs font-normal whitespace-nowrap text-muted tabular", rowSelected && "bg-primary-soft text-primary")}
+                      className={cn(
+                        cellBase,
+                        "relative bg-surface-2 px-1 text-center text-xs font-normal whitespace-nowrap text-muted tabular",
+                        !readOnly && "cursor-pointer hover:bg-surface-3",
+                        rowSelected && "bg-primary-soft text-primary hover:bg-primary-soft",
+                      )}
+                      title={readOnly ? undefined : "Select the row; right-click for its actions"}
+                      onMouseDown={(e) => {
+                        if (readOnly || (e.target as HTMLElement).closest("button")) return;
+                        e.preventDefault();
+                        if (cell) commit();
+                        select(r.key, (editable[0] ?? columns[0]!).key);
+                        gridRef.current?.focus({ preventScroll: true }); // now, so a shortcut pressed right after works
+                      }}
                     >
-                      <span className={cn("inline-flex items-center gap-0.5", part && "pl-1.5")}>
+                      <span className="inline-flex items-center gap-0.5">
                         {parts > 0 && !q ? (
+                          // At the edge, so a click on the number itself selects the row.
                           <button
                             type="button"
-                            className="-ml-1 rounded p-0.5 hover:bg-surface-3"
+                            className="absolute top-1/2 left-0 -translate-y-1/2 rounded p-0.5 text-muted hover:bg-surface-3"
                             aria-label={folded.has(r.key) ? `Show the ${parts} parts of ${no}` : `Hide the parts of ${no}`}
                             aria-expanded={!folded.has(r.key)}
                             onClick={() =>
@@ -773,7 +991,7 @@ export function LineTable({
                               })
                             }
                           >
-                            {folded.has(r.key) ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                            {folded.has(r.key) ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
                           </button>
                         ) : null}
                         {no}
@@ -790,6 +1008,7 @@ export function LineTable({
                           aria-selected={isSel}
                           aria-readonly={!c.input || readOnly}
                           title={!readOnly && c.input && isSel && !isEditing ? "Type, or press Enter, to change it" : undefined}
+                          data-cell={cellId(r.key, c.key)}
                           className={cn(
                             cellBase,
                             isEditing ? "p-0" : "py-1",
@@ -818,12 +1037,9 @@ export function LineTable({
                               label={`${label}: ${c.label}`}
                             />
                           ) : n === 0 ? (
-                            <span className={cn("flex items-start gap-1", part && "pl-3")}>
-                              {part && <CornerDownRight className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />}
-                              <span className="min-w-0">
-                                <span className="line-clamp-3 whitespace-pre-line">{c.format ? c.format({ ...r.values, [c.key]: value }, r) : value}</span>
-                                {r.badge}
-                              </span>
+                            <span className="block min-w-0">
+                              <span className="line-clamp-3 whitespace-pre-line">{c.format ? c.format({ ...r.values, [c.key]: value }, r) : value}</span>
+                              {r.badge}
                             </span>
                           ) : c.format ? (
                             c.format(Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)])), r)
@@ -853,52 +1069,11 @@ export function LineTable({
                         )}
                         {menu === r.key && (
                           <RowMenu onClose={closeMenu} anchorId={`rowmenu-${menuId}-${r.key}`} label={label}>
-                            {!part && !flat && (
-                              <MenuItem
-                                icon={<Plus />}
-                                onClick={() => {
-                                  setMenu(null);
-                                  const lastPart = [...rows].reverse().find((x) => x.parentKey === r.key);
-                                  setEntryAt({ afterKey: lastPart?.key ?? r.key, parentKey: r.key });
-                                  setEntry(initialValues(columns, r.key));
-                                  focus(entryCell(editable[0]!.key));
-                                }}
-                              >
-                                Add a part
+                            {actionsFor(r).map((a) => (
+                              <MenuItem key={a.key} icon={a.icon} onClick={() => act(a.key, r)} disabled={a.disabled} danger={a.danger} hint={a.hint}>
+                                {a.label}
                               </MenuItem>
-                            )}
-                            <MenuItem
-                              icon={<Plus />}
-                              onClick={() => {
-                                setMenu(null);
-                                setEntryAt({ afterKey: r.key, parentKey: r.parentKey });
-                                setEntry(initialValues(columns, r.parentKey));
-                                focus(entryCell(editable[0]!.key));
-                              }}
-                            >
-                              Add {part ? "a part" : an(noun)} below
-                            </MenuItem>
-                            {flat ? null : part ? (
-                              <MenuItem icon={<IndentDecrease />} onClick={() => void move(r, "outdent")}>
-                                Make it {an(noun)} of its own
-                              </MenuItem>
-                            ) : (
-                              <MenuItem icon={<IndentIncrease />} onClick={() => void move(r, "indent")} disabled={!canIndent(rows, i)}>
-                                Make it a part of {numbers[rows.indexOf(lineAbove(rows, i) ?? r)]}
-                              </MenuItem>
-                            )}
-                            <MenuItem icon={<ArrowUp />} onClick={() => void move(r, "up")} disabled={at === 0}>
-                              Move up
-                            </MenuItem>
-                            <MenuItem icon={<ArrowDown />} onClick={() => void move(r, "down")} disabled={at === siblings.length - 1}>
-                              Move down
-                            </MenuItem>
-                            <MenuItem icon={<Copy />} onClick={() => void duplicate(r)}>
-                              Duplicate
-                            </MenuItem>
-                            <MenuItem icon={<Trash2 />} danger onClick={() => void remove(r, i)}>
-                              Remove{parts ? ` with its ${parts} part${parts === 1 ? "" : "s"}` : ""}
-                            </MenuItem>
+                            ))}
                           </RowMenu>
                         )}
                       </td>
@@ -935,6 +1110,16 @@ export function LineTable({
         )}
         {footer && <div className="border-t border-line bg-surface lg:sticky lg:bottom-0">{footer}</div>}
       </div>
+
+      {ctxRow && (
+        <FloatingMenu anchor={ctxAnchor} onClose={closeCtx} label={rowLabel(rows.indexOf(ctxRow))} width={260} align="start">
+          {actionsFor(ctxRow).map((a) => (
+            <MenuItem key={a.key} icon={a.icon} onClick={() => act(a.key, ctxRow)} disabled={a.disabled} danger={a.danger} hint={a.hint}>
+              {a.label}
+            </MenuItem>
+          ))}
+        </FloatingMenu>
+      )}
 
       {error && <p className="text-xs text-bad">{error}</p>}
       {/* Notices stay in view at the bottom of the screen: with 100+ lines the row may be far from the top. */}
@@ -976,10 +1161,29 @@ export function LineTable({
         </div>
       )}
       {!readOnly && (
-        <p className="text-xs text-muted">
-          Click a cell, then type to change it · <Kbd>Enter</Kbd> saves and goes down · <Kbd>Tab</Kbd> and arrows move · <Kbd>Delete</Kbd> clears ·{" "}
-          <Kbd>Esc</Kbd> cancels · paste rows from Excel into the last row{flat ? "" : <> · <Kbd>Tab</Kbd> on an empty new row makes it a part</>}
-        </p>
+        <div className="text-xs text-muted">
+          <p>
+            Works like a sheet: click a cell and type, <Kbd>Enter</Kbd> saves and goes down, paste rows from Excel into the last row.
+            {flat ? "" : <> A number like 1.1 is a part of line 1: <Kbd>Tab</Kbd> on an empty new row (or a click on its number) makes it one.</>}
+          </p>
+          <details className="mt-1">
+            <summary className="inline-flex cursor-pointer items-center gap-1 rounded hover:text-text">
+              <Keyboard className="size-3.5" aria-hidden /> Keyboard
+            </summary>
+            <ul className="mt-1 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              <li><Kbd>Enter</Kbd> or <Kbd>F2</Kbd> change the cell · <Kbd>Esc</Kbd> cancel</li>
+              <li><Kbd>Tab</Kbd> and arrows move · <Kbd>Delete</Kbd> clears the cell</li>
+              <li><Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd> insert a row below</li>
+              {!flat && (
+                <li>
+                  <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>→</Kbd> make it a part · <Kbd>←</Kbd> move it out
+                </li>
+              )}
+              <li><Kbd>Alt</Kbd>+<Kbd>↑</Kbd>/<Kbd>↓</Kbd> move the row</li>
+              <li><Kbd>Ctrl</Kbd>+<Kbd>D</Kbd> duplicate · <Kbd>Ctrl</Kbd>+<Kbd>Del</Kbd> delete the row</li>
+            </ul>
+          </details>
+        </div>
       )}
     </div>
   );
@@ -1081,12 +1285,15 @@ function MenuItem({
   onClick,
   disabled,
   danger,
+  hint,
 }: {
   icon: ReactNode;
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
+  /** Its key, shown on the right as in a desktop menu. */
+  hint?: string;
 }) {
   return (
     <button
@@ -1100,7 +1307,8 @@ function MenuItem({
       )}
     >
       {icon}
-      {children}
+      <span className="flex-1 text-left">{children}</span>
+      {hint && <span className="ml-3 hidden text-xs text-muted sm:inline">{hint}</span>}
     </button>
   );
 }
@@ -1200,19 +1408,19 @@ function PastePanel({
       />
       {items.length > 0 && (
         <ol className="max-h-48 overflow-auto rounded-md border border-line bg-surface text-sm">
-          {items.map((p, n) => (
-            <li
-              key={n}
-              className={cn("flex justify-between gap-3 border-b border-line px-2 py-1 last:border-0", p.part && "pl-6 text-text-2")}
-            >
+          {pastedNumbers(items).map((no, n) => {
+            const p = items[n]!;
+            return (
+            <li key={n} className="flex justify-between gap-3 border-b border-line px-2 py-1 last:border-0">
               <span className="truncate">
-                {p.part && <CornerDownRight className="mr-1 inline size-3 text-muted" aria-hidden />}
+                <span className="mr-2 inline-block w-8 text-xs text-muted tabular">{no}</span>
                 {p.description}
                 {p.model && <span className="text-muted"> · {p.model}</span>}
               </span>
               <span className="shrink-0 text-muted tabular">{p.quantity ? `${p.quantity} ${p.unit}`.trim() : "no qty"}</span>
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
       <div className="flex gap-2">

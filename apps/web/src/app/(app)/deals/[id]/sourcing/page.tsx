@@ -156,7 +156,7 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
           </summary>
           <div className="flex flex-col gap-5 p-4">
             {s.items.map((it) => (
-              <section key={it.id} aria-label={`${it.parentId ? "Part" : "Item"} ${it.no}`} className={cn(it.parentId && "ml-4 border-l-2 border-line pl-4 sm:ml-6")}>
+              <section key={it.id} aria-label={`${it.parentId ? "Part" : "Item"} ${it.no}`}>
                 <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="min-w-0 text-sm font-semibold">
                     <span className="mr-1.5 text-muted tabular">{it.no}</span>
