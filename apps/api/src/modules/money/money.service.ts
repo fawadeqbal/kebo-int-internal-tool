@@ -421,7 +421,7 @@ export class MoneyService {
       paidById: (await this.activePerson(input.paidById)) ?? f.ownerId,
       reference: input.reference,
       note: input.note,
-      accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount),
+      accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount, await this.limits.allows("cash_book")),
       factoryName: f.name,
     };
   }
@@ -724,7 +724,7 @@ export class MoneyService {
         paidById: await this.activePerson(input.paidById),
         reference: input.reference,
         note: input.note,
-        accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount),
+        accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount, await this.limits.allows("cash_book")),
       },
     };
   }
@@ -886,6 +886,8 @@ export class MoneyService {
    */
   async profitAndLoss(user: SessionUser, year: number) {
     this.assertExpenses(user);
+    // Profit after expenses: needs the expenses feature as well as Insights.
+    await this.limits.require("expenses");
     const { sales } = await this.settings.get();
     const main = sales.currency;
     const from = toDbDate(`${year}-01-01`);

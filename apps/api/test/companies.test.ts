@@ -359,9 +359,19 @@ describe("companies: isolation and the platform", () => {
     // The order's money shows no costs.
     const order = ((await mine.get("/orders").expect(200)).body as { id: string }[])[0];
     expect((await mine.get(`/orders/${order.id}/money`).expect(200)).body.expenses).toBeNull();
-    await off(
-      await mine.post(`/orders/${order.id}/payments`, { kind: "deposit", amount: "10", paidOn: "2026-01-01", accountId: customer.id }),
-    );
+    // A payment can be recorded; an account sent with it is left off (no cash book).
+    const payRes = await mine.post(`/orders/${order.id}/payments`, { kind: "deposit", amount: "10", currency: "USD", paidOn: "2026-01-01", accountId: customer.id });
+    expect(payRes.status, JSON.stringify(payRes.body)).toBe(201);
+    const paid = payRes.body as { createdId: string; payments: { id: string; account: unknown }[] };
+    expect(paid.payments.find((p) => p.id === paid.createdId)?.account).toBeNull();
+    // Roles: only the built-in ones can be given, and a role's permissions stay as they are.
+    const before = (await mine.get("/roles/staff").expect(200)).body as { name: string; permissions: string[]; requireTwoStep: boolean };
+    await mine.put("/roles/staff", { name: "Renamed", permissions: ["dashboard.view"], requireTwoStep: true }).expect(200);
+    const after = (await mine.get("/roles/staff").expect(200)).body as typeof before;
+    expect(after.name).toBe(before.name);
+    expect([...after.permissions].sort()).toEqual([...before.permissions].sort());
+    expect(after.requireTwoStep).toBe(true);
+    await off(await mine.post("/users", { name: "Extra Role", email: `extra-${tag}@x.test`, password: "Extra12345678", role: "custom-x" }));
     // The phone app: no sign-in, and existing sessions stop.
     const phone = await request(app.getHttpServer())
       .post("/api/auth/login")

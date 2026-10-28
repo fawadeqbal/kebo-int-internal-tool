@@ -11,6 +11,7 @@ import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { LeaksService } from "../money/leaks.service";
+import { LimitsService } from "../../common/company/limits.service";
 
 export type ReminderLevel = "bad" | "warn" | "info";
 export type ReminderKind = "order" | "quote" | "deal" | "offer" | "money";
@@ -50,16 +51,19 @@ export class RemindersListService {
     private readonly orders: OrdersService,
     private readonly leaks: LeaksService,
     private readonly cache: ReadCache,
+    private readonly limits: LimitsService,
   ) {}
 
   async list(user: SessionUser) {
     const today = this.clock.today();
     // Worked out once per person while nothing changes (ReadCache); done and put-off are applied fresh.
-    const items = await this.cache.get(`reminders:${user.id}:${today}`, () => this.build(user, today));
+    // The money warnings come from Insights and expenses (plan features): part of the key, so a plan change shows at once.
+    const warnings = (await this.limits.allows("insights")) && (await this.limits.allows("expenses"));
+    const items = await this.cache.get(`reminders:${user.id}:${today}:${warnings}`, () => this.build(user, today, warnings));
     return this.withStates(user, items, today);
   }
 
-  private async build(user: SessionUser, today: ISODate): Promise<Reminder[]> {
+  private async build(user: SessionUser, today: ISODate, warnings: boolean): Promise<Reminder[]> {
     const s = await this.settings.get();
     const manager = can(user, "inquiries.viewAll");
     const scope = { deletedAt: null, ...inquiryAccess(user) };
@@ -196,7 +200,7 @@ export class RemindersListService {
     }
 
     // 5. Managers: the money warnings (orders losing money, money stuck, expense jumps…).
-    if (can(user, "expenses.manage")) {
+    if (warnings && can(user, "expenses.manage")) {
       const r = await this.leaks.report(user, {});
       for (const w of r.warnings)
         items.push({

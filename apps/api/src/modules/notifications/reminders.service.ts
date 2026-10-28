@@ -194,6 +194,8 @@ export class RemindersService {
 
   /** The numbers for a period, read as the system (every permission): the insights service lives in another module. */
   private async insights(from: string, to: string) {
+    // The figures in the emails are Insights (a plan feature): without it the emails carry the counts only.
+    if (!(await this.limits.allows("insights"))) return null;
     try {
       const service = this.modules.get(InsightsService, { strict: false });
       const system = { id: "00000000-0000-0000-0000-000000000000", name: "System", email: "", role: "super_admin", roleName: "System", permissions: [...PERMISSIONS], twoStepSetupRequired: false, sessionId: "" };

@@ -22,6 +22,7 @@ export function RoleForm({
   role,
   mine,
   isMine = false,
+  locked = false,
   submitLabel,
 }: {
   action: Action;
@@ -30,9 +31,12 @@ export function RoleForm({
   mine: Permission[] | null;
   /** The editor's own role: Security must stay in it. */
   isMine?: boolean;
+  /** The company's plan leaves out custom roles: the name and permissions stay as they are. */
+  locked?: boolean;
   submitLabel: string;
 }) {
-  const fixed = !!role?.superAdmin;
+  const superAdmin = !!role?.superAdmin;
+  const fixed = superAdmin || locked;
   const [picked, setPicked] = useState<Set<Permission>>(() => new Set(role?.permissions ?? ["dashboard.view"]));
   const may = (p: Permission) => !mine || mine.includes(p) || picked.has(p);
   const toggle = (p: Permission, on: boolean) =>
@@ -47,7 +51,7 @@ export function RoleForm({
       {(s) => (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name" htmlFor="name" error={s.errors?.name} hint={fixed ? "The Super Admin role keeps its name." : "What people will see, e.g. Accounts or Sales (China)."}>
+            <Field label="Name" htmlFor="name" error={s.errors?.name} hint={superAdmin ? "The Super Admin role keeps its name." : locked ? "Renaming roles is part of custom roles." : "What people will see, e.g. Accounts or Sales (China)."}>
               <Input id="name" name="name" defaultValue={s.values?.name ?? role?.name} readOnly={fixed} autoFocus={!role} aria-invalid={!!s.errors?.name} />
             </Field>
             <Field label="What it is for" htmlFor="description" error={s.errors?.description} hint="Shown when someone is given the role.">
@@ -70,7 +74,10 @@ export function RoleForm({
 
           <fieldset className="flex flex-col gap-4">
             <legend className="mb-1 text-sm font-semibold">What people in this role may do</legend>
-            {fixed && <Alert tone="info">The Super Admin always has every permission, including any added later. Only the description and the two-step rule change here.</Alert>}
+            {superAdmin && <Alert tone="info">The Super Admin always has every permission, including any added later. Only the description and the two-step rule change here.</Alert>}
+            {locked && !superAdmin && (
+              <Alert tone="info">Changing what a role allows is part of custom roles, which your company&apos;s plan does not include. The description and the two-step rule still change here.</Alert>
+            )}
             {s.errors?.permissions && <p className="text-sm text-bad">{s.errors.permissions[0]}</p>}
             <div className="grid gap-4 md:grid-cols-2">
               {PERMISSION_GROUPS.map((g) => {
@@ -103,7 +110,7 @@ export function RoleForm({
                                 id={id}
                                 name="permissions"
                                 value={i.permission}
-                                checked={fixed || picked.has(i.permission)}
+                                checked={superAdmin || picked.has(i.permission)}
                                 disabled={fixed || blocked}
                                 onChange={(e) => !keep && toggle(i.permission, e.target.checked)}
                                 className="mt-0.5"

@@ -11,6 +11,7 @@ import { inquiryAccess } from "../inquiries/inquiries.service";
 import { orderAccess } from "../orders/orders.service";
 import { CustomersService } from "../parties/customers.service";
 import { PartiesModule } from "../parties/parties.module";
+import { LimitsService } from "../../common/company/limits.service";
 
 const historyQuery = z.object({ type: z.enum(["deal", "order", "customer", "factory"]), id: z.uuid("Unknown record") });
 type HistoryQuery = z.infer<typeof historyQuery>;
@@ -25,6 +26,7 @@ export class HistoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly customers: CustomersService,
+    private readonly limits: LimitsService,
   ) {}
 
   /** The audit entries that belong to the record, as { entityType: ids }. */
@@ -71,7 +73,8 @@ export class HistoryService {
     const scope = (await this.scope(user, q)).filter((s) => s.ids.length);
     // Expenses are for managers only; payments to factories for people who see costs.
     const hidden = [
-      ...(can(user, "expenses.manage") ? [] : ["expense"]),
+      // Expenses: managers, and only with the expenses feature of the plan.
+      ...(can(user, "expenses.manage") && (await this.limits.allows("expenses")) ? [] : ["expense"]),
       ...(can(user, "sourcing.manage") ? [] : ["payment_out"]),
     ];
     const rows = await this.prisma.db.auditLog.findMany({

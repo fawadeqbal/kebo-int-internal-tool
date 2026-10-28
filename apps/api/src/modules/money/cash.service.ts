@@ -8,6 +8,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { checkAccount } from "./account-check";
+import { LimitsService } from "../../common/company/limits.service";
 
 type Kind = "in" | "factory" | "expense" | "transfer_out" | "transfer_in";
 
@@ -40,6 +41,7 @@ export class CashService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly clock: Clock,
+    private readonly limits: LimitsService,
   ) {}
 
   private assertManager(user: SessionUser) {
@@ -220,6 +222,8 @@ export class CashService {
     const live = q.removed ? {} : { voidedAt: null };
     const acc = { select: { id: true, name: true } } as const;
 
+    // Expenses are a plan feature: without it they are not listed.
+    const expensesOn = await this.limits.allows("expenses");
     const [payments, factoryPaid, expenses, transfers] = await Promise.all([
       this.prisma.db.payment.findMany({
         where: { paidOn: range, ...onAccount, ...cur, ...live },
@@ -229,10 +233,12 @@ export class CashService {
         where: { paidOn: range, ...onAccount, ...cur, ...live },
         include: { account: acc, factory: { select: { id: true, name: true } }, order: { select: { id: true, refNo: true } } },
       }),
-      this.prisma.db.expense.findMany({
-        where: { spentOn: range, ...onAccount, ...cur, ...live },
-        include: { account: acc, customer: { select: { id: true, name: true } }, order: { select: { id: true, refNo: true } }, inquiry: { select: { id: true, refNo: true } } },
-      }),
+      expensesOn
+        ? this.prisma.db.expense.findMany({
+            where: { spentOn: range, ...onAccount, ...cur, ...live },
+            include: { account: acc, customer: { select: { id: true, name: true } }, order: { select: { id: true, refNo: true } }, inquiry: { select: { id: true, refNo: true } } },
+          })
+        : Promise.resolve([]),
       none
         ? Promise.resolve([])
         : this.prisma.db.moneyTransfer.findMany({
@@ -377,7 +383,7 @@ export class CashService {
       ? out.filter((r) => !r.voided).length
       : (await this.prisma.db.payment.count({ where: { paidOn: range, accountId: null, voidedAt: null, ...curOfUnassigned } })) +
         (await this.prisma.db.factoryPayment.count({ where: { paidOn: range, accountId: null, voidedAt: null, ...curOfUnassigned } })) +
-        (await this.prisma.db.expense.count({ where: { spentOn: range, accountId: null, voidedAt: null, ...curOfUnassigned } }));
+        (expensesOn ? await this.prisma.db.expense.count({ where: { spentOn: range, accountId: null, voidedAt: null, ...curOfUnassigned } }) : 0);
 
     return {
       from: q.from,
@@ -395,6 +401,7 @@ export class CashService {
   /** Put an amount on an account afterwards (a payment, a factory payment or an expense recorded without one). */
   async setAccount(user: SessionUser, kind: "in" | "factory" | "expense", id: string, accountId: string | null) {
     this.assertManager(user);
+    if (kind === "expense") await this.limits.require("expenses");
     const find = {
       in: () => this.prisma.db.payment.findUnique({ where: { id }, select: { currency: true, accountId: true } }),
       factory: () => this.prisma.db.factoryPayment.findUnique({ where: { id }, select: { currency: true, accountId: true } }),

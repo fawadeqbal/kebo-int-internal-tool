@@ -13,6 +13,7 @@ import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo
 import type { Prisma } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
+import { LimitsService } from "../../common/company/limits.service";
 import { SESSION_MAX_AGE_DAYS } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
 
@@ -49,6 +50,7 @@ export class SecurityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly limits: LimitsService,
   ) {}
 
   /* ---------------------------------------------------------------- roles */
@@ -133,8 +135,10 @@ export class SecurityService {
     if (!role) throw new NotFoundError("Role");
     const before = permissionsOfRole(role);
     // The Super Admin keeps its name and every permission; only its description and two-step rule change.
-    const permissions = role.superAdmin ? [] : [...new Set(input.permissions)];
-    const name = role.superAdmin ? role.name : input.name;
+    // So does every role while the company's plan leaves out custom roles: shaping roles is that feature.
+    const shaping = !role.superAdmin && (await this.limits.allows("custom_roles"));
+    const permissions = role.superAdmin ? [] : shaping ? [...new Set(input.permissions)] : (role.permissions as Permission[]);
+    const name = shaping ? input.name : role.name;
     if (!role.superAdmin) {
       // Only roles within one's own may be changed, and only towards what one has.
       await this.checkWithin(actor, before);

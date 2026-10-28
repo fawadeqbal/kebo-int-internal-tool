@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { fromMinor, landedUnitCosts, toMinor } from "@kebo/money";
 import { basisText, paymentSentenceOf } from "@kebo/shared";
 import { api } from "@/lib/api";
-import { docBrand, load } from "@/lib/session";
+import { docBrand, hasFeature, load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
 import type { CompanySnapshot, DocLine, RevisionDoc } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
@@ -119,7 +119,7 @@ export default async function QuotationPrint({
         title={`Quotation ${numberOf(r)}`}
         backHref={backTo(sp.back, `/inquiries/${r.quotation.inquiryId}/quotation`)}
         pdfHref={`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`}
-        excelHref={`/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}`}
+        excelHref={(await hasFeature("excel")) ? `/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}` : undefined}
         copies={{
           current: internal ? "internal" : "customer",
           customer: copyHref(r.id, sp.back, false),

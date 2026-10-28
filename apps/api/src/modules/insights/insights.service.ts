@@ -152,11 +152,12 @@ export class InsightsService {
     this.assert(user);
     // Expenses are a plan feature: without it, no expenses and no profit after them.
     const expensesOn = await this.limits.allows("expenses");
-    const key = `insights:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}:${[...user.permissions].sort().join(",")}:${expensesOn}`;
-    return this.cache.get(key, () => this.computeOverview(user, q, expensesOn));
+    const cashBookOn = await this.limits.allows("cash_book");
+    const key = `insights:${q.from ?? ""}:${q.to ?? ""}:${this.clock.today()}:${[...user.permissions].sort().join(",")}:${expensesOn}:${cashBookOn}`;
+    return this.cache.get(key, () => this.computeOverview(user, q, expensesOn, cashBookOn));
   }
 
-  private async computeOverview(user: SessionUser, q: { from?: ISODate; to?: ISODate }, expensesOn: boolean) {
+  private async computeOverview(user: SessionUser, q: { from?: ISODate; to?: ISODate }, expensesOn: boolean, cashBookOn: boolean) {
     const today = this.clock.today();
     const to = q.to && q.to < today ? q.to : today;
     const from = q.from && q.from <= to ? q.from : `${ymOf(to)}-01`;
@@ -367,8 +368,9 @@ export class InsightsService {
     let cashInHand: number | null = null;
     let toPay: number | null = null;
     if (seeMoney) {
-      const accounts = (await this.cash.accounts(user)) as { archived: boolean; currency: string; balance?: string }[];
-      cashInHand = accounts.filter((a) => !a.archived && a.balance !== undefined).reduce((t, a) => t + toMain(Math.round(Number(a.balance) * 100), a.currency), 0);
+      // What is in our accounts: the cash book, a plan feature.
+      const accounts = cashBookOn ? ((await this.cash.accounts(user)) as { archived: boolean; currency: string; balance?: string }[]) : [];
+      cashInHand = !cashBookOn ? null : accounts.filter((a) => !a.archived && a.balance !== undefined).reduce((t, a) => t + toMain(Math.round(Number(a.balance) * 100), a.currency), 0);
       const payables = await this.money.payables(user, false);
       toPay = payables.reduce((t, p) => t + toMain(Math.round(Number(p.toPay) * 100), p.currency), 0);
     }
@@ -511,6 +513,8 @@ export class InsightsService {
       previous: prev,
       currency: main,
       seeMoney,
+      /** Expenses and profit after them (managers, with the expenses feature). */
+      seeExpenses,
       kpis: {
         revenue: kpi(cur.revenue, before.revenue),
         grossProfit: kpi(cur.revenue - cur.goodsCost, before.revenue - before.goodsCost),

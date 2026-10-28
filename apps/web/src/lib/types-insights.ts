@@ -13,6 +13,8 @@ export interface Insights {
   previous: { from: string; to: string };
   currency: string;
   seeMoney: boolean;
+  /** Managers, when the company's plan includes expenses: profit after expenses and where money is lost. */
+  seeExpenses: boolean;
   kpis: {
     revenue: Kpi<string>;
     grossProfit: Kpi<string>;
