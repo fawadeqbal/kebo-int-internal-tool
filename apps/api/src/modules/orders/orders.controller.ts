@@ -129,6 +129,12 @@ export class OrdersController {
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
+  /** ?customerId= — that customer's orders with what was received and is due, totals per currency, and every payment. */
+  @Get()
+  forCustomer(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ customerId: z.uuid() }))) q: { customerId: string }) {
+    return this.payments.forCustomer(user, q.customerId);
+  }
+
   /** The payment's fields plus { reason } (always asked): a recorded payment changed. */
   @Patch(":id")
   edit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(editPaymentInput)) body: EditPaymentInput) {

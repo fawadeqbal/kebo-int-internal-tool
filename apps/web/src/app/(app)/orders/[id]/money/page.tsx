@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { can, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
@@ -16,6 +15,7 @@ import { editPaymentAction, expenseAction, factoryPaymentAction, removePaymentFi
 import { paymentAction, voidPaymentAction } from "../../actions";
 import { PaymentForm, VoidPayment } from "../forms";
 import { FactoriesView, ProfitView } from "../money-cards";
+import { ViewSwitch } from "@/components/common/view-switch";
 
 export const metadata = { title: "Order payments" };
 
@@ -92,23 +92,11 @@ export default async function OrderPaymentsTab({ params, searchParams }: { param
       {/* The view switch, and the view's main button (its form opens full width under them). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {views.length > 1 ? (
-          <nav aria-label="Payments of" className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-3 p-1">
-            {views.map((v) => (
-              <Link
-                key={v.key}
-                href={v.key === "customer" ? base : `${base}?view=${v.key}`}
-                scroll={false}
-                aria-current={v.key === view ? "page" : undefined}
-                className={cn(
-                  "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm whitespace-nowrap transition-colors",
-                  v.key === view ? "bg-surface font-semibold text-text shadow-sm" : "text-text-2 hover:text-text",
-                )}
-              >
-                {v.label}
-                {v.hint && <span className={cn("hidden text-xs font-medium sm:inline", v.tone ?? "text-muted")}>{v.hint}</span>}
-              </Link>
-            ))}
-          </nav>
+          <ViewSwitch
+            label="Payments of"
+            current={view}
+            views={views.map((v) => ({ ...v, href: v.key === "customer" ? base : `${base}?view=${v.key}` }))}
+          />
         ) : (
           <h2 className="text-base font-semibold">From the customer</h2>
         )}

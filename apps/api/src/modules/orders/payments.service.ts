@@ -8,7 +8,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { EventBus } from "../../common/events/event-bus";
 import type { SessionUser } from "../../common/auth/session-user";
-import { OrdersService } from "./orders.service";
+import { orderAccess, OrdersService } from "./orders.service";
 import { requireReason } from "../../common/audit/reason";
 import { checkAccount } from "../money/account-check";
 import { fileView } from "../money/payment-file-view";
@@ -75,6 +75,80 @@ export class PaymentsService {
         voided: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
         /** A photo or PDF proving it (bank slip, transfer screenshot). */
         file: fileView(p),
+      })),
+    };
+  }
+
+  /**
+   * A customer's payments across their orders (the ones this person may see):
+   * each order with what was received and is still due, totals per currency
+   * (cancelled orders left out), and every payment, newest first.
+   */
+  async forCustomer(user: SessionUser, customerId: string) {
+    const orders = await this.prisma.db.order.findMany({
+      where: { ...orderAccess(user), customerId },
+      select: { id: true, refNo: true, status: true, stage: true, currency: true, total: true, depositPercent: true, orderedOn: true },
+      orderBy: [{ orderedOn: "desc" }, { refNo: "desc" }],
+    });
+    const byId = new Map(orders.map((o) => [o.id, o]));
+    const payments = orders.length
+      ? await this.prisma.db.payment.findMany({
+          where: { orderId: { in: orders.map((o) => o.id) } },
+          orderBy: [{ paidOn: "desc" }, { createdAt: "desc" }],
+        })
+      : [];
+    const totals = new Map<string, { totalMinor: number; receivedMinor: number; dueMinor: number; orders: number }>();
+    const rows = orders.map((o) => {
+      const live = payments.filter((p) => p.orderId === o.id && !p.voidedAt && p.currency === o.currency);
+      const pos = settle(
+        decimalToMinor(o.total),
+        live.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
+        Number(o.depositPercent),
+      );
+      if (o.status !== "cancelled") {
+        const t = totals.get(o.currency) ?? { totalMinor: 0, receivedMinor: 0, dueMinor: 0, orders: 0 };
+        t.totalMinor += pos.dueMinor;
+        t.receivedMinor += pos.settledMinor;
+        t.dueMinor += pos.outstandingMinor;
+        t.orders += 1;
+        totals.set(o.currency, t);
+      }
+      return {
+        id: o.id,
+        refNo: o.refNo,
+        status: o.status,
+        stage: o.stage,
+        currency: o.currency,
+        orderedOn: fromDbDate(o.orderedOn),
+        total: fromMinor(pos.dueMinor),
+        received: fromMinor(pos.settledMinor),
+        due: fromMinor(pos.outstandingMinor),
+        depositDue: fromMinor(pos.depositOutstandingMinor),
+        payStatus: pos.status,
+        lastPaidOn: live.length ? fromDbDate(live.reduce((a, b) => (a.paidOn > b.paidOn ? a : b)).paidOn) : null,
+      };
+    });
+    return {
+      totals: [...totals.entries()].map(([currency, t]) => ({
+        currency,
+        orders: t.orders,
+        total: fromMinor(t.totalMinor),
+        received: fromMinor(t.receivedMinor),
+        due: fromMinor(t.dueMinor),
+      })),
+      orders: rows,
+      payments: payments.map((p) => ({
+        id: p.id,
+        order: { id: p.orderId, refNo: byId.get(p.orderId)!.refNo },
+        kind: p.kind,
+        amount: p.amount.toFixed(2),
+        bankCharges: p.bankCharges.toFixed(2),
+        currency: p.currency,
+        paidOn: fromDbDate(p.paidOn),
+        method: p.method,
+        reference: p.reference,
+        voided: !!p.voidedAt,
+        hasFile: !!fileView(p),
       })),
     };
   }

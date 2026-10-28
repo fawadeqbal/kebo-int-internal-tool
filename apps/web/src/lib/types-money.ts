@@ -306,3 +306,35 @@ export interface LeakCustomer {
   spent: string;
   net: string;
 }
+
+/** GET /payments?customerId= — a customer's orders with what was received and is due, and every payment. */
+export interface CustomerPayments {
+  totals: { currency: string; orders: number; total: string; received: string; due: string }[];
+  orders: {
+    id: string;
+    refNo: string;
+    status: "open" | "closed" | "cancelled";
+    stage: string;
+    currency: string;
+    orderedOn: string;
+    total: string;
+    received: string;
+    due: string;
+    depositDue: string;
+    payStatus: "unpaid" | "partly_paid" | "deposit_paid" | "paid" | "overpaid";
+    lastPaidOn: string | null;
+  }[];
+  payments: {
+    id: string;
+    order: { id: string; refNo: string };
+    kind: PaymentKind;
+    amount: string;
+    bankCharges: string;
+    currency: string;
+    paidOn: string;
+    method: PaymentMethod;
+    reference: string | null;
+    voided: boolean;
+    hasFile: boolean;
+  }[];
+}
