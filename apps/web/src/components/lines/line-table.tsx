@@ -30,6 +30,12 @@ import { FloatingMenu } from "@/components/common/floating";
 
 export type LineValues = Record<string, string>;
 
+/** The units offered in a unit column's dropdown; "Other…" lets people type any other. */
+export const UNITS = ["pcs", "sets", "units", "kg", "tons", "m", "m²", "m³", "rolls", "cartons", "boxes", "bags", "pairs", "litres", "drums", "lot"];
+const OTHER_UNIT = "__other__";
+/** Picked from a list (no typing into the cell). */
+const isChoice = (c: LineColumn) => c.input === "select" || c.input === "unit";
+
 /** One row as the table shows it, in display order (parts right after their line). */
 export interface LineRow {
   key: string;
@@ -46,11 +52,9 @@ export interface LineColumn {
   width: string;
   align?: "right";
   /** How it is typed: a growing text box (description), a number, a short text or a choice. Without `input` it is shown only. */
-  input?: "textarea" | "number" | "text" | "select";
+  input?: "textarea" | "number" | "text" | "select" | "unit";
   options?: { value: string; label: string }[];
   placeholder?: string;
-  /** <datalist> id for suggestions (units). */
-  list?: string;
   maxLength?: number;
   /** The value for a new row (unit "pcs", tax "13"). */
   initial?: string | ((parentKey: string | null) => string);
@@ -500,7 +504,7 @@ export function LineTable({
       open.current = null;
       setCell(null);
       requestAnimationFrame(() => gridRef.current?.focus({ preventScroll: true }));
-    } else if (col.input !== "textarea" && col.input !== "select" && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    } else if (col.input !== "textarea" && !isChoice(col) && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault();
       commit(e.key === "ArrowUp" ? "up" : "down");
     }
@@ -562,7 +566,7 @@ export function LineTable({
     } else if (k === "Enter" || k === "F2") {
       e.preventDefault();
       edit(sel.row, sel.col);
-    } else if ((k === "Delete" || k === "Backspace") && col.input && col.input !== "select") {
+    } else if ((k === "Delete" || k === "Backspace") && col.input && !isChoice(col)) {
       e.preventDefault();
       if (valueOf(row, col.key)) saveValue(row.key, col.key, "");
     } else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "c") {
@@ -570,7 +574,7 @@ export function LineTable({
       void navigator.clipboard?.writeText(valueOf(row, col.key));
     } else if (k === "Escape") {
       setSel(null);
-    } else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && col.input && col.input !== "select") {
+    } else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && col.input && !isChoice(col)) {
       // Typing on a selected cell replaces what it holds, like a spreadsheet.
       e.preventDefault();
       edit(sel.row, sel.col, k);
@@ -749,7 +753,7 @@ export function LineTable({
               value={entry[c.key] ?? ""}
               onChange={(v) => setEntry((s) => ({ ...s, [c.key]: v }))}
               onKeyDown={(e) => {
-                if (e.key === "ArrowUp" && c.input !== "textarea" && c.input !== "select") {
+                if (e.key === "ArrowUp" && c.input !== "textarea" && !isChoice(c)) {
                   const above = order[order.indexOf("entry") - 1];
                   if (above) {
                     e.preventDefault();
@@ -1021,7 +1025,8 @@ export function LineTable({
                             if (isEditing || (e.target as HTMLElement).closest("button,a,input,textarea,select")) return;
                             e.preventDefault();
                             if (cell) commit();
-                            if (isSel) edit(r.key, c.key);
+                            // A dropdown opens with one click, as in a sheet; other cells take a second click (or typing).
+                            if (isSel || (isChoice(c) && !readOnly)) edit(r.key, c.key);
                             else select(r.key, c.key);
                           }}
                           onDoubleClick={() => edit(r.key, c.key)}
@@ -1031,6 +1036,12 @@ export function LineTable({
                               col={c}
                               value={cell.value}
                               onChange={(v) => setCell((x) => x && { ...x, value: v })}
+                              onPick={(v) => {
+                                // A choice from a dropdown is saved at once, as in a sheet.
+                                setCell((x) => x && { ...x, value: v });
+                                commit();
+                              }}
+                              autoOpen
                               onKeyDown={(e) => cellKeyDown(e, c)}
                               onBlur={() => commit()}
                               inputRef={ref(cellId(r.key, c.key))}
@@ -1040,6 +1051,13 @@ export function LineTable({
                             <span className="block min-w-0">
                               <span className="line-clamp-3 whitespace-pre-line">{c.format ? c.format({ ...r.values, [c.key]: value }, r) : value}</span>
                               {r.badge}
+                            </span>
+                          ) : isChoice(c) && !readOnly ? (
+                            <span className="flex items-center justify-between gap-1">
+                              <span className="min-w-0 truncate">
+                                {c.format ? c.format(Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)])), r) : value || <span className="text-muted">—</span>}
+                              </span>
+                              <ChevronDown className="size-3.5 shrink-0 text-muted" aria-hidden />
                             </span>
                           ) : c.format ? (
                             c.format(Object.fromEntries(columns.map((x) => [x.key, valueOf(r, x.key)])), r)
@@ -1202,6 +1220,8 @@ function GridInput({
   col,
   value,
   onChange,
+  onPick,
+  autoOpen,
   onKeyDown,
   onPaste,
   onFocus,
@@ -1213,6 +1233,10 @@ function GridInput({
   col: LineColumn;
   value: string;
   onChange: (v: string) => void;
+  /** A choice made in a dropdown (saved cells save it at once); else onChange. */
+  onPick?: (v: string) => void;
+  /** Open the dropdown as soon as it shows (a saved cell clicked to change). */
+  autoOpen?: boolean;
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
   onPaste?: (e: ClipboardEvent<HTMLTextAreaElement | HTMLInputElement>) => void;
   onFocus?: () => void;
@@ -1242,6 +1266,22 @@ function GridInput({
         className={cn(cls, "min-h-9 resize-none py-2 leading-5 [field-sizing:content]")}
       />
     );
+  if (col.input === "unit")
+    return (
+      <UnitInput
+        value={value}
+        onChange={onChange}
+        onPick={onPick ?? onChange}
+        autoOpen={autoOpen}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        inputRef={inputRef}
+        label={label}
+        maxLength={col.maxLength}
+        className={cls}
+      />
+    );
   if (col.input === "select")
     return (
       <select ref={inputRef} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur} className={cn(cls, "pr-6")}>
@@ -1258,7 +1298,6 @@ function GridInput({
       aria-label={label}
       value={value}
       inputMode={col.input === "number" ? "decimal" : undefined}
-      list={col.list}
       maxLength={col.maxLength}
       placeholder={placeholder ?? col.placeholder ?? col.label}
       onChange={(e) => onChange(e.target.value)}
@@ -1268,6 +1307,106 @@ function GridInput({
       onBlur={onBlur}
       className={cls}
     />
+  );
+}
+
+/**
+ * The unit: a dropdown of the usual units. "Other…" turns it into a box to
+ * type any unit; a unit that is not in the list shows as its own choice.
+ */
+function UnitInput({
+  value,
+  onChange,
+  onPick,
+  autoOpen,
+  onKeyDown,
+  onFocus,
+  onBlur,
+  inputRef,
+  label,
+  maxLength,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onPick: (v: string) => void;
+  autoOpen?: boolean;
+  onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  inputRef: (el: HTMLElement | null) => void;
+  label: string;
+  maxLength?: number;
+  className: string;
+}) {
+  const [typing, setTyping] = useState(false);
+  const own = useRef<HTMLSelectElement | HTMLInputElement | null>(null);
+  const setRef = (el: HTMLSelectElement | HTMLInputElement | null) => {
+    own.current = el;
+    inputRef(el);
+  };
+  useEffect(() => {
+    const el = own.current;
+    if (typing && el instanceof HTMLInputElement) {
+      el.focus();
+      el.select();
+    } else if (autoOpen && el instanceof HTMLSelectElement) {
+      try {
+        el.showPicker();
+      } catch {
+        // Not every browser opens it from here; a click on it does.
+      }
+    }
+  }, [typing, autoOpen]);
+  if (typing)
+    return (
+      <input
+        ref={setRef}
+        aria-label={`${label} (type it)`}
+        value={value}
+        maxLength={maxLength ?? 20}
+        placeholder="Type a unit"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && !value.trim()) {
+            e.preventDefault();
+            setTyping(false);
+            return;
+          }
+          onKeyDown(e);
+        }}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        className={className}
+      />
+    );
+  const known = UNITS.includes(value);
+  return (
+    <select
+      ref={setRef}
+      aria-label={label}
+      value={value}
+      onChange={(e) => {
+        if (e.target.value === OTHER_UNIT) setTyping(true);
+        else onPick(e.target.value);
+      }}
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={(e) => {
+        // Switching to "Other…" is not leaving the cell.
+        if (e.target.value !== OTHER_UNIT && !typing) onBlur?.();
+      }}
+      className={cn(className, "cursor-pointer pr-5")}
+    >
+      {!value && <option value="">—</option>}
+      {!known && value && <option value={value}>{value}</option>}
+      {UNITS.map((u) => (
+        <option key={u} value={u}>
+          {u}
+        </option>
+      ))}
+      <option value={OTHER_UNIT}>Other…</option>
+    </select>
   );
 }
 

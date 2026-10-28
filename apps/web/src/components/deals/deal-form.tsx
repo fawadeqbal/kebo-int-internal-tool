@@ -26,7 +26,7 @@ const ITEM_COLUMNS: LineColumn[] = [
   { key: "description", label: "Description", width: "minmax(0,1fr)", input: "textarea", required: "Each item needs a description", placeholder: "What it is: size, material, standard…" },
   { key: "model", label: "Model / part no.", width: "8rem", input: "text", maxLength: 120, placeholder: "Model" },
   { key: "quantity", label: "Qty", width: "5rem", input: "number", align: "right", required: "Enter a quantity", placeholder: "Qty" },
-  { key: "unit", label: "Unit", width: "5rem", input: "text", list: "item-units", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
+  { key: "unit", label: "Unit", width: "5.5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
   { key: "targetPrice", label: "Target price", width: "6.5rem", input: "number", align: "right", placeholder: "Target", phoneHidden: true },
 ];
 
@@ -294,11 +294,6 @@ export function DealForm({
                   empty="No list: the requirement above is enough."
                   {...itemHandlers}
                 />
-                <datalist id="item-units">
-                  {["pcs", "sets", "kg", "tons", "m", "m²", "m³", "rolls", "cartons", "pairs", "litres"].map((u) => (
-                    <option key={u} value={u} />
-                  ))}
-                </datalist>
               </CardBody>
             </Card>
 

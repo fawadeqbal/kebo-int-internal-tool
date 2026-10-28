@@ -270,7 +270,7 @@ function Offer({
         ]
       : []),
     { key: "quantity", label: "Qty", width: "4.5rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
-    { key: "unit", label: "Unit", width: "4.5rem", input: "text", list: "line-units", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
+    { key: "unit", label: "Unit", width: "5.5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
     {
       key: "unitPrice",
       label: `Price ${q.currency}`,
@@ -447,11 +447,6 @@ function Offer({
           ) : undefined
         }
       />
-      <datalist id="line-units">
-        {["pcs", "sets", "kg", "tons", "m", "m²", "m³", "rolls", "cartons", "pairs", "litres", "lot"].map((u) => (
-          <option key={u} value={u} />
-        ))}
-      </datalist>
 
       <OfferFiles dealId={dealId} q={q} canEdit={canEdit} removeFile={lines.removeFile} />
     </article>
