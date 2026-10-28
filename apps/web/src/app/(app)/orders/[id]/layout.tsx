@@ -7,15 +7,16 @@ import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
 import { today } from "@/components/orders/today";
 import { orderProgress } from "@/components/orders/progress";
-import { OrderProgress } from "@/components/orders/order-progress";
+import { OrderStepper } from "@/components/orders/order-progress";
 import { OrderTabs, ScrolledBar, type OrderTabLink } from "@/components/orders/order-tabs";
 import { moveStageAction } from "../actions";
 import { StageActions } from "./forms";
 
 /**
- * Every tab of an order shares its top: who and what, the four stages with
- * their checkpoints, what is needed now with the button that does it, and the
- * money in four numbers. The tabs below hold the work itself.
+ * Every tab of an order shares a short top, so the tabs stay in view: who and
+ * what with the money beside it, then one box with the four stages on a line
+ * and what is needed now with its buttons. The checks of each stage are on the
+ * Overview tab; the tabs hold the work itself.
  */
 export default async function OrderLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -51,57 +52,45 @@ export default async function OrderLayout({ children, params }: { children: Reac
     { href: `${base}/history`, label: "History" },
   ];
 
+  const stageActions = canMove ? (
+    <StageActions key={o.stage} next={o.next} back={o.back} action={moveStageAction.bind(null, o.id)} today={now} readyOn={o.readyOn} shippedOn={o.shippedOn} blNo={o.blNo} />
+  ) : null;
+  // What is needed now, joined under the stages (red when late).
   const nowBar = o.needs ? (
-    <section
+    <div
       aria-label="What is needed now"
-      className={cn("flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-start sm:justify-between", late ? "border-bad/30 bg-bad-soft" : "border-primary/25 bg-primary-soft/40")}
+      role="group"
+      className={cn("flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between", late ? "border-bad/25 bg-bad-soft" : "border-primary/15 bg-primary-soft/50")}
     >
-      <p className={cn("flex items-start gap-2 text-sm", late && "text-bad")}>
+      <p className={cn("flex min-w-0 flex-1 items-start gap-2 text-sm", late && "text-bad")}>
         {late ? <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden /> : <ArrowRight className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />}
         <span>
-          <span className="font-medium">Now: {o.needs.title}</span>
-          <span className="block text-xs">{late ? `Late: was due ${date(o.needs.due)}` : `By ${date(o.needs.due)}`}</span>
+          <span className="font-semibold">Next: {o.needs.title}</span>{" "}
+          <span className={cn("text-sm", late ? "" : "text-text-2")}>{late ? `· late, was due ${date(o.needs.due)}` : `· by ${date(o.needs.due)}`}</span>
         </span>
       </p>
-      <div className="flex flex-wrap items-start gap-2">
+      <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
         {nowCheck?.action && (
           <Link href={nowCheck.tab ? `${base}/${nowCheck.tab}` : base} className={buttonClass("secondary", "sm")}>
             {nowCheck.action}
           </Link>
         )}
-        {canMove ? (
-          <StageActions
-            key={o.stage}
-            next={o.next}
-            back={o.back}
-            action={moveStageAction.bind(null, o.id)}
-            today={now}
-            readyOn={o.readyOn}
-            shippedOn={o.shippedOn}
-            blNo={o.blNo}
-          />
-        ) : (
-          open && o.next && <p className="text-xs text-muted">The person handling the deal moves this order on.</p>
-        )}
+        {stageActions ?? (open && o.next && <p className="text-xs text-muted">The person handling the deal moves this order on.</p>)}
       </div>
-    </section>
-  ) : canMove && o.next ? (
-    <section aria-label="What is needed now" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary-soft/40 p-3">
+    </div>
+  ) : stageActions && o.next ? (
+    <div aria-label="What is needed now" role="group" className="flex flex-wrap items-center justify-between gap-3 border-t border-primary/15 bg-primary-soft/50 px-4 py-3">
       <p className="text-sm font-medium">Ready for the next step.</p>
-      <StageActions key={o.stage} next={o.next} back={o.back} action={moveStageAction.bind(null, o.id)} today={now} readyOn={o.readyOn} shippedOn={o.shippedOn} blNo={o.blNo} />
-    </section>
+      {stageActions}
+    </div>
   ) : null;
 
   const numbers = [
     { label: "Order total", value: money(o.money.total, o.currency) },
     { label: "Received", value: money(o.money.received, o.currency) },
     { label: "Still due", value: money(o.money.due, o.currency), tone: due > 0.005 ? "text-warn" : "text-ok" },
-    {
-      label: o.shippedOn ? "Shipped" : "Ship by",
-      value: o.shippedOn ? date(o.shippedOn) : o.shipBy ? date(o.shipBy) : "Not set",
-      tone: !o.shippedOn && o.shipBy && o.shipBy < now ? "text-bad" : undefined,
-    },
   ];
+  const shipLate = !o.shippedOn && !!o.shipBy && o.shipBy < now;
 
   return (
     <div>
@@ -134,58 +123,72 @@ export default async function OrderLayout({ children, params }: { children: Reac
               <Link href={`/customers/${o.customer.id}`} className="font-medium text-text hover:underline">
                 {o.customer.name}
               </Link>{" "}
-              · deal{" "}
+              · {o.inquiry.title} ·{" "}
               <Link href={`/deals/${o.inquiry.id}`} className="hover:underline">
-                {o.inquiry.refNo}
-              </Link>{" "}
-              · {o.inquiry.title}
-              {o.inquiry.assignee && <> · handled by {o.inquiry.assignee.name}</>}
+                deal {o.inquiry.refNo}
+              </Link>
               {o.proforma && <> · PI {o.proforma.number}</>}
+              {o.inquiry.assignee && <> · handled by {o.inquiry.assignee.name}</>}
+              {" · "}
+              <span className={cn(shipLate && "font-medium text-bad")}>
+                {o.shippedOn ? `shipped ${date(o.shippedOn)}` : o.shipBy ? `ship by ${date(o.shipBy)}${shipLate ? " (late)" : ""}` : "ship date not set"}
+              </span>
             </>
           }
           actions={
-            <Link href={`${base}/documents`} className={buttonClass("secondary", "sm")}>
-              <FileText aria-hidden /> Documents
-            </Link>
+            <>
+              {/* The money beside the title on a wide screen; under it (three tiles) on smaller ones. */}
+              <dl className="hidden gap-6 xl:flex">
+                {numbers.map((n) => (
+                  <div key={n.label} className="min-w-0">
+                    <dt className="text-xs text-muted">{n.label}</dt>
+                    <dd className={cn("font-semibold whitespace-nowrap tabular", n.tone)}>{n.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <Link href={`${base}/documents`} className={buttonClass("secondary", "sm")}>
+                <FileText aria-hidden /> Documents
+              </Link>
+            </>
           }
-        />
-
-        <div className="flex flex-col gap-3">
-          {o.cancelled ? (
-            <div role="status" className="flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
-              <XCircle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
-              <div>
-                <p className="font-medium">Cancelled{o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.</p>
-                {o.cancelled.reason && <p className="mt-0.5 text-text-2">{o.cancelled.reason}</p>}
-                <p className="mt-1 text-muted">The deal can be reopened and quoted again. Money already received stays recorded here.</p>
-              </div>
-            </div>
-          ) : finished ? (
-            <details className="group rounded-xl border border-ok/30 bg-ok-soft">
-              <summary className="flex cursor-pointer list-none items-center gap-2 p-3 text-sm">
-                <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden />
-                <span className="font-medium">Done: paid in full and closed.</span>
-                <span className="ml-auto text-xs text-muted group-open:hidden">Show the steps</span>
-              </summary>
-              <div className="border-t border-ok/20 p-3">
-                <OrderProgress stages={stages} base={base} />
-              </div>
-            </details>
-          ) : (
-            <OrderProgress stages={stages} base={base} />
-          )}
-
-          {open && nowBar}
-
-          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {numbers.map((n) => (
-              <div key={n.label} className="min-w-0 rounded-lg border border-line bg-surface px-3 py-2">
-                <dt className="text-xs text-muted">{n.label}</dt>
-                <dd className={cn("truncate font-semibold tabular", n.tone)}>{n.value}</dd>
+        >
+          <dl className="mt-3 grid grid-cols-3 gap-2 sm:max-w-xl xl:hidden">
+            {numbers.map((n, i) => (
+              <div key={n.label} className="min-w-0 rounded-lg border border-line bg-surface px-2.5 py-1.5">
+                {/* The currency once, in the first label, so the amounts fit a phone. */}
+                <dt className="truncate text-xs text-muted">
+                  {i === 0 ? `Total (${o.currency})` : n.label}
+                </dt>
+                <dd className={cn("truncate text-sm font-semibold tabular", n.tone)}>{n.value.replace(/^[A-Z]{3}\s+/, "")}</dd>
               </div>
             ))}
           </dl>
-        </div>
+        </PageHeader>
+
+        {o.cancelled ? (
+          <div role="status" className="flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
+            <XCircle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
+            <div>
+              <p className="font-medium">Cancelled{o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.</p>
+              {o.cancelled.reason && <p className="mt-0.5 text-text-2">{o.cancelled.reason}</p>}
+              <p className="mt-1 text-muted">The deal can be reopened and quoted again. Money already received stays recorded here.</p>
+            </div>
+          </div>
+        ) : (
+          <section aria-label="Where the order is" className="overflow-hidden rounded-xl border border-line bg-surface">
+            <div className="px-4 py-3">
+              <OrderStepper stages={stages} />
+            </div>
+            {finished ? (
+              <p className="flex items-center gap-2 border-t border-ok/25 bg-ok-soft px-4 py-3 text-sm">
+                <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden />
+                <span className="font-medium">Done: paid in full and closed.</span>
+              </p>
+            ) : (
+              nowBar
+            )}
+          </section>
+        )}
       </ScrolledBar>
 
       <OrderTabs base={base} tabs={tabs} />

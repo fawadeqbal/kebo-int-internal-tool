@@ -5,11 +5,13 @@ import { can, INSTALMENT_STATUS_LABEL } from "@kebo/shared";
 import { Badge, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { orderMoneyOf, orderOf } from "@/lib/order-data";
+import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, dateTime, money, qty } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
+import { orderProgress } from "@/components/orders/progress";
+import { StageChecklist } from "@/components/orders/order-progress";
 import { NoteForm } from "../../deals/[id]/panels";
 import { detailsAction, orderNoteAction } from "../actions";
 import { DetailsForm } from "./forms";
@@ -23,12 +25,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 const more = "flex items-center gap-1 text-sm font-medium text-primary hover:underline";
 
-/** The order at a glance: its goods, the next payment, the notes, and its details. */
+/** The order at a glance: the checks of its step, its goods, the next payment, the notes, and its details. */
 export default async function OrderOverview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const [m, deal] = await Promise.all([orderMoneyOf(id), optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`))]);
+  const [m, p, deal] = await Promise.all([orderMoneyOf(id), orderPaymentsOf(id), optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`))]);
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const goods = goodsOf(o);
@@ -38,6 +40,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="flex min-w-0 flex-col gap-5">
+        {o.status !== "cancelled" && <StageChecklist stages={orderProgress(o, p, m.factories?.rows ?? null)} base={base} />}
         {goods.length > 0 && (
           <Card>
             <CardHeader
