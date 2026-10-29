@@ -123,6 +123,12 @@ export const EXPENSE_CATEGORIES = values(
   "office",
   "other",
 );
+/**
+ * Expenses that pay for the costs planned to reach the basis we sell on (to the
+ * port, sea freight, delivery, duties): on an order, they are part of its
+ * planned costs up to those, and only beyond them a cost of their own.
+ */
+export const BASIS_COST_CATEGORIES: readonly ExpenseCategory[] = ["freight", "inland_transport", "customs"];
 /** The company's running costs, the same every month whoever the customers are. */
 export const RUNNING_COST_CATEGORIES: readonly ExpenseCategory[] = ["rent", "salaries", "utilities", "office"];
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];

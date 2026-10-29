@@ -21,7 +21,7 @@ import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
 import type { BalanceTerms, Incoterm, InquiryStage } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
-import { nextReference, openCompany, toDbDate, type Prisma } from "../src";
+import { freezeOrderMoney, nextReference, openCompany, toDbDate, type Prisma } from "../src";
 import * as map from "./import-legacy/map";
 
 /* ---------------------------------------------------------------- arguments */
@@ -41,32 +41,272 @@ const SYSTEM_EMAIL = "website-form@system.local";
 /* ---------------------------------------------------------------- old rows */
 
 type Ts = Date;
-interface OldUser { id: string; name: string; email: string; password_hash: string; role: "admin" | "manager" | "staff"; is_active: boolean; last_login_at: Ts | null; failed_logins: number; locked_until: Ts | null; totp_secret: string | null; totp_enabled_at: Ts | null; totp_last_step: number | null; recovery_codes: unknown; created_at: Ts; updated_at: Ts }
-interface OldCustomer { id: string; company_name: string | null; contact_person: string; email: string | null; phone: string; address: string | null; tax_no: string | null; vat_exempt: boolean; notes: string | null; created_by: string | null; deleted_at: Ts | null; created_at: Ts; updated_at: Ts }
-interface OldQuery { id: string; ref_no: string; customer_id: string; source: map.LegacySource; title: string; category: string | null; specifications: string | null; priority: "low" | "normal" | "high" | "urgent"; required_by: ISODate | null; status: map.LegacyQueryStatus; status_reason: string | null; assigned_to: string | null; created_by: string; completed_at: Ts | null; deleted_at: Ts | null; created_at: Ts; updated_at: Ts }
-interface OldLine { id: string; description: string; model: string | null; quantity: string; unit: string; sort_order: number }
-interface OldQueryItem extends OldLine { query_id: string; chosen_offer_item_id: string | null }
-interface OldSupplier { id: string; name: string; contact_person: string | null; phone: string | null; wechat: string | null; email: string | null; address: string | null; default_vat_rate: string; prices_include_vat: boolean; bank_details: string | null; notes: string | null; created_by: string | null; deleted_at: Ts | null; created_at: Ts; updated_at: Ts }
-interface OldSupplierQuote { id: string; query_id: string; supplier_id: string; reference: string | null; quoted_on: ISODate; valid_until: ISODate | null; currency: string; prices_include_vat: boolean; price_basis: string | null; lead_time: string | null; payment_terms: string | null; notes: string | null; created_by: string; deleted_at: Ts | null; created_at: Ts; updated_at: Ts }
-interface OldSupplierQuoteItem extends OldLine { supplier_quote_id: string; query_item_id: string | null; unit_price: string; vat_rate: string }
-interface OldHistory { id: string; query_id: string; from_status: map.LegacyQueryStatus | null; to_status: map.LegacyQueryStatus; reason: string | null; changed_by: string; changed_at: Ts }
-interface OldAssignment { id: string; query_id: string; assigned_to: string | null; assigned_by: string; assigned_at: Ts }
-interface OldAttachment { id: string; query_id: string; file_name: string; mime_type: string; size: number; storage_key: string; uploaded_by: string; deleted_at: Ts | null; created_at: Ts }
-interface OldComment { id: string; query_id: string; body: string; author_id: string; created_at: Ts }
-interface OldQuotation { id: string; ref_no: string; query_id: string; version: number; currency: string; subtotal: string; discount: string; tax_rate: string; prices_include_vat: boolean; tax_amount: string; total: string; due_date: ISODate; submitted_at: ISODate | null; status: map.LegacyQuotationStatus; terms: string | null; notes: string | null; customer_snapshot: unknown; company_snapshot: unknown; created_by: string; deleted_at: Ts | null; created_at: Ts; updated_at: Ts }
-interface OldQuotationItem extends OldLine { quotation_id: string; query_item_id: string | null; hs_code: string | null; unit_price: string; line_total: string; supplier_quote_item_id: string | null; unit_cost: string | null; fx_rate: string | null }
-interface OldInvoice { id: string; invoice_no: string; quotation_id: string; query_id: string; customer_id: string; issue_date: ISODate; due_date: ISODate; currency: string; subtotal: string; discount: string; tax_rate: string; prices_include_vat: boolean; tax_amount: string; total: string; amount_paid: string; status: "unpaid" | "partially_paid" | "paid" | "cancelled"; cancel_reason: string | null; notes: string | null; customer_snapshot: unknown; company_snapshot: unknown; created_by: string; created_at: Ts; updated_at: Ts }
-interface OldInvoiceItem extends OldLine { invoice_id: string; quotation_item_id: string | null; hs_code: string | null; unit_price: string; line_total: string }
-interface OldPayment { id: string; invoice_id: string; amount: string; paid_at: ISODate; method: map.LegacyPaymentMethod; reference: string | null; recorded_by: string; created_at: Ts }
-interface OldPackingList { id: string; pl_no: string; invoice_id: string; query_id: string; pack_date: ISODate; incoterm: string | null; port_of_loading: string | null; port_of_discharge: string | null; final_destination: string | null; transport: string | null; container_no: string | null; seal_no: string | null; marks: string | null; notes: string | null; customer_snapshot: unknown; company_snapshot: unknown; created_by: string; deleted_at: Ts | null; created_at: Ts; updated_at: Ts }
-interface OldPackingItem extends OldLine { packing_list_id: string; invoice_item_id: string | null; hs_code: string | null; packages: number; package_type: string; net_weight: string; gross_weight: string; cbm: string }
-interface OldAudit { id: string; user_id: string | null; action: string; entity_type: string; entity_id: string | null; summary: string | null; old_values: unknown; new_values: unknown; created_at: Ts }
+interface OldUser {
+  id: string;
+  name: string;
+  email: string;
+  password_hash: string;
+  role: "admin" | "manager" | "staff";
+  is_active: boolean;
+  last_login_at: Ts | null;
+  failed_logins: number;
+  locked_until: Ts | null;
+  totp_secret: string | null;
+  totp_enabled_at: Ts | null;
+  totp_last_step: number | null;
+  recovery_codes: unknown;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldCustomer {
+  id: string;
+  company_name: string | null;
+  contact_person: string;
+  email: string | null;
+  phone: string;
+  address: string | null;
+  tax_no: string | null;
+  vat_exempt: boolean;
+  notes: string | null;
+  created_by: string | null;
+  deleted_at: Ts | null;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldQuery {
+  id: string;
+  ref_no: string;
+  customer_id: string;
+  source: map.LegacySource;
+  title: string;
+  category: string | null;
+  specifications: string | null;
+  priority: "low" | "normal" | "high" | "urgent";
+  required_by: ISODate | null;
+  status: map.LegacyQueryStatus;
+  status_reason: string | null;
+  assigned_to: string | null;
+  created_by: string;
+  completed_at: Ts | null;
+  deleted_at: Ts | null;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldLine {
+  id: string;
+  description: string;
+  model: string | null;
+  quantity: string;
+  unit: string;
+  sort_order: number;
+}
+interface OldQueryItem extends OldLine {
+  query_id: string;
+  chosen_offer_item_id: string | null;
+}
+interface OldSupplier {
+  id: string;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  wechat: string | null;
+  email: string | null;
+  address: string | null;
+  default_vat_rate: string;
+  prices_include_vat: boolean;
+  bank_details: string | null;
+  notes: string | null;
+  created_by: string | null;
+  deleted_at: Ts | null;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldSupplierQuote {
+  id: string;
+  query_id: string;
+  supplier_id: string;
+  reference: string | null;
+  quoted_on: ISODate;
+  valid_until: ISODate | null;
+  currency: string;
+  prices_include_vat: boolean;
+  price_basis: string | null;
+  lead_time: string | null;
+  payment_terms: string | null;
+  notes: string | null;
+  created_by: string;
+  deleted_at: Ts | null;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldSupplierQuoteItem extends OldLine {
+  supplier_quote_id: string;
+  query_item_id: string | null;
+  unit_price: string;
+  vat_rate: string;
+}
+interface OldHistory {
+  id: string;
+  query_id: string;
+  from_status: map.LegacyQueryStatus | null;
+  to_status: map.LegacyQueryStatus;
+  reason: string | null;
+  changed_by: string;
+  changed_at: Ts;
+}
+interface OldAssignment {
+  id: string;
+  query_id: string;
+  assigned_to: string | null;
+  assigned_by: string;
+  assigned_at: Ts;
+}
+interface OldAttachment {
+  id: string;
+  query_id: string;
+  file_name: string;
+  mime_type: string;
+  size: number;
+  storage_key: string;
+  uploaded_by: string;
+  deleted_at: Ts | null;
+  created_at: Ts;
+}
+interface OldComment {
+  id: string;
+  query_id: string;
+  body: string;
+  author_id: string;
+  created_at: Ts;
+}
+interface OldQuotation {
+  id: string;
+  ref_no: string;
+  query_id: string;
+  version: number;
+  currency: string;
+  subtotal: string;
+  discount: string;
+  tax_rate: string;
+  prices_include_vat: boolean;
+  tax_amount: string;
+  total: string;
+  due_date: ISODate;
+  submitted_at: ISODate | null;
+  status: map.LegacyQuotationStatus;
+  terms: string | null;
+  notes: string | null;
+  customer_snapshot: unknown;
+  company_snapshot: unknown;
+  created_by: string;
+  deleted_at: Ts | null;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldQuotationItem extends OldLine {
+  quotation_id: string;
+  query_item_id: string | null;
+  hs_code: string | null;
+  unit_price: string;
+  line_total: string;
+  supplier_quote_item_id: string | null;
+  unit_cost: string | null;
+  fx_rate: string | null;
+}
+interface OldInvoice {
+  id: string;
+  invoice_no: string;
+  quotation_id: string;
+  query_id: string;
+  customer_id: string;
+  issue_date: ISODate;
+  due_date: ISODate;
+  currency: string;
+  subtotal: string;
+  discount: string;
+  tax_rate: string;
+  prices_include_vat: boolean;
+  tax_amount: string;
+  total: string;
+  amount_paid: string;
+  status: "unpaid" | "partially_paid" | "paid" | "cancelled";
+  cancel_reason: string | null;
+  notes: string | null;
+  customer_snapshot: unknown;
+  company_snapshot: unknown;
+  created_by: string;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldInvoiceItem extends OldLine {
+  invoice_id: string;
+  quotation_item_id: string | null;
+  hs_code: string | null;
+  unit_price: string;
+  line_total: string;
+}
+interface OldPayment {
+  id: string;
+  invoice_id: string;
+  amount: string;
+  paid_at: ISODate;
+  method: map.LegacyPaymentMethod;
+  reference: string | null;
+  recorded_by: string;
+  created_at: Ts;
+}
+interface OldPackingList {
+  id: string;
+  pl_no: string;
+  invoice_id: string;
+  query_id: string;
+  pack_date: ISODate;
+  incoterm: string | null;
+  port_of_loading: string | null;
+  port_of_discharge: string | null;
+  final_destination: string | null;
+  transport: string | null;
+  container_no: string | null;
+  seal_no: string | null;
+  marks: string | null;
+  notes: string | null;
+  customer_snapshot: unknown;
+  company_snapshot: unknown;
+  created_by: string;
+  deleted_at: Ts | null;
+  created_at: Ts;
+  updated_at: Ts;
+}
+interface OldPackingItem extends OldLine {
+  packing_list_id: string;
+  invoice_item_id: string | null;
+  hs_code: string | null;
+  packages: number;
+  package_type: string;
+  net_weight: string;
+  gross_weight: string;
+  cbm: string;
+}
+interface OldAudit {
+  id: string;
+  user_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  summary: string | null;
+  old_values: unknown;
+  new_values: unknown;
+  created_at: Ts;
+}
 
 async function readLegacy(url: string) {
   // DATE columns as plain "YYYY-MM-DD" strings (no time zone shifts); NUMERIC stays a string.
   const client = new Client({
     connectionString: url,
-    types: { getTypeParser: ((oid: number, format?: "text" | "binary") => (oid === 1082 ? (v: string) => v : pgTypes.getTypeParser(oid, format))) as typeof pgTypes.getTypeParser },
+    types: {
+      getTypeParser: ((oid: number, format?: "text" | "binary") =>
+        oid === 1082 ? (v: string) => v : pgTypes.getTypeParser(oid, format)) as typeof pgTypes.getTypeParser,
+    },
   });
   await client.connect();
   try {
@@ -177,12 +417,17 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     })),
   });
   if (!(await tx.user.findFirst({ where: { email: SYSTEM_EMAIL } }))) {
-    await tx.user.create({ data: { email: SYSTEM_EMAIL, name: "Website form", role: "staff", isSystem: true, isActive: false, passwordHash: "!" } });
+    await tx.user.create({
+      data: { email: SYSTEM_EMAIL, name: "Website form", role: "staff", isSystem: true, isActive: false, passwordHash: "!" },
+    });
     report.judge("Added (not in the old data)", `system account ${SYSTEM_EMAIL} (records website inquiries; cannot sign in)`);
   }
   const withTotp = old.users.filter((u) => u.totp_enabled_at);
   if (withTotp.length)
-    report.judge("Two-step sign-in secrets copied as they are (the new API must use the old encryption key)", withTotp.map((u) => u.email).join(", "));
+    report.judge(
+      "Two-step sign-in secrets copied as they are (the new API must use the old encryption key)",
+      withTotp.map((u) => u.email).join(", "),
+    );
 
   /* ---- settings */
   for (const [key, value] of Object.entries(settings.values)) {
@@ -229,7 +474,10 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   });
   for (const c of old.customers) {
     const hint = map.countryHintFromPhone(c.phone);
-    report.judge(`Customers without a country (set to "${map.UNKNOWN_COUNTRY}", fill in)`, `${c.company_name?.trim() || c.contact_person} (${c.phone}${hint ? `, phone suggests ${hint}` : ""})`);
+    report.judge(
+      `Customers without a country (set to "${map.UNKNOWN_COUNTRY}", fill in)`,
+      `${c.company_name?.trim() || c.contact_person} (${c.phone}${hint ? `, phone suggests ${hint}` : ""})`,
+    );
   }
   const individuals = old.customers.filter((c) => !c.company_name?.trim());
   for (const c of individuals) report.judge("Customers with no company name → type individual, named after the contact", c.contact_person);
@@ -259,7 +507,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   const acceptedAudit = new Map<string, ISODate>();
   for (const a of old.auditLogs) {
     const nv = a.new_values as { status?: string } | null;
-    if (a.entity_type === "quotation" && a.action === "status_change" && nv?.status === "accepted" && a.entity_id) acceptedAudit.set(a.entity_id, dayOf(a.created_at));
+    if (a.entity_type === "quotation" && a.action === "status_change" && nv?.status === "accepted" && a.entity_id)
+      acceptedAudit.set(a.entity_id, dayOf(a.created_at));
   }
 
   interface Deal {
@@ -297,7 +546,9 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     const accepted = (versionsOf.get(q.id) ?? []).find((v) => ["accepted", "void"].includes(revisions.get(v.id)!.status)) ?? null;
 
     // Trade term: the old quotations had none; the packing list's "CIF Karachi" is the only record of it.
-    const pls = (versionsOf.get(q.id) ?? []).flatMap((v) => (invoicesOfQuotation.get(v.id) ?? []).flatMap((i) => packingByInvoice.get(i.id) ?? []));
+    const pls = (versionsOf.get(q.id) ?? []).flatMap((v) =>
+      (invoicesOfQuotation.get(v.id) ?? []).flatMap((i) => packingByInvoice.get(i.id) ?? []),
+    );
     let incoterm = { incoterm: "FOB" as Incoterm, place: null as string | null };
     const withTerm = pls.find((p) => p.incoterm?.trim());
     const parsed = map.parseIncoterm(withTerm?.incoterm);
@@ -321,7 +572,10 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     deals.set(q.id, { q, stage, revisions, accepted, orderedOn, incoterm });
   }
   if (incotermDefaulted)
-    report.judge("Trade terms", `${incotermDefaulted} quoted deals have no packing list to read a trade term from → FOB, no place (old quotations had no trade-term field); deals with a packing list take it from there (e.g. "CIF Karachi")`);
+    report.judge(
+      "Trade terms",
+      `${incotermDefaulted} quoted deals have no packing list to read a trade term from → FOB, no place (old quotations had no trade-term field); deals with a packing list take it from there (e.g. "CIF Karachi")`,
+    );
 
   /* ---- inquiries */
   const noCategory = old.queries.filter((q) => !q.category?.trim());
@@ -355,7 +609,15 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   });
 
   await tx.requestedItem.createMany({
-    data: old.queryItems.map((i) => ({ id: i.id, inquiryId: i.query_id, description: i.description, model: i.model, quantity: i.quantity, unit: i.unit, sortOrder: i.sort_order })),
+    data: old.queryItems.map((i) => ({
+      id: i.id,
+      inquiryId: i.query_id,
+      description: i.description,
+      model: i.model,
+      quantity: i.quantity,
+      unit: i.unit,
+      sortOrder: i.sort_order,
+    })),
   });
 
   /* ---- stage history */
@@ -378,12 +640,28 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         changedAt: h.changed_at,
       };
     });
-    if (!rows.length) rows.push({ id: randomUUID(), inquiryId: d.q.id, fromStage: null, toStage: "new", cause: "created", changedById: d.q.created_by, changedAt: d.q.created_at });
+    if (!rows.length)
+      rows.push({
+        id: randomUUID(),
+        inquiryId: d.q.id,
+        fromStage: null,
+        toStage: "new",
+        cause: "created",
+        changedById: d.q.created_by,
+        changedAt: d.q.created_at,
+      });
     const last = rows[rows.length - 1];
     if (last.toStage !== d.stage.stage) {
-      const firstSent = (versionsOf.get(d.q.id) ?? []).map((v) => v.submitted_at).filter((x): x is string => !!x).sort()[0];
+      const firstSent = (versionsOf.get(d.q.id) ?? [])
+        .map((v) => v.submitted_at)
+        .filter((x): x is string => !!x)
+        .sort()[0];
       const evidence: Date =
-        d.stage.stage === "won" && d.orderedOn ? toDbDate(d.orderedOn) : d.stage.stage === "quoted" && firstSent ? toDbDate(firstSent) : (d.q.completed_at ?? d.q.updated_at);
+        d.stage.stage === "won" && d.orderedOn
+          ? toDbDate(d.orderedOn)
+          : d.stage.stage === "quoted" && firstSent
+            ? toDbDate(firstSent)
+            : (d.q.completed_at ?? d.q.updated_at);
       rows.push({
         id: randomUUID(),
         inquiryId: d.q.id,
@@ -400,12 +678,24 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     stageRows.push(...rows);
   }
   await tx.inquiryStageChange.createMany({ data: stageRows });
-  if (synthetic) report.judge("Stage history", `${synthetic} inquiries got one extra stage change (cause "legacy_import") because their final stage differs from the last mapped old status (old processing → quoted/won, assigned pending → sourcing…)`);
+  if (synthetic)
+    report.judge(
+      "Stage history",
+      `${synthetic} inquiries got one extra stage change (cause "legacy_import") because their final stage differs from the last mapped old status (old processing → quoted/won, assigned pending → sourcing…)`,
+    );
 
   await tx.inquiryAssignment.createMany({
-    data: old.assignments.map((a) => ({ id: a.id, inquiryId: a.query_id, assigneeId: a.assigned_to, assignedById: a.assigned_by, assignedAt: a.assigned_at })),
+    data: old.assignments.map((a) => ({
+      id: a.id,
+      inquiryId: a.query_id,
+      assigneeId: a.assigned_to,
+      assignedById: a.assigned_by,
+      assignedAt: a.assigned_at,
+    })),
   });
-  await tx.inquiryNote.createMany({ data: old.comments.map((c) => ({ id: c.id, inquiryId: c.query_id, body: c.body, authorId: c.author_id, createdAt: c.created_at })) });
+  await tx.inquiryNote.createMany({
+    data: old.comments.map((c) => ({ id: c.id, inquiryId: c.query_id, body: c.body, authorId: c.author_id, createdAt: c.created_at })),
+  });
   await tx.attachment.createMany({
     data: old.attachments.map((a) => ({
       id: a.id,
@@ -452,7 +742,10 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       quantity: l.quantity,
       unit: l.unit,
       // Prices entered with tax are stored without it (same cost).
-      unitPrice: quoteIncludesVat.get(l.supplier_quote_id) && Number(l.vat_rate) > 0 ? (Math.round((Number(l.unit_price) / (1 + Number(l.vat_rate) / 100)) * 100) / 100).toFixed(2) : l.unit_price,
+      unitPrice:
+        quoteIncludesVat.get(l.supplier_quote_id) && Number(l.vat_rate) > 0
+          ? (Math.round((Number(l.unit_price) / (1 + Number(l.vat_rate) / 100)) * 100) / 100).toFixed(2)
+          : l.unit_price,
       // Tax on top of the item's price, as the old app had it per line.
       taxRate: Number(l.vat_rate) || 0,
       sortOrder: l.sort_order,
@@ -478,7 +771,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       const depositPercent = fromTerms ?? settings.values.sales.defaultDepositPercent;
       const balanceTerms: BalanceTerms = "before_shipment";
       revisionTerms.set(v.id, { depositPercent, balanceTerms });
-      const answered = v.status === "accepted" ? d.orderedOn : v.status === "rejected" || v.status === "expired" ? dayOf(v.updated_at) : null;
+      const answered =
+        v.status === "accepted" ? d.orderedOn : v.status === "rejected" || v.status === "expired" ? dayOf(v.updated_at) : null;
       revisionRows.push({
         id: v.id,
         quotationId: parentId,
@@ -524,11 +818,22 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       total: r.total,
     })),
   });
-  for (const v of old.quotations.filter((q) => Number(q.tax_amount) !== 0)) report.judge("Quotations with tax (sales carry no tax now; the total is kept)", `${v.ref_no} v${v.version}: tax ${v.tax_amount}`);
+  for (const v of old.quotations.filter((q) => Number(q.tax_amount) !== 0))
+    report.judge("Quotations with tax (sales carry no tax now; the total is kept)", `${v.ref_no} v${v.version}: tax ${v.tax_amount}`);
   if (depositDefaulted)
-    report.judge("Deposit %", `${depositDefaulted} quotation versions whose terms do not state an "N% advance/deposit" → ${settings.values.sales.defaultDepositPercent}%`);
-  report.judge("Payment terms", "old quotations had no balance-terms field → before_shipment on every revision and order (deposit % read from the terms text, e.g. \"30% advance\")");
-  for (const r of renumbered) report.judge("Later versions numbered under the first version's quotation (old number kept in the audit log)", `${r.ref} → ${r.parent} R${r.version}`);
+    report.judge(
+      "Deposit %",
+      `${depositDefaulted} quotation versions whose terms do not state an "N% advance/deposit" → ${settings.values.sales.defaultDepositPercent}%`,
+    );
+  report.judge(
+    "Payment terms",
+    'old quotations had no balance-terms field → before_shipment on every revision and order (deposit % read from the terms text, e.g. "30% advance")',
+  );
+  for (const r of renumbered)
+    report.judge(
+      "Later versions numbered under the first version's quotation (old number kept in the audit log)",
+      `${r.ref} → ${r.parent} R${r.version}`,
+    );
 
   const quoteLines = old.quotationItems;
   await tx.quoteLine.createMany({
@@ -551,7 +856,10 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     })),
   });
   const charges = quoteLines.filter((l) => map.lineType(l.description) === "charge").length;
-  report.judge("Line types", `${charges} of ${quoteLines.length} quotation lines → charge (first line matches the old isServiceLine words: freight, insurance, inspection…), the rest goods; invoice lines the same way`);
+  report.judge(
+    "Line types",
+    `${charges} of ${quoteLines.length} quotation lines → charge (first line matches the old isServiceLine words: freight, insurance, inspection…), the rest goods; invoice lines the same way`,
+  );
 
   /* ---- orders for accepted revisions */
   const linesOfQuotation = groupBy(quoteLines, (l) => l.quotation_id);
@@ -560,17 +868,26 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   const orderOfRevision = new Map<string, string>();
   const orderOfInquiry = new Map<string, { id: string; customerId: string; currency: string }>();
   const orderLineOfQuoteLine = new Map<string, string>();
-  const ordered = [...deals.values()].filter((d) => d.accepted).sort((a, b) => (a.orderedOn! < b.orderedOn! ? -1 : a.orderedOn! > b.orderedOn! ? 1 : a.q.ref_no < b.q.ref_no ? -1 : 1));
+  const ordered = [...deals.values()]
+    .filter((d) => d.accepted)
+    .sort((a, b) => (a.orderedOn! < b.orderedOn! ? -1 : a.orderedOn! > b.orderedOn! ? 1 : a.q.ref_no < b.q.ref_no ? -1 : 1));
   const statusCount = { open: 0, closed: 0, cancelled: 0 };
   for (const d of ordered) {
     const rev = d.accepted!;
     const terms = revisionTerms.get(rev.id)!;
     const invoices = (invoicesOfQuery.get(d.q.id) ?? []).filter((i) => i.status !== "cancelled");
-    const payments = (invoicesOfQuery.get(d.q.id) ?? []).flatMap((i) => (paymentsOfInvoice.get(i.id) ?? []).map((p) => ({ p, invoiceNo: i.invoice_no })));
+    const payments = (invoicesOfQuery.get(d.q.id) ?? []).flatMap((i) =>
+      (paymentsOfInvoice.get(i.id) ?? []).map((p) => ({ p, invoiceNo: i.invoice_no })),
+    );
     // Only packing lists of invoices that still stand count as goods that left.
     const shipments = invoices.flatMap((i) => packingByInvoice.get(i.id) ?? []);
     const totalMinor = toMinor(rev.total);
-    const paymentFacts = payments.map(({ p, invoiceNo }) => ({ ref: `${p.reference ?? "payment"} on ${invoiceNo}`, on: p.paid_at, by: p.recorded_by, amountMinor: toMinor(p.amount) }));
+    const paymentFacts = payments.map(({ p, invoiceNo }) => ({
+      ref: `${p.reference ?? "payment"} on ${invoiceNo}`,
+      on: p.paid_at,
+      by: p.recorded_by,
+      amountMinor: toMinor(p.amount),
+    }));
     const paidInFull = paymentFacts.reduce((sum, p) => sum + p.amountMinor, 0) >= totalMinor && totalMinor > 0;
     const status = map.orderStatusFor({ legacyStatus: d.q.status, paidInFull, shipped: shipments.length > 0 });
     const closedOn = d.q.completed_at ? dayOf(d.q.completed_at) : null;
@@ -624,7 +941,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         type: map.lineType(l.description),
         description: l.description,
         model: l.model,
-          quantity: l.quantity,
+        quantity: l.quantity,
         unit: l.unit,
         unitPrice: l.unit_price,
         lineTotal: l.line_total,
@@ -633,8 +950,16 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       };
     });
     await tx.orderLine.createMany({ data: lineRows });
+    await freezeOrderMoney(tx, [id]);
     await tx.orderStageChange.createMany({
-      data: staged.history.map((h, i) => ({ id: randomUUID(), orderId: id, fromStage: i === 0 ? null : staged.history[i - 1]!.to, toStage: h.to, note: h.note, at: toDbDate(h.on) })),
+      data: staged.history.map((h, i) => ({
+        id: randomUUID(),
+        orderId: id,
+        fromStage: i === 0 ? null : staged.history[i - 1]!.to,
+        toStage: h.to,
+        note: h.note,
+        at: toDbDate(h.on),
+      })),
     });
   }
   report.judge(
@@ -664,18 +989,43 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       continue;
     }
     const t = packed.get(lineId) ?? { packages: 0, packageType: null, net: 0, gross: 0, cbm: 0 };
-    packed.set(lineId, { packages: t.packages + Number(l.packages ?? 0), packageType: t.packageType ?? l.package_type, net: t.net + Number(l.net_weight ?? 0), gross: t.gross + Number(l.gross_weight ?? 0), cbm: t.cbm + Number(l.cbm ?? 0) });
+    packed.set(lineId, {
+      packages: t.packages + Number(l.packages ?? 0),
+      packageType: t.packageType ?? l.package_type,
+      net: t.net + Number(l.net_weight ?? 0),
+      gross: t.gross + Number(l.gross_weight ?? 0),
+      cbm: t.cbm + Number(l.cbm ?? 0),
+    });
   }
   for (const [lineId, t] of packed) {
-    await tx.orderLine.update({ where: { id: lineId }, data: { packages: t.packages, packageType: t.packageType ?? "Carton", netWeightKg: t.net.toFixed(2), grossWeightKg: t.gross.toFixed(2), cbm: t.cbm.toFixed(3) } });
+    await tx.orderLine.update({
+      where: { id: lineId },
+      data: {
+        packages: t.packages,
+        packageType: t.packageType ?? "Carton",
+        netWeightKg: t.net.toFixed(2),
+        grossWeightKg: t.gross.toFixed(2),
+        cbm: t.cbm.toFixed(3),
+      },
+    });
   }
   const plsOfOrder = groupBy(livePls, (p) => orderForInvoice(invoiceById.get(p.invoice_id)!));
   for (const [orderId, pls] of plsOfOrder) {
     const last = pls[pls.length - 1]!;
-    await tx.order.update({ where: { id: orderId }, data: { packedAt: pls[0]!.created_at, containerNo: last.container_no?.slice(0, 120) ?? null, shippingMarks: last.marks } });
+    await tx.order.update({
+      where: { id: orderId },
+      data: { packedAt: pls[0]!.created_at, containerNo: last.container_no?.slice(0, 120) ?? null, shippingMarks: last.marks },
+    });
   }
-  if (livePls.length) report.judge("Packing lists", `${livePls.length} packing lists → the packing list of their order (packages, weights and CBM added up per order line; container and marks from the latest)${unmatched ? `; ${unmatched} packing line(s) matched no order line and were left out` : ""}`);
-  report.judge("Invoices", "old invoices are not copied: their numbers stay in the old app's database (kept at the switch-over); what was paid comes in as payments, and the new documents are made from each order");
+  if (livePls.length)
+    report.judge(
+      "Packing lists",
+      `${livePls.length} packing lists → the packing list of their order (packages, weights and CBM added up per order line; container and marks from the latest)${unmatched ? `; ${unmatched} packing line(s) matched no order line and were left out` : ""}`,
+    );
+  report.judge(
+    "Invoices",
+    "old invoices are not copied: their numbers stay in the old app's database (kept at the switch-over); what was paid comes in as payments, and the new documents are made from each order",
+  );
 
   /* ---- payments in, per order: deposit first, then balance */
   const paymentsOfOrder = groupBy(
@@ -686,7 +1036,9 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   for (const [orderId, list] of paymentsOfOrder) {
     const o = [...orderOfInquiry.values()].find((x) => x.id === orderId)!;
     list
-      .sort((a, b) => (a.p.paid_at < b.p.paid_at ? -1 : a.p.paid_at > b.p.paid_at ? 1 : a.p.created_at.getTime() - b.p.created_at.getTime()))
+      .sort((a, b) =>
+        a.p.paid_at < b.p.paid_at ? -1 : a.p.paid_at > b.p.paid_at ? 1 : a.p.created_at.getTime() - b.p.created_at.getTime(),
+      )
       .forEach(({ p, inv }, i) =>
         paymentRows.push({
           id: p.id,
@@ -705,7 +1057,10 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       );
   }
   await tx.payment.createMany({ data: paymentRows });
-  report.judge("Payments", 'customer payments → payments "in" on the order, oldest first: the first is "deposit" (even when it paid everything), later ones "balance"; the invoice they were recorded against is kept in the note; bank charges 0');
+  report.judge(
+    "Payments",
+    'customer payments → payments "in" on the order, oldest first: the first is "deposit" (even when it paid everything), later ones "balance"; the invoice they were recorded against is kept in the note; bank charges 0',
+  );
 
   /* ---- audit log: copied as is, plus a record of the import */
   await tx.auditLog.createMany({
@@ -728,22 +1083,29 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     summary: `Imported from the old app's ${r.ref} (version ${r.version}); now ${r.parent} R${r.version}`,
     newValues: { legacyRefNo: r.ref },
   }));
-  importAudit.push({ action: "legacy_import", entityType: "system", summary: `Imported the old app's data: ${old.queries.length} inquiries, ${ordered.length} orders, ${old.invoices.length} invoices, ${old.payments.length} payments` });
+  importAudit.push({
+    action: "legacy_import",
+    entityType: "system",
+    summary: `Imported the old app's data: ${old.queries.length} inquiries, ${ordered.length} orders, ${old.invoices.length} invoices, ${old.payments.length} payments`,
+  });
   await tx.auditLog.createMany({ data: importAudit });
 
   /* ---- counters: new numbers continue after the imported ones */
   const legacyCounters = Object.fromEntries(old.counters.map((c) => [c.key, c.value]));
-  const counters = map.counterValues(
-    [...old.queries.map((q) => q.ref_no), ...old.quotations.map((q) => q.ref_no)],
-    legacyCounters,
-    ["inquiry", "quotation"],
-  );
+  const counters = map.counterValues([...old.queries.map((q) => q.ref_no), ...old.quotations.map((q) => q.ref_no)], legacyCounters, [
+    "inquiry",
+    "quotation",
+  ]);
   for (const [key, value] of counters) {
     await tx.counter.deleteMany({ where: { key } });
     await tx.counter.create({ data: { key, value } });
   }
   const unused = old.counters.filter((c) => !counters.has(c.key));
-  if (unused.length) report.judge("Old counters not carried over", unused.map((c) => `${c.key}=${c.value} (no new document uses that prefix: an order's documents take its number)`).join(", "));
+  if (unused.length)
+    report.judge(
+      "Old counters not carried over",
+      unused.map((c) => `${c.key}=${c.value} (no new document uses that prefix: an order's documents take its number)`).join(", "),
+    );
 
   /* ---- report: counts and totals */
   const c = {
@@ -779,7 +1141,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "customers → customers", old: old.customers.length, new: c.customers },
     { what: "customers → contacts (primary)", old: old.customers.length, new: c.contacts },
     { what: "suppliers → factories", old: old.suppliers.length, new: c.factories },
-    { what: "queries → inquiries", old: old.queries.length, new: `${c.inquiries} (${fmtGroup(stagesNew, (x: { stage: string }) => x.stage)})` },
+    {
+      what: "queries → inquiries",
+      old: old.queries.length,
+      new: `${c.inquiries} (${fmtGroup(stagesNew, (x: { stage: string }) => x.stage)})`,
+    },
     { what: "query_items → requested_items", old: old.queryItems.length, new: c.requestedItems },
     { what: "query_status_history → inquiry_stage_changes", old: old.history.length, new: c.stageChanges },
     { what: "query_assignments → inquiry_assignments", old: old.assignments.length, new: c.assignments },
@@ -788,9 +1154,17 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "supplier_quotes → factory_quotes", old: old.supplierQuotes.length, new: c.factoryQuotes },
     { what: "supplier_quote_items → factory_quote_lines", old: old.supplierQuoteItems.length, new: c.factoryQuoteLines },
     { what: "quotations → quotations (one per inquiry)", old: old.quotations.length, new: c.quotations },
-    { what: "quotations → quotation_revisions", old: old.quotations.length, new: `${c.revisions} (${fmtGroup(revStatuses, (x: { status: string }) => x.status)})` },
+    {
+      what: "quotations → quotation_revisions",
+      old: old.quotations.length,
+      new: `${c.revisions} (${fmtGroup(revStatuses, (x: { status: string }) => x.status)})`,
+    },
     { what: "quotation_items → quote_lines", old: old.quotationItems.length, new: c.quoteLines },
-    { what: "accepted quotations → orders", old: old.quotations.filter((q) => q.status === "accepted" && !q.deleted_at).length, new: c.orders },
+    {
+      what: "accepted quotations → orders",
+      old: old.quotations.filter((q) => q.status === "accepted" && !q.deleted_at).length,
+      new: c.orders,
+    },
     { what: "  → order_lines", old: "-", new: c.orderLines },
     { what: "  → order stage history", old: "-", new: `${c.orderStageChanges}` },
     { what: "payments → payments (in)", old: old.payments.length, new: c.payments },
@@ -809,7 +1183,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   const check = (what: string, oldMinor: number, newMinor: number) =>
     report.totals.push({ what, old: fromMinor(oldMinor), new: fromMinor(newMinor), ok: oldMinor === newMinor });
   check("payments", sumMinor(old.payments.map((p) => p.amount)), sumMinor(newPay.map((p) => p.amount)));
-  check("old invoices' amount_paid vs new payments", sumMinor(old.invoices.map((i) => i.amount_paid)), sumMinor(newPay.map((p) => p.amount)));
+  check(
+    "old invoices' amount_paid vs new payments",
+    sumMinor(old.invoices.map((i) => i.amount_paid)),
+    sumMinor(newPay.map((p) => p.amount)),
+  );
   check("quotation totals (all versions)", sumMinor(old.quotations.map((q) => q.total)), sumMinor(newRev.map((r) => r.total)));
   check("order totals vs accepted quotations", sumMinor(ordered.map((d) => d.accepted!.total)), sumMinor(newOrders.map((o) => o.total)));
 }
@@ -821,9 +1199,13 @@ class DryRunRollback extends Error {}
 async function main() {
   const { from, dryRun } = parseArgs(process.argv.slice(2));
   const target = process.env.DATABASE_URL;
-  if (!from) throw new Error("Usage: tsx scripts/import-legacy.ts --from <old DATABASE_URL> [--dry-run]   (the new database comes from DATABASE_URL)");
+  if (!from)
+    throw new Error(
+      "Usage: tsx scripts/import-legacy.ts --from <old DATABASE_URL> [--dry-run]   (the new database comes from DATABASE_URL)",
+    );
   if (!target) throw new Error("DATABASE_URL (the new database) is not set");
-  if (new URL(from).pathname === new URL(target).pathname && new URL(from).host === new URL(target).host) throw new Error("--from and DATABASE_URL point at the same database");
+  if (new URL(from).pathname === new URL(target).pathname && new URL(from).host === new URL(target).host)
+    throw new Error("--from and DATABASE_URL point at the same database");
 
   const log = (s: string) => console.log(s);
   log(`[import] reading the old database ${new URL(from).host}${new URL(from).pathname}`);
@@ -838,7 +1220,10 @@ async function main() {
     const inquiries = await prisma.inquiry.count();
     if (inquiries > 0) throw new Error(`The new database already has ${inquiries} inquiries: the import only runs into an empty database.`);
     const taken = await prisma.user.findMany({ where: { email: { in: old.users.map((u) => u.email) } }, select: { email: true } });
-    if (taken.length) throw new Error(`These users already exist in the new database: ${taken.map((u) => u.email).join(", ")}. Import into a freshly migrated database (do not run the seed first).`);
+    if (taken.length)
+      throw new Error(
+        `These users already exist in the new database: ${taken.map((u) => u.email).join(", ")}. Import into a freshly migrated database (do not run the seed first).`,
+      );
 
     log(`[import] writing to ${new URL(target).host}${new URL(target).pathname}${dryRun ? " (dry run: rolled back at the end)" : ""}`);
     try {

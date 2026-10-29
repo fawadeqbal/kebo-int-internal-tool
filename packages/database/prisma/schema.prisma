@@ -486,9 +486,10 @@ model Factory {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  quotes   FactoryQuote[]
-  payments FactoryPayment[]
-  expenses Expense[]
+  quotes     FactoryQuote[]
+  payments   FactoryPayment[]
+  expenses   Expense[]
+  orderLines OrderLine[]
 
   @@index([name])
   @@index([ownerId])
@@ -885,7 +886,7 @@ model QuoteLine {
   factoryQuoteLineId String?           @map("factory_quote_line_id") @db.Uuid
   factoryQuoteLine   FactoryQuoteLine? @relation(fields: [factoryQuoteLineId], references: [id], onDelete: SetNull)
   /// Factory currency units per quotation currency unit when the cost was converted.
-  fxRate             Decimal?          @map("fx_rate") @db.Decimal(14, 6)
+  fxRate             Decimal?          @map("fx_rate") @db.Decimal(24, 14)
   sortOrder          Int               @default(0) @map("sort_order")
 
   orderLines OrderLine[]
@@ -941,6 +942,11 @@ model Order {
   balanceTerms     BalanceTerms      @map("balance_terms")
   incoterm         Incoterm
   incotermPlace    String?           @map("incoterm_place") @db.VarChar(80)
+  /// The main currency when the order was made, and how many of the order's currency one unit of it bought
+  /// (USD order, USD main: 1; CNY order: 7.1). Revenue and costs are turned into the main currency at this rate,
+  /// so changing the rates in Settings never moves past months. Empty: not known (Settings is used).
+  mainCurrency     String?           @map("main_currency") @db.Char(3)
+  mainRate         Decimal?          @map("main_rate") @db.Decimal(24, 14)
   closedAt         DateTime?         @map("closed_at") @db.Timestamptz
   cancelledAt      DateTime?         @map("cancelled_at") @db.Timestamptz
   cancelReason     String?           @map("cancel_reason")
@@ -955,6 +961,7 @@ model Order {
   planItems    PaymentPlanItem[]
   factoryPaid  FactoryPayment[]
   expenses     Expense[]
+  costs        OrderCost[]
 
   @@unique([companyId, refNo])
   @@unique([companyId, proformaNo])
@@ -985,6 +992,14 @@ model OrderLine {
   unitCost    Decimal?   @map("unit_cost") @db.Decimal(14, 2)
   sortOrder   Int        @default(0) @map("sort_order")
 
+  /// The factory's price this line was bought at, frozen when the order was made: what we owe the
+  /// factory is worked out from these, so changing or removing the offer later never changes it.
+  factoryId        String?  @map("factory_id") @db.Uuid
+  factory          Factory? @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  factoryUnitPrice Decimal? @map("factory_unit_price") @db.Decimal(14, 2)
+  factoryTaxRate   Decimal? @map("factory_tax_rate") @db.Decimal(5, 2)
+  factoryCurrency  String?  @map("factory_currency") @db.Char(3)
+
   /// How many have come in from the factory so far (goods lines), and when last.
   receivedQty   Decimal   @default(0) @map("received_qty") @db.Decimal(12, 2)
   receivedOn    DateTime? @map("received_on") @db.Date
@@ -996,8 +1011,32 @@ model OrderLine {
   cbm           Decimal?  @db.Decimal(10, 3)
 
   @@index([orderId])
+  @@index([factoryId])
   @@index([companyId])
   @@map("order_lines")
+}
+
+/// A cost between the factory's price basis and the one we sold on (EXW → CFR: to the port, sea freight…),
+/// copied from the accepted option when the order was made: part of the order's cost.
+model OrderCost {
+  id        String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  company   Company   @relation(fields: [companyId], references: [id])
+  orderId   String    @map("order_id") @db.Uuid
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  step      BasisStep
+  /// As entered on the quotation, in its own currency.
+  amount    Decimal   @db.Decimal(14, 2)
+  currency  String    @db.Char(3)
+  /// In the order's currency, at the rate when the quotation was saved.
+  cost      Decimal   @db.Decimal(14, 2)
+  fxRate    Decimal?  @map("fx_rate") @db.Decimal(18, 8)
+  note      String?   @db.VarChar(200)
+
+  @@unique([orderId, step])
+  @@index([companyId])
+  @@map("order_costs")
 }
 
 /// One step of the order checklist (see @kebo/shared workflows/order).
@@ -1062,7 +1101,7 @@ model FactoryPayment {
   amount       Decimal       @db.Decimal(14, 2)
   currency     String        @db.Char(3)
   /// Units of `currency` per one unit of the order's currency when it was paid (CNY 7.10 per USD).
-  rate         Decimal       @db.Decimal(14, 6)
+  rate         Decimal       @db.Decimal(24, 14)
   paidOn       DateTime      @map("paid_on") @db.Date
   method       PaymentMethod @default(bank_transfer)
   /// Who in our team paid it.
@@ -1116,8 +1155,9 @@ model Expense {
   description  String        @db.VarChar(200)
   amount       Decimal       @db.Decimal(14, 2)
   currency     String        @db.Char(3)
-  /// Units of `currency` per one unit of the main currency when it was spent.
-  rate         Decimal       @db.Decimal(14, 6)
+  /// Units of `currency` per one unit of the main currency when it was spent (14 decimals, so a
+  /// PKR company's 1/280 for USD stays exact enough: USD 100,000 is PKR 28,000,000.00).
+  rate         Decimal       @db.Decimal(24, 14)
   spentOn      DateTime      @map("spent_on") @db.Date
   paidById     String?       @map("paid_by") @db.Uuid
   paidBy       User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
@@ -1399,6 +1439,7 @@ model Company {
   quotationRevisions  QuotationRevision[]
   quotationOptions    QuotationOption[]
   optionCosts         OptionCost[]
+  orderCosts          OrderCost[]
   quoteLines          QuoteLine[]
   orders              Order[]
   orderLines          OrderLine[]

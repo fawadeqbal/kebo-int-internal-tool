@@ -8,3 +8,4 @@ export { Prisma } from "./generated/prisma/client";
 export * from "./errors";
 export * from "./seed";
 export * from "./companies";
+export * from "./order-freeze";
