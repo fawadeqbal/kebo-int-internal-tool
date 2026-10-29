@@ -5,7 +5,7 @@ import { join } from "node:path";
  * Kebo's details (the first company), as on its documents: what `pnpm db:seed`
  * gives the company "kebo" on a new database, so development and the tests
  * look like Kebo's real documents. The live Kebo keeps its own in its settings
- * (migration 20261113090000_company_brand); every other company fills in its own.
+ * (migration 20261116090000_company_brand); every other company fills in its own.
  */
 export const KEBO_PROFILE = {
   name: "Shandong Kebo International Trade Co., Ltd.",
