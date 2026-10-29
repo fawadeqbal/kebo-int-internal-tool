@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/auth/totp";
 import { PrismaService } from "../src/database/prisma.service";
 import { LifecycleService } from "../src/platform/lifecycle.service";
+import { StorageService } from "../src/common/storage/storage.service";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { api, signIn, startApp } from "./app";
 
@@ -749,6 +750,53 @@ describe("companies: isolation and the platform", () => {
     ).toBe(0);
     // Its name stays taken for a while.
     expect((await request(app.getHttpServer()).get(`/api/platform/public/slug?slug=${demo.slug}`).expect(200)).body.free).toBe(false);
+    // A copy of everything was kept first.
+    const log = await prisma.platform.platformLog.findFirstOrThrow({ where: { companyId: demo.id, action: "delete" } });
+    const key = /a copy is kept at (\S+)\)/.exec(log.summary)?.[1];
+    expect(key, log.summary).toMatch(/^archives\//);
+    const chunks: Buffer[] = [];
+    for await (const chunk of await app.get(StorageService).get(key!)) chunks.push(chunk as Buffer);
+    const files = unzipSync(new Uint8Array(Buffer.concat(chunks)));
+    expect(JSON.parse(new TextDecoder().decode(files["data/inquiries.json"]))).toHaveLength(10);
+  });
+
+  it("the rules never delete a demo or trial that is paying, paid or set by hand", async () => {
+    const lifecycle = app.get(LifecycleService);
+    const long = new Date(Date.now() - 40 * 86_400_000);
+    const inFuture = new Date(Date.now() + 20 * 86_400_000);
+    const byHand = await makeCompany(`hand-${tag}`, { kind: "demo", sampleData: false });
+    const paidFor = await makeCompany(`paid-${tag}`, { kind: "demo", sampleData: false });
+    const renews = await makeCompany(`renew-${tag}`, { kind: "demo", sampleData: false });
+    // Payments are for clients: a demo is made real first.
+    const refused = await plat().post(`/companies/${paidFor.id}/payments`, {
+      amount: 10,
+      currency: "USD",
+      paidOn: "2026-01-01",
+      paidUntil: "2026-02-01",
+    });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/real company first/);
+    // As if paid before that rule, or set by hand.
+    await prisma.platform.subscriptionPayment.create({
+      data: {
+        companyId: paidFor.id,
+        amountMinor: 1000,
+        currency: "USD",
+        paidOn: new Date("2026-01-01"),
+        paidUntil: new Date("2026-02-01"),
+      },
+    });
+    await prisma.platform.company.update({ where: { id: byHand.id }, data: { endsAt: long, status: "off", statusManual: true } });
+    await prisma.platform.company.update({ where: { id: paidFor.id }, data: { endsAt: long, status: "off" } });
+    await prisma.platform.company.update({ where: { id: renews.id }, data: { endsAt: long, status: "read_only", renewsOn: inFuture } });
+    await lifecycle.run();
+    const now = await prisma.platform.company.findMany({ where: { id: { in: [byHand.id, paidFor.id, renews.id] } } });
+    expect(Object.fromEntries(now.map((c) => [c.slug, c.status]))).toEqual({
+      [byHand.slug]: "off",
+      [paidFor.slug]: "off",
+      [renews.slug]: "off",
+    });
+    expect(await prisma.company(paidFor.id).user.count()).toBeGreaterThan(0);
   });
 
   it("a demo becomes a real company, its sample data cleared; payments set paid-until; overdue clients go read-only", async () => {

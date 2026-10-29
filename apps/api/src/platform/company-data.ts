@@ -1,3 +1,7 @@
+import { createWriteStream } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Injectable, Logger } from "@nestjs/common";
 import type { Response } from "express";
 import { Zip, ZipDeflate, ZipPassThrough } from "fflate";
@@ -113,20 +117,43 @@ export class CompanyDataService {
     return { files: files.length };
   }
 
-  /** A zip of the company: every table as JSON (data/<table>.json) and every file (files/…). */
+  /** A zip of the company (see zip()), as a download. */
   async export(companyId: string, slug: string, res: Response) {
-    const order = await this.tables();
-    const files = await this.fileKeys(companyId);
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${slug}-export-${new Date().toISOString().slice(0, 10)}.zip"`);
-    const done = new Promise<void>((resolve, reject) => {
+    await this.zip(companyId, slug, (chunk) => void res.write(chunk));
+    res.end();
+  }
+
+  /**
+   * A zip of the company kept in storage (archives/…), made before its data is
+   * deleted, so a deletion can be undone by hand. Returns its storage key.
+   */
+  async archive(companyId: string, slug: string): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "kebo-archive-"));
+    const file = join(dir, "company.zip");
+    try {
+      const out = createWriteStream(file);
+      const failed = new Promise<never>((_, reject) => out.on("error", reject));
+      await Promise.race([this.zip(companyId, slug, (chunk) => void out.write(chunk)), failed]);
+      await new Promise<void>((resolve, reject) => out.end((e?: Error | null) => (e ? reject(e) : resolve())));
+      const key = `archives/${slug}-${companyId}-${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
+      await this.storage.putPlatformFile(key, file, "application/zip");
+      return key;
+    } finally {
+      await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  /** The company as a zip: every table as JSON (data/<table>.json) and every file (files/…). */
+  private async zip(companyId: string, slug: string, write: (chunk: Buffer) => void) {
+    const order = await this.tables();
+    const files = await this.fileKeys(companyId);
+    await new Promise<void>((resolve, reject) => {
       const zip = new Zip((err, chunk, final) => {
         if (err) return reject(err);
-        res.write(Buffer.from(chunk));
-        if (final) {
-          res.end();
-          resolve();
-        }
+        write(Buffer.from(chunk));
+        if (final) resolve();
       });
       (async () => {
         const enc = new TextEncoder();
@@ -164,7 +191,6 @@ export class CompanyDataService {
         zip.end();
       })().catch(reject);
     });
-    await done;
   }
 
   /** Every company's usage at once (the platform admin's list). */

@@ -15,7 +15,9 @@ const DAY = 86_400_000;
  * affects them): demos and trials end, become read-only, are switched off and
  * finally deleted; clients past their paid-until date get a warning, become
  * read-only, then are switched off (never deleted). Emails go to the company's
- * contact and the platform admins. Each step is in the platform log.
+ * contact and the platform admins. Each step is in the platform log. Before a
+ * company is deleted, a copy of all its data and files is kept in storage
+ * (archives/…).
  */
 @Injectable()
 export class LifecycleService {
@@ -30,7 +32,10 @@ export class LifecycleService {
   ) {}
 
   async run() {
-    const all = await this.prisma.platform.company.findMany({ where: { status: { not: "deleted" } } });
+    const all = await this.prisma.platform.company.findMany({
+      where: { status: { not: "deleted" } },
+      include: { _count: { select: { subscriptionPayments: true } } },
+    });
     for (const c of all) await this.apply(c).catch((e) => this.log.error(`rules for ${c.slug} failed: ${(e as Error).stack ?? e}`));
     // Deleted companies' short names are free again after the hold.
     const held = new Date(Date.now() - LIFECYCLE.nameHoldDays * DAY);
@@ -45,11 +50,14 @@ export class LifecycleService {
   }
 
   async applyOne(id: string) {
-    const c = await this.prisma.platform.company.findUnique({ where: { id } });
+    const c = await this.prisma.platform.company.findUnique({
+      where: { id },
+      include: { _count: { select: { subscriptionPayments: true } } },
+    });
     if (c && c.status !== "deleted") await this.apply(c);
   }
 
-  private async apply(c: CompanyModel) {
+  private async apply(c: CompanyModel & { _count: { subscriptionPayments: number } }) {
     const now = new Date();
     const step = lifecycleStep(
       {
@@ -59,6 +67,7 @@ export class LifecycleService {
         endsAt: c.endsAt,
         renewsOn: fromDbDateOrNull(c.renewsOn),
         endingNoticeFor: c.endingNoticeFor,
+        hasPayments: c._count.subscriptionPayments > 0,
       },
       now,
       todayIn(this.env.APP_TIME_ZONE, now),
@@ -101,9 +110,14 @@ export class LifecycleService {
     }
 
     if (step.do === "delete") {
+      // A copy of everything first, kept in storage; if it cannot be made, nothing is deleted.
+      const archive = await this.data.archive(c.id, c.slug);
       const { files } = await this.data.clear(c.id, true);
       await db.company.update({ where: { id: c.id }, data: { status: "deleted", statusReason: step.reason, deletedAt: now } });
-      await note("delete", `${c.name} (${c.slug}) deleted by the rules: ${step.reason} (${files} file(s) removed)`);
+      await note(
+        "delete",
+        `${c.name} (${c.slug}) deleted by the rules: ${step.reason} (${files} file(s) removed; a copy is kept at ${archive})`,
+      );
       this.companies.forget(c.id);
       return;
     }

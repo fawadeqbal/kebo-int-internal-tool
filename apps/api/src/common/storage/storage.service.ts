@@ -1,9 +1,16 @@
 import { Global, Injectable, Module } from "@nestjs/common";
 import { createReadStream } from "node:fs";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { z } from "zod";
 import { loadEnv, envField } from "@kebo/config";
 import { CompanyContext } from "../company/company-context";
@@ -28,6 +35,8 @@ const storageEnv = z.object({
 
 interface Driver {
   put(key: string, data: Buffer, contentType: string): Promise<void>;
+  /** A file on this server's disk, streamed (big archives are never held in memory). */
+  putFile(key: string, file: string, contentType: string): Promise<void>;
   get(key: string): Promise<Readable>;
   delete(key: string): Promise<void>;
 }
@@ -44,6 +53,11 @@ class LocalDisk implements Driver {
     await mkdir(path.dirname(full), { recursive: true });
     await writeFile(full, data);
   }
+  async putFile(key: string, file: string) {
+    const full = this.resolve(key);
+    await mkdir(path.dirname(full), { recursive: true });
+    await copyFile(file, full);
+  }
   async get(key: string) {
     const full = this.resolve(key);
     await stat(full);
@@ -57,8 +71,16 @@ class LocalDisk implements Driver {
 class S3 implements Driver {
   private readonly client: S3Client;
   private ready: Promise<void> | null = null;
-  constructor(private readonly bucket: string, opts: { endpoint?: string; region: string; accessKeyId: string; secretAccessKey: string; forcePathStyle: boolean }) {
-    this.client = new S3Client({ endpoint: opts.endpoint || undefined, region: opts.region, forcePathStyle: opts.forcePathStyle, credentials: { accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey } });
+  constructor(
+    private readonly bucket: string,
+    opts: { endpoint?: string; region: string; accessKeyId: string; secretAccessKey: string; forcePathStyle: boolean },
+  ) {
+    this.client = new S3Client({
+      endpoint: opts.endpoint || undefined,
+      region: opts.region,
+      forcePathStyle: opts.forcePathStyle,
+      credentials: { accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey },
+    });
   }
   /** Create the bucket on first use. */
   private ensure() {
@@ -78,7 +100,16 @@ class S3 implements Driver {
   }
   async put(key: string, data: Buffer, contentType: string) {
     await this.ensure();
-    await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data, ContentType: contentType || "application/octet-stream" }));
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: data, ContentType: contentType || "application/octet-stream" }),
+    );
+  }
+  async putFile(key: string, file: string, contentType: string) {
+    await this.ensure();
+    const { size } = await stat(file);
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: createReadStream(file), ContentLength: size, ContentType: contentType }),
+    );
   }
   async get(key: string) {
     await this.ensure();
@@ -94,10 +125,34 @@ class S3 implements Driver {
 
 /** Documents, images, spreadsheets, CAD drawings and archives. */
 export const ALLOWED_EXTENSIONS = new Set([
-  "pdf", "doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx", "txt", "rtf",
-  "png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff",
-  "dwg", "dxf", "step", "stp", "iges", "igs", "stl",
-  "zip", "rar", "7z",
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "csv",
+  "ppt",
+  "pptx",
+  "txt",
+  "rtf",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "bmp",
+  "tif",
+  "tiff",
+  "dwg",
+  "dxf",
+  "step",
+  "stp",
+  "iges",
+  "igs",
+  "stl",
+  "zip",
+  "rar",
+  "7z",
 ]);
 
 export const safeFileName = (name: string) => name.replace(/[^\w.\- ()]+/g, "_").slice(0, 200) || "file";
@@ -111,8 +166,15 @@ export class StorageService {
     const env = loadEnv(storageEnv);
     const driver = env.STORAGE_DRIVER ?? (env.S3_BUCKET ? "s3" : "local");
     if (driver === "s3") {
-      if (!env.S3_BUCKET || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) throw new Error("S3_BUCKET, S3_ACCESS_KEY and S3_SECRET_KEY are required when STORAGE_DRIVER=s3");
-      this.driver = new S3(env.S3_BUCKET, { endpoint: env.S3_ENDPOINT, region: env.S3_REGION, accessKeyId: env.S3_ACCESS_KEY, secretAccessKey: env.S3_SECRET_KEY, forcePathStyle: env.S3_FORCE_PATH_STYLE });
+      if (!env.S3_BUCKET || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY)
+        throw new Error("S3_BUCKET, S3_ACCESS_KEY and S3_SECRET_KEY are required when STORAGE_DRIVER=s3");
+      this.driver = new S3(env.S3_BUCKET, {
+        endpoint: env.S3_ENDPOINT,
+        region: env.S3_REGION,
+        accessKeyId: env.S3_ACCESS_KEY,
+        secretAccessKey: env.S3_SECRET_KEY,
+        forcePathStyle: env.S3_FORCE_PATH_STYLE,
+      });
     } else {
       this.driver = new LocalDisk(env.UPLOAD_DIR);
     }
@@ -132,6 +194,10 @@ export class StorageService {
   async put(key: string, data: Buffer, contentType: string) {
     await this.limits.checkStorage(data.length);
     return this.driver.put(key, data, contentType);
+  }
+  /** The platform's own files (company archives): no company, no plan limit. */
+  putPlatformFile(key: string, file: string, contentType: string) {
+    return this.driver.putFile(key, file, contentType);
   }
   get(key: string) {
     return this.driver.get(key);
