@@ -17,7 +17,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   // At a company's own address: its name over the form.
   const slug = await addressCompany();
   const res = slug ? await apiFetch(`/platform/public/company?slug=${encodeURIComponent(slug)}`, { auth: false }).catch(() => null) : null;
-  const company = res?.ok ? ((await res.json()) as { name: string }).name : null;
+  // Its name only while it is switched on.
+  const company = res?.ok ? ((await res.json()) as { name: string | null }).name : null;
   return (
     <AuthShell subtitle={company ?? undefined}>
       {moved && (

@@ -91,7 +91,10 @@ export class LimitsService {
   /** Refuse when the company's plan does not include the feature. */
   async require(feature: PlanFeature, company?: CompanyInfo) {
     if (!(await this.allows(feature, company))) {
-      throw new ForbiddenError(`Your plan does not include ${planFeatureName(feature).toLowerCase()}. Ask the platform admin to switch it on.`, "plan_feature");
+      throw new ForbiddenError(
+        `Your plan does not include ${planFeatureName(feature).toLowerCase()}. Ask the platform admin to switch it on.`,
+        "plan_feature",
+      );
     }
   }
 

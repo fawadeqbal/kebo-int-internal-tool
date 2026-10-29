@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Inject, Module, Put, Query } from "@nestjs/common";
+import { randomBytes } from "node:crypto";
+import { Body, Controller, Get, HttpCode, Inject, Module, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { fromDbDateOrNull } from "@kebo/database";
@@ -60,7 +61,11 @@ class CompanyController {
       /** Not before this (the last change is recent). */
       nextChangeOn: next,
       check: slug
-        ? { slug, url: companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL), problem: slug === c.slug ? "This is the address now." : await this.companies.slugTaken(slug, c.id) }
+        ? {
+            slug,
+            url: companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL),
+            problem: slug === c.slug ? "This is the address now." : await this.companies.slugTaken(slug, c.id),
+          }
         : null,
     };
   }
@@ -74,7 +79,9 @@ class CompanyController {
     if (body.slug === c.slug) throw new DomainError("This is the address now.");
     const next = await this.nextChange(c.id);
     if (next && !user.viaPlatform) {
-      throw new DomainError(`The address was changed recently. It can change again on ${next.toISOString().slice(0, 10)}, or ask us to change it.`);
+      throw new DomainError(
+        `The address was changed recently. It can change again on ${next.toISOString().slice(0, 10)}, or ask us to change it.`,
+      );
     }
     const taken = await this.companies.slugTaken(body.slug, c.id);
     if (taken) throw new ConflictError(taken);
@@ -89,9 +96,50 @@ class CompanyController {
       }),
     );
     await this.prisma.platform.platformLog.create({
-      data: { action: "update", adminName: `${user.name} (${c.name})`, summary: `${c.name} changed its address from ${c.slug} to ${body.slug}`, companyId: c.id },
+      data: {
+        action: "update",
+        adminName: `${user.name} (${c.name})`,
+        summary: `${c.name} changed its address from ${c.slug} to ${body.slug}`,
+        companyId: c.id,
+      },
     });
     return { slug: body.slug, url: companyOrigin(body.slug, this.env.BASE_DOMAIN, this.env.APP_URL) };
+  }
+
+  /* ---------------------------------------------------------------- website form */
+
+  /** The company's website form: its key and the snippet to paste (Super Admin). */
+  @Get("website-form")
+  @RequirePermissions("settings.manage")
+  async websiteForm(@CurrentUser() user: SessionUser) {
+    const c = CompanyContext.require();
+    if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can see the website form's key.");
+    const row = await this.prisma.platform.company.findUniqueOrThrow({ where: { id: c.id }, select: { formKey: true } });
+    return { key: row.formKey, endpoint: `${this.apiOrigin()}/api/public/inquiries`, allowed: await this.limits.allows("website_form", c) };
+  }
+
+  /** A new key: the old one stops working at once (paste the new snippet). */
+  @Post("website-form/new-key")
+  @HttpCode(200)
+  @RequirePermissions("settings.manage")
+  async newFormKey(@CurrentUser() user: SessionUser) {
+    const c = CompanyContext.require();
+    if (!(await this.mayChange(user))) throw new ForbiddenError("Only a Super Admin can change the website form's key.");
+    await this.prisma.platform.company.update({ where: { id: c.id }, data: { formKey: randomBytes(24).toString("hex") } });
+    await this.prisma.tx((tx) =>
+      this.audit.record(tx, {
+        userId: user.id,
+        action: "update",
+        entityType: "settings",
+        summary: "Made a new key for the website form (the old one stopped working)",
+      }),
+    );
+    return this.websiteForm(user);
+  }
+
+  /** Where the API is reached from outside: the company's own address (or the one shared address). */
+  private apiOrigin() {
+    return companyOrigin(CompanyContext.require().slug, this.env.BASE_DOMAIN, this.env.APP_URL);
   }
 
   @AllowDuringTwoStepSetup()

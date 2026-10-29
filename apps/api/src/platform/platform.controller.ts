@@ -42,6 +42,7 @@ import { CompanyDataService } from "./company-data";
 import { LeadsService } from "./leads.service";
 import { PlansService } from "./plans.service";
 import { SiteService } from "./site.service";
+import { RateLimiter } from "../common/http/rate-limit";
 import {
   CurrentAdmin,
   PlatformAuthService,
@@ -66,11 +67,15 @@ const deleteInput = z.object({
   reason: z.string().trim().max(200).nullish(),
 });
 const tokenInput = z.object({ token: z.string().min(10).max(2000) });
+/** Page views counted per address and minute (POST /platform/public/visit). */
+const VISITS_PER_MINUTE = Number(process.env.SITE_VISITS_PER_MINUTE) || 30;
 
 /** Public pages of the platform: request a demo, sign up, confirm, set a password from a link. */
 @ApiTags("platform")
 @Controller("platform/public")
 export class PlatformPublicController {
+  private readonly visits = new RateLimiter();
+
   constructor(
     private readonly leads: LeadsService,
     private readonly platform: PlatformCompaniesService,
@@ -94,7 +99,10 @@ export class PlatformPublicController {
   @Post("visit")
   @HttpCode(200)
   visit(@Body(Validate(siteVisitInput)) body: z.infer<typeof siteVisitInput>, @Req() req: Request) {
-    return this.site.visit({ ip: clientIp(req), userAgent: body.userAgent, origin: body.origin });
+    const ip = clientIp(req);
+    // The web server sends a view per page load; more than this from one address is not people reading.
+    this.visits.check(`visit:${ip}`, VISITS_PER_MINUTE, 60_000, "Too many requests. Please try again a little later.");
+    return this.site.visit({ ip, userAgent: body.userAgent, origin: body.origin });
   }
 
   /** "Questions?" on the marketing page. */
@@ -159,18 +167,27 @@ export class PlatformPublicController {
   async domainCheck(@Query("domain") domain = "", @Res({ passthrough: true }) res: Response) {
     const base = this.env.BASE_DOMAIN;
     const a = base ? addressOf(domain, base) : { kind: "other" as const };
-    const ok = a.kind === "root" || a.kind === "admin" || a.kind === "marketing" || (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
+    const ok =
+      a.kind === "root" ||
+      a.kind === "admin" ||
+      a.kind === "marketing" ||
+      (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
     res.status(ok ? 200 : 404);
     return { ok };
   }
 
-  /** The company at an address (the web app's check before showing a company's pages). */
+  /**
+   * The company at an address: only what the web app needs before showing its
+   * pages. Its current short name (a renamed company's old address sends people
+   * on), and its name for the sign-in page while it is switched on. Never its
+   * status, plan or anything else.
+   */
   @Public()
   @Get("company")
   async company(@Query("slug") slug = "") {
     const c = await this.companies.bySlug(slug);
     if (!c) throw new NotFoundError("Company");
-    return { slug: c.slug, name: c.name, status: c.status };
+    return { exists: true, slug: c.slug, name: c.status === "active" ? c.name : null };
   }
 
   @Public()

@@ -174,7 +174,7 @@ enum PaymentMethod {
 model Role {
   key            String   @db.VarChar(40)
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId      String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId      String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company        Company  @relation(fields: [companyId], references: [id])
   name           String   @db.VarChar(60)
   description    String?  @db.VarChar(300)
@@ -196,7 +196,7 @@ model Role {
 model User {
   id              String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId       String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId       String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company         Company   @relation(fields: [companyId], references: [id])
   /// Set on the hidden account a platform admin works through when they open this company.
   platformAdminId String?   @map("platform_admin_id") @db.Uuid
@@ -234,6 +234,24 @@ model User {
 
   reminderStates ReminderState[]
 
+  /// What they made or did (kept when they are switched off; people are not deleted).
+  relCustomerCreator        Customer[]           @relation("CustomerCreator")
+  relFactoryCreator         Factory[]            @relation("FactoryCreator")
+  relInquiryStageChanger    InquiryStageChange[] @relation("InquiryStageChanger")
+  relAssignmentAssignee     InquiryAssignment[]  @relation("AssignmentAssignee")
+  relAssignmentAssigner     InquiryAssignment[]  @relation("AssignmentAssigner")
+  relNoteAuthor             InquiryNote[]        @relation("NoteAuthor")
+  relAttachmentUploader     Attachment[]         @relation("AttachmentUploader")
+  relFactoryQuoteCreator    FactoryQuote[]       @relation("FactoryQuoteCreator")
+  relRevisionCreator        QuotationRevision[]  @relation("RevisionCreator")
+  relOrderCreator           Order[]              @relation("OrderCreator")
+  relFactoryPaymentRecorder FactoryPayment[]     @relation("FactoryPaymentRecorder")
+  relExpenseRecorder        Expense[]            @relation("ExpenseRecorder")
+  relPaymentRecorder        Payment[]            @relation("PaymentRecorder")
+  relTransferRecorder       MoneyTransfer[]      @relation("TransferRecorder")
+  relTargetUpdater          SalesTarget[]        @relation("TargetUpdater")
+  relAuditUser              AuditLog[]           @relation("AuditUser")
+
   @@unique([companyId, email])
   @@map("users")
 }
@@ -242,7 +260,7 @@ model User {
 model Session {
   id             String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId      String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId      String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company        Company   @relation(fields: [companyId], references: [id])
   userId         String    @map("user_id") @db.Uuid
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -266,7 +284,7 @@ model Session {
 model SignIn {
   id        String       @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String       @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String       @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company      @relation(fields: [companyId], references: [id])
   /// Null when the email is not anyone's.
   userId    String?      @map("user_id") @db.Uuid
@@ -289,17 +307,19 @@ model SignIn {
 model DeviceToken {
   id         String   @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId  String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId  String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company  @relation(fields: [companyId], references: [id])
   userId     String   @map("user_id") @db.Uuid
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionId  String?  @map("session_id") @db.Uuid
   session    Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  token      String   @unique
+  /// One row per phone per company (the same phone may be signed in to two companies).
+  token      String
   platform   String   @default("android") @db.VarChar(20)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
   lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
 
+  @@unique([companyId, token])
   @@index([userId])
   @@index([companyId])
   @@map("device_tokens")
@@ -308,7 +328,7 @@ model DeviceToken {
 model Notification {
   id        String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company   @relation(fields: [companyId], references: [id])
   userId    String    @map("user_id") @db.Uuid
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -331,9 +351,10 @@ model Notification {
 model AuditLog {
   id         String   @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId  String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId  String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company  @relation(fields: [companyId], references: [id])
   userId     String?  @map("user_id") @db.Uuid
+  user       User?    @relation("AuditUser", fields: [userId], references: [id], onDelete: SetNull)
   action     String   @db.VarChar(60)
   entityType String   @map("entity_type") @db.VarChar(60)
   entityId   String?  @map("entity_id") @db.Uuid
@@ -354,7 +375,7 @@ model AuditLog {
 model Setting {
   key       String   @db.VarChar(100)
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company  @relation(fields: [companyId], references: [id])
   value     Json
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -367,7 +388,7 @@ model Setting {
 model Counter {
   key       String  @db.VarChar(50)
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String  @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String  @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company @relation(fields: [companyId], references: [id])
   value     Int     @default(0)
 
@@ -382,7 +403,7 @@ model Counter {
 model Customer {
   id              String       @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId       String       @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId       String       @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company         Company      @relation(fields: [companyId], references: [id])
   type            CustomerType @default(company)
   name            String       @db.VarChar(200)
@@ -398,6 +419,7 @@ model Customer {
   initials        String?      @db.VarChar(6)
   notes           String?
   createdById     String?      @map("created_by") @db.Uuid
+  createdBy       User?        @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
   deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
@@ -417,7 +439,7 @@ model Customer {
 model Contact {
   id         String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId  String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId  String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company   @relation(fields: [companyId], references: [id])
   customerId String    @map("customer_id") @db.Uuid
   customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -445,7 +467,7 @@ model Contact {
 model Factory {
   id            String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId     String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId     String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company       Company   @relation(fields: [companyId], references: [id])
   name          String    @db.VarChar(200)
   contactPerson String?   @map("contact_person") @db.VarChar(120)
@@ -459,6 +481,7 @@ model Factory {
   ownerId       String?   @map("owner_id") @db.Uuid
   owner         User?     @relation("FactoryOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdById   String?   @map("created_by") @db.Uuid
+  createdBy     User?     @relation("FactoryCreator", fields: [createdById], references: [id], onDelete: SetNull)
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -480,7 +503,7 @@ model Factory {
 model Inquiry {
   id           String         @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String         @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId    String         @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company        @relation(fields: [companyId], references: [id])
   /// RFQ-2026-0001
   refNo        String         @map("ref_no") @db.VarChar(30)
@@ -531,7 +554,7 @@ model Inquiry {
 model RequestedItem {
   id          String          @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId   String          @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId   String          @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company     Company         @relation(fields: [companyId], references: [id])
   inquiryId   String          @map("inquiry_id") @db.Uuid
   inquiry     Inquiry         @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
@@ -559,7 +582,7 @@ model RequestedItem {
 model InquiryStageChange {
   id          String        @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId   String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId   String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company     Company       @relation(fields: [companyId], references: [id])
   inquiryId   String        @map("inquiry_id") @db.Uuid
   inquiry     Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
@@ -570,6 +593,7 @@ model InquiryStageChange {
   lostReason  LostReason?   @map("lost_reason")
   note        String?
   changedById String?       @map("changed_by") @db.Uuid
+  changedBy   User?         @relation("InquiryStageChanger", fields: [changedById], references: [id], onDelete: SetNull)
   changedAt   DateTime      @default(now()) @map("changed_at") @db.Timestamptz
 
   @@index([inquiryId])
@@ -580,12 +604,14 @@ model InquiryStageChange {
 model InquiryAssignment {
   id           String   @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId    String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company  @relation(fields: [companyId], references: [id])
   inquiryId    String   @map("inquiry_id") @db.Uuid
   inquiry      Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   assigneeId   String?  @map("assignee_id") @db.Uuid
+  assignee     User?    @relation("AssignmentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   assignedById String   @map("assigned_by") @db.Uuid
+  assignedBy   User     @relation("AssignmentAssigner", fields: [assignedById], references: [id])
   assignedAt   DateTime @default(now()) @map("assigned_at") @db.Timestamptz
 
   @@index([inquiryId])
@@ -596,12 +622,13 @@ model InquiryAssignment {
 model InquiryNote {
   id        String   @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company  @relation(fields: [companyId], references: [id])
   inquiryId String   @map("inquiry_id") @db.Uuid
   inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   body      String
   authorId  String   @map("author_id") @db.Uuid
+  author    User     @relation("NoteAuthor", fields: [authorId], references: [id])
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([inquiryId])
@@ -613,7 +640,7 @@ model InquiryNote {
 model Attachment {
   id             String        @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId      String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId      String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company        Company       @relation(fields: [companyId], references: [id])
   inquiryId      String        @map("inquiry_id") @db.Uuid
   inquiry        Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
@@ -628,6 +655,7 @@ model Attachment {
   kind           String        @default("other") @db.VarChar(20)
   note           String?       @db.VarChar(300)
   uploadedById   String        @map("uploaded_by") @db.Uuid
+  uploadedBy     User          @relation("AttachmentUploader", fields: [uploadedById], references: [id])
   deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
@@ -644,7 +672,7 @@ model Attachment {
 model FactoryQuote {
   id           String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId    String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company   @relation(fields: [companyId], references: [id])
   inquiryId    String    @map("inquiry_id") @db.Uuid
   inquiry      Inquiry   @relation(fields: [inquiryId], references: [id])
@@ -664,6 +692,7 @@ model FactoryQuote {
   paymentTerms String?   @map("payment_terms")
   notes        String?
   createdById  String    @map("created_by") @db.Uuid
+  createdBy    User      @relation("FactoryQuoteCreator", fields: [createdById], references: [id])
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -681,7 +710,7 @@ model FactoryQuote {
 model FactoryQuoteLine {
   id              String             @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId       String             @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId       String             @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company         Company            @relation(fields: [companyId], references: [id])
   factoryQuoteId  String             @map("factory_quote_id") @db.Uuid
   factoryQuote    FactoryQuote       @relation(fields: [factoryQuoteId], references: [id], onDelete: Cascade)
@@ -720,7 +749,7 @@ model FactoryQuoteLine {
 model Quotation {
   id        String   @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company  @relation(fields: [companyId], references: [id])
   /// QUO-2026-0007 (revisions print as QUO-2026-0007 R2)
   refNo     String   @map("ref_no") @db.VarChar(30)
@@ -737,7 +766,7 @@ model Quotation {
 model QuotationRevision {
   id               String         @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId        String         @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId        String         @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company          Company        @relation(fields: [companyId], references: [id])
   quotationId      String         @map("quotation_id") @db.Uuid
   quotation        Quotation      @relation(fields: [quotationId], references: [id], onDelete: Cascade)
@@ -764,6 +793,7 @@ model QuotationRevision {
   customerSnapshot Json?          @map("customer_snapshot")
   companySnapshot  Json?          @map("company_snapshot")
   createdById      String         @map("created_by") @db.Uuid
+  createdBy        User           @relation("RevisionCreator", fields: [createdById], references: [id])
   deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
@@ -783,7 +813,7 @@ model QuotationRevision {
 model QuotationOption {
   id                String            @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId         String            @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId         String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company           Company           @relation(fields: [companyId], references: [id])
   revisionId        String            @map("revision_id") @db.Uuid
   revision          QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
@@ -814,7 +844,7 @@ model QuotationOption {
 model OptionCost {
   id        String          @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String          @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String          @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company         @relation(fields: [companyId], references: [id])
   optionId  String          @map("option_id") @db.Uuid
   option    QuotationOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
@@ -835,7 +865,7 @@ model OptionCost {
 model QuoteLine {
   id                 String            @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId          String            @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId          String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company            Company           @relation(fields: [companyId], references: [id])
   revisionId         String            @map("revision_id") @db.Uuid
   revision           QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
@@ -873,7 +903,7 @@ model QuoteLine {
 model Order {
   id               String            @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId        String            @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId        String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company          Company           @relation(fields: [companyId], references: [id])
   /// SO-2026-0001
   refNo            String            @map("ref_no") @db.VarChar(30)
@@ -915,6 +945,7 @@ model Order {
   cancelledAt      DateTime?         @map("cancelled_at") @db.Timestamptz
   cancelReason     String?           @map("cancel_reason")
   createdById      String            @map("created_by") @db.Uuid
+  createdBy        User              @relation("OrderCreator", fields: [createdById], references: [id])
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -938,7 +969,7 @@ model Order {
 model OrderLine {
   id          String     @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId   String     @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId   String     @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company     Company    @relation(fields: [companyId], references: [id])
   orderId     String     @map("order_id") @db.Uuid
   order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -974,7 +1005,7 @@ model OrderLine {
 model OrderStageChange {
   id        String      @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String      @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String      @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company     @relation(fields: [companyId], references: [id])
   orderId   String      @map("order_id") @db.Uuid
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1001,7 +1032,7 @@ model OrderStageChange {
 model PaymentPlanItem {
   id        String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company   @relation(fields: [companyId], references: [id])
   orderId   String    @map("order_id") @db.Uuid
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1021,7 +1052,7 @@ model PaymentPlanItem {
 model FactoryPayment {
   id           String        @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId    String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company       @relation(fields: [companyId], references: [id])
   orderId      String        @map("order_id") @db.Uuid
   order        Order         @relation(fields: [orderId], references: [id])
@@ -1048,6 +1079,7 @@ model FactoryPayment {
   fileType     String?       @map("file_type") @db.VarChar(150)
   fileSize     Int?          @map("file_size")
   recordedById String        @map("recorded_by") @db.Uuid
+  recordedBy   User          @relation("FactoryPaymentRecorder", fields: [recordedById], references: [id])
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -1066,7 +1098,7 @@ model FactoryPayment {
 model Expense {
   id           String        @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId    String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company       @relation(fields: [companyId], references: [id])
   orderId      String?       @map("order_id") @db.Uuid
   order        Order?        @relation(fields: [orderId], references: [id])
@@ -1100,6 +1132,7 @@ model Expense {
   accountId    String?       @map("account_id") @db.Uuid
   account      MoneyAccount? @relation(fields: [accountId], references: [id])
   recordedById String        @map("recorded_by") @db.Uuid
+  recordedBy   User          @relation("ExpenseRecorder", fields: [recordedById], references: [id])
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -1118,7 +1151,7 @@ model Expense {
 model Payment {
   id           String        @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String        @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId    String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company       @relation(fields: [companyId], references: [id])
   kind         PaymentKind
   orderId      String        @map("order_id") @db.Uuid
@@ -1144,6 +1177,7 @@ model Payment {
   fileType     String?       @map("file_type") @db.VarChar(150)
   fileSize     Int?          @map("file_size")
   recordedById String        @map("recorded_by") @db.Uuid
+  recordedBy   User          @relation("PaymentRecorder", fields: [recordedById], references: [id])
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -1169,7 +1203,7 @@ model Payment {
 model MoneyAccount {
   id             String           @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId      String           @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId      String           @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company        Company          @relation(fields: [companyId], references: [id])
   name           String           @db.VarChar(80)
   kind           MoneyAccountKind @default(bank)
@@ -1198,7 +1232,7 @@ model MoneyAccount {
 model MoneyTransfer {
   id            String       @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId     String       @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId     String       @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company       Company      @relation(fields: [companyId], references: [id])
   fromAccountId String       @map("from_account_id") @db.Uuid
   fromAccount   MoneyAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
@@ -1211,6 +1245,7 @@ model MoneyTransfer {
   reference     String?      @db.VarChar(120)
   note          String?
   recordedById  String       @map("recorded_by") @db.Uuid
+  recordedBy    User         @relation("TransferRecorder", fields: [recordedById], references: [id])
   voidedAt      DateTime?    @map("voided_at") @db.Timestamptz
   voidReason    String?      @map("void_reason")
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
@@ -1233,11 +1268,12 @@ model SalesTarget {
   /// YYYY-MM
   month       String   @db.Char(7)
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId   String   @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId   String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company     Company  @relation(fields: [companyId], references: [id])
   amount      Decimal  @db.Decimal(14, 2)
   currency    String   @db.Char(3)
   updatedById String?  @map("updated_by") @db.Uuid
+  updatedBy   User?    @relation("TargetUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@id([companyId, month])
@@ -1250,7 +1286,7 @@ model SalesTarget {
 model ReminderState {
   userId       String    @map("user_id") @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId    String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company   @relation(fields: [companyId], references: [id])
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// What it is about, e.g. "pay:<instalment id>" or "quote-expiring:<revision id>".
@@ -1329,6 +1365,8 @@ model Company {
   contactEmail      String?       @map("contact_email") @db.VarChar(254)
   notes             String?
   lastActiveAt      DateTime?     @map("last_active_at") @db.Timestamptz
+  /// The company website form's key: the form sends it, and it decides the company (Settings → Website form).
+  formKey           String        @unique @default(dbgenerated("replace(((gen_random_uuid())::text || (gen_random_uuid())::text), '-'::text, ''::text)")) @map("form_key") @db.VarChar(64)
   deletedAt         DateTime?     @map("deleted_at") @db.Timestamptz
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz

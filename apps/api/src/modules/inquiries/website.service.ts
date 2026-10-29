@@ -1,10 +1,11 @@
-import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import { UNKNOWN_COUNTRY } from "@kebo/shared";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { EventBus } from "../../common/events/event-bus";
 import { InquiriesService } from "./inquiries.service";
+import { RateLimiter, verifyTurnstile } from "../../common/http/rate-limit";
 
 /**
  * The website form's field names are not ours to choose, so common spellings
@@ -39,14 +40,22 @@ export function normalizeFields(raw: Record<string, unknown>): Record<string, st
 
 export const websiteInquiry = z.object({
   fullName: z.string().trim().min(2, "Please enter your full name").max(120),
-  email: z.email("Please enter a valid business email").max(254).transform((v) => v.toLowerCase()),
+  email: z
+    .email("Please enter a valid business email")
+    .max(254)
+    .transform((v) => v.toLowerCase()),
   phone: z
     .string()
     .trim()
     .min(7, "Please enter a valid phone / WhatsApp number")
     .max(40)
     .regex(/^[+\d][\d\s\-()./]{6,}$/, "Please enter a valid phone / WhatsApp number"),
-  company: z.string().trim().max(200).optional().transform((v) => v || null),
+  company: z
+    .string()
+    .trim()
+    .max(200)
+    .optional()
+    .transform((v) => v || null),
   country: z
     .string()
     .trim()
@@ -62,8 +71,7 @@ const digits = (v: string) => v.replace(/\D/g, "");
 
 @Injectable()
 export class WebsiteService {
-  private readonly log = new Logger("Website");
-  private readonly hits = new Map<string, { count: number; resetAt: number }>();
+  private readonly hits = new RateLimiter();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -74,31 +82,12 @@ export class WebsiteService {
 
   /** Small in-memory limiter: per visitor, and an hourly cap for everyone. */
   limit(key: string, max: number, windowMs: number) {
-    const now = Date.now();
-    if (this.hits.size > 20_000) this.hits.clear();
-    const h = this.hits.get(key);
-    if (!h || h.resetAt < now) {
-      this.hits.set(key, { count: 1, resetAt: now + windowMs });
-      return;
-    }
-    if (++h.count > max) throw new HttpException({ message: "Too many inquiries were sent. Please try again in a few minutes or contact us on WhatsApp." }, HttpStatus.TOO_MANY_REQUESTS);
+    this.hits.check(key, max, windowMs, "Too many inquiries were sent. Please try again in a few minutes or contact us on WhatsApp.");
   }
 
-  /** Cloudflare Turnstile ("not a robot"), when TURNSTILE_SECRET_KEY is set. */
-  async human(token: unknown, ip: string): Promise<boolean> {
-    const secret = process.env.TURNSTILE_SECRET_KEY;
-    if (!secret) return true;
-    if (typeof token !== "string" || !token || token.length > 2048) return false;
-    try {
-      const body = new URLSearchParams({ secret, response: token });
-      if (ip) body.set("remoteip", ip);
-      const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body, signal: AbortSignal.timeout(5000) });
-      return !!((await res.json()) as { success?: boolean }).success;
-    } catch (e) {
-      // Cloudflare unreachable: accept (rate limits still apply) rather than lose a real customer.
-      this.log.warn(`Turnstile unreachable, accepting: ${(e as Error).message}`);
-      return true;
-    }
+  /** Cloudflare Turnstile ("not a robot"), when TURNSTILE_SECRET_KEY is set (refuses when Cloudflare cannot be reached). */
+  human(token: unknown, ip: string): Promise<boolean> {
+    return verifyTurnstile(token, ip);
   }
 
   /**
@@ -111,7 +100,9 @@ export class WebsiteService {
     if (!system) throw new Error("The website-form system user is missing (run the seed).");
     const phone = digits(input.phone);
     const { inquiry, events } = await this.prisma.tx(async (tx) => {
-      const [match] = await tx.$queryRaw<{ customer_id: string; contact_id: string; name: string; email: string | null; phone: string | null }[]>`
+      const [match] = await tx.$queryRaw<
+        { customer_id: string; contact_id: string; name: string; email: string | null; phone: string | null }[]
+      >`
         select ct.customer_id, ct.id as contact_id, ct.name, ct.email, ct.phone
           from contacts ct join customers c on c.id = ct.customer_id
          where ct.deleted_at is null and c.deleted_at is null
@@ -139,15 +130,33 @@ export class WebsiteService {
             name: input.company || input.fullName,
             country: input.country ?? UNKNOWN_COUNTRY,
             createdById: system.id,
-            contacts: { create: { name: input.fullName, email: input.email, phone: input.phone.replace(/[^\d+]/g, ""), whatsapp: input.phone.replace(/[^\d+]/g, ""), isPrimary: true } },
+            contacts: {
+              create: {
+                name: input.fullName,
+                email: input.email,
+                phone: input.phone.replace(/[^\d+]/g, ""),
+                whatsapp: input.phone.replace(/[^\d+]/g, ""),
+                isPrimary: true,
+              },
+            },
           },
           include: { contacts: true },
         });
         customerId = c.id;
         contactId = c.contacts[0].id;
-        await this.audit.record(tx, { userId: system.id, action: "create", entityType: "customer", entityId: c.id, summary: `Added customer ${c.name} from the website form` });
+        await this.audit.record(tx, {
+          userId: system.id,
+          action: "create",
+          entityType: "customer",
+          entityId: c.id,
+          summary: `Added customer ${c.name} from the website form`,
+        });
       }
-      const firstLine = input.requirements.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? input.category;
+      const firstLine =
+        input.requirements
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .find(Boolean) ?? input.category;
       return this.inquiries.createRecord(
         tx,
         system.id,
@@ -162,7 +171,18 @@ export class WebsiteService {
           requiredBy: null,
           assigneeId: null,
           // One free-text message: one item to split up later; the full text is kept as the requirements.
-          items: [{ id: null, parentId: null, partOf: null, description: firstLine.slice(0, 2000), model: null, quantity: 1, unit: "pcs", targetPrice: null }],
+          items: [
+            {
+              id: null,
+              parentId: null,
+              partOf: null,
+              description: firstLine.slice(0, 2000),
+              model: null,
+              quantity: 1,
+              unit: "pcs",
+              targetPrice: null,
+            },
+          ],
         },
         { channelNote: [note, input.page && `— Sent from ${input.page}`].filter(Boolean).join("\n\n") || undefined },
       );

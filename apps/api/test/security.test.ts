@@ -190,11 +190,15 @@ describe("security: roles, two-step per role, sessions, sign-ins", () => {
 
     const failed = (await api(app, admin).get(`/security/sign-ins?failed=true&q=${tag}`).expect(200)).body;
     expect(failed.rows.map((s: { email: string; result: string }) => `${s.result} ${s.email}`)).toEqual(
-      expect.arrayContaining([`wrong_password ${kim.email}`, `unknown_email nobody-${tag}@example.com`]),
+      expect.arrayContaining([`wrong_password ${kim.email}`]),
     );
+    // An email with no account here is not kept: anyone could fill the history with them.
+    expect(failed.rows.some((s: { email: string }) => s.email === `nobody-${tag}@example.com`)).toBe(false);
     expect(failed.rows.every((s: { result: string }) => s.result !== "signed_in")).toBe(true);
     await api(app, kim.token).get("/security/sign-ins").expect(403);
-    await prisma.company(FIRST_COMPANY_ID).user.update({ where: { companyId_email: { companyId: FIRST_COMPANY_ID, email: kim.email } }, data: { failedLogins: 0 } });
+    await prisma
+      .company(FIRST_COMPANY_ID)
+      .user.update({ where: { companyId_email: { companyId: FIRST_COMPANY_ID, email: kim.email } }, data: { failedLogins: 0 } });
   });
 
   it("lists signed-in devices and signs them out", async () => {

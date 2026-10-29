@@ -236,6 +236,8 @@ export interface LifecycleInput {
   /** Paid until (clients). */
   renewsOn: ISODate | null;
   endingNoticeFor: Date | null;
+  /** A subscription payment was ever recorded for it. */
+  hasPayments: boolean;
 }
 
 export type LifecycleStep =
@@ -251,7 +253,10 @@ const DAY = 86_400_000;
  * they end, switched off after the read-only days, deleted after the off days.
  * Clients: a warning once past the paid-until date, read-only after the grace
  * days, switched off later; never deleted. A status the platform admin set by
- * hand is left alone.
+ * hand is left alone. A demo or trial is never deleted by the rules when its
+ * status was set by hand, when it has paid (any payment recorded), or when it
+ * has a paid-until date not yet passed: it stays switched off for the platform
+ * admin to decide.
  */
 export function lifecycleStep(c: LifecycleInput, now: Date, today: ISODate): LifecycleStep {
   if (c.status === "deleted") return { do: "nothing" };
@@ -267,9 +272,9 @@ export function lifecycleStep(c: LifecycleInput, now: Date, today: ISODate): Lif
       return want("active", null);
     }
     if (ended >= (LIFECYCLE.readOnlyDays + LIFECYCLE.deleteAfterOffDays) * DAY) {
-      return c.statusManual && c.status === "active"
-        ? { do: "nothing" }
-        : { do: "delete", reason: `The ${what} ended ${LIFECYCLE.readOnlyDays + LIFECYCLE.deleteAfterOffDays} days ago` };
+      const keep = c.statusManual || c.hasPayments || (c.renewsOn !== null && today <= c.renewsOn);
+      if (keep) return want("off", `The ${what} has ended`);
+      return { do: "delete", reason: `The ${what} ended ${LIFECYCLE.readOnlyDays + LIFECYCLE.deleteAfterOffDays} days ago` };
     }
     if (ended >= LIFECYCLE.readOnlyDays * DAY) return want("off", `The ${what} has ended`);
     return want("read_only", `The ${what} has ended`);

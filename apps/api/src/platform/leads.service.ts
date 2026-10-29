@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { z } from "zod";
@@ -20,6 +20,7 @@ import { PrismaService } from "../database/prisma.service";
 import { PlatformCompaniesService } from "./companies.platform";
 import { PlatformMail } from "./platform-mail";
 import type { PlatformAdminUser } from "./platform-auth";
+import { RateLimiter, verifyTurnstile } from "../common/http/rate-limit";
 
 type Actor = Pick<PlatformAdminUser, "id" | "name"> | null;
 
@@ -30,8 +31,7 @@ type Actor = Pick<PlatformAdminUser, "id" | "name"> | null;
  */
 @Injectable()
 export class LeadsService {
-  private readonly hits = new Map<string, { count: number; resetAt: number }>();
-  private readonly logger = new Logger("Leads");
+  private readonly hits = new RateLimiter();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -46,31 +46,12 @@ export class LeadsService {
 
   /** Per visitor and for everyone: public forms cannot be flooded. */
   limit(key: string, max: number, windowMs: number) {
-    const now = Date.now();
-    if (this.hits.size > 20_000) this.hits.clear();
-    const h = this.hits.get(key);
-    if (!h || h.resetAt < now) return void this.hits.set(key, { count: 1, resetAt: now + windowMs });
-    if (++h.count > max)
-      throw new HttpException({ message: "Too many requests. Please try again a little later." }, HttpStatus.TOO_MANY_REQUESTS);
+    this.hits.check(key, max, windowMs, "Too many requests. Please try again a little later.");
   }
 
-  /** Cloudflare Turnstile ("not a robot"), when TURNSTILE_SECRET_KEY is set. */
-  async human(token: unknown, ip: string): Promise<boolean> {
-    const secret = process.env.TURNSTILE_SECRET_KEY;
-    if (!secret) return true;
-    if (typeof token !== "string" || !token || token.length > 4000) return false;
-    try {
-      const body = new URLSearchParams({ secret, response: token, remoteip: ip });
-      const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        body,
-        signal: AbortSignal.timeout(5000),
-      });
-      return !!((await res.json()) as { success?: boolean }).success;
-    } catch (e) {
-      this.logger.warn(`Turnstile unreachable, accepting: ${(e as Error).message}`);
-      return true;
-    }
+  /** Cloudflare Turnstile ("not a robot"), when TURNSTILE_SECRET_KEY is set (refuses when Cloudflare cannot be reached). */
+  human(token: unknown, ip: string): Promise<boolean> {
+    return verifyTurnstile(token, ip);
   }
 
   /* ---------------------------------------------------------------- public: request a demo */
@@ -126,7 +107,12 @@ export class LeadsService {
 
   /** "google.com · campaign spring · button hero", for the email to the platform admin. */
   private cameFrom(origin: LeadOrigin | null | undefined) {
-    const parts = [channelOf(origin), origin?.campaign && `campaign ${origin.campaign}`, origin?.medium, origin?.cta && `button "${origin.cta}"`];
+    const parts = [
+      channelOf(origin),
+      origin?.campaign && `campaign ${origin.campaign}`,
+      origin?.medium,
+      origin?.cta && `button "${origin.cta}"`,
+    ];
     return parts.filter(Boolean).join(" · ");
   }
 

@@ -3,10 +3,12 @@ import request from "supertest";
 import { unzipSync } from "fflate";
 import bcrypt from "bcryptjs";
 import { FIRST_COMPANY_ID } from "@kebo/database";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/auth/totp";
 import { PrismaService } from "../src/database/prisma.service";
 import { LifecycleService } from "../src/platform/lifecycle.service";
+import { StorageService } from "../src/common/storage/storage.service";
+import { PlatformPublicController } from "../src/platform/platform.controller";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { api, signIn, startApp } from "./app";
 
@@ -209,6 +211,149 @@ describe("companies: isolation and the platform", () => {
     expect(Number((await prisma.platform.$queryRawUnsafe<{ n: bigint }[]>(`select count(*) as n from inquiries`))[0].n)).toBeGreaterThan(0);
   });
 
+  it("the same phone can be signed in to two companies", async () => {
+    const bAdmin = api(app, await signIn(app, `boss@iso-${tag}.test`, "Boss12345678"));
+    const token = `fcm-${tag}-shared-phone`;
+    await api(app, keboManager).post("/me/devices", { token, platform: "android" }).expect(200);
+    await bAdmin.post("/me/devices", { token, platform: "android" }).expect(200);
+    await bAdmin.post("/me/devices", { token, platform: "android" }).expect(200); // again: the same row
+    const rows = await prisma.platform.deviceToken.findMany({ where: { token } });
+    expect(rows.map((r) => r.companyId).sort()).toEqual(
+      [FIRST_COMPANY_ID, (await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } })).id].sort(),
+    );
+    await bAdmin.delete("/me/devices").send({ token }).expect(200);
+    expect(await prisma.platform.deviceToken.count({ where: { token } })).toBe(1);
+  });
+
+  it("every column naming a person points at a real person of the same company", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const db = prisma.company(b.id);
+    const keboUser = (await prisma.company(FIRST_COMPANY_ID).user.findFirstOrThrow({ where: { email: "manager@example.com" } })).id;
+    const bCustomer = (await db.customer.findFirstOrThrow()).id;
+    const bInquiry = (await db.inquiry.findFirstOrThrow()).id;
+    for (const [sql, args] of [
+      [`update customers set created_by = $1::uuid where id = $2::uuid`, [keboUser, bCustomer]],
+      [
+        `insert into inquiry_notes (id, inquiry_id, author_id, body) values (gen_random_uuid(), $2::uuid, $1::uuid, 'x')`,
+        [keboUser, bInquiry],
+      ],
+      [
+        `insert into audit_logs (id, user_id, action, entity_type, summary) values (gen_random_uuid(), $1::uuid, 'x', 'x', 'x')`,
+        [keboUser],
+      ],
+    ] as const) {
+      await expect(db.$executeRawUnsafe(sql, ...args), sql).rejects.toThrow(/another company/);
+      // Even the owner's connection cannot link across companies.
+      await expect(
+        prisma.platform.$executeRawUnsafe(
+          sql.replace("(id,", "(company_id, id,").replace("values (", `values ('${b.id}'::uuid, `),
+          ...args,
+        ),
+        sql,
+      ).rejects.toThrow(/another company/);
+    }
+    // Someone who does not exist: refused by the key.
+    await expect(
+      db.$executeRawUnsafe(`update orders set created_by = gen_random_uuid() where id = (select id from orders limit 1)`),
+    ).rejects.toThrow(/foreign key|another company/);
+  });
+
+  it("no SQL run on a company connection gets out of its company", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const db = prisma.company(b.id);
+    const count = async (tx: { $queryRawUnsafe: typeof db.$queryRawUnsafe }) =>
+      (
+        await tx.$queryRawUnsafe<{ mine: bigint; other: bigint }[]>(
+          `select count(*) filter (where company_id = $1::uuid) as mine, count(*) filter (where company_id <> $1::uuid) as other from inquiries`,
+          b.id,
+        )
+      )[0];
+    // It logs in as the restricted role itself: no superuser, nothing past row-level security, no way to become the owner.
+    const [who] = await db.$queryRawUnsafe<{ who: string; su: boolean; bypass: boolean; member_of: string[] }[]>(
+      `select session_user::text as who, r.rolsuper as su, r.rolbypassrls as bypass,
+              array(select g.rolname::text from pg_auth_members m join pg_roles g on g.oid = m.roleid where m.member = r.oid) as member_of
+         from pg_roles r where r.rolname = session_user`,
+    );
+    expect(who).toEqual({ who: "kebo_app", su: false, bypass: false, member_of: [] });
+    for (const sql of ["set role kebo", "set local role kebo", "set session authorization kebo", "reset role; set role kebo"]) {
+      await expect(
+        db.$transaction((tx) => tx.$executeRawUnsafe(sql)),
+        sql,
+      ).rejects.toThrow(/permission denied/);
+    }
+    await expect(db.$executeRawUnsafe(`alter role kebo_app bypassrls`)).rejects.toThrow(/permission denied/);
+    await expect(db.$executeRawUnsafe(`alter table inquiries disable row level security`)).rejects.toThrow(/must be owner/);
+    // Naming another company in the session (SET, set_config, in or out of a transaction) changes nothing.
+    const before = await count(db);
+    expect(Number(before.other)).toBe(0);
+    expect(Number(before.mine)).toBeGreaterThan(0);
+    const moved = await db.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe(`select set_config('app.company_id', $1, false)`, FIRST_COMPANY_ID);
+      await tx.$executeRawUnsafe(`set app.company_id = '${FIRST_COMPANY_ID}'`);
+      return {
+        local: await count(tx),
+        setting: (await tx.$queryRawUnsafe<{ s: string }[]>(`select current_setting('app.company_id') as s`))[0].s,
+      };
+    });
+    expect(moved.setting).toBe(FIRST_COMPANY_ID); // the setting did change…
+    expect(Number(moved.local.other)).toBe(0); // …and still only B's rows.
+    expect(Number(moved.local.mine)).toBe(Number(before.mine));
+    await expect(
+      db.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`set local app.company_id = '${FIRST_COMPANY_ID}'`);
+        await tx.$executeRawUnsafe(`insert into counters (company_id, key, value) values ($1::uuid, 'sneak', 1)`, FIRST_COMPANY_ID);
+      }),
+    ).rejects.toThrow(/row-level security/);
+    // And after all that, every connection of the pool still sees B only.
+    for (let i = 0; i < 4; i++) expect(Number((await count(db)).other)).toBe(0);
+  });
+
+  it("the website form: its key decides the company; naming a company does not", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const bAdmin = api(app, await signIn(app, `boss@iso-${tag}.test`, "Boss12345678"));
+    const view = (await bAdmin.get("/company/website-form").expect(200)).body;
+    expect(view).toMatchObject({ key: b.formKey, allowed: true });
+    expect(view.endpoint).toMatch(/\/api\/public\/inquiries$/);
+    const send = (who: string) => ({
+      fullName: "Web Buyer",
+      email: `${who}-${tag}@web.test`,
+      phone: "+92 300 7654321",
+      category: "Valves",
+      requirements: `Valves for ${who} ${tag}`,
+    });
+    const post = () => request(app.getHttpServer()).post("/api/public/inquiries");
+    const inB = (who: string) => prisma.company(b.id).inquiry.count({ where: { title: `Valves for ${who} ${tag}` } });
+    const inKebo = (who: string) => prisma.company(FIRST_COMPANY_ID).inquiry.count({ where: { title: `Valves for ${who} ${tag}` } });
+
+    // Naming the company (as the old form did, or in the header) is not enough.
+    expect((await post().query({ company: b.slug }).send(send("named")).expect(403)).body.ok).toBe(false);
+    await post().set("x-company", b.slug).send(send("header")).expect(403);
+    await post().set("x-form-key", "0".repeat(48)).send(send("wrong")).expect(403);
+    // Even from an allowed site, a named company is not taken: the inquiry goes to the default company.
+    await post().set("origin", "https://keboint.com").set("x-company", b.slug).send(send("site")).expect(201);
+    expect(await inB("site")).toBe(0);
+    expect(await inKebo("site")).toBe(1);
+    // With B's key, from anywhere (header or a form field): B's, and only B's.
+    const ok = await post().set("origin", "https://b-company.example").set("x-form-key", b.formKey).send(send("keyed")).expect(201);
+    expect(ok.body).toEqual({ ok: true, message: expect.stringMatching(/^Thank you/) });
+    expect(ok.headers["access-control-allow-origin"]).toBe("https://b-company.example");
+    await post()
+      .send({ ...send("field"), formKey: b.formKey })
+      .expect(201);
+    expect([await inB("keyed"), await inB("field"), await inKebo("keyed")]).toEqual([1, 1, 0]);
+
+    // A new key: the old one stops working. Only a Super Admin sees or changes it.
+    const fresh = (await bAdmin.post("/company/website-form/new-key").expect(200)).body;
+    expect(fresh.key).not.toBe(b.formKey);
+    await post().set("x-form-key", b.formKey).send(send("old")).expect(403);
+    await post().set("x-form-key", fresh.key).send(send("new")).expect(201);
+    await bAdmin
+      .post("/users", { name: "Form Mgr", email: `formmgr@iso-${tag}.test`, role: "manager", password: "Manager12345" })
+      .expect(201);
+    const mgr = api(app, await signIn(app, `formmgr@iso-${tag}.test`, "Manager12345"));
+    expect((await mgr.get("/company/website-form")).status).toBeGreaterThanOrEqual(403);
+  });
+
   it("an email in two companies: the password decides, or the person chooses", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const bAdmin = await signIn(app, `boss@iso-${tag}.test`, "Boss12345678");
@@ -250,6 +395,58 @@ describe("companies: isolation and the platform", () => {
     expect(wrong.body.companies).toBeUndefined();
   });
 
+  it("signing in at a company's address considers that company only, and writes nothing where the email has no account", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    (app.get(AuthService) as unknown as { attempts: Map<string, unknown> }).attempts.clear();
+    const login = (body: object, company?: string) => {
+      const r = request(app.getHttpServer()).post("/api/auth/login");
+      return (company ? r.set("x-company", company) : r).send(body);
+    };
+    const email = "staff@example.com"; // Kebo's only
+    const kebo = prisma.company(FIRST_COMPANY_ID);
+    const rows = async (companyId: string) =>
+      Number(
+        (
+          await prisma.platform.$queryRaw<
+            { n: bigint }[]
+          >`select count(*) as n from sign_ins where company_id = ${companyId}::uuid and email = ${email}`
+        )[0].n,
+      );
+    const [inB, inKebo] = [await rows(b.id), await rows(FIRST_COMPANY_ID)];
+    // The right password, at B's address (or naming B): no.
+    expect((await login({ email, password: "Staff@12345" }, b.slug).expect(401)).body.error).toBe("Wrong email or password.");
+    await login({ email, password: "Staff@12345", company: b.slug }).expect(401);
+    // Wrong passwords there, many times: Kebo's account is not locked or counted, and no history anywhere.
+    for (let i = 0; i < 6; i++) await login({ email, password: `wrong-${i}` }, b.slug).expect(401);
+    const user = await kebo.user.findFirstOrThrow({ where: { email } });
+    expect(user.failedLogins).toBe(0);
+    expect(user.lockedUntil).toBeNull();
+    expect([await rows(b.id), await rows(FIRST_COMPANY_ID)]).toEqual([inB, inKebo]);
+    // An email nobody has: the same answer, nothing written.
+    const before = Number((await prisma.platform.$queryRaw<{ n: bigint }[]>`select count(*) as n from sign_ins`)[0].n);
+    await login({ email: `ghost-${tag}@nowhere.test`, password: "Whatever123" }).expect(401);
+    await login({ email: `ghost-${tag}@nowhere.test`, password: "Whatever123" }, b.slug).expect(401);
+    expect(Number((await prisma.platform.$queryRaw<{ n: bigint }[]>`select count(*) as n from sign_ins`)[0].n)).toBe(before);
+    // Every answer takes one password check, account or not.
+    const compare = vi.spyOn(bcrypt, "compare");
+    try {
+      for (const [body, company] of [
+        [{ email: `ghost-${tag}@nowhere.test`, password: "x" }, undefined],
+        [{ email, password: "nope" }, b.slug],
+        [{ email, password: "nope" }, undefined],
+      ] as const) {
+        compare.mockClear();
+        await login(body, company).expect(401);
+        expect(compare, JSON.stringify(body)).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      compare.mockRestore();
+    }
+    // At Kebo's address it works as before (and the wrong ones above count there now).
+    await login({ email, password: "Staff@12345" }, "kebo").expect(200);
+    (app.get(AuthService) as unknown as { attempts: Map<string, unknown> }).attempts.clear();
+  });
+
   it("the platform admin opens a company and works as themself, in its history", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const opened = (await plat().post(`/companies/${b.id}/open`).expect(200)).body;
@@ -289,6 +486,18 @@ describe("companies: isolation and the platform", () => {
         password: "!",
       })
       .expect(401);
+  });
+
+  it("the public company lookup tells the web app only what it needs", async () => {
+    const look = (slug: string) => request(app.getHttpServer()).get(`/api/platform/public/company?slug=${slug}`);
+    expect((await look("kebo").expect(200)).body).toEqual({ exists: true, slug: "kebo", name: expect.any(String) });
+    await look("nobody-here").expect(404);
+    const c = await makeCompany(`look-${tag}`, { sampleData: false });
+    await plat().post(`/companies/${c.id}/status`, { status: "read_only" }).expect(200);
+    // Not switched on: no name, and never the status.
+    expect((await look(c.slug).expect(200)).body).toEqual({ exists: true, slug: c.slug, name: null });
+    await plat().post(`/companies/${c.id}/status`, { status: "auto" }).expect(200);
+    expect((await look(c.slug).expect(200)).body.name).toBe(`Company ${c.slug}`);
   });
 
   it("only real companies' addresses get a certificate", async () => {
@@ -441,8 +650,9 @@ describe("companies: isolation and the platform", () => {
     expect(phone.status).toBe(403);
     expect(phone.body.code).toBe("plan_feature");
     await off(await mine.get("/customers").set("user-agent", "Dart/3.5 (dart:io)"));
-    // The website form.
-    const form = await request(app.getHttpServer()).post(`/api/public/inquiries?company=${c.slug}`).send({
+    // The website form, even with the company's own key.
+    const { formKey } = await prisma.platform.company.findUniqueOrThrow({ where: { id: c.id } });
+    const form = await request(app.getHttpServer()).post(`/api/public/inquiries`).set("x-form-key", formKey).send({
       fullName: "Web Buyer",
       email: "buyer@web.test",
       phone: "+92 300 1234567",
@@ -450,6 +660,7 @@ describe("companies: isolation and the platform", () => {
       requirements: "100 valves please",
     });
     expect(form.status).toBe(403);
+    expect(form.body.message).toMatch(/cannot be received right now/);
     // Insights without expenses: no expenses and no profit after them.
     const insightsOnly = (
       await plat()
@@ -649,6 +860,12 @@ describe("companies: isolation and the platform", () => {
       ok: true,
     });
 
+    // Page views from one address are limited (30 a minute).
+    const views = await Promise.all(Array.from({ length: 35 }, () => visit(browser)));
+    expect(views.filter((r) => r.status === 429).length).toBeGreaterThan(0);
+    expect(views.filter((r) => r.status === 200).length).toBeLessThanOrEqual(30);
+    (app.get(PlatformPublicController) as unknown as { visits: { clear(): void } }).visits.clear();
+
     // Back as it was, for the other tests.
     await plat().put("/site", { draft: editor.draft }).expect(200);
     await plat().post("/site/publish").expect(200);
@@ -699,6 +916,53 @@ describe("companies: isolation and the platform", () => {
     ).toBe(0);
     // Its name stays taken for a while.
     expect((await request(app.getHttpServer()).get(`/api/platform/public/slug?slug=${demo.slug}`).expect(200)).body.free).toBe(false);
+    // A copy of everything was kept first.
+    const log = await prisma.platform.platformLog.findFirstOrThrow({ where: { companyId: demo.id, action: "delete" } });
+    const key = /a copy is kept at (\S+)\)/.exec(log.summary)?.[1];
+    expect(key, log.summary).toMatch(/^archives\//);
+    const chunks: Buffer[] = [];
+    for await (const chunk of await app.get(StorageService).get(key!)) chunks.push(chunk as Buffer);
+    const files = unzipSync(new Uint8Array(Buffer.concat(chunks)));
+    expect(JSON.parse(new TextDecoder().decode(files["data/inquiries.json"]))).toHaveLength(10);
+  });
+
+  it("the rules never delete a demo or trial that is paying, paid or set by hand", async () => {
+    const lifecycle = app.get(LifecycleService);
+    const long = new Date(Date.now() - 40 * 86_400_000);
+    const inFuture = new Date(Date.now() + 20 * 86_400_000);
+    const byHand = await makeCompany(`hand-${tag}`, { kind: "demo", sampleData: false });
+    const paidFor = await makeCompany(`paid-${tag}`, { kind: "demo", sampleData: false });
+    const renews = await makeCompany(`renew-${tag}`, { kind: "demo", sampleData: false });
+    // Payments are for clients: a demo is made real first.
+    const refused = await plat().post(`/companies/${paidFor.id}/payments`, {
+      amount: 10,
+      currency: "USD",
+      paidOn: "2026-01-01",
+      paidUntil: "2026-02-01",
+    });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error).toMatch(/real company first/);
+    // As if paid before that rule, or set by hand.
+    await prisma.platform.subscriptionPayment.create({
+      data: {
+        companyId: paidFor.id,
+        amountMinor: 1000,
+        currency: "USD",
+        paidOn: new Date("2026-01-01"),
+        paidUntil: new Date("2026-02-01"),
+      },
+    });
+    await prisma.platform.company.update({ where: { id: byHand.id }, data: { endsAt: long, status: "off", statusManual: true } });
+    await prisma.platform.company.update({ where: { id: paidFor.id }, data: { endsAt: long, status: "off" } });
+    await prisma.platform.company.update({ where: { id: renews.id }, data: { endsAt: long, status: "read_only", renewsOn: inFuture } });
+    await lifecycle.run();
+    const now = await prisma.platform.company.findMany({ where: { id: { in: [byHand.id, paidFor.id, renews.id] } } });
+    expect(Object.fromEntries(now.map((c) => [c.slug, c.status]))).toEqual({
+      [byHand.slug]: "off",
+      [paidFor.slug]: "off",
+      [renews.slug]: "off",
+    });
+    expect(await prisma.company(paidFor.id).user.count()).toBeGreaterThan(0);
   });
 
   it("a demo becomes a real company, its sample data cleared; payments set paid-until; overdue clients go read-only", async () => {
@@ -744,7 +1008,8 @@ describe("companies: isolation and the platform", () => {
       .expect(200);
     const files = unzipSync(new Uint8Array(zip.body as Buffer));
     const inquiries = JSON.parse(new TextDecoder().decode(files["data/inquiries.json"])) as { company_id: string }[];
-    expect(inquiries.length).toBe(10);
+    expect(inquiries.length).toBe(await prisma.company(c.id).inquiry.count());
+    expect(inquiries.length).toBeGreaterThanOrEqual(10);
     expect(inquiries.every((r) => r.company_id === c.id)).toBe(true);
     const users = JSON.parse(new TextDecoder().decode(files["data/users.json"])) as Record<string, unknown>[];
     expect(users.some((u) => "password_hash" in u)).toBe(false);

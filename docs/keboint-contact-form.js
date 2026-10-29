@@ -19,14 +19,20 @@
  *   3. Upload the website, check a test inquiry arrives, THEN put the secret key on the server:
  *        TURNSTILE_SECRET_KEY=... in /opt/kebo-rfq/.env, then: docker compose up -d
  *      (Doing step 3 before the website has the widget would refuse every website inquiry.)
+ *
+ * The form key: copy it from RFQ Desk, Settings → Website form, into FORM_KEY below. It says
+ * which company the inquiry is for. (Without it, keboint.com is still accepted for Kebo,
+ * because it is in PUBLIC_FORM_ORIGINS on the server; with it, that list is not needed.)
  */
+
+            const FORM_KEY = 'PASTE-THE-KEY-FROM-SETTINGS';
 
             const select = document.getElementById('form-service');
             const category = select.options[select.selectedIndex].text.trim(); // e.g. "Medical Devices & Equipment"
 
             fetch('https://rfq.fawadiqbal.dev/api/public/inquiries', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Form-Key': FORM_KEY },
                 body: JSON.stringify({
                     fullName: name,
                     email: email,
@@ -45,7 +51,7 @@
                         return data;
                     });
                 })
-                .then(function (data) {
+                .then(function () {
                     const formCard = contactForm.parentElement;
                     formCard.innerHTML = `
                         <div class="form-success-wrapper text-center" style="padding: 40px 20px; animation: fadeIn 0.5s ease-out;">
@@ -53,7 +59,6 @@
                                 <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                             </div>
                             <h3 style="font-size: 24px; margin-bottom: 12px; color: var(--primary-blue);">Inquiry Submitted Successfully!</h3>
-                            <p style="color: var(--grey-text); margin-bottom: 8px; font-size: 15px;">Your reference number is <strong>${data.reference}</strong>.</p>
                             <p style="color: var(--grey-text); margin-bottom: 24px; font-size: 15px;">Our technical engineering team will review your requirements and reach out to you within 24 hours.</p>
                             <button class="btn btn-primary" onclick="window.location.reload();">Submit Another Inquiry</button>
                         </div>`;

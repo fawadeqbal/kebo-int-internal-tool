@@ -4,18 +4,24 @@ RFQ Desk runs many companies in one installation. Each company has its own peopl
 
 ## Who is who
 
-| Who | Where | Does |
-|---|---|---|
-| Platform admin | `/platform` (own sign-in, two-step required) | Client inquiries, demos, companies, plans, payments. Can open any company and work in it; everything they do there is in the company's own history under their name ("Fawad Iqbal (platform admin)"), and in the platform log. |
-| Tenant admin | inside one company | The company's Super Admin role: its people, roles, settings, money, security. Made with the company; gets an email link to set a password. |
-| Managers, staff | inside one company | As before. |
+| Who             | Where                                        | Does                                                                                                                                                                                                                           |
+| --------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Platform admin  | `/platform` (own sign-in, two-step required) | Client inquiries, demos, companies, plans, payments. Can open any company and work in it; everything they do there is in the company's own history under their name ("Fawad Iqbal (platform admin)"), and in the platform log. |
+| Tenant admin    | inside one company                           | The company's Super Admin role: its people, roles, settings, money, security. Made with the company; gets an email link to set a password.                                                                                     |
+| Managers, staff | inside one company                           | As before.                                                                                                                                                                                                                     |
 
 ## How companies are kept apart
 
 **One database, one set of tables.** Every company table has a `company_id` column. Two locks keep companies apart:
 
 1. **The API works in one company per request.** The company comes from the session (the token names it), so a request can never pick another company. Every query of company data goes through that company's own connection pool (`PrismaService.db`); outside a company there is no such connection, so company data cannot be read by mistake.
-2. **The database checks it too (row-level security).** Company connections run as the restricted role `kebo_app` with `app.company_id` set when they connect. Policies on every company table let that role see and change only rows of its company; with no company set it sees nothing. New rows are tagged with the connection's company automatically (the column's default). A trigger on every link between company tables refuses a link to another company's row. The role has no access at all to the platform tables (companies, plans, leads, platform admins…).
+2. **The database checks it too (row-level security).** Company connections **log in as** the restricted role `kebo_app` (not a superuser, not past row-level security, a member of no other role, so `SET ROLE kebo` is refused) with `app.company_id` given when they connect. Policies on every company table let that role see and change only rows of its company; with no company set it sees nothing. New rows are tagged with the connection's company automatically (the column's default). A trigger on every link between company tables (people included: who made, recorded, wrote…) refuses a link to another company's row. The role has no access at all to the platform tables (companies, plans, leads, platform admins…).
+
+   **The company cannot be changed on an open connection.** The policies and the column defaults read the company through `app_company()`, which returns the value the connection was opened with (`SET LOCAL app.company_id TO DEFAULT` inside the function), not the session's current one. So even SQL injected into a company connection (`SET app.company_id = …`, `set_config(…)`) still sees only its own company. All SQL in the app is parameterised as well.
+
+   **The password.** `kebo_app`'s password is made from `AUTH_SECRET` (HMAC-SHA256 of `"kebo_app-db-password"`, hex). The API sets it on the role when it starts (through the owner's connection, only if it does not already work), together with LOGIN and taking away any role membership; the worker and scripts work it out the same way. Nothing to set up on the server. Changing `AUTH_SECRET` changes it too; the API puts the new one in place when it next starts (restart the worker after the API). `COMPANY_DATABASE_URL` overrides where company connections log in; the API refuses to start if that login could pass row-level security.
+
+   **Not FORCE ROW LEVEL SECURITY.** The tables are owned by `kebo`, the database superuser, and a superuser is never held by row-level security, forced or not; the owner's connection also legitimately reads across companies (the platform admin's lists, export, delete, the worker's rules). So forcing it would change nothing and is not done.
 
 The owner's connection (`PrismaService.platform`) is used only for the platform tables, and by the platform's export and delete, which name the company explicitly.
 
@@ -25,11 +31,11 @@ Other per-company things: settings and the settings cache, document numbers (eac
 
 ### Adding a table
 
-A new company table needs, in its migration: the `company_id` column (copy the Prisma field from any model: `@default(dbgenerated("(current_setting('app.company_id'::text))::uuid"))` and the relation to `Company`), then
+A new company table needs, in its migration: the `company_id` column (copy the Prisma field from any model: `@default(dbgenerated("app_company()"))` and the relation to `Company`), then
 
 ```sql
 ALTER TABLE "x" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY company_isolation ON "x" USING (company_id = nullif(current_setting('app.company_id', true), '')::uuid) WITH CHECK (company_id = nullif(current_setting('app.company_id', true), '')::uuid);
+CREATE POLICY company_isolation ON "x" USING (company_id = (SELECT app_company())) WITH CHECK (company_id = (SELECT app_company()));
 GRANT SELECT, INSERT, UPDATE, DELETE ON "x" TO kebo_app;
 -- and for each link to another company table:
 CREATE TRIGGER same_company_x_y_fkey BEFORE INSERT OR UPDATE OF y_id ON "x" FOR EACH ROW EXECUTE FUNCTION enforce_same_company('y', 'y_id');
@@ -39,7 +45,8 @@ The companies test fails if a table with `company_id` is not under row-level sec
 
 ## Signing in
 
-- People sign in at the usual page with email and password. The email decides the company; if the same email and password fit two companies, they choose.
+- People sign in at the usual page with email and password. At a company's own address (or once they chose a company) only that company's account is tried. Otherwise the email decides the company; if the same email and password fit two companies, they choose.
+- A wrong email or password gets the same answer, after the same work (one password check). The sign-in history and the account lock are only written in a company where the email really has an account, so nobody can fill another company's history or lock its people by trying emails at it.
 - Sessions belong to one company. Sessions from before companies existed belong to the first company (Kebo), so nobody is signed out by the change.
 - Platform admins sign in at `/platform/login` with password and an authenticator code.
 
@@ -52,54 +59,60 @@ The companies test fails if a table with `company_id` is not under row-level sec
 
   Every feature that is off is hidden in the apps **and refused by the API** (code `plan_feature`); `test/companies.test.ts` checks each one.
 
-  | Feature | When off |
-  |---|---|
-  | Excel | no templates, uploads, exports or imports |
-  | Mobile app | the phone app cannot sign in, and its open sessions stop |
-  | Expenses | no expenses anywhere (orders, inquiries, customers, factories, Money) |
-  | Insights | no Insights pages or targets |
-  | Email reports | no daily summary or monthly email |
-  | Cash book | no cash book, accounts or transfers |
-  | Custom roles | only Super Admin, Manager and Staff (no new roles) |
-  | Audit log | no audit log page (each record's own history stays) |
-  | Website form | the company's website form is refused |
+  | Feature       | When off                                                              |
+  | ------------- | --------------------------------------------------------------------- |
+  | Excel         | no templates, uploads, exports or imports                             |
+  | Mobile app    | the phone app cannot sign in, and its open sessions stop              |
+  | Expenses      | no expenses anywhere (orders, inquiries, customers, factories, Money) |
+  | Insights      | no Insights pages or targets                                          |
+  | Email reports | no daily summary or monthly email                                     |
+  | Cash book     | no cash book, accounts or transfers                                   |
+  | Custom roles  | only Super Admin, Manager and Staff (no new roles)                    |
+  | Audit log     | no audit log page (each record's own history stays)                   |
+  | Website form  | the company's website form is refused                                 |
 
   Ready-made plans (made by a migration; change or remove them freely):
 
-  | | Starter | Team | Business | Unlimited |
-  |---|---|---|---|---|
-  | Price / month | $49 | $99 | $199 | $399 |
-  | People | 3 | 10 | 25 | no limit |
-  | Files | 2 GB | 10 GB | 50 GB | no limit |
-  | Features | Excel | + mobile app, expenses, Insights, email reports | everything | everything |
-- **Payments**: recorded by hand; each sets the new paid-until date.
+  |               | Starter | Team                                            | Business   | Unlimited  |
+  | ------------- | ------- | ----------------------------------------------- | ---------- | ---------- |
+  | Price / month | $49     | $99                                             | $199       | $399       |
+  | People        | 3       | 10                                              | 25         | no limit   |
+  | Files         | 2 GB    | 10 GB                                           | 50 GB      | no limit   |
+  | Features      | Excel   | + mobile app, expenses, Insights, email reports | everything | everything |
+
+- **Payments**: recorded by hand, for clients only (a demo or trial is made real first); each sets the new paid-until date.
 
 ### Automatic rules (the worker, every hour)
 
-| | When | Then |
-|---|---|---|
-| Demo / trial | 24 h before the end | email to its contact and the platform admins |
-| | ended | read-only (email) |
-| | 7 days after | switched off |
-| | 37 days after | **deleted** (data and files) |
-| Client | past paid-until | warning shown in the company |
-| | 7 days past | read-only (email) |
-| | 30 days past | switched off. **Never deleted.** |
+|              | When                | Then                                                                                                                                                                                                        |
+| ------------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Demo / trial | 24 h before the end | email to its contact and the platform admins                                                                                                                                                                |
+|              | ended               | read-only (email)                                                                                                                                                                                           |
+|              | 7 days after        | switched off                                                                                                                                                                                                |
+|              | 37 days after       | **deleted** (data and files), unless its status was set by hand, a payment was ever recorded for it, or it is paid until a date not yet passed: then it stays switched off for the platform admin to decide |
+| Client       | past paid-until     | warning shown in the company                                                                                                                                                                                |
+|              | 7 days past         | read-only (email)                                                                                                                                                                                           |
+|              | 30 days past        | switched off. **Never deleted.**                                                                                                                                                                            |
 
 Read-only: everyone can look, nothing can be changed. Off: nobody can sign in. A status set by hand is left alone by the rules.
 
+Before any company is deleted (by the rules or by the platform admin), a zip of all its data and files (the same as Export) is kept in storage at `archives/<short name>-<id>-<time>.zip`; the platform log names it. If it cannot be made, nothing is deleted.
+
 ### Self sign-up
 
-`/sign-up` makes a 14-day trial company with the person as tenant admin, after they confirm their email. It is closed until `SIGN_UP_OPEN=true` and email (SMTP) is set up; otherwise the page offers "Request a demo". The bot check uses Cloudflare Turnstile when `TURNSTILE_SECRET_KEY` is set; public forms are rate-limited.
+`/sign-up` makes a 14-day trial company with the person as tenant admin, after they confirm their email. It is closed until `SIGN_UP_OPEN=true` and email (SMTP) is set up; otherwise the page offers "Request a demo". The bot check uses Cloudflare Turnstile when `TURNSTILE_SECRET_KEY` is set (if Cloudflare cannot be reached, the form is refused with "try again in a few minutes", never let through); public forms are rate-limited.
 
 ## Running it
 
-| Setting | |
-|---|---|
-| `DEFAULT_COMPANY` | Short name of the company for requests that do not name one (the website form, old sessions). Default: the first company. |
-| `PLATFORM_EMAIL` | Where new client inquiries and platform warnings are emailed (comma-separated). Default: every platform admin. |
-| `SIGN_UP_OPEN` | `true` opens self sign-up (needs SMTP). |
-| `COMPANY_POOL_SIZE` | Database connections per active company (default 4; idle companies' connections close after 10 minutes). |
+| Setting                  |                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEFAULT_COMPANY`        | Short name of the company for requests that do not name one (the website form, old sessions). Default: the first company.                                                                                                                                                                                                                            |
+| `PLATFORM_EMAIL`         | Where new client inquiries and platform warnings are emailed (comma-separated). Default: every platform admin.                                                                                                                                                                                                                                       |
+| `SIGN_UP_OPEN`           | `true` opens self sign-up (needs SMTP).                                                                                                                                                                                                                                                                                                              |
+| `COMPANY_POOL_SIZE`      | Database connections per active company (default 2; idle companies' connections close after 10 minutes).                                                                                                                                                                                                                                             |
+| `COMPANY_POOLS_MAX`      | Companies with open connections at once, per process (default 20; the least recently used one is closed to make room). With the defaults, API and worker together hold at most 2 × (5 + (20 + 5) × 2) = 110 connections (5 just-closed pools may finish their work for up to 30 s); Postgres allows 200 (`max_connections` in `docker-compose.yml`). |
+| `COMPANY_DATABASE_URL`   | Where company connections log in. Default: `DATABASE_URL` with the user `kebo_app` and its password made from `AUTH_SECRET`.                                                                                                                                                                                                                         |
+| `SITE_VISITS_PER_MINUTE` | Page views the marketing site counts per address and minute (default 30).                                                                                                                                                                                                                                                                            |
 
 The first platform admin (and more), on the server:
 
@@ -109,7 +122,9 @@ docker compose exec api node apps/api/dist/cli/platform-admin.js list
 docker compose exec api node apps/api/dist/cli/platform-admin.js off someone@example.com
 ```
 
-Restoring a backup (into a new database server: create the role `kebo_app` first): see `docs/restore.md`.
+Restoring a backup into a new database server: create the role `kebo_app` first, then follow `docs/restore.md`; the API gives the role its login and password when it starts.
+
+**The website form** (the company's own website sending inquiries): each company has a form key, shown with a ready-made snippet in Settings → Website form (Super Admin, who can also make a new one; the old one then stops working). The key decides the company; `?company=` and `X-Company` do not. Without a key, only the sites in `PUBLIC_FORM_ORIGINS` are accepted, for the default company (so keboint.com keeps working). The answer is only "thank you": no inquiry number. See `docs/website-form.md`.
 
 ## Moving Kebo (the first deploy of this)
 
@@ -129,14 +144,14 @@ Off while `BASE_DOMAIN` is empty: then every company works at the one address, t
 
 When on (`BASE_DOMAIN=rfq.fawadiqbal.dev`, `ROOT_COMPANY=kebo`):
 
-| Address | Is |
-|---|---|
-| `acme.rfq.fawadiqbal.dev` | the company with the short name `acme`: its sign-in page shows its name, only its accounts can sign in there, and a session from another company is refused. |
-| `admin.rfq.fawadiqbal.dev` | the platform area (`/platform` anywhere else is sent there). Opening a company takes the platform admin to the company's address with a one-time link (2 minutes). |
-| `get.rfq.fawadiqbal.dev` | the marketing site (request a demo, sign up). |
-| `rfq.fawadiqbal.dev` | sends every page on to `kebo.rfq.fawadiqbal.dev` (same path), except the marketing pages (to `get.`), set-password links from older emails, and the phone app's PDFs. `/api` is not a page: the phone app keeps working here. |
-| a renamed company's old name | sends people on to the new one for 30 days, and stays held that long |
-| an unknown name | "There is no company at this address" |
+| Address                      | Is                                                                                                                                                                                                                            |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `acme.rfq.fawadiqbal.dev`    | the company with the short name `acme`: its sign-in page shows its name, only its accounts can sign in there, and a session from another company is refused.                                                                  |
+| `admin.rfq.fawadiqbal.dev`   | the platform area (`/platform` anywhere else is sent there). Opening a company takes the platform admin to the company's address with a one-time link (2 minutes).                                                            |
+| `get.rfq.fawadiqbal.dev`     | the marketing site (request a demo, sign up).                                                                                                                                                                                 |
+| `rfq.fawadiqbal.dev`         | sends every page on to `kebo.rfq.fawadiqbal.dev` (same path), except the marketing pages (to `get.`), set-password links from older emails, and the phone app's PDFs. `/api` is not a page: the phone app keeps working here. |
+| a renamed company's old name | sends people on to the new one for 30 days, and stays held that long                                                                                                                                                          |
+| an unknown name              | "There is no company at this address"                                                                                                                                                                                         |
 
 New companies get their address from the short name made when they are created. Short names follow the rules for addresses (3–30 characters, a–z 0–9 and dashes; reserved names such as `admin`, `www`, `api`, `get` refused). Emails link to the company's own address.
 

@@ -44,12 +44,16 @@ x-server-env: &server-env
   BASE_DOMAIN: ${BASE_DOMAIN:-}
   PLATFORM_EMAIL: ${PLATFORM_EMAIL:-}
   SIGN_UP_OPEN: ${SIGN_UP_OPEN:-false}
-  COMPANY_POOL_SIZE: ${COMPANY_POOL_SIZE:-4}
+  COMPANY_POOL_SIZE: ${COMPANY_POOL_SIZE:-2}
+  COMPANY_POOLS_MAX: ${COMPANY_POOLS_MAX:-20}
+  # Empty: company connections log in as kebo_app with a password made from AUTH_SECRET (set up by the API).
+  COMPANY_DATABASE_URL: ${COMPANY_DATABASE_URL:-}
 
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    command: postgres -c max_connections=200
     environment:
       POSTGRES_DB: kebo
       POSTGRES_USER: kebo

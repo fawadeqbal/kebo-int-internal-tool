@@ -33,26 +33,30 @@ export class AuthService {
     private readonly limits: LimitsService,
   ) {}
 
-  private async limitIp(ip: string, attempt: { email: string; userId?: string | null; userAgent?: string }) {
+  /** Too many sign-ins from this address: true the first time over the limit in a window (to record it once). */
+  private overIpLimit(ip: string): { over: false } | { over: true; first: boolean; minutes: number } {
     const now = Date.now();
+    if (this.attempts.size > 20_000) for (const [k, e] of this.attempts) if (e.resetAt < now) this.attempts.delete(k);
     if (this.attempts.size > 20_000) this.attempts.clear();
     const entry = this.attempts.get(ip);
     if (!entry || entry.resetAt < now) {
       this.attempts.set(ip, { count: 1, resetAt: now + IP_WINDOW_MS });
-      return;
+      return { over: false };
     }
     entry.count += 1;
-    if (entry.count > IP_LIMIT) {
-      // Kept once per window, so a flood does not fill the history.
-      if (entry.count === IP_LIMIT + 1) await this.record({ ...attempt, ip, result: "too_many" });
-      throw new HttpException(
-        { message: `Too many sign-in attempts. Try again in ${Math.ceil((entry.resetAt - now) / 60000)} minutes.` },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
+    if (entry.count <= IP_LIMIT) return { over: false };
+    return { over: true, first: entry.count === IP_LIMIT + 1, minutes: Math.ceil((entry.resetAt - now) / 60000) };
   }
 
-  /** One line of the sign-in history. Never stops a sign-in. */
+  private tooMany(minutes: number) {
+    return new HttpException({ message: `Too many sign-in attempts. Try again in ${minutes} minutes.` }, HttpStatus.TOO_MANY_REQUESTS);
+  }
+
+  /**
+   * One line of the sign-in history, in the current company. Only ever for an
+   * account of that company (callers make sure), so nobody can fill another
+   * company's history by trying emails at it. Never stops a sign-in.
+   */
   private async record(a: {
     email: string;
     userId?: string | null;
@@ -76,50 +80,87 @@ export class AuthService {
       .catch(() => undefined);
   }
 
-  /**
-   * Which company the sign-in is for. The email decides: the companies where it
-   * is someone's account (a company chosen on the sign-in page narrows it).
-   * When it is in several, the password decides; if it fits more than one, the
-   * person chooses (only companies whose password fits are named, so the list
-   * never tells a stranger where an email has accounts).
-   */
-  private async companyFor(email: string, password: string, chosen?: string) {
-    const rows = await this.prisma.platform.$queryRaw<{ company_id: string; slug: string; name: string; password_hash: string }[]>`
+  /** The accounts this email has (in the named company only, when one is named). */
+  private async accountsOf(email: string, named?: string) {
+    const only = named ? await this.companies.bySlug(named) : null;
+    if (named && !only) return [];
+    return this.prisma.platform.$queryRaw<{ company_id: string; slug: string; name: string; password_hash: string }[]>`
       select u.company_id, c.slug, c.name, u.password_hash
       from users u join companies c on c.id = u.company_id
       where u.email = ${email} and not u.is_system and u.platform_admin_id is null and c.status <> 'deleted'
+        and (${only?.id ?? null}::uuid is null or u.company_id = ${only?.id ?? null}::uuid)
       order by c.created_at`;
-    const pool = chosen ? rows.filter((r) => r.slug === chosen.trim().toLowerCase()) : rows;
-    let pick = pool[0];
-    if (pool.length > 1) {
-      const fits: typeof pool = [];
-      for (const r of pool) if (await bcrypt.compare(password, r.password_hash).catch(() => false)) fits.push(r);
-      if (fits.length > 1) {
-        throw new HttpException(
-          { message: "Your email is in more than one company. Choose the one to sign in to.", code: "choose_company", companies: fits.map((r) => ({ slug: r.slug, name: r.name })) },
-          HttpStatus.CONFLICT,
-        );
-      }
-      pick = fits[0] ?? pool[0];
-    }
-    if (pick) return this.companies.byId(pick.company_id);
-    // Unknown email: carry on in the request's company, so the answer looks and takes the same.
-    return CompanyContext.current() ?? (await this.companies.defaultCompany());
   }
 
-  async login(email: string, password: string, meta: { ip: string; userAgent?: string }, chosenCompany?: string) {
-    await this.limitIp(meta.ip, { email, userAgent: meta.userAgent });
-    const company = await this.companyFor(email.trim().toLowerCase(), password, chosenCompany);
-    if (!company) throw new HttpException({ message: "Wrong email or password." }, HttpStatus.UNAUTHORIZED);
-    CompanyContext.set(company);
-    const user = await this.prisma.db.user.findFirst({ where: { email: email.trim().toLowerCase() }, include: { access: true } });
-    const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH).catch(() => false);
+  /**
+   * Which company the sign-in is for. A company named by the request (its
+   * address, or the one the person chose) is the only one considered. Otherwise
+   * the email decides: the companies where it is someone's account. When it is
+   * in several, the password decides; if it fits more than one, the person
+   * chooses (only companies whose password fits are named, so the list never
+   * tells a stranger where an email has accounts).
+   * Null: the email has no account there. `fits`: the password was already
+   * checked against the picked account (so it is not checked twice).
+   */
+  private async companyFor(email: string, password: string, named?: string) {
+    const pool = await this.accountsOf(email, named);
+    if (pool.length <= 1) return pool[0] ? { company: await this.companies.byId(pool[0].company_id), fits: null } : null;
+    const fits: typeof pool = [];
+    for (const r of pool) if (await bcrypt.compare(password, r.password_hash).catch(() => false)) fits.push(r);
+    if (fits.length > 1) {
+      throw new HttpException(
+        {
+          message: "Your email is in more than one company. Choose the one to sign in to.",
+          code: "choose_company",
+          companies: fits.map((r) => ({ slug: r.slug, name: r.name })),
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+    return { company: await this.companies.byId((fits[0] ?? pool[0]).company_id), fits: fits.length === 1 };
+  }
+
+  /**
+   * Sign in. `named`: the company the request is for (its address, or the one
+   * the person chose); only that company's account is tried. Every answer for a
+   * wrong email or password is the same and takes about as long (one password
+   * check, against a stand-in when there is no account).
+   */
+  async login(email: string, password: string, meta: { ip: string; userAgent?: string }, named?: string) {
+    const address = email.trim().toLowerCase();
     const wrong = new HttpException({ message: "Wrong email or password." }, HttpStatus.UNAUTHORIZED);
-    const attempt = { email, userId: user && !user.isSystem ? user.id : null, ip: meta.ip, userAgent: meta.userAgent };
-    if (!user || user.isSystem || user.platformAdminId) {
-      await this.record({ ...attempt, result: "unknown_email" });
+    const limit = this.overIpLimit(meta.ip);
+    if (limit.over) {
+      // Kept once per window, in the companies where this email is an account, so a flood does not fill the history.
+      if (limit.first) {
+        for (const a of await this.accountsOf(address, named)) {
+          const company = await this.companies.byId(a.company_id);
+          if (company)
+            await CompanyContext.run(company, () =>
+              this.record({ email: address, ip: meta.ip, userAgent: meta.userAgent, result: "too_many" }),
+            );
+        }
+      }
+      throw this.tooMany(limit.minutes);
+    }
+    const found = await this.companyFor(address, password, named);
+    if (!found?.company) {
+      // No account here: the same answer, after the same work; nothing is written anywhere.
+      await bcrypt.compare(password, DUMMY_HASH).catch(() => false);
       throw wrong;
     }
+    const company = found.company;
+    CompanyContext.set(company);
+    const user = await this.prisma.db.user.findFirst({
+      where: { email: address, isSystem: false, platformAdminId: null },
+      include: { access: true },
+    });
+    if (!user) {
+      await bcrypt.compare(password, DUMMY_HASH).catch(() => false);
+      throw wrong;
+    }
+    const ok = found.fits ?? (await bcrypt.compare(password, user.passwordHash).catch(() => false));
+    const attempt = { email, userId: user.id, ip: meta.ip, userAgent: meta.userAgent };
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       await this.record({ ...attempt, result: "locked" });
       throw new HttpException(
@@ -143,17 +184,30 @@ export class AuthService {
     }
     if (isMobileApp(meta.userAgent) && !(await this.limits.allows("mobile_app", company))) {
       await this.record({ ...attempt, result: "switched_off", detail: "the plan has no mobile app" });
-      throw new HttpException({ message: "Your company's plan does not include the mobile app. Sign in on the website, or ask for a bigger plan.", code: "plan_feature" }, HttpStatus.FORBIDDEN);
+      throw new HttpException(
+        {
+          message: "Your company's plan does not include the mobile app. Sign in on the website, or ask for a bigger plan.",
+          code: "plan_feature",
+        },
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     const twoStep = !!user.totpEnabledAt;
     const session = await this.prisma.tx(async (tx) => {
-      await tx.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, ...(twoStep ? {} : { lastLoginAt: new Date() }) } });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { failedLogins: 0, lockedUntil: null, ...(twoStep ? {} : { lastLoginAt: new Date() }) },
+      });
       // Tidy this person's finished sessions.
       await tx.session.deleteMany({
         where: {
           userId: user.id,
-          OR: [{ expiresAt: { lt: new Date() } }, { createdAt: { lt: new Date(Date.now() - SESSION_MAX_AGE_DAYS * 86_400_000) } }, { revokedAt: { not: null } }],
+          OR: [
+            { expiresAt: { lt: new Date() } },
+            { createdAt: { lt: new Date(Date.now() - SESSION_MAX_AGE_DAYS * 86_400_000) } },
+            { revokedAt: { not: null } },
+          ],
         },
       });
       const s = await tx.session.create({
@@ -165,7 +219,13 @@ export class AuthService {
           pendingTwoStep: twoStep,
         },
       });
-      await this.audit.record(tx, { userId: user.id, action: "login", entityType: "user", entityId: user.id, summary: `Signed in from ${meta.ip}` });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "login",
+        entityType: "user",
+        entityId: user.id,
+        summary: `Signed in from ${meta.ip}`,
+      });
       return s;
     });
     const setup = user.access.requireTwoStep && !twoStep;
@@ -197,7 +257,18 @@ export class AuthService {
     const session =
       claims &&
       (await this.prisma.db.session.findUnique({ where: { id: claims.sessionId }, include: { user: { include: { access: true } } } }));
-    await this.limitIp(meta.ip, { email: session?.user.email ?? "", userId: session?.userId, userAgent: meta.userAgent });
+    const limit = this.overIpLimit(meta.ip);
+    if (limit.over) {
+      if (limit.first && session)
+        await this.record({
+          email: session.user.email,
+          userId: session.userId,
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          result: "too_many",
+        });
+      throw this.tooMany(limit.minutes);
+    }
     if (!session || !session.pendingTwoStep || session.revokedAt || session.expiresAt < new Date() || session.userId !== claims.userId) {
       throw new HttpException({ message: "Sign in with your password again." }, HttpStatus.UNAUTHORIZED);
     }
@@ -206,7 +277,11 @@ export class AuthService {
     if (!result.ok) {
       await this.record({ ...attempt, result: result.locked ? "locked" : "wrong_code" });
       throw new HttpException(
-        { message: result.locked ? "Too many wrong codes. This account is locked for a few minutes." : "That code is not right. Enter the newest code from your app." },
+        {
+          message: result.locked
+            ? "Too many wrong codes. This account is locked for a few minutes."
+            : "That code is not right. Enter the newest code from your app.",
+        },
         result.locked ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.UNAUTHORIZED,
       );
     }
@@ -240,10 +315,22 @@ export class AuthService {
     const claims = await this.tokens.verifyPurpose("enter", token);
     const company = claims && (await this.companies.byId(String(claims.cid)));
     const session = company && (await this.prisma.company(company.id).session.findUnique({ where: { id: String(claims.sid) } }));
-    if (!claims || !company || !session || session.userId !== claims.uid || session.revokedAt || session.expiresAt < new Date() || Date.now() - session.createdAt.getTime() > 5 * 60_000) {
+    if (
+      !claims ||
+      !company ||
+      !session ||
+      session.userId !== claims.uid ||
+      session.revokedAt ||
+      session.expiresAt < new Date() ||
+      Date.now() - session.createdAt.getTime() > 5 * 60_000
+    ) {
       throw new HttpException({ message: "This link has expired. Open the company again from the platform." }, HttpStatus.UNAUTHORIZED);
     }
-    return { token: await this.tokens.sign(session.userId, session.id, company.id), expiresInSeconds: Math.max(60, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000)), slug: company.slug };
+    return {
+      token: await this.tokens.sign(session.userId, session.id, company.id),
+      expiresInSeconds: Math.max(60, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000)),
+      slug: company.slug,
+    };
   }
 
   async logout(user: SessionUser) {

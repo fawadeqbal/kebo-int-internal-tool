@@ -386,17 +386,23 @@ export class PlatformCompaniesService {
     return this.get(id);
   }
 
-  /** Delete a company: all its data and files. Its row stays (deleted) and holds the short name for a while. */
+  /** Delete a company: all its data and files (a copy is kept in storage first). Its row stays (deleted) and holds the short name for a while. */
   async remove(actor: Actor, id: string, reason?: string) {
     const c = await this.one(id);
+    const archive = await this.data.archive(id, c.slug);
     const { files } = await this.data.clear(id, true);
     await this.db.company.update({
       where: { id },
       data: { status: "deleted", statusManual: false, statusReason: reason ?? "Deleted", deletedAt: new Date() },
     });
-    await this.log(actor, "delete", `Deleted ${c.name} (${c.slug}): all its data and ${files} file(s)${reason ? ` — ${reason}` : ""}`, {
-      companyId: id,
-    });
+    await this.log(
+      actor,
+      "delete",
+      `Deleted ${c.name} (${c.slug}): all its data and ${files} file(s)${reason ? ` — ${reason}` : ""} (a copy is kept at ${archive})`,
+      {
+        companyId: id,
+      },
+    );
     this.companies.forget(id);
     return { ok: true };
   }
@@ -429,6 +435,8 @@ export class PlatformCompaniesService {
   /** A payment from the company (recorded by hand): it is paid until the given date. */
   async recordPayment(actor: Actor, id: string, input: z.infer<typeof subscriptionPaymentInput>) {
     const c = await this.one(id);
+    // A demo or trial that pays becomes a client first (Make it real), so the rules never delete a paying company.
+    if (c.kind !== "client") throw new DomainError(`Make the ${c.kind} a real company first, then record its payments.`);
     await this.db.subscriptionPayment.create({
       data: {
         companyId: id,
