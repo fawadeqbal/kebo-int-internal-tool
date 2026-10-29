@@ -66,11 +66,14 @@ describe("company connection pools", () => {
     expect(closed).toEqual(["a"]);
   });
 
-  it("never holds more than max companies, however many ask", () => {
+  it("never holds more than max companies (and a few closing), however many ask", () => {
     const p = pools(3);
     for (let i = 0; i < 50; i++) p.get(`c${i}`);
     expect(p.size).toBe(3);
     expect(p.ids()).toEqual(["c47", "c48", "c49"]);
+    // Only the last 5 closed wait out the grace time; the others were closed at once.
+    expect(closed).toHaveLength(42);
+    expect(made.length - closed.length).toBe(3 + 5);
     vi.advanceTimersByTime(1_000);
     expect(closed).toHaveLength(47);
   });

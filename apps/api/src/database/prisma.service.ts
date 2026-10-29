@@ -6,8 +6,10 @@ import { CompanyPools } from "./company-pools";
 
 /** A company's connection is closed after this long unused. */
 const IDLE_MS = 10 * 60_000;
-/** A connection closed to make room is ended this long after, so work still using it finishes. */
-const GRACE_MS = 60_000;
+/** A connection closed to make room is ended this long after, so work still using it finishes (transactions time out at 15 s). */
+const GRACE_MS = 30_000;
+/** Closed connections waiting out that time at once. */
+const MAX_CLOSING = 5;
 
 /**
  * The database. Company data is only reachable through a company connection:
@@ -24,7 +26,10 @@ const GRACE_MS = 60_000;
  *   (companies, plans, leads…). Never for company data.
  *
  * Connections: the owner's pool (5), and up to COMPANY_POOLS_MAX companies' pools
- * of COMPANY_POOL_SIZE each (the least recently used company's is closed to make room).
+ * of COMPANY_POOL_SIZE each (the least recently used company's is closed to make
+ * room; a few just closed may finish their work first). Defaults: at most
+ * 5 + (20 + 5) × 2 = 55 per process, API and worker together 110, under
+ * Postgres' max_connections of 200.
  */
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
@@ -40,6 +45,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     this.companyUrl = companyDatabaseUrl(env.DATABASE_URL, env.AUTH_SECRET, env.COMPANY_DATABASE_URL);
     this.pools = new CompanyPools<PrismaClient>({
       max: env.COMPANY_POOLS_MAX,
+      maxClosing: MAX_CLOSING,
       idleMs: IDLE_MS,
       graceMs: GRACE_MS,
       create: (companyId) => createPrismaClient({ url: this.companyUrl, companyId, poolSize: env.COMPANY_POOL_SIZE, logQueries }),

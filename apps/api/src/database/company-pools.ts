@@ -7,6 +7,9 @@
  *
  * A closed one is not cut off at once: it is closed after `graceMs`, so a
  * request still using it finishes; asked for again before then, it is reused.
+ * At most `maxClosing` wait like that (the oldest is closed at once to make
+ * room), so a process holds at most (max + maxClosing) pools however fast
+ * companies come and go.
  */
 export class CompanyPools<T> {
   /** In use order: the first is the least recently used (a Map keeps insertion order). */
@@ -16,6 +19,8 @@ export class CompanyPools<T> {
   constructor(
     private readonly opts: {
       max: number;
+      /** Pools waiting out the grace time at once (default 5). */
+      maxClosing?: number;
       idleMs: number;
       graceMs: number;
       create: (companyId: string) => T;
@@ -96,5 +101,11 @@ export class CompanyPools<T> {
     }, this.opts.graceMs);
     timer.unref();
     this.closing.set(companyId, { client: c.client, timer });
+    while (this.closing.size > (this.opts.maxClosing ?? 5)) {
+      const [oldestId, oldest] = this.closing.entries().next().value!;
+      clearTimeout(oldest.timer);
+      this.closing.delete(oldestId);
+      void this.opts.close(oldest.client, oldestId);
+    }
   }
 }
