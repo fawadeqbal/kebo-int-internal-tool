@@ -17,6 +17,8 @@ COPY --from=prune /repo/out/full/ .
 RUN pnpm turbo run build --filter=@kebo/web...
 
 FROM node:22-alpine AS runner
+# Kept by the nightly cleanup (deploy/server/docker-cleanup.sh): the :previous image a failed deploy goes back to.
+LABEL desk.kebo.keep="true"
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 CHROME_PATH=/usr/bin/chromium
 RUN apk add --no-cache tini chromium font-noto font-noto-cjk font-liberation && addgroup -S app && adduser -S app -G app
