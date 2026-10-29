@@ -17,6 +17,10 @@ export interface SettingField {
   options?: { value: string; label: string }[];
   wide?: boolean;
   placeholder?: string;
+  /** Images: what it is ("logo"), for "No logo" and "Remove the logo". */
+  noun?: string;
+  /** Images: made at most this many pixels wide and high before saving (a logo); none: kept as chosen. */
+  maxPixels?: number;
 }
 
 export interface SettingGroup {
@@ -33,11 +37,22 @@ export const SETTING_GROUPS: SettingGroup[] = [
   {
     key: "company",
     title: "Company",
-    description: "Printed on quotations, invoices and packing lists.",
+    description: "Printed on quotations, invoices and packing lists. The first five make the top of every document; the preview shows it as you type.",
     save: "Save company details",
     fields: [
-      { name: "name", label: "Company name", kind: "text", wide: true, hint: "The legal name in English, as on contracts" },
-      { name: "nameLocal", label: "Name in Chinese", kind: "text", hint: "Printed above the English name", placeholder: "山东科波国际贸易有限公司" },
+      {
+        name: "logo",
+        label: "Logo",
+        kind: "image",
+        wide: true,
+        noun: "logo",
+        maxPixels: 360,
+        hint: "At the top left of every document and beside the company name in the app. A square PNG or JPEG works best; without one, the title's initials show in a ring.",
+      },
+      { name: "brandMark", label: "Title on documents", kind: "text", hint: "The big word beside the logo, e.g. KEBO. Empty: made from the company name.", placeholder: "KEBO" },
+      { name: "brandTagline", label: "Line under the title", kind: "text", hint: "Small letters under it, e.g. INTERNATIONAL TRADE. Empty: none.", placeholder: "INTERNATIONAL TRADE" },
+      { name: "name", label: "Company name", kind: "text", hint: "The legal name in English, as on contracts" },
+      { name: "nameLocal", label: "Name in Chinese", kind: "text", hint: "Printed beside the English name, if given" },
       { name: "taxNo", label: "Business license number", kind: "text", hint: "Unified social credit code" },
       { name: "address", label: "Address", kind: "textarea", wide: true },
       { name: "phone", label: "Phone", kind: "text" },
@@ -47,7 +62,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "bankDetails", label: "Bank details for customers", kind: "textarea", wide: true, hint: "Beneficiary, bank, SWIFT and account number, printed on invoices so customers can pay" },
       { name: "invoiceFooter", label: "Invoice footer", kind: "textarea", wide: true, hint: "A line at the bottom of every invoice, e.g. thanks or payment notes" },
       { name: "proformaPrefix", label: "Proforma number starts with", kind: "text", hint: "e.g. ABC in ABC260916TN07 (then the issue date, the customer's letters and the handler's count this year)" },
-      { name: "stamp", label: "Company stamp", kind: "image", wide: true, hint: "The red seal printed on proforma invoices. A PNG or JPEG under 300 KB, scanned on white." },
+      { name: "stamp", label: "Company stamp", kind: "image", wide: true, noun: "stamp", hint: "The red seal printed on proforma invoices. A PNG or JPEG under 300 KB, scanned on white." },
     ],
   },
   {

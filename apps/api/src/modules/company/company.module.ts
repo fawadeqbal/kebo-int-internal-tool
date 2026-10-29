@@ -3,7 +3,7 @@ import { Body, Controller, Get, HttpCode, Inject, Module, Post, Put, Query } fro
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { fromDbDateOrNull } from "@kebo/database";
-import { companyOrigin, LIFECYCLE, slugField } from "@kebo/shared";
+import { brandMarkOf, companyOrigin, LIFECYCLE, slugField } from "@kebo/shared";
 import { addDays, ConflictError, DomainError, ForbiddenError, todayIn } from "@kebo/utils";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
@@ -13,6 +13,8 @@ import { Validate } from "../../common/http/zod.pipe";
 import { AuditService } from "../../common/audit/audit.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { CompaniesService } from "../../common/company/companies.service";
+import { SettingsService } from "../settings/settings.service";
+import { SettingsModule } from "../settings/settings.module";
 import { LimitsService } from "../../common/company/limits.service";
 
 /**
@@ -28,8 +30,20 @@ class CompanyController {
     private readonly limits: LimitsService,
     private readonly companies: CompaniesService,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
     @Inject(ENV) private readonly env: Env,
   ) {}
+
+  /**
+   * The company's brand on its documents and in the app, from Settings → Company:
+   * its logo (or none), the title ("KEBO", or made from its name), the line under
+   * it, and its name and name in Chinese. For everyone signed in (documents are printed by all).
+   */
+  @Get("brand")
+  async brand() {
+    const c = (await this.settings.get()).company;
+    return { logo: c.logo || null, mark: brandMarkOf(c.brandMark, c.name), tagline: c.brandTagline || null, name: c.name, nameLocal: c.nameLocal || null };
+  }
 
   /* ---------------------------------------------------------------- address */
 
@@ -192,5 +206,5 @@ class CompanyController {
   }
 }
 
-@Module({ controllers: [CompanyController] })
+@Module({ imports: [SettingsModule], controllers: [CompanyController] })
 export class CompanyModule {}

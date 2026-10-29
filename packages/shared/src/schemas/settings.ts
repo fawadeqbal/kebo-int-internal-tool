@@ -9,24 +9,22 @@ import { DEFAULT_ORDER_REMINDER_DAYS } from "../workflows/order";
  */
 const days = (fallback: number, max = 365) => z.coerce.number().int().min(0).max(max).default(fallback);
 
-/** Kebo's details as on its proforma invoices (used until changed in Settings). */
+/**
+ * The company's own details, printed on its documents: everything blank until
+ * the company fills it in under Settings → Company (nothing here belongs to any
+ * one company).
+ */
 export const companySettings = z.object({
-  name: z.string().trim().min(1).max(200).default("Shandong Kebo International Trade Co., Ltd."),
-  nameLocal: z.string().trim().max(120).default("山东科波国际贸易有限公司"),
-  address: z.string().trim().max(500).default("No.5, Jielu Road, High-Tech Zone, City Jining, Shandong, China"),
-  phone: z.string().trim().max(60).default("+86-151-54754812  +86-178-53758700"),
-  email: z.string().trim().max(254).default("shandongkeboint@gmail.com"),
+  name: z.string().trim().min(1).max(200).default("Company"),
+  nameLocal: z.string().trim().max(120).default(""),
+  address: z.string().trim().max(500).default(""),
+  phone: z.string().trim().max(60).default(""),
+  email: z.string().trim().max(254).default(""),
   email2: z.string().trim().max(254).default(""),
-  website: z.string().trim().max(120).default("www.keboint.com"),
+  website: z.string().trim().max(120).default(""),
   /** Business license number (unified social credit code). */
-  taxNo: z.string().trim().max(60).default("91370811MAK4PH5B1N"),
-  bankDetails: z
-    .string()
-    .trim()
-    .max(1000)
-    .default(
-      "ACCOUNT NAME: SHANDONG KEBO INTERNATIONAL TRADE CO., LTD.\nBANK NAME: BANK OF CHINA RENCHENG SUB BRANCH\nBANK ADDRESS: B.O.C TOWER,1 TAIBAI ROAD JINING, SHANDONG, P, R. CHINA,\nPOST CODE: 272000\nSWIFT CODE: BKCHCNBJ500\nACCOUNT NO: 242895006310",
-    ),
+  taxNo: z.string().trim().max(60).default(""),
+  bankDetails: z.string().trim().max(1000).default(""),
   invoiceFooter: z.string().trim().max(1000).default(""),
   /** Starts every proforma number, e.g. KEB in KEB260916TN07. */
   proformaPrefix: z
@@ -34,7 +32,18 @@ export const companySettings = z.object({
     .trim()
     .toUpperCase()
     .regex(/^[A-Z]{1,6}$/, "Use 1 to 6 letters")
-    .default("KEB"),
+    .default("PI"),
+  /** The company's logo at the top of every document (and beside its name in the app): a PNG/JPEG image as a data URL, or empty. */
+  logo: z
+    .string()
+    .trim()
+    .max(400_000, "The logo image is too large (keep it under 300 KB)")
+    .refine((v) => v === "" || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v), "Upload the logo as a PNG or JPEG image")
+    .default(""),
+  /** The title beside the logo on documents (a short name, e.g. "KEBO"); empty: made from the company name. */
+  brandMark: z.string().trim().max(24).default(""),
+  /** The line under the title (e.g. "INTERNATIONAL TRADE"); empty: none. */
+  brandTagline: z.string().trim().max(40).default(""),
   /** The company stamp (seal) printed on proforma invoices: a PNG/JPEG image as a data URL, or empty. */
   stamp: z
     .string()
@@ -113,4 +122,18 @@ export function readSettings(stored: Partial<Record<string, unknown>>): Settings
     out[key] = parsed.success ? parsed.data : SETTINGS[key].parse({});
   }
   return out as Settings;
+}
+
+/** Words that do not tell a company apart ("Co., Ltd."), left out of the mark made from its name. */
+const GENERIC_WORDS = new Set(["co", "company", "ltd", "limited", "llc", "inc", "corp", "corporation", "pvt", "private", "the", "group", "gmbh", "plc", "and", "&"]);
+
+/** The big word on a company's documents: the one it chose, else its name's first one or two words ("Meray Company" → "MERAY"). */
+export function brandMarkOf(mark: string | null | undefined, name: string): string {
+  if (mark?.trim()) return mark.trim().toUpperCase();
+  const words = name
+    .replace(/[.,()]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !GENERIC_WORDS.has(w.toLowerCase()));
+  const two = words.slice(0, 2).join(" ");
+  return (two.length <= 14 ? two : (words[0] ?? name)).toUpperCase().slice(0, 24);
 }

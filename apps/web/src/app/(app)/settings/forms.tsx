@@ -1,9 +1,9 @@
 "use client";
 
 import { useFeature } from "@/components/common/features";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { restateRates } from "@kebo/money";
-import { CURRENCIES, CURRENCY_LABEL, type SettingsKey } from "@kebo/shared";
+import { brandMarkOf, CURRENCIES, CURRENCY_LABEL, type SettingsKey } from "@kebo/shared";
 import { Card, CardBody, CardFooter, CardHeader, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -12,48 +12,132 @@ import { SETTING_GROUPS, toFormText, type SettingField } from "./groups";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/** An image kept in the settings as a data URL (the company stamp): choose, preview, remove. */
+/** A picture made at most `max` pixels wide and high (keeps its shape), as a PNG data URL. */
+function shrink(dataUrl: string, max: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      if (scale === 1) return resolve(dataUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/** An image kept in the settings as a data URL (the logo, the stamp): choose, preview, remove. */
 function ImageControl({ f, text, error }: { f: SettingField; text: string; error?: string[] }) {
   const id = `set-${f.name}`;
+  const noun = f.noun ?? "image";
   const [value, setValue] = useState(text);
   const [problem, setProblem] = useState<string | null>(null);
+  const hidden = useRef<HTMLInputElement>(null);
+  // Let the form know (the header preview follows it).
+  useEffect(() => {
+    hidden.current?.dispatchEvent(new Event("input", { bubbles: true }));
+  }, [value]);
   const choose = (file: File | undefined) => {
     setProblem(null);
     if (!file) return;
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return setProblem("Choose a PNG or JPEG image.");
-    if (file.size > 300 * 1024) return setProblem("This image is over 300 KB. Use a smaller scan.");
+    if (file.size > (f.maxPixels ? 5 * 1024 : 300) * 1024) return setProblem(`This image is over ${f.maxPixels ? "5 MB" : "300 KB"}. Use a smaller one.`);
     const reader = new FileReader();
-    reader.onload = () => setValue(String(reader.result));
+    reader.onload = async () => {
+      const url = f.maxPixels ? await shrink(String(reader.result), f.maxPixels) : String(reader.result);
+      if (url.length > 400_000) return setProblem("This image is still too large after making it smaller. Use a simpler one.");
+      setValue(url);
+    };
     reader.readAsDataURL(file);
   };
   return (
     <Field label={f.label} htmlFor={id} hint={f.hint} error={problem ? [problem] : error} className={cn(f.wide && "sm:col-span-2")}>
       <div className="flex flex-wrap items-center gap-4">
-        <input type="hidden" name={f.name} value={value} />
+        <input ref={hidden} type="hidden" name={f.name} value={value} />
         {value ? (
           // eslint-disable-next-line @next/next/no-img-element -- a data URL kept in the settings
           <img src={value} alt="" className="size-24 rounded-md border border-line bg-white object-contain p-1" />
         ) : (
-          <div className="flex size-24 items-center justify-center rounded-md border border-dashed border-line text-xs text-muted">
-            No stamp
-          </div>
+          <div className="flex size-24 items-center justify-center rounded-md border border-dashed border-line text-xs text-muted">No {noun}</div>
         )}
         <div className="flex flex-col gap-2">
-          <input
-            id={id}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="text-sm"
-            onChange={(e) => choose(e.target.files?.[0])}
-          />
+          <input id={id} type="file" accept="image/png,image/jpeg,image/webp" className="text-sm" onChange={(e) => choose(e.target.files?.[0])} />
           {value && (
             <button type="button" className="self-start text-sm text-bad underline-offset-2 hover:underline" onClick={() => setValue("")}>
-              Remove the stamp
+              Remove the {noun}
             </button>
           )}
         </div>
       </div>
     </Field>
+  );
+}
+
+/**
+ * The top of the company's documents as the fields above say right now: the
+ * logo (or the title's initials), the title, the line under it, and the names.
+ */
+function BrandPreview({ initial }: { initial: Record<string, unknown> }) {
+  const box = useRef<HTMLDivElement>(null);
+  const read = (form: HTMLFormElement | null) => {
+    const d = form ? new FormData(form) : null;
+    const v = (k: string) => String(d?.get(k) ?? initial[k] ?? "").trim();
+    return { logo: v("logo"), mark: v("brandMark"), tagline: v("brandTagline"), name: v("name"), nameLocal: v("nameLocal") };
+  };
+  const [b, setB] = useState(() => read(null));
+  useEffect(() => {
+    const form = box.current?.closest("form") ?? null;
+    if (!form) return;
+    const update = () => setB(read(form));
+    update();
+    form.addEventListener("input", update);
+    form.addEventListener("change", update);
+    return () => {
+      form.removeEventListener("input", update);
+      form.removeEventListener("change", update);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read() only uses the form and the first values
+  }, []);
+  const mark = brandMarkOf(b.mark, b.name || "Company");
+  const initials =
+    mark
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("") || "·";
+  return (
+    <div ref={box} className="sm:col-span-2">
+      <p className="mb-1.5 text-sm font-medium">The top of your documents</p>
+      <div className="overflow-x-auto rounded-lg border border-line bg-white p-5 text-[#1a1a1a]">
+        <div className="flex min-w-[26rem] items-center gap-3.5">
+          {b.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a data URL kept in the settings
+            <img src={b.logo} alt="" className="size-[70px] shrink-0 object-contain" />
+          ) : (
+            <div className="grid size-[62px] shrink-0 place-items-center rounded-full border-[3px] border-[#B08D3C] bg-[#063C8C] text-[22px] font-extrabold text-white">
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="text-[28px] leading-none font-extrabold tracking-[0.14em] text-[#063C8C]">{mark}</div>
+            {b.tagline && <div className="mt-0.5 text-[11.5px] font-semibold tracking-[0.18em] text-[#8A6A22]">{b.tagline.toUpperCase()}</div>}
+            <div className="mt-0.5 text-[11.5px] text-[#444]">
+              {b.name}
+              {b.nameLocal && ` · ${b.nameLocal}`}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex h-[3px]">
+          <div className="flex-[7] bg-[#063C8C]" />
+          <div className="flex-[3] bg-[#B08D3C]" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -211,6 +295,7 @@ export function SettingsGroupForm({
         <Card id={group.key} className="scroll-mt-20">
           <CardHeader title={group.title} description={group.description} />
           <CardBody className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
+            {group.key === "company" && <BrandPreview initial={values} />}
             {fields.map((f) =>
               f.kind === "currencies" ? (
                 <CurrenciesControl

@@ -511,6 +511,32 @@ describe("companies: isolation and the platform", () => {
     await check("evil.example.com").expect(404);
   });
 
+  it("every company's documents carry its own brand, from its settings; nothing of Kebo's is anyone else's", async () => {
+    // Kebo: its own details, logo, title and line (seeded as Kebo's).
+    const kebo = (await api(app, await signIn(app, "admin@example.com", "Admin@12345")).get("/company/brand").expect(200)).body;
+    expect(kebo).toMatchObject({ mark: "KEBO", tagline: "INTERNATIONAL TRADE", name: "Shandong Kebo International Trade Co., Ltd." });
+    expect(kebo.logo).toMatch(/^data:image\//);
+    // A new company: its name, nothing of Kebo's; the title made from the name, no logo.
+    const c = await makeCompany(`brand-${tag}`, { sampleData: false });
+    const mine = api(app, c.token);
+    expect((await mine.get("/company/brand").expect(200)).body).toEqual({
+      logo: null,
+      mark: `brand-${tag}`.toUpperCase(),
+      tagline: null,
+      name: `Company brand-${tag}`,
+      nameLocal: null,
+    });
+    const settings = (await mine.get("/settings").expect(200)).body.company;
+    for (const k of ["nameLocal", "address", "phone", "email", "website", "taxNo", "bankDetails", "logo", "stamp"]) expect(settings[k]).toBe("");
+    // Its own, from Settings → Company.
+    const logo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    await mine.put("/settings/company", { ...settings, brandMark: "Meray", brandTagline: "Global Sourcing", nameLocal: "梅雷公司", logo }).expect(200);
+    expect((await mine.get("/company/brand").expect(200)).body).toMatchObject({ logo, mark: "MERAY", tagline: "Global Sourcing", nameLocal: "梅雷公司" });
+    await mine.put("/settings/company", { ...settings, logo: "data:text/html;base64,PHNjcmlwdD4=" }).expect(422);
+    // Every sign-in here comes from one address: start the sign-in limit afresh for the tests after this one.
+    (app.get(AuthService) as unknown as { attempts: Map<string, unknown> }).attempts.clear();
+  });
+
   it("a company changes its own address: checked, held, sent on, once a month", async () => {
     const c = await makeCompany(`addr-${tag}`, { sampleData: false });
     const mine = api(app, c.token);

@@ -12,6 +12,7 @@ import "./env";
 import bcrypt from "bcryptjs";
 import { createPrismaClient, scriptCompanyUrl, seedCompanyBase, seedDemoData } from "../src";
 import { seedPeople } from "./seed-people";
+import { KEBO_PROFILE } from "./kebo-profile";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -44,6 +45,8 @@ async function main() {
       admin: { email: who.admin.email, name: who.admin.name, role: "admin", passwordHash: await hash(who.admin.password) },
       manager: { email: who.manager.email, name: who.manager.name, role: "manager", passwordHash: await hash(who.manager.password) },
       staff: { email: who.staff.email, name: who.staff.name, role: "staff", passwordHash: await hash(who.staff.password) },
+      // The first company, Kebo, gets its real details; any other starts blank with its own name.
+      ...(company.slug === "kebo" ? { profile: KEBO_PROFILE } : { companyName: company.name }),
       log,
     });
     if (demo) {
