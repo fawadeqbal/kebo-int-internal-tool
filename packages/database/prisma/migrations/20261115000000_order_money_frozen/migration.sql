@@ -9,7 +9,7 @@
 -- 1. The order's costs to reach the basis it was sold on.
 CREATE TABLE "order_costs" (
     "id" UUID NOT NULL,
-    "company_id" UUID NOT NULL DEFAULT (current_setting('app.company_id'::text))::uuid,
+    "company_id" UUID NOT NULL DEFAULT app_company(),
     "order_id" UUID NOT NULL,
     "step" "BasisStep" NOT NULL,
     "amount" DECIMAL(14,2) NOT NULL,
@@ -27,9 +27,10 @@ ALTER TABLE "order_costs" ADD CONSTRAINT "order_costs_order_id_fkey" FOREIGN KEY
 
 -- Kept apart per company like every company table (see the companies migration).
 ALTER TABLE "order_costs" ENABLE ROW LEVEL SECURITY;
+-- Like every company table since 20261114000000_company_role: the company the connection was opened for.
 CREATE POLICY company_isolation ON "order_costs"
-  USING (company_id = nullif(current_setting('app.company_id', true), '')::uuid)
-  WITH CHECK (company_id = nullif(current_setting('app.company_id', true), '')::uuid);
+  USING (company_id = (SELECT app_company()))
+  WITH CHECK (company_id = (SELECT app_company()));
 GRANT SELECT, INSERT, UPDATE, DELETE ON "order_costs" TO kebo_app;
 CREATE TRIGGER "same_company_order_costs_order_id_fkey" BEFORE INSERT OR UPDATE OF "order_id" ON "order_costs"
   FOR EACH ROW EXECUTE FUNCTION enforce_same_company('orders', 'order_id');

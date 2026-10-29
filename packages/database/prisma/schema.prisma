@@ -1021,7 +1021,7 @@ model OrderLine {
 model OrderCost {
   id        String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("(current_setting('app.company_id'::text))::uuid")) @map("company_id") @db.Uuid
+  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company   Company   @relation(fields: [companyId], references: [id])
   orderId   String    @map("order_id") @db.Uuid
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
