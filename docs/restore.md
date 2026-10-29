@@ -23,40 +23,32 @@ docker compose exec backup sh /backup.sh once   # a backup now (exit code 0 = go
 
 Off until `OFFSITE_S3_ENDPOINT` is set. Then, after each good nightly backup, the dump is copied and the files are synced (only what changed) to an S3 store of your own, ideally on another machine. Encrypted before it leaves the server when `OFFSITE_ENCRYPTION_PASSWORD` is set (rclone crypt): the store sees only scrambled names and contents. **Keep that password somewhere other than this server**: without it the off-site copy cannot be read.
 
-**On the other machine** (any with Docker; the port must be reachable from this server, best only from it, or through a VPN):
+**On the other machine** (any with Docker, not this server), one command:
 
 ```bash
-mkdir -p /srv/backup-minio/data
-openssl rand -hex 24 > /srv/backup-minio/root-password      # the store's own admin password
-openssl rand -hex 24                                         # note it: the server's secret key (below)
-docker run -d --name backup-minio --restart unless-stopped --user 0:0 -p 9000:9000 \
-  -v /srv/backup-minio/data:/data -e MINIO_ROOT_USER=admin -e MINIO_ROOT_PASSWORD="$(cat /srv/backup-minio/root-password)" \
-  cgr.dev/chainguard/minio:latest server /data
-# A bucket, and a key that can only use it (the same MinIO image as the app's; mc from Chainguard too):
-cat > /srv/backup-minio/policy.json <<'JSON'
-{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::kebo-backups","arn:aws:s3:::kebo-backups/*"]}]}
-JSON
-mc() { docker run --rm --network container:backup-minio -v /srv/backup-minio:/cfg -e MC_HOST_local="http://admin:$(cat /srv/backup-minio/root-password)@localhost:9000" cgr.dev/chainguard/minio-client:latest "$@"; }
-mc mb local/kebo-backups
-mc admin policy create local kebo-backups /cfg/policy.json
-mc admin user add local kebo-desk <the secret key you noted>
-mc admin policy attach local kebo-backups --user kebo-desk
+curl -fsSL https://raw.githubusercontent.com/fawadeqbal/kebo-int-internal-tool/main/deploy/offsite-minio/setup.sh | sudo bash -s -- http://<that machine's IP>:9000
 ```
 
-Put it behind HTTPS (e.g. Caddy) when it is reached over the internet.
+It starts MinIO (data in `/srv/backup-minio`), makes the bucket `kebo-backups` and a key that can use only it, and prints the `OFFSITE_*` lines. Save `OFFSITE_ENCRYPTION_PASSWORD` in your password manager, then delete that machine's copy (`rm /srv/backup-minio/encryption-password`). Let only this server reach the port (a firewall rule for 145.241.156.60), or put HTTPS (e.g. Caddy) in front and use the `https://` address.
 
-**On this server**, in `/opt/kebo-desk/.env`:
+**On this server**, one command, then paste the printed lines and press Ctrl-D:
+
+```bash
+cd /opt/kebo-desk && bash deploy/server/enable-offsite.sh
+```
+
+It saves them in `.env` (the old one kept as `.env.before-offsite-<date>`), restarts the backup container, which backs up at once, and checks that the copy reached the store. By hand instead: put these in `/opt/kebo-desk/.env`:
 
 ```bash
 OFFSITE_S3_ENDPOINT=https://backup.example.com      # or http://10.0.0.5:9000 on a private network
 OFFSITE_S3_BUCKET=kebo-backups
 OFFSITE_S3_ACCESS_KEY=kebo-desk
-OFFSITE_S3_SECRET_KEY=<the secret above>
-OFFSITE_ENCRYPTION_PASSWORD=<openssl rand -hex 32; also keep it in your password manager>
+OFFSITE_S3_SECRET_KEY=<from setup.sh>
+OFFSITE_ENCRYPTION_PASSWORD=<from setup.sh; also in your password manager>
 # optional: OFFSITE_S3_PREFIX=kebo-desk  OFFSITE_RETENTION_DAYS=30  OFFSITE_S3_REGION=us-east-1
 ```
 
-Then `docker compose up -d backup` (it backs up at once) and check: `cat backups/status/last-status.json` says `"ok":true,"offsite":"ok"`, and `docker compose exec backup sh /backup.sh rclone lsf -R offsite:db` lists the dump.
+After editing it by hand: `docker compose up -d backup` (it backs up at once) and check: `cat backups/status/last-status.json` says `"ok":true,"offsite":"ok"`, and `docker compose exec backup sh /backup.sh rclone lsf -R offsite:db` lists the dump.
 
 ## Before a restore
 

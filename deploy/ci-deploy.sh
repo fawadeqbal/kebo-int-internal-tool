@@ -201,6 +201,24 @@ main() {
   echo "$TARGET" >"$STATE"
   echo "$(date -Is) deployed $(short "$TARGET")" >>"$LOG"
   say "deployed $(short "$TARGET")"
+  server_setup
+}
+
+# The server's own pieces (deploy/server: the nightly Docker cleanup and its timer), installed or
+# updated when this commit's copy differs from the installed one. Never fails the deploy.
+server_setup() {
+  local changed=""
+  cmp -s deploy/server/docker-cleanup.sh /usr/local/sbin/docker-cleanup.sh || changed=1
+  cmp -s deploy/server/docker-cleanup.service /etc/systemd/system/docker-cleanup.service || changed=1
+  cmp -s deploy/server/docker-cleanup.timer /etc/systemd/system/docker-cleanup.timer || changed=1
+  systemctl is-enabled -q docker-cleanup.timer 2>/dev/null || changed=1
+  [ -n "$changed" ] || return 0
+  say "installing the server's nightly cleanup (deploy/server)"
+  if bash deploy/server/install.sh >/dev/null; then
+    say "nightly cleanup installed"
+  else
+    say "WARNING: could not install the nightly cleanup: run bash deploy/server/install.sh by hand"
+  fi
 }
 
 # One line: bash reads it whole before running it, so the checkout of another commit (which may
