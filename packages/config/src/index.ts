@@ -70,8 +70,15 @@ export const serverEnvSchema = z.object({
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
   /** The company used when a request does not say which (old sessions, the website form): its short name. Default: the first company. */
   DEFAULT_COMPANY: z.string().trim().toLowerCase().optional(),
+  /**
+   * Where company connections log in. Default: DATABASE_URL with the restricted
+   * role kebo_app and a password made from AUTH_SECRET (the API sets it up when it starts).
+   */
+  COMPANY_DATABASE_URL: z.string().trim().optional(),
   /** Database connections each active company may hold at once. */
-  COMPANY_POOL_SIZE: z.coerce.number().int().min(1).max(20).default(4),
+  COMPANY_POOL_SIZE: z.coerce.number().int().min(1).max(20).default(2),
+  /** Companies with open connections at once (each process); the least recently used one is closed to make room. */
+  COMPANY_POOLS_MAX: z.coerce.number().int().min(1).max(500).default(20),
   /**
    * Addresses per company (e.g. rfq.fawadiqbal.dev): each company at <short name>.<BASE_DOMAIN>, the
    * platform at admin.<BASE_DOMAIN>. Empty: one address for everything (the email picks the company).

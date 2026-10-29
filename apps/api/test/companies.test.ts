@@ -209,6 +209,56 @@ describe("companies: isolation and the platform", () => {
     expect(Number((await prisma.platform.$queryRawUnsafe<{ n: bigint }[]>(`select count(*) as n from inquiries`))[0].n)).toBeGreaterThan(0);
   });
 
+  it("no SQL run on a company connection gets out of its company", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const db = prisma.company(b.id);
+    const count = async (tx: { $queryRawUnsafe: typeof db.$queryRawUnsafe }) =>
+      (
+        await tx.$queryRawUnsafe<{ mine: bigint; other: bigint }[]>(
+          `select count(*) filter (where company_id = $1::uuid) as mine, count(*) filter (where company_id <> $1::uuid) as other from inquiries`,
+          b.id,
+        )
+      )[0];
+    // It logs in as the restricted role itself: no superuser, nothing past row-level security, no way to become the owner.
+    const [who] = await db.$queryRawUnsafe<{ who: string; su: boolean; bypass: boolean; member_of: string[] }[]>(
+      `select session_user::text as who, r.rolsuper as su, r.rolbypassrls as bypass,
+              array(select g.rolname::text from pg_auth_members m join pg_roles g on g.oid = m.roleid where m.member = r.oid) as member_of
+         from pg_roles r where r.rolname = session_user`,
+    );
+    expect(who).toEqual({ who: "kebo_app", su: false, bypass: false, member_of: [] });
+    for (const sql of ["set role kebo", "set local role kebo", "set session authorization kebo", "reset role; set role kebo"]) {
+      await expect(
+        db.$transaction((tx) => tx.$executeRawUnsafe(sql)),
+        sql,
+      ).rejects.toThrow(/permission denied/);
+    }
+    await expect(db.$executeRawUnsafe(`alter role kebo_app bypassrls`)).rejects.toThrow(/permission denied/);
+    await expect(db.$executeRawUnsafe(`alter table inquiries disable row level security`)).rejects.toThrow(/must be owner/);
+    // Naming another company in the session (SET, set_config, in or out of a transaction) changes nothing.
+    const before = await count(db);
+    expect(Number(before.other)).toBe(0);
+    expect(Number(before.mine)).toBeGreaterThan(0);
+    const moved = await db.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe(`select set_config('app.company_id', $1, false)`, FIRST_COMPANY_ID);
+      await tx.$executeRawUnsafe(`set app.company_id = '${FIRST_COMPANY_ID}'`);
+      return {
+        local: await count(tx),
+        setting: (await tx.$queryRawUnsafe<{ s: string }[]>(`select current_setting('app.company_id') as s`))[0].s,
+      };
+    });
+    expect(moved.setting).toBe(FIRST_COMPANY_ID); // the setting did change…
+    expect(Number(moved.local.other)).toBe(0); // …and still only B's rows.
+    expect(Number(moved.local.mine)).toBe(Number(before.mine));
+    await expect(
+      db.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`set local app.company_id = '${FIRST_COMPANY_ID}'`);
+        await tx.$executeRawUnsafe(`insert into counters (company_id, key, value) values ($1::uuid, 'sneak', 1)`, FIRST_COMPANY_ID);
+      }),
+    ).rejects.toThrow(/row-level security/);
+    // And after all that, every connection of the pool still sees B only.
+    for (let i = 0; i < 4; i++) expect(Number((await count(db)).other)).toBe(0);
+  });
+
   it("an email in two companies: the password decides, or the person chooses", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const bAdmin = await signIn(app, `boss@iso-${tag}.test`, "Boss12345678");

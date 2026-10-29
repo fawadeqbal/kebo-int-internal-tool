@@ -1,4 +1,5 @@
 export * from "./client";
+export * from "./company-role";
 export * from "./counters";
 export * from "./convert";
 export * from "./generated/prisma/enums";

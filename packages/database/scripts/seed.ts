@@ -10,7 +10,7 @@
  */
 import "./env";
 import bcrypt from "bcryptjs";
-import { createPrismaClient, seedCompanyBase, seedDemoData } from "../src";
+import { createPrismaClient, scriptCompanyUrl, seedCompanyBase, seedDemoData } from "../src";
 import { seedPeople } from "./seed-people";
 
 const url = process.env.DATABASE_URL;
@@ -36,7 +36,7 @@ async function main() {
     : await owner.company.findFirst({ where: { status: { not: "deleted" } }, orderBy: { createdAt: "asc" } });
   if (!company) throw new Error(slug ? `No company "${slug}"` : "No company yet: run the migrations first (pnpm db:deploy)");
   log(`company ${company.slug} (${company.name})`);
-  const db = createPrismaClient({ url: url!, poolSize: 2, companyId: company.id });
+  const db = createPrismaClient({ url: await scriptCompanyUrl(url!), poolSize: 2, companyId: company.id });
   try {
     const hash = (p: string) => bcrypt.hash(p, 12);
     const who = seedPeople(process.env);
