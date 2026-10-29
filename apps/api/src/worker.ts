@@ -15,14 +15,27 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { RemindersService } from "./modules/notifications/reminders.service";
 import { PlatformJobsModule } from "./platform/platform-jobs.module";
 import { LifecycleService } from "./platform/lifecycle.service";
+import { ServerHealthService } from "./platform/server-health";
 
 /**
  * The background worker, on a schedule (REMINDER_INTERVAL_MINUTES, default 60):
  * the automatic rules for companies (demos and trials ending, overdue payments),
- * then each active company's reminders, one company at a time and each inside
- * its own company.
+ * the server check (backups, disk: emails the platform admins), then each active
+ * company's reminders, one company at a time and each inside its own company.
  */
-@Module({ imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, EventsModule, SettingsModule, NotificationsModule, PlatformJobsModule] })
+@Module({
+  imports: [
+    EnvModule,
+    PrismaModule,
+    CompaniesModule,
+    LimitsModule,
+    CommonModule,
+    EventsModule,
+    SettingsModule,
+    NotificationsModule,
+    PlatformJobsModule,
+  ],
+})
 class WorkerModule {}
 
 async function main() {
@@ -31,6 +44,7 @@ async function main() {
   const prisma = app.get(PrismaService);
   const reminders = app.get(RemindersService);
   const lifecycle = app.get(LifecycleService);
+  const server = app.get(ServerHealthService);
   const minutes = Math.max(Number(process.env.REMINDER_INTERVAL_MINUTES) || 60, 1);
   const log = new Logger("Worker");
   let running = false;
@@ -39,9 +53,12 @@ async function main() {
     running = true;
     try {
       await lifecycle.run().catch((e) => log.error(`company rules failed: ${(e as Error).stack ?? e}`));
+      await server.run().catch((e) => log.error(`server check failed: ${(e as Error).stack ?? e}`));
       const companies = await prisma.platform.company.findMany({ where: { status: "active" }, orderBy: { createdAt: "asc" } });
       for (const c of companies) {
-        await CompanyContext.run(toInfo(c), () => reminders.run()).catch((e) => log.error(`reminders for ${c.slug} failed: ${(e as Error).stack ?? e}`));
+        await CompanyContext.run(toInfo(c), () => reminders.run()).catch((e) =>
+          log.error(`reminders for ${c.slug} failed: ${(e as Error).stack ?? e}`),
+        );
       }
     } finally {
       running = false;

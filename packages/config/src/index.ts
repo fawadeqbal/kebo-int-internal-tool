@@ -33,7 +33,12 @@ export const envField = {
     z
       .string()
       .default("")
-      .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
+      .transform((v) =>
+        v
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
   secret: (min = 32) => z.string().min(min, `must be at least ${min} characters`),
   timeZone: (fallback: string) =>
     z
@@ -74,6 +79,11 @@ export const serverEnvSchema = z.object({
   BASE_DOMAIN: z.string().trim().toLowerCase().optional(),
   /** Where new client inquiries (demo requests, sign-ups) and platform warnings are emailed. */
   PLATFORM_EMAIL: z.string().trim().optional(),
+  /**
+   * The folder with the server's status files (backups/status on the server, mounted into the
+   * worker): the worker emails the platform admins when backups are old or failed, or the disk is full.
+   */
+  SERVER_STATUS_DIR: z.string().trim().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
