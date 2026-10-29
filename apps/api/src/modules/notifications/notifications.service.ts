@@ -49,7 +49,12 @@ export class NotificationsService implements OnModuleInit {
   async managerIds(db: PrismaService["db"] | Tx = this.prisma.db) {
     return (
       await db.user.findMany({
-        where: { access: { OR: [{ superAdmin: true }, { permissions: { has: "inquiries.viewAll" } }] }, isActive: true, isSystem: false, platformAdminId: null },
+        where: {
+          access: { OR: [{ superAdmin: true }, { permissions: { has: "inquiries.viewAll" } }] },
+          isActive: true,
+          isSystem: false,
+          platformAdminId: null,
+        },
         select: { id: true },
       })
     ).map((u) => u.id);
@@ -60,7 +65,14 @@ export class NotificationsService implements OnModuleInit {
     const ids = [...new Set(userIds.filter((u): u is string => !!u && u !== exceptActor))];
     if (!ids.length) return 0;
     const res = await this.prisma.db.notification.createManyAndReturn({
-      data: ids.map((userId) => ({ userId, type: n.type, title: n.title.slice(0, 255), body: n.body ?? null, link: n.link ?? null, dedupeKey: n.dedupeKey ?? null })),
+      data: ids.map((userId) => ({
+        userId,
+        type: n.type,
+        title: n.title.slice(0, 255),
+        body: n.body ?? null,
+        link: n.link ?? null,
+        dedupeKey: n.dedupeKey ?? null,
+      })),
       skipDuplicates: true,
       select: { userId: true },
     });
@@ -77,7 +89,10 @@ export class NotificationsService implements OnModuleInit {
         where: { userId: { in: userIds }, OR: [{ sessionId: null }, { session: { revokedAt: null, expiresAt: { gt: new Date() } } }] },
         select: { token: true },
       });
-      const dead = await sendPush(devices.map((d) => d.token), { title: n.title, body: n.body, data: n.link ? { link: n.link } : {} });
+      const dead = await sendPush(
+        devices.map((d) => d.token),
+        { title: n.title, body: n.body, data: n.link ? { link: n.link } : {} },
+      );
       if (dead.length) await this.prisma.db.deviceToken.deleteMany({ where: { token: { in: dead } } });
     } catch (e) {
       this.log.warn(`push failed: ${(e as Error).message}`);
@@ -85,14 +100,22 @@ export class NotificationsService implements OnModuleInit {
   }
 
   /** Email the admin list (Settings → notifications), when that kind of event is switched on. */
-  async emailAdmins(kind: "newInquiry" | "dealWonOrLost" | "paymentReceived" | "dailySummary", subject: string, content: Parameters<typeof renderEmail>[0]) {
+  async emailAdmins(
+    kind: "newInquiry" | "dealWonOrLost" | "paymentReceived" | "dailySummary",
+    subject: string,
+    content: Parameters<typeof renderEmail>[0],
+  ) {
     const s = await this.settings.get();
     if (!s.notifications[kind] || !s.notifications.emails.length) return;
     try {
       // Links go to the company's own address (once companies have addresses).
       const slug = CompanyContext.current()?.slug;
       const origin = slug ? companyOrigin(slug, this.env.BASE_DOMAIN, this.env.APP_URL) : this.env.APP_URL;
-      const { html, text } = renderEmail({ ...content, link: content.link ? new URL(content.link, origin).toString() : undefined, footer: `${s.company.name} · you get this because your email is on the notification list in Settings.` });
+      const { html, text } = renderEmail({
+        ...content,
+        link: content.link ? new URL(content.link, origin).toString() : undefined,
+        footer: `${s.company.name} · you get this because your email is on the notification list in Settings.`,
+      });
       await getMailer().send({ to: s.notifications.emails, subject, html, text });
     } catch (e) {
       this.log.warn(`email failed: ${(e as Error).message}`);
@@ -106,25 +129,75 @@ export class NotificationsService implements OnModuleInit {
     this.bus.on("inquiry.assigned", (e) => this.inquiryAssigned(e));
     this.bus.on("inquiry.stageChanged", (e) => this.stageChanged(e));
     this.bus.on("revision.statusChanged", (e) => this.revisionChanged(e));
-    this.bus.on("order.created", (e) => this.notify(e.notify, { type: "order.created", title: `Order ${e.refNo} confirmed — send the proforma invoice and wait for the deposit`, link: links.order(e.orderId) }, e.actorId).then(() => undefined));
-    this.bus.on("order.stageChanged", (e) => this.notify(e.notify, { type: "order.stage", title: `${e.refNo}: ${ORDER_STAGE_LABEL[e.from]} → ${ORDER_STAGE_LABEL[e.to]}`, link: links.order(e.orderId) }, e.actorId).then(() => undefined));
+    this.bus.on("order.created", (e) =>
+      this.notify(
+        e.notify,
+        {
+          type: "order.created",
+          title: `Order ${e.refNo} confirmed — send the proforma invoice and wait for the deposit`,
+          link: links.order(e.orderId),
+        },
+        e.actorId,
+      ).then(() => undefined),
+    );
+    this.bus.on("order.stageChanged", (e) =>
+      this.notify(
+        e.notify,
+        {
+          type: "order.stage",
+          title: `${e.refNo}: ${ORDER_STAGE_LABEL[e.from]} → ${ORDER_STAGE_LABEL[e.to]}`,
+          link: links.order(e.orderId),
+        },
+        e.actorId,
+      ).then(() => undefined),
+    );
     this.bus.on("payment.recorded", (e) => this.paymentRecorded(e));
   }
 
   private async inquiryCreated(e: Extract<DomainEvent, { type: "inquiry.created" }>) {
-    await this.notify(await this.managerIds(), { type: "inquiry.created", title: `New inquiry ${e.refNo}: ${e.title}`, body: e.channel === "website" ? "From the website form — assign someone" : null, link: links.deal(e.inquiryId) }, e.actorId);
-    await this.emailAdmins("newInquiry", `New inquiry ${e.refNo}: ${e.title}`, { heading: `New inquiry ${e.refNo}`, rows: [["What", e.title], ["Came in by", e.channel]], link: links.deal(e.inquiryId), linkLabel: "Open the inquiry" });
+    await this.notify(
+      await this.managerIds(),
+      {
+        type: "inquiry.created",
+        title: `New inquiry ${e.refNo}: ${e.title}`,
+        body: e.channel === "website" ? "From the website form — assign someone" : null,
+        link: links.deal(e.inquiryId),
+      },
+      e.actorId,
+    );
+    await this.emailAdmins("newInquiry", `New inquiry ${e.refNo}: ${e.title}`, {
+      heading: `New inquiry ${e.refNo}`,
+      rows: [
+        ["What", e.title],
+        ["Came in by", e.channel],
+      ],
+      link: links.deal(e.inquiryId),
+      linkLabel: "Open the inquiry",
+    });
   }
 
   private async inquiryAssigned(e: Extract<DomainEvent, { type: "inquiry.assigned" }>) {
     if (!e.assigneeId) return;
-    await this.notify([e.assigneeId], { type: "inquiry.assigned", title: `${e.refNo} is yours: ${e.title}`, body: "Next: get factory prices", link: links.deal(e.inquiryId) }, e.actorId);
+    await this.notify(
+      [e.assigneeId],
+      {
+        type: "inquiry.assigned",
+        title: `${e.refNo} is yours: ${e.title}`,
+        body: "Next: get factory prices",
+        link: links.deal(e.inquiryId),
+      },
+      e.actorId,
+    );
   }
 
   private async stageChanged(e: Extract<DomainEvent, { type: "inquiry.stageChanged" }>) {
     if (e.to !== "won" && e.to !== "lost") return;
     const title = `${e.refNo} ${e.to === "won" ? "won" : "lost"}: ${e.title}`;
-    await this.notify([...e.notify, ...(await this.managerIds())], { type: `inquiry.${e.to}`, title, link: links.deal(e.inquiryId) }, e.actorId);
+    await this.notify(
+      [...e.notify, ...(await this.managerIds())],
+      { type: `inquiry.${e.to}`, title, link: links.deal(e.inquiryId) },
+      e.actorId,
+    );
     const deal = await this.prisma.db.inquiry.findUnique({ where: { id: e.inquiryId }, select: { lostReason: true, lostNote: true } });
     await this.emailAdmins("dealWonOrLost", title, {
       heading: title,
@@ -140,33 +213,57 @@ export class NotificationsService implements OnModuleInit {
 
   private async revisionChanged(e: Extract<DomainEvent, { type: "revision.statusChanged" }>) {
     if (e.status === "sent") return;
-    await this.notify(e.notify, { type: `quotation.${e.status}`, title: `${e.refNo}: ${REVISION_STATUS_LABEL[e.status].toLowerCase()} by the customer`, link: links.deal(e.inquiryId) }, e.actorId);
+    await this.notify(
+      e.notify,
+      {
+        type: `quotation.${e.status}`,
+        title: `${e.refNo}: ${REVISION_STATUS_LABEL[e.status].toLowerCase()} by the customer`,
+        link: links.deal(e.inquiryId),
+      },
+      e.actorId,
+    );
   }
 
   private async paymentRecorded(e: Extract<DomainEvent, { type: "payment.recorded" }>) {
-    await this.notify(e.notify, { type: "payment.in", title: `${e.refNo}: received ${e.amount}`, link: links.orderMoney(e.orderId) }, e.actorId);
-    await this.emailAdmins("paymentReceived", `Payment received on ${e.refNo}: ${e.amount}`, { heading: `Payment received: ${e.amount}`, rows: [["Order", e.refNo]], link: links.orderMoney(e.orderId), linkLabel: "Open the order" });
+    await this.notify(
+      e.notify,
+      { type: "payment.in", title: `${e.refNo}: received ${e.amount}`, link: links.orderMoney(e.orderId) },
+      e.actorId,
+    );
+    await this.emailAdmins("paymentReceived", `Payment received on ${e.refNo}: ${e.amount}`, {
+      heading: `Payment received: ${e.amount}`,
+      rows: [["Order", e.refNo]],
+      link: links.orderMoney(e.orderId),
+      linkLabel: "Open the order",
+    });
   }
 
   /* ---------------------------------------------------------------- reading */
 
   async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number }) {
     const [items, unread] = await Promise.all([
-      this.prisma.db.notification.findMany({ where: { userId: user.id, ...(opts.unreadOnly ? { readAt: null } : {}) }, orderBy: { createdAt: "desc" }, take: Math.min(opts.take ?? 50, 200) }),
+      this.prisma.db.notification.findMany({
+        where: { userId: user.id, ...(opts.unreadOnly ? { readAt: null } : {}) },
+        orderBy: { createdAt: "desc" },
+        take: Math.min(opts.take ?? 50, 200),
+      }),
       this.prisma.db.notification.count({ where: { userId: user.id, readAt: null } }),
     ]);
     return { unread, items };
   }
 
   async markRead(user: SessionUser, ids: string[] | "all") {
-    await this.prisma.db.notification.updateMany({ where: { userId: user.id, readAt: null, ...(ids === "all" ? {} : { id: { in: ids } }) }, data: { readAt: new Date() } });
+    await this.prisma.db.notification.updateMany({
+      where: { userId: user.id, readAt: null, ...(ids === "all" ? {} : { id: { in: ids } }) },
+      data: { readAt: new Date() },
+    });
     return { ok: true };
   }
 
   /** A phone signed in to the app, for push. */
   async registerDevice(user: SessionUser, token: string, platform: string) {
     await this.prisma.db.deviceToken.upsert({
-      where: { token },
+      where: { companyId_token: { companyId: CompanyContext.require().id, token } },
       create: { token, platform, userId: user.id, sessionId: user.sessionId },
       update: { userId: user.id, sessionId: user.sessionId, platform, lastSeenAt: new Date() },
     });

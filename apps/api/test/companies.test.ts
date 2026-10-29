@@ -210,6 +210,53 @@ describe("companies: isolation and the platform", () => {
     expect(Number((await prisma.platform.$queryRawUnsafe<{ n: bigint }[]>(`select count(*) as n from inquiries`))[0].n)).toBeGreaterThan(0);
   });
 
+  it("the same phone can be signed in to two companies", async () => {
+    const bAdmin = api(app, await signIn(app, `boss@iso-${tag}.test`, "Boss12345678"));
+    const token = `fcm-${tag}-shared-phone`;
+    await api(app, keboManager).post("/me/devices", { token, platform: "android" }).expect(200);
+    await bAdmin.post("/me/devices", { token, platform: "android" }).expect(200);
+    await bAdmin.post("/me/devices", { token, platform: "android" }).expect(200); // again: the same row
+    const rows = await prisma.platform.deviceToken.findMany({ where: { token } });
+    expect(rows.map((r) => r.companyId).sort()).toEqual(
+      [FIRST_COMPANY_ID, (await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } })).id].sort(),
+    );
+    await bAdmin.delete("/me/devices").send({ token }).expect(200);
+    expect(await prisma.platform.deviceToken.count({ where: { token } })).toBe(1);
+  });
+
+  it("every column naming a person points at a real person of the same company", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const db = prisma.company(b.id);
+    const keboUser = (await prisma.company(FIRST_COMPANY_ID).user.findFirstOrThrow({ where: { email: "manager@example.com" } })).id;
+    const bCustomer = (await db.customer.findFirstOrThrow()).id;
+    const bInquiry = (await db.inquiry.findFirstOrThrow()).id;
+    for (const [sql, args] of [
+      [`update customers set created_by = $1::uuid where id = $2::uuid`, [keboUser, bCustomer]],
+      [
+        `insert into inquiry_notes (id, inquiry_id, author_id, body) values (gen_random_uuid(), $2::uuid, $1::uuid, 'x')`,
+        [keboUser, bInquiry],
+      ],
+      [
+        `insert into audit_logs (id, user_id, action, entity_type, summary) values (gen_random_uuid(), $1::uuid, 'x', 'x', 'x')`,
+        [keboUser],
+      ],
+    ] as const) {
+      await expect(db.$executeRawUnsafe(sql, ...args), sql).rejects.toThrow(/another company/);
+      // Even the owner's connection cannot link across companies.
+      await expect(
+        prisma.platform.$executeRawUnsafe(
+          sql.replace("(id,", "(company_id, id,").replace("values (", `values ('${b.id}'::uuid, `),
+          ...args,
+        ),
+        sql,
+      ).rejects.toThrow(/another company/);
+    }
+    // Someone who does not exist: refused by the key.
+    await expect(
+      db.$executeRawUnsafe(`update orders set created_by = gen_random_uuid() where id = (select id from orders limit 1)`),
+    ).rejects.toThrow(/foreign key|another company/);
+  });
+
   it("no SQL run on a company connection gets out of its company", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const db = prisma.company(b.id);

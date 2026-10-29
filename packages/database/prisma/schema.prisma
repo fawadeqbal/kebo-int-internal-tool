@@ -234,6 +234,24 @@ model User {
 
   reminderStates ReminderState[]
 
+  /// What they made or did (kept when they are switched off; people are not deleted).
+  relCustomerCreator        Customer[]           @relation("CustomerCreator")
+  relFactoryCreator         Factory[]            @relation("FactoryCreator")
+  relInquiryStageChanger    InquiryStageChange[] @relation("InquiryStageChanger")
+  relAssignmentAssignee     InquiryAssignment[]  @relation("AssignmentAssignee")
+  relAssignmentAssigner     InquiryAssignment[]  @relation("AssignmentAssigner")
+  relNoteAuthor             InquiryNote[]        @relation("NoteAuthor")
+  relAttachmentUploader     Attachment[]         @relation("AttachmentUploader")
+  relFactoryQuoteCreator    FactoryQuote[]       @relation("FactoryQuoteCreator")
+  relRevisionCreator        QuotationRevision[]  @relation("RevisionCreator")
+  relOrderCreator           Order[]              @relation("OrderCreator")
+  relFactoryPaymentRecorder FactoryPayment[]     @relation("FactoryPaymentRecorder")
+  relExpenseRecorder        Expense[]            @relation("ExpenseRecorder")
+  relPaymentRecorder        Payment[]            @relation("PaymentRecorder")
+  relTransferRecorder       MoneyTransfer[]      @relation("TransferRecorder")
+  relTargetUpdater          SalesTarget[]        @relation("TargetUpdater")
+  relAuditUser              AuditLog[]           @relation("AuditUser")
+
   @@unique([companyId, email])
   @@map("users")
 }
@@ -295,11 +313,13 @@ model DeviceToken {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionId  String?  @map("session_id") @db.Uuid
   session    Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  token      String   @unique
+  /// One row per phone per company (the same phone may be signed in to two companies).
+  token      String
   platform   String   @default("android") @db.VarChar(20)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
   lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
 
+  @@unique([companyId, token])
   @@index([userId])
   @@index([companyId])
   @@map("device_tokens")
@@ -334,6 +354,7 @@ model AuditLog {
   companyId  String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company  @relation(fields: [companyId], references: [id])
   userId     String?  @map("user_id") @db.Uuid
+  user       User?    @relation("AuditUser", fields: [userId], references: [id], onDelete: SetNull)
   action     String   @db.VarChar(60)
   entityType String   @map("entity_type") @db.VarChar(60)
   entityId   String?  @map("entity_id") @db.Uuid
@@ -398,6 +419,7 @@ model Customer {
   initials        String?      @db.VarChar(6)
   notes           String?
   createdById     String?      @map("created_by") @db.Uuid
+  createdBy       User?        @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
   deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
@@ -459,6 +481,7 @@ model Factory {
   ownerId       String?   @map("owner_id") @db.Uuid
   owner         User?     @relation("FactoryOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdById   String?   @map("created_by") @db.Uuid
+  createdBy     User?     @relation("FactoryCreator", fields: [createdById], references: [id], onDelete: SetNull)
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -570,6 +593,7 @@ model InquiryStageChange {
   lostReason  LostReason?   @map("lost_reason")
   note        String?
   changedById String?       @map("changed_by") @db.Uuid
+  changedBy   User?         @relation("InquiryStageChanger", fields: [changedById], references: [id], onDelete: SetNull)
   changedAt   DateTime      @default(now()) @map("changed_at") @db.Timestamptz
 
   @@index([inquiryId])
@@ -585,7 +609,9 @@ model InquiryAssignment {
   inquiryId    String   @map("inquiry_id") @db.Uuid
   inquiry      Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   assigneeId   String?  @map("assignee_id") @db.Uuid
+  assignee     User?    @relation("AssignmentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   assignedById String   @map("assigned_by") @db.Uuid
+  assignedBy   User     @relation("AssignmentAssigner", fields: [assignedById], references: [id])
   assignedAt   DateTime @default(now()) @map("assigned_at") @db.Timestamptz
 
   @@index([inquiryId])
@@ -602,6 +628,7 @@ model InquiryNote {
   inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   body      String
   authorId  String   @map("author_id") @db.Uuid
+  author    User     @relation("NoteAuthor", fields: [authorId], references: [id])
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([inquiryId])
@@ -628,6 +655,7 @@ model Attachment {
   kind           String        @default("other") @db.VarChar(20)
   note           String?       @db.VarChar(300)
   uploadedById   String        @map("uploaded_by") @db.Uuid
+  uploadedBy     User          @relation("AttachmentUploader", fields: [uploadedById], references: [id])
   deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
@@ -664,6 +692,7 @@ model FactoryQuote {
   paymentTerms String?   @map("payment_terms")
   notes        String?
   createdById  String    @map("created_by") @db.Uuid
+  createdBy    User      @relation("FactoryQuoteCreator", fields: [createdById], references: [id])
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -764,6 +793,7 @@ model QuotationRevision {
   customerSnapshot Json?          @map("customer_snapshot")
   companySnapshot  Json?          @map("company_snapshot")
   createdById      String         @map("created_by") @db.Uuid
+  createdBy        User           @relation("RevisionCreator", fields: [createdById], references: [id])
   deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
@@ -915,6 +945,7 @@ model Order {
   cancelledAt      DateTime?         @map("cancelled_at") @db.Timestamptz
   cancelReason     String?           @map("cancel_reason")
   createdById      String            @map("created_by") @db.Uuid
+  createdBy        User              @relation("OrderCreator", fields: [createdById], references: [id])
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1048,6 +1079,7 @@ model FactoryPayment {
   fileType     String?       @map("file_type") @db.VarChar(150)
   fileSize     Int?          @map("file_size")
   recordedById String        @map("recorded_by") @db.Uuid
+  recordedBy   User          @relation("FactoryPaymentRecorder", fields: [recordedById], references: [id])
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -1100,6 +1132,7 @@ model Expense {
   accountId    String?       @map("account_id") @db.Uuid
   account      MoneyAccount? @relation(fields: [accountId], references: [id])
   recordedById String        @map("recorded_by") @db.Uuid
+  recordedBy   User          @relation("ExpenseRecorder", fields: [recordedById], references: [id])
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -1144,6 +1177,7 @@ model Payment {
   fileType     String?       @map("file_type") @db.VarChar(150)
   fileSize     Int?          @map("file_size")
   recordedById String        @map("recorded_by") @db.Uuid
+  recordedBy   User          @relation("PaymentRecorder", fields: [recordedById], references: [id])
   voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
   voidReason   String?       @map("void_reason")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -1211,6 +1245,7 @@ model MoneyTransfer {
   reference     String?      @db.VarChar(120)
   note          String?
   recordedById  String       @map("recorded_by") @db.Uuid
+  recordedBy    User         @relation("TransferRecorder", fields: [recordedById], references: [id])
   voidedAt      DateTime?    @map("voided_at") @db.Timestamptz
   voidReason    String?      @map("void_reason")
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
@@ -1238,6 +1273,7 @@ model SalesTarget {
   amount      Decimal  @db.Decimal(14, 2)
   currency    String   @db.Char(3)
   updatedById String?  @map("updated_by") @db.Uuid
+  updatedBy   User?    @relation("TargetUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@id([companyId, month])
