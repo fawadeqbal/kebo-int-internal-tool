@@ -13,6 +13,7 @@ import { CompanyContext } from "./common/company/company-context";
 import { SettingsModule } from "./modules/settings/settings.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { RemindersService } from "./modules/notifications/reminders.service";
+import { InsightsModule } from "./modules/insights/insights.module";
 import { PlatformJobsModule } from "./platform/platform-jobs.module";
 import { LifecycleService } from "./platform/lifecycle.service";
 import { ServerHealthService } from "./platform/server-health";
@@ -33,6 +34,8 @@ import { ServerHealthService } from "./platform/server-health";
     EventsModule,
     SettingsModule,
     NotificationsModule,
+    // The figures in the morning and monthly emails (RemindersService reads them from InsightsService).
+    InsightsModule,
     PlatformJobsModule,
   ],
 })

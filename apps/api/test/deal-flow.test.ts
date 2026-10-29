@@ -50,8 +50,9 @@ describe("a whole deal through the API", () => {
     expect(bad.body.error).toBe("Please enter a valid business email");
     const ok = await api(app).post("/public/inquiries", form).set("origin", "https://keboint.com").expect(201);
     // Only that it arrived: no number that tells how many came before.
-    expect(Object.keys(ok.body).sort()).toEqual(["message", "ok"]);
-    expect(JSON.stringify(ok.body)).not.toMatch(/RFQ-/);
+    // keboint.com's keyless form keeps its reference until the site sends a form key.
+    expect(Object.keys(ok.body).sort()).toEqual(["message", "ok", "reference"]);
+    expect(ok.body.reference).toMatch(/^RFQ-/);
     expect(ok.headers["access-control-allow-origin"]).toBe("https://keboint.com");
 
     const list = await api(app, manager)

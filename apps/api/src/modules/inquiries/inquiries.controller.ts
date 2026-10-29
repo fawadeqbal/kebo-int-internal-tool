@@ -205,6 +205,8 @@ export const FORM_KEY_HEADER = "x-form-key";
  * only the sites in PUBLIC_FORM_ORIGINS (keboint.com) may send, for the default
  * company. Also a honeypot field, Turnstile (when configured) and rate limits.
  * The reply says only that it arrived: never a number that tells how many came before.
+ * One exception, until keboint.com uses a form key: its keyless form still gets the
+ * reference back (its live script shows it), for the default company only.
  */
 @ApiTags("public")
 @Controller("public/inquiries")
@@ -243,23 +245,26 @@ export class WebsiteController {
     this.cors(req, res);
   }
 
-  /** The company this form is for: by its key, or the default company for the allowed sites. Null: refused. */
+  /**
+   * The company this form is for: by its key, or the default company for the allowed sites
+   * (`keyless`: such a form, whose script may still show the reference). Null company: refused.
+   */
   private async companyOf(req: Request, raw: Record<string, unknown>) {
     const header = req.headers[FORM_KEY_HEADER];
     const sent = [typeof header === "string" ? header : undefined, ...FORM_KEY_FIELDS.map((f) => raw[f])].find(
       (v) => typeof v === "string" && v.trim(),
     );
-    if (typeof sent === "string") return this.companies.byFormKey(sent.trim().toLowerCase());
+    if (typeof sent === "string") return { company: await this.companies.byFormKey(sent.trim().toLowerCase()), keyless: false };
     const origin = req.headers.origin?.replace(/\/$/, "");
-    if (origin && this.origins().includes(origin)) return this.companies.defaultCompany();
-    return null;
+    if (origin && this.origins().includes(origin)) return { company: await this.companies.defaultCompany(), keyless: true };
+    return { company: null, keyless: false };
   }
 
   @Public()
   @Post()
   async receive(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() raw: Record<string, unknown>) {
     this.cors(req, res);
-    const company = await this.companyOf(req, raw ?? {});
+    const { company, keyless } = await this.companyOf(req, raw ?? {});
     if (!company) {
       res.status(403);
       return { ok: false, message: "This website is not allowed to send inquiries." };
@@ -284,8 +289,15 @@ export class WebsiteController {
       };
     }
     this.website.limit(`inquiry:all:${company.id}`, Number(process.env.PUBLIC_INQUIRIES_PER_HOUR) || 40, 60 * 60_000);
-    await this.website.receive(input);
+    const { reference } = await this.website.receive(input);
     res.status(201);
+    // The keyless form of the allowed sites (keboint.com's current script shows the reference).
+    if (keyless)
+      return {
+        ok: true,
+        reference,
+        message: `Thank you. We have your request (ref. ${reference}). Our sourcing team will reply within one working day.`,
+      };
     return { ok: true, message: "Thank you. We have your request. Our sourcing team will reply within one working day." };
   }
 }
