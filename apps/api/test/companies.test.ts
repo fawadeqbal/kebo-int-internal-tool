@@ -204,6 +204,7 @@ describe("companies: isolation and the platform", () => {
     ).rejects.toThrow(/another company/);
     // The platform tables are out of reach.
     await expect(db.$queryRawUnsafe(`select count(*) from companies`)).rejects.toThrow(/permission denied/);
+    await expect(db.$queryRawUnsafe(`select count(*) from database_markers`)).rejects.toThrow(/permission denied/);
     // With no company set, nothing at all.
     expect(Number((await prisma.platform.$queryRawUnsafe<{ n: bigint }[]>(`select count(*) as n from inquiries`))[0].n)).toBeGreaterThan(0);
   });
@@ -312,20 +313,34 @@ describe("companies: isolation and the platform", () => {
     expect((await mine.get("/company/address?slug=get").expect(200)).body.check.problem).toContain("kept for the platform");
     expect((await mine.get("/company/address?slug=a").expect(200)).body.check.problem).not.toBeNull();
     const fresh = `moved-${tag}`;
-    expect((await mine.get(`/company/address?slug=${fresh}`).expect(200)).body.check).toEqual({ slug: fresh, url: `https://${fresh}.rfq.test`, problem: null });
+    expect((await mine.get(`/company/address?slug=${fresh}`).expect(200)).body.check).toEqual({
+      slug: fresh,
+      url: `https://${fresh}.rfq.test`,
+      problem: null,
+    });
     // Someone who is not a Super Admin cannot.
     await mine.post("/users", { name: "Mgr", email: `mgr@addr-${tag}.test`, role: "manager", password: "Manager12345" }).expect(201);
     const mgr = api(app, await signIn(app, `mgr@addr-${tag}.test`, "Manager12345"));
     await mgr.put("/company/address", { slug: fresh }).expect(403);
     await mine.put("/company/address", { slug: "kebo" }).expect(409);
     // Changed: the new address is theirs, the old one still finds them (and gets a certificate) and is held.
-    expect((await mine.put("/company/address", { slug: fresh }).expect(200)).body).toEqual({ slug: fresh, url: `https://${fresh}.rfq.test` });
+    expect((await mine.put("/company/address", { slug: fresh }).expect(200)).body).toEqual({
+      slug: fresh,
+      url: `https://${fresh}.rfq.test`,
+    });
     const check = (domain: string) => request(app.getHttpServer()).get(`/api/platform/public/domain-check?domain=${domain}`);
     await check(`${fresh}.rfq.test`).expect(200);
     await check(`${c.slug}.rfq.test`).expect(200);
     expect((await request(app.getHttpServer()).get(`/api/platform/public/company?slug=${c.slug}`).expect(200)).body.slug).toBe(fresh);
     // Held for others: a new company cannot take the old address.
-    const clash = await plat().post("/companies", { name: "Clash", slug: c.slug, adminName: "Clash", adminEmail: `clash@${tag}.test`, sampleData: false, kind: "demo" });
+    const clash = await plat().post("/companies", {
+      name: "Clash",
+      slug: c.slug,
+      adminName: "Clash",
+      adminEmail: `clash@${tag}.test`,
+      sampleData: false,
+      kind: "demo",
+    });
     expect(clash.status).toBe(409);
     // Once a month.
     const again = await mine.get("/company/address").expect(200);
@@ -400,7 +415,13 @@ describe("companies: isolation and the platform", () => {
     const order = ((await mine.get("/orders").expect(200)).body as { id: string }[])[0];
     expect((await mine.get(`/orders/${order.id}/money`).expect(200)).body.expenses).toBeNull();
     // A payment can be recorded; an account sent with it is left off (no cash book).
-    const payRes = await mine.post(`/orders/${order.id}/payments`, { kind: "deposit", amount: "10", currency: "USD", paidOn: "2026-01-01", accountId: customer.id });
+    const payRes = await mine.post(`/orders/${order.id}/payments`, {
+      kind: "deposit",
+      amount: "10",
+      currency: "USD",
+      paidOn: "2026-01-01",
+      accountId: customer.id,
+    });
     expect(payRes.status, JSON.stringify(payRes.body)).toBe(201);
     const paid = payRes.body as { createdId: string; payments: { id: string; account: unknown }[] };
     expect(paid.payments.find((p) => p.id === paid.createdId)?.account).toBeNull();
@@ -458,8 +479,11 @@ describe("companies: isolation and the platform", () => {
     const perms = async (who = mine) => (await who.get("/auth/me").expect(200)).body.permissions as string[];
 
     // Business: a role of their own, with someone in it.
-    const made = (await mine.post("/roles", { name: "Accounts", permissions: ["dashboard.view", "expenses.manage", "reports.view"], requireTwoStep: false }).expect(201))
-      .body as { key: string };
+    const made = (
+      await mine
+        .post("/roles", { name: "Accounts", permissions: ["dashboard.view", "expenses.manage", "reports.view"], requireTwoStep: false })
+        .expect(201)
+    ).body as { key: string };
     await mine.post("/users", { name: "Acc Person", email: `acc@perm-${tag}.test`, role: made.key, password: "Accounts12345" }).expect(201);
     const acc = api(app, await signIn(app, `acc@perm-${tag}.test`, "Accounts12345"));
     expect(await perms(acc)).toEqual(expect.arrayContaining(["expenses.manage", "reports.view"]));
@@ -477,10 +501,17 @@ describe("companies: isolation and the platform", () => {
     expect((await roleOf("manager")).notInPlan).toEqual(expect.arrayContaining(["expenses.manage", "reports.view", "audit.view"]));
     expect((await roleOf("manager")).frozen).toBe(false);
     // A frozen role cannot be given; a built-in one can (a Manager has more than the plan, which is not counted).
-    const extra = await mine.post("/users", { name: "Second", email: `second@perm-${tag}.test`, role: made.key, password: "Second12345678" });
+    const extra = await mine.post("/users", {
+      name: "Second",
+      email: `second@perm-${tag}.test`,
+      role: made.key,
+      password: "Second12345678",
+    });
     expect(extra.status).toBe(403);
     expect(extra.body.code).toBe("plan_feature");
-    await mine.post("/users", { name: "Second", email: `second@perm-${tag}.test`, role: "manager", password: "Second12345678" }).expect(201);
+    await mine
+      .post("/users", { name: "Second", email: `second@perm-${tag}.test`, role: "manager", password: "Second12345678" })
+      .expect(201);
 
     // Back up to Business: everything as it was, at once.
     await plat().patch(`/companies/${c.id}`, { planId: business.id }).expect(200);
@@ -491,13 +522,21 @@ describe("companies: isolation and the platform", () => {
     expect((await roleOf(made.key)).notInPlan).toEqual([]);
 
     // A plan with custom roles but not expenses or insights: new roles get only what the plan has, and an edit keeps what it does not.
-    const lean = (await plat().post("/plans", { name: `Roles only ${tag}`, price: 20, features: ["custom_roles"] }).expect(201)).body as { id: string };
+    const lean = (
+      await plat()
+        .post("/plans", { name: `Roles only ${tag}`, price: 20, features: ["custom_roles"] })
+        .expect(201)
+    ).body as { id: string };
     await plat().patch(`/companies/${c.id}`, { planId: lean.id }).expect(200);
-    const fresh = (await mine.post("/roles", { name: "Lean", permissions: ["dashboard.view", "expenses.manage"], requireTwoStep: false }).expect(201)).body as {
+    const fresh = (
+      await mine.post("/roles", { name: "Lean", permissions: ["dashboard.view", "expenses.manage"], requireTwoStep: false }).expect(201)
+    ).body as {
       key: string;
     };
     expect((await roleOf(fresh.key)).permissions).toEqual(["dashboard.view"]);
-    await mine.put(`/roles/${made.key}`, { name: "Accounts", permissions: ["dashboard.view", "customers.manage"], requireTwoStep: false }).expect(200);
+    await mine
+      .put(`/roles/${made.key}`, { name: "Accounts", permissions: ["dashboard.view", "customers.manage"], requireTwoStep: false })
+      .expect(200);
     expect((await roleOf(made.key)).permissions.sort()).toEqual(["customers.manage", "dashboard.view", "expenses.manage", "reports.view"]);
     expect(await perms(acc)).toEqual(expect.arrayContaining(["customers.manage", "dashboard.view"]));
     expect(await perms(acc)).not.toContain("expenses.manage");
@@ -526,15 +565,24 @@ describe("companies: isolation and the platform", () => {
     const pub = () => request(app.getHttpServer());
     // Its own marker (the other tests find their leads by tag).
     const mk = `mk${Math.random().toString(36).slice(2, 9)}`;
-    const live = (await pub().get("/api/platform/public/site").expect(200)).body as { content: { hero: { title: string } }; plans: { id: string; name: string }[] };
+    const live = (await pub().get("/api/platform/public/site").expect(200)).body as {
+      content: { hero: { title: string } };
+      plans: { id: string; name: string }[];
+    };
     expect(live.plans.map((p) => p.name)).toEqual(expect.arrayContaining(["Starter", "Team", "Business", "Unlimited"]));
     // A draft is not live until published.
     const editor = (await plat().get("/site").expect(200)).body;
     const starter = (editor.plans as { id: string; name: string }[]).find((p) => p.name === "Starter")!;
-    const draft = { ...editor.draft, hero: { ...editor.draft.hero, title: `Hello ${tag}` }, plans: { ...editor.draft.plans, hidden: [starter.id] } };
+    const draft = {
+      ...editor.draft,
+      hero: { ...editor.draft.hero, title: `Hello ${tag}` },
+      plans: { ...editor.draft.plans, hidden: [starter.id] },
+    };
     expect((await plat().put("/site", { draft }).expect(200)).body.unpublished).toBe(true);
     expect((await pub().get("/api/platform/public/site").expect(200)).body.content.hero.title).toBe(live.content.hero.title);
-    await plat().put("/site", { draft: { ...draft, hero: { ...draft.hero, title: "" } } }).expect(422);
+    await plat()
+      .put("/site", { draft: { ...draft, hero: { ...draft.hero, title: "" } } })
+      .expect(422);
     const done = (await plat().post("/site/publish").expect(200)).body;
     expect(done.unpublished).toBe(false);
     const after = (await pub().get("/api/platform/public/site").expect(200)).body;
@@ -546,7 +594,9 @@ describe("companies: isolation and the platform", () => {
     // Visits: each visitor once a day per address and browser; bots not at all.
     const browser = "Mozilla/5.0 (Windows NT 10.0) Chrome/130.0";
     const visit = (ua: string, source?: string) =>
-      pub().post("/api/platform/public/visit").send({ path: "/", userAgent: ua, origin: source ? { source, campaign: "oct" } : { referrer: "www.google.com" } });
+      pub()
+        .post("/api/platform/public/visit")
+        .send({ path: "/", userAgent: ua, origin: source ? { source, campaign: "oct" } : { referrer: "www.google.com" } });
     expect((await visit(browser, `fb${tag}`).expect(200)).body.counted).toBe(true);
     await visit(browser, `fb${tag}`).expect(200);
     expect((await visit("Googlebot/2.1", `fb${tag}`).expect(200)).body.counted).toBe(false);
@@ -555,14 +605,29 @@ describe("companies: isolation and the platform", () => {
     // Leads keep where they came from.
     await pub()
       .post("/api/platform/public/demo-request")
-      .send({ companyName: `Ad Co ${mk}`, name: "Ada", email: `ada-${mk}@ad.test`, origin: { source: `fb${tag}`, campaign: "oct", cta: "hero" } })
+      .send({
+        companyName: `Ad Co ${mk}`,
+        name: "Ada",
+        email: `ada-${mk}@ad.test`,
+        origin: { source: `fb${tag}`, campaign: "oct", cta: "hero" },
+      })
       .expect(200);
     await pub()
       .post("/api/platform/public/contact")
-      .send({ name: "Quinn", email: `quinn-${mk}@q.test`, message: "Do you support CNY?", origin: { referrer: "www.google.com", page: "/" } })
+      .send({
+        name: "Quinn",
+        email: `quinn-${mk}@q.test`,
+        message: "Do you support CNY?",
+        origin: { referrer: "www.google.com", page: "/" },
+      })
       .expect(200);
     await pub().post("/api/platform/public/contact").send({ name: "", email: "x", message: "" }).expect(422);
-    const leads = (await plat().get(`/leads?q=${mk}`).expect(200)).body as { email: string; channel: string; source: string; origin: { campaign?: string } }[];
+    const leads = (await plat().get(`/leads?q=${mk}`).expect(200)).body as {
+      email: string;
+      channel: string;
+      source: string;
+      origin: { campaign?: string };
+    }[];
     const ada = leads.find((l) => l.email === `ada-${mk}@ad.test`)!;
     expect(ada).toMatchObject({ channel: `fb${tag}`, source: "form", origin: { campaign: "oct", cta: "hero" } });
     expect(leads.find((l) => l.email === `quinn-${mk}@q.test`)).toMatchObject({ channel: "google.com", source: "contact" });
@@ -577,8 +642,12 @@ describe("companies: isolation and the platform", () => {
     expect(n.last30.at(-1).visitors).toBeGreaterThanOrEqual(1);
 
     // "Sign in" by email: always the same answer.
-    expect((await pub().post("/api/platform/public/find-company").send({ email: "boss@kebo.test" }).expect(200)).body).toEqual({ ok: true });
-    expect((await pub().post("/api/platform/public/find-company").send({ email: "nobody@nowhere.test" }).expect(200)).body).toEqual({ ok: true });
+    expect((await pub().post("/api/platform/public/find-company").send({ email: "boss@kebo.test" }).expect(200)).body).toEqual({
+      ok: true,
+    });
+    expect((await pub().post("/api/platform/public/find-company").send({ email: "nobody@nowhere.test" }).expect(200)).body).toEqual({
+      ok: true,
+    });
 
     // Back as it was, for the other tests.
     await plat().put("/site", { draft: editor.draft }).expect(200);
