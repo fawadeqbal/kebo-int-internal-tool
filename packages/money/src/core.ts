@@ -61,7 +61,10 @@ export function fromMinor(minor: Minor): string {
 }
 
 export const money = (amount: DecimalLike, currency: string): Money => ({ amount: toMinor(amount), currency: normalizeCurrency(currency) });
-export const moneyOfMinor = (amount: Minor, currency: string): Money => ({ amount: Math.round(amount), currency: normalizeCurrency(currency) });
+export const moneyOfMinor = (amount: Minor, currency: string): Money => ({
+  amount: Math.round(amount),
+  currency: normalizeCurrency(currency),
+});
 export const zero = (currency: string): Money => moneyOfMinor(0, currency);
 
 function same(a: Money, b: Money) {
@@ -74,11 +77,55 @@ export const compare = (a: Money, b: Money): -1 | 0 | 1 => (same(a, b), a.amount
 export const max = (a: Money, b: Money): Money => (compare(a, b) >= 0 ? a : b);
 export const min = (a: Money, b: Money): Money => (compare(a, b) <= 0 ? a : b);
 
-/** Minor units × a decimal quantity (e.g. 2.5 m), rounded to the nearest minor unit. */
-export const multiplyMinor = (minor: Minor, factor: number | string): Minor => roundHalfAway(minor * Number(factor || 0));
+/**
+ * A decimal as an exact integer and a power of ten: "19.85" → 1985 / 10². Numbers
+ * are read from their shortest text (19.85, not 19.850000000000001), so what was
+ * typed is what is multiplied. null when it is not a number.
+ */
+export function exactDecimal(value: number | string | { toString(): string }): { n: bigint; scale: number } | null {
+  const text = typeof value === "number" ? (Number.isFinite(value) ? String(value) : "") : value.toString().replace(/,/g, "").trim();
+  const m = /^([+-])?(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(text);
+  if (!m || (m[2] ?? "") + (m[3] ?? "") === "") return null;
+  const digits = `${m[2] ?? ""}${m[3] ?? ""}`;
+  let scale = (m[3] ?? "").length - Number(m[4] ?? 0);
+  let n = BigInt(digits);
+  if (scale < 0) {
+    n *= 10n ** BigInt(-scale);
+    scale = 0;
+  }
+  return { n: m[1] === "-" ? -n : n, scale };
+}
 
-/** `percent`% of an amount (15 → 15%), rounded to the nearest minor unit. */
-export const percentOfMinor = (minor: Minor, percent: number): Minor => roundHalfAway((minor * percent) / 100);
+/** num ÷ den for integers, rounded half away from zero (as the database's round() does). */
+export function divideHalfAway(num: bigint, den: bigint): bigint {
+  if (den === 0n) throw new Error("Division by zero");
+  const negative = num < 0n !== den < 0n;
+  const a = num < 0n ? -num : num;
+  const b = den < 0n ? -den : den;
+  const q = a / b + (2n * (a % b) >= b ? 1n : 0n);
+  return negative ? -q : q;
+}
+
+/** A whole number of minor units as an exact integer (a stray fraction is rounded first). */
+const bigMinor = (minor: Minor): bigint => BigInt(roundHalfAway(minor));
+
+/**
+ * Minor units × a decimal quantity (e.g. 19.85 × 4.10 m = 81.39), worked out
+ * exactly in integers and rounded half away from zero, like the database's
+ * round(numeric).
+ */
+export function multiplyMinor(minor: Minor, factor: number | string): Minor {
+  const f = exactDecimal(factor || 0);
+  if (!f) return 0;
+  return Number(divideHalfAway(bigMinor(minor) * f.n, 10n ** BigInt(f.scale)));
+}
+
+/** `percent`% of an amount (15 → 15%), exactly, rounded half away from zero. */
+export function percentOfMinor(minor: Minor, percent: number | string): Minor {
+  const p = exactDecimal(percent || 0);
+  if (!p) return 0;
+  return Number(divideHalfAway(bigMinor(minor) * p.n, 100n * 10n ** BigInt(p.scale)));
+}
 
 /** Rounds .5 away from zero, as accountants expect (−6.25 → −6.3 at one decimal). */
 export function roundHalfAway(n: number): number {
@@ -105,9 +152,7 @@ export function allocate(totalInput: Minor, weightsInput: number[]): Minor[] {
   const parts = raw.map((r) => Math.trunc(r));
   let remainder = total - parts.reduce((s, p) => s + p, 0);
   const step = Math.sign(remainder);
-  const order = raw
-    .map((r, i) => ({ i, frac: Math.abs(r - Math.trunc(r)) }))
-    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  const order = raw.map((r, i) => ({ i, frac: Math.abs(r - Math.trunc(r)) })).sort((a, b) => b.frac - a.frac || a.i - b.i);
   for (let k = 0; remainder !== 0; k = (k + 1) % order.length) {
     parts[order[k].i] += step;
     remainder -= step;
@@ -119,4 +164,3 @@ export function formatMinor(minor: Minor, currency: string, locale = "en-US"): s
   const amount = (minor / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${currency} ${amount}`;
 }
-

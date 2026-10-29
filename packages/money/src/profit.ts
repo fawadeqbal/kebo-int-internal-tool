@@ -1,4 +1,4 @@
-import { allocate, roundHalfAway, type Minor } from "./core";
+import { allocate, multiplyMinor, roundHalfAway, type Minor } from "./core";
 
 /**
  * Profit maths for reports, free of the database so it can be tested on its
@@ -15,7 +15,7 @@ import { allocate, roundHalfAway, type Minor } from "./core";
 export interface SoldLine {
   docId: string;
   lineTotalMinor: Minor;
-  quantity: number;
+  quantity: number | string;
   /** One unit's cost in the document currency; null = no cost recorded. */
   unitCostMinor: Minor | null;
   /** Grouping keys for reports. */
@@ -26,6 +26,11 @@ export interface SoldDoc {
   id: string;
   discountMinor: Minor;
   lines: SoldLine[];
+  /**
+   * Costs that are not lines (freight and the like to reach the basis we sell
+   * on): part of the cost, counted against the revenue that has a cost.
+   */
+  extraCostMinor?: Minor;
 }
 
 export interface CostedSoldLine extends SoldLine {
@@ -35,12 +40,29 @@ export interface CostedSoldLine extends SoldLine {
 }
 
 export function costDocLines(doc: SoldDoc): CostedSoldLine[] {
-  const shares = allocate(doc.discountMinor, doc.lines.map((l) => l.lineTotalMinor));
-  return doc.lines.map((l, i) => {
-    const revenue = l.lineTotalMinor - shares[i];
-    const cost = l.unitCostMinor === null ? null : roundHalfAway(l.unitCostMinor * l.quantity);
+  const shares = allocate(
+    doc.discountMinor,
+    doc.lines.map((l) => l.lineTotalMinor),
+  );
+  const lines = doc.lines.map((l, i) => {
+    const revenue = l.lineTotalMinor - shares[i]!;
+    const cost = l.unitCostMinor === null ? null : multiplyMinor(l.unitCostMinor, l.quantity);
     return { ...l, revenueMinor: revenue, costMinor: cost, profitMinor: cost === null ? null : revenue - cost };
   });
+  const extra = Math.max(Math.round(doc.extraCostMinor ?? 0), 0);
+  // The extra cost as a line of its own with no revenue, grouped like the document's first line.
+  if (extra > 0)
+    lines.push({
+      docId: doc.id,
+      lineTotalMinor: 0,
+      quantity: 1,
+      unitCostMinor: extra,
+      keys: doc.lines[0]?.keys,
+      revenueMinor: 0,
+      costMinor: extra,
+      profitMinor: -extra,
+    });
+  return lines;
 }
 
 export interface ProfitTotals {
@@ -91,6 +113,11 @@ export function profitBy(lines: CostedSoldLine[], key: string, limit = 8) {
   }
   return [...groups.entries()]
     .map(([k, ls]) => ({ key: k, ...profitTotals(ls) }))
-    .sort((a, b) => Number(b.costedRevenueMinor > 0) - Number(a.costedRevenueMinor > 0) || b.profitMinor - a.profitMinor || b.revenueMinor - a.revenueMinor)
+    .sort(
+      (a, b) =>
+        Number(b.costedRevenueMinor > 0) - Number(a.costedRevenueMinor > 0) ||
+        b.profitMinor - a.profitMinor ||
+        b.revenueMinor - a.revenueMinor,
+    )
     .slice(0, limit);
 }

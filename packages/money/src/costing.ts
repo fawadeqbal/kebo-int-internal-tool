@@ -1,4 +1,4 @@
-import { allocate, roundHalfAway, type Minor } from "./core";
+import { allocate, divideHalfAway, exactDecimal, multiplyMinor, roundHalfAway, type Minor } from "./core";
 
 /**
  * Costing for a trading company: what a factory line costs us in the quotation
@@ -55,10 +55,16 @@ export const convertMinor = (minor: Minor, rate: number): Minor => {
   return roundHalfAway(minor / rate);
 };
 
-/** A factory price with its tax % added on top: 100.00 + 13% → 113.00 (what one unit costs Kebo). */
-export function withTaxMinor(unitPriceMinor: Minor, taxRate: number): Minor {
-  const rate = Math.max(Number(taxRate) || 0, 0);
-  return roundHalfAway(unitPriceMinor * (1 + rate / 100));
+/**
+ * A factory price with its tax % added on top: 100.00 + 13% → 113.00 (what one
+ * unit costs Kebo); 100.50 + 13% → 113.57. Exact integer arithmetic, rounded
+ * half away from zero, the same as round(price × (100 + tax)) in the database.
+ */
+export function withTaxMinor(unitPriceMinor: Minor, taxRate: number | string): Minor {
+  const rate = exactDecimal(Math.max(Number(taxRate) || 0, 0));
+  if (!rate) return roundHalfAway(unitPriceMinor);
+  const s = 10n ** BigInt(rate.scale);
+  return Number(divideHalfAway(BigInt(roundHalfAway(unitPriceMinor)) * (100n * s + rate.n), 100n * s));
 }
 
 /** Margin as a share of the selling price, in % with one decimal: (price − cost) / price. */
@@ -85,7 +91,7 @@ export interface CostedLine {
  * over all lines by amount (as on the invoice), so it lowers the profit shown.
  */
 export function costSummary(lines: CostedLine[], discountMinor: Minor = 0, extraCostMinor: Minor = 0) {
-  const gross = lines.map((l) => roundHalfAway(l.unitPriceMinor * (Number(l.quantity) || 0)));
+  const gross = lines.map((l) => multiplyMinor(l.unitPriceMinor, l.quantity));
   const subtotal = gross.reduce((s, g) => s + g, 0);
   const shares = allocate(Math.min(Math.max(discountMinor, 0), Math.max(subtotal, 0)), gross);
   let cost = 0;
@@ -98,7 +104,7 @@ export function costSummary(lines: CostedLine[], discountMinor: Minor = 0, extra
     }
     const afterDiscount = gross[i] - shares[i];
     sales += afterDiscount;
-    cost += roundHalfAway(l.unitCostMinor * (Number(l.quantity) || 0));
+    cost += multiplyMinor(l.unitCostMinor, l.quantity);
   });
   // Costs that are not lines (freight to reach the basis we sell on…) are part of the cost too.
   cost += Math.max(Math.round(extraCostMinor), 0);
@@ -118,7 +124,7 @@ export function costSummary(lines: CostedLine[], discountMinor: Minor = 0, extra
  * cover. Lines without a cost stay null and take no share.
  */
 export function landedUnitCosts(lines: { unitCostMinor: Minor | null; quantity: number | string }[], extraMinor: Minor): (Minor | null)[] {
-  const weights = lines.map((l) => (l.unitCostMinor === null ? 0 : Math.max(l.unitCostMinor * (Number(l.quantity) || 0), 0)));
+  const weights = lines.map((l) => (l.unitCostMinor === null ? 0 : Math.max(multiplyMinor(l.unitCostMinor, l.quantity), 0)));
   const total = weights.reduce((t, w) => t + w, 0);
   const shares = total > 0 && extraMinor > 0 ? allocate(Math.round(extraMinor), weights) : weights.map(() => 0);
   return lines.map((l, i) => {
