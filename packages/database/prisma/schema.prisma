@@ -1329,6 +1329,8 @@ model Company {
   contactEmail      String?       @map("contact_email") @db.VarChar(254)
   notes             String?
   lastActiveAt      DateTime?     @map("last_active_at") @db.Timestamptz
+  /// The company website form's key: the form sends it, and it decides the company (Settings → Website form).
+  formKey           String        @unique @default(dbgenerated("replace(((gen_random_uuid())::text || (gen_random_uuid())::text), '-'::text, ''::text)")) @map("form_key") @db.VarChar(64)
   deletedAt         DateTime?     @map("deleted_at") @db.Timestamptz
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz

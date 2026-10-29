@@ -7,6 +7,7 @@ import { saveSettingsAction } from "./actions";
 import { SettingsGroupForm } from "./forms";
 import { SETTING_GROUPS } from "./groups";
 import { AddressCard } from "./address/card";
+import { WebsiteFormCard } from "./website-form/card";
 
 export const metadata = { title: "Settings" };
 
@@ -16,8 +17,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const settings = await api.get<Settings>("/settings");
   // The company's own address: only once companies have addresses.
-  const tabs: { key: string; title: string }[] = [...SETTING_GROUPS, ...(process.env.BASE_DOMAIN ? [{ key: "address", title: "Company address" }] : [])];
+  const tabs: { key: string; title: string }[] = [
+    ...SETTING_GROUPS,
+    { key: "website-form", title: "Website form" },
+    ...(process.env.BASE_DOMAIN ? [{ key: "address", title: "Company address" }] : []),
+  ];
   const address = sp.tab === "address" && !!process.env.BASE_DOMAIN;
+  const websiteForm = sp.tab === "website-form";
+  const own = address ? "address" : websiteForm ? "website-form" : null;
   const group = SETTING_GROUPS.find((g) => g.key === sp.tab) ?? SETTING_GROUPS[0]!;
   return (
     <div>
@@ -29,7 +36,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <nav aria-label="Settings sections" className="lg:sticky lg:top-20">
           <ul className="flex gap-1 overflow-x-auto border-b border-line pb-1 lg:flex-col lg:overflow-visible lg:border-0 [scrollbar-width:none]">
             {tabs.map((g) => {
-              const active = address ? g.key === "address" : g.key === group.key;
+              const active = own ? g.key === own : g.key === group.key;
               return (
                 <li key={g.key} className="shrink-0">
                   <Link
@@ -50,8 +57,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <div className="flex max-w-3xl min-w-0 flex-col gap-6">
           {address ? (
             <AddressCard />
+          ) : websiteForm ? (
+            <WebsiteFormCard />
           ) : (
-            <SettingsGroupForm key={group.key} groupKey={group.key} values={settings[group.key] as Record<string, unknown>} action={saveSettingsAction.bind(null, group.key)} />
+            <SettingsGroupForm
+              key={group.key}
+              groupKey={group.key}
+              values={settings[group.key] as Record<string, unknown>}
+              action={saveSettingsAction.bind(null, group.key)}
+            />
           )}
         </div>
       </div>

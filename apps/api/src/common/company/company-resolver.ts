@@ -10,9 +10,10 @@ export const COMPANY_HEADER = "x-company";
 /**
  * Decides which company each request works in, before anything else runs:
  * - a session token: the company it was issued in (tokens from before companies: the first company);
- * - otherwise the X-Company header or ?company= (a company's short name);
+ * - otherwise the X-Company header (a company's short name: the web app sends it for the address it is at);
  * - otherwise the default company.
- * Platform routes (/api/platform/…) work in no company.
+ * Platform routes (/api/platform/…) work in no company. The public website form
+ * does not use this: its form key decides its company (WebsiteController).
  */
 @Injectable()
 export class CompanyResolver {
@@ -30,7 +31,7 @@ export class CompanyResolver {
       if (!claims.companyId) return this.companies.defaultCompany();
       return this.companies.byId(claims.companyId);
     }
-    const named = req.headers[COMPANY_HEADER] ?? (req.query as Record<string, unknown> | undefined)?.company;
+    const named = req.headers[COMPANY_HEADER];
     if (typeof named === "string" && named.trim()) return this.companies.bySlug(named);
     return this.companies.defaultCompany();
   }

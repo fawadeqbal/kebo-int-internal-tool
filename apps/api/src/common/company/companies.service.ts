@@ -52,6 +52,13 @@ export class CompaniesService {
     return c ? toInfo(c) : null;
   }
 
+  /** The company whose website form key this is (null: no such key, or the company is deleted). */
+  async byFormKey(key: string): Promise<CompanyInfo | null> {
+    if (!/^[0-9a-f]{32,64}$/.test(key)) return null;
+    const c = await this.prisma.platform.company.findUnique({ where: { formKey: key } });
+    return c && c.status !== "deleted" ? toInfo(c) : null;
+  }
+
   /** Why this short name (the company's address) cannot be taken now: the rules, in use, or held after a rename or delete. Null: free. */
   async slugTaken(slug: string, exceptCompanyId?: string): Promise<string | null> {
     const rule = slugProblem(slug);

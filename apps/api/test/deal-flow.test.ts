@@ -27,25 +27,54 @@ describe("a whole deal through the API", () => {
   });
 
   it("takes an RFQ from the website form, refusing other sites and bots", async () => {
-    const form = { "Full Name": "Yusuf Ali", email: `yusuf-${tag}@gulf.test`, "Phone / WhatsApp": phone, company: `Gulf Valves ${tag}`, category: "machinery", message: "200 gate valves DN100 PN16\nDelivery Jebel Ali" };
+    const form = {
+      "Full Name": "Yusuf Ali",
+      email: `yusuf-${tag}@gulf.test`,
+      "Phone / WhatsApp": phone,
+      company: `Gulf Valves ${tag}`,
+      category: "machinery",
+      message: "200 gate valves DN100 PN16\nDelivery Jebel Ali",
+    };
+    // Not from an allowed site, and no form key: refused (so is no Origin at all).
     await api(app).post("/public/inquiries", form).set("origin", "https://evil.test").expect(403);
-    const bot = await api(app).post("/public/inquiries", { ...form, website: "http://spam" }).expect(201);
-    expect(bot.body.reference).toBeUndefined();
-    const bad = await api(app).post("/public/inquiries", { ...form, email: "nope" }).set("origin", "https://keboint.com").expect(422);
+    await api(app).post("/public/inquiries", form).expect(403);
+    const bot = await api(app)
+      .post("/public/inquiries", { ...form, website: "http://spam" })
+      .set("origin", "https://keboint.com")
+      .expect(201);
+    expect(bot.body).toEqual({ ok: true, message: "Thank you." });
+    const bad = await api(app)
+      .post("/public/inquiries", { ...form, email: "nope" })
+      .set("origin", "https://keboint.com")
+      .expect(422);
     expect(bad.body.error).toBe("Please enter a valid business email");
     const ok = await api(app).post("/public/inquiries", form).set("origin", "https://keboint.com").expect(201);
-    expect(ok.body.reference).toMatch(/^RFQ-\d{4}-\d{4}$/);
+    // Only that it arrived: no number that tells how many came before.
+    expect(Object.keys(ok.body).sort()).toEqual(["message", "ok"]);
+    expect(JSON.stringify(ok.body)).not.toMatch(/RFQ-/);
     expect(ok.headers["access-control-allow-origin"]).toBe("https://keboint.com");
 
-    const list = await api(app, manager).get(`/inquiries?q=${ok.body.reference}`).expect(200);
+    const list = await api(app, manager)
+      .get(`/inquiries?q=${encodeURIComponent(`Gulf Valves ${tag}`)}`)
+      .expect(200);
+    expect(list.body.rows).toHaveLength(1);
     const row = list.body.rows[0];
-    expect(row).toMatchObject({ refNo: ok.body.reference, stage: "new", channel: "website", category: "Machinery", assignee: null });
+    expect(row).toMatchObject({ stage: "new", channel: "website", category: "Machinery", assignee: null });
     expect(row.customer.country).toBe("ZZ"); // the form gives no country: staff are asked for it
     inquiryId = row.id;
 
     // The same person writing again is matched to the same customer; the public form never edits it.
-    const again = await api(app).post("/public/inquiries", { ...form, "Full Name": "Y. Ali" }).expect(201);
-    const second = (await api(app, manager).get(`/inquiries?q=${again.body.reference}`).expect(200)).body.rows[0];
+    await api(app)
+      .post("/public/inquiries", { ...form, "Full Name": "Y. Ali" })
+      .set("origin", "https://keboint.com")
+      .expect(201);
+    const both = (
+      await api(app, manager)
+        .get(`/inquiries?q=${encodeURIComponent(`Gulf Valves ${tag}`)}`)
+        .expect(200)
+    ).body.rows as { id: string; customer: { id: string } }[];
+    expect(both).toHaveLength(2);
+    const second = both.find((r) => r.id !== row.id)!;
     expect(second.customer.id).toBe(row.customer.id);
     const detail = await api(app, manager).get(`/inquiries/${second.id}`).expect(200);
     expect(detail.body.requirements).toMatch(/Name: Y\. Ali/);
@@ -58,7 +87,10 @@ describe("a whole deal through the API", () => {
     expect(assigned.body.stage).toBe("sourcing");
     const detail = await api(app, staff).get(`/inquiries/${inquiryId}`).expect(200);
     expect(detail.body.allowed).toMatchObject({ edit: true, quote: true, source: true });
-    expect(detail.body.stageChanges.map((s: { toStage: string; cause: string }) => `${s.toStage}:${s.cause}`)).toEqual(["new:created", "sourcing:assigned"]);
+    expect(detail.body.stageChanges.map((s: { toStage: string; cause: string }) => `${s.toStage}:${s.cause}`)).toEqual([
+      "new:created",
+      "sourcing:assigned",
+    ]);
     itemId = detail.body.items[0].id;
     // Staff turn the free-text message into proper items.
     const d = detail.body;
@@ -97,7 +129,9 @@ describe("a whole deal through the API", () => {
     expect(draft.body.number).toBe(1);
     expect(draft.body.options).toHaveLength(1);
     expect(draft.body.options[0].prices[0]).toMatchObject({ unitPrice: 117.65 }); // USD 100 cost, 15% margin on the price
-    const r1 = await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft.body, incotermPlace: "Qingdao" }).expect(201);
+    const r1 = await api(app, staff)
+      .post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft.body, incotermPlace: "Qingdao" })
+      .expect(201);
     rev[1] = r1.body.id;
     expect(r1.body).toMatchObject({ status: "draft", total: "23530.00" });
     expect(r1.body.options[0]).toMatchObject({ letter: "A", status: "open", total: "23530.00" });
@@ -109,7 +143,9 @@ describe("a whole deal through the API", () => {
   });
 
   it("supersedes R1 when a cheaper R2 is sent, and won't let a sent revision change", async () => {
-    await api(app, staff).put(`/revisions/${rev[1]}`, (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`)).body).expect(400);
+    await api(app, staff)
+      .put(`/revisions/${rev[1]}`, (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`)).body)
+      .expect(400);
     const draft = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     expect(draft.number).toBe(2);
     // R1 was sent, so a new revision says why.
@@ -128,7 +164,11 @@ describe("a whole deal through the API", () => {
 
   it("records the customer's yes on R2 even with an R3 draft open: order made, deal won, draft discarded", async () => {
     const draft = (await api(app, staff).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
-    rev[3] = (await api(app, staff).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, reason: "Terms changed" }).expect(201)).body.id;
+    rev[3] = (
+      await api(app, staff)
+        .post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, reason: "Terms changed" })
+        .expect(201)
+    ).body.id;
     await api(app, staff).post(`/revisions/${rev[1]}/status`, { to: "accepted" }).expect(409); // superseded: no answer possible
     const accepted = await api(app, staff).post(`/revisions/${rev[2]}/status`, { to: "accepted" }).expect(200);
     expect(accepted.body.status).toBe("accepted");
@@ -138,7 +178,13 @@ describe("a whole deal through the API", () => {
     expect(deal.stage).toBe("won");
     expect(deal.orders).toHaveLength(1);
     const order = (await api(app, staff).get(`/orders/${deal.orders[0].id}`).expect(200)).body;
-    expect(order).toMatchObject({ total: "23000.00", depositPercent: 30, balanceTerms: "before_shipment", stage: "confirmed", next: { to: "in_production" } });
+    expect(order).toMatchObject({
+      total: "23000.00",
+      depositPercent: 30,
+      balanceTerms: "before_shipment",
+      stage: "confirmed",
+      next: { to: "in_production" },
+    });
     expect(order.money.deposit).toBe("6900.00");
     expect(order.needs.title).toBe("Get the deposit (USD 6,900.00)");
     // Acceptance is final.

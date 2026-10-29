@@ -260,6 +260,52 @@ describe("companies: isolation and the platform", () => {
     for (let i = 0; i < 4; i++) expect(Number((await count(db)).other)).toBe(0);
   });
 
+  it("the website form: its key decides the company; naming a company does not", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    const bAdmin = api(app, await signIn(app, `boss@iso-${tag}.test`, "Boss12345678"));
+    const view = (await bAdmin.get("/company/website-form").expect(200)).body;
+    expect(view).toMatchObject({ key: b.formKey, allowed: true });
+    expect(view.endpoint).toMatch(/\/api\/public\/inquiries$/);
+    const send = (who: string) => ({
+      fullName: "Web Buyer",
+      email: `${who}-${tag}@web.test`,
+      phone: "+92 300 7654321",
+      category: "Valves",
+      requirements: `Valves for ${who} ${tag}`,
+    });
+    const post = () => request(app.getHttpServer()).post("/api/public/inquiries");
+    const inB = (who: string) => prisma.company(b.id).inquiry.count({ where: { title: `Valves for ${who} ${tag}` } });
+    const inKebo = (who: string) => prisma.company(FIRST_COMPANY_ID).inquiry.count({ where: { title: `Valves for ${who} ${tag}` } });
+
+    // Naming the company (as the old form did, or in the header) is not enough.
+    expect((await post().query({ company: b.slug }).send(send("named")).expect(403)).body.ok).toBe(false);
+    await post().set("x-company", b.slug).send(send("header")).expect(403);
+    await post().set("x-form-key", "0".repeat(48)).send(send("wrong")).expect(403);
+    // Even from an allowed site, a named company is not taken: the inquiry goes to the default company.
+    await post().set("origin", "https://keboint.com").set("x-company", b.slug).send(send("site")).expect(201);
+    expect(await inB("site")).toBe(0);
+    expect(await inKebo("site")).toBe(1);
+    // With B's key, from anywhere (header or a form field): B's, and only B's.
+    const ok = await post().set("origin", "https://b-company.example").set("x-form-key", b.formKey).send(send("keyed")).expect(201);
+    expect(ok.body).toEqual({ ok: true, message: expect.stringMatching(/^Thank you/) });
+    expect(ok.headers["access-control-allow-origin"]).toBe("https://b-company.example");
+    await post()
+      .send({ ...send("field"), formKey: b.formKey })
+      .expect(201);
+    expect([await inB("keyed"), await inB("field"), await inKebo("keyed")]).toEqual([1, 1, 0]);
+
+    // A new key: the old one stops working. Only a Super Admin sees or changes it.
+    const fresh = (await bAdmin.post("/company/website-form/new-key").expect(200)).body;
+    expect(fresh.key).not.toBe(b.formKey);
+    await post().set("x-form-key", b.formKey).send(send("old")).expect(403);
+    await post().set("x-form-key", fresh.key).send(send("new")).expect(201);
+    await bAdmin
+      .post("/users", { name: "Form Mgr", email: `formmgr@iso-${tag}.test`, role: "manager", password: "Manager12345" })
+      .expect(201);
+    const mgr = api(app, await signIn(app, `formmgr@iso-${tag}.test`, "Manager12345"));
+    expect((await mgr.get("/company/website-form")).status).toBeGreaterThanOrEqual(403);
+  });
+
   it("an email in two companies: the password decides, or the person chooses", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const bAdmin = await signIn(app, `boss@iso-${tag}.test`, "Boss12345678");
@@ -492,8 +538,9 @@ describe("companies: isolation and the platform", () => {
     expect(phone.status).toBe(403);
     expect(phone.body.code).toBe("plan_feature");
     await off(await mine.get("/customers").set("user-agent", "Dart/3.5 (dart:io)"));
-    // The website form.
-    const form = await request(app.getHttpServer()).post(`/api/public/inquiries?company=${c.slug}`).send({
+    // The website form, even with the company's own key.
+    const { formKey } = await prisma.platform.company.findUniqueOrThrow({ where: { id: c.id } });
+    const form = await request(app.getHttpServer()).post(`/api/public/inquiries`).set("x-form-key", formKey).send({
       fullName: "Web Buyer",
       email: "buyer@web.test",
       phone: "+92 300 1234567",
@@ -501,6 +548,7 @@ describe("companies: isolation and the platform", () => {
       requirements: "100 valves please",
     });
     expect(form.status).toBe(403);
+    expect(form.body.message).toMatch(/cannot be received right now/);
     // Insights without expenses: no expenses and no profit after them.
     const insightsOnly = (
       await plat()
@@ -842,7 +890,8 @@ describe("companies: isolation and the platform", () => {
       .expect(200);
     const files = unzipSync(new Uint8Array(zip.body as Buffer));
     const inquiries = JSON.parse(new TextDecoder().decode(files["data/inquiries.json"])) as { company_id: string }[];
-    expect(inquiries.length).toBe(10);
+    expect(inquiries.length).toBe(await prisma.company(c.id).inquiry.count());
+    expect(inquiries.length).toBeGreaterThanOrEqual(10);
     expect(inquiries.every((r) => r.company_id === c.id)).toBe(true);
     const users = JSON.parse(new TextDecoder().decode(files["data/users.json"])) as Record<string, unknown>[];
     expect(users.some((u) => "password_hash" in u)).toBe(false);
