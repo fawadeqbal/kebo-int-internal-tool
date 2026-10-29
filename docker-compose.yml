@@ -54,7 +54,6 @@ services:
       POSTGRES_DB: kebo
       POSTGRES_USER: kebo
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U kebo -d kebo"], interval: 10s, timeout: 5s, retries: 10 }
     mem_limit: ${DB_MEMORY:-512m}
@@ -93,7 +92,10 @@ services:
     environment:
       <<: *server-env
       REMINDER_INTERVAL_MINUTES: ${REMINDER_INTERVAL_MINUTES:-60}
-    volumes: [./secrets:/app/secrets:ro]
+      # The backup's and the disk's status (written by docker/backup.sh and deploy/server/docker-cleanup.sh):
+      # the worker emails the platform admins when a backup is old or failed, or the disk is full.
+      SERVER_STATUS_DIR: /server-status
+    volumes: [./secrets:/app/secrets:ro, ./backups/status:/server-status:ro]
     healthcheck: { disable: true }
     depends_on:
       api: { condition: service_healthy }
@@ -120,7 +122,9 @@ services:
     logging: *logging
 
   backup:
-    image: postgres:16-alpine
+    # PostgreSQL's tools and rclone (the off-site copy); docker/backup.sh says what it does.
+    build: { context: docker, dockerfile: backup.Dockerfile }
+    image: kebo-desk-backup:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       PGHOST: db
@@ -128,9 +132,24 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: kebo
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_FILES_KEEP: ${BACKUP_FILES_KEEP:-2}
       BACKUP_HOUR: ${BACKUP_HOUR:-2}
       BACKUP_GID: ${BACKUP_GID:-10560}
       TZ: ${APP_TIME_ZONE:-Asia/Shanghai}
+      # The app's files, read through MinIO for the off-site sync.
+      FILES_S3_ENDPOINT: http://minio:9000
+      FILES_S3_BUCKET: ${S3_BUCKET:-kebo-files}
+      FILES_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-kebo}
+      FILES_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # Off-site copy to an S3 store of your own (docs/restore.md); off while OFFSITE_S3_ENDPOINT is empty.
+      OFFSITE_S3_ENDPOINT: ${OFFSITE_S3_ENDPOINT:-}
+      OFFSITE_S3_BUCKET: ${OFFSITE_S3_BUCKET:-}
+      OFFSITE_S3_ACCESS_KEY: ${OFFSITE_S3_ACCESS_KEY:-}
+      OFFSITE_S3_SECRET_KEY: ${OFFSITE_S3_SECRET_KEY:-}
+      OFFSITE_S3_REGION: ${OFFSITE_S3_REGION:-us-east-1}
+      OFFSITE_S3_PREFIX: ${OFFSITE_S3_PREFIX:-kebo-desk}
+      OFFSITE_ENCRYPTION_PASSWORD: ${OFFSITE_ENCRYPTION_PASSWORD:-}
+      OFFSITE_RETENTION_DAYS: ${OFFSITE_RETENTION_DAYS:-30}
     volumes:
       - ./docker/backup.sh:/backup.sh:ro
       - ./backups:/backups
@@ -138,6 +157,7 @@ services:
     entrypoint: ["sh", "/backup.sh"]
     depends_on:
       db: { condition: service_healthy }
+      minio: { condition: service_started }
     mem_limit: 256m
     logging: *logging
 
