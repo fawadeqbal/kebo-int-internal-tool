@@ -42,6 +42,7 @@ import { CompanyDataService } from "./company-data";
 import { LeadsService } from "./leads.service";
 import { PlansService } from "./plans.service";
 import { SiteService } from "./site.service";
+import { RateLimiter } from "../common/http/rate-limit";
 import {
   CurrentAdmin,
   PlatformAuthService,
@@ -66,11 +67,15 @@ const deleteInput = z.object({
   reason: z.string().trim().max(200).nullish(),
 });
 const tokenInput = z.object({ token: z.string().min(10).max(2000) });
+/** Page views counted per address and minute (POST /platform/public/visit). */
+const VISITS_PER_MINUTE = Number(process.env.SITE_VISITS_PER_MINUTE) || 30;
 
 /** Public pages of the platform: request a demo, sign up, confirm, set a password from a link. */
 @ApiTags("platform")
 @Controller("platform/public")
 export class PlatformPublicController {
+  private readonly visits = new RateLimiter();
+
   constructor(
     private readonly leads: LeadsService,
     private readonly platform: PlatformCompaniesService,
@@ -94,7 +99,10 @@ export class PlatformPublicController {
   @Post("visit")
   @HttpCode(200)
   visit(@Body(Validate(siteVisitInput)) body: z.infer<typeof siteVisitInput>, @Req() req: Request) {
-    return this.site.visit({ ip: clientIp(req), userAgent: body.userAgent, origin: body.origin });
+    const ip = clientIp(req);
+    // The web server sends a view per page load; more than this from one address is not people reading.
+    this.visits.check(`visit:${ip}`, VISITS_PER_MINUTE, 60_000, "Too many requests. Please try again a little later.");
+    return this.site.visit({ ip, userAgent: body.userAgent, origin: body.origin });
   }
 
   /** "Questions?" on the marketing page. */

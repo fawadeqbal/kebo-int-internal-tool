@@ -8,6 +8,7 @@ import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/au
 import { PrismaService } from "../src/database/prisma.service";
 import { LifecycleService } from "../src/platform/lifecycle.service";
 import { StorageService } from "../src/common/storage/storage.service";
+import { PlatformPublicController } from "../src/platform/platform.controller";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { api, signIn, startApp } from "./app";
 
@@ -858,6 +859,12 @@ describe("companies: isolation and the platform", () => {
     expect((await pub().post("/api/platform/public/find-company").send({ email: "nobody@nowhere.test" }).expect(200)).body).toEqual({
       ok: true,
     });
+
+    // Page views from one address are limited (30 a minute).
+    const views = await Promise.all(Array.from({ length: 35 }, () => visit(browser)));
+    expect(views.filter((r) => r.status === 429).length).toBeGreaterThan(0);
+    expect(views.filter((r) => r.status === 200).length).toBeLessThanOrEqual(30);
+    (app.get(PlatformPublicController) as unknown as { visits: { clear(): void } }).visits.clear();
 
     // Back as it was, for the other tests.
     await plat().put("/site", { draft: editor.draft }).expect(200);

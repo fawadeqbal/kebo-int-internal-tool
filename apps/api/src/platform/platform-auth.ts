@@ -63,6 +63,7 @@ export class PlatformAuthService {
 
   private limitIp(ip: string) {
     const now = Date.now();
+    if (this.attempts.size > 10_000) for (const [k, a] of this.attempts) if (a.resetAt < now) this.attempts.delete(k);
     if (this.attempts.size > 10_000) this.attempts.clear();
     const e = this.attempts.get(ip);
     if (!e || e.resetAt < now) return void this.attempts.set(ip, { count: 1, resetAt: now + 15 * 60_000 });
