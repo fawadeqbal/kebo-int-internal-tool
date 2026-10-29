@@ -27,7 +27,7 @@ COMPOSE_FILE=docker-compose.yml:deploy/compose.shared-proxy.yml
 docker compose up -d --build
 docker compose logs api | tail -5          # "API on http://localhost:4000/api"
 
-# 3. The starting accounts — use your real emails and strong passwords.
+# 3. The starting accounts — use your real emails and strong passwords (all three passwords are required in production).
 docker compose exec \
   -e SEED_ADMIN_EMAIL=you@example.com     -e SEED_ADMIN_PASSWORD='…' \
   -e SEED_MANAGER_EMAIL=boss@example.com  -e SEED_MANAGER_PASSWORD='…' \
@@ -47,7 +47,7 @@ Then open https://rfq.fawadiqbal.dev, sign in as the admin, and in **Settings �
 
 **Undo**: put the old `rfq.fawadiqbal.dev` block back in the Caddyfile, reload Caddy, `docker compose -p kebo-rfq start`.
 
-**Updates later**: `cd /opt/kebo-desk && git pull && docker compose up -d --build` (migrations apply on start).
+**Updates later**: merging into `main` deploys (README, Deploy); by hand: `cd /opt/kebo-desk && bash deploy/ci-deploy.sh`.
 
 ## Moving the old data instead (not used)
 
@@ -141,5 +141,5 @@ Sign in with your usual email and password (two-step codes keep working because 
 
 - Keep the old stack stopped (not removed) for a few weeks; then `docker compose -p kebo-rfq down` (volumes stay until you remove them).
 - **Mobile app**: the old app calls `/api/v1/...`, which the new API does not have. Ship the updated app before the switch, or tell the team to use the web app on phones until it is out.
-- Backups: `/opt/kebo-desk/backups` (nightly database dump + files), same as before.
+- Backups: `/opt/kebo-desk/backups` (nightly database dump + the latest 2 copies of the files), and off-site once set up: `docs/restore.md`.
 - **First morning**: the reminder worker runs within the hour and finds the real backlog on imported open orders (deposits not received, balances still due after shipping). Each person gets one summary of their orders that need them, and managers one summary of orders more than the escalation days late (Settings → reminders), not one message per order. Ask each handler to open *Orders → Mine* in the first days and move each order to the stage it is really at.

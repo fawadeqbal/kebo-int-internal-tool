@@ -4,10 +4,14 @@
  *
  *   pnpm db:seed            accounts + settings (safe to run again)
  *   pnpm db:seed --demo     plus sample customers, factories and deals
+ *
+ * In production (NODE_ENV=production) SEED_ADMIN_PASSWORD, SEED_MANAGER_PASSWORD
+ * and SEED_STAFF_PASSWORD are required: the default passwords are refused there.
  */
 import "./env";
 import bcrypt from "bcryptjs";
 import { createPrismaClient, seedCompanyBase, seedDemoData } from "../src";
+import { seedPeople } from "./seed-people";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -35,10 +39,11 @@ async function main() {
   const db = createPrismaClient({ url: url!, poolSize: 2, companyId: company.id });
   try {
     const hash = (p: string) => bcrypt.hash(p, 12);
+    const who = seedPeople(process.env);
     const people = await seedCompanyBase(db, {
-      admin: { email: process.env.SEED_ADMIN_EMAIL ?? "admin@example.com", name: process.env.SEED_ADMIN_NAME ?? "Super Admin", role: "admin", passwordHash: await hash(process.env.SEED_ADMIN_PASSWORD ?? "Admin@12345") },
-      manager: { email: process.env.SEED_MANAGER_EMAIL ?? "manager@example.com", name: process.env.SEED_MANAGER_NAME ?? "Manager", role: "manager", passwordHash: await hash(process.env.SEED_MANAGER_PASSWORD ?? "Manager@12345") },
-      staff: { email: process.env.SEED_STAFF_EMAIL ?? "staff@example.com", name: process.env.SEED_STAFF_NAME ?? "Staff", role: "staff", passwordHash: await hash(process.env.SEED_STAFF_PASSWORD ?? "Staff@12345") },
+      admin: { email: who.admin.email, name: who.admin.name, role: "admin", passwordHash: await hash(who.admin.password) },
+      manager: { email: who.manager.email, name: who.manager.name, role: "manager", passwordHash: await hash(who.manager.password) },
+      staff: { email: who.staff.email, name: who.staff.name, role: "staff", passwordHash: await hash(who.staff.password) },
       log,
     });
     if (demo) {

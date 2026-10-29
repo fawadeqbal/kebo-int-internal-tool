@@ -28,7 +28,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
-    "db:reset": "prisma migrate reset --force && tsx scripts/seed.ts --demo"
+    "db:reset": "prisma migrate reset --force && tsx scripts/seed.ts --demo",
+    "db:check-migrations": "tsx scripts/check-migrations.ts"
   },
   "dependencies": {
     "@kebo/money": "workspace:*",

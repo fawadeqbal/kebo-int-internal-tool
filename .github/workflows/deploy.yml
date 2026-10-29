@@ -1,13 +1,19 @@
 name: Deploy
 
 # Every push to main deploys to rfq.fawadiqbal.dev once CI has passed for it.
-# "Run workflow" (on the Actions tab) deploys main by hand.
+# "Run workflow" (on the Actions tab, from main) deploys main's latest commit by hand, or the commit
+# given (to go back to an older one). Either way only a commit of main whose CI run on main passed.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      commit:
+        description: "A commit of main to deploy (empty: main's latest). Its CI run must have passed."
+        required: false
+        default: ""
 
 # One deploy at a time; a newer one waits for the running one to finish.
 concurrency:
@@ -16,6 +22,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read # to check that CI passed for the commit (Run workflow)
 
 jobs:
   deploy:
@@ -26,13 +33,43 @@ jobs:
       name: production
       url: https://rfq.fawadiqbal.dev
     steps:
+      - name: Choose the commit
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          ASKED: ${{ inputs.commit }}
+        run: |
+          if [ "$EVENT" = "workflow_run" ]; then
+            echo "commit=$RUN_SHA" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$REF" = "refs/heads/main" ] || { echo "::error::Run the workflow from main."; exit 1; }
+          if [ -n "$ASKED" ]; then
+            [[ $ASKED =~ ^[0-9a-f]{7,40}$ ]] || { echo "::error::\"$ASKED\" is not a commit id."; exit 1; }
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$ASKED" --jq .sha) || { echo "::error::No commit $ASKED."; exit 1; }
+            # On main: main's latest is the commit or comes after it.
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...main" --jq .status)
+            case "$status" in ahead|identical) ;; *) echo "::error::Commit ${sha::7} is not on main."; exit 1 ;; esac
+            extra=" --older-ok"
+          else
+            sha=$GITHUB_SHA
+            extra=""
+          fi
+          # CI passed for exactly this commit, on a push to main.
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$sha&branch=main&event=push&status=success&per_page=1" --jq .total_count)
+          [ "$passed" -gt 0 ] || { echo "::error::CI has not passed for ${sha::7} on main: not deployed."; exit 1; }
+          echo "commit=$sha$extra" >>"$GITHUB_OUTPUT"
+
       - name: Deploy on the server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+          COMMIT: ${{ steps.pick.outputs.commit }}
         run: |
           for v in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
             [ -n "${!v}" ] || { echo "::error::The $v secret is missing (Settings › Secrets and variables › Actions)."; exit 1; }
@@ -42,7 +79,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           echo "Deploying ${COMMIT::7}"
-          # The key may only run deploy/ci-deploy.sh (a forced command on the server).
+          # The key may only run deploy/ci-deploy.sh (a forced command on the server); it deploys exactly this commit.
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 -o ConnectTimeout=20 \
             "$DEPLOY_USER@$DEPLOY_HOST" "$COMMIT"
 
