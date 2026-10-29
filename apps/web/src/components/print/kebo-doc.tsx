@@ -33,14 +33,46 @@ const TEXT_2 = "#444444";
 const LABEL_GREY = "#555555";
 /** Page margins (the footer sits in the bottom one). */
 const MARGIN = { top: 44, side: 52, bottom: 64 };
-/** A company's brand next to its name on documents: the logo and its wordmark. */
+/** A company's brand at the top of its documents, from Settings → Company: its logo (or its initials), the title and the line under it. */
 export interface DocBrand {
-  logo: string;
+  logo: string | null;
   mark: string;
-  tagline: string;
+  tagline: string | null;
 }
-/** Kebo's (the first company). Other companies: their name, no logo, until they can upload their own. */
-export const KEBO_BRAND: DocBrand = { logo: "/brand/kebo-logo.png", mark: "KEBO", tagline: "INTERNATIONAL TRADE" };
+
+/** Initials in a navy and gold ring, for a company that has not uploaded a logo yet. */
+function Monogram({ mark }: { mark: string }) {
+  const letters =
+    mark
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("") || "·";
+  return (
+    <div
+      style={{
+        ...exact,
+        width: "62px",
+        height: "62px",
+        flexShrink: 0,
+        borderRadius: "50%",
+        border: `3px solid ${GOLD}`,
+        background: NAVY,
+        color: "#FFFFFF",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: DISPLAY,
+        fontWeight: 800,
+        fontSize: letters.length > 1 ? "22px" : "26px",
+        letterSpacing: "0.04em",
+      }}
+    >
+      {letters}
+    </div>
+  );
+}
 
 const exact: CSSProperties = { printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" };
 const label: CSSProperties = { fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" };
@@ -297,15 +329,22 @@ export function KeboDoc<T>({
       {/* Letterhead: the logo and name on the left, how to reach us on the right */}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
-          {brand && (
-            // eslint-disable-next-line @next/next/no-img-element -- printed as is, also by the PDF renderer
-            <img src={brand.logo} alt="" style={{ width: "70px", height: "70px", objectFit: "contain", flexShrink: 0 }} />
-          )}
+          {brand &&
+            (brand.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element -- printed as is, also by the PDF renderer
+              <img src={brand.logo} alt="" style={{ width: "70px", height: "70px", objectFit: "contain", flexShrink: 0 }} />
+            ) : (
+              <Monogram mark={brand.mark} />
+            ))}
           <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
             {brand ? (
               <>
                 <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "28px", letterSpacing: "0.14em", color: NAVY, lineHeight: 1 }}>{brand.mark}</div>
-                <div style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: "11.5px", letterSpacing: "0.18em", color: GOLD_TEXT }}>{brand.tagline}</div>
+                {brand.tagline && (
+                  <div style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: "11.5px", letterSpacing: "0.18em", color: GOLD_TEXT, textTransform: "uppercase" }}>
+                    {brand.tagline}
+                  </div>
+                )}
               </>
             ) : (
               <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "22px", letterSpacing: "0.04em", color: NAVY, lineHeight: 1.15 }}>{company.name}</div>

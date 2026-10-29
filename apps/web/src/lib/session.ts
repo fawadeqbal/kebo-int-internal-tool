@@ -78,8 +78,8 @@ export async function load<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** The company's brand on its documents: Kebo (the first company) has its logo; others print their name for now. */
-export async function docBrand() {
-  const { KEBO_BRAND } = await import("@/components/print/kebo-doc");
-  return (await getCompany())?.slug === "kebo" ? KEBO_BRAND : null;
-}
+/** The company's brand on its documents (Settings → Company: logo, title, the line under it); null when it cannot be read. */
+export const docBrand = cache(async (): Promise<{ logo: string | null; mark: string; tagline: string | null } | null> => {
+  const b = await api.get<{ logo: string | null; mark: string; tagline: string | null }>("/company/brand").catch(() => null);
+  return b ? { logo: b.logo, mark: b.mark, tagline: b.tagline } : null;
+});

@@ -179,7 +179,20 @@ describe("settings", () => {
     expect(s.sales.defaultDepositPercent).toBe(50);
     expect(s.sales.currency).toBe("USD");
     expect(s.reminders.depositDays).toBe(7);
-    expect(s.company.website).toBe("www.keboint.com"); // Kebo's details, as on its proforma
+    // No company's details are built in: a company's own come from its settings.
+    expect(s.company.website).toBe("");
+    expect(s.company.bankDetails).toBe("");
+    expect(s.company.brandMark).toBe("");
+  });
+});
+
+describe("brand", () => {
+  it("makes a title from the company name when none is chosen", async () => {
+    const { brandMarkOf } = await import("../src");
+    expect(brandMarkOf("Kebo", "Shandong Kebo International Trade Co., Ltd.")).toBe("KEBO");
+    expect(brandMarkOf("", "Meray Company")).toBe("MERAY");
+    expect(brandMarkOf(null, "Code Crood")).toBe("CODE CROOD");
+    expect(brandMarkOf(" ", "Shandong Kebo International Trade Co., Ltd.")).toBe("SHANDONG KEBO");
   });
 });
 

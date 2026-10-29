@@ -38,11 +38,19 @@ export async function ensureUser(db: SeedDb, p: SeedPerson, log: (m: string) => 
 /**
  * Preset roles, the company's admin (and optionally a manager and staff), the
  * website-form account and every setting with its default. Safe to run again.
- * companyName: a new company's own name on its documents (the defaults are Kebo's).
+ * companyName: a new company's own name on its documents (the rest starts blank).
+ * profile: the company details to start with instead (the seed script's Kebo).
  */
 export async function seedCompanyBase(
   db: SeedDb,
-  opts: { admin: SeedPerson; manager?: SeedPerson; staff?: SeedPerson; companyName?: string; log?: (m: string) => void },
+  opts: {
+    admin: SeedPerson;
+    manager?: SeedPerson;
+    staff?: SeedPerson;
+    companyName?: string;
+    profile?: Record<string, unknown>;
+    log?: (m: string) => void;
+  },
 ) {
   const log = opts.log ?? (() => undefined);
   for (const [key, r] of Object.entries(PRESET_ROLES)) {
@@ -72,13 +80,14 @@ export async function seedCompanyBase(
     if (key in stored) continue;
     let value: unknown = complete[key];
     // A new company: its own name, and none of the defaults' contact details, bank or stamp.
-    if (key === "company" && opts.companyName) value = companyProfile(opts.companyName, value as Record<string, unknown>);
+    if (key === "company" && opts.profile) value = { ...(value as Record<string, unknown>), ...opts.profile };
+    else if (key === "company" && opts.companyName) value = companyProfile(opts.companyName, value as Record<string, unknown>);
     await db.setting.create({ data: { key, value: value as object } });
   }
   return { admin, manager, staff } satisfies SeedPeople;
 }
 
-/** The company settings for a new company: its name, every text detail blank (the defaults describe Kebo). */
+/** The company settings for a new company: its name, every text detail blank, and proforma letters from its name. */
 function companyProfile(name: string, defaults: Record<string, unknown>) {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(defaults)) out[k] = typeof v === "string" ? "" : v;
