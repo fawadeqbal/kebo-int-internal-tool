@@ -2,7 +2,7 @@ import { cache, Suspense } from "react";
 import Link from "next/link";
 import { Banknote, Coins, TrendingUp, Users } from "lucide-react";
 import { can, type InquiryStage, type Priority } from "@kebo/shared";
-import { Badge, Card, CardBody, CardHeader, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
+import { Alert, Badge, Card, CardBody, CardHeader, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
@@ -110,7 +110,12 @@ export default async function DashboardPage() {
             <CardBody className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ["New", d.counts.new, "/inquiries?stage=new", d.counts.unassigned ? `${d.counts.unassigned} not assigned` : "Not started"],
+                  [
+                    "New",
+                    d.counts.new,
+                    "/inquiries?stage=new",
+                    d.counts.unassigned ? `${d.counts.unassigned} not assigned` : "Not started",
+                  ],
                   ["Sourcing", d.counts.sourcing, "/inquiries?stage=sourcing", "Getting prices"],
                   ["Quoted", d.counts.quoted, "/inquiries?stage=quoted", "Waiting for answers"],
                 ] as const
@@ -179,81 +184,95 @@ async function MonthStrip() {
   const i = await getInsights();
   if (!i) return null;
   return (
-    <section aria-label="This month" className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard
-          label="Sales this month"
-          icon={<TrendingUp className="size-3.5" />}
-          value={<Headline amount={i.kpis.revenue.value ?? 0} currency={i.currency} />}
-          kpi={i.kpis.revenue}
-          note={`${i.kpis.orders.value} order${i.kpis.orders.value === 1 ? "" : "s"}`}
-          href="/insights"
-        />
-        {i.kpis.netProfit ? (
+    <>
+      {i.missingRates.length > 0 && (
+        <Alert tone="warning" className="mb-4">
+          There is no exchange rate for {i.missingRates.join(", ")} in Settings, so amounts in{" "}
+          {i.missingRates.length === 1 ? "it are" : "them are"} left out of these figures.
+        </Alert>
+      )}
+      <section aria-label="This month" className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KpiCard
-            label="Profit after expenses"
-            icon={<Coins className="size-3.5" />}
-            value={<Headline amount={i.kpis.netProfit.value ?? 0} currency={i.currency} />}
-            kpi={i.kpis.netProfit}
-            tone={Number(i.kpis.netProfit.value) < 0 ? "bad" : undefined}
-            href="/insights?tab=profit"
+            label="Sales this month"
+            icon={<TrendingUp className="size-3.5" />}
+            value={<Headline amount={i.kpis.revenue.value ?? 0} currency={i.currency} />}
+            kpi={i.kpis.revenue}
+            note={`${i.kpis.orders.value} order${i.kpis.orders.value === 1 ? "" : "s"}`}
+            href="/insights"
           />
-        ) : (
-          <KpiCard
-            label="Gross profit"
-            icon={<Coins className="size-3.5" />}
-            value={<Headline amount={i.kpis.grossProfit.value ?? 0} currency={i.currency} />}
-            kpi={i.kpis.grossProfit}
-            href="/insights?tab=profit"
-          />
-        )}
-        <KpiCard
-          label="Customers owe us"
-          icon={<Users className="size-3.5" />}
-          value={<Headline amount={i.now.toReceive} currency={i.currency} />}
-          note={
-            Number(i.now.overdue) > 0 ? (
-              <span className="font-medium text-bad">{money(i.now.overdue, i.currency)} overdue</span>
-            ) : (
-              "Nothing overdue"
-            )
-          }
-          tone={Number(i.now.overdue) > 0 ? "warn" : undefined}
-          href="/money?tab=receive"
-        />
-        {i.now.cashInHand !== null ? (
-          <KpiCard
-            label="In our accounts"
-            icon={<Banknote className="size-3.5" />}
-            value={<Headline amount={i.now.cashInHand} currency={i.currency} />}
-            note="Cash, banks and wallets"
-            href="/money?tab=cash"
-          />
-        ) : (
-          <KpiCard
-            label="Win rate"
-            icon={<Banknote className="size-3.5" />}
-            value={i.kpis.winRate.value === null ? "—" : `${i.kpis.winRate.value}%`}
-            kpi={i.kpis.winRate}
-            points
-            href="/insights?tab=sales"
-          />
-        )}
-      </div>
-      <Card className="rounded-2xl">
-        <CardHeader
-          title="This month's target"
-          actions={i.target.canSet ? <TargetEditor month={i.target.month} current={i.target.amount} currency={i.currency} /> : undefined}
-        />
-        <CardBody>
-          {i.target.amount && i.target.percent !== null ? (
-            <TargetRing percent={i.target.percent} reached={i.target.reached} amount={i.target.amount} currency={i.currency} size={112} />
+          {i.kpis.netProfit ? (
+            <KpiCard
+              label="Profit after expenses"
+              icon={<Coins className="size-3.5" />}
+              value={<Headline amount={i.kpis.netProfit.value ?? 0} currency={i.currency} />}
+              kpi={i.kpis.netProfit}
+              tone={Number(i.kpis.netProfit.value) < 0 ? "bad" : undefined}
+              note={
+                Number(i.kpis.uncostedRevenue.value) > 0 ? `${money(i.kpis.uncostedRevenue.value ?? 0, i.currency)} not costed` : undefined
+              }
+              href="/insights?tab=profit"
+            />
           ) : (
-            <p className="text-sm text-muted">No target yet. Set one to see at a glance how the month is going.</p>
+            <KpiCard
+              label="Gross profit"
+              icon={<Coins className="size-3.5" />}
+              value={<Headline amount={i.kpis.grossProfit.value ?? 0} currency={i.currency} />}
+              kpi={i.kpis.grossProfit}
+              note={
+                Number(i.kpis.uncostedRevenue.value) > 0 ? `${money(i.kpis.uncostedRevenue.value ?? 0, i.currency)} not costed` : undefined
+              }
+              href="/insights?tab=profit"
+            />
           )}
-        </CardBody>
-      </Card>
-    </section>
+          <KpiCard
+            label="Customers owe us"
+            icon={<Users className="size-3.5" />}
+            value={<Headline amount={i.now.toReceive} currency={i.currency} />}
+            note={
+              Number(i.now.overdue) > 0 ? (
+                <span className="font-medium text-bad">{money(i.now.overdue, i.currency)} overdue</span>
+              ) : (
+                "Nothing overdue"
+              )
+            }
+            tone={Number(i.now.overdue) > 0 ? "warn" : undefined}
+            href="/money?tab=receive"
+          />
+          {i.now.cashInHand !== null ? (
+            <KpiCard
+              label="In our accounts"
+              icon={<Banknote className="size-3.5" />}
+              value={<Headline amount={i.now.cashInHand} currency={i.currency} />}
+              note="Cash, banks and wallets"
+              href="/money?tab=cash"
+            />
+          ) : (
+            <KpiCard
+              label="Win rate"
+              icon={<Banknote className="size-3.5" />}
+              value={i.kpis.winRate.value === null ? "—" : `${i.kpis.winRate.value}%`}
+              kpi={i.kpis.winRate}
+              points
+              href="/insights?tab=sales"
+            />
+          )}
+        </div>
+        <Card className="rounded-2xl">
+          <CardHeader
+            title="This month's target"
+            actions={i.target.canSet ? <TargetEditor month={i.target.month} current={i.target.amount} currency={i.currency} /> : undefined}
+          />
+          <CardBody>
+            {i.target.amount && i.target.percent !== null ? (
+              <TargetRing percent={i.target.percent} reached={i.target.reached} amount={i.target.amount} currency={i.currency} size={112} />
+            ) : (
+              <p className="text-sm text-muted">No target yet. Set one to see at a glance how the month is going.</p>
+            )}
+          </CardBody>
+        </Card>
+      </section>
+    </>
   );
 }
 

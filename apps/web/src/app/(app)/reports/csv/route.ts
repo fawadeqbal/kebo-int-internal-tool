@@ -18,6 +18,13 @@ function toCsv(r: ReportView) {
   const p = r.profit;
   const lines = [
     row("Report", `${r.range.from} to ${r.range.to}`, `Amounts in ${r.currency}`),
+    ...(r.missingRates.length
+      ? [
+          row(
+            `No exchange rate for ${r.missingRates.join(", ")} in Settings: amounts in ${r.missingRates.length === 1 ? "it are" : "them are"} left out`,
+          ),
+        ]
+      : []),
     "",
     row("Funnel"),
     row("Received", "Quoted", "Won", "Lost", "Win rate %", "Won value"),
@@ -40,15 +47,27 @@ function toCsv(r: ReportView) {
     ...r.people.map((x) => row(x.person, x.won, x.lost, x.winRatePercent)),
     "",
     row("Estimated profit (lines without a cost are left out of profit and margin)"),
-    row("Group", "Name", "Orders", "Sales", "Cost", "Profit", "Margin %", "Costed %"),
-    row("Total", "", p.total.orders, p.total.revenue, p.total.cost, p.total.profit, p.total.marginPercent, p.total.coveragePercent),
+    row("Group", "Name", "Orders", "Sales", "Not costed", "Cost", "Profit", "Margin %", "Costed %"),
+    row(
+      "Total",
+      "",
+      p.total.orders,
+      p.total.revenue,
+      p.total.uncostedRevenue,
+      p.total.cost,
+      p.total.profit,
+      p.total.marginPercent,
+      p.total.coveragePercent,
+    ),
     ...(
       [
         ["Customer", p.byCustomer],
         ["Category", p.byCategory],
         ["Person", p.byPerson],
       ] as const
-    ).flatMap(([group, rows]) => rows.map((x) => row(group, x.key, x.orders, x.revenue, x.cost, x.profit, x.marginPercent, x.coveragePercent))),
+    ).flatMap(([group, rows]) =>
+      rows.map((x) => row(group, x.key, x.orders, x.revenue, x.uncostedRevenue, x.cost, x.profit, x.marginPercent, x.coveragePercent)),
+    ),
     "",
     row("Last 12 months"),
     row("Month", "Received", "Won"),
@@ -70,7 +89,10 @@ export async function GET(req: Request) {
   const res = await apiFetch("/reports", { query });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    return new Response(body.error ?? "Could not make the report.", { status: res.status, headers: { "content-type": "text/plain; charset=utf-8" } });
+    return new Response(body.error ?? "Could not make the report.", {
+      status: res.status,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
   }
   const r = (await res.json()) as ReportView;
   return new Response(toCsv(r), {

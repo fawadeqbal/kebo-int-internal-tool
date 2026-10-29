@@ -15,7 +15,10 @@ export const metadata = { title: "Settings" };
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   await requirePermission("settings.manage");
   const sp = await searchParams;
-  const settings = await api.get<Settings>("/settings");
+  const [settings, lock] = await Promise.all([
+    api.get<Settings>("/settings"),
+    api.get<{ locked: boolean; reason: string | null }>("/settings/main-currency"),
+  ]);
   // The company's own address: only once companies have addresses.
   const tabs: { key: string; title: string }[] = [
     ...SETTING_GROUPS,
@@ -65,6 +68,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               groupKey={group.key}
               values={settings[group.key] as Record<string, unknown>}
               action={saveSettingsAction.bind(null, group.key)}
+              currencyLocked={lock.locked ? lock.reason : null}
             />
           )}
         </div>

@@ -34,10 +34,18 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
           // eslint-disable-next-line @next/next/no-img-element -- a data URL kept in the settings
           <img src={value} alt="" className="size-24 rounded-md border border-line bg-white object-contain p-1" />
         ) : (
-          <div className="flex size-24 items-center justify-center rounded-md border border-dashed border-line text-xs text-muted">No stamp</div>
+          <div className="flex size-24 items-center justify-center rounded-md border border-dashed border-line text-xs text-muted">
+            No stamp
+          </div>
         )}
         <div className="flex flex-col gap-2">
-          <input id={id} type="file" accept="image/png,image/jpeg,image/webp" className="text-sm" onChange={(e) => choose(e.target.files?.[0])} />
+          <input
+            id={id}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="text-sm"
+            onChange={(e) => choose(e.target.files?.[0])}
+          />
           {value && (
             <button type="button" className="self-start text-sm text-bad underline-offset-2 hover:underline" onClick={() => setValue("")}>
               Remove the stamp
@@ -50,19 +58,37 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
 }
 
 /** A rate as typed text: 6 decimals for big rates, 10 significant digits for small ones (1 PKR = 0.003571428571 USD), so switching the main currency back and forth gives the same numbers. */
-const rateText = (n: number | undefined) => (n === undefined || !Number.isFinite(n) || n <= 0 ? "" : String(n >= 1 ? Number(n.toFixed(6)) : Number(n.toPrecision(10))));
+const rateText = (n: number | undefined) =>
+  n === undefined || !Number.isFinite(n) || n <= 0 ? "" : String(n >= 1 ? Number(n.toFixed(6)) : Number(n.toPrecision(10)));
 
 /**
  * The main currency and, for each other currency, how many of it one unit of
  * the main one buys. Choosing another main currency restates the rates
  * (1 USD = 280 PKR becomes 1 PKR = 0.003571 USD), so nothing has to be retyped.
+ * Once money is recorded the main currency is locked (`locked` says why).
  */
-function CurrenciesControl({ f, main: initialMain, rates: initialRates, errors }: { f: SettingField; main: string; rates: Record<string, string>; errors?: string[] }) {
+function CurrenciesControl({
+  f,
+  main: initialMain,
+  rates: initialRates,
+  errors,
+  locked,
+}: {
+  f: SettingField;
+  main: string;
+  rates: Record<string, string>;
+  errors?: string[];
+  locked?: string | null;
+}) {
   const [main, setMain] = useState(initialMain);
   const [rates, setRates] = useState<Record<string, string>>(initialRates);
   const others = CURRENCIES.filter((c) => c !== main);
   const changeMain = (next: string) => {
-    const numeric = Object.fromEntries(Object.entries(rates).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Number(v)]));
+    const numeric = Object.fromEntries(
+      Object.entries(rates)
+        .filter(([, v]) => Number(v) > 0)
+        .map(([k, v]) => [k, Number(v)]),
+    );
     const restated = restateRates(numeric, main, next);
     setRates(Object.fromEntries(Object.entries(restated).map(([k, v]) => [k, rateText(v)])));
     setMain(next);
@@ -71,14 +97,22 @@ function CurrenciesControl({ f, main: initialMain, rates: initialRates, errors }
     <fieldset className={cn("flex flex-col gap-3", f.wide && "sm:col-span-2")}>
       <legend className="mb-1 text-sm font-medium">{f.label}</legend>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Main currency" htmlFor="set-currency">
-          <Select id="set-currency" name="currency" value={main} onChange={(e) => changeMain(e.target.value)}>
+        <Field label="Main currency" htmlFor="set-currency" hint={locked ?? undefined}>
+          <Select
+            id="set-currency"
+            name={locked ? undefined : "currency"}
+            value={main}
+            disabled={!!locked}
+            onChange={(e) => changeMain(e.target.value)}
+          >
             {CURRENCIES.map((c) => (
               <option key={c} value={c}>
                 {c} · {CURRENCY_LABEL[c]}
               </option>
             ))}
           </Select>
+          {/* A disabled field is not sent: the locked main currency goes with the form as it is. */}
+          {locked && <input type="hidden" name="currency" value={main} />}
         </Field>
         {others.map((c) => (
           <Field key={c} label={`1 ${main} buys`} htmlFor={`set-rate-${c}`} hint={CURRENCY_LABEL[c]}>
@@ -127,7 +161,12 @@ function Control({ f, text, checked, error }: { f: SettingField; text: string; c
       {f.kind === "textarea" ? (
         <Textarea {...common} rows={3} />
       ) : f.kind === "lines" ? (
-        <Textarea {...common} rows={Math.min(8, Math.max(3, text.split("\n").length + 1))} className="font-mono text-[13px]" spellCheck={false} />
+        <Textarea
+          {...common}
+          rows={Math.min(8, Math.max(3, text.split("\n").length + 1))}
+          className="font-mono text-[13px]"
+          spellCheck={false}
+        />
       ) : f.kind === "select" ? (
         // Keyed by the value: a select's default only applies when it mounts, and React resets the form after each submit.
         <Select key={text} id={id} name={f.name} defaultValue={text}>
@@ -150,7 +189,18 @@ function Control({ f, text, checked, error }: { f: SettingField; text: string; c
 }
 
 /** One settings group as its own form with its own Save button. */
-export function SettingsGroupForm({ groupKey, values, action }: { groupKey: SettingsKey; values: Record<string, unknown>; action: Action }) {
+export function SettingsGroupForm({
+  groupKey,
+  values,
+  action,
+  currencyLocked,
+}: {
+  groupKey: SettingsKey;
+  values: Record<string, unknown>;
+  action: Action;
+  /** Why the main currency cannot change any more (money is recorded against it); null while it can. */
+  currencyLocked?: string | null;
+}) {
   const group = SETTING_GROUPS.find((g) => g.key === groupKey)!;
   // The daily summary email is part of the plan's email reports.
   const emailReports = useFeature("email_reports");
@@ -170,18 +220,21 @@ export function SettingsGroupForm({ groupKey, values, action }: { groupKey: Sett
                   rates={
                     s.values
                       ? Object.fromEntries(CURRENCIES.map((c) => [c, s.values?.[`rate_${c}`] ?? ""]))
-                      : Object.fromEntries(Object.entries((values.exchangeRates ?? {}) as Record<string, number>).map(([k, v]) => [k, rateText(v)]))
+                      : Object.fromEntries(
+                          Object.entries((values.exchangeRates ?? {}) as Record<string, number>).map(([k, v]) => [k, rateText(v)]),
+                        )
                   }
                   errors={[...(s.errors?.currency ?? []), ...(s.errors?.exchangeRates ?? [])]}
+                  locked={currencyLocked}
                 />
               ) : (
-              <Control
-                key={f.name}
-                f={f}
-                text={s.values ? (s.values[f.name] ?? "") : toFormText(f, values[f.name])}
-                checked={s.values ? s.values[f.name] === "on" : values[f.name] === true}
-                error={s.errors?.[f.name]}
-              />
+                <Control
+                  key={f.name}
+                  f={f}
+                  text={s.values ? (s.values[f.name] ?? "") : toFormText(f, values[f.name])}
+                  checked={s.values ? s.values[f.name] === "on" : values[f.name] === true}
+                  error={s.errors?.[f.name]}
+                />
               ),
             )}
           </CardBody>

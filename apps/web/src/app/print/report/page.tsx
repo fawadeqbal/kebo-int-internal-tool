@@ -15,7 +15,8 @@ export const metadata = { title: "Sales report" };
 const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isId = (v?: string) => !!v && /^[0-9a-f-]{36}$/i.test(v);
 const pct = (v: number | null) => (v === null ? "—" : `${v}%`);
-const monthLabel = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+const monthLabel = (m: string) =>
+  new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 
 function H2({ children }: { children: ReactNode }) {
   return <h2 className="mt-6 mb-1 text-[8pt] font-semibold tracking-[0.08em] text-kebo-deep uppercase break-after-avoid">{children}</h2>;
@@ -69,7 +70,16 @@ function Profit({ title, rows, currency }: { title: string; rows: (ProfitRow & {
             { label: title.replace(/^By /, ""), render: (r) => r.key },
             { label: "Orders", className: "w-14 text-right tabular", render: (r) => r.orders },
             { label: "Sales", className: "w-28 text-right tabular whitespace-nowrap", render: (r) => money(r.revenue, currency) },
-            { label: "Profit", className: "w-28 text-right tabular whitespace-nowrap font-medium", render: (r) => money(r.profit, currency) },
+            {
+              label: "Not costed",
+              className: "w-24 text-right tabular whitespace-nowrap",
+              render: (r) => (Number(r.uncostedRevenue) > 0 ? money(r.uncostedRevenue, currency) : "—"),
+            },
+            {
+              label: "Profit",
+              className: "w-28 text-right tabular whitespace-nowrap font-medium",
+              render: (r) => money(r.profit, currency),
+            },
             { label: "Margin", className: "w-16 text-right tabular", render: (r) => pct(r.marginPercent) },
           ]}
         />
@@ -101,7 +111,11 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PrintToolbar title={`Sales report ${date(r.range.from)} – ${date(r.range.to)}`} backHref={`/reports?${query}`} pdfHref={`/pdf/report/summary?${query}`} />
+      <PrintToolbar
+        title={`Sales report ${date(r.range.from)} – ${date(r.range.to)}`}
+        backHref={`/reports?${query}`}
+        pdfHref={`/pdf/report/summary?${query}`}
+      />
       <Sheet>
         <Letterhead
           logo={(await docBrand())?.logo}
@@ -110,7 +124,7 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
           number={`${date(r.range.from)} – ${date(r.range.to)}`}
           meta={[
             { label: "Inquiries of", value: person ? person.name : "Everyone" },
-            { label: "Amounts in", value: `${r.currency}, at today's rates` },
+            { label: "Amounts in", value: `${r.currency}, at each order's rate` },
           ]}
         />
 
@@ -118,9 +132,17 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
         <Tiles
           items={[
             { label: "Received", value: f.received, hint: "New inquiries" },
-            { label: "Quoted", value: f.quoted, hint: f.received ? `${Math.round((f.quoted / f.received) * 100)}% of those received` : undefined },
+            {
+              label: "Quoted",
+              value: f.quoted,
+              hint: f.received ? `${Math.round((f.quoted / f.received) * 100)}% of those received` : undefined,
+            },
             { label: "Won", value: f.won, hint: r.turnaroundMs.won ? `Took ${formatDuration(r.turnaroundMs.won)} on average` : undefined },
-            { label: "Lost", value: f.lost, hint: r.turnaroundMs.lost ? `Took ${formatDuration(r.turnaroundMs.lost)} on average` : undefined },
+            {
+              label: "Lost",
+              value: f.lost,
+              hint: r.turnaroundMs.lost ? `Took ${formatDuration(r.turnaroundMs.lost)} on average` : undefined,
+            },
             { label: "Win rate", value: pct(f.winRatePercent), hint: "Won ÷ (won + lost)" },
             { label: "Won value", value: money(r.wonValue, r.currency), hint: "Orders made in the period" },
           ]}
@@ -129,11 +151,20 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
         <H2>Estimated profit</H2>
         <p className="text-[8pt] text-[#64748b]">
           On {t.orders} order{t.orders === 1 ? "" : "s"} made in the period, from the costs recorded on their lines (sales after discount).
-          {t.coveragePercent !== null && t.coveragePercent < 100 ? ` Only ${t.coveragePercent}% of sales have a cost; lines without one are left out of profit and margin.` : ""}
+          {t.coveragePercent !== null && t.coveragePercent < 100
+            ? ` Only ${t.coveragePercent}% of sales have a cost; lines without one are left out of profit and margin.`
+            : ""}
+          {r.missingRates.length > 0
+            ? ` There is no exchange rate for ${r.missingRates.join(", ")} in Settings, so amounts in ${r.missingRates.length === 1 ? "it are" : "them are"} left out.`
+            : ""}
         </p>
         <Tiles
           items={[
-            { label: "Sales", value: money(t.revenue, r.currency) },
+            {
+              label: "Sales",
+              value: money(t.revenue, r.currency),
+              hint: Number(t.uncostedRevenue) > 0 ? `${money(t.uncostedRevenue, r.currency)} not costed` : undefined,
+            },
             { label: "Profit", value: money(t.profit, r.currency), hint: `Cost ${money(t.cost, r.currency)}` },
             { label: "Margin", value: pct(t.marginPercent) },
           ]}
@@ -143,9 +174,21 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
         <Profit title="By person" rows={r.profit.byPerson} currency={r.currency} />
 
         <div className="grid grid-cols-2 gap-x-6">
-          <Counts title="Why inquiries were lost" rows={r.lostReasons.map((x) => ({ label: LOST_REASON_LABEL[x.reason], count: x.count }))} empty="No inquiries lost in this period." />
-          <Counts title="By channel" rows={r.byChannel.map((x) => ({ label: CHANNEL_LABEL[x.key] ?? x.key, count: x.count }))} empty="No inquiries in this period." />
-          <Counts title="By category" rows={r.byCategory.map((x) => ({ label: x.key, count: x.count }))} empty="No inquiries in this period." />
+          <Counts
+            title="Why inquiries were lost"
+            rows={r.lostReasons.map((x) => ({ label: LOST_REASON_LABEL[x.reason], count: x.count }))}
+            empty="No inquiries lost in this period."
+          />
+          <Counts
+            title="By channel"
+            rows={r.byChannel.map((x) => ({ label: CHANNEL_LABEL[x.key] ?? x.key, count: x.count }))}
+            empty="No inquiries in this period."
+          />
+          <Counts
+            title="By category"
+            rows={r.byCategory.map((x) => ({ label: x.key, count: x.count }))}
+            empty="No inquiries in this period."
+          />
           <div className="min-w-0 break-inside-avoid">
             <H2>Win rate by person</H2>
             {r.people.length === 0 ? (
