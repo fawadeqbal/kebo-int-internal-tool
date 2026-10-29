@@ -165,7 +165,9 @@ once() {
     # MinIO keeps each file as a folder on its volume; a copy of that volume restores everything.
     step="copy the files"
     part="$DIR/.files-$stamp.tar.gz.partial"
-    tar -czf "$part" -C "$(dirname "$FILES")" "$(basename "$FILES")"
+    # Once more if it fails: MinIO may remove a temporary file while it is read.
+    tar -czf "$part" -C "$(dirname "$FILES")" "$(basename "$FILES")" ||
+      { sleep 30 && tar -czf "$part" -C "$(dirname "$FILES")" "$(basename "$FILES")"; }
     gzip -t "$part"
     mv "$part" "$DIR/files-$stamp.tar.gz"
     chgrp "$BACKUP_GID" "$DIR/files-$stamp.tar.gz" 2>/dev/null || true
@@ -175,6 +177,7 @@ once() {
   # Only now, after a good run: the old copies go.
   step="remove old copies"
   find "$DIR" -maxdepth 1 -type f -name 'db-*.sql.gz' -mtime +"${BACKUP_RETENTION_DAYS:-14}" -exec rm -f {} \;
+  find "$DIR" -maxdepth 1 -type f -name '*.tmp' -mtime +1 -exec rm -f {} \;
   { ls -1t "$DIR"/files-*.tar.gz 2>/dev/null || true; } | tail -n +$((keep + 1)) | while read -r f; do rm -f "$f"; done
 
   if [ -n "${OFFSITE_S3_ENDPOINT:-}" ]; then

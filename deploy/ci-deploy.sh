@@ -12,9 +12,9 @@
 # (Run workflow with a commit: going back on purpose).
 #
 # The site keeps running the previous version until step 5:
-#   1. copy the database (backups/pre-deploy-*.sql.gz, the last 10 kept)
-#   2. tag the running images :previous
-#   3. build the new images (a failed build changes nothing)
+#   1. tag the running images :previous
+#   2. build the new images (a failed build changes nothing)
+#   3. copy the database (backups/pre-deploy-*.sql.gz, the last 10 kept)
 #   4. apply the migrations with the new image, in a one-off container. If they fail: stop, leave
 #      the old containers running, and print how to recover
 #   5. start the new containers and wait until they are healthy. If they are not: start the
@@ -78,6 +78,21 @@ restore_previous() {
   if [ -n "$DEPLOYED" ]; then checkout "$DEPLOYED"; fi
 }
 
+# The database copied to backups/pre-deploy-<date>-<commit>.sql.gz (COPY), checked; the last 10 kept.
+# Each step is checked here: set -e does not apply inside a function called with ||.
+copy_database() {
+  COPY=""
+  if ! running db; then dc up -d --no-build --wait db || return 1; fi
+  local copy
+  copy="backups/pre-deploy-$(date +%Y%m%d-%H%M%S)-$(short HEAD).sql.gz"
+  sudo mkdir -p backups || return 1
+  dc exec -T db pg_dump -U kebo --no-owner kebo | gzip | sudo tee "$copy.tmp" >/dev/null || return 1
+  sudo gzip -t "$copy.tmp" && sudo mv "$copy.tmp" "$copy" || return 1
+  COPY=$copy
+  say "database copied to $COPY"
+  sudo sh -c 'ls -1t backups/pre-deploy-*.sql.gz | tail -n +11 | xargs -r rm -f'
+}
+
 migration_failed() {
   local failed
   failed=$(dc exec -T db psql -U kebo -d kebo -Atc \
@@ -138,30 +153,24 @@ main() {
   checkout "$TARGET"
   say "deploying $(git log -1 --format='%h %s')${DEPLOYED:+ (running now: $(short "$DEPLOYED"))}"
 
-  # 1. The database as it is before this deploy's migrations run.
-  COPY=""
-  if running db; then
-    sudo mkdir -p backups
-    COPY="backups/pre-deploy-$(date +%Y%m%d-%H%M%S)-$(short HEAD).sql.gz"
-    dc exec -T db pg_dump -U kebo --no-owner kebo | gzip | sudo tee "$COPY.tmp" >/dev/null
-    sudo gzip -t "$COPY.tmp"
-    sudo mv "$COPY.tmp" "$COPY"
-    say "database copied to $COPY"
-    sudo sh -c 'ls -1t backups/pre-deploy-*.sql.gz | tail -n +11 | xargs -r rm -f'
-  fi
-
-  # 2. The running images, to come back to (from the containers, so a half-finished build changes nothing).
+  # 1. The running images, to come back to (from the containers, so a half-finished build changes nothing).
   TAGGED=()
   tag_previous
 
-  # 3. Build. A failure here leaves everything running as it was.
+  # 2. Build. A failure here leaves everything running as it was.
   dc build || {
     restore_previous
     die "the build failed: nothing was changed"
   }
 
+  # 3. The database as it is just before this deploy's migrations (after the build, so nothing
+  # entered while it built is missing from the copy).
+  copy_database || {
+    restore_previous
+    die "could not copy the database: nothing was changed"
+  }
+
   # 4. Migrations with the new image while the old containers keep serving.
-  if ! running db; then dc up -d --no-build --wait db; fi
   say "applying the database migrations"
   # Its own name: the api service may have a fixed container_name (deploy/compose.shared-proxy.yml).
   if ! dc run --rm --no-deps -T --name "kebo-desk-migrate-$(date +%s)" api sh -c "cd /app/packages/database && npx prisma migrate deploy"; then
