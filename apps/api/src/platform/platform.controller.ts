@@ -159,18 +159,27 @@ export class PlatformPublicController {
   async domainCheck(@Query("domain") domain = "", @Res({ passthrough: true }) res: Response) {
     const base = this.env.BASE_DOMAIN;
     const a = base ? addressOf(domain, base) : { kind: "other" as const };
-    const ok = a.kind === "root" || a.kind === "admin" || a.kind === "marketing" || (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
+    const ok =
+      a.kind === "root" ||
+      a.kind === "admin" ||
+      a.kind === "marketing" ||
+      (a.kind === "company" && !!(await this.companies.bySlug(a.slug)));
     res.status(ok ? 200 : 404);
     return { ok };
   }
 
-  /** The company at an address (the web app's check before showing a company's pages). */
+  /**
+   * The company at an address: only what the web app needs before showing its
+   * pages. Its current short name (a renamed company's old address sends people
+   * on), and its name for the sign-in page while it is switched on. Never its
+   * status, plan or anything else.
+   */
   @Public()
   @Get("company")
   async company(@Query("slug") slug = "") {
     const c = await this.companies.bySlug(slug);
     if (!c) throw new NotFoundError("Company");
-    return { slug: c.slug, name: c.name, status: c.status };
+    return { exists: true, slug: c.slug, name: c.status === "active" ? c.name : null };
   }
 
   @Public()

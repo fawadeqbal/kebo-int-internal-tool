@@ -3,7 +3,7 @@ import request from "supertest";
 import { unzipSync } from "fflate";
 import bcrypt from "bcryptjs";
 import { FIRST_COMPANY_ID } from "@kebo/database";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/auth/totp";
 import { PrismaService } from "../src/database/prisma.service";
 import { LifecycleService } from "../src/platform/lifecycle.service";
@@ -347,6 +347,58 @@ describe("companies: isolation and the platform", () => {
     expect(wrong.body.companies).toBeUndefined();
   });
 
+  it("signing in at a company's address considers that company only, and writes nothing where the email has no account", async () => {
+    const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
+    (app.get(AuthService) as unknown as { attempts: Map<string, unknown> }).attempts.clear();
+    const login = (body: object, company?: string) => {
+      const r = request(app.getHttpServer()).post("/api/auth/login");
+      return (company ? r.set("x-company", company) : r).send(body);
+    };
+    const email = "staff@example.com"; // Kebo's only
+    const kebo = prisma.company(FIRST_COMPANY_ID);
+    const rows = async (companyId: string) =>
+      Number(
+        (
+          await prisma.platform.$queryRaw<
+            { n: bigint }[]
+          >`select count(*) as n from sign_ins where company_id = ${companyId}::uuid and email = ${email}`
+        )[0].n,
+      );
+    const [inB, inKebo] = [await rows(b.id), await rows(FIRST_COMPANY_ID)];
+    // The right password, at B's address (or naming B): no.
+    expect((await login({ email, password: "Staff@12345" }, b.slug).expect(401)).body.error).toBe("Wrong email or password.");
+    await login({ email, password: "Staff@12345", company: b.slug }).expect(401);
+    // Wrong passwords there, many times: Kebo's account is not locked or counted, and no history anywhere.
+    for (let i = 0; i < 6; i++) await login({ email, password: `wrong-${i}` }, b.slug).expect(401);
+    const user = await kebo.user.findFirstOrThrow({ where: { email } });
+    expect(user.failedLogins).toBe(0);
+    expect(user.lockedUntil).toBeNull();
+    expect([await rows(b.id), await rows(FIRST_COMPANY_ID)]).toEqual([inB, inKebo]);
+    // An email nobody has: the same answer, nothing written.
+    const before = Number((await prisma.platform.$queryRaw<{ n: bigint }[]>`select count(*) as n from sign_ins`)[0].n);
+    await login({ email: `ghost-${tag}@nowhere.test`, password: "Whatever123" }).expect(401);
+    await login({ email: `ghost-${tag}@nowhere.test`, password: "Whatever123" }, b.slug).expect(401);
+    expect(Number((await prisma.platform.$queryRaw<{ n: bigint }[]>`select count(*) as n from sign_ins`)[0].n)).toBe(before);
+    // Every answer takes one password check, account or not.
+    const compare = vi.spyOn(bcrypt, "compare");
+    try {
+      for (const [body, company] of [
+        [{ email: `ghost-${tag}@nowhere.test`, password: "x" }, undefined],
+        [{ email, password: "nope" }, b.slug],
+        [{ email, password: "nope" }, undefined],
+      ] as const) {
+        compare.mockClear();
+        await login(body, company).expect(401);
+        expect(compare, JSON.stringify(body)).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      compare.mockRestore();
+    }
+    // At Kebo's address it works as before (and the wrong ones above count there now).
+    await login({ email, password: "Staff@12345" }, "kebo").expect(200);
+    (app.get(AuthService) as unknown as { attempts: Map<string, unknown> }).attempts.clear();
+  });
+
   it("the platform admin opens a company and works as themself, in its history", async () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const opened = (await plat().post(`/companies/${b.id}/open`).expect(200)).body;
@@ -386,6 +438,18 @@ describe("companies: isolation and the platform", () => {
         password: "!",
       })
       .expect(401);
+  });
+
+  it("the public company lookup tells the web app only what it needs", async () => {
+    const look = (slug: string) => request(app.getHttpServer()).get(`/api/platform/public/company?slug=${slug}`);
+    expect((await look("kebo").expect(200)).body).toEqual({ exists: true, slug: "kebo", name: expect.any(String) });
+    await look("nobody-here").expect(404);
+    const c = await makeCompany(`look-${tag}`, { sampleData: false });
+    await plat().post(`/companies/${c.id}/status`, { status: "read_only" }).expect(200);
+    // Not switched on: no name, and never the status.
+    expect((await look(c.slug).expect(200)).body).toEqual({ exists: true, slug: c.slug, name: null });
+    await plat().post(`/companies/${c.id}/status`, { status: "auto" }).expect(200);
+    expect((await look(c.slug).expect(200)).body.name).toBe(`Company ${c.slug}`);
   });
 
   it("only real companies' addresses get a certificate", async () => {

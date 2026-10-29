@@ -6,6 +6,7 @@ import { Validate } from "../../common/http/zod.pipe";
 import { AllowDuringTwoStepSetup, AllowWhenReadOnly, CurrentUser, Public } from "../../common/auth/decorators";
 import { SESSION_COOKIE, sessionCookieOptions, tokenFrom } from "../../common/auth/tokens.service";
 import type { SessionUser } from "../../common/auth/session-user";
+import { COMPANY_HEADER } from "../../common/company/company-resolver";
 import { AuthService } from "./auth.service";
 
 const loginInput = z.object({
@@ -28,8 +29,15 @@ export class AuthController {
   @Public()
   @Post("login")
   @HttpCode(200)
-  async login(@Body(Validate(loginInput)) body: z.infer<typeof loginInput>, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.login(body.email, body.password, { ip: clientIp(req), userAgent: req.headers["user-agent"] }, body.company ?? undefined);
+  async login(
+    @Body(Validate(loginInput)) body: z.infer<typeof loginInput>,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // The company the request is for: its address (X-Company) wins over the one the person chose.
+    const header = req.headers[COMPANY_HEADER];
+    const named = (typeof header === "string" && header.trim()) || body.company || undefined;
+    const result = await this.auth.login(body.email, body.password, { ip: clientIp(req), userAgent: req.headers["user-agent"] }, named);
     if (body.cookie) {
       res.cookie(SESSION_COOKIE, result.token, sessionCookieOptions());
     }
