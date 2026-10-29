@@ -109,7 +109,7 @@ docker compose exec api node apps/api/dist/cli/platform-admin.js list
 docker compose exec api node apps/api/dist/cli/platform-admin.js off someone@example.com
 ```
 
-Restoring a backup into a new database server: create the role first (`create role kebo_app nologin`), then restore as usual.
+Restoring a backup (into a new database server: create the role `kebo_app` first): see `docs/restore.md`.
 
 ## Moving Kebo (the first deploy of this)
 
@@ -121,17 +121,7 @@ The migrations do it, in place: nothing moves.
 
 Every deploy now copies the database first (`backups/pre-deploy-*.sql.gz` on the server, the last 10 kept; see `deploy/ci-deploy.sh`).
 
-**Going back** (if something is wrong after the deploy): on the server, `git checkout` the previous commit and restore the pre-deploy copy:
-
-```bash
-cd /opt/kebo-desk
-sudo docker compose stop api worker web
-gunzip -c backups/pre-deploy-<…>.sql.gz | sudo docker compose exec -T db psql -q -U kebo -d kebo -c "drop schema public cascade; create schema public" -f -
-sudo docker compose exec -T db psql -U kebo -d kebo -c "alter database kebo reset timezone"
-git checkout <previous commit> && sudo docker compose up -d --build
-```
-
-(The pre-deploy copy is from before the migrations, so it matches the previous code; the time zone reset gives the old code the database's old time zone back.)
+**Going back** (if something is wrong after the deploy): `docs/restore.md`, "Go back to a pre-deploy copy". A copy from before the time zone fix needs `alter database kebo reset timezone` (not UTC), so the old code gets the database's old time zone back. A dump without the row `utc_timestamps` in `database_markers` is from before the fix: bring it up to date with the normal migrations, never by running the fix's SQL by hand.
 
 ## Addresses per company
 

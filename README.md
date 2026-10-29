@@ -55,18 +55,36 @@ Next time: start Docker's database (`docker compose -f docker-compose.dev.yml up
 | `pnpm build` / `pnpm typecheck` / `pnpm lint` / `pnpm test` | Every package and app, through Turborepo (also run in CI) |
 | `pnpm db:migrate` | Create a migration after changing `packages/database/prisma/schema.prisma` |
 | `pnpm db:deploy` | Apply migrations |
+| `pnpm db:check-migrations [base]` | The migration rules below, against `origin/main` (or `base`); CI runs it |
 | `pnpm db:seed [--demo]` | Starting accounts and settings (`--demo` adds sample inquiries; refused on a non-local database) |
 | `pnpm db:reset` | Empty the local database, apply all migrations and seed it again with the demo data |
 | `pnpm db:load-data [-- --years N --deals N --people N]` | A year (or N years) of realistic history on top of the seed, to see Insights, Home and the money pages with a working company's data: about 1,200 inquiries a year, growing month by month, targets, accounts. Adds, never deletes; local databases only. Sales people sign in as sales1@example.com… with Demo@12345 |
 
 The API tests run against a real database: migrate and seed with `--demo` first (CI does this).
 
+### Migrations
+
+Production applies them to real data, in name order. So:
+
+- **Name**: Prisma's, `YYYYMMDDHHMMSS_what_it_does` (UTC timestamp, lowercase words), as `pnpm db:migrate` makes it.
+- **Order**: a new migration sorts **after every migration already on `main`**. A branch that has been open a while may need its migration renamed to a later timestamp before it is merged (CI fails otherwise: a database that has the later ones would get the new one after them, a fresh one before).
+- **Never edit, rename or remove** a migration that is on `main`: production has applied it. Fix it with a new one.
+- **Safe on data**: fill new columns before making them required, never drop data that is still needed. CI's `upgrade` job migrates and seeds with the base's code, then applies the change's migrations on that database and runs the API tests.
+
 ## Deploy
 
-Merging into `main` deploys by itself: when the **CI** workflow passes for the new commit on `main`, the **Deploy** workflow (`.github/workflows/deploy.yml`) logs into the server over SSH and runs `deploy/ci-deploy.sh`, which brings `/opt/kebo-desk` up to `main`, rebuilds and restarts with `docker compose up -d --build --wait`, and fails if the containers are not healthy. Then it checks the site answers. CI failed: nothing is deployed. Build failed: the site stays as it was and the workflow shows red.
+Merging into `main` deploys by itself: when the **CI** workflow passes for the new commit on `main`, the **Deploy** workflow (`.github/workflows/deploy.yml`) logs into the server over SSH and runs `deploy/ci-deploy.sh` for exactly that commit. It copies the database, builds the new images, applies the migrations with the new image while the site keeps running the old one, and only then replaces the containers and waits until they are healthy. Then the workflow checks the site answers.
 
-- See every deploy, and deploy `main` by hand (**Run workflow**), on the Actions tab › Deploy.
+| Fails at | Then |
+|---|---|
+| CI | nothing is deployed |
+| the build | nothing changes |
+| the migrations | the old version keeps running; the log says how to put the database back (`docs/restore.md`) |
+| the new containers' health | the previous images (`:previous`) are started again; the workflow shows red |
+
+- See every deploy on the Actions tab › Deploy. **Run workflow** (from `main`) deploys main's latest commit, or the commit given (to go back to an older one); only a commit of `main` whose CI passed.
 - Secrets (Settings › Secrets and variables › Actions): `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (a key used only for this), `DEPLOY_KNOWN_HOSTS` (the server's host key line).
 - On the server, that key may only run the deploy: its line in `~/.ssh/authorized_keys` has a forced command (see the top of `deploy/ci-deploy.sh`). A log of deploys is in `~/kebo-deploys.log`.
-- Deploy by hand as before: `cd /opt/kebo-desk && git pull && sudo docker compose up -d --build`.
-- Disk: a nightly job on the server (`docker-cleanup.timer`, 03:30 GMT) keeps Docker's build cache to the most recent 20 GB and removes images no container uses after 7 days; volumes are never touched. It logs what it freed (`journalctl -u docker-cleanup`) and warns when the disk is over 80%. Files and setup: `deploy/server/`.
+- Deploy by hand: `cd /opt/kebo-desk && bash deploy/ci-deploy.sh [commit]` (main's latest, or that commit of main).
+- Backups: nightly, checked, and off-site to your own S3 store once set up; the worker emails the platform admins when one is late or failed. Restoring, and setting up the off-site copy: `docs/restore.md`.
+- Disk: a nightly job on the server (`docker-cleanup.timer`, 03:30 GMT) keeps Docker's build cache to the most recent 20 GB and removes images no container uses after 7 days; volumes are never touched. It logs what it freed (`journalctl -u docker-cleanup`) and, at 80% full, warns (syslog, and an email to the platform admins through the worker). RFQ Desk's `:previous` images are kept. Files and setup: `deploy/server/` (run `install.sh` again after a change).
