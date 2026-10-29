@@ -14,6 +14,7 @@
     "db:generate": "pnpm --filter @kebo/database db:generate",
     "db:migrate": "pnpm --filter @kebo/database db:migrate",
     "db:deploy": "pnpm --filter @kebo/database db:deploy",
+    "db:check-migrations": "pnpm --filter @kebo/database db:check-migrations",
     "db:seed": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:seed",
     "db:reset": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:reset",
     "db:load-data": "turbo run build --filter=@kebo/database^... --output-logs=errors-only && pnpm --filter @kebo/database db:load-data",

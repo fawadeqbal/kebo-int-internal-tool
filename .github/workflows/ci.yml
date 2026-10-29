@@ -34,6 +34,69 @@ jobs:
         run: pnpm db:deploy && pnpm db:seed --demo
       - run: pnpm turbo run typecheck lint test
 
+  # The migrations on a database with data in it, as in production: the base (main, or the
+  # previous commit on a push) is migrated and seeded with its own code, then this change's
+  # migrations run on it, then the API tests.
+  upgrade:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: kebo
+          POSTGRES_USER: kebo
+          POSTGRES_PASSWORD: kebo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U kebo" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://kebo:kebo@localhost:5432/kebo
+      AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret-1234
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ env.HEAD_SHA }}
+      - name: Find the base
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -n "$PR_BASE" ]; then
+            base=$(git merge-base "$PR_BASE" HEAD)
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            base=$BEFORE
+          else
+            base=$(git rev-parse HEAD~1)
+          fi
+          echo "BASE_SHA=$base" >>"$GITHUB_ENV"
+          echo "Base: $(git log -1 --format='%h %s' "$base")"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: New migrations come after the base's, with Prisma names
+        run: pnpm db:check-migrations "$BASE_SHA"
+      - name: The base's code migrates and seeds the database
+        run: |
+          git checkout -q "$BASE_SHA"
+          pnpm install --frozen-lockfile
+          pnpm turbo run build --filter=@kebo/database...
+          pnpm db:deploy && pnpm db:seed --demo
+      - name: This change's migrations on that database
+        run: |
+          git checkout -q "$HEAD_SHA"
+          pnpm install --frozen-lockfile
+          pnpm turbo run build --filter=@kebo/api...
+          pnpm db:deploy
+          pnpm --filter @kebo/database exec prisma migrate status
+          pnpm db:seed --demo
+      - name: The API tests on the upgraded database
+        run: pnpm turbo run test --filter=@kebo/api
+
   mobile:
     runs-on: ubuntu-latest
     defaults:
