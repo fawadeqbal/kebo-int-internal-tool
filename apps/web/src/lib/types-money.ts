@@ -1,4 +1,4 @@
-import type { ExpenseCategory, InquiryStage, LostReason, PaymentKind, PaymentMethod, InstalmentStatus } from "@kebo/shared";
+import type { BasisStep, ExpenseCategory, InquiryStage, LostReason, PaymentKind, PaymentMethod, InstalmentStatus } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** A file kept with a record (an expense's receipt, a payment's bank slip). */
@@ -36,9 +36,19 @@ export interface OrderMoney {
   deal: { id: string };
   profit: {
     revenue: string;
-    goodsCost: string;
+    /** The part of the value whose lines have a cost: profit is worked out on it alone. */
+    costedRevenue: string;
+    /** Value on lines without a cost: never counted as profit. */
     uncostedRevenue: string;
+    goodsCost: string;
+    /** Costs to reach the basis it was sold on (to the port, freight…), from the accepted option. */
+    basisCost: string;
+    basisCosts: { step: BasisStep; amount: string; currency: string; cost: string; note: string | null }[];
+    /** All its expenses, and those counted in profit (freight paid for the planned costs is counted there once). */
     expenses: string;
+    expensesCounted: string;
+    /** Taken by banks from the customer's payments. */
+    bankCharges: string;
     earned: string;
     /** Spent on the deal before the sale, and the profit once that is taken off too. */
     beforeSale: string;
@@ -149,11 +159,17 @@ export interface Payable {
 interface EarnedMonth {
   orders: number;
   revenue: string;
+  /** The part of the value with a cost recorded: profit is worked out on it alone. */
+  costedRevenue: string;
+  /** Value without a cost recorded: left out of profit. */
+  uncostedRevenue: string;
   goodsCost: string;
+  /** Costs to reach the basis sold on (to the port, freight…). */
+  basisCost: string;
   orderExpenses: string;
+  bankCharges: string;
   generalExpenses: string;
   profit: string;
-  uncostedRevenue: string;
 }
 interface CashMonth {
   in: string;
@@ -174,7 +190,9 @@ export interface ProfitAndLoss {
     customer: string;
     month: string;
     revenue: string;
+    uncostedRevenue: string;
     goodsCost: string;
+    basisCost: string;
     expenses: string;
     profit: string;
   }[];
@@ -211,6 +229,7 @@ export interface CustomerAccount {
     factoryPaid: string;
     cash: string;
     uncostedRevenue: string;
+    bankCharges: string;
   };
   lostReasons: { reason: LostReason | "not_said"; deals: number; spent: string }[];
   rows: {
@@ -225,9 +244,27 @@ export interface CustomerAccount {
     assignee: { id: string; name: string } | null;
     spent: string;
     beforeSale: string;
-    order: { id: string; refNo: string; stage: string; status: string; revenue: string; goodsCost: string; costs: string; profit: string; net: string } | null;
+    order: {
+      id: string;
+      refNo: string;
+      stage: string;
+      status: string;
+      revenue: string;
+      uncostedRevenue: string;
+      goodsCost: string;
+      costs: string;
+      profit: string;
+      net: string;
+    } | null;
   }[];
-  timeline: { on: string; kind: "deal" | "won" | "lost" | "order" | "shipped" | "payment" | "expense"; text: string; amount?: string; currency?: string; href?: string }[];
+  timeline: {
+    on: string;
+    kind: "deal" | "won" | "lost" | "order" | "shipped" | "payment" | "expense";
+    text: string;
+    amount?: string;
+    currency?: string;
+    href?: string;
+  }[];
   missingRates: string[];
 }
 
@@ -266,9 +303,28 @@ export interface CashBook {
 export interface LeaksReport {
   range: { from: string; to: string };
   currency: string;
-  summary: { lostDeals: number; lostSpent: string; winRate: number | null; planned: string; actual: string; leaked: string; keptPercent: number | null; stuck: string };
+  summary: {
+    lostDeals: number;
+    lostSpent: string;
+    winRate: number | null;
+    planned: string;
+    actual: string;
+    leaked: string;
+    keptPercent: number | null;
+    stuck: string;
+    /** Value on lines without a cost: left out of planned and actual profit. */
+    uncostedRevenue: string;
+  };
   lostReasons: { reason: LostReason | "not_said"; label: string; deals: number; spent: string }[];
-  lostDeals: { id: string; refNo: string; title: string; customer: { id: string; name: string }; reason: LostReason | null; assignee: string; spent: string }[];
+  lostDeals: {
+    id: string;
+    refNo: string;
+    title: string;
+    customer: { id: string; name: string };
+    reason: LostReason | null;
+    assignee: string;
+    spent: string;
+  }[];
   byPerson: LeakGroup[];
   byCategory: LeakGroup[];
   orders: {
@@ -283,6 +339,7 @@ export interface LeaksReport {
     actual: string;
     leaked: string;
     uncosted: boolean;
+    uncostedRevenue: string;
   }[];
   customers: { best: LeakCustomer[]; costing: LeakCustomer[] };
   trend: { month: string; sales: string; expenses: string; percent: number | null }[];

@@ -17,6 +17,12 @@ class SettingsController {
     return this.settings.get();
   }
 
+  /** Whether the main currency can still change (not once money is recorded against it). */
+  @Get("main-currency")
+  mainCurrency() {
+    return this.settings.mainCurrencyLock();
+  }
+
   @Put(":key")
   @RequirePermissions("settings.manage")
   update(@CurrentUser() user: SessionUser, @Param("key", new ParseEnumPipe(KEYS)) key: SettingsKey, @Body() body: unknown) {

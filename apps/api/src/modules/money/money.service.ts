@@ -6,6 +6,8 @@ import {
   formatMinor,
   fromMinor,
   fxRate,
+  multiplyMinor,
+  orderCosting,
   orderProfit,
   planTotalMinor,
   roundHalfAway,
@@ -21,6 +23,7 @@ import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { checkAccount } from "./account-check";
 import { ordersOwingFactories } from "./due";
+import { convert, costingsOf, MainMoney, orderRate, paysBasis } from "./order-money";
 import { fileView } from "./payment-file-view";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
@@ -31,28 +34,13 @@ import { OrdersService } from "../orders/orders.service";
 
 const person = { select: { id: true, name: true } } as const;
 
-/** Lines of an order with the factory price they came from (for what we owe each factory). */
+/** Lines of an order with the factory price frozen on them when it was made (for what we owe each factory). */
 const linesWithFactory = {
   orderBy: { sortOrder: "asc" },
-  include: {
-    quoteLine: {
-      select: {
-        factoryQuoteLine: {
-          select: {
-            unitPrice: true,
-            taxRate: true,
-            factoryQuote: { select: { currency: true, factory: { select: { id: true, name: true, owner: person } } } },
-          },
-        },
-      },
-    },
-  },
+  include: { factory: { select: { id: true, name: true, owner: person } } },
 } satisfies Prisma.Order$linesArgs;
 
 type FactoryRow = { id: string; name: string; owner: { id: string; name: string } | null };
-
-/** Amount ÷ rate (units of its currency per one unit of the target), rounded to cents. */
-const convert = (minor: Minor, rate: number) => roundHalfAway(minor / rate);
 
 const expenseInclude = {
   paidBy: person,
@@ -89,13 +77,23 @@ export class MoneyService {
     if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can see expenses and profit.");
   }
 
-  /** Units of `from` per one unit of `to` from Settings, or the rate given; refuses a missing rate instead of using 1:1. */
+  /**
+   * Units of `from` per one unit of `to`: always 1 for the same currency
+   * (whatever was sent); else the rate given, or Settings when none is. A
+   * missing rate is refused, never taken as 1:1.
+   */
   private async rateFor(from: string, to: string, given: number | null | undefined) {
+    if (from === to) return 1;
     if (given) return given;
     const { sales } = await this.settings.get();
     const r = fxRate(from, to, sales.currency, sales.exchangeRates);
     if (r === null) throw new DomainError(`There is no exchange rate for ${from} in Settings. Enter the rate (${from} per 1 ${to}).`);
     return r;
+  }
+
+  /** On a change: the rate sent; else the one used before while the currency stays; else Settings (rateFor). */
+  private keptRate(input: { currency: string; rate?: number | null }, before: { currency: string; rate: Prisma.Decimal }) {
+    return input.rate ?? (input.currency === before.currency ? Number(before.rate) : null);
   }
 
   private async activePerson(id: string | null | undefined) {
@@ -107,17 +105,19 @@ export class MoneyService {
 
   /* ---------------------------------------------------------------- one order */
 
-  /** What we owe each factory for the order's goods (their price plus tax × the quantity ordered), in the factory's currency. */
+  /**
+   * What we owe each factory for the order's goods (the price frozen on each
+   * line when the order was made, plus tax, × the quantity ordered), in the
+   * factory's currency. Changing or removing the factory's offer later changes nothing.
+   */
   private owedByFactory(lines: Prisma.OrderLineGetPayload<{ include: (typeof linesWithFactory)["include"] }>[]) {
     const owed = new Map<string, { factory: FactoryRow; currency: string; owedMinor: Minor; lines: number }>();
     for (const l of lines) {
-      const fl = l.quoteLine?.factoryQuoteLine;
-      if (!fl) continue;
-      const f = fl.factoryQuote.factory;
-      const key = `${f.id}:${fl.factoryQuote.currency}`;
-      const unit = withTaxMinor(decimalToMinor(fl.unitPrice), Number(fl.taxRate));
-      const cur = owed.get(key) ?? { factory: f, currency: fl.factoryQuote.currency, owedMinor: 0, lines: 0 };
-      cur.owedMinor += roundHalfAway(unit * Number(l.quantity));
+      if (!l.factory || l.factoryUnitPrice === null || !l.factoryCurrency) continue;
+      const key = `${l.factory.id}:${l.factoryCurrency}`;
+      const unit = withTaxMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0);
+      const cur = owed.get(key) ?? { factory: l.factory, currency: l.factoryCurrency, owedMinor: 0, lines: 0 };
+      cur.owedMinor += multiplyMinor(unit, l.quantity.toString());
       cur.lines += 1;
       owed.set(key, cur);
     }
@@ -135,6 +135,7 @@ export class MoneyService {
       where: { id: orderId },
       include: {
         lines: linesWithFactory,
+        costs: true,
         planItems: { orderBy: { sortOrder: "asc" } },
         payments: { where: { voidedAt: null } },
         factoryPaid: {
@@ -197,7 +198,12 @@ export class MoneyService {
       factoryAfter.set(p.id, { paid: fromMinor(sum), toPay: fromMinor(Math.max((owed.get(key)?.owedMinor ?? 0) - sum, 0)) });
     }
     const recorders = new Map(
-      (await this.prisma.db.user.findMany({ where: { id: { in: [...new Set(o.factoryPaid.map((p) => p.recordedById))] } }, select: { id: true, name: true } })).map((u) => [u.id, u]),
+      (
+        await this.prisma.db.user.findMany({
+          where: { id: { in: [...new Set(o.factoryPaid.map((p) => p.recordedById))] } },
+          select: { id: true, name: true },
+        })
+      ).map((u) => [u.id, u]),
     );
     const factories = [...owed.entries()].map(([key, f]) => {
       const paidMinor = livePaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0);
@@ -214,40 +220,37 @@ export class MoneyService {
       };
     });
 
-    // Profit, in the order's currency.
-    const orderPerMain = fxRate(o.currency, s.sales.currency, s.sales.currency, s.sales.exchangeRates);
+    // Profit, in the order's currency: expenses (kept in the main currency) come back at the order's own rate.
+    const orderPerMain = orderRate(o, s.sales.currency, s.sales.exchangeRates);
+    const inOrder = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) =>
+      roundHalfAway(convert(decimalToMinor(e.amount), Number(e.rate)) * orderPerMain!);
     const liveExpenses = o.expenses.filter((e) => !e.voidedAt);
-    const expensesMinor =
-      orderPerMain === null
-        ? null
-        : liveExpenses.reduce((t, e) => t + roundHalfAway(convert(decimalToMinor(e.amount), Number(e.rate)) * orderPerMain), 0);
-    const beforeSaleMinor =
-      orderPerMain === null
-        ? null
-        : dealExpenses
-            .filter((e) => !e.voidedAt)
-            .reduce((t, e) => t + roundHalfAway(convert(decimalToMinor(e.amount), Number(e.rate)) * orderPerMain), 0);
+    const expensesMinor = orderPerMain === null ? null : liveExpenses.reduce((t, e) => t + inOrder(e), 0);
+    const basisPaidMinor =
+      orderPerMain === null ? 0 : liveExpenses.filter((e) => paysBasis(e.category)).reduce((t, e) => t + inOrder(e), 0);
+    const beforeSaleMinor = orderPerMain === null ? null : dealExpenses.filter((e) => !e.voidedAt).reduce((t, e) => t + inOrder(e), 0);
     const factoryPaidMinor = livePaid.reduce((t, p) => t + convert(decimalToMinor(p.amount), Number(p.rate)), 0);
-    let goodsCostMinor = 0;
-    let uncostedMinor = 0;
-    for (const l of o.lines) {
-      if (l.unitCost === null) uncostedMinor += decimalToMinor(l.lineTotal);
-      else goodsCostMinor += roundHalfAway(decimalToMinor(l.unitCost) * Number(l.quantity));
-    }
-    // The order total is after the discount; revenue on uncosted lines is scaled the same way.
-    const linesSum = o.lines.reduce((t, l) => t + decimalToMinor(l.lineTotal), 0);
-    const uncostedRevenueMinor = linesSum > 0 ? roundHalfAway((uncostedMinor * totalMinor) / linesSum) : 0;
+    const costing = orderCosting(
+      o.lines.map((l) => ({
+        lineTotalMinor: decimalToMinor(l.lineTotal),
+        quantity: l.quantity.toString(),
+        unitCostMinor: l.unitCost === null ? null : decimalToMinor(l.unitCost),
+      })),
+      totalMinor,
+      o.costs.reduce((t, c) => t + decimalToMinor(c.cost), 0),
+    );
     const profit =
       expensesMinor === null
         ? null
         : orderProfit({
-            revenueMinor: totalMinor,
-            goodsCostMinor,
-            uncostedRevenueMinor,
+            ...costing,
             receivedMinor: position.receivedMinor,
             factoryPaidMinor,
             expensesMinor,
+            basisPaidMinor,
+            bankChargesMinor: position.bankChargesMinor,
           });
+    const netMinor = profit ? profit.earnedMinor - (beforeSaleMinor ?? 0) : 0;
 
     return {
       orderId: o.id,
@@ -312,14 +315,30 @@ export class MoneyService {
         seeExpenses && profit
           ? {
               revenue: fromMinor(totalMinor),
-              goodsCost: fromMinor(goodsCostMinor),
-              uncostedRevenue: fromMinor(uncostedRevenueMinor),
+              /** The part of the order value whose lines have a cost: profit is worked out on it alone. */
+              costedRevenue: fromMinor(costing.costedRevenueMinor),
+              /** Order value on lines without a cost: never counted as profit, shown apart. */
+              uncostedRevenue: fromMinor(costing.uncostedRevenueMinor),
+              goodsCost: fromMinor(costing.goodsCostMinor),
+              /** Costs to reach the basis it was sold on (to the port, freight…), from the accepted option. */
+              basisCost: fromMinor(costing.basisCostMinor),
+              basisCosts: o.costs.map((c) => ({
+                step: c.step,
+                amount: c.amount.toFixed(2),
+                currency: c.currency,
+                cost: c.cost.toFixed(2),
+                note: c.note,
+              })),
+              /** All its expenses (cash), and those counted in profit: freight paid for the planned costs is counted there once. */
               expenses: fromMinor(expensesMinor!),
+              expensesCounted: fromMinor(profit.expensesCountedMinor),
+              /** Taken by banks from the customer's payments: a cost. */
+              bankCharges: fromMinor(position.bankChargesMinor),
               earned: fromMinor(profit.earnedMinor),
               /** Spent on the deal before the sale, and the profit once that is taken off too. */
               beforeSale: fromMinor(beforeSaleMinor ?? 0),
-              net: fromMinor(profit.earnedMinor - (beforeSaleMinor ?? 0)),
-              netMarginPercent: totalMinor > 0 ? Math.round(((profit.earnedMinor - (beforeSaleMinor ?? 0)) / totalMinor) * 1000) / 10 : null,
+              net: fromMinor(netMinor),
+              netMarginPercent: costing.costedRevenueMinor > 0 ? roundHalfAway((netMinor / costing.costedRevenueMinor) * 1000) / 10 : null,
               marginPercent: profit.marginPercent,
               coveragePercent: profit.coveragePercent,
               received: fromMinor(position.receivedMinor),
@@ -392,11 +411,8 @@ export class MoneyService {
    */
   private async checkFactoryCurrency(orderId: string, factory: { id: string; name: string }, currency: string, keep?: string) {
     if (keep && keep === currency) return;
-    const lines = await this.prisma.db.orderLine.findMany({
-      where: { orderId, quoteLine: { factoryQuoteLine: { factoryQuote: { factoryId: factory.id } } } },
-      select: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { currency: true } } } } } } },
-    });
-    const owedIn = [...new Set(lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote.currency).filter((c): c is string => !!c))];
+    const lines = await this.prisma.db.orderLine.findMany({ where: { orderId, factoryId: factory.id }, select: { factoryCurrency: true } });
+    const owedIn = [...new Set(lines.map((l) => l.factoryCurrency).filter((c): c is string => !!c))];
     if (owedIn.length && !owedIn.includes(currency)) {
       throw new DomainError(
         `We owe ${factory.name} in ${owedIn.join(" and ")}. Record the payment in ${owedIn[0]}: a payment in ${currency} would not count against what we owe. If you sent ${currency}, enter the ${owedIn[0]} amount the factory received.`,
@@ -404,7 +420,12 @@ export class MoneyService {
     }
   }
 
-  private async factoryPaymentData(o: { id: string; currency: string }, input: FactoryPaymentInput, keepCurrency?: string, keepAccount?: string | null) {
+  private async factoryPaymentData(
+    o: { id: string; currency: string },
+    input: FactoryPaymentInput,
+    keepCurrency?: string,
+    keepAccount?: string | null,
+  ) {
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
     const f = await this.prisma.db.factory.findFirst({ where: { id: input.factoryId, deletedAt: null } });
     if (!f) throw new DomainError("That factory was removed. Choose another one.");
@@ -460,7 +481,12 @@ export class MoneyService {
     const { p, o } = await this.findFactoryPayment(user, id);
     const reason = requireReason(input.reason, "payment", "a recorded payment changes");
     // A payment already recorded in another currency (before this rule) may keep it.
-    const { factoryName, ...data } = await this.factoryPaymentData(o, { ...input, rate: input.rate ?? Number(p.rate) }, p.factoryId === input.factoryId ? p.currency : undefined, p.accountId);
+    const { factoryName, ...data } = await this.factoryPaymentData(
+      o,
+      { ...input, rate: this.keptRate(input, p) },
+      p.factoryId === input.factoryId ? p.currency : undefined,
+      p.accountId,
+    );
     await this.prisma.tx(async (tx) => {
       await tx.factoryPayment.update({ where: { id }, data });
       await this.audit.record(tx, {
@@ -582,7 +608,9 @@ export class MoneyService {
       paidBy: e.paidBy,
       reference: e.reference,
       note: e.note,
-      receipt: e.receiptKey ? { name: e.receiptName ?? "receipt", type: e.receiptType ?? "application/octet-stream", size: e.receiptSize ?? 0 } : null,
+      receipt: e.receiptKey
+        ? { name: e.receiptName ?? "receipt", type: e.receiptType ?? "application/octet-stream", size: e.receiptSize ?? 0 }
+        : null,
       voided: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,
     };
   }
@@ -631,7 +659,16 @@ export class MoneyService {
                 : {}),
         ...(q.from || q.to ? { spentOn: { ...(q.from ? { gte: toDbDate(q.from) } : {}), ...(q.to ? { lte: toDbDate(q.to) } : {}) } } : {}),
       },
-      select: { id: true, amount: true, rate: true, category: true, customerId: true, orderId: true, voidedAt: true, customer: { select: { id: true, name: true } } },
+      select: {
+        id: true,
+        amount: true,
+        rate: true,
+        category: true,
+        customerId: true,
+        orderId: true,
+        voidedAt: true,
+        customer: { select: { id: true, name: true } },
+      },
       orderBy,
     });
     type Light = (typeof rows)[number];
@@ -674,7 +711,9 @@ export class MoneyService {
       ...(await (async () => {
         const listed = rows.filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category));
         const ids = listed.slice((page - 1) * pageSize, page * pageSize).map((e) => e.id);
-        const full = ids.length ? await this.prisma.db.expense.findMany({ where: { id: { in: ids } }, include: expenseInclude, orderBy }) : [];
+        const full = ids.length
+          ? await this.prisma.db.expense.findMany({ where: { id: { in: ids } }, include: expenseInclude, orderBy })
+          : [];
         /** `listed`: how many rows the list has (removed ones included), for the page links. */
         return { page, pageSize, listed: listed.length, rows: full.map((e) => this.expenseView(e)) };
       })()),
@@ -695,7 +734,10 @@ export class MoneyService {
       customerId = o.customerId;
       inquiryId = o.inquiryId;
     } else if (inquiryId) {
-      const d = await this.prisma.db.inquiry.findFirst({ where: { id: inquiryId, deletedAt: null }, select: { refNo: true, customerId: true } });
+      const d = await this.prisma.db.inquiry.findFirst({
+        where: { id: inquiryId, deletedAt: null },
+        select: { refNo: true, customerId: true },
+      });
       if (!d) throw new DomainError("That inquiry is not in the system any more.");
       if (customerId && customerId !== d.customerId) throw new DomainError(`Inquiry ${d.refNo} is for another customer.`);
       customerId = d.customerId;
@@ -775,7 +817,7 @@ export class MoneyService {
   async editExpense(user: SessionUser, id: string, input: ExpenseInput) {
     const e = await this.findExpense(user, id);
     const reason = requireReason(input.reason, "payment", "a recorded expense changes");
-    const { order, data } = await this.expenseData(user, { ...input, rate: input.rate ?? Number(e.rate) }, e.accountId);
+    const { order, data } = await this.expenseData(user, { ...input, rate: this.keptRate(input, e) }, e.accountId);
     const row = await this.prisma.tx(async (tx) => {
       const updated = await tx.expense.update({
         where: { id },
@@ -834,7 +876,8 @@ export class MoneyService {
     const e = await this.findExpense(user, id);
     const ext = file.originalname.split(".").pop()?.toLowerCase() ?? "";
     if (!RECEIPT_EXTENSIONS.has(ext)) throw new DomainError("A receipt can be a photo (JPG, PNG, WEBP) or a PDF.");
-    if (file.size > this.storage.maxBytes) throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
+    if (file.size > this.storage.maxBytes)
+      throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
     const name = safeFileName(file.originalname);
     const key = this.storage.keyFor(`expenses/${id}/${randomUUID()}-${name}`);
     await this.storage.put(key, file.buffer, file.mimetype);
@@ -845,7 +888,14 @@ export class MoneyService {
           data: { receiptKey: key, receiptName: name, receiptType: file.mimetype || "application/octet-stream", receiptSize: file.size },
           include: expenseInclude,
         });
-        await this.expenseAudit(tx, user, id, e.order, `${e.receiptKey ? "replaced" : "added"} the receipt of "${e.description}"`, "expense_receipt");
+        await this.expenseAudit(
+          tx,
+          user,
+          id,
+          e.order,
+          `${e.receiptKey ? "replaced" : "added"} the receipt of "${e.description}"`,
+          "expense_receipt",
+        );
         return updated;
       });
       if (e.receiptKey) await this.storage.delete(e.receiptKey).catch(() => undefined);
@@ -860,7 +910,12 @@ export class MoneyService {
     this.assertExpenses(user);
     const e = await this.prisma.db.expense.findUnique({ where: { id } });
     if (!e?.receiptKey) throw new NotFoundError("Receipt");
-    return { stream: await this.storage.get(e.receiptKey), fileName: e.receiptName ?? "receipt", mimeType: e.receiptType ?? "application/octet-stream", size: e.receiptSize ?? 0 };
+    return {
+      stream: await this.storage.get(e.receiptKey),
+      fileName: e.receiptName ?? "receipt",
+      mimeType: e.receiptType ?? "application/octet-stream",
+      size: e.receiptSize ?? 0,
+    };
   }
 
   async removeReceipt(user: SessionUser, id: string) {
@@ -878,11 +933,15 @@ export class MoneyService {
 
   /**
    * The company's profit & loss for a year, month by month, in the main currency.
-   * - Earned: an order counts in the month it shipped — its value, less the
-   *   factory cost of its goods and its expenses; less the general expenses of
-   *   the month.
-   * - Cash: what came in from customers that month, less what was paid to
-   *   factories and all expenses paid that month.
+   * - Earned: an order counts in the month it shipped — the part of its value
+   *   whose lines have a cost, less the factory cost of its goods, the costs to
+   *   reach the basis it was sold on, its expenses and the bank charges on its
+   *   payments; less the general expenses of the month. Value on lines without a
+   *   cost is shown apart, never as profit. Expenses on a cancelled order are
+   *   general expenses of the month they were spent.
+   * - Cash: what came in from customers that month (what arrived, without the
+   *   bank charges), less what was paid to factories and all expenses paid that month.
+   * Orders are turned into the main currency at the rate stored on them.
    */
   async profitAndLoss(user: SessionUser, year: number) {
     this.assertExpenses(user);
@@ -892,16 +951,8 @@ export class MoneyService {
     const main = sales.currency;
     const from = toDbDate(`${year}-01-01`);
     const to = toDbDate(`${year}-12-31`);
-    const missing = new Set<string>();
-    /** Order currency → main: divide by units of the order currency per main unit. */
-    const toMain = (minor: Minor, currency: string) => {
-      const r = fxRate(currency, main, main, sales.exchangeRates);
-      if (r === null) {
-        missing.add(currency);
-        return 0;
-      }
-      return convert(minor, r);
-    };
+    const fx = new MainMoney(main, sales.exchangeRates);
+    const rated = { currency: true, mainCurrency: true, mainRate: true } as const;
 
     const [shipped, payments, factoryPaid, expenses] = await Promise.all([
       this.prisma.db.order.findMany({
@@ -909,34 +960,50 @@ export class MoneyService {
         select: {
           id: true,
           refNo: true,
-          currency: true,
+          ...rated,
           total: true,
           shippedOn: true,
           customer: { select: { name: true } },
-          lines: { select: { unitCost: true, quantity: true, lineTotal: true } },
-          expenses: { where: { voidedAt: null }, select: { amount: true, rate: true } },
+          expenses: { where: { voidedAt: null }, select: { amount: true, rate: true, category: true } },
+          payments: { where: { voidedAt: null }, select: { bankCharges: true, currency: true } },
         },
       }),
       this.prisma.db.payment.findMany({
         where: { voidedAt: null, paidOn: { gte: from, lte: to } },
-        select: { amount: true, currency: true, paidOn: true },
+        select: { amount: true, bankCharges: true, currency: true, paidOn: true, order: { select: { status: true, ...rated } } },
       }),
       this.prisma.db.factoryPayment.findMany({
         where: { voidedAt: null, paidOn: { gte: from, lte: to } },
-        select: { amount: true, rate: true, paidOn: true, order: { select: { currency: true } } },
+        select: { amount: true, rate: true, paidOn: true, order: { select: rated } },
       }),
       this.prisma.db.expense.findMany({
         where: { voidedAt: null, spentOn: { gte: from, lte: to } },
-        select: { amount: true, rate: true, spentOn: true, orderId: true },
+        select: { amount: true, rate: true, spentOn: true, orderId: true, order: { select: { status: true } } },
       }),
     ]);
+    const costings = await costingsOf(
+      this.prisma.db,
+      shipped.map((o) => ({ id: o.id, totalMinor: decimalToMinor(o.total) })),
+    );
 
     const months = Array.from({ length: 12 }, (_, i) => ({
       month: `${year}-${String(i + 1).padStart(2, "0")}`,
-      earned: { revenue: 0, goodsCost: 0, orderExpenses: 0, generalExpenses: 0, orders: 0, uncostedRevenue: 0 },
+      earned: {
+        revenue: 0,
+        costedRevenue: 0,
+        goodsCost: 0,
+        basisCost: 0,
+        orderExpenses: 0,
+        bankCharges: 0,
+        generalExpenses: 0,
+        orders: 0,
+        uncostedRevenue: 0,
+      },
       cash: { in: 0, factories: 0, expenses: 0 },
     }));
     const monthOf = (d: Date) => months[d.getUTCMonth()]!;
+    const profitOf = (e: (typeof months)[number]["earned"]) =>
+      e.costedRevenue - e.goodsCost - e.basisCost - e.orderExpenses - e.bankCharges - e.generalExpenses;
 
     const orderRows: {
       id: string;
@@ -944,28 +1011,43 @@ export class MoneyService {
       customer: string;
       month: string;
       revenue: number;
+      uncostedRevenue: number;
       goodsCost: number;
+      basisCost: number;
       expenses: number;
       profit: number;
     }[] = [];
     for (const o of shipped) {
       const m = monthOf(o.shippedOn!);
-      const revenue = toMain(decimalToMinor(o.total), o.currency);
-      const linesSum = o.lines.reduce((t, l) => t + decimalToMinor(l.lineTotal), 0);
-      let cost = 0;
-      let uncosted = 0;
-      for (const l of o.lines) {
-        if (l.unitCost === null) uncosted += decimalToMinor(l.lineTotal);
-        else cost += roundHalfAway(decimalToMinor(l.unitCost) * Number(l.quantity));
-      }
-      const goodsCost = toMain(cost, o.currency);
-      // The order total is after the discount: revenue on uncosted lines takes the same share.
-      const uncostedRevenue = linesSum > 0 ? roundHalfAway((uncosted / linesSum) * revenue) : 0;
+      const c = costings.get(o.id)!;
+      const inMain = (minor: Minor) => fx.order(minor, o);
       const exp = o.expenses.reduce((t, e) => t + convert(decimalToMinor(e.amount), Number(e.rate)), 0);
+      const basisPaid = o.expenses
+        .filter((e) => paysBasis(e.category))
+        .reduce((t, e) => t + convert(decimalToMinor(e.amount), Number(e.rate)), 0);
+      const bank = inMain(o.payments.filter((p) => p.currency === o.currency).reduce((t, p) => t + decimalToMinor(p.bankCharges), 0));
+      const revenue = inMain(c.revenueMinor);
+      const costedRevenue = inMain(c.costedRevenueMinor);
+      const goodsCost = inMain(c.goodsCostMinor);
+      const basisCost = inMain(c.basisCostMinor);
+      const p = orderProfit({
+        revenueMinor: revenue,
+        costedRevenueMinor: costedRevenue,
+        goodsCostMinor: goodsCost,
+        basisCostMinor: basisCost,
+        receivedMinor: 0,
+        factoryPaidMinor: 0,
+        expensesMinor: exp,
+        basisPaidMinor: basisPaid,
+        bankChargesMinor: bank,
+      });
       m.earned.revenue += revenue;
+      m.earned.costedRevenue += costedRevenue;
+      m.earned.uncostedRevenue += revenue - costedRevenue;
       m.earned.goodsCost += goodsCost;
-      m.earned.orderExpenses += exp;
-      m.earned.uncostedRevenue += uncostedRevenue;
+      m.earned.basisCost += basisCost;
+      m.earned.orderExpenses += p.expensesCountedMinor;
+      m.earned.bankCharges += bank;
       m.earned.orders += 1;
       orderRows.push({
         id: o.id,
@@ -973,58 +1055,88 @@ export class MoneyService {
         customer: o.customer.name,
         month: m.month,
         revenue,
+        uncostedRevenue: revenue - costedRevenue,
         goodsCost,
-        expenses: exp,
-        profit: revenue - goodsCost - exp,
+        basisCost,
+        expenses: p.expensesCountedMinor + bank,
+        profit: p.earnedMinor,
       });
     }
     for (const e of expenses) {
       const inMain = convert(decimalToMinor(e.amount), Number(e.rate));
-      if (!e.orderId) monthOf(e.spentOn).earned.generalExpenses += inMain;
+      // The company's own, or spent on an order that was then cancelled: a general expense of the month.
+      if (!e.orderId || e.order?.status === "cancelled") monthOf(e.spentOn).earned.generalExpenses += inMain;
       monthOf(e.spentOn).cash.expenses += inMain;
     }
-    for (const p of payments) monthOf(p.paidOn).cash.in += toMain(decimalToMinor(p.amount), p.currency);
-    for (const p of factoryPaid)
-      monthOf(p.paidOn).cash.factories += toMain(convert(decimalToMinor(p.amount), Number(p.rate)), p.order.currency);
+    for (const p of payments) {
+      // Cash in is what arrived; bank charges never reached us. (Old payments in another currency: at today's rate.)
+      monthOf(p.paidOn).cash.in +=
+        p.currency === p.order.currency ? fx.order(decimalToMinor(p.amount), p.order) : fx.live(decimalToMinor(p.amount), p.currency);
+      // Bank charges on a cancelled order's payments: a general cost of the month (no shipped order carries them).
+      if (p.order.status === "cancelled" && p.currency === p.order.currency)
+        monthOf(p.paidOn).earned.bankCharges += fx.order(decimalToMinor(p.bankCharges), p.order);
+    }
+    for (const p of factoryPaid) monthOf(p.paidOn).cash.factories += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);
 
     const money = (n: number) => fromMinor(n);
-    const rows = months.map((m) => {
-      const earnedProfit = m.earned.revenue - m.earned.goodsCost - m.earned.orderExpenses - m.earned.generalExpenses;
-      const cashNet = m.cash.in - m.cash.factories - m.cash.expenses;
-      return {
-        month: m.month,
-        earned: {
-          orders: m.earned.orders,
-          revenue: money(m.earned.revenue),
-          goodsCost: money(m.earned.goodsCost),
-          orderExpenses: money(m.earned.orderExpenses),
-          generalExpenses: money(m.earned.generalExpenses),
-          profit: money(earnedProfit),
-          uncostedRevenue: money(m.earned.uncostedRevenue),
-        },
-        cash: { in: money(m.cash.in), factories: money(m.cash.factories), expenses: money(m.cash.expenses), net: money(cashNet) },
-      };
+    const earnedView = (e: (typeof months)[number]["earned"]) => ({
+      orders: e.orders,
+      revenue: money(e.revenue),
+      /** The part of the value with a cost recorded: profit is worked out on it alone. */
+      costedRevenue: money(e.costedRevenue),
+      /** Value without a cost recorded: left out of profit. */
+      uncostedRevenue: money(e.uncostedRevenue),
+      goodsCost: money(e.goodsCost),
+      /** Costs to reach the basis sold on (to the port, freight…), planned on the accepted option. */
+      basisCost: money(e.basisCost),
+      orderExpenses: money(e.orderExpenses),
+      /** Taken by banks from customers' payments. */
+      bankCharges: money(e.bankCharges),
+      generalExpenses: money(e.generalExpenses),
+      profit: money(profitOf(e)),
     });
-    const sum = (f: (m: (typeof months)[number]) => number) => months.reduce((t, m) => t + f(m), 0);
+    const rows = months.map((m) => ({
+      month: m.month,
+      earned: earnedView(m.earned),
+      cash: {
+        in: money(m.cash.in),
+        factories: money(m.cash.factories),
+        expenses: money(m.cash.expenses),
+        net: money(m.cash.in - m.cash.factories - m.cash.expenses),
+      },
+    }));
+    const total = months.reduce(
+      (t, m) => {
+        for (const k of Object.keys(t.earned) as (keyof typeof t.earned)[]) t.earned[k] += m.earned[k];
+        for (const k of Object.keys(t.cash) as (keyof typeof t.cash)[]) t.cash[k] += m.cash[k];
+        return t;
+      },
+      {
+        earned: {
+          revenue: 0,
+          costedRevenue: 0,
+          goodsCost: 0,
+          basisCost: 0,
+          orderExpenses: 0,
+          bankCharges: 0,
+          generalExpenses: 0,
+          orders: 0,
+          uncostedRevenue: 0,
+        },
+        cash: { in: 0, factories: 0, expenses: 0 },
+      },
+    );
     return {
       year,
       currency: main,
       months: rows,
       total: {
-        earned: {
-          orders: sum((m) => m.earned.orders),
-          revenue: money(sum((m) => m.earned.revenue)),
-          goodsCost: money(sum((m) => m.earned.goodsCost)),
-          orderExpenses: money(sum((m) => m.earned.orderExpenses)),
-          generalExpenses: money(sum((m) => m.earned.generalExpenses)),
-          profit: money(sum((m) => m.earned.revenue - m.earned.goodsCost - m.earned.orderExpenses - m.earned.generalExpenses)),
-          uncostedRevenue: money(sum((m) => m.earned.uncostedRevenue)),
-        },
+        earned: earnedView(total.earned),
         cash: {
-          in: money(sum((m) => m.cash.in)),
-          factories: money(sum((m) => m.cash.factories)),
-          expenses: money(sum((m) => m.cash.expenses)),
-          net: money(sum((m) => m.cash.in - m.cash.factories - m.cash.expenses)),
+          in: money(total.cash.in),
+          factories: money(total.cash.factories),
+          expenses: money(total.cash.expenses),
+          net: money(total.cash.in - total.cash.factories - total.cash.expenses),
         },
       },
       orders: orderRows
@@ -1032,11 +1144,13 @@ export class MoneyService {
         .map((o) => ({
           ...o,
           revenue: money(o.revenue),
+          uncostedRevenue: money(o.uncostedRevenue),
           goodsCost: money(o.goodsCost),
+          basisCost: money(o.basisCost),
           expenses: money(o.expenses),
           profit: money(o.profit),
         })),
-      missingRates: [...missing],
+      missingRates: fx.missingRates,
     };
   }
 }

@@ -160,7 +160,14 @@ export interface SourcingView {
     options: SourcingOption[];
   }[];
   /** Without the customer's list: the same products across offers (lines copied from each other). */
-  products: { key: string; description: string; quantity: string; unit: string; cheapestLineId: string | null; options: SourcingOption[] }[];
+  products: {
+    key: string;
+    description: string;
+    quantity: string;
+    unit: string;
+    cheapestLineId: string | null;
+    options: SourcingOption[];
+  }[];
 }
 
 /* ---------------------------------------------------------------- quotation */
@@ -278,7 +285,14 @@ export interface OptionValues {
   leadTime: string | null;
   discount: number;
   prices: { lineId: string; unitPrice: number }[];
-  charges: { type: "service" | "charge"; description: string; quantity: number; unit: string; unitPrice: number; unitCost: number | null }[];
+  charges: {
+    type: "service" | "charge";
+    description: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    unitCost: number | null;
+  }[];
   costs: { step: BasisStep; amount: number; currency: string; note: string | null }[];
 }
 
@@ -342,6 +356,8 @@ export interface QuoteOffers {
 
 export interface ProfitRow {
   revenue: string;
+  /** Sales whose lines have no cost: left out of profit and margin. */
+  uncostedRevenue: string;
   cost: string;
   profit: string;
   marginPercent: number | null;
@@ -366,4 +382,6 @@ export interface ReportView {
     byPerson: (ProfitRow & { key: string })[];
   };
   trend: { month: string; received: number; won: number }[];
+  /** Currencies with no exchange rate: their amounts are left out. */
+  missingRates: string[];
 }

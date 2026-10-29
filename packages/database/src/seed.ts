@@ -9,6 +9,7 @@ import { defaultPlan, PRESET_ROLES, readSettings, SETTINGS, type BalanceTerms, t
 import { addDays, todayIn } from "@kebo/utils";
 import type { PrismaClient } from "./client";
 import { nextReference } from "./counters";
+import { freezeOrderMoney } from "./order-freeze";
 import { toDbDate } from "./convert";
 
 /** A company connection (or a transaction on one). */
@@ -365,6 +366,8 @@ export async function seedDemoData(
           : {}),
       },
     });
+    // What the API freezes on acceptance: factory prices, costs to reach the basis, the rate.
+    await freezeOrderMoney(db, [order.id]);
     // Its history: each stage it went through, in order.
     const flow: OrderStage[] = ["confirmed", "in_production", "shipped", "done"];
     for (const [i, st] of flow.slice(0, flow.indexOf(o.order.stage) + 1).entries()) {

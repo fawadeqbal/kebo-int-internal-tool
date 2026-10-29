@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, settle } from "@kebo/money";
+import { fromMinor, fxRate, settle } from "@kebo/money";
 import {
   can,
   checkMove,
@@ -52,9 +52,11 @@ const orderInclude = {
           requestedItemId: true,
           requestedItem: { select: { parentId: true } },
           factoryQuoteLineId: true,
-          factoryQuoteLine: { select: { parentId: true, factoryQuote: { select: { factory: { select: { id: true, name: true } } } } } },
+          factoryQuoteLine: { select: { parentId: true } },
         },
       },
+      // The factory it was bought from (frozen when the order was made).
+      factory: { select: { id: true, name: true } },
     },
   },
   customer: { select: { id: true, name: true, country: true } },
@@ -129,12 +131,25 @@ export class OrdersService {
       include: { quotation: { include: { inquiry: true } } },
     });
     // The order is the accepted option: its lines, its total.
+    // With the factory price each line was bought at (frozen on the order: what we owe the factory),
+    // and the costs to reach the basis it was sold on (part of its cost).
     const option = await tx.quotationOption.findFirstOrThrow({
       where: { id: optionId, revisionId },
-      include: { lines: { orderBy: { sortOrder: "asc" } } },
+      include: {
+        lines: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            factoryQuoteLine: { select: { unitPrice: true, taxRate: true, factoryQuote: { select: { factoryId: true, currency: true } } } },
+          },
+        },
+        costs: true,
+      },
     });
     const inquiry = rev.quotation.inquiry;
     const refNo = await nextReference(tx, "order", Number(this.clock.today().slice(0, 4)));
+    // The order's rate to the main currency today, kept so its revenue never moves with later rates.
+    const { sales } = await this.settings.get();
+    const mainRate = fxRate(rev.currency, sales.currency, sales.currency, sales.exchangeRates);
     const order = await tx.order.create({
       data: {
         refNo,
@@ -149,7 +164,14 @@ export class OrdersService {
         balanceTerms: rev.balanceTerms,
         incoterm: rev.incoterm,
         incotermPlace: rev.incotermPlace,
+        mainCurrency: sales.currency,
+        mainRate,
         createdById: actorId,
+        costs: {
+          create: option.costs
+            .filter((c) => Number(c.cost) > 0)
+            .map((c) => ({ step: c.step, amount: c.amount, currency: c.currency, cost: c.cost, fxRate: c.fxRate, note: c.note })),
+        },
         lines: {
           create: option.lines.map((l) => ({
             quoteLineId: l.id,
@@ -162,6 +184,10 @@ export class OrdersService {
             lineTotal: l.lineTotal,
             unitCost: l.unitCost,
             sortOrder: l.sortOrder,
+            factoryId: l.factoryQuoteLine?.factoryQuote.factoryId ?? null,
+            factoryUnitPrice: l.factoryQuoteLine?.unitPrice ?? null,
+            factoryTaxRate: l.factoryQuoteLine?.taxRate ?? null,
+            factoryCurrency: l.factoryQuoteLine?.factoryQuote.currency ?? null,
           })),
         },
         stageChanges: {
@@ -371,7 +397,7 @@ export class OrdersService {
         unit: l.unit,
         unitPrice: l.unitPrice.toFixed(2),
         lineTotal: l.lineTotal.toFixed(2),
-        factory: l.quoteLine?.factoryQuoteLine?.factoryQuote.factory ?? null,
+        factory: l.factory ?? null,
         receivedQty: trimQty(l.receivedQty),
         receivedOn: fromDbDateOrNull(l.receivedOn),
         packing: {
@@ -478,7 +504,15 @@ export class OrdersService {
    */
   async list(
     user: SessionUser,
-    filter: { mine?: boolean; status?: "open" | "closed" | "cancelled"; stage?: OrderStage; lateOnly?: boolean; recent?: boolean; limit?: number; ids?: string[] },
+    filter: {
+      mine?: boolean;
+      status?: "open" | "closed" | "cancelled";
+      stage?: OrderStage;
+      lateOnly?: boolean;
+      recent?: boolean;
+      limit?: number;
+      ids?: string[];
+    },
   ) {
     const rows = await this.prisma.db.order.findMany({
       where: {
@@ -524,9 +558,10 @@ export class OrdersService {
     // Closed orders appear only while money is still owed on them: the database picks those, so years
     // of finished orders are not read on every Home.
     const due = await ordersWithMoneyDue(this.prisma);
-    const items = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed", ids: due }))].filter(
-      (i) => i.needs,
-    );
+    const items = [
+      ...(await this.list(user, { mine: true })),
+      ...(await this.list(user, { mine: true, status: "closed", ids: due })),
+    ].filter((i) => i.needs);
     return items.sort((a, b) => Number(b.needs!.late) - Number(a.needs!.late) || a.needs!.due.localeCompare(b.needs!.due));
   }
 

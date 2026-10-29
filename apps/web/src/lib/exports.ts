@@ -31,7 +31,8 @@ type Q = Record<string, string | undefined>;
 export class ExportNotFound extends Error {}
 type Cell = string | number | null;
 
-const num = (v: string | number | null | undefined): number | null => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+const num = (v: string | number | null | undefined): number | null =>
+  v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
 const day = (v: string | null | undefined) => (v ? v.slice(0, 10) : null);
 const when = (v: string) => v.replace("T", " ").slice(0, 16);
 const text = (h: string, width = 16): SheetCol => ({ header: h, width });
@@ -53,7 +54,13 @@ const stamp = () => new Date().toISOString().slice(0, 10);
 
 async function deals(q: Q): Promise<SheetSpec> {
   const stage = q.stage ?? "open";
-  const rows = await allPages<DealRow>("/inquiries", { stage: stage === "all" ? undefined : stage, q: q.q, assignee: q.assignee, customerId: q.customer, sort: q.sort });
+  const rows = await allPages<DealRow>("/inquiries", {
+    stage: stage === "all" ? undefined : stage,
+    q: q.q,
+    assignee: q.assignee,
+    customerId: q.customer,
+    sort: q.sort,
+  });
   return {
     name: `Inquiries ${stamp()}`,
     title: "Inquiries",
@@ -103,7 +110,10 @@ async function orders(q: Q): Promise<SheetSpec> {
   const cancelled = q.view === "cancelled";
   const rows = cancelled
     ? await api.get<OrderRow[]>("/orders", { status: "cancelled", mine })
-    : [...(await api.get<OrderRow[]>("/orders", { status: "open", mine })), ...(await api.get<OrderRow[]>("/orders", { status: "closed", mine }))];
+    : [
+        ...(await api.get<OrderRow[]>("/orders", { status: "open", mine })),
+        ...(await api.get<OrderRow[]>("/orders", { status: "closed", mine })),
+      ];
   return {
     name: `${cancelled ? "Cancelled orders" : "Orders"} ${stamp()}`,
     title: cancelled ? "Cancelled orders" : "Orders",
@@ -151,7 +161,19 @@ async function customers(q: Q): Promise<SheetSpec> {
   return {
     name: `Customers ${stamp()}`,
     title: "Customers",
-    columns: [text("Customer name", 32), text("Type", 11), text("Country", 18), text("Contact name", 22), text("Position"), text("Email", 26), text("Phone", 18), text("WhatsApp", 18), text("WeChat"), count("Open inquiries"), count("Open orders")],
+    columns: [
+      text("Customer name", 32),
+      text("Type", 11),
+      text("Country", 18),
+      text("Contact name", 22),
+      text("Position"),
+      text("Email", 26),
+      text("Phone", 18),
+      text("WhatsApp", 18),
+      text("WeChat"),
+      count("Open inquiries"),
+      count("Open orders"),
+    ],
     rows: rows.map((c): Cell[] => [
       c.name,
       CUSTOMER_TYPE_LABEL[c.type],
@@ -173,8 +195,30 @@ async function factories(q: Q): Promise<SheetSpec> {
   return {
     name: `Factories ${stamp()}`,
     title: "Factories",
-    columns: [text("Factory name", 32), text("Contact person", 22), text("Phone", 18), text("Email", 26), text("WeChat"), text("Address", 36), text("Bank details", 36), text("Notes", 30), text("Looked after by"), count("Offers")],
-    rows: rows.map((f): Cell[] => [f.name, f.contactPerson, f.phone, f.email, f.wechat, f.address, f.bankDetails, f.notes, f.owner?.name ?? null, f._count.quotes]),
+    columns: [
+      text("Factory name", 32),
+      text("Contact person", 22),
+      text("Phone", 18),
+      text("Email", 26),
+      text("WeChat"),
+      text("Address", 36),
+      text("Bank details", 36),
+      text("Notes", 30),
+      text("Looked after by"),
+      count("Offers"),
+    ],
+    rows: rows.map((f): Cell[] => [
+      f.name,
+      f.contactPerson,
+      f.phone,
+      f.email,
+      f.wechat,
+      f.address,
+      f.bankDetails,
+      f.notes,
+      f.owner?.name ?? null,
+      f._count.quotes,
+    ]),
   };
 }
 
@@ -223,7 +267,15 @@ async function payables(q: Q): Promise<SheetSpec> {
   return {
     name: `To pay factories ${stamp()}`,
     title: "To pay",
-    columns: [text("Factory", 30), text("Looked after by"), text("Currency", 9), money("Owed"), money("Paid"), money("To pay"), text("Orders", 40)],
+    columns: [
+      text("Factory", 30),
+      text("Looked after by"),
+      text("Currency", 9),
+      money("Owed"),
+      money("Paid"),
+      money("To pay"),
+      text("Orders", 40),
+    ],
     rows: rows.map((p): Cell[] => [
       p.factory.name,
       p.lookedAfterBy?.name ?? null,
@@ -236,7 +288,13 @@ async function payables(q: Q): Promise<SheetSpec> {
   };
 }
 
-const CASH_KIND: Record<string, string> = { in: "Money in", factory: "Paid to factory", expense: "Expense", transfer_out: "Transfer out", transfer_in: "Transfer in" };
+const CASH_KIND: Record<string, string> = {
+  in: "Money in",
+  factory: "Paid to factory",
+  expense: "Expense",
+  transfer_out: "Transfer out",
+  transfer_in: "Transfer in",
+};
 
 async function cashBook(q: Q): Promise<SheetSpec> {
   const b = await api.get<CashBook>("/money/cash-book", { from: q.from, to: q.to, account: q.account, currency: q.currency });
@@ -258,7 +316,9 @@ async function cashBook(q: Q): Promise<SheetSpec> {
       text("Voided", 8),
     ],
     rows: [
-      ...(balance && b.opening !== null ? [[b.from, "Opening balance", null, null, b.account!.name, null, b.account!.currency, null, null, num(b.opening), null] as Cell[]] : []),
+      ...(balance && b.opening !== null
+        ? [[b.from, "Opening balance", null, null, b.account!.name, null, b.account!.currency, null, null, num(b.opening), null] as Cell[]]
+        : []),
       ...b.rows.map((r): Cell[] => {
         const a = Number(r.amount);
         return [
@@ -278,7 +338,19 @@ async function cashBook(q: Q): Promise<SheetSpec> {
     ],
     foot:
       b.totals.length === 1
-        ? ["Total", null, null, null, null, null, b.totals[0]!.currency, num(b.totals[0]!.in), num(b.totals[0]!.out), ...(balance ? [num(b.closing)] : []), null]
+        ? [
+            "Total",
+            null,
+            null,
+            null,
+            null,
+            null,
+            b.totals[0]!.currency,
+            num(b.totals[0]!.in),
+            num(b.totals[0]!.out),
+            ...(balance ? [num(b.closing)] : []),
+            null,
+          ]
         : undefined,
   };
 }
@@ -352,7 +424,17 @@ async function report(q: Q): Promise<SheetSpec[]> {
   const name = `Report ${r.range.from} to ${r.range.to}`;
   const cur = r.currency;
   const profitRows = (group: string, rows: ReportView["profit"]["byCustomer"]) =>
-    rows.map((x): Cell[] => [group, x.key, x.orders, num(x.revenue), num(x.cost), num(x.profit), x.marginPercent, x.coveragePercent]);
+    rows.map((x): Cell[] => [
+      group,
+      x.key,
+      x.orders,
+      num(x.revenue),
+      num(x.uncostedRevenue),
+      num(x.cost),
+      num(x.profit),
+      x.marginPercent,
+      x.coveragePercent,
+    ]);
   return [
     {
       name,
@@ -360,22 +442,62 @@ async function report(q: Q): Promise<SheetSpec[]> {
       columns: [count("Received"), count("Quoted"), count("Won"), count("Lost"), count("Win rate %"), money(`Won value ${cur}`)],
       rows: [[r.funnel.received, r.funnel.quoted, r.funnel.won, r.funnel.lost, r.funnel.winRatePercent, num(r.wonValue)]],
     },
-    { name, title: "Lost reasons", columns: [text("Reason", 28), count("Inquiries")], rows: r.lostReasons.map((x) => [LOST_REASON_LABEL[x.reason], x.count]) },
-    { name, title: "By channel", columns: [text("Channel", 16), count("Inquiries")], rows: r.byChannel.map((x) => [CHANNEL_LABEL[x.key] ?? x.key, x.count]) },
+    {
+      name,
+      title: "Lost reasons",
+      columns: [text("Reason", 28), count("Inquiries")],
+      rows: r.lostReasons.map((x) => [LOST_REASON_LABEL[x.reason], x.count]),
+    },
+    {
+      name,
+      title: "By channel",
+      columns: [text("Channel", 16), count("Inquiries")],
+      rows: r.byChannel.map((x) => [CHANNEL_LABEL[x.key] ?? x.key, x.count]),
+    },
     { name, title: "By category", columns: [text("Category", 24), count("Inquiries")], rows: r.byCategory.map((x) => [x.key, x.count]) },
-    { name, title: "Win rate by person", columns: [text("Person", 20), count("Won"), count("Lost"), count("Win rate %")], rows: r.people.map((x) => [x.person, x.won, x.lost, x.winRatePercent]) },
+    {
+      name,
+      title: "Win rate by person",
+      columns: [text("Person", 20), count("Won"), count("Lost"), count("Win rate %")],
+      rows: r.people.map((x) => [x.person, x.won, x.lost, x.winRatePercent]),
+    },
     {
       name,
       title: "Profit",
-      columns: [text("Group", 12), text("Name", 28), count("Orders"), money(`Sales ${cur}`), money(`Cost ${cur}`), money(`Profit ${cur}`), count("Margin %"), count("Costed %")],
+      columns: [
+        text("Group", 12),
+        text("Name", 28),
+        count("Orders"),
+        money(`Sales ${cur}`),
+        money(`Not costed ${cur}`),
+        money(`Cost ${cur}`),
+        money(`Profit ${cur}`),
+        count("Margin %"),
+        count("Costed %"),
+      ],
       rows: [
-        ["Total", null, p.total.orders, num(p.total.revenue), num(p.total.cost), num(p.total.profit), p.total.marginPercent, p.total.coveragePercent],
+        [
+          "Total",
+          null,
+          p.total.orders,
+          num(p.total.revenue),
+          num(p.total.uncostedRevenue),
+          num(p.total.cost),
+          num(p.total.profit),
+          p.total.marginPercent,
+          p.total.coveragePercent,
+        ],
         ...profitRows("Customer", p.byCustomer),
         ...profitRows("Category", p.byCategory),
         ...profitRows("Person", p.byPerson),
       ],
     },
-    { name, title: "Last 12 months", columns: [text("Month", 10), count("Received"), count("Won")], rows: r.trend.map((x) => [x.month, x.received, x.won]) },
+    {
+      name,
+      title: "Last 12 months",
+      columns: [text("Month", 10), count("Received"), count("Won")],
+      rows: r.trend.map((x) => [x.month, x.received, x.won]),
+    },
   ];
 }
 
@@ -400,19 +522,35 @@ async function quotation(q: Q): Promise<SheetSpec> {
     text("Model", 16),
     { header: "Qty", kind: "number", width: 10 },
     text("Unit", 9),
-    ...(internal ? [...(costs ? [money(`Unit cost ${c}`), count("Margin %")] : []), money(`Unit price ${c}`), money(`Amount ${c}`)] : [money(`Total ${c}`)]),
+    ...(internal
+      ? [...(costs ? [money(`Unit cost ${c}`), count("Margin %")] : []), money(`Unit price ${c}`), money(`Amount ${c}`)]
+      : [money(`Total ${c}`)]),
   ];
   const width = columns.length;
   const pad = (cells: Cell[]): Cell[] => [...cells, ...Array<Cell>(Math.max(0, width - cells.length)).fill(null)];
-  const sum = (label: string, value: string): Cell[] => pad([null, label, ...Array<Cell>(width - 3).fill(null), num(value)]).slice(0, width);
+  const sum = (label: string, value: string): Cell[] =>
+    pad([null, label, ...Array<Cell>(width - 3).fill(null), num(value)]).slice(0, width);
   const rows: Cell[][] = [];
   for (const o of options) {
-    if (!single) rows.push(pad([null, `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.factory ? ` (${o.factory.name})` : ""}`]));
+    if (!single)
+      rows.push(
+        pad([
+          null,
+          `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.factory ? ` (${o.factory.name})` : ""}`,
+        ]),
+      );
     const extra = o.costing?.extraCostMinor ?? 0;
-    const landed = internal && extra ? landedUnitCosts(o.lines.map((l) => ({ unitCostMinor: l.unitCost == null ? null : toMinor(l.unitCost), quantity: l.quantity })), extra) : null;
+    const landed =
+      internal && extra
+        ? landedUnitCosts(
+            o.lines.map((l) => ({ unitCostMinor: l.unitCost == null ? null : toMinor(l.unitCost), quantity: l.quantity })),
+            extra,
+          )
+        : null;
     o.lines.forEach((l, i) => {
       const cost = landed?.[i] != null ? fromMinor(landed[i]!) : l.unitCost;
-      const margin = cost != null && Number(l.unitPrice) ? Math.round(((Number(l.unitPrice) - Number(cost)) / Number(l.unitPrice)) * 1000) / 10 : null;
+      const margin =
+        cost != null && Number(l.unitPrice) ? Math.round(((Number(l.unitPrice) - Number(cost)) / Number(l.unitPrice)) * 1000) / 10 : null;
       rows.push([
         l.no,
         l.description,
@@ -426,7 +564,9 @@ async function quotation(q: Q): Promise<SheetSpec> {
       rows.push(sum(single ? "Subtotal" : `Option ${o.letter} subtotal`, o.subtotal));
       if (Number(o.discount)) rows.push(sum("Discount", String(-Number(o.discount))));
     }
-    rows.push(sum(`${single ? "" : `Option ${o.letter} `}Total ${r.incoterm}${r.incotermPlace ? ` ${r.incotermPlace}` : ""} (${c})`, o.total));
+    rows.push(
+      sum(`${single ? "" : `Option ${o.letter} `}Total ${r.incoterm}${r.incotermPlace ? ` ${r.incotermPlace}` : ""} (${c})`, o.total),
+    );
   }
   const no = `${r.quotation.refNo}-R${r.number}`;
   return { name: `Quotation ${no}${internal ? " (internal)" : ""}`, title: `Quotation ${no}`, columns, rows };

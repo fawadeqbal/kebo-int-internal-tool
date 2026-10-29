@@ -34,12 +34,24 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
             <table data-fit="" className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-surface-2 text-left text-xs text-text-2">
-                  <th scope="col" className="px-3 py-2 font-medium">Factory</th>
-                  <th scope="col" className="hidden px-3 py-2 font-medium md:table-cell">Looked after by</th>
-                  <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">Order cost</th>
-                  <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">Paid</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Left to pay</th>
-                  <th scope="col" className="hidden w-44 px-3 py-2 font-medium lg:table-cell">Progress</th>
+                  <th scope="col" className="px-3 py-2 font-medium">
+                    Factory
+                  </th>
+                  <th scope="col" className="hidden px-3 py-2 font-medium md:table-cell">
+                    Looked after by
+                  </th>
+                  <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">
+                    Order cost
+                  </th>
+                  <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">
+                    Paid
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">
+                    Left to pay
+                  </th>
+                  <th scope="col" className="hidden w-44 px-3 py-2 font-medium lg:table-cell">
+                    Progress
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -54,16 +66,37 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                         <span className="block text-xs text-muted sm:hidden tabular">
                           {money(r.paid, r.currency)} of {money(r.owed, r.currency)} paid
                         </span>
-                        {r.overpaid && <span className="block text-xs text-warn">Paid {money(r.overpaid, r.currency)} more than its prices add up to.</span>}
+                        {r.overpaid && (
+                          <span className="block text-xs text-warn">
+                            Paid {money(r.overpaid, r.currency)} more than its prices add up to.
+                          </span>
+                        )}
                       </td>
-                      <td className={cn("hidden px-3 py-2.5 align-top md:table-cell", r.lookedAfterBy ? "text-text-2" : "text-warn")}>{r.lookedAfterBy?.name ?? "Nobody yet"}</td>
-                      <td className="hidden px-3 py-2.5 text-right align-top whitespace-nowrap tabular sm:table-cell">{money(r.owed, r.currency)}</td>
-                      <td className="hidden px-3 py-2.5 text-right align-top whitespace-nowrap text-ok tabular sm:table-cell">{money(r.paid, r.currency)}</td>
+                      <td className={cn("hidden px-3 py-2.5 align-top md:table-cell", r.lookedAfterBy ? "text-text-2" : "text-warn")}>
+                        {r.lookedAfterBy?.name ?? "Nobody yet"}
+                      </td>
+                      <td className="hidden px-3 py-2.5 text-right align-top whitespace-nowrap tabular sm:table-cell">
+                        {money(r.owed, r.currency)}
+                      </td>
+                      <td className="hidden px-3 py-2.5 text-right align-top whitespace-nowrap text-ok tabular sm:table-cell">
+                        {money(r.paid, r.currency)}
+                      </td>
                       <td className="px-3 py-2.5 text-right align-top whitespace-nowrap tabular">
-                        {Number(r.toPay) > 0 ? <span className="font-semibold text-warn">{money(r.toPay, r.currency)}</span> : <Badge tone="ok">Paid</Badge>}
+                        {Number(r.toPay) > 0 ? (
+                          <span className="font-semibold text-warn">{money(r.toPay, r.currency)}</span>
+                        ) : (
+                          <Badge tone="ok">Paid</Badge>
+                        )}
                       </td>
                       <td className="hidden px-3 py-2.5 align-top lg:table-cell">
-                        <div className="h-2 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${r.factory.name}: ${pct}% paid`}>
+                        <div
+                          className="h-2 overflow-hidden rounded-full bg-surface-3"
+                          role="progressbar"
+                          aria-valuenow={pct}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`${r.factory.name}: ${pct}% paid`}
+                        >
                           <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-xs text-muted">{pct}% paid</span>
@@ -85,7 +118,9 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
       <section aria-label="Payments made to the factory" className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Payments made</h3>
         {f.payments.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing paid to a factory for this order yet.</p>
+          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">
+            Nothing paid to a factory for this order yet.
+          </p>
         ) : (
           <RecordTable
             label="Payments made to the factory"
@@ -105,7 +140,9 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                 label: `Payment of ${money(p.amount, p.currency)} to ${p.factory.name} on ${date(p.paidOn)}`,
                 removed: !!p.voided,
                 cells: [
-                  <span key="d" className="whitespace-nowrap">{date(p.paidOn)}</span>,
+                  <span key="d" className="whitespace-nowrap">
+                    {date(p.paidOn)}
+                  </span>,
                   <span key="f">
                     {p.factory.name} {p.voided && <Badge tone="bad">Removed</Badge>}
                   </span>,
@@ -114,12 +151,29 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                     {PAYMENT_METHOD_LABEL[p.method]}
                     {p.reference && ` · ${p.reference}`}
                   </span>,
-                  <span key="b" className={p.paidBy ? "text-text-2" : "text-muted"}>{p.paidBy?.name ?? "—"}</span>,
-                  <span key="a" className="font-semibold whitespace-nowrap">{money(p.amount, p.currency)}</span>,
-                  p.file ? <Paperclip key="p" className="size-4 text-text-2" aria-label="Bank slip" /> : <span key="p" className="text-muted">—</span>,
+                  <span key="b" className={p.paidBy ? "text-text-2" : "text-muted"}>
+                    {p.paidBy?.name ?? "—"}
+                  </span>,
+                  <span key="a" className="font-semibold whitespace-nowrap">
+                    {money(p.amount, p.currency)}
+                  </span>,
+                  p.file ? (
+                    <Paperclip key="p" className="size-4 text-text-2" aria-label="Bank slip" />
+                  ) : (
+                    <span key="p" className="text-muted">
+                      —
+                    </span>
+                  ),
                 ],
                 fields: [
-                  { label: "Factory", value: <Link href={`/factories/${p.factory.id}`} className="hover:text-primary">{p.factory.name}</Link> },
+                  {
+                    label: "Factory",
+                    value: (
+                      <Link href={`/factories/${p.factory.id}`} className="hover:text-primary">
+                        {p.factory.name}
+                      </Link>
+                    ),
+                  },
                   { label: "Amount paid", value: <span className="font-medium tabular">{money(p.amount, p.currency)}</span> },
                   {
                     label: `In the order's currency (${m.currency})`,
@@ -128,7 +182,10 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                         "Same currency"
                       ) : (
                         <span className="tabular">
-                          ≈ {money(p.inOrderCurrency, m.currency)} <span className="text-xs text-muted">at {p.rate} {p.currency} per {m.currency}</span>
+                          ≈ {money(p.inOrderCurrency, m.currency)}{" "}
+                          <span className="text-xs text-muted">
+                            at {p.rate} {p.currency} per {m.currency}
+                          </span>
                         </span>
                       ),
                   },
@@ -170,7 +227,15 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                     wide: true,
                   },
                   ...(p.voided
-                    ? [{ label: "Removed", value: <span className="text-bad">{`${dateTime(p.voided.at)}${p.voided.reason ? `: ${p.voided.reason}` : ""}`}</span>, wide: true }]
+                    ? [
+                        {
+                          label: "Removed",
+                          value: (
+                            <span className="text-bad">{`${dateTime(p.voided.at)}${p.voided.reason ? `: ${p.voided.reason}` : ""}`}</span>
+                          ),
+                          wide: true,
+                        },
+                      ]
                     : []),
                 ],
                 actions:
@@ -190,7 +255,21 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                   ) : undefined,
               };
             })}
-            foot={["Total paid", "", "", "", "", currencies.length === 1 ? <span key="t" className="whitespace-nowrap">{money(paidTotal, currencies[0]!)}</span> : "", ""]}
+            foot={[
+              "Total paid",
+              "",
+              "",
+              "",
+              "",
+              currencies.length === 1 ? (
+                <span key="t" className="whitespace-nowrap">
+                  {money(paidTotal, currencies[0]!)}
+                </span>
+              ) : (
+                ""
+              ),
+              "",
+            ]}
           />
         )}
       </section>
@@ -199,7 +278,19 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
 }
 
 /** The order's profit (earned and cash) and its expenses. Managers and the super admin only; "Add an expense" is at the top of the tab. */
-export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMoney; people: Person[]; today: string; mainCurrency: string; fx: Fx }) {
+export function ProfitView({
+  m,
+  people,
+  today,
+  mainCurrency,
+  fx,
+}: {
+  m: OrderMoney;
+  people: Person[];
+  today: string;
+  mainCurrency: string;
+  fx: Fx;
+}) {
   const p = m.profit;
   const c = m.currency;
   return (
@@ -215,7 +306,11 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
             <div className="rounded-xl border border-line bg-surface p-4">
               <p className="text-xs text-muted">Expected profit</p>
               <p className={cn("text-xl font-bold tabular", Number(p.earned) < 0 ? "text-bad" : "text-ok")}>{money(p.earned, c)}</p>
-              {p.marginPercent !== null && <p className="text-xs text-text-2">{p.marginPercent}% of the order value</p>}
+              {p.marginPercent !== null && (
+                <p className="text-xs text-text-2">
+                  {p.marginPercent}% of the {Number(p.uncostedRevenue) > 0 ? "value with a cost" : "order value"}
+                </p>
+              )}
             </div>
             <div className="rounded-xl border border-line bg-surface p-4">
               <p className="text-xs text-muted">Cash so far</p>
@@ -226,7 +321,8 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
               <div className="rounded-xl border border-warn/30 bg-warn-soft p-4 text-warn">
                 <p className="text-xs font-semibold">Check this</p>
                 <p className="mt-1 text-sm">
-                  {money(p.uncostedRevenue, c)} of the order has no factory cost recorded, so the profit may be too high by up to that much.
+                  {money(p.uncostedRevenue, c)} of the order has no cost recorded. It is not counted as profit: add its cost to see the
+                  whole profit.
                 </p>
               </div>
             ) : (
@@ -242,11 +338,22 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
               title="Expected profit (the whole order)"
               rows={[
                 ["Order value", money(p.revenue, c)],
+                ...(Number(p.uncostedRevenue) > 0
+                  ? ([["Not costed (left out)", `− ${money(p.uncostedRevenue, c)}`]] as [string, string][])
+                  : []),
                 ["Goods from the factories", `− ${money(p.goodsCost, c)}`],
-                ["Costs", `− ${money(p.expenses, c)}`],
+                ...(Number(p.basisCost) > 0
+                  ? ([["To reach the price basis (freight…)", `− ${money(p.basisCost, c)}`]] as [string, string][])
+                  : []),
+                [p.expensesCounted === p.expenses ? "Costs" : "Costs beyond the planned freight", `− ${money(p.expensesCounted, c)}`],
+                ...(Number(p.bankCharges) > 0 ? ([["Bank charges", `− ${money(p.bankCharges, c)}`]] as [string, string][]) : []),
                 ...(Number(p.beforeSale) > 0 ? ([["Costs before the order", `− ${money(p.beforeSale, c)}`]] as [string, string][]) : []),
               ]}
-              total={Number(p.beforeSale) > 0 ? ["Profit after everything", money(p.net, c), Number(p.net) < 0] : ["Profit", money(p.earned, c), Number(p.earned) < 0]}
+              total={
+                Number(p.beforeSale) > 0
+                  ? ["Profit after everything", money(p.net, c), Number(p.net) < 0]
+                  : ["Profit", money(p.earned, c), Number(p.earned) < 0]
+              }
             />
             <SumTable
               title="Cash so far"
@@ -263,13 +370,27 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
       <section aria-label="Costs on this order" className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">Costs on this order</h3>
         {m.expenses && m.expenses.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface" aria-label="Costs on this order">
+          <ul
+            className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface"
+            aria-label="Costs on this order"
+          >
             {m.expenses.map((e) => (
-              <ExpenseRecord key={e.id} e={e} mainCurrency={mainCurrency} people={people} fx={fx} today={today} showFor={false} canChange={!m.cancelled} />
+              <ExpenseRecord
+                key={e.id}
+                e={e}
+                mainCurrency={mainCurrency}
+                people={people}
+                fx={fx}
+                today={today}
+                showFor={false}
+                canChange={!m.cancelled}
+              />
             ))}
           </ul>
         ) : (
-          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">No costs yet. Add one when you pay for freight, an inspection or a ticket.</p>
+          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">
+            No costs yet. Add one when you pay for freight, an inspection or a ticket.
+          </p>
         )}
       </section>
       {m.dealExpenses && m.dealExpenses.length > 0 && (
@@ -282,7 +403,16 @@ export function ProfitView({ m, people, today, mainCurrency, fx }: { m: OrderMon
           </h3>
           <ul className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
             {m.dealExpenses.map((e) => (
-              <ExpenseRecord key={e.id} e={e} mainCurrency={mainCurrency} people={people} fx={fx} today={today} showFor={false} canChange={!m.cancelled} />
+              <ExpenseRecord
+                key={e.id}
+                e={e}
+                mainCurrency={mainCurrency}
+                people={people}
+                fx={fx}
+                today={today}
+                showFor={false}
+                canChange={!m.cancelled}
+              />
             ))}
           </ul>
         </section>

@@ -278,9 +278,7 @@ function ProfitBody({
                   <td className={cn(td, "hidden md:table-cell")} />
                   <td className={cn(td, "hidden sm:table-cell")} />
                   <td className={cn(td, "hidden text-right whitespace-nowrap tabular sm:table-cell")}>− {money(t.otherCosts, c)}</td>
-                  <td className={cn(td, "text-right font-semibold whitespace-nowrap text-bad tabular")}>
-                    {signed(-Number(t.otherCosts))}
-                  </td>
+                  <td className={cn(td, "text-right font-semibold whitespace-nowrap text-bad tabular")}>{signed(-Number(t.otherCosts))}</td>
                 </tr>
               )}
             </tbody>
@@ -300,7 +298,8 @@ function ProfitBody({
         </div>
         {Number(t.uncostedRevenue) > 0 && (
           <p className="text-xs text-warn">
-            {money(t.uncostedRevenue, c)} of their orders has no factory cost yet, so the profit may be too high by up to that much.
+            Not costed: {money(t.uncostedRevenue, c)} of their orders has no cost recorded yet. It is left out of profit until its cost is
+            added.
           </p>
         )}
       </section>

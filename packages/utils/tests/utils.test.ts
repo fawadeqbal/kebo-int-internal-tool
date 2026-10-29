@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { addDays, amountInWords, daysBetween, formatReference, isISODate, parseReference, todayIn, ForbiddenError, DomainError } from "../src";
+import {
+  addDays,
+  amountInWords,
+  daysBetween,
+  startOfDayIn,
+  formatReference,
+  isISODate,
+  parseReference,
+  todayIn,
+  ForbiddenError,
+  DomainError,
+} from "../src";
 
 describe("dates", () => {
   it("gives today in the business time zone", () => {
     const lateUtc = new Date("2026-10-26T20:30:00Z"); // already the 27th in Shanghai
     expect(todayIn("Asia/Shanghai", lateUtc)).toBe("2026-10-27");
     expect(todayIn("UTC", lateUtc)).toBe("2026-10-26");
+  });
+  it("finds when a day starts in a time zone", () => {
+    expect(startOfDayIn("2026-11-01", "Asia/Shanghai").toISOString()).toBe("2026-10-31T16:00:00.000Z");
+    expect(startOfDayIn("2026-11-01", "UTC").toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    expect(startOfDayIn("2026-03-29", "Europe/London").toISOString()).toBe("2026-03-29T00:00:00.000Z"); // clocks go forward at 01:00
+    expect(startOfDayIn("2026-07-01", "Europe/London").toISOString()).toBe("2026-06-30T23:00:00.000Z");
+    expect(startOfDayIn("2026-01-01", "America/New_York").toISOString()).toBe("2026-01-01T05:00:00.000Z");
   });
   it("adds days across month and year ends", () => {
     expect(addDays("2026-12-30", 3)).toBe("2027-01-02");

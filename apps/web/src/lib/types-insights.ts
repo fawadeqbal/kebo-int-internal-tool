@@ -35,13 +35,24 @@ export interface Insights {
     onTime: Kpi<number>;
     newCustomers: Kpi<number>;
     repeatShare: Kpi<number>;
+    /** Revenue with no cost recorded: left out of profit and margin. */
+    uncostedRevenue: Kpi<string>;
   };
-  now: { cashInHand: string | null; toReceive: string; overdue: string; toPay: string | null; pipeline: string; pipelineDeals: number; weightedPipeline: string | null };
+  now: {
+    cashInHand: string | null;
+    toReceive: string;
+    overdue: string;
+    toPay: string | null;
+    pipeline: string;
+    pipelineDeals: number;
+    weightedPipeline: string | null;
+  };
   target: { month: string; amount: string | null; reached: string; percent: number | null; canSet: boolean };
   series: {
     month: string;
     revenue: string;
     grossProfit: string;
+    uncostedRevenue: string;
     expenses: string | null;
     netProfit: string | null;
     cashIn: string;
@@ -53,12 +64,27 @@ export interface Insights {
   }[];
   funnel: { received: number; quoted: number; won: number };
   aging: { notDue: string; d30: string; d60: string; d90: string; older: string };
-  topCustomers: { customer: { id: string; name: string; country: string }; revenue: string; grossProfit: string; orders: number; isNew: boolean }[];
+  topCustomers: {
+    customer: { id: string; name: string; country: string };
+    revenue: string;
+    grossProfit: string;
+    orders: number;
+    isNew: boolean;
+  }[];
   categories: { category: string; revenue: string; grossProfit: string; orders: number }[];
   countries: { country: string; revenue: string; orders: number; customers: number }[];
   channels: { channel: InquiryChannel; received: number; won: number; winRate: number | null }[];
   lostReasons: { reason: string; label: string; count: number }[];
-  people: { id: string | null; name: string; received: number; won: number; lost: number; winRate: number | null; revenue: string; quoteDays: number | null }[];
+  people: {
+    id: string | null;
+    name: string;
+    received: number;
+    won: number;
+    lost: number;
+    winRate: number | null;
+    revenue: string;
+    quoteDays: number | null;
+  }[];
   factories: { factory: { id: string; name: string }; spend: string; orders: number }[];
   missingRates: string[];
 }
@@ -67,7 +93,17 @@ export type ReminderLevel = "bad" | "warn" | "info";
 
 /** GET /reminders */
 export interface Reminders {
-  items: { key: string; kind: "order" | "quote" | "deal" | "offer" | "money"; level: ReminderLevel; title: string; detail: string | null; due: string | null; href: string; action: string; who: string | null }[];
+  items: {
+    key: string;
+    kind: "order" | "quote" | "deal" | "offer" | "money";
+    level: ReminderLevel;
+    title: string;
+    detail: string | null;
+    due: string | null;
+    href: string;
+    action: string;
+    who: string | null;
+  }[];
   counts: { total: number; bad: number; hidden: number };
 }
 

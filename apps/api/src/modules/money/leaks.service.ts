@@ -1,17 +1,18 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
-import { formatMinor, fromMinor, fxRate, roundHalfAway, type Minor } from "@kebo/money";
+import { formatMinor, fromMinor, orderProfit, roundHalfAway, type Minor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import { addDays, ForbiddenError, type ISODate } from "@kebo/utils";
+import { addDays, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import { ReadCache } from "../../common/cache/read-cache";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { LimitsService } from "../../common/company/limits.service";
+import { convert, costingsOf, MainMoney } from "./order-money";
 
-const convert = (minor: Minor, rate: number) => roundHalfAway(minor / rate);
-const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 1000) / 10 : null);
+/** part ÷ whole in %, one decimal, half away from zero (−6.25 → −6.3). */
+const pct = (part: number, whole: number) => (whole > 0 ? roundHalfAway((part / whole) * 1000) / 10 : null);
 
 /** When a warning is raised. */
 const LIMITS = {
@@ -56,13 +57,17 @@ type LeakOrder = {
   refNo: string;
   status: string;
   currency: string;
+  mainCurrency: string | null;
+  mainRate: string | null;
   totalMinor: number;
   orderedOn: ISODate;
   customerId: string;
   customerName: string;
-  costMinor: number;
-  uncostedMinor: number;
   factoryPaidMinor: number;
+  /** Bank charges taken from the customer's payments (its currency). */
+  bankChargesMinor: number;
+  /** Of the order's expenses, freight, transport and customs: they pay for the planned costs to reach the basis. */
+  basisPaidMinor: number;
   firstFactoryPaid: ISODate | null;
   receivedMinor: number;
   orderCostsMinor: number;
@@ -94,19 +99,14 @@ export class LeaksService {
     const from = q.from ?? `${to.slice(0, 4)}-01-01`;
     const { sales } = await this.settings.get();
     const main = sales.currency;
-    const missing = new Set<string>();
-    const toMain = (minor: Minor, currency: string) => {
-      const r = fxRate(currency, main, main, sales.exchangeRates);
-      if (r === null) {
-        missing.add(currency);
-        return 0;
-      }
-      return convert(minor, r);
-    };
+    const fx = new MainMoney(main, sales.exchangeRates);
+    const toMain = (minor: Minor, currency: string) => fx.live(minor, currency);
+    const tz = this.clock.timeZone;
     const range = { gte: toDbDate(from), lte: toDbDate(to) };
     const inMain = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) => convert(decimalToMinor(e.amount), Number(e.rate));
     const show = (minor: Minor, currency: string = main) => formatMinor(minor, currency as typeof main);
-    const monthName = (m: string) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
+    const monthName = (m: string) =>
+      new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
 
     const [closedDeals, openDeals, orders, periodExpenses, people] = await Promise.all([
       // Deals decided in the period, with what was spent on them (all of it, and before any order: the
@@ -122,7 +122,7 @@ export class LeaksService {
         left join expenses e on e.inquiry_id = i.id and e.voided_at is null
         left join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v on e.id is not null
         where i.deleted_at is null and i.stage in ('won', 'lost')
-          and i.closed_at >= ${from}::timestamp and i.closed_at < ${addDays(to, 1)}::timestamp
+          and i.closed_at >= ${startOfDayIn(from, tz)} and i.closed_at < ${startOfDayIn(addDays(to, 1), tz)}
         group by i.id, c.id`,
       // Deals still open, with their latest quotation value and what was spent on them.
       this.prisma.db.inquiry.findMany({
@@ -133,25 +133,32 @@ export class LeaksService {
           title: true,
           customer: { select: { name: true } },
           expenses: { where: { voidedAt: null }, select: { amount: true, rate: true } },
-          quotation: { select: { revisions: { where: { deletedAt: null }, orderBy: { number: "desc" }, take: 1, select: { total: true, currency: true } } } },
+          quotation: {
+            select: {
+              revisions: { where: { deletedAt: null }, orderBy: { number: "desc" }, take: 1, select: { total: true, currency: true } },
+            },
+          },
         },
       }),
       // Orders placed in the period (planned against actual), and open ones (money stuck), each as one
-      // row of sums from the database: goods cost, what is not costed, paid to factories (in the order's
-      // currency at each payment's rate), received, the order's expenses and those on its deal before it.
+      // row of sums from the database: paid to factories (in the order's currency at each payment's rate),
+      // received, bank charges, the order's expenses and those on its deal before it. Their costing
+      // (goods, what is not costed, the costs to reach the basis) is read just after, as everywhere.
       this.prisma.db.$queryRaw<LeakOrder[]>`
-        select o.id, o.ref_no as "refNo", o.status::text as status, o.currency, (o.total * 100)::float8 as "totalMinor",
+        select o.id, o.ref_no as "refNo", o.status::text as status, o.currency, o.main_currency as "mainCurrency", o.main_rate::text as "mainRate",
+               (o.total * 100)::float8 as "totalMinor",
                to_char(o.ordered_on, 'YYYY-MM-DD') as "orderedOn", c.id as "customerId", c.name as "customerName",
-               coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from order_lines l
-                 cross join lateral (select (l.unit_cost * 100)::float8 * l.quantity::float8 as x) v
-                 where l.order_id = o.id and l.unit_cost is not null), 0)::float8 as "costMinor",
-               coalesce((select sum(l.line_total * 100) from order_lines l where l.order_id = o.id and l.unit_cost is null), 0)::float8 as "uncostedMinor",
                coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from factory_payments p
                  cross join lateral (select (p.amount * 100)::float8 / p.rate::float8 as x) v
                  where p.order_id = o.id and p.voided_at is null), 0)::float8 as "factoryPaidMinor",
                (select to_char(min(p.paid_on), 'YYYY-MM-DD') from factory_payments p where p.order_id = o.id and p.voided_at is null) as "firstFactoryPaid",
                coalesce((select sum((p.amount + p.bank_charges) * 100) from payments p
                  where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "receivedMinor",
+               coalesce((select sum(p.bank_charges * 100) from payments p
+                 where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "bankChargesMinor",
+               coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
+                 cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
+                 where e.order_id = o.id and e.voided_at is null and e.category in ('freight', 'inland_transport', 'customs')), 0)::float8 as "basisPaidMinor",
                coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
                  cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
                  where e.order_id = o.id and e.voided_at is null), 0)::float8 as "orderCostsMinor",
@@ -164,7 +171,17 @@ export class LeaksService {
       // Every expense in the period, and the 12 months before its end for the trend.
       this.prisma.db.expense.findMany({
         where: { voidedAt: null, spentOn: { gte: toDbDate(`${addDays(`${to.slice(0, 7)}-01`, -334).slice(0, 7)}-01`), lte: toDbDate(to) } },
-        select: { amount: true, rate: true, spentOn: true, customerId: true, inquiryId: true, orderId: true, factoryId: true, factory: { select: { id: true, name: true } }, customer: { select: { id: true, name: true } } },
+        select: {
+          amount: true,
+          rate: true,
+          spentOn: true,
+          customerId: true,
+          inquiryId: true,
+          orderId: true,
+          factoryId: true,
+          factory: { select: { id: true, name: true } },
+          customer: { select: { id: true, name: true } },
+        },
       }),
       this.prisma.db.user.findMany({ where: { isSystem: false }, select: { id: true, name: true } }),
     ]);
@@ -183,7 +200,15 @@ export class LeaksService {
       r.deals += 1;
       r.spent += spent;
       reasons.set(key, r);
-      return { id: d.id, refNo: d.refNo, title: d.title, customer: { id: d.customerId, name: d.customerName }, reason: d.lostReason, assignee: nameOf(d.assigneeId), spentMinor: spent };
+      return {
+        id: d.id,
+        refNo: d.refNo,
+        title: d.title,
+        customer: { id: d.customerId, name: d.customerName },
+        reason: d.lostReason,
+        assignee: nameOf(d.assigneeId),
+        spentMinor: spent,
+      };
     });
     const lostSpent = lostRows.reduce((t, r) => t + r.spentMinor, 0);
 
@@ -212,19 +237,39 @@ export class LeaksService {
 
     /* ----- profit planned against actual, for orders placed in the period */
     const placed = orders.filter((o) => inPeriodDay(o.orderedOn));
+    const costings = await costingsOf(
+      this.prisma.db,
+      placed.map((o) => ({ id: o.id, totalMinor: Math.round(o.totalMinor) })),
+    );
     const leakRows = placed
       .map((o) => {
-        const revenue = toMain(o.totalMinor, o.currency);
-        const uncosted = o.uncostedMinor;
-        const goods = toMain(o.costMinor, o.currency);
+        const c = costings.get(o.id)!;
+        const inMain = (minor: Minor) => fx.order(Math.round(minor), o);
+        const revenue = inMain(c.revenueMinor);
+        const costedRevenue = inMain(c.costedRevenueMinor);
+        const goods = inMain(c.goodsCostMinor);
+        const basis = inMain(c.basisCostMinor);
         // Paid to factories beyond the costs on the lines (extra work, a price that changed); counted only once paid in full or more.
-        const paidFactories = toMain(o.factoryPaidMinor, o.currency);
+        const paidFactories = inMain(o.factoryPaidMinor);
         // Rate rounding is not a cost: only more than half a percent (and more than 1.00) counts.
         const factoryExtra = paidFactories - goods > Math.max(100, goods * 0.005) ? paidFactories - goods : 0;
-        const orderCosts = o.orderCostsMinor;
+        // Planned: what the quotation promised on the revenue that has a cost (goods and the costs to reach the basis).
+        const planned = costedRevenue - goods - basis;
+        // After the sale: its expenses (freight paid for the planned costs is already in them), bank charges, costs before it.
+        const p = orderProfit({
+          revenueMinor: revenue,
+          costedRevenueMinor: costedRevenue,
+          goodsCostMinor: goods,
+          basisCostMinor: basis,
+          receivedMinor: 0,
+          factoryPaidMinor: 0,
+          expensesMinor: o.orderCostsMinor,
+          basisPaidMinor: o.basisPaidMinor,
+          bankChargesMinor: inMain(o.bankChargesMinor),
+        });
+        const orderCosts = p.expensesCountedMinor + inMain(o.bankChargesMinor);
         const beforeSale = o.beforeSaleMinor;
-        const planned = revenue - goods;
-        const actual = planned - orderCosts - beforeSale - factoryExtra;
+        const actual = p.earnedMinor - beforeSale - factoryExtra;
         return {
           id: o.id,
           refNo: o.refNo,
@@ -236,12 +281,18 @@ export class LeaksService {
           factoryExtraMinor: factoryExtra,
           actualMinor: actual,
           leakMinor: planned - actual,
-          uncosted: uncosted > 0,
+          uncosted: c.uncostedRevenueMinor > 0,
+          uncostedMinor: revenue - costedRevenue,
         };
       })
       .sort((a, b) => b.leakMinor - a.leakMinor || a.refNo.localeCompare(b.refNo));
     for (const r of leakRows) {
-      if (r.actualMinor < 0) warnings.push({ level: "bad", text: `Order ${r.refNo} (${r.customer.name}) is losing money: ${show(r.actualMinor)} after all costs.`, href: `/orders/${r.id}/money` });
+      if (r.actualMinor < 0)
+        warnings.push({
+          level: "bad",
+          text: `Order ${r.refNo} (${r.customer.name}) is losing money: ${show(r.actualMinor)} after all costs.`,
+          href: `/orders/${r.id}/money`,
+        });
       else if (r.plannedMinor > 0 && (r.leakMinor / r.plannedMinor) * 100 >= LIMITS.leakPercent)
         warnings.push({
           level: "warn",
@@ -267,10 +318,22 @@ export class LeaksService {
       cust(e.customer).spent += inMain(e);
     }
     const customerRows = [...customers.values()]
-      .map((c) => ({ customer: c.customer, sales: fromMinor(c.sales), profit: fromMinor(c.profit), spent: fromMinor(c.spent), net: fromMinor(c.profit - c.spent), netMinor: c.profit - c.spent, spentMinor: c.spent }))
+      .map((c) => ({
+        customer: c.customer,
+        sales: fromMinor(c.sales),
+        profit: fromMinor(c.profit),
+        spent: fromMinor(c.spent),
+        net: fromMinor(c.profit - c.spent),
+        netMinor: c.profit - c.spent,
+        spentMinor: c.spent,
+      }))
       .sort((a, b) => b.netMinor - a.netMinor || a.customer.name.localeCompare(b.customer.name));
     for (const c of customerRows.filter((x) => x.netMinor < 0 && Number(x.spent) > 0).slice(0, 5))
-      warnings.push({ level: "warn", text: `${c.customer.name} cost more than they earned us: net ${show(c.netMinor)} (spent ${show(c.spentMinor)}).`, href: `/customers/${c.customer.id}` });
+      warnings.push({
+        level: "warn",
+        text: `${c.customer.name} cost more than they earned us: net ${show(c.netMinor)} (spent ${show(c.spentMinor)}).`,
+        href: `/customers/${c.customer.id}`,
+      });
 
     /* ----- open deals: spending against the quotation */
     for (const d of openDeals) {
@@ -292,13 +355,27 @@ export class LeaksService {
         const received = o.receivedMinor;
         const paid = o.factoryPaidMinor;
         const first = o.firstFactoryPaid;
-        const days = first ? Math.round((new Date(`${today}T00:00:00Z`).getTime() - new Date(`${first}T00:00:00Z`).getTime()) / 86_400_000) : 0;
-        return { id: o.id, refNo: o.refNo, customer: { id: o.customerId, name: o.customerName }, currency: o.currency, stuckMinor: paid - received, days, mainMinor: toMain(paid - received, o.currency) };
+        const days = first
+          ? Math.round((new Date(`${today}T00:00:00Z`).getTime() - new Date(`${first}T00:00:00Z`).getTime()) / 86_400_000)
+          : 0;
+        return {
+          id: o.id,
+          refNo: o.refNo,
+          customer: { id: o.customerId, name: o.customerName },
+          currency: o.currency,
+          stuckMinor: paid - received,
+          days,
+          mainMinor: fx.order(Math.round(paid - received), o),
+        };
       })
       .filter((x) => x.stuckMinor > 0)
       .sort((a, b) => b.mainMinor - a.mainMinor || a.refNo.localeCompare(b.refNo));
     for (const s of stuck.filter((x) => x.days >= LIMITS.stuckDays))
-      warnings.push({ level: "warn", text: `${s.refNo}: ${show(s.stuckMinor, s.currency)} paid to the factory ${s.days} days ago is not back from ${s.customer.name} yet.`, href: `/orders/${s.id}/money` });
+      warnings.push({
+        level: "warn",
+        text: `${s.refNo}: ${show(s.stuckMinor, s.currency)} paid to the factory ${s.days} days ago is not back from ${s.customer.name} yet.`,
+        href: `/orders/${s.id}/money`,
+      });
 
     /* ----- expenses against sales, month by month (12 months to the end of the period) */
     const months: string[] = [];
@@ -309,10 +386,12 @@ export class LeaksService {
     }
     const monthOrders = await this.prisma.db.order.findMany({
       where: { status: { not: "cancelled" }, orderedOn: { gte: toDbDate(`${months[0]}-01`), lte: toDbDate(to) } },
-      select: { total: true, currency: true, orderedOn: true },
+      select: { total: true, currency: true, mainCurrency: true, mainRate: true, orderedOn: true },
     });
     const trend = months.map((m) => {
-      const salesM = monthOrders.filter((o) => fromDbDate(o.orderedOn).startsWith(m)).reduce((t, o) => t + toMain(decimalToMinor(o.total), o.currency), 0);
+      const salesM = monthOrders
+        .filter((o) => fromDbDate(o.orderedOn).startsWith(m))
+        .reduce((t, o) => t + fx.order(decimalToMinor(o.total), o), 0);
       const exp = periodExpenses.filter((e) => fromDbDate(e.spentOn).startsWith(m)).reduce((t, e) => t + inMain(e), 0);
       return { month: m, sales: fromMinor(salesM), expenses: fromMinor(exp), percent: pct(exp, salesM), expMinor: exp };
     });
@@ -320,7 +399,11 @@ export class LeaksService {
     const avg = earlier.length ? earlier.reduce((t, x) => t + x.expMinor, 0) / earlier.length : 0;
     const last = trend[trend.length - 1]!;
     if (avg > 0 && last.expMinor > avg * LIMITS.expenseJump)
-      warnings.push({ level: "warn", text: `Expenses in ${monthName(last.month)} (${show(last.expMinor)}) are ${Math.round((last.expMinor / avg) * 100 - 100)}% above the monthly average.`, href: "/money?tab=expenses" });
+      warnings.push({
+        level: "warn",
+        text: `Expenses in ${monthName(last.month)} (${show(last.expMinor)}) are ${Math.round((last.expMinor / avg) * 100 - 100)}% above the monthly average.`,
+        href: "/money?tab=expenses",
+      });
 
     /* ----- factories: what visits and costs there came to */
     const factories = new Map<string, { factory: { id: string; name: string }; spent: number; count: number }>();
@@ -339,7 +422,11 @@ export class LeaksService {
       (await this.prisma.db.expense.count({ where: { accountId: null, voidedAt: null, spentOn: range } }));
     const hasAccounts = (await this.prisma.db.moneyAccount.count()) > 0;
     if (cashBook && hasAccounts && unassigned > 0)
-      warnings.push({ level: "warn", text: `${unassigned} amount${unassigned === 1 ? " is" : "s are"} not on an account, so the cash book cannot match the bank.`, href: "/money?tab=cash&acct=none" });
+      warnings.push({
+        level: "warn",
+        text: `${unassigned} amount${unassigned === 1 ? " is" : "s are"} not on an account, so the cash book cannot match the bank.`,
+        href: "/money?tab=cash&acct=none",
+      });
 
     const planned = leakRows.reduce((t, r) => t + r.plannedMinor, 0);
     const actual = leakRows.reduce((t, r) => t + r.actualMinor, 0);
@@ -356,9 +443,16 @@ export class LeaksService {
         leaked: fromMinor(planned - actual),
         keptPercent: planned > 0 ? Math.round((actual / planned) * 100) : null,
         stuck: fromMinor(stuck.reduce((t, s) => t + s.mainMinor, 0)),
+        /** Value of the period's orders on lines without a cost: left out of planned and actual profit. */
+        uncostedRevenue: fromMinor(leakRows.reduce((t, r) => t + r.uncostedMinor, 0)),
       },
       lostReasons: [...reasons.entries()]
-        .map(([reason, r]) => ({ reason: reason as LostReason | "not_said", label: reason === "not_said" ? "No reason given" : LOST_REASON_LABEL[reason as LostReason], deals: r.deals, spent: fromMinor(r.spent) }))
+        .map(([reason, r]) => ({
+          reason: reason as LostReason | "not_said",
+          label: reason === "not_said" ? "No reason given" : LOST_REASON_LABEL[reason as LostReason],
+          deals: r.deals,
+          spent: fromMinor(r.spent),
+        }))
         .sort((a, b) => b.deals - a.deals),
       lostDeals: lostRows
         .sort((a, b) => b.spentMinor - a.spentMinor || b.refNo.localeCompare(a.refNo))
@@ -378,19 +472,47 @@ export class LeaksService {
         actual: fromMinor(r.actualMinor),
         leaked: fromMinor(r.leakMinor),
         uncosted: r.uncosted,
+        /** Its value on lines without a cost: left out of planned and actual profit. */
+        uncostedRevenue: fromMinor(r.uncostedMinor),
       })),
       customers: {
-        best: customerRows.filter((c) => c.netMinor > 0).slice(0, 5).map(({ netMinor: _n, spentMinor: _s, ...c }) => c),
-        costing: customerRows.filter((c) => c.netMinor < 0).reverse().slice(0, 5).map(({ netMinor: _n, spentMinor: _s, ...c }) => c),
+        best: customerRows
+          .filter((c) => c.netMinor > 0)
+          .slice(0, 5)
+          .map(({ netMinor: _n, spentMinor: _s, ...c }) => c),
+        costing: customerRows
+          .filter((c) => c.netMinor < 0)
+          .reverse()
+          .slice(0, 5)
+          .map(({ netMinor: _n, spentMinor: _s, ...c }) => c),
       },
       // Months before anything happened are left out (at least the last three stay).
       trend: trend
-        .slice(Math.min(Math.max(trend.findIndex((t) => t.expMinor > 0 || Number(t.sales) > 0), 0), trend.length - 3))
+        .slice(
+          Math.min(
+            Math.max(
+              trend.findIndex((t) => t.expMinor > 0 || Number(t.sales) > 0),
+              0,
+            ),
+            trend.length - 3,
+          ),
+        )
         .map(({ expMinor: _e, ...t }) => t),
-      stuck: stuck.slice(0, 10).map((s) => ({ id: s.id, refNo: s.refNo, customer: s.customer, currency: s.currency, amount: fromMinor(s.stuckMinor), days: s.days })),
-      factories: [...factories.values()].sort((a, b) => b.spent - a.spent).map((f) => ({ factory: f.factory, spent: fromMinor(f.spent), count: f.count })),
+      stuck: stuck
+        .slice(0, 10)
+        .map((s) => ({
+          id: s.id,
+          refNo: s.refNo,
+          customer: s.customer,
+          currency: s.currency,
+          amount: fromMinor(s.stuckMinor),
+          days: s.days,
+        })),
+      factories: [...factories.values()]
+        .sort((a, b) => b.spent - a.spent)
+        .map((f) => ({ factory: f.factory, spent: fromMinor(f.spent), count: f.count })),
       warnings: warnings.sort((a, b) => (a.level === b.level ? 0 : a.level === "bad" ? -1 : 1)),
-      missingRates: [...missing],
+      missingRates: fx.missingRates,
     };
   }
 }

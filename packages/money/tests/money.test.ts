@@ -22,7 +22,11 @@ import {
   toMinor,
   withTaxMinor,
   orderProfit,
+  orderCosting,
   payInstalments,
+  multiplyMinor,
+  percentOfMinor,
+  exactDecimal,
 } from "../src";
 
 describe("minor units", () => {
@@ -116,6 +120,25 @@ describe("costing", () => {
     expect(withTaxMinor(100_00, 13)).toBe(113_00);
     expect(withTaxMinor(100_00, 0)).toBe(100_00);
     expect(withTaxMinor(1_15, 13)).toBe(1_30); // 1.2995 → 1.30
+    expect(withTaxMinor(100_50, 13)).toBe(113_57); // 113.565 exactly → 113.57 (floating point gives 113.5649…)
+    expect(withTaxMinor(100_50, "13.00")).toBe(113_57);
+    expect(withTaxMinor(10_00, 12.5)).toBe(11_25);
+    expect(withTaxMinor(1_01, 0.5)).toBe(1_02); // 1.01505
+    expect(withTaxMinor(-100_50, 13)).toBe(-113_57);
+  });
+
+  it("multiplies money by quantities and percentages exactly", () => {
+    expect(multiplyMinor(19_85, 4.1)).toBe(81_39); // 81.385 exactly → 81.39 (floating point gives 81.3849…)
+    expect(multiplyMinor(19_85, "4.10")).toBe(81_39);
+    expect(multiplyMinor(-19_85, 4.1)).toBe(-81_39);
+    expect(multiplyMinor(1_00, 0)).toBe(0);
+    expect(multiplyMinor(33_33, "2.5")).toBe(83_33); // 83.325 → 83.33
+    expect(multiplyMinor(999_999_999_999, 1)).toBe(999_999_999_999);
+    expect(multiplyMinor(1_00, "abc")).toBe(0);
+    expect(percentOfMinor(1_000_001, 30)).toBe(300_000); // 300,000.3
+    expect(percentOfMinor(10_05, 50)).toBe(5_03); // 502.5 → 503
+    expect(exactDecimal("1.50e2")).toEqual({ n: 150n, scale: 0 });
+    expect(exactDecimal(0.1)).toEqual({ n: 1n, scale: 1 });
   });
 
   it("works margins both ways on the selling price", () => {
@@ -127,7 +150,11 @@ describe("costing", () => {
 
   it("takes the document discount off the costing box", () => {
     // 10 × 10.00 at cost 8.00 with a 5.00 discount: sales 95.00, profit 15.00 → 15.8%
-    expect(costSummary([{ quantity: 10, unitPriceMinor: 10_00, unitCostMinor: 8_00 }], 5_00)).toMatchObject({ salesMinor: 95_00, profitMinor: 15_00, marginPercent: 15.8 });
+    expect(costSummary([{ quantity: 10, unitPriceMinor: 10_00, unitCostMinor: 8_00 }], 5_00)).toMatchObject({
+      salesMinor: 95_00,
+      profitMinor: 15_00,
+      marginPercent: 15.8,
+    });
   });
 
   it("sums the costing box and counts uncosted lines apart", () => {
@@ -151,8 +178,18 @@ describe("deposit and settlement", () => {
     const due = 10_000_00;
     expect(settle(due, [], 30).status).toBe("unpaid");
     expect(settle(due, [{ amountMinor: 1_000_00 }], 30)).toMatchObject({ status: "partly_paid", depositOutstandingMinor: 2_000_00 });
-    expect(settle(due, [{ amountMinor: 2_975_00, bankChargesMinor: 25_00 }], 30)).toMatchObject({ status: "deposit_paid", outstandingMinor: 7_000_00 });
-    const done = settle(due, [{ amountMinor: 2_975_00, bankChargesMinor: 25_00 }, { amountMinor: 6_980_00, bankChargesMinor: 20_00 }], 30);
+    expect(settle(due, [{ amountMinor: 2_975_00, bankChargesMinor: 25_00 }], 30)).toMatchObject({
+      status: "deposit_paid",
+      outstandingMinor: 7_000_00,
+    });
+    const done = settle(
+      due,
+      [
+        { amountMinor: 2_975_00, bankChargesMinor: 25_00 },
+        { amountMinor: 6_980_00, bankChargesMinor: 20_00 },
+      ],
+      30,
+    );
     expect(done).toMatchObject({ status: "paid", outstandingMinor: 0, receivedMinor: 9_955_00, bankChargesMinor: 45_00 });
   });
 
@@ -176,7 +213,9 @@ describe("profit", () => {
   const b = {
     id: "b",
     discountMinor: 0,
-    lines: [{ docId: "b", lineTotalMinor: 5_000_00, quantity: 1, unitCostMinor: 4_900_00, keys: { customer: "Gulf Foods", factory: "Wenzhou" } }],
+    lines: [
+      { docId: "b", lineTotalMinor: 5_000_00, quantity: 1, unitCostMinor: 4_900_00, keys: { customer: "Gulf Foods", factory: "Wenzhou" } },
+    ],
   };
 
   it("spreads the discount and keeps uncosted revenue apart", () => {
@@ -192,6 +231,11 @@ describe("profit", () => {
     });
   });
 
+  it("counts costs that are not lines (freight to reach our basis) against the costed revenue", () => {
+    const t = profitTotals(costDocLines({ ...b, extraCostMinor: 50_00 }));
+    expect(t).toMatchObject({ revenueMinor: 5_000_00, costMinor: 4_950_00, profitMinor: 50_00, uncostedRevenueMinor: 0 });
+  });
+
   it("groups by any key", () => {
     const lines = [...costDocLines(a), ...costDocLines(b)];
     expect(profitBy(lines, "customer").map((g) => [g.key, g.profitMinor])).toEqual([
@@ -203,9 +247,66 @@ describe("profit", () => {
 });
 
 describe("order profit", () => {
-  it("earned: worth less goods cost and expenses; cash: in less out", () => {
-    const p = orderProfit({ revenueMinor: 10_000_00, goodsCostMinor: 7_000_00, uncostedRevenueMinor: 1_000_00, receivedMinor: 3_000_00, factoryPaidMinor: 2_000_00, expensesMinor: 500_00 });
-    expect(p).toEqual({ earnedMinor: 2_500_00, cashMinor: 500_00, marginPercent: 25, coveragePercent: 90 });
+  it("earned: costed revenue less goods cost and expenses (uncosted revenue apart); cash: in less out", () => {
+    const p = orderProfit({
+      revenueMinor: 10_000_00,
+      costedRevenueMinor: 9_000_00,
+      goodsCostMinor: 7_000_00,
+      receivedMinor: 3_000_00,
+      factoryPaidMinor: 2_000_00,
+      expensesMinor: 500_00,
+    });
+    // 9,000 − 7,000 − 500: the 1,000 without a cost is never profit.
+    expect(p).toMatchObject({
+      earnedMinor: 1_500_00,
+      cashMinor: 500_00,
+      marginPercent: 16.7,
+      coveragePercent: 90,
+      uncostedRevenueMinor: 1_000_00,
+    });
+  });
+
+  it("counts the costs to reach our basis and bank charges, without counting freight paid for them twice", () => {
+    // Sold at 14,500 (14,000 goods + 500 courier with no cost); goods 10,000; 3,000 planned to reach CFR.
+    const c = orderCosting(
+      [
+        { lineTotalMinor: 14_000_00, quantity: 1, unitCostMinor: 10_000_00 },
+        { lineTotalMinor: 500_00, quantity: 1, unitCostMinor: null },
+      ],
+      14_500_00,
+      3_000_00,
+    );
+    expect(c).toEqual({
+      revenueMinor: 14_500_00,
+      costedRevenueMinor: 14_000_00,
+      uncostedRevenueMinor: 500_00,
+      goodsCostMinor: 10_000_00,
+      basisCostMinor: 3_000_00,
+    });
+    const base = { ...c, receivedMinor: 0, factoryPaidMinor: 0 };
+    expect(orderProfit({ ...base, expensesMinor: 0 })).toMatchObject({ earnedMinor: 1_000_00, marginPercent: 7.1 });
+    // Freight of 2,800 paid later is part of the 3,000 planned; a 200 inspection is extra.
+    expect(orderProfit({ ...base, expensesMinor: 3_000_00, basisPaidMinor: 2_800_00 })).toMatchObject({
+      earnedMinor: 800_00,
+      coveredMinor: 2_800_00,
+    });
+    // Freight beyond the plan is a cost too; bank charges are a cost.
+    expect(orderProfit({ ...base, expensesMinor: 3_500_00, basisPaidMinor: 3_500_00, bankChargesMinor: 20_00 })).toMatchObject({
+      earnedMinor: 480_00,
+    });
+  });
+
+  it("rounds negative margins away from zero", () => {
+    const p = orderProfit({
+      revenueMinor: 80_00,
+      costedRevenueMinor: 80_00,
+      goodsCostMinor: 85_00,
+      receivedMinor: 0,
+      factoryPaidMinor: 0,
+      expensesMinor: 0,
+    });
+    // −5 / 80 = −6.25% → −6.3 (Math.round would give −6.2).
+    expect(p.marginPercent).toBe(-6.3);
   });
 
   it("pays instalments in order", () => {
@@ -225,7 +326,15 @@ describe("costs that are not lines", () => {
     expect(costSummary(lines, 0, 20000)).toMatchObject({ costMinor: 130000, salesMinor: 132000, profitMinor: 2000, extraCostMinor: 20000 });
     // 100,000 and 10,000 of cost: freight 22,000 splits 20,000 / 2,000 → per unit +20,000 and +200.
     expect(landedUnitCosts(lines, 22000)).toEqual([120000, 1200]);
-    expect(landedUnitCosts([{ unitCostMinor: null, quantity: 1 }, { unitCostMinor: 500, quantity: 2 }], 100)).toEqual([null, 550]);
+    expect(
+      landedUnitCosts(
+        [
+          { unitCostMinor: null, quantity: 1 },
+          { unitCostMinor: 500, quantity: 2 },
+        ],
+        100,
+      ),
+    ).toEqual([null, 550]);
     expect(landedUnitCosts(lines, 0)).toEqual([100000, 1000]);
   });
 });

@@ -24,6 +24,35 @@ export function todayIn(timeZone: string, now: Date = new Date()): ISODate {
 /** The calendar date of a moment in a time zone. */
 export const dateIn = (moment: Date, timeZone: string): ISODate => todayIn(timeZone, moment);
 
+/** How far a time zone's clocks are ahead of UTC at a moment, in ms (Asia/Shanghai: +8 h). */
+function zoneOffsetMs(moment: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(moment);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const wall = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return wall - Math.floor(moment.getTime() / 1000) * 1000;
+}
+
+/**
+ * The moment a calendar day starts in a time zone: startOfDayIn("2026-11-01",
+ * "Asia/Shanghai") → 2026-10-31T16:00:00Z. For "from this day to that day"
+ * limits on timestamps, so a deal at 05:00 on the 1st in Shanghai is in November.
+ */
+export function startOfDayIn(date: ISODate, timeZone: string): Date {
+  const utc = Date.parse(`${date}T00:00:00Z`);
+  const first = utc - zoneOffsetMs(new Date(utc), timeZone);
+  // Again at the moment found, in case the offset differs there (summer time).
+  return new Date(utc - zoneOffsetMs(new Date(first), timeZone));
+}
+
 export function addDays(date: ISODate, days: number): ISODate {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
@@ -39,14 +68,21 @@ export function formatDate(value: ISODate | Date | null | undefined, timeZone = 
   if (!value) return "—";
   const isDay = typeof value === "string" && value.length === 10;
   const d = typeof value === "string" ? new Date(isDay ? `${value}T00:00:00Z` : value) : value;
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: isDay ? "UTC" : timeZone }).format(d);
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: isDay ? "UTC" : timeZone }).format(
+    d,
+  );
 }
 
 export function formatDateTime(value: Date | string | null | undefined, timeZone: string): string {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone }).format(
-    new Date(value),
-  );
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(value));
 }
 
 /** "3d 4h", "2h 5m", "45m". */

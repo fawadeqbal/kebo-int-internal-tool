@@ -8,13 +8,23 @@ import type { ProfitAndLoss } from "@/lib/types-money";
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
 const monthName = (ym: string) => MONTH.format(new Date(`${ym}-01T00:00:00Z`));
-
+/** Goods and the costs to reach the price basis (freight…); the order's costs and bank charges. */
+const goodsOf = (e: { goodsCost: string; basisCost: string }) => String(Number(e.goodsCost) + Number(e.basisCost));
+const orderCostsOf = (e: { orderExpenses: string; bankCharges: string }) => String(Number(e.orderExpenses) + Number(e.bankCharges));
 
 /**
  * The company's profit & loss for a year, month by month: earned (orders in
  * the month they shipped) or cash (money as it moved). Insights → Profit.
  */
-export async function ProfitTable({ year: asked, cash, href }: { year?: string; cash: boolean; href: (change: Record<string, string | undefined>) => string }) {
+export async function ProfitTable({
+  year: asked,
+  cash,
+  href,
+}: {
+  year?: string;
+  cash: boolean;
+  href: (change: Record<string, string | undefined>) => string;
+}) {
   const today = todayIn(TZ);
   const thisYear = Number(today.slice(0, 4));
   const year = Number(asked) >= 2020 && Number(asked) <= thisYear ? Number(asked) : thisYear;
@@ -45,7 +55,7 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
         <p className="text-xs text-muted">
           {cash
             ? "Cash: money in from customers less what we paid factories and all expenses, in the month it moved."
-            : "Earned: each order counts in the month it shipped — its value less its goods and expenses — less the company's own expenses that month."}
+            : "Earned: each order counts in the month it shipped — its value with a cost, less its goods, freight, expenses and bank charges — less the company's own expenses that month."}
         </p>
       </div>
       {pnl.missingRates.length > 0 && (
@@ -65,10 +75,7 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
           : [
               ["Orders shipped", null, t.earned.orders],
               ["Value", t.earned.revenue],
-              [
-                "Costs and expenses",
-                String(Number(t.earned.goodsCost) + Number(t.earned.orderExpenses) + Number(t.earned.generalExpenses)),
-              ],
+              ["Costs and expenses", String(Number(goodsOf(t.earned)) + Number(orderCostsOf(t.earned)) + Number(t.earned.generalExpenses))],
               ["Profit", t.earned.profit],
             ]
         ).map(([label, value, count]) => (
@@ -100,8 +107,8 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
                 <Th>Month</Th>
                 <Th className="text-right">Orders</Th>
                 <Th className="text-right">Value</Th>
-                <Th className="text-right">Goods</Th>
-                <Th className="text-right">Order expenses</Th>
+                <Th className="text-right">Goods and freight</Th>
+                <Th className="text-right">Order costs</Th>
                 <Th className="text-right">Company expenses</Th>
                 <Th className="text-right">Profit</Th>
                 <Th className="hidden w-40 md:table-cell">
@@ -126,8 +133,8 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
                     <>
                       <Td className="text-right tabular">{m.earned.orders || <span className="text-muted">0</span>}</Td>
                       <Td className="text-right tabular">{money(m.earned.revenue, c)}</Td>
-                      <Td className="text-right tabular">{money(m.earned.goodsCost, c)}</Td>
-                      <Td className="text-right tabular">{money(m.earned.orderExpenses, c)}</Td>
+                      <Td className="text-right tabular">{money(goodsOf(m.earned), c)}</Td>
+                      <Td className="text-right tabular">{money(orderCostsOf(m.earned), c)}</Td>
                       <Td className="text-right tabular">{money(m.earned.generalExpenses, c)}</Td>
                     </>
                   )}
@@ -158,8 +165,8 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
                 <>
                   <Td className="text-right tabular">{t.earned.orders}</Td>
                   <Td className="text-right tabular">{money(t.earned.revenue, c)}</Td>
-                  <Td className="text-right tabular">{money(t.earned.goodsCost, c)}</Td>
-                  <Td className="text-right tabular">{money(t.earned.orderExpenses, c)}</Td>
+                  <Td className="text-right tabular">{money(goodsOf(t.earned), c)}</Td>
+                  <Td className="text-right tabular">{money(orderCostsOf(t.earned), c)}</Td>
                   <Td className="text-right tabular">{money(t.earned.generalExpenses, c)}</Td>
                   <Td className={cn("text-right tabular", Number(t.earned.profit) < 0 && "text-bad")}>{money(t.earned.profit, c)}</Td>
                 </>
@@ -171,17 +178,14 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
       </Card>
       {!cash && Number(t.earned.uncostedRevenue) > 0 && (
         <p className="text-xs text-warn">
-          {money(t.earned.uncostedRevenue, c)} of the value has no factory cost recorded (freight or hand-priced lines), so profit may be
-          too high by that much at most.
+          Not costed: {money(t.earned.uncostedRevenue, c)} of the value has no cost recorded (freight or hand-priced lines). It is left out
+          of profit until its cost is added.
         </p>
       )}
 
       {!cash && (
         <Card>
-          <CardHeader
-            title={`Orders shipped in ${year}`}
-            description="Most profit first. Other expenses are not shared out over orders."
-          />
+          <CardHeader title={`Orders shipped in ${year}`} description="Most profit first. Other expenses are not shared out over orders." />
           {pnl.orders.length === 0 ? (
             <CardBody>
               <p className="text-sm text-muted">No order shipped in {year} yet.</p>
@@ -193,8 +197,8 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
                   <Th>Order</Th>
                   <Th>Shipped</Th>
                   <Th className="text-right">Value</Th>
-                  <Th className="text-right">Goods</Th>
-                  <Th className="text-right">Expenses</Th>
+                  <Th className="text-right">Goods and freight</Th>
+                  <Th className="text-right">Costs</Th>
                   <Th className="text-right">Profit</Th>
                 </tr>
               </THead>
@@ -208,8 +212,13 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
                       <span className="block max-w-60 truncate text-xs text-muted">{o.customer}</span>
                     </Td>
                     <Td className="text-sm">{monthName(o.month)}</Td>
-                    <Td className="text-right tabular">{money(o.revenue, c)}</Td>
-                    <Td className="text-right tabular">{money(o.goodsCost, c)}</Td>
+                    <Td className="text-right tabular">
+                      {money(o.revenue, c)}
+                      {Number(o.uncostedRevenue) > 0 && (
+                        <span className="block text-xs text-warn">{money(o.uncostedRevenue, c)} not costed</span>
+                      )}
+                    </Td>
+                    <Td className="text-right tabular">{money(goodsOf(o), c)}</Td>
                     <Td className="text-right tabular">{money(o.expenses, c)}</Td>
                     <Td className={cn("text-right font-semibold tabular", Number(o.profit) < 0 && "text-bad")}>{money(o.profit, c)}</Td>
                   </Tr>
@@ -222,4 +231,3 @@ export async function ProfitTable({ year: asked, cash, href }: { year?: string; 
     </div>
   );
 }
-
