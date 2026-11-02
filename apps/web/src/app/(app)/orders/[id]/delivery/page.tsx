@@ -8,6 +8,7 @@ import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/
 import { addClaimAction, deliveryAction, satAction, updateClaimAction } from "../../flow-actions";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
+import { StepPapers } from "../papers";
 
 export const metadata = { title: "Order · delivery and SAT" };
 
@@ -58,6 +59,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               { label: "Open claims", value: String(dv.claims.filter((c) => c.status === "open" || c.status === "with_factory").length) },
             ]}
           />
+          <StepPapers id={o.id} dealId={o.inquiry.id} step="delivery" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>

@@ -6,7 +6,7 @@ import { ActionForm } from "@/components/common/action-form";
 import { api } from "@/lib/api";
 import { FileActions } from "@/components/common/file-actions";
 import { BankChainPanel, PaperSetPanel } from "@/components/orders/flow-panels";
-import { PAYMENT_ROUTE_LABEL, PAYMENT_ROUTE_SHORT, type OrderDocumentKind } from "@kebo/shared";
+import { DOCUMENT_PAPER, PAYMENT_ROUTE_LABEL, PAYMENT_ROUTE_SHORT, type OrderDocumentKind } from "@kebo/shared";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
 import { addDocumentAction, bankStepAction, clearBankStepAction, removeDocumentAction, updateDocumentAction } from "../../flow-actions";
@@ -18,6 +18,7 @@ import { describeFileAction } from "../../../inquiries/actions";
 import { issueProformaAction, orderRemoveFileAction } from "../../actions";
 import { docHref } from "../shared";
 import { stepData } from "../step-data";
+import { StepPapers } from "../papers";
 
 export const metadata = { title: "Order · documents and bank" };
 
@@ -58,6 +59,12 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
       if (!doc.required) continue;
       const key = `doc:${doc.kind}`;
       if (tools[key]) continue;
+      // Papers the app makes open their Make page.
+      const made = DOCUMENT_PAPER[doc.kind as OrderDocumentKind];
+      if (made && (!doc.id || doc.paperId)) {
+        tools[key] = { kind: "link", label: doc.status === "ready" ? "View" : "Make", href: `${d.base}/papers/${made}` };
+        continue;
+      }
       if (doc.id)
         tools[key] = {
           kind: "document",
@@ -131,6 +138,14 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
         people={d.people}
         tools={tools}
         listHref={d.listHref}
+      />
+      <StepPapers
+        id={o.id}
+        dealId={o.inquiry.id}
+        step="documents"
+        variant="main"
+        title="Papers"
+        description="Made by the app, uploaded, or kept elsewhere: all three count as done."
       />
       {papers && (
         <Card>

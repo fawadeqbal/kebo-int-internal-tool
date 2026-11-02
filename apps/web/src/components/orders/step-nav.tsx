@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
-import type { StepState } from "@kebo/shared";
+import { isPaperKind, PAPER_STEP, STEP_PATH, type StepState } from "@kebo/shared";
 import { cn } from "@kebo/ui";
 
 export interface StepNavStep {
@@ -52,7 +52,10 @@ const SR: Record<StepState, string> = { done: "done", now: "now", late: "late", 
  * opens the same links.
  */
 export function StepNav({ base, steps }: { base: string; steps: StepNavStep[] }) {
-  const path = usePathname();
+  const at = usePathname();
+  // A paper's Make page (/orders/:id/papers/:kind) belongs to the paper's step.
+  const paper = at.slice(base.length).match(/^\/papers\/([a-z-]+)/)?.[1];
+  const path = paper && isPaperKind(paper) ? `${base}/${STEP_PATH[PAPER_STEP[paper]]}` : at;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const links = [{ href: base, label: "Overview" }, ...steps, { href: `${base}/history`, label: "History" }];

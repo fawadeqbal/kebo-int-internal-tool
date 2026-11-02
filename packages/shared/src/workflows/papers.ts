@@ -367,6 +367,9 @@ export const PAPER_FIX_LABEL: Record<PaperFixField, { label: string; type: "text
 
 /* ---------------------------------------------------------------- text inside sentences */
 
+/** "Vessel and ports" → "vessel and ports" inside a sentence; "B/L number" and "HS codes" stay as they are. */
+export const inSentence = (label: string) => (/^[A-Z][a-z]/.test(label) ? label.charAt(0).toLowerCase() + label.slice(1) : label);
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** "20 Jan 2027", for dates inside a sentence on a paper. */

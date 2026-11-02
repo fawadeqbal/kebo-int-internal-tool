@@ -8,6 +8,7 @@ import {
   DOCUMENT_PAPER,
   documentDone,
   FACTORY_PRICE_PAPERS,
+  inSentence,
   LIVE_PAPERS,
   ORDER_DOCUMENT_LABEL,
   orderDetailsInput,
@@ -547,7 +548,7 @@ export class PapersService {
           ref: r.ref,
         });
         const ready = built.checks.every((x) => x.ok || !x.required);
-        const needs = built.checks.filter((x) => x.required && !x.ok).map((x) => x.label.toLowerCase());
+        const needs = built.checks.filter((x) => x.required && !x.ok).map((x) => inSentence(x.label));
         const recorded = docKind ? o.documents.find((d) => d.kind === docKind && !d.paperId && documentDone(d.status)) : undefined;
         const state: PaperState = latest ? this.stateOf(latest, ready) : recorded ? docState(recorded) : this.stateOf(null, ready);
         out.push(
@@ -722,8 +723,7 @@ export class PapersService {
       const options = this.optionsOf(kind, o, asOptions(row.options), input.options ?? null);
       const { doc, checks } = this.build(kind, await this.ctx(user, o, kind, options, row.ref));
       const missing = checks.filter((x) => x.required && !x.ok);
-      if (missing.length)
-        throw new DomainError(`Still needed before it is final: ${missing.map((x) => x.label.toLowerCase()).join(", ")}.`);
+      if (missing.length) throw new DomainError(`Still needed before it is final: ${missing.map((x) => inSentence(x.label)).join(", ")}.`);
       const now = new Date();
       const snapshot = { ...doc, number: row.number } as unknown as Prisma.InputJsonValue;
       await tx.orderPaper.update({ where: { id: row.id }, data: { status: "final", options, snapshot, finalAt: now } });

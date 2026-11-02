@@ -14,6 +14,7 @@ import { readyDateAction } from "../../checklist-actions";
 import { GoodsExcel, GoodsReceipt } from "../goods";
 import { goodsOf } from "../shared";
 import { stepData } from "../step-data";
+import { StepPapers } from "../papers";
 
 export const metadata = { title: "Order · production" };
 
@@ -84,6 +85,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               { label: "Goods in", value: goods.length ? `${o.goods.received} of ${o.goods.lines}` : "No goods lines" },
             ]}
           />
+          <StepPapers id={o.id} dealId={o.inquiry.id} step="production" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>

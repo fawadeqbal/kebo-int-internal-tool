@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Check, Lock, Minus, MoreHorizontal, Paperclip, Plus, Upload } from "lucide-react";
 import { TOOL_LABEL, type FlowStep, type OrderDocumentKind, type PaymentRoute } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
@@ -73,7 +73,7 @@ function sourceOf(key: string) {
 }
 
 /** Sends a file to the deal's files and answers its id (server actions cap bodies at 1 MB, so files go through a route). */
-async function uploadToDeal(dealId: string, file: File, note: string): Promise<{ id?: string; error?: string }> {
+export async function uploadToDeal(dealId: string, file: File, note: string): Promise<{ id?: string; error?: string }> {
   const body = new FormData();
   body.set("file", file, file.name);
   body.set("kind", "other");
@@ -442,10 +442,19 @@ function Row({
   const close = () => setOpen(null);
   const target = item.auto ? item.key! : item.id!;
   const closed = item.done || item.skipped;
+  // Make and Send items open the paper's Make page (/orders/:id/papers/:kind).
+  const orderBase = usePathname().split("/").slice(0, 3).join("/");
+  const makes = (item.tool === "make" || item.tool === "send") && !!item.paper;
 
   // The row's own button: Mark done, Fill in, Upload, Pay; an automatic item's form.
   let buttons: ReactNode = null;
-  if (canEdit && !item.auto && !closed && open !== "tool") {
+  if (!item.auto && makes && open !== "tool")
+    buttons = (
+      <Link href={`${orderBase}/papers/${item.paper}`} className={buttonClass(closed ? "ghost" : now ? "primary" : "secondary", "xs")}>
+        {closed ? "View" : item.tool === "send" ? "Make and send" : "Make"}
+      </Link>
+    );
+  else if (canEdit && !item.auto && !closed && open !== "tool") {
     const primary = now ? "primary" : "secondary";
     if (item.tool === "fill" || item.tool === "upload")
       buttons = (

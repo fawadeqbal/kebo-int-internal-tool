@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PAPER_FIX_FIELDS, PAPER_KINDS, PAPER_OPTIONS } from "../workflows/papers";
+import { PAPER_FIX_FIELDS, PAPER_KINDS, type PAPER_OPTIONS } from "../workflows/papers";
 import { optionalId } from "./common";
 
 /** Inputs for the papers the app makes (see workflows/papers). */

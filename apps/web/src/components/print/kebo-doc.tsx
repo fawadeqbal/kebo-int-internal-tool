@@ -160,12 +160,12 @@ export const docFootCell = (align: "left" | "right" = "left"): CSSProperties => 
   verticalAlign: "top",
 });
 
-/** "PROFORMA  INVOICE" → "Proforma Invoice" */
+/** "PROFORMA  INVOICE" → "Proforma Invoice"; short abbreviations stay as they are ("SAT CERTIFICATE" → "SAT Certificate"). */
 const titleCase = (t: string) =>
   t
     .trim()
     .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .map((w) => (/^[A-Z]{2,3}$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
     .join(" ");
 /** "Invoice.NO." → "Invoice No." */
 const numberText = (l: string) => l.replace(/\.?\s*no\.?\s*:?\s*$/i, " No.").trim();
@@ -210,6 +210,7 @@ export function KeboDoc<T>({
   internalBand = "INTERNAL COPY — FOR OUR OWN USE, NOT FOR THE CUSTOMER",
   watermark,
   brand = null,
+  after,
 }: {
   company: CompanySnapshot;
   customer: CustomerSnapshot;
@@ -245,6 +246,8 @@ export function KeboDoc<T>({
   watermark?: string | null;
   /** The company's logo and wordmark; none: its name as the letterhead. */
   brand?: DocBrand | null;
+  /** A section after the terms, e.g. a contract's two signature lines. */
+  after?: ReactNode;
 }) {
   const address = customer.address?.trim() || (isUnknownCountry(customer.country) ? "" : countryName(customer.country));
   const width = (c: DocColumn<T>) => (c.width ? `${c.width}pt` : undefined);
@@ -523,6 +526,8 @@ export function KeboDoc<T>({
           <img src={company.stamp} alt="Company stamp" style={{ width: "124px", height: "118px", objectFit: "contain", mixBlendMode: "multiply", flexShrink: 0, breakInside: "avoid" }} />
         )}
       </section>
+
+      {after && <section style={{ marginTop: "30px", breakInside: "avoid" }}>{after}</section>}
 
       {internal && <section style={{ marginTop: "22px", breakInside: "avoid" }}>{internal}</section>}
 

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PAYMENT_KIND_LABEL, type PaymentKind } from "@kebo/shared";
+import { isPaperKind, PAYMENT_KIND_LABEL, type PaperKind, type PaymentKind } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { docBrand, load } from "@/lib/session";
 import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
+import type { PaperDocView } from "@/lib/types-papers";
+import { PaperSheet } from "@/components/print/paper";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo, customerOr } from "@/components/print/data";
 import {
@@ -38,6 +40,18 @@ const m3 = (v: string | null | undefined) =>
 const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE", "packing-list": "PACKING  LIST" };
 const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", "packing-list": "Packing List NO." };
 
+/** A paper the app makes: ?v= a version, ?opts= options to preview, ?ref= which payment, plan item or factory. */
+type PaperQuery = { v?: string; opts?: string; ref?: string; embed?: string; back?: string };
+const paperQuery = (sp: PaperQuery) =>
+  Object.fromEntries(
+    (["v", "opts", "ref"] as const).flatMap((k) => (sp[k] && /^[\w,.-]{1,60}$/.test(sp[k]!) ? [[k, sp[k]!]] : [])),
+  ) as Record<string, string>;
+
+async function getPaper(id: string, kind: PaperKind, sp: PaperQuery) {
+  if (!UUID.test(id)) notFound();
+  return load(() => api.get<PaperDocView>(`/orders/${id}/papers/${kind}/doc`, paperQuery(sp)));
+}
+
 async function getDoc(id: string, kind: string) {
   if (!KINDS.includes(kind as OrderDocumentKind) || !UUID.test(id)) notFound();
   return load(() => api.get<OrderDocument>(`/orders/${id}/documents/${kind}`));
@@ -48,9 +62,13 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ id: string; kind: string }>;
-  searchParams: Promise<{ copy?: string }>;
+  searchParams: Promise<{ copy?: string } & PaperQuery>;
 }): Promise<Metadata> {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
+  if (isPaperKind(kind)) {
+    const p = await getPaper(id, kind, sp);
+    return { title: `${p.label} ${p.doc.number}${p.final ? "" : " (draft)"}` };
+  }
   const d = await getDoc(id, kind);
   return { title: `${d.title} ${d.number ?? "(draft)"}${sp.copy === "internal" && d.kind !== "packing-list" ? " (internal)" : ""}` };
 }
@@ -71,9 +89,10 @@ export default async function OrderDocumentPrint({
   searchParams,
 }: {
   params: Promise<{ id: string; kind: string }>;
-  searchParams: Promise<{ back?: string; copy?: string }>;
+  searchParams: Promise<{ back?: string; copy?: string } & PaperQuery>;
 }) {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
+  if (isPaperKind(kind)) return <PaperPrint id={id} kind={kind} sp={sp} />;
   const d = await getDoc(id, kind);
   // Customer snapshots imported from the old system may be empty: then the customer as it is now.
   const customer = await customerOr(d.customer, async () => ({
@@ -265,6 +284,33 @@ export default async function OrderDocumentPrint({
         internal={internalPart}
         watermark={o.status === "cancelled" ? "CANCELLED" : packing && !pk?.done ? "DRAFT" : null}
       />
+    </>
+  );
+}
+
+/**
+ * A paper the app makes (sales contract, commercial invoice, …) in the same
+ * template, from GET /orders/:id/papers/:kind/doc: a final version as it was
+ * made, else made from the order now with a DRAFT watermark. ?embed=1 (the Make
+ * page's preview) leaves out the toolbar.
+ */
+async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: PaperQuery }) {
+  const p = await getPaper(id, kind, sp);
+  const q = new URLSearchParams(paperQuery(sp));
+  q.delete("opts");
+  const pdf = `/pdf/${kind}/${id}${q.size ? `?${q}` : ""}`;
+  return (
+    <>
+      {sp.embed !== "1" && (
+        <PrintToolbar
+          title={`${p.label} ${p.doc.number}${p.paper && p.versions.length > 1 ? ` · version ${p.paper.version}` : ""}${p.final || p.live ? "" : " (draft)"}`}
+          backHref={backTo(sp.back, `/orders/${id}/papers/${kind}${sp.ref ? `?ref=${encodeURIComponent(sp.ref)}` : ""}`)}
+          pdfHref={pdf}
+        />
+      )}
+      <div className={sp.embed === "1" ? "pt-4" : undefined}>
+        <PaperSheet doc={p.doc} brand={await docBrand()} watermark={p.watermark} />
+      </div>
     </>
   );
 }
