@@ -24,7 +24,7 @@ export const links = {
   deal: (id: string) => `/inquiries/${id}`,
   order: (id: string) => `/orders/${id}`,
   /** The order's Money tab (payments in, the plan, factory payments). */
-  orderMoney: (id: string) => `/orders/${id}/money`,
+  orderMoney: (id: string) => `/orders/${id}/payment`,
 };
 
 /**

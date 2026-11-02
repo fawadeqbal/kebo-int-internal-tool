@@ -363,10 +363,10 @@ describe("order flow tables are company tables", () => {
         join pg_class pa on pa.oid = k.confrelid
         join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
        where k.contype = 'f' and cl.relrowsecurity and pa.relrowsecurity and a.attname <> 'company_id'
-         and cl.relname in ('factory_requests', 'order_bank_contracts', 'production_steps', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders')
+         and cl.relname in ('factory_requests', 'order_bank_contracts', 'production_steps', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders', 'order_checklist_items', 'checklist_templates')
          and not exists (select 1 from pg_trigger t where t.tgrelid = k.conrelid and t.tgname = left('same_company_' || k.conname, 63))`;
     expect(unchecked).toEqual([]);
-    for (const t of ["factory_requests", "order_bank_contracts", "production_steps", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims"]) {
+    for (const t of ["factory_requests", "order_bank_contracts", "production_steps", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims", "order_checklist_items", "checklist_templates"]) {
       const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean; policies: bigint }[]>(
         `select c.relrowsecurity as rls, (select count(*) from pg_policies p where p.tablename = c.relname) as policies from pg_class c where c.relname = $1`,
         t,

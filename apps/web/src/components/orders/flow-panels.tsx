@@ -21,7 +21,7 @@ import { Badge, Button, DetailGrid, EmptyState, Tracker, type StepState } from "
 import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
-import type { BankContract, BankStepView, ClaimView, DeliveryView, FlowDocument, ProductionStepView, SatCheckView, ShipmentView } from "@/lib/types-flow";
+import type { BankContract, BankStepView, ClaimView, DeliveryView, FlowDocument, SatCheckView, ShipmentView } from "@/lib/types-flow";
 import {
   BankContractForm,
   BankStepForm,
@@ -30,7 +30,6 @@ import {
   DateForm,
   DeliveryForm,
   DocumentForm,
-  ProductionEditor,
   RemoveButton,
   RouteForm,
   SatEditor,
@@ -140,7 +139,7 @@ export function RoutePanel({
   );
 }
 
-/* ---------------------------------------------------------------- factory order and production */
+/* ---------------------------------------------------------------- factory order */
 
 export function FactoryOrderPanel({ action, orderedOn, readyOn, factories, today, canEdit }: { action: Action; orderedOn: string | null; readyOn: string | null; factories: { id: string; name: string }[]; today: string; canEdit: boolean }) {
   const [edit, setEdit] = useState(false);
@@ -172,47 +171,6 @@ export function FactoryOrderPanel({ action, orderedOn, readyOn, factories, today
             </Button>
           </div>
         ))}
-    </div>
-  );
-}
-
-export function ProductionPanel({ action, steps, suggested, factories, today, canEdit }: { action: Action; steps: ProductionStepView[]; suggested: string[]; factories: { id: string; name: string }[]; today: string; canEdit: boolean }) {
-  const [edit, setEdit] = useState(false);
-  if (edit) return <ProductionEditor action={action} steps={steps} suggested={suggested} factories={factories} today={today} onDone={() => setEdit(false)} />;
-  if (!steps.length)
-    return (
-      <EmptyState
-        title="No production timeline yet"
-        description="Add the factory's milestones (drawings, parts, assembly, test run, packed) to see at a glance whether the ready date holds."
-        action={
-          canEdit ? (
-            <Button size="sm" variant="primary" onClick={() => setEdit(true)}>
-              <Plus aria-hidden /> Start from the usual steps
-            </Button>
-          ) : undefined
-        }
-      />
-    );
-  const st = states(steps, (s) => !!s.doneOn, (s) => s.late);
-  return (
-    <div className="flex flex-col gap-3">
-      <Tracker
-        label="Production timeline"
-        steps={steps.map((s, i) => ({
-          key: s.id,
-          title: s.title,
-          sub: [factories.length > 1 ? s.factory?.name : null, s.doneOn ? `done ${day(s.doneOn)}` : s.plannedOn ? `${s.late ? "was planned" : "planned"} ${day(s.plannedOn)}` : "no date yet", s.note].filter(Boolean).join(" · "),
-          state: st[i]!,
-          side: s.doneOn ? <span className="text-xs text-muted tabular">{short(s.doneOn)}</span> : s.late ? <Badge tone="warn">Late</Badge> : null,
-        }))}
-      />
-      {canEdit && (
-        <div>
-          <Button size="sm" variant="secondary" onClick={() => setEdit(true)}>
-            <Pencil aria-hidden /> Update the timeline
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   BANK_CONTRACT_STATUS_LABEL,
   BANK_CONTRACT_STATUSES,
@@ -25,12 +25,12 @@ import {
   type PaymentRoute,
   type SatResult,
 } from "@kebo/shared";
-import { Button, cn, Field, Input, Select, SelectCard, SelectCardList, StickyBar, Textarea } from "@kebo/ui";
+import { Button, cn, Field, Input, Select, SelectCard, SelectCardList, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
-import type { BankContract, BankStepView, ClaimView, DeliveryView, FlowDocument, ProductionStepView, SatCheckView, ShipmentView } from "@/lib/types-flow";
+import type { BankContract, BankStepView, ClaimView, DeliveryView, FlowDocument, SatCheckView, ShipmentView } from "@/lib/types-flow";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -172,116 +172,8 @@ export function DateForm({ action, name, label, value, max, save, onDone, hint }
   );
 }
 
-/* ---------------------------------------------------------------- production timeline */
-
-interface StepRow {
-  key: string;
-  id: string | null;
-  title: string;
-  factoryId: string;
-  plannedOn: string;
-  doneOn: string;
-  note: string;
-}
-
 let seq = 0;
 const nextKey = () => `n${++seq}`;
-
-/** The whole timeline at once: rows to type in, reorder, tick off; saved together. */
-export function ProductionEditor({
-  action,
-  steps,
-  suggested,
-  factories,
-  today,
-  onDone,
-}: {
-  action: Action;
-  steps: ProductionStepView[];
-  suggested: string[];
-  factories: { id: string; name: string }[];
-  today: string;
-  onDone: () => void;
-}) {
-  const only = factories.length === 1 ? factories[0]!.id : "";
-  const [rows, setRows] = useState<StepRow[]>(() =>
-    steps.length
-      ? steps.map((s) => ({ key: s.id, id: s.id, title: s.title, factoryId: s.factory?.id ?? "", plannedOn: s.plannedOn ?? "", doneOn: s.doneOn ?? "", note: s.note ?? "" }))
-      : suggested.map((t) => ({ key: nextKey(), id: null, title: t, factoryId: only, plannedOn: "", doneOn: "", note: "" })),
-  );
-  const set = (i: number, patch: Partial<StepRow>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const move = (i: number, by: number) =>
-    setRows((r) => {
-      const n = [...r];
-      const [x] = n.splice(i, 1);
-      n.splice(i + by, 0, x!);
-      return n;
-    });
-  const payload = JSON.stringify({
-    steps: rows.filter((r) => r.title.trim()).map((r) => ({ id: r.id, title: r.title, factoryId: r.factoryId || null, plannedOn: r.plannedOn || null, doneOn: r.doneOn || null, note: r.note || null })),
-  });
-  return (
-    <ActionForm action={action} onDone={onDone} keepFields className="flex flex-col gap-3">
-      <input type="hidden" name="payload" value={payload} />
-      <ol className="flex flex-col gap-2">
-        {rows.map((r, i) => (
-          <li key={r.key} className="grid gap-2 rounded-lg border border-line bg-surface p-2.5 sm:grid-cols-[minmax(0,1fr)_10rem_9.5rem_9.5rem_auto] sm:items-end">
-            <Field label={`Step ${i + 1}`} htmlFor={`ps-${r.key}`}>
-              <Input id={`ps-${r.key}`} value={r.title} maxLength={120} onChange={(e) => set(i, { title: e.target.value })} placeholder="e.g. Factory test run" />
-            </Field>
-            <Field label="Factory" htmlFor={`pf-${r.key}`} optional>
-              <Select id={`pf-${r.key}`} value={r.factoryId} onChange={(e) => set(i, { factoryId: e.target.value })}>
-                <option value="">—</option>
-                {factories.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Planned" htmlFor={`pp-${r.key}`} optional>
-              <Input id={`pp-${r.key}`} type="date" value={r.plannedOn} onChange={(e) => set(i, { plannedOn: e.target.value })} />
-            </Field>
-            <Field label="Done on" htmlFor={`pd-${r.key}`} optional>
-              <div className="flex gap-1">
-                <Input id={`pd-${r.key}`} type="date" max={today} value={r.doneOn} onChange={(e) => set(i, { doneOn: e.target.value })} />
-              </div>
-            </Field>
-            <div className="flex gap-1 sm:pb-0.5">
-              {!r.doneOn && (
-                <Button type="button" size="sm" variant="secondary" onClick={() => set(i, { doneOn: today })}>
-                  Done today
-                </Button>
-              )}
-              <Button type="button" size="icon-sm" variant="ghost" aria-label={`Move step ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}>
-                <ArrowUp aria-hidden />
-              </Button>
-              <Button type="button" size="icon-sm" variant="ghost" aria-label={`Move step ${i + 1} down`} disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
-                <ArrowDown aria-hidden />
-              </Button>
-              <Button type="button" size="icon-sm" variant="danger-ghost" aria-label={`Remove step ${i + 1}`} onClick={() => setRows((x) => x.filter((_, j) => j !== i))}>
-                <Trash2 aria-hidden />
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <div>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setRows((r) => [...r, { key: nextKey(), id: null, title: "", factoryId: only, plannedOn: "", doneOn: "", note: "" }])}>
-          <Plus aria-hidden /> Add a step
-        </Button>
-      </div>
-      <StickyBar>
-        <SubmitButton size="sm" pendingText="Saving…">
-          Save the timeline
-        </SubmitButton>
-        <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-          Cancel
-        </Button>
-      </StickyBar>
-    </ActionForm>
-  );
-}
 
 /* ---------------------------------------------------------------- shipments */
 

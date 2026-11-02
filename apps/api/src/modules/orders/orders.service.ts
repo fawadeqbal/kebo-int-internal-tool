@@ -559,10 +559,28 @@ export class OrdersService {
     // Closed orders appear only while money is still owed on them: the database picks those, so years
     // of finished orders are not read on every Home.
     const due = await ordersWithMoneyDue(this.prisma);
-    const items = [
-      ...(await this.list(user, { mine: true })),
-      ...(await this.list(user, { mine: true, status: "closed", ids: due })),
-    ].filter((i) => i.needs);
+    const all = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed", ids: due }))];
+    // A checklist item of the order that is late or due soon comes first when it is due before what the order needs.
+    const today = this.clock.today();
+    const soon = (await this.settings.get()).reminders.dueSoonDays;
+    const dated = await this.prisma.db.orderChecklistItem.findMany({
+      where: {
+        key: null,
+        doneAt: null,
+        skippedAt: null,
+        dueOn: { lte: toDbDate(addDays(today, soon)) },
+        orderId: { in: all.filter((i) => i.status === "open").map((i) => i.id) },
+      },
+      select: { orderId: true, title: true, dueOn: true, route: true, order: { select: { paymentRoute: true } } },
+      orderBy: { dueOn: "asc" },
+    });
+    for (const i of all) {
+      const c = dated.find((d) => d.orderId === i.id && (!d.route || d.route === d.order.paymentRoute));
+      if (!c) continue;
+      const on = fromDbDate(c.dueOn!);
+      if (!i.needs || on < i.needs.due) i.needs = { title: c.title ?? "Checklist item", due: on, late: on < today };
+    }
+    const items = all.filter((i) => i.needs);
     return items.sort((a, b) => Number(b.needs!.late) - Number(a.needs!.late) || a.needs!.due.localeCompare(b.needs!.due));
   }
 
@@ -657,7 +675,14 @@ export class OrdersService {
    * No warnings are asked (the work already happened); the history says why.
    * Runs inside the caller's transaction; publish the returned event after it.
    */
-  async followFlow(tx: Tx, user: SessionUser, orderId: string, to: "in_production" | "shipped", why: string, facts: { shippedOn?: ISODate | null; blNo?: string | null } = {}) {
+  async followFlow(
+    tx: Tx,
+    user: SessionUser,
+    orderId: string,
+    to: "in_production" | "shipped",
+    why: string,
+    facts: { shippedOn?: ISODate | null; blNo?: string | null } = {},
+  ) {
     const o = await this.load(user, orderId, tx);
     if (o.status !== "open" || STAGE_FLOW.indexOf(o.stage) >= STAGE_FLOW.indexOf(to)) return null;
     const data: Prisma.OrderUpdateInput = { stage: to, stageSince: new Date() };
@@ -670,7 +695,9 @@ export class OrdersService {
     }
     await tx.order.update({ where: { id: o.id }, data });
     await this.datePlan(tx, o, to, true, null, shippedOn);
-    await tx.orderStageChange.create({ data: { orderId: o.id, fromStage: o.stage, toStage: to, note: why, confirmed: false, byId: user.id } });
+    await tx.orderStageChange.create({
+      data: { orderId: o.id, fromStage: o.stage, toStage: to, note: why, confirmed: false, byId: user.id },
+    });
     await this.audit.record(tx, {
       userId: user.id,
       action: "stage_change",

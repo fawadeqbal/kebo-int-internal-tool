@@ -34,7 +34,7 @@ describe("every read endpoint answers for every record", () => {
     for (const who of [manager, staff]) {
       for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true"]) await ok(who, path);
     }
-    for (const path of ["/reports", "/audit", "/users", "/settings"]) await ok(admin, path);
+    for (const path of ["/reports", "/audit", "/users", "/settings", "/settings/checklist"]) await ok(admin, path);
   });
 
   it("every deal, with its sourcing and quotation", async () => {
@@ -61,6 +61,8 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/orders/${o.id}`);
       await ok(manager, `/orders/${o.id}/payments`);
       await ok(manager, `/orders/${o.id}/flow`);
+      await ok(manager, `/orders/${o.id}/steps`);
+      await ok(manager, `/history?type=order&id=${o.id}&step=production`);
       for (const kind of ["proforma", "packing-list"]) await ok(manager, `/orders/${o.id}/documents/${kind}`);
     }
   });

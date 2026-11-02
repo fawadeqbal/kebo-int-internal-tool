@@ -265,7 +265,7 @@ export class CashService {
         what: `${PAYMENT_KIND_LABEL[p.kind]} for ${p.order.refNo}${decimalToMinor(p.bankCharges) ? ` (bank charges ${p.bankCharges.toFixed(2)})` : ""}`,
         party: p.customer ? { name: p.customer.name, href: `/customers/${p.customer.id}` } : null,
         reference: p.reference,
-        href: `/orders/${p.order.id}/money`,
+        href: `/orders/${p.order.id}/payment`,
         voided: Boolean(p.voidedAt),
       });
     for (const p of factoryPaid)
@@ -281,7 +281,7 @@ export class CashService {
         what: `${PAYMENT_KIND_LABEL[p.kind]} to the factory for ${p.order.refNo}`,
         party: { name: p.factory.name, href: `/factories/${p.factory.id}` },
         reference: p.reference,
-        href: `/orders/${p.order.id}/money`,
+        href: `/orders/${p.order.id}/payment`,
         voided: Boolean(p.voidedAt),
       });
     for (const e of expenses)
@@ -297,7 +297,7 @@ export class CashService {
         what: `${EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category}: ${e.description}`,
         party: e.customer ? { name: e.order ? `${e.customer.name} · ${e.order.refNo}` : e.inquiry ? `${e.customer.name} · ${e.inquiry.refNo}` : e.customer.name, href: `/customers/${e.customer.id}` } : null,
         reference: e.reference,
-        href: e.order ? `/orders/${e.order.id}/money` : e.inquiry ? `/inquiries/${e.inquiry.id}` : null,
+        href: e.order ? `/orders/${e.order.id}/payment` : e.inquiry ? `/inquiries/${e.inquiry.id}` : null,
         voided: Boolean(e.voidedAt),
       });
     for (const t of transfers) {

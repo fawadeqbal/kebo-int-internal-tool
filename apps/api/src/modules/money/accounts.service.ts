@@ -300,7 +300,7 @@ export class AccountsService {
         text: `Payment for ${p.order.refNo}`,
         amount: p.amount.toFixed(2),
         currency: p.currency,
-        href: `/orders/${p.order.id}/money`,
+        href: `/orders/${p.order.id}/payment`,
       });
     for (const e of expenses)
       events.push({ on: fromDbDate(e.spentOn), kind: "expense", text: e.description, amount: e.amount.toFixed(2), currency: e.currency });

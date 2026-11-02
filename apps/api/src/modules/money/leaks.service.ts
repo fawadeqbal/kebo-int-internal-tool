@@ -291,13 +291,13 @@ export class LeaksService {
         warnings.push({
           level: "bad",
           text: `Order ${r.refNo} (${r.customer.name}) is losing money: ${show(r.actualMinor)} after all costs.`,
-          href: `/orders/${r.id}/money`,
+          href: `/orders/${r.id}/payment`,
         });
       else if (r.plannedMinor > 0 && (r.leakMinor / r.plannedMinor) * 100 >= LIMITS.leakPercent)
         warnings.push({
           level: "warn",
           text: `Order ${r.refNo} kept only ${Math.round((r.actualMinor / r.plannedMinor) * 100)}% of its planned profit: ${show(r.leakMinor)} went on costs after the quote.`,
-          href: `/orders/${r.id}/money`,
+          href: `/orders/${r.id}/payment`,
         });
     }
 
@@ -374,7 +374,7 @@ export class LeaksService {
       warnings.push({
         level: "warn",
         text: `${s.refNo}: ${show(s.stuckMinor, s.currency)} paid to the factory ${s.days} days ago is not back from ${s.customer.name} yet.`,
-        href: `/orders/${s.id}/money`,
+        href: `/orders/${s.id}/payment`,
       });
 
     /* ----- expenses against sales, month by month (12 months to the end of the period) */
