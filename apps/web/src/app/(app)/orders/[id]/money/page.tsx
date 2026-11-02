@@ -3,7 +3,11 @@ import { can, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
+import { orderFlowOf, orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
+import { Card, CardBody, CardHeader } from "@kebo/ui";
+import { optional } from "@/components/print/data";
+import { RoutePanel } from "@/components/orders/flow-panels";
+import { bankContractAction, routeAction } from "../../flow-actions";
 import { date, dateTime, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { PaymentStatus } from "@/lib/types-orders";
@@ -73,8 +77,25 @@ export default async function OrderPaymentsTab({ params }: { params: Promise<{ i
   if (m.expenses && m.profit)
     glance.push({ href: "#costs", label: "Expected profit", value: money(m.profit.earned, c), tone: Number(m.profit.earned) < 0 ? "text-bad" : "text-ok" });
 
+  const flow = await optional(() => orderFlowOf(id));
   return (
     <div className="flex flex-col gap-5">
+      {flow && (
+        <Card>
+          <CardHeader title="How the customer pays" description="It decides the papers and bank steps after shipping." />
+          <CardBody>
+            <RoutePanel
+              routeAction={routeAction.bind(null, o.id)}
+              contractAction={bankContractAction.bind(null, o.id)}
+              route={flow.payment.route}
+              contract={flow.payment.bankContract}
+              bankRoutes={flow.modules.bankContracts}
+              currency={o.currency}
+              canEdit={can(me, "orders.update") && o.status !== "cancelled"}
+            />
+          </CardBody>
+        </Card>
+      )}
       {glance.length > 1 && (
         <nav aria-label="On this tab" className="grid gap-3 sm:grid-cols-3">
           {glance.map((g) => (

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
@@ -238,5 +238,18 @@ export class FactoryRequestsController {
   @RequireFeature("factory_requests")
   remove(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
     return this.requests.remove(user, id);
+  }
+}
+
+@ApiTags("order flow")
+@Controller("order-board")
+export class OrderBoardController {
+  constructor(private readonly flow: FlowService) {}
+
+  /** ?mine=true — each open order's current step, for the board's columns. */
+  @Get()
+  @RequireFeature("orders_board")
+  board(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ mine: z.enum(["true", "false"]).optional() }))) q: { mine?: "true" | "false" }) {
+    return this.flow.board(user, q.mine === "true");
   }
 }
