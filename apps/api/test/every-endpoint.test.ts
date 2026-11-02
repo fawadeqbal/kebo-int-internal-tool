@@ -43,6 +43,7 @@ describe("every read endpoint answers for every record", () => {
     for (const d of deals) {
       await ok(manager, `/inquiries/${d.id}`);
       await ok(manager, `/inquiries/${d.id}/sourcing`);
+      await ok(manager, `/inquiries/${d.id}/factory-requests`);
       const q = await ok(manager, `/inquiries/${d.id}/quotation`);
       for (const r of (q?.revisions ?? []) as { id: string }[]) await ok(manager, `/revisions/${r.id}`);
     }
@@ -59,6 +60,7 @@ describe("every read endpoint answers for every record", () => {
     for (const o of orders) {
       await ok(manager, `/orders/${o.id}`);
       await ok(manager, `/orders/${o.id}/payments`);
+      await ok(manager, `/orders/${o.id}/flow`);
       for (const kind of ["proforma", "packing-list"]) await ok(manager, `/orders/${o.id}/documents/${kind}`);
     }
   });
