@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { FlowModule } from "./modules/flow/flow.module";
 import { EnvModule } from "./config/env";
 import { PrismaModule } from "./database/prisma.service";
 import { CommonModule } from "./common/common.module";
@@ -31,6 +32,6 @@ import { PlatformModule } from "./platform/platform.module";
  */import { InsightsModule } from "./modules/insights/insights.module";
 
 @Module({
-  imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, SecurityModule, InsightsModule, CompanyModule, PlatformModule],
+  imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, SecurityModule, InsightsModule, FlowModule, CompanyModule, PlatformModule],
 })
 export class AppModule {}

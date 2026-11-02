@@ -137,6 +137,53 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export const BASIS_STEPS = values("to_port", "freight", "insurance", "delivery", "duties");
 export type BasisStep = (typeof BASIS_STEPS)[number];
 
+/* ---------------------------------------------------------------- order flow */
+
+/** How the customer pays: informally (cash, Alipay, WeChat, a personal account), on a bank contract, or by LC. */
+export const PAYMENT_ROUTES = values("informal", "bank_contract", "letter_of_credit");
+export type PaymentRoute = (typeof PAYMENT_ROUTES)[number];
+
+export const BANK_CONTRACT_STATUSES = values("draft", "opened", "amended", "documents_presented", "paid", "closed");
+export type BankContractStatus = (typeof BANK_CONTRACT_STATUSES)[number];
+
+export const FACTORY_REQUEST_STATUSES = values("sent", "quoted", "declined", "no_reply");
+export type FactoryRequestStatus = (typeof FACTORY_REQUEST_STATUSES)[number];
+
+export const SHIP_MODES = values("sea", "air", "road", "rail");
+export type ShipMode = (typeof SHIP_MODES)[number];
+
+export const SHIPMENT_STATUSES = values("planned", "booked", "loaded", "departed", "arrived", "cleared");
+export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
+
+export const ORDER_DOCUMENT_KINDS = values(
+  "bill_of_lading",
+  "airway_bill",
+  "packing_list",
+  "commercial_invoice",
+  "proforma_invoice",
+  "sales_contract",
+  "certificate_of_origin",
+  "insurance",
+  "inspection",
+  "other",
+);
+export type OrderDocumentKind = (typeof ORDER_DOCUMENT_KINDS)[number];
+
+export const ORDER_DOCUMENT_STATUSES = values("missing", "draft", "ready");
+export type OrderDocumentStatus = (typeof ORDER_DOCUMENT_STATUSES)[number];
+
+export const BANK_STEP_KINDS = values("sent_to_our_bank", "couriered_to_customer_bank", "copies_to_customer", "customer_paid_bank", "bank_paid_us");
+export type BankStepKind = (typeof BANK_STEP_KINDS)[number];
+
+export const DELIVERY_CONDITIONS = values("good", "minor_damage", "damaged", "partial");
+export type DeliveryCondition = (typeof DELIVERY_CONDITIONS)[number];
+
+export const SAT_RESULTS = values("pending", "pass", "fail", "not_applicable");
+export type SatResult = (typeof SAT_RESULTS)[number];
+
+export const CLAIM_STATUSES = values("open", "with_factory", "resolved", "rejected");
+export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
+
 export const ENUMS = {
   SignInResult: SIGN_IN_RESULTS,
   InquiryStage: INQUIRY_STAGES,
@@ -153,4 +200,15 @@ export const ENUMS = {
   OrderStage: ORDER_STAGES,
   PaymentKind: PAYMENT_KINDS,
   PaymentMethod: PAYMENT_METHODS,
+  PaymentRoute: PAYMENT_ROUTES,
+  BankContractStatus: BANK_CONTRACT_STATUSES,
+  FactoryRequestStatus: FACTORY_REQUEST_STATUSES,
+  ShipMode: SHIP_MODES,
+  ShipmentStatus: SHIPMENT_STATUSES,
+  OrderDocumentKind: ORDER_DOCUMENT_KINDS,
+  OrderDocumentStatus: ORDER_DOCUMENT_STATUSES,
+  BankStepKind: BANK_STEP_KINDS,
+  DeliveryCondition: DELIVERY_CONDITIONS,
+  SatResult: SAT_RESULTS,
+  ClaimStatus: CLAIM_STATUSES,
 } as const;
