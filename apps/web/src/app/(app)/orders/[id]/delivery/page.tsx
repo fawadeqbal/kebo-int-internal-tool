@@ -11,6 +11,7 @@ import { OrderLines } from "@/components/orders/order-lines";
 import { DeliveredExcel } from "../goods";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
+import { StepPapers } from "../papers";
 
 export const metadata = { title: "Order · delivery and SAT" };
 
@@ -65,6 +66,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
             ]}
           />
           <StepCosts id={o.id} step="delivery" />
+          <StepPapers id={o.id} dealId={o.inquiry.id} step="delivery" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>

@@ -3,6 +3,8 @@ import puppeteer from "puppeteer-core";
 import { apiFetch, ApiError, SESSION_COOKIE } from "@/lib/api";
 import type { ReportView } from "@/lib/types-deals";
 import type { OrderDocument, RevisionDoc } from "@/lib/types-orders";
+import type { PaperDocView } from "@/lib/types-papers";
+import { PAPER_KINDS, type PaperKind } from "@kebo/shared";
 import { chromiumPath } from "../../chromium";
 
 /**
@@ -13,6 +15,7 @@ import { chromiumPath } from "../../chromium";
  *
  *   /pdf/revisions/<revision id>                 quotation
  *   /pdf/proforma|invoice|packing-list/<order id> the order's documents
+ *   /pdf/<paper>/<order id>?v=&ref=              a paper the app makes (sales-contract, commercial-invoice…)
  *   /pdf/report/summary?from&to&staff            the Reports page (any UUID works in place of "summary")
  *
  * The session is the kebo_session cookie, or `Authorization: Bearer <token>`
@@ -44,7 +47,25 @@ const orderDocument =
     return { name: `${d.title} ${d.number}${d.order.status === "cancelled" ? " (cancelled)" : ""}`, path: `/print/orders/${id}/${kind}` };
   };
 
+/** A paper the app makes: a version (?v=), which payment, plan item or factory (?ref=). */
+const paper =
+  (kind: PaperKind): Kind =>
+  async (id, token, url) => {
+    const q: Record<string, string> = {};
+    for (const k of ["v", "ref"]) {
+      const v = url.searchParams.get(k);
+      if (v && /^[\w-]{1,60}$/.test(v)) q[k] = v;
+    }
+    const d = await ask<PaperDocView>(token, `/orders/${id}/papers/${kind}/doc`, q);
+    const qs = new URLSearchParams(q);
+    return {
+      name: `${d.label} ${d.doc.number}${d.paper && d.versions.length > 1 ? ` v${d.paper.version}` : ""}${d.final || d.live ? "" : " (draft)"}`,
+      path: `/print/orders/${id}/${kind}${qs.size ? `?${qs}` : ""}`,
+    };
+  };
+
 const KINDS: Record<string, { id: (id: string) => boolean; target: Kind }> = {
+  ...Object.fromEntries(PAPER_KINDS.map((k) => [k, { id: (id: string) => UUID.test(id), target: paper(k) }])),
   revisions: {
     id: (id) => UUID.test(id),
     target: async (id, token) => {
@@ -88,7 +109,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   try {
     target = await KINDS[kind].target(id, session, new URL(req.url));
     // Priced documents: the internal copy (every price, cost and payment) when asked for.
-    if (kind !== "report" && kind !== "packing-list" && new URL(req.url).searchParams.get("copy") === "internal") {
+    if ((kind === "revisions" || kind === "proforma") && new URL(req.url).searchParams.get("copy") === "internal") {
       target = { name: `${target.name} (internal)`, path: `${target.path}?copy=internal` };
     }
   } catch (e) {

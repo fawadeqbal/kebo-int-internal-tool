@@ -1,4 +1,4 @@
-import type { ChecklistField, ChecklistTool, FlowStep, PaymentRoute, StepState } from "@kebo/shared";
+import type { ChecklistField, ChecklistTool, FlowStep, PaperKind, PaymentRoute, StepState } from "@kebo/shared";
 
 /** One item of GET /orders/:id/steps (keep in step with apps/api/src/modules/checklist). */
 export interface ChecklistItem {
@@ -10,6 +10,8 @@ export interface ChecklistItem {
   step: FlowStep;
   title: string;
   tool: ChecklistTool | null;
+  /** Make and Send items: the paper the app makes. */
+  paper: PaperKind | null;
   fields: ChecklistField[];
   values: Record<string, string>;
   /** label / value pairs; a YYYY-MM-DD value is a date. */
@@ -69,6 +71,7 @@ export interface ChecklistSettings {
     title: string;
     tool: ChecklistTool;
     fields: ChecklistField[];
+    paper: PaperKind | null;
     route: PaymentRoute | null;
     dueDays: number | null;
   }[];

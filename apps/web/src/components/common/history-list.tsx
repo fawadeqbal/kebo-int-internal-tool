@@ -24,6 +24,7 @@ const FIELD: Record<string, string> = {
   defaultBalanceTerms: "Balance terms",
   defaultPaymentTerms: "Payment terms",
   defaultDeliveryTerms: "Delivery terms",
+  warrantyTerms: "Warranty",
   paymentTerms: "Payment terms",
   deliveryTerms: "Delivery terms",
 };

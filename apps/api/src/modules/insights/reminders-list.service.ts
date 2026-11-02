@@ -8,6 +8,7 @@ import {
   FLOW_STEP_LABEL,
   OPEN_STAGES,
   ORDER_DOCUMENT_LABEL,
+  documentDone,
   requiredDocuments,
   STEP_PATH,
 } from "@kebo/shared";
@@ -452,7 +453,7 @@ export class RemindersListService {
       for (const o of sailed) {
         const missing = requiredDocuments(o.paymentRoute, o.shipments[0]?.mode ?? "sea").filter((k) => {
           const rows = o.documents.filter((d) => d.kind === k);
-          if (rows.length) return !rows.some((d) => d.status === "ready");
+          if (rows.length) return !rows.some((d) => documentDone(d.status));
           return k === "proforma_invoice" ? !o.proformaNo : k === "packing_list" ? !o.packedAt : true;
         });
         const eta = fromDbDateOrNull(o.shipments[0]?.eta);
