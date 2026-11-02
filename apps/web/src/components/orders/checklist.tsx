@@ -66,6 +66,8 @@ export type AutoTool =
       tap?: LightTap;
       /** The exception: "Short or damaged? Open the lines". */
       also?: { label: string; href: string };
+      /** Values sent along that are not asked (the paper's kind and status). */
+      fixed?: Record<string, string>;
     }
   /** A one-tap item ("All received", "Arrived today", "Done today"), with its exception. */
   | { kind: "tap"; tap: LightTap; also?: { label: string; href: string } };
@@ -633,7 +635,7 @@ function Row({
           fileNote={item.title}
           save={changing ? "Save" : (tool.save ?? "Save and tick")}
           hint={tool.hint}
-          onSubmit={sendTo(tool.action)}
+          onSubmit={sendTo(tool.action, tool.fixed)}
           onDone={hideForm}
         />
       );

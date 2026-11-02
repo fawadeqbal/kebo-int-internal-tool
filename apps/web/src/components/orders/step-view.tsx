@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, X } from "lucide-react";
@@ -19,6 +19,10 @@ export const dayLabel = (iso: string | null | undefined) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "";
 
 /* ---------------------------------------------------------------- the side panel */
+
+const noop = () => () => {};
+/** True in the browser, false while rendering on the server. */
+const useMounted = () => useSyncExternalStore(noop, () => true, () => false);
 
 const PanelClose = createContext<() => void>(() => {});
 /** Inside an Edit panel: closes it (a form's onDone). */
@@ -42,9 +46,8 @@ export function EditPanel({
 }) {
   const id = useId();
   const head = useRef<HTMLHeadingElement>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   useEffect(() => {
-    setMounted(true);
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
     const overflow = document.body.style.overflow;
@@ -280,18 +283,18 @@ function AddInPlace({ f, action }: { f: DetailField; action: Action }) {
 /* ---------------------------------------------------------------- the cards */
 
 /** "8 of 12 filled" and its small bar. */
-function FilledMeter({ n, of }: { n: number; of: number }) {
+function FilledMeter({ n, of, word = "filled" }: { n: number; of: number; word?: string }) {
   const pct = of ? Math.round((n / of) * 100) : 100;
   return (
     <span className="inline-flex items-center gap-2 text-xs text-text-2 tabular">
-      {n} of {of} filled
+      {n} of {of} {word}
       <span
         className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-3 max-sm:hidden"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={of}
         aria-valuenow={n}
-        aria-label={`${n} of ${of} filled`}
+        aria-label={`${n} of ${of} ${word}`}
       >
         <span className={cn("block h-full rounded-full", n >= of ? "bg-ok" : "bg-ok/80")} style={{ width: `${pct}%` }} />
       </span>
@@ -318,7 +321,7 @@ export function ViewCard({
   id?: string;
   title: ReactNode;
   description?: ReactNode;
-  meter?: { n: number; of: number };
+  meter?: { n: number; of: number; word?: string };
   canEdit: boolean;
   editLabel?: string;
   /** The panel the Edit opens. */

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { PaymentRoute } from "@kebo/shared";
 import type { ActionState } from "@/lib/actions";
 import type { BankContract, BankStepView, DeliveryView, FlowDocument, SatCheckView } from "@/lib/types-flow";
@@ -62,10 +63,12 @@ export function PaperSetEdit(props: {
   set: FlowDocument[];
   files: { id: string; name: string; href: string }[];
   shipments: { id: string; label: string }[];
+  /** The order's own View / PDF buttons for the papers the app makes, unchanged. */
+  printButtons: Partial<Record<"proforma" | "packing-list", ReactNode>>;
 }) {
   return (
     <PanelBody>
-      <PaperSetPanel {...props} printButtons={{}} canEdit />
+      <PaperSetPanel {...props} canEdit />
     </PanelBody>
   );
 }

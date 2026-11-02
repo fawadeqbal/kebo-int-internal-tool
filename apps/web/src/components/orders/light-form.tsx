@@ -210,10 +210,10 @@ export function LightForm({
 }
 
 /** The light form of an automatic item: its values go to the item's action as form fields. */
-export function sendTo(action: Action) {
+export function sendTo(action: Action, fixed?: Record<string, string>) {
   return (values: Record<string, string>) => {
     const form = new FormData();
-    for (const [k, v] of Object.entries(values)) form.set(k, v);
+    for (const [k, v] of Object.entries({ ...fixed, ...values })) form.set(k, v);
     return action({}, form);
   };
 }
