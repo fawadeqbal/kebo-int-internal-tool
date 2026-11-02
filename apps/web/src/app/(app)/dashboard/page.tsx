@@ -12,6 +12,7 @@ import { Headline, KpiCard, TargetRing } from "@/components/insights/kpi";
 import { RevenueChart } from "@/components/insights/charts";
 import { TargetEditor } from "@/components/insights/targets";
 import { ReminderList } from "@/components/insights/reminder-list";
+import { readableDates } from "@/components/insights/readable-dates";
 
 export const metadata = { title: "Home" };
 
@@ -309,10 +310,10 @@ async function MyOrders() {
   if (!board || !board.items.length) return null;
   const cols: [string, string, FlowStep[]][] = [
     ["Payment", "payment", ["payment"]],
-    ["Production", "production", ["factory", "production"]],
+    ["Factory", "production", ["factory", "production"]],
     ["Shipping", "shipping", ["shipping"]],
-    ["Documents", "documents", ["documents"]],
-    ["Delivery & SAT", "delivery", ["delivery"]],
+    ["Papers", "documents", ["documents"]],
+    ["SAT", "delivery", ["delivery"]],
   ];
   const count = (steps: FlowStep[]) => board.items.filter((i) => (i.current ? steps.includes(i.current.key) : steps.includes("delivery"))).length;
   return (
@@ -348,7 +349,7 @@ async function ThisWeek({ today }: { today: string }) {
           <li key={i.key}>
             <Link href={i.href} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 px-4 py-2.5 text-sm hover:bg-surface-2">
               <span className={i.due === today ? "font-semibold text-primary" : "text-muted"}>{i.due === today ? "Today" : dayOf(i.due!)}</span>
-              <span className="min-w-0 truncate">{i.title}</span>
+              <span className="min-w-0 truncate">{readableDates(i.title)}</span>
             </Link>
           </li>
         ))}

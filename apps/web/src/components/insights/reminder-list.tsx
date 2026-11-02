@@ -20,6 +20,7 @@ import {
 import { Button, cn } from "@kebo/ui";
 import { reminderAction } from "@/app/(app)/money/actions";
 import type { Reminders } from "@/lib/types-insights";
+import { readableDates } from "./readable-dates";
 import { FloatingMenu } from "@/components/common/floating";
 
 const KIND_ICON = { order: Package, quote: FileText, deal: Inbox, offer: Factory, money: Banknote, ship: Ship } as const;
@@ -101,11 +102,11 @@ export function ReminderList({ data, limit = 8 }: { data: Reminders; limit?: num
               </span>
               <div className="min-w-0 flex-1">
                 <Link href={it.href} className="block text-sm font-medium hover:text-primary">
-                  {it.title}
+                  {readableDates(it.title)}
                 </Link>
                 {(it.detail || it.who) && (
                   <p className="mt-0.5 text-xs text-muted">
-                    {it.detail}
+                    {it.detail && readableDates(it.detail)}
                     {it.who && <span className="ml-1 rounded bg-surface-2 px-1.5 py-0.5 text-text-2">{it.who}</span>}
                   </p>
                 )}
