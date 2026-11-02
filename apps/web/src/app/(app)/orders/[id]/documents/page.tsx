@@ -1,12 +1,22 @@
 import { Eye, FileText } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, can } from "@kebo/shared";
-import { Badge, buttonClass, Card, CardHeader } from "@kebo/ui";
+import { Badge, buttonClass, Card, CardBody, CardHeader } from "@kebo/ui";
 import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { api } from "@/lib/api";
 import { FileActions } from "@/components/common/file-actions";
 import { requireUser } from "@/lib/session";
-import { orderOf } from "@/lib/order-data";
+import { orderFlowOf, orderOf } from "@/lib/order-data";
+import { BankChainPanel, PaperSetPanel } from "@/components/orders/flow-panels";
+import { today } from "@/components/orders/today";
+import { PAYMENT_ROUTE_SHORT } from "@kebo/shared";
+import {
+  addDocumentAction,
+  bankStepAction,
+  clearBankStepAction,
+  removeDocumentAction,
+  updateDocumentAction,
+} from "../../flow-actions";
 import { date } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import { optional } from "@/components/print/data";
@@ -22,13 +32,61 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const deal = await optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`));
+  const [deal, flow] = await Promise.all([optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)), optional(() => orderFlowOf(id))]);
+  const papers = flow?.documents ?? null;
+  const canPapers = can(me, "documents.manage") && o.status !== "cancelled";
+  const print = Object.fromEntries(
+    o.documents
+      .filter((d) => d.kind === "proforma" || d.kind === "packing-list")
+      .map((d) => {
+        const h = docHref(o, d);
+        return [d.kind, <FileActions key={d.kind} viewHref={h.view} pdfHref={h.pdf} of={d.label.toLowerCase()} />];
+      }),
+  );
+  const route = flow?.payment.route ?? null;
   const open = o.status !== "cancelled";
   const canMove = can(me, "orders.update") && open;
   const name = (uid: string | null) => (uid ? (deal?.people[uid] ?? "Someone") : "System");
 
   return (
     <div className="flex flex-col gap-5">
+      {papers && (
+        <Card>
+          <CardHeader
+            title="Documents through the banks"
+            description={
+              route
+                ? `${PAYMENT_ROUTE_SHORT[route]} route${flow?.payment.bankContract?.number ? ` · ${flow.payment.bankContract.number}` : ""}: the papers the shipment needs and where they are`
+                : "Choose how the customer pays on Payments: it decides the papers and bank steps"
+            }
+          />
+          <CardBody className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <div className="flex min-w-0 flex-col gap-2">
+              <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">Document set</h3>
+              <PaperSetPanel
+                addAction={addDocumentAction.bind(null, o.id)}
+                updateActions={Object.fromEntries(papers.set.filter((d) => d.id).map((d) => [d.id!, updateDocumentAction.bind(null, o.id, d.id!)]))}
+                removeActions={Object.fromEntries(papers.set.filter((d) => d.id).map((d) => [d.id!, removeDocumentAction.bind(null, o.id, d.id!)]))}
+                set={papers.set}
+                files={(deal?.attachments ?? []).map((f) => ({ id: f.id, name: f.fileName, href: `/files/${f.id}` }))}
+                shipments={(flow?.shipping?.shipments ?? []).map((s, i) => ({ id: s.id, label: `Shipment ${i + 1}${s.blNo ? ` · ${s.blNo}` : ""}` }))}
+                printButtons={print}
+                canEdit={canPapers}
+              />
+            </div>
+            <div className="flex min-w-0 flex-col gap-2">
+              <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">{route === "informal" || !route ? "To the customer" : "Through the banks"}</h3>
+              <BankChainPanel
+                stepActions={Object.fromEntries(papers.bankSteps.map((b) => [b.step, bankStepAction.bind(null, o.id, b.step)]))}
+                clearActions={Object.fromEntries(papers.bankSteps.map((b) => [b.step, clearBankStepAction.bind(null, o.id, b.step)]))}
+                steps={papers.bankSteps}
+                today={today()}
+                canEdit={canPapers}
+              />
+            </div>
+          </CardBody>
+        </Card>
+      )}
       <Card>
         <CardHeader title="Made from the order" description="Made whenever you open them, so they are always up to date." />
         <ul className="flex flex-col divide-y divide-line">

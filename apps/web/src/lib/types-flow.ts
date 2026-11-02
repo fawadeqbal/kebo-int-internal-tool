@@ -1,0 +1,148 @@
+import type {
+  BankContractStatus,
+  BankStepKind,
+  ClaimStatus,
+  DeliveryCondition,
+  FactoryRequestStatus,
+  FlowState,
+  FlowStep,
+  OrderDocumentKind,
+  OrderDocumentStatus,
+  PaymentRoute,
+  SatResult,
+  ShipMode,
+  ShipmentStatus,
+} from "@kebo/shared";
+
+/** GET /orders/:id/flow — the order after the customer accepted; a module switched off for the company is null. */
+export interface OrderFlow {
+  orderId: string;
+  refNo: string;
+  steps: { key: FlowStep; label: string; state: FlowState; sub: string }[];
+  modules: { bankContracts: boolean; production: boolean; shipping: boolean; bankDocuments: boolean; deliverySat: boolean };
+  payment: {
+    route: PaymentRoute | null;
+    routeLabel: string | null;
+    depositIn: boolean;
+    bankContract: BankContract | null;
+  };
+  factory: { orderedOn: string | null; readyOn: string | null; factories: { id: string; name: string }[] };
+  production: { steps: ProductionStepView[]; suggested: string[] } | null;
+  shipping: { shipments: ShipmentView[] } | null;
+  documents: { set: FlowDocument[]; bankSteps: BankStepView[] } | null;
+  delivery: DeliveryView | null;
+}
+
+export interface BankContract {
+  number: string | null;
+  status: BankContractStatus;
+  customerBank: string | null;
+  ourBank: string | null;
+  amount: number | null;
+  currency: string | null;
+  openedOn: string | null;
+  latestShipOn: string | null;
+  expiresOn: string | null;
+  note: string | null;
+}
+
+export interface ProductionStepView {
+  id: string;
+  title: string;
+  factory: { id: string; name: string } | null;
+  plannedOn: string | null;
+  doneOn: string | null;
+  note: string | null;
+  late: boolean;
+}
+
+export interface ShipmentView {
+  id: string;
+  mode: ShipMode;
+  status: ShipmentStatus;
+  forwarder: string | null;
+  bookingNo: string | null;
+  blNo: string | null;
+  vessel: string | null;
+  portOfLoading: string | null;
+  portOfDischarge: string | null;
+  containerNo: string | null;
+  containerType: string | null;
+  etd: string | null;
+  eta: string | null;
+  departedOn: string | null;
+  arrivedOn: string | null;
+  note: string | null;
+}
+
+export interface FlowDocument {
+  /** Null: not recorded yet. */
+  id: string | null;
+  kind: OrderDocumentKind;
+  label: string;
+  required: boolean;
+  status: OrderDocumentStatus;
+  number: string | null;
+  issuedOn: string | null;
+  shipmentId: string | null;
+  note: string | null;
+  file: { id: string; name: string; size: number } | null;
+  printable: "proforma" | "packing-list" | null;
+}
+
+export interface BankStepView {
+  step: BankStepKind;
+  label: string;
+  doneOn: string | null;
+  courier: string | null;
+  reference: string | null;
+  note: string | null;
+}
+
+export interface SatCheckView {
+  id: string;
+  item: string;
+  result: SatResult;
+  note: string | null;
+}
+
+export interface ClaimView {
+  id: string;
+  title: string;
+  detail: string | null;
+  status: ClaimStatus;
+  statusLabel: string;
+  openedOn: string;
+  resolvedOn: string | null;
+  resolution: string | null;
+}
+
+export interface DeliveryView {
+  deliveredOn: string | null;
+  condition: DeliveryCondition | null;
+  note: string | null;
+  satEngineer: { id: string; name: string } | null;
+  satPlannedOn: string | null;
+  satDoneOn: string | null;
+  satSignedBy: string | null;
+  sat: SatCheckView[];
+  suggestedSat: string[];
+  claims: ClaimView[];
+}
+
+/** GET /inquiries/:id/factory-requests */
+export interface FactoryRequests {
+  items: {
+    id: string;
+    factory: { id: string; name: string };
+    status: FactoryRequestStatus;
+    statusLabel: string;
+    sentOn: string;
+    replyBy: string | null;
+    late: boolean;
+    factoryQuoteId: string | null;
+    note: string | null;
+    by: { id: string; name: string };
+  }[];
+  counts: { asked: number; quoted: number; waiting: number; late: number };
+}

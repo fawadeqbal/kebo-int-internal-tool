@@ -243,6 +243,15 @@ describe("order flow: from asking factories to SAT", () => {
     for (const text of ["payment route LC", "LC added", "ordered from the factory", "shipment added", "Couriered to the customer's bank", "SAT signed off", "claim opened"]) expect(audit).toContain(text);
   });
 
+  it("the board shows each open order at its current step", async () => {
+    const board = (await api(app, sana).get("/order-board?mine=true").expect(200)).body;
+    const mine = board.items.find((i: { id: string }) => i.id === orderId);
+    // Every step is done but the second (air) shipment the logistics test adds later: here nothing is current yet.
+    expect(mine).toEqual({ id: orderId, current: null });
+    await api(app, bilal).get("/order-board").expect(200);
+    expect((await api(app, bilal).get("/order-board").expect(200)).body.items.map((i: { id: string }) => i.id)).not.toContain(orderId);
+  });
+
   it("a role without a permission is refused, and does not get it in /auth/me", async () => {
     const role = (await api(app, admin).post("/roles", { name: `Logistics ${tag}`, permissions: ["dashboard.view", "inquiries.viewAll", "shipping.manage"] }).expect(201)).body;
     const email = `logistics-${tag}@example.com`;
@@ -279,10 +288,14 @@ describe("order flow: from asking factories to SAT", () => {
       expect(me.permissions).not.toContain("shipping.manage");
       expect(me.permissions).not.toContain("delivery.manage");
       expect(me.permissions).toContain("documents.manage");
+      // The board itself is a module too.
+      await modulesOff(["orders_board"]);
+      expect((await api(app, sana).get("/order-board").expect(403)).body.code).toBe("plan_feature");
     } finally {
       await modulesOff([]);
     }
     expect((await flow()).shipping).not.toBeNull();
+    await api(app, sana).get("/order-board").expect(200);
   });
 
   it("the steps: a module switched off never blocks, the first unfinished step is current", () => {

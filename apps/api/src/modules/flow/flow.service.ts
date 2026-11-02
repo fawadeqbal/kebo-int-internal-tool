@@ -15,6 +15,13 @@ import {
   type BankContractInput,
   type BankStepInput,
   type BankStepKind,
+  type ClaimStatus,
+  type FlowFacts,
+  type OrderStage,
+  type PaymentRoute,
+  type SatResult,
+  type ShipMode,
+  type ShipmentStatus,
   type ClaimInput,
   type ClaimUpdateInput,
   type DeliveryInput,
@@ -40,6 +47,70 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess } from "../orders/orders.service";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
+
+/** What the step line is worked out from (see @kebo/shared flowSteps), for one order with its flow rows. */
+interface FlowRows {
+  stage: OrderStage;
+  status: string;
+  paymentRoute: PaymentRoute | null;
+  factoryOrderedOn: Date | null;
+  readyOn: Date | null;
+  proformaNo: string | null;
+  packedAt: Date | null;
+  deliveredOn: Date | null;
+  satDoneOn: Date | null;
+  production: { doneOn: Date | null }[];
+  shipments: { mode: ShipMode; status: ShipmentStatus }[];
+  documents: { kind: OrderDocumentKind; status: OrderDocumentStatus }[];
+  bankSteps: { step: BankStepKind }[];
+  satChecks: { result: SatResult }[];
+  claims: { status: ClaimStatus }[];
+}
+
+export function factsOf(o: FlowRows, depositIn: boolean): FlowFacts {
+  const route = o.paymentRoute;
+  const required = requiredDocuments(route, o.shipments[0]?.mode ?? "sea");
+  const ready = required.filter((kind) => {
+    const rows = o.documents.filter((d) => d.kind === kind);
+    if (rows.length) return rows.some((d) => d.status === "ready");
+    return kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false;
+  }).length;
+  const bankKinds = bankStepsFor(route);
+  return {
+    stage: o.stage,
+    cancelled: o.status === "cancelled",
+    route,
+    depositIn,
+    factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
+    production: { total: o.production.length, done: o.production.filter((p) => p.doneOn).length },
+    readyOn: fromDbDateOrNull(o.readyOn),
+    shipments: {
+      total: o.shipments.length,
+      departed: o.shipments.filter((s) => ["departed", "arrived", "cleared"].includes(s.status)).length,
+      arrived: o.shipments.filter((s) => s.status === "arrived" || s.status === "cleared").length,
+    },
+    documents: { required: required.length, ready },
+    bankSteps: { required: bankKinds.length, done: o.bankSteps.filter((b) => bankKinds.includes(b.step)).length },
+    deliveredOn: fromDbDateOrNull(o.deliveredOn),
+    sat: {
+      total: o.satChecks.length,
+      passed: o.satChecks.filter((c) => c.result === "pass").length,
+      failed: o.satChecks.filter((c) => c.result === "fail").length,
+      doneOn: fromDbDateOrNull(o.satDoneOn),
+    },
+    openClaims: o.claims.filter((c) => c.status === "open" || c.status === "with_factory").length,
+  };
+}
+
+/** The deposit (or everything, with no deposit) has come in, in the order's currency. */
+function depositInOf(o: { total: Prisma.Decimal; currency: string; depositPercent: Prisma.Decimal; payments: { currency: string; amount: Prisma.Decimal; bankCharges: Prisma.Decimal }[] }) {
+  const money = settle(
+    decimalToMinor(o.total),
+    o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
+    Number(o.depositPercent),
+  );
+  return money.depositOutstandingMinor === 0 && (Number(o.depositPercent) > 0 || money.outstandingMinor === 0);
+}
 
 interface DocumentView {
   /** Null: not recorded yet (a paper the shipment needs, or one the system prints). */
@@ -131,12 +202,7 @@ export class FlowService {
     const features = await this.limits.features();
     const has = (f: PlanFeature) => !features || features.includes(f);
 
-    const money = settle(
-      decimalToMinor(o.total),
-      o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-      Number(o.depositPercent),
-    );
-    const depositIn = money.depositOutstandingMinor === 0 && (Number(o.depositPercent) > 0 || money.outstandingMinor === 0);
+    const depositIn = depositInOf(o);
 
     const route = o.paymentRoute;
     const mode = o.shipments[0]?.mode ?? "sea";
@@ -184,30 +250,7 @@ export class FlowService {
       resolvedOn: fromDbDateOrNull(c.resolvedOn),
       resolution: c.resolution,
     }));
-    const openClaims = o.claims.filter((c) => c.status === "open" || c.status === "with_factory").length;
-
-    const steps = flowSteps(
-      {
-        stage: o.stage,
-        cancelled: o.status === "cancelled",
-        route,
-        depositIn,
-        factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
-        production: { total: o.production.length, done: o.production.filter((p) => p.doneOn).length },
-        readyOn: fromDbDateOrNull(o.readyOn),
-        shipments: {
-          total: o.shipments.length,
-          departed: o.shipments.filter((s) => ["departed", "arrived", "cleared"].includes(s.status)).length,
-          arrived: o.shipments.filter((s) => s.status === "arrived" || s.status === "cleared").length,
-        },
-        documents: { required: required.length, ready: documents.filter((d) => d.required && d.status === "ready").length },
-        bankSteps: { required: bankKinds.length, done: bankSteps.filter((b) => b.doneOn).length },
-        deliveredOn: fromDbDateOrNull(o.deliveredOn),
-        sat: { total: sat.length, passed: sat.filter((c) => c.result === "pass").length, failed: sat.filter((c) => c.result === "fail").length, doneOn: fromDbDateOrNull(o.satDoneOn) },
-        openClaims,
-      },
-      features,
-    );
+    const steps = flowSteps(factsOf(o, depositIn), features);
 
     const factories = [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
     const b = o.bankContract;
@@ -332,6 +375,48 @@ export class FlowService {
       ];
     });
     return [...out, ...o.documents.filter((d) => !required.includes(d.kind)).map(row)];
+  }
+
+  /**
+   * The open orders' current step, for the orders board (columns by step): one
+   * light query for up to 300 orders. Steps of switched-off modules are skipped.
+   */
+  async board(user: SessionUser, mine: boolean) {
+    const rows = await this.prisma.db.order.findMany({
+      where: { ...orderAccess(user), status: "open", ...(mine ? { inquiry: { assigneeId: user.id } } : {}) },
+      select: {
+        id: true,
+        stage: true,
+        status: true,
+        paymentRoute: true,
+        factoryOrderedOn: true,
+        readyOn: true,
+        proformaNo: true,
+        packedAt: true,
+        deliveredOn: true,
+        satDoneOn: true,
+        total: true,
+        currency: true,
+        depositPercent: true,
+        payments: { where: { voidedAt: null }, select: { currency: true, amount: true, bankCharges: true } },
+        production: { select: { doneOn: true } },
+        shipments: { orderBy: { createdAt: "asc" }, select: { mode: true, status: true } },
+        documents: { select: { kind: true, status: true } },
+        bankSteps: { select: { step: true } },
+        satChecks: { select: { result: true } },
+        claims: { select: { status: true } },
+      },
+      orderBy: { stageSince: "asc" },
+      take: 300,
+    });
+    const features = await this.limits.features();
+    return {
+      items: rows.map((o) => {
+        const steps = flowSteps(factsOf(o, depositInOf(o)), features);
+        const current = steps.find((s) => s.state === "current") ?? null;
+        return { id: o.id, current: current && { key: current.key, label: current.label, sub: current.sub } };
+      }),
+    };
   }
 
   /* ---------------------------------------------------------------- payment route, bank contract, factory order */

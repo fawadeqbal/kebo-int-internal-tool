@@ -187,7 +187,8 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
   };
   const shippedStage = f.stage === "shipped" || f.stage === "done";
   const done: Record<FlowStep, boolean> = {
-    payment: f.route !== null && f.depositIn,
+    // The route is asked for, never a gate: an order paid (or past Confirmed) has its payment step done.
+    payment: f.depositIn || after(f.stage, "confirmed"),
     factory: f.factoryOrderedOn !== null || after(f.stage, "confirmed"),
     production: (f.production.total > 0 && f.production.done === f.production.total) || shippedStage,
     shipping: f.shipments.total > 0 ? f.shipments.arrived === f.shipments.total : f.stage === "done",
@@ -195,7 +196,7 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
     delivery: f.deliveredOn !== null && f.sat.doneOn !== null && f.openClaims === 0,
   };
   const sub: Record<FlowStep, string> = {
-    payment: f.route === null ? "Choose how the customer pays" : f.depositIn ? "Deposit received" : "Waiting for the deposit",
+    payment: f.depositIn ? (f.route === null ? "Deposit received · route not chosen" : "Deposit received") : f.route === null ? "Choose how the customer pays" : "Waiting for the deposit",
     factory: f.factoryOrderedOn ? `Ordered ${f.factoryOrderedOn}` : "Place the order with the factory",
     production: f.production.total ? `${f.production.done} of ${f.production.total} steps` : f.readyOn ? `Ready ${f.readyOn}` : "No timeline yet",
     shipping: f.shipments.total
