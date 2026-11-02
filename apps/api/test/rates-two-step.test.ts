@@ -1,7 +1,9 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
+import { addDays } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
+import { Clock } from "../src/common/time/clock.service";
 
 /** How old each exchange rate is, flagged when old; and asking people to turn on two-step sign-in. */
 describe("rate dates and two-step reminders", () => {
@@ -23,7 +25,8 @@ describe("rate dates and two-step reminders", () => {
   });
 
   it("a changed rate gets today's date; an unchanged one keeps its date", async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    // The business day (Asia/Shanghai by default), not the UTC one: they differ for eight hours a day.
+    const today = app.get(Clock).today();
     const rates = original.exchangeRates as Record<string, number>;
     const cny = Object.keys(rates).find((c) => c === "CNY") ?? Object.keys(rates)[0]!;
     const saved = (await api(app, admin).put("/settings/sales", { ...original, exchangeRates: { ...rates, [cny]: rates[cny]! + 0.01 }, reason: "test" }).expect(200)).body;
@@ -38,7 +41,7 @@ describe("rate dates and two-step reminders", () => {
     const s = await prisma.platform.setting.findFirstOrThrow({ where: { key: "sales", company: { slug: "kebo" } } });
     const v = s.value as { rateDates: Record<string, string>; exchangeRates: Record<string, number> };
     const c = Object.keys(v.exchangeRates)[0]!;
-    const old = new Date(Date.now() - 40 * 86_400_000).toISOString().slice(0, 10);
+    const old = addDays(app.get(Clock).today(), -40);
     await prisma.platform.setting.update({ where: { companyId_key: { companyId: s.companyId, key: "sales" } }, data: { value: { ...v, rateDates: { ...v.rateDates, [c]: old } } } });
     await api(app, admin).put("/settings/notifications", (await api(app, admin).get("/settings")).body.notifications); // clears the settings cache
     const items = (await api(app, admin).get("/reminders").expect(200)).body.items as { title: string }[];
