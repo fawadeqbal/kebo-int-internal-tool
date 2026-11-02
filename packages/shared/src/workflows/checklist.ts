@@ -1,8 +1,10 @@
 import type { ISODate } from "@kebo/utils";
 import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute, ShipMode, ShipmentStatus } from "../enums";
+import type { PaperKind } from "./papers";
 import {
   BANK_STEP_LABEL,
   bankStepsFor,
+  documentDone,
   FLOW_STEP_LABEL,
   FLOW_STEPS,
   ORDER_DOCUMENT_LABEL,
@@ -43,8 +45,8 @@ export const TOOL_HINT: Record<ChecklistTool, string> = {
   fill: "A small form with the item's fields; saving ticks it",
   upload: "Attach the file; the item ticks when it is in",
   pay: "Opens the payment form; tick it once paid",
-  make: "The app makes the paper (coming soon; ticks by hand for now)",
-  send: "A message to the customer (coming soon; ticks by hand for now)",
+  make: "The app makes the paper (choose which); made final, it ticks",
+  send: "The app makes the paper and gives the email / WhatsApp text to send it; made final, it ticks",
 };
 
 export const CHECKLIST_FIELD_TYPES = ["text", "date", "number", "file"] as const;
@@ -113,7 +115,7 @@ export interface ChecklistFacts {
   shippedOn: ISODate | null;
   blNo: string | null;
   proforma: { number: string; issuedOn: ISODate | null } | null;
-  documents: { kind: OrderDocumentKind; status: "missing" | "draft" | "ready"; number: string | null; issuedOn: ISODate | null }[];
+  documents: { kind: OrderDocumentKind; status: "missing" | "draft" | "ready" | "elsewhere"; number: string | null; issuedOn: ISODate | null }[];
   bankSteps: { step: BankStepKind; doneOn: ISODate; reference: string | null }[];
   deliveredOn: ISODate | null;
   satDoneOn: ISODate | null;
@@ -401,7 +403,7 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     const mode = first?.mode ?? f.shipMode ?? "sea";
     requiredDocuments(f.route, mode).forEach((kind, i) => {
       const rows = f.documents.filter((d) => d.kind === kind);
-      const ready = rows.find((d) => d.status === "ready");
+      const ready = rows.find((d) => documentDone(d.status));
       const system = kind === "proforma_invoice" ? f.proforma : null;
       const done = rows.length ? !!ready : kind === "proforma_invoice" ? !!f.proforma : kind === "packing_list" ? !!f.packedAt : false;
       add("documents", `doc:${kind}`, {
@@ -419,7 +421,9 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
             ? `${rows[0]!.status === "draft" ? "draft: " : ""}mark it ready`
             : kind === "packing_list"
               ? "made from the packing list"
-              : "upload or record it",
+              : kind === "commercial_invoice" || kind === "sales_contract" || kind === "inspection"
+                ? "the app makes it"
+                : "upload it, or say where it is kept",
       });
     });
     bankStepsFor(f.route).forEach((step, i) => {
@@ -480,6 +484,8 @@ export interface ChecklistTemplateItem {
   title: string;
   tool: ChecklistTool;
   fields?: ChecklistField[];
+  /** Make and Send items: the paper the app makes. */
+  paper?: PaperKind | null;
   route?: PaymentRoute | null;
   /** Due this many days after the order date. */
   dueDays?: number | null;
@@ -517,7 +523,7 @@ export const DEFAULT_CHECKLIST: ChecklistTemplateItem[] = [
     route,
     sort: 50,
   })),
-  { step: "shipping", title: "Shipping advice to the customer", tool: "send", sort: 50 },
+  { step: "shipping", title: "Shipping advice to the customer", tool: "send", paper: "shipping-advice", sort: 50 },
 ];
 
 /* ---------------------------------------------------------------- the steps */
@@ -592,7 +598,7 @@ export function stepOfKey(key: string): FlowStep | null {
 export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | null {
   const nv = (newValues && typeof newValues === "object" ? newValues : {}) as Record<string, unknown>;
   const step = typeof nv.step === "string" && (FLOW_STEPS as readonly string[]).includes(nv.step) ? (nv.step as FlowStep) : null;
-  if (action.startsWith("checklist.")) return step;
+  if (action.startsWith("checklist.") || action.startsWith("paper.")) return step;
   if (action.startsWith("expense")) return step;
   if (action.startsWith("payment_out")) return "factory";
   if (action.startsWith("payment_") || action === "payment_plan") return "payment";

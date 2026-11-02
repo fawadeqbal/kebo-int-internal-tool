@@ -99,7 +99,7 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
       { permission: "orders.manage", label: "Cancel orders, remove payments, ship with money due" },
       { permission: "payments.record", label: "Record customer payments" },
       { permission: "shipping.manage", label: "Shipping", hint: "Book shipments, packing, bill of lading or air waybill, shipping costs." },
-      { permission: "documents.manage", label: "Documents and bank", hint: "The document set and its steps through the banks." },
+      { permission: "documents.manage", label: "Papers, documents and bank", hint: "Make the papers (contract, invoices, reports), the document set and its steps through the banks." },
       { permission: "delivery.manage", label: "Delivery and SAT", hint: "Arrival, customs, delivery, site acceptance and claims." },
       { permission: "expenses.manage", label: "Expenses, factory payments and profit & loss" },
     ],
@@ -178,8 +178,9 @@ export const PERMISSION_FEATURE: Partial<Record<Permission, PlanFeature>> = {
   "audit.view": "audit_log",
   "customers.export": "excel",
   "shipping.manage": "shipping",
-  "documents.manage": "bank_documents",
   "delivery.manage": "delivery_sat",
+  // documents.manage stays in every plan: the papers the app makes are core; the document set and the
+  // bank chain still need bank_documents, which the API checks on those routes.
 };
 
 /** Whether a plan with these features includes the permission (null: no plan, so every one). */

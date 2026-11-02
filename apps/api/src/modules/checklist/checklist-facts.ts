@@ -1,6 +1,6 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, settle, splitDeposit } from "@kebo/money";
-import { bankStepsFor, requiredDocuments, type ChecklistFacts, type FlowFacts } from "@kebo/shared";
+import { bankStepsFor, documentDone, requiredDocuments, type ChecklistFacts, type FlowFacts } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
@@ -115,7 +115,7 @@ export function flowFactsOf(o: ChecklistOrderRow, f: ChecklistFacts): FlowFacts 
   const required = requiredDocuments(o.paymentRoute, o.shipments[0]?.mode ?? "sea");
   const ready = required.filter((kind) => {
     const rows = o.documents.filter((d) => d.kind === kind);
-    if (rows.length) return rows.some((d) => d.status === "ready");
+    if (rows.length) return rows.some((d) => documentDone(d.status));
     return kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false;
   }).length;
   const bankKinds = bankStepsFor(o.paymentRoute);

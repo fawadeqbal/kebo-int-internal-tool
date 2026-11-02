@@ -80,8 +80,11 @@ export const ORDER_DOCUMENT_LABEL: Record<OrderDocumentKind, string> = {
   inspection: "Inspection certificate",
   other: "Other document",
 };
-export const ORDER_DOCUMENT_STATUS_LABEL: Record<OrderDocumentStatus, string> = { missing: "Missing", draft: "Draft", ready: "Ready" };
-export const ORDER_DOCUMENT_STATUS_TONE: Record<OrderDocumentStatus, Tone> = { missing: "warn", draft: "info", ready: "ok" };
+export const ORDER_DOCUMENT_STATUS_LABEL: Record<OrderDocumentStatus, string> = { missing: "Missing", draft: "Draft", ready: "Ready", elsewhere: "Kept elsewhere" };
+export const ORDER_DOCUMENT_STATUS_TONE: Record<OrderDocumentStatus, Tone> = { missing: "warn", draft: "info", ready: "ok", elsewhere: "neutral" };
+
+/** A paper of the set counts as done when it is ready or kept elsewhere (no file in the app). */
+export const documentDone = (status: OrderDocumentStatus | string) => status === "ready" || status === "elsewhere";
 
 export const BANK_STEP_LABEL: Record<BankStepKind, string> = {
   sent_to_our_bank: "Documents handed to our bank",

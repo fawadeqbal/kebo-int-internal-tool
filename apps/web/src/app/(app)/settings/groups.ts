@@ -85,6 +85,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "defaultIncoterm", label: "Usual Incoterm", kind: "select", options: INCOTERMS.map((i) => ({ value: i, label: i })), hint: "Who pays freight and insurance. FOB: we deliver onto the ship at the Chinese port." },
       { name: "defaultPaymentTerms", label: "Payment terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the deposit and balance, e.g. By T/T; L/C at sight accepted" },
       { name: "defaultDeliveryTerms", label: "Delivery terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the delivery time, e.g. packing, inspection, warranty" },
+      { name: "warrantyTerms", label: "Warranty on sales contracts", kind: "textarea", wide: true, hint: "Printed on the sales contract and the SAT certificate" },
       { name: "categories", label: "Product categories", kind: "lines", wide: true, hint: "One per line. Every inquiry is filed under one of these." },
     ],
   },

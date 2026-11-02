@@ -169,7 +169,8 @@ export const ORDER_DOCUMENT_KINDS = values(
 );
 export type OrderDocumentKind = (typeof ORDER_DOCUMENT_KINDS)[number];
 
-export const ORDER_DOCUMENT_STATUSES = values("missing", "draft", "ready");
+/** elsewhere: kept outside the app (a shelf, a bank, a person), with where; counts as done like ready. */
+export const ORDER_DOCUMENT_STATUSES = values("missing", "draft", "ready", "elsewhere");
 export type OrderDocumentStatus = (typeof ORDER_DOCUMENT_STATUSES)[number];
 
 export const BANK_STEP_KINDS = values("sent_to_our_bank", "couriered_to_customer_bank", "copies_to_customer", "customer_paid_bank", "bank_paid_us");

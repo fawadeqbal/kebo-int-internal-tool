@@ -2,11 +2,14 @@ import { z } from "zod";
 import { PAYMENT_ROUTES } from "../enums";
 import { FLOW_STEPS } from "../workflows/flow";
 import { CHECKLIST_FIELD_TYPES, CHECKLIST_TOOLS, HIDEABLE_AUTO_KEYS } from "../workflows/checklist";
+import { PAPER_KINDS } from "../workflows/papers";
 import { optionalDate, optionalId, optionalText, text } from "./common";
 
 /** Inputs for an order's checklist and the company's list (see workflows/checklist). */
 
 const maybe = <T extends z.ZodTypeAny>(s: T) => s.optional();
+/** The paper a Make or Send item makes (empty: none). */
+const optionalPaper = z.preprocess((v) => (v === "" || v === undefined ? null : v), z.enum(PAPER_KINDS).nullable());
 const optionalRoute = z.preprocess((v) => (v === "" || v === undefined ? null : v), z.enum(PAYMENT_ROUTES).nullable());
 
 export const checklistField = z.object({
@@ -30,6 +33,7 @@ export const checklistItemInput = z.object({
   title: text(200, "Say what has to be done"),
   tool: z.enum(CHECKLIST_TOOLS).default("done"),
   fields,
+  paper: optionalPaper.optional().transform((v) => v ?? null),
   route: optionalRoute.optional().transform((v) => v ?? null),
   dueOn: optionalDate,
   assigneeId: optionalId,
@@ -41,6 +45,7 @@ export const checklistItemUpdateInput = z.object({
   title: maybe(text(200, "Say what has to be done")),
   tool: maybe(z.enum(CHECKLIST_TOOLS)),
   fields: maybe(fields),
+  paper: maybe(optionalPaper),
   route: maybe(optionalRoute),
   dueOn: maybe(optionalDate),
   assigneeId: maybe(optionalId),
@@ -82,6 +87,7 @@ export const checklistTemplateInput = z.object({
         title: text(200, "Say what has to be done"),
         tool: z.enum(CHECKLIST_TOOLS).default("done"),
         fields,
+        paper: optionalPaper.optional().transform((v) => v ?? null),
         route: optionalRoute.optional().transform((v) => v ?? null),
         dueDays: z.preprocess(
           (v) => (v === "" || v === null || v === undefined ? null : Number(v)),

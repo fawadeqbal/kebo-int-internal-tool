@@ -64,6 +64,13 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/orders/${o.id}/steps`);
       await ok(manager, `/history?type=order&id=${o.id}&step=production`);
       for (const kind of ["proforma", "packing-list"]) await ok(manager, `/orders/${o.id}/documents/${kind}`);
+      const papers = (await ok(manager, `/orders/${o.id}/papers`)) as { papers: { kind: string; ref: string | null; makeable: boolean; live: boolean }[] };
+      for (const p of papers.papers.filter((x) => x.makeable || x.live)) {
+        const q = p.ref ? `?ref=${p.ref}` : "";
+        await ok(manager, `/orders/${o.id}/papers/${p.kind}/doc${q}`);
+        await ok(manager, `/orders/${o.id}/papers/${p.kind}/checks${q}`);
+      }
+      await ok(staff, `/orders/${o.id}/papers`);
     }
   });
 });
