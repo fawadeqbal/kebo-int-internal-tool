@@ -9,6 +9,11 @@ import type { DealDetail, Person } from "@/lib/types";
 import { assignAction, describeFileAction, holdAction, moveStageAction, noteAction, removeFileAction } from "../actions";
 import { AssignPanel, HoldPanel, NoteForm, StagePanel } from "./panels";
 import { DocumentsPanel } from "@/components/deals/documents-panel";
+import { FactoriesAsked } from "@/components/deals/factories-asked";
+import { optional } from "@/components/print/data";
+import { today } from "@/components/orders/today";
+import type { FactoryRequests } from "@/lib/types-flow";
+import { askFactoriesAction, factoryRequestStatusAction, removeFactoryRequestAction } from "../factory-request-actions";
 import { CustomerHistoryNote } from "@/components/money/customer-account";
 
 export const metadata = { title: "Inquiry" };
@@ -37,6 +42,18 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
 
   // The customer's account history comes with Expenses (a plan feature).
   const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
+
+  // Factories asked for a price: people who see factory prices, with the module on.
+  const asking = can(me, "sourcing.manage") && (await hasFeature("factory_requests"));
+  const requests = asking ? await optional(() => api.get<FactoryRequests>(`/inquiries/${d.id}/factory-requests`)) : null;
+  const excel = await hasFeature("excel");
+  const message = [
+    "Hello, please quote the attached list:",
+    ...d.items.map((i) => `${i.parentId ? "   " : ""}${i.no}. ${i.description.split("\n")[0]}${i.model ? ` (${i.model})` : ""} — ${qty(i.quantity)} ${i.unit}`),
+    "",
+    "Please give the price basis (EXW or FOB), the lead time and how long the price is valid.",
+    `Our reference: ${d.refNo}`,
+  ].join("\n");
 
   return (
     <>
@@ -94,6 +111,34 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
               />
             </CardBody>
           </Card>
+
+          {requests && (
+            <Card id="factories-asked">
+              <CardHeader
+                title="Factories asked"
+                description={
+                  requests.counts.asked
+                    ? `${requests.counts.asked} asked · ${requests.counts.quoted} answered${requests.counts.waiting ? ` · ${requests.counts.waiting} waiting` : ""}`
+                    : "Who has the list, and who has answered"
+                }
+              />
+              <CardBody>
+                <FactoriesAsked
+                  data={requests}
+                  ask={askFactoriesAction.bind(null, d.id)}
+                  statusActions={Object.fromEntries(requests.items.map((r) => [r.id, factoryRequestStatusAction.bind(null, d.id, r.id)]))}
+                  removeActions={Object.fromEntries(requests.items.map((r) => [r.id, removeFactoryRequestAction.bind(null, d.id, r.id)]))}
+                  message={message}
+                  excelHref={excel ? `/sheets/export/factory-list?id=${d.id}` : null}
+                  files={d.attachments.map((f) => ({ id: f.id, name: f.fileName, size: f.size }))}
+                  sourcingHref={`/inquiries/${d.id}/sourcing`}
+                  canEdit={d.canWork}
+                  today={today()}
+                  closed={d.stage === "won" || d.stage === "lost"}
+                />
+              </CardBody>
+            </Card>
+          )}
 
           <Card id="notes">
             <CardHeader title="Notes" />

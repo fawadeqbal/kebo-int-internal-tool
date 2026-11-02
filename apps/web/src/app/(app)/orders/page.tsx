@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
-import { ORDER_STAGE_LABEL, STAGE_FLOW, type OrderStage } from "@kebo/shared";
+import { ORDER_STAGE_LABEL, STAGE_FLOW, type FlowStep, type OrderStage } from "@kebo/shared";
 import { buildHref, Card, cn, EmptyState, FilterBar, FilterChip, LinkTabs, OrderStageBadge, PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
-import { requireUser } from "@/lib/session";
+import { hasFeature, requireUser } from "@/lib/session";
+import { optional } from "@/components/print/data";
 import { date, money } from "@/lib/format";
 import type { OrderRow } from "@/lib/types-orders";
 
@@ -39,6 +40,65 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     note: stage === "done" && doneCount > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneCount}` : undefined,
     count: stage === "done" ? doneCount : undefined,
   }));
+  // With the orders board module, the columns are the steps after acceptance (the design's board); else the four stages.
+  const board = !cancelled && (await hasFeature("orders_board")) ? await optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", q)) : null;
+  if (board) {
+    const at = new Map(board.items.map((i) => [i.id, i.current]));
+    const on = {
+      production: await hasFeature("production"),
+      shipping: await hasFeature("shipping"),
+      documents: await hasFeature("bank_documents"),
+      delivery: await hasFeature("delivery_sat"),
+    };
+    const flowCols: { key: string; label: string; steps: FlowStep[] }[] = [
+      { key: "payment", label: "Customer payment", steps: ["payment"] },
+      { key: "production", label: on.production ? "Factory & production" : "Factory order", steps: ["factory", "production"] },
+      ...(on.shipping ? [{ key: "shipping", label: "Shipping", steps: ["shipping"] as FlowStep[] }] : []),
+      ...(on.documents ? [{ key: "documents", label: "Documents & bank", steps: ["documents"] as FlowStep[] }] : []),
+      ...(on.delivery ? [{ key: "delivery", label: "Delivery & SAT", steps: ["delivery"] as FlowStep[] }] : []),
+    ];
+    const last = flowCols[flowCols.length - 1]!;
+    const cols: BoardCol[] = [
+      ...flowCols.map((c) => ({
+        key: c.key,
+        label: c.label,
+        rows: openRows
+          .filter((r) => {
+            const cur = at.get(r.id);
+            return cur ? c.steps.includes(cur.key) : c === last;
+          })
+          .map((r) => ({ ...r, flow: (at.get(r.id)?.sub ?? "Every step done: close the order").replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d)) })),
+      })),
+      { key: "done", label: "Done (recent)", rows: recentDone, count: doneCount, note: doneCount > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneCount}` : undefined },
+    ];
+    const phoneKey = cols.some((c) => c.key === sp.stage) ? sp.stage! : (cols.find((c) => c.key !== "done" && c.rows.length)?.key ?? "payment");
+    const phoneCol = cols.find((c) => c.key === phoneKey)!;
+    return (
+      <div>
+        <PageHeader
+          title="Orders"
+          description={`${openRows.length} open · each card says what it needs now`}
+          actions={<ExportLink what="orders" query={{ mine: mine ? "1" : undefined }} />}
+        />
+        <Filters mine={mine} cancelled={false} keep={keep} />
+        {openRows.length + doneCount === 0 ? (
+          <EmptyState title={mine ? "No orders of yours yet" : "No orders yet"} description="An order appears when a customer accepts a quotation." />
+        ) : (
+          <>
+            <div className="xl:hidden">
+              <LinkTabs label="Step" className="mb-4" tabs={cols.map((c) => ({ href: buildHref("/orders", keep, { stage: c.key }), label: c.label, count: c.count ?? c.rows.length, active: c.key === phoneKey }))} />
+              <BoardColumn col={phoneCol} hideTitle />
+            </div>
+            <div className="hidden gap-3 xl:grid" style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}>
+              {cols.map((c) => (
+                <BoardColumn key={c.key} col={c} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
   const phoneStage: OrderStage = STAGE_FLOW.includes(sp.stage as OrderStage) ? (sp.stage as OrderStage) : (columns.find((c) => c.stage !== "done" && c.rows.length)?.stage ?? "confirmed");
   const phone = columns.find((c) => c.stage === phoneStage)!;
 
@@ -49,18 +109,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         description="Every order moves Confirmed → In production → Shipped → Done. Each card says what it needs now."
         actions={<ExportLink what="orders" query={{ mine: mine ? "1" : undefined, view: cancelled ? "cancelled" : undefined }} />}
       />
-      <FilterBar className="mb-5 rounded-xl border bg-surface">
-        <FilterChip href={buildHref("/orders", { view: keep.view }, {})} active={!mine}>
-          All
-        </FilterChip>
-        <FilterChip href={buildHref("/orders", { view: keep.view }, { mine: "1" })} active={mine}>
-          Mine
-        </FilterChip>
-        <span className="mx-1 h-5 w-px bg-line" aria-hidden />
-        <FilterChip href={buildHref("/orders", { mine: keep.mine }, cancelled ? {} : { view: "cancelled" })} active={cancelled}>
-          Cancelled
-        </FilterChip>
-      </FilterBar>
+      <Filters mine={mine} cancelled={cancelled} keep={keep} />
 
       {cancelled ? (
         cancelledRows.length === 0 ? (
@@ -97,6 +146,49 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   );
 }
 
+function Filters({ mine, cancelled, keep }: { mine: boolean; cancelled: boolean; keep: { mine?: string; view?: string } }) {
+  return (
+    <FilterBar className="mb-5 rounded-xl border bg-surface">
+      <FilterChip href={buildHref("/orders", { view: keep.view }, {})} active={!mine}>
+        All
+      </FilterChip>
+      <FilterChip href={buildHref("/orders", { view: keep.view }, { mine: "1" })} active={mine}>
+        Mine
+      </FilterChip>
+      <span className="mx-1 h-5 w-px bg-line" aria-hidden />
+      <FilterChip href={buildHref("/orders", { mine: keep.mine }, cancelled ? {} : { view: "cancelled" })} active={cancelled}>
+        Cancelled
+      </FilterChip>
+    </FilterBar>
+  );
+}
+
+type BoardRow = OrderRow & { flow?: string };
+interface BoardCol {
+  key: string;
+  label: string;
+  rows: BoardRow[];
+  count?: number;
+  note?: string;
+}
+
+function BoardColumn({ col, hideTitle }: { col: BoardCol; hideTitle?: boolean }) {
+  return (
+    <section aria-label={col.label} className="flex min-w-0 flex-col gap-3">
+      {!hideTitle && (
+        <h2 className="flex items-center justify-between gap-2 text-sm font-semibold">
+          <span className="truncate">{col.label}</span> <span className="text-xs font-normal text-muted">{col.count ?? col.rows.length}</span>
+        </h2>
+      )}
+      {col.rows.map((o) => (
+        <OrderCard key={o.id} o={o} />
+      ))}
+      {col.rows.length === 0 && <p className="rounded-lg border border-dashed border-line p-3 text-xs text-muted">Nothing here</p>}
+      {col.note && <p className="text-xs text-muted">{col.note}</p>}
+    </section>
+  );
+}
+
 function Column({ stage, rows, note, count, hideTitle }: { stage: OrderStage; rows: OrderRow[]; note?: string; count?: number; hideTitle?: boolean }) {
   return (
     <section aria-label={ORDER_STAGE_LABEL[stage]} className="flex min-w-0 flex-col gap-3">
@@ -114,17 +206,18 @@ function Column({ stage, rows, note, count, hideTitle }: { stage: OrderStage; ro
   );
 }
 
-function OrderCard({ o }: { o: OrderRow }) {
+function OrderCard({ o }: { o: BoardRow }) {
   const late = o.needs?.late;
   return (
     <Link href={`/orders/${o.id}`} className="block min-w-0">
       <Card className={cn("p-3 transition-colors hover:border-line-strong", late && "border-bad/40")}>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold">{o.refNo}</span>
-          {o.status === "cancelled" ? <span className="text-xs text-muted">Cancelled</span> : <OrderStageBadge stage={o.stage} />}
+          <span className="text-sm font-semibold whitespace-nowrap">{o.refNo}</span>
+          {o.status === "cancelled" ? <span className="text-xs text-muted">Cancelled</span> : o.flow === undefined && <OrderStageBadge stage={o.stage} />}
         </div>
         <p className="mt-0.5 truncate text-sm">{o.customer.name}</p>
         <p className="truncate text-xs text-muted">{o.inquiry.title}</p>
+        {o.flow && <p className="mt-1 text-xs font-medium text-primary">{o.flow}</p>}
         <div className="mt-2 flex items-baseline justify-between gap-2 text-xs">
           <span className="font-medium tabular">{money(o.total, o.currency)}</span>
           {Number(o.due) > 0 && o.status !== "cancelled" ? <span className="text-muted tabular">{money(o.due, o.currency)} due</span> : o.status !== "cancelled" && <span className="text-ok">Paid</span>}

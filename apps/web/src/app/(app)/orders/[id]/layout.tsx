@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, XCircle } from "lucide-react";
-import { Badge, cn, OrderStageBadge, PageHeader } from "@kebo/ui";
+import { Badge, cn, OrderStageBadge, PageHeader, ProgressSteps } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { orderMoneyOf, orderOf } from "@/lib/order-data";
+import { orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
+import { optional } from "@/components/print/data";
+import { FLOW_TAB } from "./flow-tab";
 import { date, money } from "@/lib/format";
 import { OrderTabs, ScrolledBar, type OrderTabLink } from "@/components/orders/order-tabs";
 
@@ -16,7 +18,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const { id } = await params;
   await requireUser();
   const o = await orderOf(id);
-  const m = await orderMoneyOf(id);
+  const [m, flow] = await Promise.all([orderMoneyOf(id), optional(() => orderFlowOf(id))]);
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const late = !!o.needs?.late;
@@ -24,16 +26,25 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const short = o.goods.lines - o.goods.received;
   const latePlan = m.plan.items.some((i) => i.status === "late");
 
+  const step = (k: string) => flow?.steps.find((s) => s.key === k);
+  const hintOf = (k: string) => (step(k)?.state === "current" ? "now" : undefined);
   const tabs: OrderTabLink[] = [
     { href: base, label: "Overview" },
+    { href: `${base}/money`, label: "Payments", hint: due > 0.005 ? `${money(o.money.due, o.currency)} due` : undefined, alert: latePlan },
+    ...(flow ? [{ href: `${base}/factory`, label: "Factory", hint: hintOf("factory") ?? hintOf("production") }] : []),
     ...(o.goods.lines > 0
       ? [
-          { href: `${base}/goods`, label: "Goods from factory", hint: short > 0 ? `${short} short` : undefined, alert: short > 0 && late && o.stage === "in_production" },
+          { href: `${base}/goods`, label: "Goods", hint: short > 0 ? `${short} short` : undefined, alert: short > 0 && late && o.stage === "in_production" },
           { href: `${base}/packing`, label: "Packing list", hint: !o.goods.packed && o.stage === "in_production" ? "not made" : undefined },
         ]
       : []),
-    { href: `${base}/money`, label: "Payments", hint: due > 0.005 ? `${money(o.money.due, o.currency)} due` : undefined, alert: latePlan },
-    { href: `${base}/documents`, label: "Documents", hint: o.proforma ? undefined : "proforma not issued" },
+    ...(flow?.shipping ? [{ href: `${base}/shipping`, label: "Shipping", hint: hintOf("shipping") }] : []),
+    {
+      href: `${base}/documents`,
+      label: flow?.documents ? "Documents & bank" : "Documents",
+      hint: flow?.documents ? (hintOf("documents") ?? (o.proforma ? undefined : "no proforma")) : o.proforma ? undefined : "proforma not issued",
+    },
+    ...(flow?.delivery ? [{ href: `${base}/delivery`, label: "Delivery & SAT", hint: hintOf("delivery") }] : []),
     { href: `${base}/history`, label: "History" },
   ];
 
@@ -96,6 +107,16 @@ export default async function OrderLayout({ children, params }: { children: Reac
               {o.cancelled.reason && <p className="mt-0.5 text-text-2">{o.cancelled.reason}</p>}
               <p className="mt-1 text-muted">The inquiry can be reopened and quoted again. Money already received stays recorded here.</p>
             </div>
+          </div>
+        )}
+        {flow && (
+          <div className="mt-4">
+            <ProgressSteps
+              label="Where the order is"
+              steps={flow.steps
+                .filter((s) => s.state !== "off")
+                .map((s) => ({ key: s.key, label: s.label, sub: s.sub.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d)), state: s.state === "off" ? "todo" : s.state, href: `${base}${FLOW_TAB[s.key]}` }))}
+            />
           </div>
         )}
       </ScrolledBar>

@@ -13,7 +13,7 @@ import { fromMinor, landedUnitCosts, toMinor } from "@kebo/money";
 import { api } from "./api";
 import { countryName } from "./countries";
 import type { SheetCol, SheetSpec } from "./sheet-spec";
-import type { DealRow, Paged } from "./types";
+import type { DealDetail, DealRow, Paged } from "./types";
 import type { ReportView } from "./types-deals";
 import type { OrderRow, RevisionDoc } from "./types-orders";
 import type { AuditRow, CustomerRow, FactoryRow } from "./types-people";
@@ -572,6 +572,31 @@ async function quotation(q: Q): Promise<SheetSpec> {
   return { name: `Quotation ${no}${internal ? " (internal)" : ""}`, title: `Quotation ${no}`, columns, rows };
 }
 
+/**
+ * The inquiry's items as a list to send to factories: no customer name, no
+ * target prices, with columns for the factory to fill in.
+ */
+async function factoryList(q: Q): Promise<SheetSpec> {
+  if (!UUID.test(q.id ?? "")) throw new ExportNotFound();
+  const d = await api.get<DealDetail>(`/inquiries/${q.id}`);
+  return {
+    name: `${d.refNo} list for factories`,
+    title: d.refNo,
+    columns: [
+      text("No.", 7),
+      text("Item", 52),
+      text("Model", 18),
+      { header: "Qty", kind: "number", width: 10 },
+      text("Unit", 9),
+      money("Your unit price"),
+      money("Your total"),
+      text("Lead time", 14),
+      text("Note", 28),
+    ],
+    rows: d.items.map((i) => [i.no, i.description, i.model, num(i.quantity), i.unit, null, null, null, null]),
+  };
+}
+
 export const EXPORTS = {
   inquiries: deals,
   orders,
@@ -584,6 +609,7 @@ export const EXPORTS = {
   audit,
   report,
   quotation,
+  "factory-list": factoryList,
 } satisfies Record<string, (q: Q) => Promise<SheetSpec | SheetSpec[]>>;
 
 export type ExportKind = keyof typeof EXPORTS;
