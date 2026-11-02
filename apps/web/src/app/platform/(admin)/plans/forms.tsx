@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PLAN_FEATURES } from "@kebo/shared";
+import { MODULE_PRESETS, PLAN_FEATURES, withPreset } from "@kebo/shared";
 import { Button, Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -12,8 +12,10 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** A plan's price, limits and features. */
 export function PlanForm({ action, plan, onDone, submit }: { action: Action; plan?: Plan; onDone?: () => void; submit: string }) {
+  const [features, setFeatures] = useState<string[]>(() => (plan ? [...plan.features] : Object.keys(PLAN_FEATURES)));
+  const toggle = (k: string, on: boolean) => setFeatures((f) => (on ? [...f, k] : f.filter((x) => x !== k)));
   return (
-    <ActionForm action={action} onDone={onDone} resetOnSuccess={!plan} className="flex flex-col gap-4">
+    <ActionForm action={action} onDone={onDone} resetOnSuccess={!plan} keepFields className="flex flex-col gap-4">
       {(s) => (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -59,9 +61,10 @@ export function PlanForm({ action, plan, onDone, submit }: { action: Action; pla
           </div>
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1 text-sm font-medium">Included</legend>
+            <PresetButtons features={features} onPick={setFeatures} />
             {Object.entries(PLAN_FEATURES).map(([key, label]) => (
               <label key={key} className="flex items-center gap-2 text-sm">
-                <Checkbox name="features" value={key} defaultChecked={plan ? plan.features.includes(key) : true} /> {label}
+                <Checkbox name="features" value={key} checked={features.includes(key)} onChange={(e) => toggle(key, e.target.checked)} /> {label}
               </label>
             ))}
             <p className="text-xs text-muted">Inquiries, quotations, orders, payments and documents are in every plan.</p>
@@ -83,6 +86,23 @@ export function PlanForm({ action, plan, onDone, submit }: { action: Action; pla
         </>
       )}
     </ActionForm>
+  );
+}
+
+/** One click sets the order-flow modules to a preset; the other features stay as they are. */
+export function PresetButtons({ features, onPick }: { features: readonly string[]; onPick: (features: string[]) => void }) {
+  return (
+    <div className="mb-1 flex flex-wrap items-center gap-1.5">
+      <span className="text-xs text-muted">Order-flow modules:</span>
+      {MODULE_PRESETS.map((p) => {
+        const same = withPreset(features, p).sort().join() === [...features].sort().join();
+        return (
+          <Button key={p.key} type="button" size="xs" variant={same ? "primary" : "secondary"} title={p.hint} aria-pressed={same} onClick={() => onPick(withPreset(features, p))}>
+            {p.name}
+          </Button>
+        );
+      })}
+    </div>
   );
 }
 

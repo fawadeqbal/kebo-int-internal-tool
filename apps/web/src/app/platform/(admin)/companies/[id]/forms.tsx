@@ -6,7 +6,8 @@ import { Button, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
-import { PLAN_FEATURE_KEYS, PLAN_FEATURES, type PlanFeature } from "@kebo/shared";
+import { ORDER_FLOW_FEATURES, PLAN_FEATURE_KEYS, PLAN_FEATURES, type PlanFeature } from "@kebo/shared";
+import { PresetButtons } from "../../plans/forms";
 import type { CompanyDetail, Plan } from "@/lib/types-platform";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -308,6 +309,10 @@ export function ModulesForm({ c, action }: { c: CompanyDetail; action: Action })
     <ActionForm action={action} className="flex flex-col gap-3">
       {() => (
         <>
+          <PresetButtons
+            features={PLAN_FEATURE_KEYS.filter((f) => inPlan(f) && !off.includes(f))}
+            onPick={(on) => setOff((o) => [...o.filter((f) => !(ORDER_FLOW_FEATURES as readonly string[]).includes(f)), ...ORDER_FLOW_FEATURES.filter((f) => inPlan(f) && !on.includes(f))])}
+          />
           <ul className="grid gap-2 sm:grid-cols-2">
             {PLAN_FEATURE_KEYS.map((f) => {
               const plan = inPlan(f);
