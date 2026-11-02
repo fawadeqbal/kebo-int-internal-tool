@@ -40,6 +40,37 @@ export const planFeatureName = (f: string) => (PLAN_FEATURES[f as PlanFeature] ?
 /** The order-flow modules, in every plan when they were added (the platform admin takes them out of a plan or a company). */
 export const ORDER_FLOW_FEATURES = ["factory_requests", "bank_contracts", "production", "shipping", "bank_documents", "delivery_sat", "orders_board"] as const satisfies readonly PlanFeature[];
 
+/**
+ * One-click sets of the order-flow modules, for a plan or for one company
+ * ("less management"): only the order-flow modules change; the others stay as they are.
+ */
+export const MODULE_PRESETS = [
+  {
+    key: "quotes",
+    name: "Quotes and orders only",
+    hint: "Inquiries, factory prices, quotations, orders and payments. No shipping, bank or SAT tracking.",
+    modules: [] as readonly PlanFeature[],
+  },
+  {
+    key: "simple",
+    name: "Simple trading",
+    hint: "Adds asking factories, production, shipping and the orders board. No bank contracts, bank documents or SAT.",
+    modules: ["factory_requests", "production", "shipping", "orders_board"] as readonly PlanFeature[],
+  },
+  {
+    key: "full",
+    name: "Full import flow",
+    hint: "Every step: bank contract or LC, production, shipping, documents through the banks, delivery and SAT.",
+    modules: ORDER_FLOW_FEATURES as readonly PlanFeature[],
+  },
+] as const;
+
+/** A plan's (or company's) features with the order-flow modules set to a preset's. */
+export const withPreset = (features: readonly string[], preset: (typeof MODULE_PRESETS)[number]) => [
+  ...features.filter((f) => !(ORDER_FLOW_FEATURES as readonly string[]).includes(f)),
+  ...preset.modules,
+];
+
 /** The ready-made plans (made once by a migration; the platform admin changes them freely). The order-flow modules were added to each later. */
 export const DEFAULT_PLANS = [
   { name: "Starter", price: 49, maxUsers: 3, maxStorageMb: 2 * 1024, features: ["excel"] },

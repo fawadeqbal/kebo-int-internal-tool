@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FIRST_COMPANY_ID } from "@kebo/database";
-import { flowSteps, requiredDocuments, type FlowFacts } from "@kebo/shared";
+import { flowSteps, MODULE_PRESETS, ORDER_FLOW_FEATURES, requiredDocuments, withPreset, type FlowFacts } from "@kebo/shared";
 import { api, signIn, startApp } from "./app";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
@@ -325,6 +325,15 @@ describe("order flow: from asking factories to SAT", () => {
     expect(flowSteps(facts, ["shipping", "bank_documents"]).map((s) => s.state)).toEqual(["done", "done", "off", "current", "todo", "off"]);
     expect(flowSteps({ ...facts, cancelled: true }, null).some((s) => s.state === "current")).toBe(false);
     expect(requiredDocuments("informal", "air")).toContain("airway_bill");
+  });
+
+  it("module presets change only the order-flow modules, and the Lite plan exists without them", async () => {
+    const [quotes, simple, full] = MODULE_PRESETS;
+    expect(withPreset(["excel", "insights", "shipping", "production"], quotes!).sort()).toEqual(["excel", "insights"]);
+    expect(withPreset(["excel"], simple!).sort()).toEqual(["excel", "factory_requests", "orders_board", "production", "shipping"]);
+    expect(withPreset([], full!).sort()).toEqual([...ORDER_FLOW_FEATURES].sort());
+    const lite = await prisma.platform.plan.findUnique({ where: { name: "Lite" } });
+    expect(lite).toMatchObject({ isActive: true, features: ["excel"], maxUsers: 2 });
   });
 });
 
