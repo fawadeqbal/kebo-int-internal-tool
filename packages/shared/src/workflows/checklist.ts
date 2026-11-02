@@ -547,6 +547,22 @@ export interface ChecklistTemplateItem {
   sort: number;
 }
 
+/**
+ * Order v4, light rows: a fill item asks its date fields (filled with today)
+ * and its first two other fields up front; the rest are "+ chips" one tap
+ * away. The non-file fields asked up front are the ones that tick it.
+ */
+export function fillSplit<F extends ChecklistField>(fields: readonly F[]): { upfront: F[]; later: F[]; required: F[] } {
+  const firstTwo = new Set(
+    fields
+      .filter((f) => f.type !== "date")
+      .slice(0, 2)
+      .map((f) => f.key),
+  );
+  const upfront = fields.filter((f) => f.type === "date" || firstTwo.has(f.key));
+  return { upfront, later: fields.filter((f) => !upfront.includes(f)), required: upfront.filter((f) => f.type !== "file") };
+}
+
 const fld = (key: string, label: string, type: ChecklistFieldType = "text"): ChecklistField => ({ key, label, type });
 
 /** The items every order starts with while the company has not made its own list. */

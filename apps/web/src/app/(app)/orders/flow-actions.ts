@@ -47,12 +47,17 @@ export async function bankContractAction(orderId: string, _prev: ActionState, fo
 }
 
 export async function factoryOrderAction(orderId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: formValues(form).factoryOrderedOn || null }), "Saved.");
+  const v = formValues(form);
+  const body = {
+    ...("factoryOrderedOn" in v ? { factoryOrderedOn: v.factoryOrderedOn || null } : {}),
+    ...("factoryOrderNo" in v ? { factoryOrderNo: v.factoryOrderNo || null } : {}),
+  };
+  return run(orderId, form, () => api.patch(`/orders/${orderId}/factory-order`, body), "Saved.");
 }
 
 /* ---------------------------------------------------------------- shipping */
 
-const SHIPMENT = ["mode", "status", "forwarder", "bookingNo", "blNo", "vessel", "portOfLoading", "portOfDischarge", "containerNo", "containerType", "etd", "eta", "departedOn", "arrivedOn", "note"];
+const SHIPMENT = ["mode", "status", "forwarder", "bookingNo", "blNo", "vessel", "portOfLoading", "portOfDischarge", "containerNo", "containerType", "sealNo", "loadedOn", "vgmKg", "etd", "eta", "departedOn", "arrivedOn", "note"];
 
 export async function addShipmentAction(orderId: string, _prev: ActionState, form: FormData) {
   return run(orderId, form, () => api.post(`/orders/${orderId}/shipments`, pick(form, SHIPMENT)), "Shipment added.");
@@ -92,7 +97,7 @@ export async function clearBankStepAction(orderId: string, step: BankStepKind, _
 
 /* ---------------------------------------------------------------- delivery, SAT, claims */
 
-const DELIVERY = ["deliveredOn", "deliveryCondition", "deliveryNote", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy"];
+const DELIVERY = ["deliveredOn", "deliveryCondition", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy"];
 
 export async function deliveryAction(orderId: string, _prev: ActionState, form: FormData) {
   return run(orderId, form, () => api.patch(`/orders/${orderId}/delivery`, pick(form, DELIVERY)), "Saved.");

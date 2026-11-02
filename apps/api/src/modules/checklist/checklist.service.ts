@@ -6,6 +6,7 @@ import {
   can,
   DEFAULT_CHECKLIST,
   doNow,
+  fillSplit,
   FLOW_STEP_LABEL,
   stepLine,
   itemClosed,
@@ -267,7 +268,10 @@ export class ChecklistService {
       const shown = fields
         .filter((f) => values[f.key])
         .map((f): [string, string] => [f.label, files.includes(f.key) ? (fileNames.get(values[f.key]!) ?? "attached") : values[f.key]!]);
-      const missing = fields.filter((f) => f.type !== "file" && !values[f.key]).map((f) => f.label.toLowerCase());
+      // What ticks it: the fields asked up front (the rest are optional, one tap away).
+      const missing = fillSplit(fields)
+        .required.filter((f) => !values[f.key])
+        .map((f) => f.label.toLowerCase());
       return {
         id: r.id,
         key: null,
@@ -519,7 +523,7 @@ export class ChecklistService {
       const fields = asFields(r.fields);
       const values = { ...asData(r.data), ...(await this.cleanData(tx, o.inquiryId, fields, input.data)) };
       if (r.tool === "fill") {
-        const missing = fields.filter((f) => f.type !== "file" && !values[f.key]);
+        const missing = fillSplit(fields).required.filter((f) => !values[f.key]);
         if (missing.length) throw new DomainError(`Fill in ${missing.map((f) => f.label.toLowerCase()).join(", ")}.`);
       }
       const attachmentId = input.attachmentId ?? r.attachmentId;

@@ -1,17 +1,19 @@
 import { ArrowDownLeft } from "lucide-react";
-import { can, PAYMENT_ROUTE_LABEL } from "@kebo/shared";
-import { Card, CardBody, CardHeader } from "@kebo/ui";
+import { BALANCE_TERMS_LABEL, can, PAYMENT_ROUTE_LABEL, type PaymentRoute } from "@kebo/shared";
+import { CardBody } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
-import { money } from "@/lib/format";
-import { RoutePanel } from "@/components/orders/flow-panels";
+import { date, money } from "@/lib/format";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { StepChanges, StepFiles, StepPage, StepViewDivider, ViewPair } from "@/components/orders/step-page";
+import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/step-view";
+import { PaymentEdit } from "@/components/orders/view-panels";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { PaymentPlan } from "@/components/money/forms";
-import { PlanLines, ReceivedForm, UseCredit } from "@/components/money/money-v2";
+import { LcChecks, PlanLines, ReceivedForm, UseCredit } from "@/components/money/money-v2";
 import { savePlanAction } from "../../../money/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
+import { fieldsAction, lightAction } from "../../light-actions";
 import { paymentAction, useCreditAction } from "../../actions";
 import { CustomerSummary, MoneySection, PaymentsReceived } from "../money-sections";
 import { stepData } from "../step-data";
@@ -20,14 +22,22 @@ import { termsOf } from "../shared";
 
 export const metadata = { title: "Order · payment" };
 
+/** The route the quote's balance terms point to, for a route not chosen yet. */
+const SUGGEST: Record<string, PaymentRoute> = {
+  letter_of_credit: "letter_of_credit",
+  before_shipment: "informal",
+  against_bl_copy: "informal",
+  after_arrival: "informal",
+};
+
 /**
- * Step 1, Payment: how the customer pays (the route and the bank contract or
- * LC), the plan and the payments received. Costs and profit are on the Costs page.
+ * Step 1, Payment: the checklist (route, LC, deposit), then the view: how they
+ * pay, the plan, the payments received, the papers and the costs.
  */
 export default async function OrderPayment({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const d = await stepData(id, "payment");
-  const { me, o, flow, now } = d;
+  const { me, o, flow, now, defaults } = d;
   const [p, m, settings] = await Promise.all([
     orderPaymentsOf(id),
     orderMoneyOf(id),
@@ -39,6 +49,8 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const canRoute = can(me, "orders.update") && d.open && !!flow;
   const route = flow?.payment.route ?? null;
   const lc = route === "letter_of_credit";
+  const bankRoute = (route === "bank_contract" || lc) && !!flow?.modules.bankContracts;
+  const contract = flow?.payment.bankContract ?? null;
   const terms = flow ? { balanceWhen: flow.payment.balanceWhen, lcTerms: flow.payment.lcTerms, lcDays: flow.payment.lcDays } : undefined;
   // Money in, in any currency: what arrived, the rate, what it counts as here; the rest is the customer's credit.
   const pay = (label: string, quiet = true) =>
@@ -66,21 +78,64 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       action: routeAction.bind(null, o.id),
       route,
       bankRoutes: !!flow?.modules.bankContracts,
-      terms,
+      terms: route ? terms : { balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment", lcTerms: null, lcDays: null },
+      suggest: SUGGEST[o.balanceTerms] ?? null,
     };
-  if (canRoute && flow?.modules.bankContracts && (route === "bank_contract" || lc))
+  if (canRoute && bankRoute) {
+    const banks = defaults.banks;
+    const balance = (Number(o.money.total) - Number(o.money.deposit)).toFixed(2);
     tools.contract = {
-      kind: "contract",
-      label: flow.payment.bankContract ? (lc ? "Open LC" : "Open contract") : lc ? "Add the LC" : "Add the contract",
-      action: bankContractAction.bind(null, o.id),
-      contract: flow.payment.bankContract,
-      lc,
-      currency: c,
+      kind: "light",
+      label: contract ? (lc ? "Open the LC" : "Open the contract") : lc ? "Add the LC" : "Add the contract",
+      action: lightAction.bind(null, o.id, "contract"),
+      fields: [
+        { name: "number", label: lc ? "LC no." : "Contract no.", value: contract?.number, required: true, placeholder: lc ? "e.g. LC/HBL/2026/118" : undefined },
+        { name: "amount", label: `Amount, ${contract?.currency ?? c}`, type: "number", value: contract?.amount !== null && contract?.amount !== undefined ? String(contract.amount) : balance, required: true },
+        { name: "expiresOn", label: lc ? "Expires" : "Expires (if it does)", type: "date", value: contract?.expiresOn, required: lc },
+        {
+          name: "customerBank",
+          label: "Their bank",
+          value: contract?.customerBank ?? banks?.customerBank,
+          hint: !contract?.customerBank && banks?.customerBank ? `As on ${banks.refNo}` : undefined,
+        },
+        { name: "ourBank", label: "Our bank", value: contract?.ourBank ?? banks?.ourBank, hint: !contract?.ourBank && banks?.ourBank ? `As on ${banks.refNo}` : undefined },
+      ],
+      chips: [
+        { label: "Opened on", field: { name: "openedOn", label: "Opened on", type: "date", value: contract?.openedOn ?? now, max: now } },
+        ...(lc ? [{ label: "Ship by", field: { name: "latestShipOn", label: "Ship by (latest)", type: "date" as const, value: contract?.latestShipOn } }] : []),
+        { label: lc ? "LC copy" : "Contract copy", field: { name: "attachmentId", label: lc ? "LC copy" : "Contract copy", type: "file" } },
+        { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },
+      ],
+      save: "Save and tick",
+      hint: `Only the first ${lc ? "three" : "two"} are needed; it is checked against the order.`,
     };
+  }
   const depositPay = pay("Record payment");
   if (depositPay) tools.deposit_in = { kind: "node", node: depositPay };
 
-  const contract = flow?.payment.bankContract;
+  // How they pay: the route and its terms, and on a bank route the LC or contract (+ Add each value).
+  const fields: DetailField[] = [
+    { label: "Route", value: route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : null },
+    { label: "Deposit", value: o.depositPercent > 0 ? `${o.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
+    { label: "Balance", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
+  ];
+  if (bankRoute)
+    fields.push(
+      { name: "number", label: lc ? "LC no." : "Contract no.", value: contract?.number },
+      {
+        name: "amount",
+        label: lc ? "LC amount" : "Amount",
+        type: "number",
+        value: contract?.amount !== null && contract?.amount !== undefined ? String(contract.amount) : null,
+        show: contract?.amount !== null && contract?.amount !== undefined ? money(String(contract.amount), contract.currency ?? c) : null,
+      },
+      { name: "customerBank", label: "Their bank", value: contract?.customerBank },
+      { name: "ourBank", label: "Our bank", value: contract?.ourBank },
+      ...(lc ? [{ name: "latestShipOn", label: "Ship by", type: "date" as const, value: contract?.latestShipOn }] : []),
+      { name: "expiresOn", label: "Expires", type: "date", value: contract?.expiresOn, uncounted: !lc },
+    );
+  const shown = fields.map((f) => (f.type === "date" && f.value ? { ...f, show: date(f.value) } : f));
+
   return (
     <StepPage
       steps={d.steps}
@@ -89,23 +144,6 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       action={pay("Record a payment", false)}
       side={
         <>
-          <KeyFacts
-            facts={[
-              { label: "Order total", value: money(o.money.total, c) },
-              {
-                label: "Received",
-                value: `${money(o.money.received, c)}${Number(o.money.total) > 0 ? ` · ${Math.round((Number(o.money.received) / Number(o.money.total)) * 100)}%` : ""}`,
-              },
-              { label: "Still due", value: money(m.due, c) },
-              ...(m.charged.length ? [{ label: "Charged to them", value: money(m.chargedTotal, c) }] : []),
-              { label: "Comes through", value: flow?.payment.summary ?? (route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : "Not chosen") },
-              { label: "Customer credit", value: money(p.credit.amount, c) },
-              ...(contract?.number ? [{ label: lc ? "LC" : "Contract", value: contract.number }] : []),
-              { label: "Terms", value: termsOf(o) },
-            ]}
-          />
-          <StepCosts id={o.id} step="payment" />
-          <StepPapers id={o.id} dealId={o.inquiry.id} step="payment" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
@@ -124,37 +162,48 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         tools={tools}
         payNode={pay("Record payment")}
         listHref={d.listHref}
+        me={me.name}
+        today={now}
       />
-      {flow && (
-        <Card id="route">
-          <CardHeader
-            title={`How ${o.customer.name} pays for ${o.refNo}`}
-            description="The route decides the plan, the papers and the bank steps. Change it and the plan is rebuilt (payments already recorded stay)."
-          />
-          <CardBody>
-            <RoutePanel
+      <StepViewDivider />
+      <DetailsCard
+        id="route"
+        title="How they pay"
+        description={bankRoute && canRoute ? undefined : route ? undefined : "The route is chosen in the checklist above."}
+        fields={shown}
+        action={bankRoute ? fieldsAction.bind(null, o.id, "contract") : undefined}
+        canEdit={canRoute}
+        panelTitle="Edit how they pay"
+        panelDescription="The route decides the plan, the papers and the bank steps. Change it and the plan is rebuilt (payments already recorded stay)."
+        panelBody={
+          flow ? (
+            <PaymentEdit
               routeAction={routeAction.bind(null, o.id)}
               contractAction={bankContractAction.bind(null, o.id)}
               route={route}
-              contract={flow.payment.bankContract}
+              contract={contract}
               bankRoutes={flow.modules.bankContracts}
               currency={c}
-              canEdit={canRoute}
               terms={terms}
-              summary={flow.payment.summary}
-              lcChecks={flow.payment.lcChecks}
             />
-          </CardBody>
-        </Card>
-      )}
-      <Card id="plan">
-        <CardHeader
-          title="The plan"
-          description={m.route.summary ? `Built from the route: ${m.route.summary}.` : "Deposit and balance; choose the route to build the balance part."}
-          actions={
-            <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />
-          }
-        />
+          ) : undefined
+        }
+        footer={
+          lc && flow?.payment.lcChecks ? (
+            <div className="flex flex-col gap-1 border-t border-line px-4 py-3">
+              <p className="text-xs font-semibold text-text-2">The LC against the order</p>
+              <LcChecks checks={flow.payment.lcChecks} />
+            </div>
+          ) : undefined
+        }
+      />
+      <ViewCard
+        id="plan"
+        title="The plan"
+        description={m.route.summary ? `Built from the route: ${m.route.summary}.` : "Deposit and balance; choose the route to build the balance part."}
+        canEdit={false}
+        actions={<PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />}
+      >
         <CardBody className="flex flex-col gap-2">
           {!m.plan.matchesTotal && (
             <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
@@ -163,7 +212,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           )}
           <PlanLines plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} />
         </CardBody>
-      </Card>
+      </ViewCard>
       <MoneySection
         id="customer"
         icon={<ArrowDownLeft aria-hidden />}
@@ -190,6 +239,10 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         )}
         <PaymentsReceived o={o} p={p} me={me} now={now} />
       </MoneySection>
+      <ViewPair>
+        <StepPapers id={o.id} dealId={o.inquiry.id} step="payment" />
+        <StepCosts id={o.id} step="payment" />
+      </ViewPair>
     </StepPage>
   );
 }

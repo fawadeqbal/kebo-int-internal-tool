@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CheckCircle2, Pencil } from "lucide-react";
 import { LINE_CONDITION_LABEL } from "@kebo/shared";
 import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea } from "@kebo/ui";
@@ -10,7 +10,7 @@ import type { ActionState } from "@/lib/actions";
 import type { LinePacking, OrderLineView } from "@/lib/types-orders";
 import { ExcelMenu } from "@/components/sheets/excel-menu";
 import { FileActions } from "@/components/common/file-actions";
-import { OrderLines } from "@/components/orders/order-lines";
+import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { headerKey, sheetNumber, type ReadSheet, type SheetSpec } from "@/lib/sheet-spec";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -267,6 +267,7 @@ export function PackingCard({
   marksAction,
   links,
   today,
+  toggle,
 }: {
   title: string;
   description?: string;
@@ -284,7 +285,18 @@ export function PackingCard({
   /** The paper's View / Print and PDF (once there is something on it). */
   links?: { view: string; pdf: string };
   today: string;
+  /** Order v4's view: read-only until "Edit lines" ("#edit-lines" opens it); short text lines on a phone. */
+  toggle?: boolean;
 }) {
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!toggle || !canEdit) return;
+    const check = () => window.location.hash === "#edit-lines" && setEditing(true);
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, [toggle, canEdit]);
+  const editable = toggle ? canEdit && editing : canEdit;
   const [fromFile, setFromFile] = useState<{ file: string; rows: PackRow[]; filled: number; problems: string[]; error: string | null } | null>(null);
   const saved = rowsOf(goods);
 
@@ -317,6 +329,11 @@ export function PackingCard({
           <>
             {badge}
             <FileActions excel={excel} viewHref={links?.view} pdfHref={links?.pdf} />
+            {toggle && canEdit && (
+              <Button size="xs" variant={editing ? "secondary" : "ghost"} onClick={() => setEditing((e) => !e)}>
+                {editing ? "Done" : "Edit lines"}
+              </Button>
+            )}
           </>
         }
       />
@@ -358,14 +375,21 @@ export function PackingCard({
             </div>
           </div>
         )}
-        <OrderLines
-          set="packing"
-          orderId={orderId}
-          lines={lines}
-          canEdit={canEdit}
-          today={today}
-          footer={<PackingMarks containerNo={containerNo} shippingMarks={shippingMarks} canEdit={canEdit} action={marksAction} />}
-        />
+        {toggle && !editing && (
+          <div className="sm:hidden">
+            <PhoneLines set="packing" lines={lines} />
+          </div>
+        )}
+        <div className={cn(toggle && !editing && "max-sm:hidden")}>
+          <OrderLines
+            set="packing"
+            orderId={orderId}
+            lines={lines}
+            canEdit={editable}
+            today={today}
+            footer={<PackingMarks containerNo={containerNo} shippingMarks={shippingMarks} canEdit={editable} action={marksAction} />}
+          />
+        </div>
       </CardBody>
     </Card>
   );

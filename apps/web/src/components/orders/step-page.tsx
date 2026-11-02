@@ -145,6 +145,22 @@ export function StepPage({
   );
 }
 
+/** "What this step holds · view only, change with Edit": the line between the checklist and the step's view. */
+export function StepViewDivider() {
+  return (
+    <div className="flex items-center gap-3 pt-1" role="separator" aria-label="What this step holds">
+      <span className="text-[11px] font-semibold tracking-wide text-muted uppercase">What this step holds</span>
+      <span className="h-px flex-1 bg-line" aria-hidden />
+      <span className="text-xs text-muted">view only · change with Edit</span>
+    </div>
+  );
+}
+
+/** Papers and Costs side by side on a wide screen, one under the other below. */
+export function ViewPair({ children }: { children: ReactNode }) {
+  return <div className="grid items-start gap-5 lg:grid-cols-2 [&>*]:min-w-0">{children}</div>;
+}
+
 /** The step's few numbers and dates, label left, value right. */
 export function KeyFacts({ facts, editHref }: { facts: { label: string; value: ReactNode }[]; editHref?: string }) {
   return (
