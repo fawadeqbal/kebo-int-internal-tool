@@ -55,7 +55,7 @@ function shipmentFields(s: Partial<ShipmentView>, shipBy: string | null): Detail
   if (!air)
     out.push(
       { name: "containerType", label: "Container", value: s.containerType, group: "Container", panelOnly: true, placeholder: "e.g. 1 × 40 HQ" },
-      { name: "containerNo", label: air ? "Container" : "Container", value: s.containerNo, show: container, group: "Container", cardOnly: false },
+      { name: "containerNo", label: "Container", panelLabel: "Container no.", value: s.containerNo, show: container, group: "Container" },
       { name: "sealNo", label: "Seal no.", value: s.sealNo, group: "Container", placeholder: "e.g. 0048812" },
       { name: "loadedOn", label: "Loaded on", value: s.loadedOn, type: "date", group: "Container", panelOnly: true },
       { name: "vgmKg", label: "Gross weight (VGM), kg", value: s.vgmKg, type: "number", group: "Container", panelOnly: true, uncounted: true },

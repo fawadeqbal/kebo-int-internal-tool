@@ -117,6 +117,8 @@ export interface DetailField {
   /** What the action is sent (empty: shown only). */
   name?: string;
   label: string;
+  /** Its label in the panel, when the card's is shorter ("Container" → "Container no."). */
+  panelLabel?: string;
   /** The value as it is edited (YYYY-MM-DD for dates). */
   value: string | null | undefined;
   /** How it reads (default: the value, dates as "14 Jan 2027"). */
@@ -192,7 +194,7 @@ export function FieldsForm({ action, fields, save }: { action: Action; fields: D
                     .map((f) => (
                       <Field
                         key={f.name}
-                        label={f.label}
+                        label={f.panelLabel ?? f.label}
                         htmlFor={`${id}-${f.name}`}
                         hint={f.hint}
                         error={s.errors?.[f.name!]}
