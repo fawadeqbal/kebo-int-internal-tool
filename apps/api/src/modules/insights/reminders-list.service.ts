@@ -204,6 +204,24 @@ export class RemindersListService {
     //    running late, the LC's dates, arrivals, papers missing after sailing, the SAT, open claims.
     items.push(...(await this.flowItems(user, today, nameOf)));
 
+    // 7. Whoever keeps the settings: exchange rates not updated for a month (totals use them).
+    if (can(user, "settings.manage")) {
+      for (const [c, on] of Object.entries(s.sales.rateDates ?? {})) {
+        if (!(c in s.sales.exchangeRates) || on > addDays(today, -30)) continue;
+        items.push({
+          key: `rate:${c}:${on}`,
+          kind: "money",
+          level: on <= addDays(today, -60) ? "warn" : "info",
+          title: `The ${c} rate was last updated ${daysBetween(on, today)} days ago`,
+          detail: `1 ${s.sales.currency} = ${s.sales.exchangeRates[c]} ${c} · totals and targets use it`,
+          due: addDays(on, 30),
+          href: "/settings?tab=sales",
+          action: "Update rates",
+          who: null,
+        });
+      }
+    }
+
     // 5. Managers: the money warnings (orders losing money, money stuck, expense jumps…).
     if (warnings && can(user, "expenses.manage")) {
       const r = await this.leaks.report(user, {});

@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { Avatar, Badge, ButtonLink, Card, cn, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { timeAgo } from "@/lib/format";
 import type { UserRow } from "@/lib/types-people";
 import { RoleBadge } from "@/components/people/role-badge";
+import { TwoStepRemind } from "@/components/people/two-step-remind";
+import { remindTwoStepAction } from "./actions";
 
 export const metadata = { title: "Users" };
 
@@ -14,6 +16,10 @@ export default async function UsersPage() {
   const me = await requirePermission("users.manage");
   const users = await api.get<UserRow[]>("/users");
   const active = users.filter((u) => u.isActive).length;
+  // People who sign in with a password only: those whose role requires two-step first.
+  const without = users
+    .filter((u) => u.isActive && !u.totpEnabledAt && u.id !== me.id)
+    .sort((a, b) => Number(b.access.requireTwoStep) - Number(a.access.requireTwoStep) || a.name.localeCompare(b.name));
   return (
     <div>
       <PageHeader
@@ -21,6 +27,37 @@ export default async function UsersPage() {
         description={`${active} ${active === 1 ? "person" : "people"} can sign in${users.length > active ? `, ${users.length - active} switched off` : ""}. Switch people off when they leave; their work stays.`}
         actions={<ButtonLink href="/users/new" variant="primary">Add a person</ButtonLink>}
       />
+      {without.length > 0 && (
+        <Card className="mb-5 border-warn/30 bg-warn-soft/40 p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold text-warn">
+            <ShieldAlert className="size-4" aria-hidden />
+            {without.length === 1 ? "1 person signs in" : `${without.length} people sign in`} without two-step
+          </p>
+          <p className="mt-0.5 text-xs text-text-2">A stolen password is enough to get into their account. Ask them to turn it on: it takes two minutes with an authenticator app.</p>
+          {(() => {
+            const row = (u: (typeof without)[number]) => (
+              <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="min-w-0 text-sm">
+                  <span className="font-medium">{u.name}</span> <span className="text-text-2">· {u.access.name}</span>
+                  {u.access.requireTwoStep && <span className="block text-xs text-warn">Their role requires it: they are asked to set it up at their next sign-in.</span>}
+                </span>
+                <TwoStepRemind action={remindTwoStepAction.bind(null, u.id)} />
+              </li>
+            );
+            return (
+              <>
+                <ul className="mt-3 flex flex-col divide-y divide-warn/20">{without.slice(0, 5).map(row)}</ul>
+                {without.length > 5 && (
+                  <details className="group">
+                    <summary className="cursor-pointer py-2 text-sm font-medium text-primary">Show the other {without.length - 5}</summary>
+                    <ul className="flex flex-col divide-y divide-warn/20">{without.slice(5).map(row)}</ul>
+                  </details>
+                )}
+              </>
+            );
+          })()}
+        </Card>
+      )}
       <Card className="overflow-hidden p-0">
         <Table>
           <THead>

@@ -31,6 +31,8 @@ import { CashFlowChart, Donut, RevenueChart } from "@/components/insights/charts
 import { Change, flag, Funnel, Headline, KpiCard, ShareBars, TargetRing } from "@/components/insights/kpi";
 import { PeriodPicker } from "@/components/insights/period";
 import { TargetEditor } from "@/components/insights/targets";
+import { TargetsGrid, type TargetRow } from "@/components/insights/targets-grid";
+import { saveTargetRowAction } from "../money/actions";
 import { FileActions } from "@/components/common/file-actions";
 import { LEAK_VIEWS, LeaksBody, type LeakView } from "@/components/insights/leaks";
 import { ProfitTable } from "@/components/insights/pnl";
@@ -40,7 +42,7 @@ export const metadata = { title: "Insights" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
-const TABS = ["overview", "sales", "customers", "factories", "profit"] as const;
+const TABS = ["overview", "sales", "customers", "factories", "profit", "targets"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: "Overview",
@@ -48,6 +50,7 @@ const TAB_LABEL: Record<Tab, string> = {
   customers: "Customers",
   factories: "Factories",
   profit: "Profit",
+  targets: "Targets",
 };
 const n = (v: number | null | undefined, suffix = "") =>
   v === null || v === undefined ? "—" : `${v.toLocaleString("en-US", { maximumFractionDigits: 1 })}${suffix}`;
@@ -92,7 +95,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
       <LinkTabs
         label="Insights sections"
         className="no-print mb-4"
-        tabs={TABS.map((t) => ({
+        tabs={TABS.filter((t) => t !== "targets" || i.target.canSet).map((t) => ({
           href: buildHref("/insights", { from, to }, { tab: t === "overview" ? undefined : t }),
           label: TAB_LABEL[t],
           active: tab === t,
@@ -458,6 +461,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                     <Th className="text-right">Win rate</Th>
                     <Th className="text-right">Days to quote</Th>
                     <Th className="text-right">Sales</Th>
+                    <Th className="text-right">Target this month</Th>
                   </tr>
                 </THead>
                 <tbody>
@@ -478,6 +482,9 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
                       <Td className={cn("text-right tabular", p.winRate !== null && p.winRate < 30 && "text-bad")}>{n(p.winRate, "%")}</Td>
                       <Td className="text-right tabular">{n(p.quoteDays)}</Td>
                       <Td className="text-right font-semibold whitespace-nowrap tabular">{money(p.revenue, c)}</Td>
+                      <Td className={cn("text-right whitespace-nowrap tabular", p.month.percent !== null && p.month.percent >= 100 && "text-ok")}>
+                        {p.month.percent === null ? <span className="text-muted">—</span> : `${p.month.percent}% of ${money(p.month.target, c)}`}
+                      </Td>
                     </Tr>
                   ))}
                 </tbody>
@@ -591,6 +598,8 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
       )}
 
       {tab === "factories" && <FactoriesTab i={i} from={i.range.from} to={i.range.to} />}
+
+      {tab === "targets" && i.target.canSet && <TargetsTab year={/^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : Number(today.slice(0, 4))} today={today} currency={c} series={i.series} />}
 
       {tab === "profit" && (
         <div className="flex flex-col gap-5">
@@ -755,5 +764,55 @@ function SectionSkeleton() {
       <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />
       <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
     </div>
+  );
+}
+
+/** Company › Targets: the company's and each person's monthly targets for a year, and how each month went. */
+async function TargetsTab({ year, today, currency, series }: { year: number; today: string; currency: string; series: Insights["series"] }) {
+  const [company, people] = await Promise.all([
+    api.get<{ month: string; amount: string }[]>("/insights/targets", { year }),
+    api.get<{ people: { id: string; name: string }[]; targets: { month: string; userId: string; amount: string }[] }>("/insights/targets/people", { year }),
+  ]);
+  const thisMonth = today.slice(0, 7);
+  const rows: TargetRow[] = Array.from({ length: 12 }, (_, m) => {
+    const month = `${year}-${String(m + 1).padStart(2, "0")}`;
+    const values: Record<string, string> = { company: company.find((t) => t.month === month)?.amount ?? "" };
+    for (const p of people.people) values[`p:${p.id}`] = people.targets.find((t) => t.month === month && t.userId === p.id)?.amount ?? "";
+    const s = series.find((x) => x.month === month);
+    const sold = month <= thisMonth && s ? String(s.revenue) : null;
+    const target = Number(values.company || 0);
+    return {
+      month,
+      label: new Date(Date.UTC(year, m, 1)).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" }),
+      values,
+      sold,
+      percent: sold !== null && target > 0 ? Math.round((Number(sold) / target) * 100) : null,
+      current: month === thisMonth,
+      past: month < thisMonth,
+    };
+  });
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader
+        title={`Targets ${year}`}
+        description={`Monthly sales targets in ${currency}, for the company and each person. Home and Insights measure against these.`}
+        actions={
+          <span className="flex gap-1">
+            <Link href={buildHref("/insights", {}, { tab: "targets", year: String(year - 1) })} className="rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-2">
+              ← {year - 1}
+            </Link>
+            <Link href={buildHref("/insights", {}, { tab: "targets", year: String(year + 1) })} className="rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-2">
+              {year + 1} →
+            </Link>
+          </span>
+        }
+      />
+      <TargetsGrid
+        rows={rows}
+        people={people.people}
+        currency={currency}
+        actions={Object.fromEntries(rows.map((r) => [r.month, saveTargetRowAction.bind(null, r.month, r.values)]))}
+      />
+    </Card>
   );
 }

@@ -3,6 +3,9 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { can, PERMISSION_GROUPS, permissionsInPlan, PRESET_ROLES } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import { NotificationsService } from "../notifications/notifications.service";
+import { Clock } from "../../common/time/clock.service";
+import { getMailer, renderEmail } from "../../common/notify/mailer";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { ENV, type Env } from "../../config/env";
@@ -57,6 +60,8 @@ export class UsersService {
     private readonly audit: AuditService,
     @Inject(ENV) private readonly env: Env,
     private readonly limits: LimitsService,
+    private readonly notifications: NotificationsService,
+    private readonly clock: Clock,
   ) {}
 
   /* ---------------------------------------------------------------- shared with sign-in */
@@ -211,6 +216,39 @@ export class UsersService {
       await this.revokeSessions(tx, id);
       await this.audit.record(tx, { userId: actor.id, action: "two_step_reset", entityType: "user", entityId: id, summary: `Reset two-step sign-in for ${user.email}` });
     });
+  }
+
+  /**
+   * Ask someone to turn on two-step sign-in: a notification (and push) that
+   * opens My account, and an email when mail is set up. Once a day at most.
+   */
+  async remindTwoStep(actor: SessionUser, id: string) {
+    if (!can(actor, "users.manage")) throw new ForbiddenError();
+    const user = await this.managed(actor, id);
+    const full = await this.prisma.db.user.findUniqueOrThrow({ where: { id }, select: { totpEnabledAt: true, isActive: true, email: true, name: true } });
+    if (full.totpEnabledAt) throw new DomainError(`${full.name} already signs in with two-step.`);
+    if (!full.isActive) throw new DomainError(`${full.name} is switched off.`);
+    const today = this.clock.today();
+    const sent = await this.notifications.notify([id], {
+      type: "two_step",
+      title: "Please turn on two-step sign-in",
+      body: `${actor.name} asks you to protect your account with a code from your phone. It takes two minutes.`,
+      link: "/account?tab=two-step",
+      dedupeKey: `two-step:${id}:${today}`,
+    });
+    if (sent) {
+      const mailer = getMailer();
+      if (mailer.enabled) {
+        const content = renderEmail({
+          heading: "Please turn on two-step sign-in",
+          body: `${actor.name} asks you to protect your account with a code from your phone (Google Authenticator, Microsoft Authenticator…). Sign in, open My account, and choose "Turn on two-step".`,
+          linkLabel: "Open My account",
+        });
+        void mailer.send({ to: full.email, subject: "Turn on two-step sign-in", ...content }).catch(() => undefined);
+      }
+      await this.prisma.tx((tx) => this.audit.record(tx, { userId: actor.id, action: "update", entityType: "user", entityId: id, summary: `Reminded ${user.email} to turn on two-step sign-in` }));
+    }
+    return { sent: sent > 0 };
   }
 
   /* ---------------------------------------------------------------- my account */

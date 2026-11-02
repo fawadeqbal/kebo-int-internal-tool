@@ -345,6 +345,8 @@ model User {
   relAuditUser              AuditLog[]           @relation("AuditUser")
   relFactoryRequestCreator  FactoryRequest[]     @relation("FactoryRequestCreator")
   relOrderSatEngineer       Order[]              @relation("OrderSatEngineer")
+  relPersonTarget           PersonTarget[]       @relation("PersonTargetOwner")
+  relPersonTargetUpdater    PersonTarget[]       @relation("PersonTargetUpdater")
 
   @@unique([companyId, email])
   @@map("users")
@@ -1653,6 +1655,26 @@ model SalesTarget {
 /**
  * A reminder a person marked done or put off. Reminders themselves are worked out from the data each time.
  */
+/// A person's sales target for a month (the company's is SalesTarget). Home and Insights measure against it.
+model PersonTarget {
+  /// YYYY-MM
+  month       String   @db.Char(7)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company     Company  @relation(fields: [companyId], references: [id])
+  userId      String   @map("user_id") @db.Uuid
+  user        User     @relation("PersonTargetOwner", fields: [userId], references: [id], onDelete: Cascade)
+  amount      Decimal  @db.Decimal(14, 2)
+  currency    String   @db.Char(3)
+  updatedById String?  @map("updated_by") @db.Uuid
+  updatedBy   User?    @relation("PersonTargetUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@id([companyId, month, userId])
+  @@index([userId])
+  @@map("person_targets")
+}
+
 model ReminderState {
   userId       String    @map("user_id") @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
@@ -1784,6 +1806,7 @@ model Company {
   moneyTransfers      MoneyTransfer[]
   salesTargets        SalesTarget[]
   reminderStates      ReminderState[]
+  personTargets       PersonTarget[]
   factoryRequests     FactoryRequest[]
   orderBankContracts  OrderBankContract[]
   productionSteps     ProductionStep[]

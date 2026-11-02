@@ -67,6 +67,8 @@ export const salesSettings = z.object({
           .filter(([k]) => (CURRENCIES as readonly string[]).includes(k)),
       ),
     ),
+  /** When each rate was last changed (YYYY-MM-DD): kept by the API, so old rates can be flagged. */
+  rateDates: z.record(z.string(), z.string()).default({}),
   defaultMarginPercent: z.coerce.number().min(0).max(95).default(15),
   quotationValidityDays: days(15),
   defaultDepositPercent: z.coerce.number().min(0).max(100).default(30),

@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
 import { fromMinor, orderProfit, roundHalfAway, settle, type Minor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, planStatus, type InquiryChannel, type InquiryStage, type LostReason } from "@kebo/shared";
-import { addDays, daysBetween, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
+import { addDays, daysBetween, DomainError, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import { ReadCache } from "../../common/cache/read-cache";
@@ -592,6 +592,11 @@ export class InsightsService {
     }
 
     const monthTarget = targets.find((t) => t.month === ymOf(today));
+    // Each person's sales this month and their own target for it.
+    const monthStart = `${ymOf(today)}-01`;
+    const personTargets = await this.prisma.db.personTarget.findMany({ where: { month: ymOf(today) } });
+    const monthSold = new Map<string, number>();
+    for (const x of orderMoney) if (inRange(x.on, { from: monthStart, to: today }) && x.o.assigneeId) monthSold.set(x.o.assigneeId, (monthSold.get(x.o.assigneeId) ?? 0) + x.revenue);
     const monthRevenue = figuresFor({ from: `${ymOf(today)}-01`, to: today }).revenue;
 
     /** A figure now and before, with the change in percent (null when there is nothing to compare). */
@@ -687,6 +692,12 @@ export class InsightsService {
           winRate: pct(p.won, p.won + p.lost),
           revenue: fromMinor(p.revenue),
           quoteDays: avg(p.quoteDays),
+          month: (() => {
+            const t = id === "nobody" ? undefined : personTargets.find((x) => x.userId === id);
+            const sold = monthSold.get(id) ?? 0;
+            const amount = t ? toMain(decimalToMinor(t.amount), t.currency) : null;
+            return { sold: fromMinor(sold), target: amount === null ? null : fromMinor(amount), percent: amount ? Math.round((sold / amount) * 100) : null };
+          })(),
         }))
         .sort((a, b) => Number(b.revenue) - Number(a.revenue) || b.received - a.received),
       factories: [...factories.values()]
@@ -719,6 +730,70 @@ export class InsightsService {
       update: { amount, currency: sales.currency, updatedById: user.id },
     });
     return { month: row.month, amount: row.amount.toFixed(2), currency: row.currency };
+  }
+
+  /** Each person's targets for a year (managers set them in Company › Targets). */
+  async personTargets(user: SessionUser, year: number) {
+    this.assert(user);
+    const [rows, people] = await Promise.all([
+      this.prisma.db.personTarget.findMany({ where: { month: { startsWith: `${year}-` } }, orderBy: [{ month: "asc" }] }),
+      // The people who sell: those who handle inquiries (or already have a target that year).
+      this.prisma.db.user.findMany({
+        where: {
+          isSystem: false,
+          isActive: true,
+          OR: [{ assignedDeals: { some: { deletedAt: null } } }, { relPersonTarget: { some: { month: { startsWith: `${year}-` } } } }],
+        },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+        take: 30,
+      }),
+    ]);
+    return { people, targets: rows.map((r) => ({ month: r.month, userId: r.userId, amount: r.amount.toFixed(2), currency: r.currency })) };
+  }
+
+  /** One person's target for a month in the main currency; 0 or empty removes it. */
+  async setPersonTarget(user: SessionUser, month: string, userId: string, amount: number | null) {
+    if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can set targets.");
+    const person = await this.prisma.db.user.findFirst({ where: { id: userId, isSystem: false } });
+    if (!person) throw new DomainError("That person is not in your company.");
+    const { sales } = await this.settings.get();
+    if (!amount) {
+      await this.prisma.db.personTarget.deleteMany({ where: { month, userId } });
+      return { month, userId, amount: null };
+    }
+    const row = await this.prisma.db.personTarget.upsert({
+      where: { companyId_month_userId: { companyId: user.companyId, month, userId } },
+      create: { month, userId, amount, currency: sales.currency, updatedById: user.id },
+      update: { amount, currency: sales.currency, updatedById: user.id },
+    });
+    return { month: row.month, userId, amount: row.amount.toFixed(2), currency: row.currency };
+  }
+
+  /** My own target this month and how far I am (Home, for everyone with a target). */
+  async myTarget(user: SessionUser) {
+    const today = this.clock.today();
+    const month = ymOf(today);
+    const t = await this.prisma.db.personTarget.findUnique({ where: { companyId_month_userId: { companyId: user.companyId, month, userId: user.id } } });
+    if (!t) return { month, target: null, sold: null, percent: null, currency: null, daysLeft: null };
+    const { sales } = await this.settings.get();
+    const fx = new MainMoney(sales.currency, sales.exchangeRates);
+    const orders = await this.prisma.db.order.findMany({
+      where: { status: { not: "cancelled" }, orderedOn: { gte: new Date(`${month}-01T00:00:00Z`), lte: new Date(`${today}T00:00:00Z`) }, inquiry: { assigneeId: user.id } },
+      select: { id: true, total: true, currency: true, mainCurrency: true, mainRate: true },
+    });
+    const costings = await costingsOf(this.prisma.db, orders.map((o) => ({ id: o.id, totalMinor: decimalToMinor(o.total) })));
+    const sold = orders.reduce((sum, o) => sum + fx.order(costings.get(o.id)!.revenueMinor, o), 0);
+    const target = fx.live(decimalToMinor(t.amount), t.currency);
+    const end = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
+    return {
+      month,
+      currency: sales.currency,
+      target: fromMinor(target),
+      sold: fromMinor(sold),
+      percent: target ? Math.round((sold / target) * 100) : null,
+      daysLeft: daysBetween(today, end),
+    };
   }
 
   /* ---------------------------------------------------------------- to receive */

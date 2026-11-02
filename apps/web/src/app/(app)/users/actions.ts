@@ -47,3 +47,10 @@ export async function resetTwoStepAction(id: string, _prev: ActionState, _form: 
   const r = await attempt(null, () => api.post(`/users/${id}/two-step/reset`));
   return r.ok ? done(id, "Two-step sign-in is off for them. They can set it up again under My account.") : r;
 }
+
+/** Ask someone to turn on two-step sign-in (a notification and an email, once a day at most). */
+export async function remindTwoStepAction(userId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post<{ sent: boolean }>(`/users/${userId}/two-step/remind`), "Reminder sent.");
+  if (r.ok && !(r.data as { sent: boolean }).sent) return { ok: true, message: "Already reminded today." };
+  return r;
+}

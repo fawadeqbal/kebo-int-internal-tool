@@ -157,13 +157,25 @@ function CurrenciesControl({
   rates: initialRates,
   errors,
   locked,
+  dates = {},
+  today,
 }: {
   f: SettingField;
   main: string;
   rates: Record<string, string>;
   errors?: string[];
   locked?: string | null;
+  /** When each rate was last changed (kept by the API). */
+  dates?: Record<string, string>;
+  today?: string;
 }) {
+  const ageOf = (c: string) => {
+    const d = dates[c];
+    if (!d || !today) return null;
+    const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000);
+    const when = new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+    return { text: days <= 0 ? `Updated today` : `Updated ${when}${days >= 14 ? ` · ${days >= 60 ? `${Math.round(days / 30)} months` : days >= 21 ? `${Math.round(days / 7)} weeks` : `${days} days`} old` : ""}`, old: days >= 30 };
+  };
   const [main, setMain] = useState(initialMain);
   const [rates, setRates] = useState<Record<string, string>>(initialRates);
   const others = CURRENCIES.filter((c) => c !== main);
@@ -199,7 +211,17 @@ function CurrenciesControl({
           {locked && <input type="hidden" name="currency" value={main} />}
         </Field>
         {others.map((c) => (
-          <Field key={c} label={`1 ${main} buys`} htmlFor={`set-rate-${c}`} hint={CURRENCY_LABEL[c]}>
+          <Field
+            key={c}
+            label={`1 ${main} buys`}
+            htmlFor={`set-rate-${c}`}
+            hint={
+              <>
+                {CURRENCY_LABEL[c]}
+                {ageOf(c) && <span className={cn("block", ageOf(c)!.old && "font-medium text-warn")}>{ageOf(c)!.text}</span>}
+              </>
+            }
+          >
             <div className="flex items-center gap-2">
               <Input
                 id={`set-rate-${c}`}
@@ -311,6 +333,8 @@ export function SettingsGroupForm({
                   }
                   errors={[...(s.errors?.currency ?? []), ...(s.errors?.exchangeRates ?? [])]}
                   locked={currencyLocked}
+                  dates={(values.rateDates ?? {}) as Record<string, string>}
+                  today={new Date().toISOString().slice(0, 10)}
                 />
               ) : (
                 <Control

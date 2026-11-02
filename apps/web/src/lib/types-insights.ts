@@ -84,6 +84,8 @@ export interface Insights {
     winRate: number | null;
     revenue: string;
     quoteDays: number | null;
+    /** This month: sold and their own target. */
+    month: { sold: string; target: string | null; percent: number | null };
   }[];
   factories: { factory: { id: string; name: string }; spend: string; orders: number }[];
   missingRates: string[];
