@@ -95,7 +95,7 @@ export type ReminderLevel = "bad" | "warn" | "info";
 export interface Reminders {
   items: {
     key: string;
-    kind: "order" | "quote" | "deal" | "offer" | "money";
+    kind: "order" | "quote" | "deal" | "offer" | "money" | "ship";
     level: ReminderLevel;
     title: string;
     detail: string | null;

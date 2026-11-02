@@ -77,8 +77,8 @@ class FactoriesController {
 
   @Get(":id")
   @RequirePermissions("sourcing.manage")
-  get(@Param("id", ParseUUIDPipe) id: string) {
-    return this.factories.get(id);
+  get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.factories.get(id, user);
   }
 
   @Post()

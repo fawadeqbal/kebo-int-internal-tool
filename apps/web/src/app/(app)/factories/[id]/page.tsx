@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can, EXPENSE_CATEGORY_LABEL } from "@kebo/shared";
-import { ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, LinkTabs, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ButtonLink, Card, CardBody, CardHeader, DetailList, EmptyState, LinkTabs, PageHeader, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requirePermission, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
@@ -41,6 +41,40 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
           </ButtonLink>
         }
       />
+      {(f.record.asked > 0 || f.record.openOrders.length > 0) && (
+        <StatRow className="mb-5">
+          <StatTile
+            label="Answers when asked"
+            value={f.record.asked ? `${Math.round((f.record.answered / f.record.asked) * 100)}%` : "—"}
+            delta={f.record.asked ? `${f.record.answered} of ${f.record.asked} asked${f.record.declined ? ` · ${f.record.declined} declined` : ""}` : "Not asked yet"}
+            tone={f.record.asked && f.record.answered / f.record.asked < 0.5 ? "down" : undefined}
+          />
+          <StatTile label="Days to answer" value={f.record.avgDaysToAnswer ?? "—"} delta="on average, from asked to offer" />
+          <StatTile
+            label="Making for us now"
+            value={f.record.openOrders.length}
+            delta={f.record.lateSteps ? `${f.record.lateSteps} production step${f.record.lateSteps === 1 ? "" : "s"} late` : "open orders"}
+            tone={f.record.lateSteps ? "down" : undefined}
+          />
+        </StatRow>
+      )}
+      {f.record.openOrders.length > 0 && (
+        <Card className="mb-5">
+          <CardHeader title="Orders it is making" description="Open orders with lines from this factory" />
+          <ul className="flex flex-col divide-y divide-line">
+            {f.record.openOrders.map((o) => (
+              <li key={o.id}>
+                <Link href={`/orders/${o.id}/factory`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-surface-2">
+                  <span className="min-w-0">
+                    <span className="font-medium">{o.refNo}</span> <span className="text-muted">· {o.customer}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-muted">{o.readyOn ? `ready ${date(o.readyOn)}` : "no ready date"}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <LinkTabs
         label="Factory sections"
         className="mb-5"
