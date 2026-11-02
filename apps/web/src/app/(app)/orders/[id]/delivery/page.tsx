@@ -4,7 +4,7 @@ import { Badge, CardBody } from "@kebo/ui";
 import { date } from "@/lib/format";
 import { ClaimsPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepFiles, StepPage, StepViewDivider, ViewPair } from "@/components/orders/step-page";
+import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { SatEdit } from "@/components/orders/view-panels";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
@@ -14,7 +14,7 @@ import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { DeliveredExcel } from "../goods";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
-import { StepPapers } from "../papers";
+import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · delivery and SAT" };
 
@@ -99,7 +99,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       base={d.base}
       side={
         <>
-          <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
+          <StepFilesSide id={o.id} step="delivery" />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
@@ -181,10 +181,8 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
           />
         </CardBody>
       </ViewCard>
-      <ViewPair>
-        <StepPapers id={o.id} dealId={o.inquiry.id} step="delivery" />
-        <StepCosts id={o.id} step="delivery" />
-      </ViewPair>
+      <StepPapers id={o.id} step="delivery" />
+      <StepCosts id={o.id} step="delivery" />
     </StepPage>
   );
 }

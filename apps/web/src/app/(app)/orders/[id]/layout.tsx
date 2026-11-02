@@ -3,13 +3,15 @@ import { ArrowLeft, XCircle } from "lucide-react";
 import { PAYMENT_ROUTE_SHORT, STEP_PATH } from "@kebo/shared";
 import { Badge, cn, OrderStageBadge } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
+import { orderFilesOf, orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date, money, whole } from "@/lib/format";
 import { FileActions } from "@/components/common/file-actions";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
 import { StepNav } from "@/components/orders/step-nav";
 import { orderCostsSetup } from "@/components/orders/costs-data";
+import { FileToolsProvider } from "@/components/files/file-tools";
+import { OrderDrop } from "@/components/files/order-drop";
 import { docHref } from "./shared";
 
 /**
@@ -21,11 +23,13 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const { id } = await params;
   await requireUser();
   const o = await orderOf(id);
-  const [steps, flow, costs] = await Promise.all([
+  const [steps, flow, costs, files] = await Promise.all([
     optional(() => orderStepsOf(id)),
     optional(() => orderFlowOf(id)),
     orderCostsSetup(id),
+    optional(() => orderFilesOf(id)),
   ]);
+  const ship = flow?.shipping?.shipments[0];
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const route = flow?.payment.route ? PAYMENT_ROUTE_SHORT[flow.payment.route] : null;
@@ -121,7 +125,16 @@ export default async function OrderLayout({ children, params }: { children: Reac
           costs={costs && { spent: whole(costs.costs.totals.spent, costs.costs.currency) }}
         />
       )}
-      <div className="mt-5">{children}</div>
+      {/* Documents v3: the same file tools (viewer, menus, dialogs) on every page of the order, and drop anywhere. */}
+      <FileToolsProvider
+        orderId={o.id}
+        files={files?.files ?? []}
+        targets={files?.targets ?? []}
+        share={{ refNo: o.refNo, greeting: `Dear ${o.customer.name}`, vessel: ship?.vessel ?? null, eta: ship?.eta ? date(ship.eta) : null }}
+      >
+        <div className="mt-5">{children}</div>
+      </FileToolsProvider>
+      {files?.canUpload && <OrderDrop orderId={o.id} refNo={o.refNo} />}
     </div>
   );
 }

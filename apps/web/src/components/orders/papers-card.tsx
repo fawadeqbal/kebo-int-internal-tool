@@ -33,13 +33,16 @@ function viewHref(base: string, r: PaperRow, back: string) {
 }
 
 /** Upload the paper (to the deal's files) or say where it is kept: both record it in the order's document set. */
-function RecordForm({
+export function RecordForm({
   r,
   mode,
   dealId,
   add,
   update,
   onDone,
+  send,
+  hint,
+  today,
 }: {
   r: PaperRow;
   mode: "upload" | "elsewhere";
@@ -47,6 +50,11 @@ function RecordForm({
   add: Action;
   update?: Action;
   onDone: () => void;
+  /** Where the file goes (default: the deal's files). */
+  send?: (file: File) => Promise<{ id?: string; error?: string }>;
+  hint?: string;
+  /** Prefills the date (Upload on Documents). */
+  today?: string;
 }) {
   const id = useId();
   const router = useRouter();
@@ -63,7 +71,7 @@ function RecordForm({
       body.set("issuedOn", String(form.get("issuedOn") ?? ""));
       if (mode === "upload") {
         if (!file) return setError("Choose the file.");
-        const up = await uploadToDeal(dealId, file, r.label);
+        const up = send ? await send(file) : await uploadToDeal(dealId, file, r.label);
         if (up.error || !up.id) return setError(up.error ?? "The file was not kept.");
         body.set("attachmentId", up.id);
         body.set("status", "ready");
@@ -102,7 +110,7 @@ function RecordForm({
           <Input id={`${id}-no`} name="number" maxLength={60} defaultValue={r.number ?? ""} />
         </Field>
         <Field label="Date" htmlFor={`${id}-on`} optional>
-          <Input id={`${id}-on`} name="issuedOn" type="date" defaultValue={r.doc?.issuedOn ?? ""} />
+          <Input id={`${id}-on`} name="issuedOn" type="date" defaultValue={r.doc?.issuedOn ?? (mode === "upload" ? (today ?? "") : "")} />
         </Field>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -112,13 +120,13 @@ function RecordForm({
         <Button type="button" size="sm" variant="ghost" onClick={onDone}>
           Cancel
         </Button>
-        {mode === "elsewhere" && <span className="text-xs text-muted">No file is stored; it counts as done.</span>}
+        {(hint || mode === "elsewhere") && <span className="text-xs text-muted">{hint ?? "No file is stored; it counts as done."}</span>}
       </div>
     </form>
   );
 }
 
-function StateMark({ state }: { state: PaperState }) {
+export function StateMark({ state }: { state: PaperState }) {
   return paperDone(state) ? (
     <span className="grid size-[18px] shrink-0 place-items-center rounded-full bg-ok text-white" role="img" aria-label="Done">
       <Check className="size-3" strokeWidth={3.5} aria-hidden />

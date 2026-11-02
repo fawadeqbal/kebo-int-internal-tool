@@ -45,7 +45,7 @@ export function ProgressBar({ done, total, state, className }: { done: number; t
 }
 
 /** The step's top: its number, name, state, n of m, one line on where it stands, progress, and its main button. */
-function StepHeader({ step, action }: { step: StepView; action?: ReactNode }) {
+function StepHeader({ step, action, line }: { step: StepView; action?: ReactNode; line?: string }) {
   return (
     <section
       aria-labelledby="step-title"
@@ -77,7 +77,7 @@ function StepHeader({ step, action }: { step: StepView; action?: ReactNode }) {
             {step.done} of {step.total} done
           </span>
         </h2>
-        {step.line && <p className="mt-0.5 text-sm text-text-2">{readable(step.line)}</p>}
+        {(line ?? step.line) && <p className="mt-0.5 text-sm text-text-2">{readable(line ?? step.line)}</p>}
         <ProgressBar done={step.done} total={step.total} state={step.state} className="mt-2.5 max-w-md" />
       </div>
       {action && <div className="flex shrink-0 flex-wrap gap-2 has-[form]:basis-full sm:has-[form]:basis-auto">{action}</div>}
@@ -117,6 +117,7 @@ export function StepPage({
   step,
   base,
   action,
+  line,
   side,
   children,
 }: {
@@ -124,6 +125,8 @@ export function StepPage({
   step: FlowStep;
   base: string;
   action?: ReactNode;
+  /** The step's one line, when the page says it better than the checklist (Documents: papers ready, what is missing, the bank). */
+  line?: string;
   side: ReactNode;
   children: ReactNode;
 }) {
@@ -131,7 +134,7 @@ export function StepPage({
   return (
     <div className="flex flex-col gap-5">
       {view ? (
-        <StepHeader step={view} action={action} />
+        <StepHeader step={view} action={action} line={line} />
       ) : (
         <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
           {FLOW_STEP_LABEL[step]} is switched off for your company.

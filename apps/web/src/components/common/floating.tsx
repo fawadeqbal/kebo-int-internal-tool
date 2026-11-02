@@ -29,7 +29,7 @@ function subscribePhone(cb: () => void) {
   m.addEventListener("change", cb);
   return () => m.removeEventListener("change", cb);
 }
-const useIsPhone = () => useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE).matches, () => false);
+export const useIsPhone = () => useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE).matches, () => false);
 
 /**
  * Keeps a panel next to its anchor while the page or any box around it
@@ -96,7 +96,10 @@ export function FloatingMenu({
   label,
   width = 240,
   align = "end",
+  header,
 }: {
+  /** On a phone, shown at the top of the sheet in place of the label (a file's name and details). */
+  header?: ReactNode;
   /** The button that opened it. */
   anchor: Anchor;
   onClose: () => void;
@@ -139,7 +142,7 @@ export function FloatingMenu({
           className="relative flex max-h-[80dvh] flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base"
         >
           <span className="mx-auto mb-1 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
-          <p className="px-2.5 pt-1 pb-2 text-xs font-medium text-muted">{label}</p>
+          {header ?? <p className="px-2.5 pt-1 pb-2 text-xs font-medium text-muted">{label}</p>}
           {children}
         </div>
       </div>,

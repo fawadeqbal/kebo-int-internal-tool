@@ -3,7 +3,7 @@
 import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, Lock, Minus, MoreHorizontal, Paperclip, Plus, Upload } from "lucide-react";
+import { Check, Lock, Minus, MoreHorizontal, Plus, Upload } from "lucide-react";
 import { fillSplit, TOOL_LABEL, type FlowStep, type OrderDocumentKind, type PaymentRoute } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { FloatingMenu } from "@/components/common/floating";
@@ -13,6 +13,7 @@ import type { ChecklistItem } from "@/lib/types-checklist";
 import type { BankContract, BankStepView, DeliveryView, FlowDocument, ShipmentView } from "@/lib/types-flow";
 import { BankContractForm, BankStepForm, DateForm, DeliveryForm, DocumentForm, RouteForm, ShipmentForm, type RouteTermsValue } from "./flow-forms";
 import { LightForm, sendTo, TapButton, uploadFile, type LightChip, type LightField, type LightTap } from "./light-form";
+import { FileChip } from "@/components/files/file-tools";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** checklistAction bound to the order: (change, item id or automatic key, …). */
@@ -662,6 +663,9 @@ function Row({
 
   return (
     <li
+      // Files dropped on the row are attached to it (see OrderDrop).
+      data-drop-attach={canEdit && (item.key || item.id) && !item.key?.startsWith("doc:") && !item.key?.startsWith("bank:") ? `checklist:${item.key ?? item.id}` : undefined}
+      data-drop-label={item.title}
       className={cn(
         "grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-lg px-3 py-3",
         item.late ? "bg-bad-soft" : (now || showForm) && !closed ? "bg-primary-soft/70 ring-1 ring-primary/15" : "",
@@ -703,16 +707,13 @@ function Row({
               {item.needs && !showForm && <span className="text-muted">Needs: {item.needs}</span>}
             </>
           )}
-          {item.file && (
-            <a
-              href={`/files/${item.file.id}?view=1`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-            >
-              <Paperclip className="size-3" aria-hidden /> {item.file.name}
-            </a>
-          )}
+          {/* Documents v3: the item's files as chips with the same tools as everywhere (view here, download, ⋯). */}
+          {item.file && <FileChip file={{ id: item.file.id, name: item.file.name, href: `/files/${item.file.id}`, viewHref: `/files/${item.file.id}?view=1` }} />}
+          {item.fields
+            .filter((f) => f.type === "file" && item.values[f.key] && item.values[f.key] !== item.file?.id)
+            .map((f) => (
+              <FileChip key={f.key} file={{ id: item.values[f.key]!, name: f.label, href: `/files/${item.values[f.key]}`, viewHref: `/files/${item.values[f.key]}?view=1` }} />
+            ))}
           {item.note && <span className="text-text-2 italic">{item.note}</span>}
         </span>
         {whoWhen && <span className="shrink-0 text-muted">{whoWhen}</span>}
