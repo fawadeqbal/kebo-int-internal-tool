@@ -454,7 +454,6 @@ function ownLight(item: ChecklistItem, today: string, me?: string): { fields: Li
     type: f.type === "file" ? "file" : f.type === "date" ? "date" : f.type === "number" ? "number" : "text",
     value: item.values[f.key] && f.type !== "file" ? item.values[f.key] : up && f.type === "date" ? today : up && ME_FIELD.test(f.key + f.label) ? (me ?? "") : "",
     required: up && req.has(f.key),
-    max: f.type === "date" ? undefined : undefined,
   });
   const fields = upfront.map((f) => asField(f, true));
   if (item.tool === "upload") fields.push({ name: "$file", label: "The file", type: "file", required: !item.file, hint: item.file ? `Now: ${item.file.name}` : undefined });

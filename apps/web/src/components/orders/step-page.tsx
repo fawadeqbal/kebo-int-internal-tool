@@ -107,9 +107,10 @@ function PrevNext({ base, steps, here }: { base: string; steps: StepView[]; here
 }
 
 /**
- * Every step page: the header card, then the checklist and the step's data on
- * the left and the side cards (key facts, files, changes) on the right, then
- * the way to the step before and after.
+ * Every step page (order v4): the header card, then the checklist and, under
+ * "What this step holds", the step's read-only view on the left (details,
+ * lines, papers and costs) and the side cards (files, changes) on the right,
+ * then the way to the step before and after.
  */
 export function StepPage({
   steps,
@@ -159,32 +160,6 @@ export function StepViewDivider() {
 /** Papers and Costs side by side on a wide screen, one under the other below. */
 export function ViewPair({ children }: { children: ReactNode }) {
   return <div className="grid items-start gap-5 lg:grid-cols-2 [&>*]:min-w-0">{children}</div>;
-}
-
-/** The step's few numbers and dates, label left, value right. */
-export function KeyFacts({ facts, editHref }: { facts: { label: string; value: ReactNode }[]; editHref?: string }) {
-  return (
-    <Card>
-      <CardHeader
-        title="Key facts"
-        actions={
-          editHref ? (
-            <Link href={editHref} className={buttonClass("ghost", "xs")}>
-              Edit
-            </Link>
-          ) : undefined
-        }
-      />
-      <dl className="flex flex-col gap-2.5 px-4 py-3.5 text-sm">
-        {facts.map((f) => (
-          <div key={f.label} className="flex items-baseline justify-between gap-3">
-            <dt className="shrink-0 text-xs text-muted">{f.label}</dt>
-            <dd className="min-w-0 text-right font-medium tabular">{f.value ?? <span className="text-muted">—</span>}</dd>
-          </div>
-        ))}
-      </dl>
-    </Card>
-  );
 }
 
 /** The files the step's items keep, and where to add more. */

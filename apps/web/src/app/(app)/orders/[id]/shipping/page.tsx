@@ -54,7 +54,7 @@ function shipmentFields(s: Partial<ShipmentView>, shipBy: string | null): Detail
   ];
   if (!air)
     out.push(
-      { name: "containerType", label: "Container", value: s.containerType, group: "Container", panelOnly: true, placeholder: "e.g. 1 × 40 HQ" },
+      { name: "containerType", label: "Container type", value: s.containerType, group: "Container", panelOnly: true, placeholder: "e.g. 1 × 40 HQ" },
       { name: "containerNo", label: "Container", panelLabel: "Container no.", value: s.containerNo, show: container, group: "Container" },
       { name: "sealNo", label: "Seal no.", value: s.sealNo, group: "Container", placeholder: "e.g. 0048812" },
       { name: "loadedOn", label: "Loaded on", value: s.loadedOn, type: "date", group: "Container", panelOnly: true },
@@ -116,7 +116,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         { name: "etd", label: "ETD", type: "date", value: toBook?.etd, required: true },
       ],
       chips: [
-        { label: "Container type", field: { name: "containerType", label: "Container", value: toBook?.containerType, placeholder: "e.g. 1 × 40 HQ" } },
+        { label: "Container type", field: { name: "containerType", label: "Container type", value: toBook?.containerType, placeholder: "e.g. 1 × 40 HQ" } },
         { label: "ETA", field: { name: "eta", label: "ETA", type: "date", value: toBook?.eta } },
         { label: "Booking copy", field: { name: "attachmentId", label: "Booking copy (PDF or photo)", type: "file" } },
         { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },

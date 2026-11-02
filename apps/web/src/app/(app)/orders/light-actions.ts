@@ -228,11 +228,3 @@ export async function lightAction(orderId: string, what: string, _prev: ActionSt
   if (r.ok) refresh(orderId);
   return { ...r, message: r.ok ? (note ?? r.message) : r.message, data: undefined };
 }
-
-/** A file and a note kept with an automatic item (⋯ → Attach a file on a row that ticks itself). */
-export async function autoKeepAction(orderId: string, key: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const r = await attempt(form, () => api.put(`/orders/${orderId}/checklist/auto/${key}`, pick(v, ["attachmentId", "note"])), "Saved.");
-  if (r.ok) refresh(orderId);
-  return { ...r, data: undefined };
-}
