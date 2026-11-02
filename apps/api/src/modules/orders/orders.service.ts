@@ -373,6 +373,8 @@ export class OrdersService {
               inquiryId: o.inquiryId,
               factoryId: x.factory.id,
               category: "other",
+              step: "factory",
+              borneBy: "us",
               description: `Paid to ${x.factory.name}, lost when ${o.refNo} was cancelled`.slice(0, 200),
               amount: fromMinor(x.minor),
               currency: x.currency,

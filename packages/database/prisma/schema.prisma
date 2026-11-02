@@ -1578,48 +1578,58 @@ model FactoryPayment {
 /// A cost: for one order (freight, inspection…) or for the company when orderId
 /// is empty (rent, salaries…). Only managers and the super admin see these.
 model Expense {
-  id           String        @id @default(uuid()) @db.Uuid
+  id              String        @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company      Company       @relation(fields: [companyId], references: [id])
-  orderId      String?       @map("order_id") @db.Uuid
-  order        Order?        @relation(fields: [orderId], references: [id])
+  companyId       String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company       @relation(fields: [companyId], references: [id])
+  orderId         String?       @map("order_id") @db.Uuid
+  order           Order?        @relation(fields: [orderId], references: [id])
   /// Who it was spent on (a dinner, a ticket to visit them…); for a deal or an order always its customer. Empty: the company's own cost.
-  customerId   String?       @map("customer_id") @db.Uuid
-  customer     Customer?     @relation(fields: [customerId], references: [id])
+  customerId      String?       @map("customer_id") @db.Uuid
+  customer        Customer?     @relation(fields: [customerId], references: [id])
   /// The deal it was spent on (a trip to check products, samples…), won or lost; for an order always its deal.
-  inquiryId    String?       @map("inquiry_id") @db.Uuid
-  inquiry      Inquiry?      @relation(fields: [inquiryId], references: [id])
+  inquiryId       String?       @map("inquiry_id") @db.Uuid
+  inquiry         Inquiry?      @relation(fields: [inquiryId], references: [id])
   /// The factory visited or paid for (a trip to check its products, an inspection there).
-  factoryId    String?       @map("factory_id") @db.Uuid
-  factory      Factory?      @relation(fields: [factoryId], references: [id])
+  factoryId       String?       @map("factory_id") @db.Uuid
+  factory         Factory?      @relation(fields: [factoryId], references: [id])
   /// See EXPENSE_CATEGORIES in @kebo/shared.
-  category     String        @db.VarChar(30)
-  description  String        @db.VarChar(200)
-  amount       Decimal       @db.Decimal(14, 2)
-  currency     String        @db.Char(3)
+  category        String        @db.VarChar(30)
+  description     String        @db.VarChar(200)
+  amount          Decimal       @db.Decimal(14, 2)
+  currency        String        @db.Char(3)
   /// Units of `currency` per one unit of the main currency when it was spent (14 decimals, so a
   /// PKR company's 1/280 for USD stays exact enough: USD 100,000 is PKR 28,000,000.00).
-  rate         Decimal       @db.Decimal(24, 14)
-  spentOn      DateTime      @map("spent_on") @db.Date
-  paidById     String?       @map("paid_by") @db.Uuid
-  paidBy       User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
-  reference    String?       @db.VarChar(120)
-  note         String?
+  rate            Decimal       @db.Decimal(24, 14)
+  spentOn         DateTime      @map("spent_on") @db.Date
+  paidById        String?       @map("paid_by") @db.Uuid
+  paidBy          User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  reference       String?       @db.VarChar(120)
+  note            String?
   /// A photo or PDF of the receipt or ticket.
-  receiptKey   String?       @map("receipt_key")
-  receiptName  String?       @map("receipt_name") @db.VarChar(255)
-  receiptType  String?       @map("receipt_type") @db.VarChar(150)
-  receiptSize  Int?          @map("receipt_size")
+  receiptKey      String?       @map("receipt_key")
+  receiptName     String?       @map("receipt_name") @db.VarChar(255)
+  receiptType     String?       @map("receipt_type") @db.VarChar(150)
+  receiptSize     Int?          @map("receipt_size")
   /// Which of our accounts the money moved through (cash, a bank, a wallet).
-  accountId    String?       @map("account_id") @db.Uuid
-  account      MoneyAccount? @relation(fields: [accountId], references: [id])
-  recordedById String        @map("recorded_by") @db.Uuid
-  recordedBy   User          @relation("ExpenseRecorder", fields: [recordedById], references: [id])
-  voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
-  voidReason   String?       @map("void_reason")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  accountId       String?       @map("account_id") @db.Uuid
+  account         MoneyAccount? @relation(fields: [accountId], references: [id])
+  /// On an order: the step it belongs to (FlowStep: payment, factory, production, shipping, documents, delivery).
+  step            String?       @db.VarChar(20)
+  /// Who bears it: us (cuts the order's profit), customer (added to what they owe), factory (taken off what we owe it).
+  borneBy         String        @default("us") @map("borne_by") @db.VarChar(10)
+  /// Paid by `paidBy` from their own money: we owe it back until `repaidOn`.
+  ownMoney        Boolean       @default(false) @map("own_money")
+  repaidOn        DateTime?     @map("repaid_on") @db.Date
+  /// The account the money was paid back from.
+  repaidAccountId String?       @map("repaid_account_id") @db.Uuid
+  repaidAccount   MoneyAccount? @relation("ExpenseRepaidFrom", fields: [repaidAccountId], references: [id])
+  recordedById    String        @map("recorded_by") @db.Uuid
+  recordedBy      User          @relation("ExpenseRecorder", fields: [recordedById], references: [id])
+  voidedAt        DateTime?     @map("voided_at") @db.Timestamptz
+  voidReason      String?       @map("void_reason")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([orderId])
   @@index([customerId])
@@ -1627,6 +1637,7 @@ model Expense {
   @@index([factoryId])
   @@index([spentOn])
   @@index([accountId])
+  @@index([repaidAccountId])
   @@index([companyId])
   @@map("expenses")
 }
@@ -1716,6 +1727,7 @@ model MoneyAccount {
   payments        Payment[]
   factoryPayments FactoryPayment[]
   expenses        Expense[]
+  expensesRepaid  Expense[]         @relation("ExpenseRepaidFrom")
   transfersOut    MoneyTransfer[]   @relation("TransferFrom")
   transfersIn     MoneyTransfer[]   @relation("TransferTo")
   receipts        CustomerReceipt[]

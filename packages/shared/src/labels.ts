@@ -128,6 +128,8 @@ export const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
   inland_transport: "Inland transport",
   inspection: "Inspection",
   customs: "Customs & documents",
+  insurance: "Insurance",
+  courier: "Courier",
   bank_charges: "Bank charges",
   commission: "Commission",
   rent: "Rent",

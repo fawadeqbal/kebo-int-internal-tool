@@ -391,7 +391,7 @@ describe("money v2", () => {
     await api(app, manager).post(`/orders/${d}/factory-payments`, { factoryId, kind: "deposit", amount: 3600, currency: "CNY", rate: 7.1, paidOn: today }).expect(201);
     await api(app, manager).post(`/orders/${d}/cancel`, { reason: "Factory failed", factoryMoney: "loss" }).expect(200);
     const loss = await prisma.platform.expense.findFirst({ where: { orderId: d } });
-    expect(loss).toMatchObject({ category: "other", currency: "CNY" });
+    expect(loss).toMatchObject({ category: "other", currency: "CNY", borneBy: "us", step: "factory" });
     expect(loss!.amount.toFixed(2)).toBe("3600.00");
     // …or a refund expected from the factory (the default).
     const e = await newOrder(12000);

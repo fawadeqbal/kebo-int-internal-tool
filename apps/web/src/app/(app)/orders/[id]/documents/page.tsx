@@ -9,6 +9,7 @@ import { BankChainPanel, PaperSetPanel } from "@/components/orders/flow-panels";
 import { PAYMENT_ROUTE_LABEL, PAYMENT_ROUTE_SHORT, type OrderDocumentKind } from "@kebo/shared";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { addDocumentAction, bankStepAction, clearBankStepAction, removeDocumentAction, updateDocumentAction } from "../../flow-actions";
 import { date, money } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
@@ -141,12 +142,14 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
               { label: "Balance due", value: Number(o.money.due) > 0 ? money(o.money.due, o.currency) : "Nothing" },
             ]}
           />
+          <StepCosts id={o.id} step="documents" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? "#files" : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
     >
       <Checklist
+        payFor={await expensePayTools(o.id, d.items)}
         step="documents"
         label="Documents & bank"
         items={d.items}

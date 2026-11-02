@@ -32,7 +32,9 @@ import {
   factoryPlanInput,
   type FactoryPlanInput,
   paymentPlanInput,
+  repayInput,
   voidInput,
+  type RepayInput,
   type ExpenseInput,
   type FactoryPaymentInput,
   type PaymentPlanInput,
@@ -44,6 +46,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { MoneyService } from "./money.service";
+import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
 import { CashService } from "./cash.service";
 import { LeaksService } from "./leaks.service";
@@ -81,6 +84,7 @@ const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) }
 class MoneyController {
   constructor(
     private readonly money: MoneyService,
+    private readonly costs: CostsService,
     private readonly accounts: AccountsService,
     private readonly cash: CashService,
     private readonly leaks: LeaksService,
@@ -168,6 +172,14 @@ class MoneyController {
     return this.money.forOrder(user, id);
   }
 
+  /** An order's costs: planned on the quote against spent, its expenses by step, the profit now expected, who to repay (managers). */
+  @RequireFeature("expenses")
+  @RequirePermissions("expenses.manage")
+  @Get("orders/:id/costs")
+  costsOf(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.costs.forOrder(user, id);
+  }
+
   /** { items: [{ id?, label, amount, dueOn? }], reason? } — they must add up to the order total. */
   @Put("orders/:id/payment-plan")
   plan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentPlanInput)) body: PaymentPlanInput) {
@@ -245,6 +257,15 @@ class MoneyController {
     @Body(Validate(voidInput)) body: z.infer<typeof voidInput>,
   ) {
     return this.money.voidExpense(user, id, body.reason);
+  }
+
+  /** { repaidOn, accountId? }: paying back someone who paid it from their own money. */
+  @RequireFeature("expenses")
+  @RequirePermissions("expenses.manage")
+  @Post("expenses/:id/repay")
+  @HttpCode(200)
+  repayExpense(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(repayInput)) body: RepayInput) {
+    return this.money.repayExpense(user, id, body);
   }
 
   /** multipart/form-data with one `file`: a photo or PDF of the receipt (replaces the one there). */
@@ -338,5 +359,5 @@ class MoneyController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, AccountsService, CashService, LeaksService, PaymentFilesService], exports: [MoneyService, AccountsService, CashService, LeaksService] })
+@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, CostsService, AccountsService, CashService, LeaksService, PaymentFilesService], exports: [MoneyService, AccountsService, CashService, LeaksService] })
 export class MoneyModule {}

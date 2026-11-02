@@ -132,6 +132,7 @@ export class AccountsService {
           category: true,
           spentOn: true,
           description: true,
+          borneBy: true,
         },
       }),
       this.prisma.db.payment.findMany({
@@ -164,6 +165,8 @@ export class AccountsService {
       }
       const d = byDeal.get(e.inquiryId) ?? { beforeSale: 0, onOrder: 0, basisPaid: 0 };
       if (e.orderId) {
+        // Charged to the customer or taken off what we owe a factory: not a cost of the order.
+        if (e.borneBy !== "us") continue;
         d.onOrder += v;
         if (paysBasis(e.category)) d.basisPaid += v;
       } else d.beforeSale += v;

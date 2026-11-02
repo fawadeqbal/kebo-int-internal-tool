@@ -1,4 +1,19 @@
-import type { BasisStep, CreditKind, ExpenseCategory, FactoryDueRule, FactoryPlanStatus, InquiryStage, LostReason, PaymentKind, PaymentMethod, PaymentRoute, InstalmentStatus } from "@kebo/shared";
+import type {
+  BasisStep,
+  CostRowStatus,
+  CreditKind,
+  ExpenseBearer,
+  ExpenseCategory,
+  FactoryDueRule,
+  FactoryPlanStatus,
+  FlowStep,
+  InquiryStage,
+  LostReason,
+  PaymentKind,
+  PaymentMethod,
+  PaymentRoute,
+  InstalmentStatus,
+} from "@kebo/shared";
 import type { Person } from "./types";
 
 /** A file kept with a record (an expense's receipt, a payment's bank slip). */
@@ -19,7 +34,11 @@ export interface OrderMoney {
   /** How the customer pays, from the route. */
   route: { route: PaymentRoute | null; summary: string | null };
   received: string;
+  /** Still due: the total and what was charged to the customer, less what came in. */
   due: string;
+  /** Expenses charged to the customer on this order ("Charged to you: …"). */
+  charged: { id: string; description: string; spentOn: string; amount: string }[];
+  chargedTotal: string;
   plan: {
     items: {
       id: string;
@@ -88,7 +107,10 @@ export interface FactoryOwed {
   currency: string;
   lines: number;
   owed: string;
+  /** Paid, with the expenses the factory bears. */
   paid: string;
+  /** Expenses the factory bears, taken off what we owe it. */
+  takenOff: string;
   toPay: string;
   overpaid: string | null;
 }
@@ -141,7 +163,88 @@ export interface ExpenseView {
   reference: string | null;
   note: string | null;
   receipt: { name: string; type: string; size: number } | null;
+  /** On an order: its step, who bears it, and whether someone paid it from their own money. */
+  step: FlowStep | null;
+  borneBy: ExpenseBearer;
+  ownMoney: boolean;
+  repaid: { on: string; account: { id: string; name: string } | null } | null;
   voided: { at: string; reason: string | null } | null;
+}
+
+/** One expense on the order's Costs page (amounts also in the order's currency). */
+export interface CostExpense {
+  id: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: string;
+  currency: string;
+  rate: number;
+  inMain: string;
+  inOrder: string;
+  spentOn: string;
+  step: FlowStep | null;
+  borneBy: ExpenseBearer;
+  factory: { id: string; name: string } | null;
+  paidBy: Person | null;
+  account: { id: string; name: string } | null;
+  ownMoney: boolean;
+  repaid: { on: string; account: { id: string; name: string } | null } | null;
+  reference: string | null;
+  note: string | null;
+  receipt: AttachedFileInfo | null;
+  recordedBy: Person | null;
+  recordedAt: string;
+  voided: { at: string; reason: string | null } | null;
+}
+
+/** GET /orders/:id/costs (managers with the expenses feature). */
+export interface OrderCosts {
+  orderId: string;
+  refNo: string;
+  currency: string;
+  mainCurrency: string;
+  missingRate: string | null;
+  cancelled: boolean;
+  canEdit: boolean;
+  totals: {
+    planned: string;
+    spent: string;
+    count: number;
+    notPlanned: string;
+    notPlannedKinds: string[];
+    receiptsMissing: number;
+    receiptsMissingAmounts: { currency: string; amount: string }[];
+    borneByUs: string;
+    chargedToCustomer: string;
+    takenOffFactory: string;
+  };
+  planned: {
+    key: string;
+    label: string;
+    basisStep: BasisStep | null;
+    categories: ExpenseCategory[];
+    planned: string | null;
+    spent: string;
+    difference: string;
+    status: CostRowStatus;
+    note: string | null;
+  }[];
+  steps: Record<FlowStep, { count: number; spent: string }>;
+  expenses: CostExpense[];
+  profit: {
+    sale: string;
+    uncosted: string;
+    factory: string;
+    factoryOwed: { currency: string; amount: string }[];
+    planned: string;
+    notPlanned: string;
+    bankCharges: string;
+    expected: string;
+    margin: number | null;
+    onQuote: string;
+    onQuoteMargin: number | null;
+  } | null;
+  toRepay: { person: Person; currency: string; amount: string; items: { id: string; description: string; amount: string; spentOn: string }[] }[];
 }
 
 /** GET /expenses: what is shown, with its totals (in the main currency). */

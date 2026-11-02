@@ -124,6 +124,10 @@ export async function expenseAction(
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
     accountId: v.accountId || null,
+    // The order's expense form says the step, who bears it and whether it was someone's own money; other forms leave them as they are.
+    ...(form.has("step") ? { step: v.step || null } : {}),
+    ...(form.has("borneBy") ? { borneBy: v.borneBy } : {}),
+    ...(form.has("ownMoney") ? { ownMoney: v.ownMoney === "on" || v.ownMoney === "true" } : {}),
     reason: reasonOf(form),
   };
   const r = await attempt(
@@ -143,6 +147,19 @@ export async function expenseAction(
 export async function removePaymentFileAction(side: "in" | "out", paymentId: string, orderId: string): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/${side === "in" ? "payments" : "factory-payments"}/${paymentId}/file`), "File removed.");
   if (r.ok) refresh(orderId);
+  return r;
+}
+
+/** Pays back what someone paid from their own money: each of `expenseIds`, on one day, from one account. */
+export async function repayAction(orderId: string, expenseIds: string[], _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const body = { repaidOn: v.repaidOn, accountId: v.accountId || null };
+  let r: ActionState = { ok: true };
+  for (const id of expenseIds) {
+    r = await attempt(form, () => api.post(`/expenses/${id}/repay`, body), expenseIds.length > 1 ? `${expenseIds.length} expenses repaid.` : "Repaid.");
+    if (!r.ok) break;
+  }
+  refresh(orderId);
   return r;
 }
 
