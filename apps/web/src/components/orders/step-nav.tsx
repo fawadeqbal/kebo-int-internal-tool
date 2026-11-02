@@ -84,7 +84,7 @@ export function StepNav({ base, steps, costs }: { base: string; steps: StepNavSt
   return (
     <>
       <nav aria-label="Order steps" className="no-print mt-4 hidden border-b border-line md:block">
-        <ul className="-mb-px flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="-mb-px flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {links.map((l) => {
             const s = "number" in l ? l : null;
             const on = active(l.href);
@@ -94,7 +94,7 @@ export function StepNav({ base, steps, costs }: { base: string; steps: StepNavSt
                   href={l.href}
                   aria-current={on ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-1.5 border-b-2 px-2.5 py-2.5 text-sm whitespace-nowrap transition-colors",
+                    "flex items-center gap-1.5 border-b-2 px-2 py-2.5 text-sm whitespace-nowrap transition-colors xl:px-2.5",
                     on ? "border-primary font-semibold text-text" : "border-transparent text-text-2 hover:text-text",
                   )}
                 >

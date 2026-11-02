@@ -161,14 +161,44 @@ export function PapersCard({
   back: string;
 }) {
   const [open, setOpen] = useState<{ key: string; mode: "upload" | "elsewhere" } | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const main = variant === "main";
+  // Papers made once per payment (receipts, requests) can be many: show the latest few and a "more" link.
+  const KEEP = 2;
+  const count: Record<string, number> = {};
+  for (const r of rows) count[r.kind] = (count[r.kind] ?? 0) + 1;
+  const seen: Record<string, number> = {};
+  const shown: (PaperRow | { more: string; label: string; hidden: number })[] = [];
+  for (const r of rows) {
+    seen[r.kind] = (seen[r.kind] ?? 0) + 1;
+    const n = count[r.kind]!;
+    const folded = n > KEEP + 1 && !expanded.has(r.kind);
+    if (folded && seen[r.kind]! <= n - KEEP) {
+      if (seen[r.kind] === 1) shown.push({ more: r.kind, label: r.label.replace(/\s+\d+$/, ""), hidden: n - KEEP });
+      continue;
+    }
+    shown.push(r);
+  }
   if (!rows.length && !main) return null;
   return (
     <Card id={main ? "papers" : undefined} className={main ? "scroll-mt-24" : undefined}>
       <CardHeader title={title} description={description} />
       {rows.length ? (
         <ul className={cn("flex flex-col divide-y divide-line", main ? "px-2 py-1" : "px-4")}>
-          {rows.map((r) => {
+          {shown.map((r) => {
+            if ("more" in r)
+              return (
+                <li key={`more-${r.more}`} className={cn("py-2.5", main && "px-2")}>
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-primary hover:underline"
+                    onClick={() => setExpanded((e) => new Set(e).add(r.more))}
+                  >
+                    Show {r.hidden} earlier {r.label.toLowerCase()}
+                    {r.hidden === 1 ? "" : "s"}
+                  </button>
+                </li>
+              );
             const view = viewHref(base, r, back);
             const make = r.makeable ? `${base}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
             const badge = r.source === "app" ? SOURCE.app! : (SOURCE[r.state] ?? null);
