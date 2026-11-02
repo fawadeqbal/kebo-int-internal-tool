@@ -5,9 +5,9 @@ import { ShipmentsPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
 import { addShipmentAction, removeShipmentAction, updateShipmentAction } from "../../flow-actions";
-import { packingAction, paymentAction } from "../../actions";
+import { packingAction, packingMarksAction, paymentAction } from "../../actions";
 import { PaymentForm } from "../forms";
-import { PackingList } from "../goods";
+import { PackingCard } from "../goods";
 import { docHref, goodsOf } from "../shared";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
@@ -47,7 +47,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
     tools.arrived = ship("Mark arrived");
   }
   if (goods.length)
-    tools.packing_list = { kind: "link", label: o.goods.packed ? "Edit" : canEdit ? "Make it" : "See it", href: "#packing" };
+    tools.packing_list = { kind: "link", label: o.goods.packed ? "Edit" : canEdit ? "Make it" : "See it", href: "#lines" };
   if (canPay && Number(o.money.due) > 0)
     tools.balance_in = {
       kind: "node",
@@ -135,26 +135,28 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         </Card>
       )}
       {goods.length > 0 && (
-        <div id="packing" className="scroll-mt-24">
+        <div id="lines" className="scroll-mt-24">
           {showPacking ? (
-            <PackingList
-              title="Packing list"
-              description={o.goods.packed ? undefined : "Packages, weights and volume for each line, before shipping."}
+            <PackingCard
+              title="Lines · packing"
+              description={o.goods.packed ? "The packing list paper is made from these lines." : "Packages, weights and volume for each line, before shipping."}
               badge={o.goods.packed ? <Badge tone="ok">Done</Badge> : <Badge tone="warn">Not made yet</Badge>}
-              lines={goods}
+              orderId={o.id}
+              lines={o.lines.filter((l) => l.type === "goods")}
+              goods={goods}
               containerNo={o.goods.containerNo}
               shippingMarks={o.goods.shippingMarks}
-              packed={o.goods.packed}
-              totals={o.goods.totals}
               canEdit={canEdit}
               canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
               action={packingAction.bind(null, o.id)}
-              links={docHref(o, { kind: "packing-list", label: "Packing list" })}
+              marksAction={packingMarksAction.bind(null, o.id)}
+              links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
+              today={now}
             />
           ) : (
             <Card>
               <CardHeader
-                title="Packing list"
+                title="Lines · packing"
                 description="Opens once production has started, for the packages, weights and volume of each line."
                 actions={<Badge tone="warn">Not made yet</Badge>}
               />
