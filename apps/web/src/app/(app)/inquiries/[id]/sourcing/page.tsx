@@ -1,15 +1,14 @@
 import Link from "next/link";
-import { multiplyMinor, toMinor, formatMinor } from "@kebo/money";
+import { ArrowRight } from "lucide-react";
 import { basisText } from "@kebo/shared";
-import { Alert, Badge, buttonClass, Card, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, Badge, ButtonLink, Card, cn, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { load, requirePermission } from "@/lib/session";
 import { date, money, qty } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
-import type { SalesSettings, SourcingView } from "@/lib/types-deals";
+import type { FactoryQuoteView, SalesSettings, SourcingView } from "@/lib/types-deals";
 import { FactoryQuotes } from "@/components/deals/sourcing-board";
-import { CoverageBadge } from "@/components/deals/revision-editor";
 import { removeFileAction } from "../../actions";
 import {
   addOfferLinesAction,
@@ -27,13 +26,21 @@ export const metadata = { title: "Factory prices" };
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 /**
- * The factories' offers for the deal. Each offer is the factory's own lines
- * (its models, quantities and parts), each saying which of the customer's items
- * it answers. Compare whole offers (cost, what they cover, lead time) and item
- * by item; the quotation offers whole offers as options A, B…
+ * The factories' offers for the deal, in two views: "Offers" (one offer at a
+ * time: its details, what is still missing, its lines and files) and "Compare
+ * side by side" (each of the customer's items across the offers, cheapest
+ * marked, then each whole offer's cost, coverage and terms). The quotation
+ * offers whole offers as options A, B…
  */
-export default async function SourcingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SourcingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ view?: string; offer?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
   await requirePermission("sourcing.manage");
   const [d, s, settings] = await Promise.all([
     load(() => api.get<DealDetail>(`/inquiries/${id}`)),
@@ -41,14 +48,12 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
     api.get<{ sales: SalesSettings }>("/settings"),
   ]);
   const canEdit = d.allowed.source;
-  // Only an offer that covers everything and has a price on every line can be "cheapest".
-  // Offers on different price bases (EXW vs CFR) cannot be compared on cost alone.
-  const bases = [...new Set(s.quotes.filter((q) => q.lines.length).map((q) => q.basis ?? "?"))];
-  const mixedBases = bases.length > 1;
-  const cheapest = mixedBases ? NaN : Math.min(...s.quotes.filter((q) => q.totalCost !== null && !q.coverage.missing.length && !q.unpriced && q.lines.length).map((q) => Number(q.totalCost)));
+  const compare = sp.view === "compare";
+  const withLines = s.quotes.filter((q) => q.lines.length);
+  const base = `/inquiries/${d.id}/sourcing`;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {!canEdit && (
         <Alert tone="info">
           {d.stage === "won" || d.stage === "lost"
@@ -56,242 +61,268 @@ export default async function SourcingPage({ params }: { params: Promise<{ id: s
             : "Only the person handling this inquiry (or a manager) can change its factory prices."}
         </Alert>
       )}
-      {s.missingRates.length > 0 && (
-        <Alert tone="warning">
-          There is no exchange rate for {s.missingRates.join(", ")} in Settings, so those prices cannot be turned into {s.currency} and are
-          left out of the comparison. Ask an admin to add the rate (1 {s.currency} = ? {s.missingRates[0]}).
-        </Alert>
+
+      {s.quotes.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Segmented
+            label="View"
+            options={[
+              { href: base, label: `Offers (${s.quotes.length})`, active: !compare },
+              { href: `${base}?view=compare`, label: "Compare side by side", active: compare },
+            ]}
+          />
+          {withLines.length > 0 && (
+            <ButtonLink href={`/inquiries/${d.id}/quotation`} variant="primary" size="sm">
+              Go to the quotation <ArrowRight aria-hidden />
+            </ButtonLink>
+          )}
+        </div>
       )}
 
-      {s.quotes.some((q) => q.lines.length) && (
-        <Card>
-          <CardHeader
-            title="Compare offers"
-            description={`What each whole offer costs us in ${s.currency} (factory prices plus tax, on each factory's own price basis) and which of the customer's items it covers. Freight and the like to reach your basis are added in the quotation.`}
-            actions={
-              <Link href={`/inquiries/${d.id}/quotation`} className={buttonClass("primary", "sm")}>
-                Go to the quotation
-              </Link>
-            }
-          />
-          <Table>
+      {compare ? (
+        <CompareView view={s} dealId={d.id} />
+      ) : (
+        <FactoryQuotes
+          dealId={d.id}
+          quotes={s.quotes}
+          items={s.items}
+          canEdit={canEdit}
+          today={todayIn(TZ)}
+          mainCurrency={s.currency}
+          rates={settings.sales.exchangeRates}
+          initialOffer={sp.offer ?? null}
+          saveAction={saveFactoryQuoteAction.bind(null, d.id)}
+          removeAction={removeFactoryQuoteAction.bind(null, d.id)}
+          searchFactories={searchFactoriesAction}
+          lines={{
+            add: addOfferLinesAction.bind(null, d.id),
+            edit: editOfferLineAction.bind(null, d.id),
+            move: moveOfferLineAction.bind(null, d.id),
+            remove: removeOfferLineAction.bind(null, d.id),
+            copy: copyOfferLinesAction.bind(null, d.id),
+            removeFile: removeFileAction.bind(null, d.id),
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** "Compare side by side": the customer's items down the side, one column per offer. */
+function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
+  const offers = view.quotes.filter((q) => q.lines.length);
+  const base = `/inquiries/${dealId}/sourcing`;
+  if (offers.length < 2)
+    return (
+      <Card className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <h2 className="text-base font-semibold">{offers.length === 0 ? "No offer has lines yet" : "Only one offer so far"}</h2>
+        <p className="max-w-md text-sm text-text-2">
+          Comparing needs at least two offers with their lines. Ask another factory and add its offer
+          {offers.length === 1 ? `; you can still make a quotation from ${offers[0]!.factory.name} alone.` : "."}
+        </p>
+        <ButtonLink href={base} variant="secondary" size="sm">
+          Back to the offers
+        </ButtonLink>
+      </Card>
+    );
+
+  // Offers on different price bases (EXW vs FOB) are not like for like on cost alone.
+  const bases = [...new Set(offers.map((q) => q.basis ?? "?"))];
+  const mixed = bases.length > 1;
+  const cheapestTotal = mixed ? NaN : Math.min(...offers.filter((q) => q.totalCost !== null && !q.coverage.missing.length && !q.unpriced).map((q) => Number(q.totalCost)));
+  const head = (q: FactoryQuoteView) => (
+    <Th key={q.id} className="min-w-36 border-l border-line align-bottom sm:min-w-44">
+      <Link href={`${base}?offer=${q.id}`} className="block text-sm font-semibold text-text hover:text-primary">
+        {q.factory.name}
+      </Link>
+      <span className="block text-xs font-normal text-muted normal-case">
+        {[q.basis ? basisText(q.basis, q.basisPlace) : "Basis not said", q.leadTime].filter(Boolean).join(" · ")}
+      </span>
+    </Th>
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      {view.missingRates.length > 0 && (
+        <Alert tone="warning">
+          There is no exchange rate for {view.missingRates.join(", ")} in Settings, so those prices cannot be turned into {view.currency} and are left out
+          here. Ask an admin to add the rate (1 {view.currency} = ? {view.missingRates[0]}).
+        </Alert>
+      )}
+      {mixed && (
+        <Alert tone="warning">
+          Not like for like: these offers are on different price bases ({bases.map((b) => (b === "?" ? "not said" : b)).join(", ")}). The quotation adds
+          freight and the like to each before comparing margins.
+        </Alert>
+      )}
+      <Card className="overflow-hidden">
+        <div className="border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold">Compare side by side</h2>
+          <p className="text-xs text-muted">Our cost per unit in {view.currency}, with tax. The cheapest in each row is marked.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <Table className="min-w-[640px]">
             <THead>
               <tr>
-                <Th>Factory</Th>
-                {s.items.length > 0 && <Th>Covers</Th>}
-                <Th>Price basis</Th>
-                <Th className="text-right">Lines</Th>
-                <Th className="text-right">Cost to us</Th>
-                <Th>Lead time</Th>
-                <Th>Valid until</Th>
+                <Th className="sticky left-0 z-10 min-w-36 bg-surface-2 sm:min-w-48">{view.items.length ? "Customer's item" : "Product"}</Th>
+                <Th className="hidden text-right sm:table-cell">Qty</Th>
+                {offers.map(head)}
               </tr>
             </THead>
             <tbody>
-              {s.quotes
-                .filter((q) => q.lines.length)
-                .sort((a, b) => a.coverage.missing.length - b.coverage.missing.length || (a.totalCost === null ? 1 : b.totalCost === null ? -1 : Number(a.totalCost) - Number(b.totalCost)))
-                .map((q) => (
-                  <Tr key={q.id}>
-                    <Td>
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-medium">{q.factory.name}</span>
-                        {q.totalCost !== null && Number(q.totalCost) === cheapest && s.quotes.length > 1 && <Badge tone="ok">Cheapest complete</Badge>}
-                      </span>
-                      <span className="text-xs text-muted">received {date(q.receivedOn)}</span>
-                      {q.unpriced > 0 && (
-                        <span className="block text-xs font-medium text-warn">
-                          {q.unpriced} line{q.unpriced === 1 ? "" : "s"} without a price
+              {view.items.length > 0
+                ? view.items.map((it) => (
+                    <Tr key={it.id}>
+                      <Td className={cn("sticky left-0 z-10 bg-surface", it.parentId && "pl-8")}>
+                        <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-text-2 tabular">{it.no}</span>
+                        <span className={cn("text-sm", !it.parentId && "font-medium")}>{it.description.split("\n")[0]}</span>
+                        <span className="block text-xs text-muted tabular sm:hidden">
+                          {qty(it.quantity)} {it.unit}
                         </span>
-                      )}
-                    </Td>
-                    {s.items.length > 0 && (
-                      <Td>
-                        <CoverageBadge missing={q.coverage.missing} />
                       </Td>
+                      <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">
+                        {qty(it.quantity)} {it.unit}
+                      </Td>
+                      {offers.map((q) => {
+                        const mine = it.options.filter((o) => o.quoteId === q.id);
+                        const o = mine.find((x) => x.id === it.cheapestLineId) ?? mine[0];
+                        return (
+                          <Cell
+                            key={q.id}
+                            empty={!o ? (it.hasParts ? "In its parts" : "Not offered") : null}
+                            emptyWarn={!o && !it.hasParts}
+                            noPrice={!!o && Number(o.unitPrice) === 0}
+                            noRate={!!o && o.unitCost === null}
+                            cheapest={!!o && o.id === it.cheapestLineId && it.options.length > 1}
+                            value={o?.unitCost ? money(o.unitCost, view.currency) : null}
+                            model={o?.model ?? null}
+                          />
+                        );
+                      })}
+                    </Tr>
+                  ))
+                : view.products.map((p) => (
+                    <Tr key={p.key}>
+                      <Td className="sticky left-0 z-10 max-w-80 bg-surface">
+                        <span className="line-clamp-2 text-sm">{p.description}</span>
+                        <span className="block text-xs text-muted tabular sm:hidden">
+                          {qty(p.quantity)} {p.unit}
+                        </span>
+                      </Td>
+                      <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">
+                        {qty(p.quantity)} {p.unit}
+                      </Td>
+                      {offers.map((q) => {
+                        const o = p.options.find((x) => x.quoteId === q.id);
+                        return (
+                          <Cell
+                            key={q.id}
+                            empty={!o ? "Not offered" : null}
+                            emptyWarn={false}
+                            noPrice={!!o && Number(o.unitPrice) === 0}
+                            noRate={!!o && o.unitCost === null}
+                            cheapest={!!o && o.id === p.cheapestLineId}
+                            value={o?.unitCost ? money(o.unitCost, view.currency) : null}
+                            model={o?.model ?? null}
+                          />
+                        );
+                      })}
+                    </Tr>
+                  ))}
+              <SummaryRow label="Our cost, whole offer" strong>
+                {offers.map((q) => (
+                  <Td key={q.id} className="border-l border-line text-right font-semibold whitespace-nowrap tabular">
+                    {q.totalCost === null ? <span className="text-xs font-medium text-warn">No exchange rate</span> : money(q.totalCost, view.currency)}
+                    {q.totalCost !== null && Number(q.totalCost) === cheapestTotal && (
+                      <Badge tone="ok" className="ml-1.5">
+                        Cheapest complete
+                      </Badge>
                     )}
-                    <Td className="text-sm whitespace-nowrap">{q.basis ? basisText(q.basis, q.basisPlace) : <span className="text-xs text-warn">Not said</span>}</Td>
-                    <Td className="text-right tabular">{q.lines.length}</Td>
-                    <Td className="text-right font-medium whitespace-nowrap tabular">{q.totalCost === null ? <span className="text-xs font-normal text-warn">No exchange rate</span> : money(q.totalCost, s.currency)}</Td>
-                    <Td className="text-sm">{q.leadTime ?? <span className="text-muted">—</span>}</Td>
-                    <Td className="text-sm whitespace-nowrap">{q.validUntil ? date(q.validUntil) : <span className="text-muted">—</span>}</Td>
-                  </Tr>
+                  </Td>
                 ))}
+              </SummaryRow>
+              {view.items.length > 0 && (
+                <SummaryRow label="Covers the customer's list">
+                  {offers.map((q) => (
+                    <Td key={q.id} className={cn("border-l border-line text-right text-sm font-medium", q.coverage.missing.length ? "text-warn" : "text-ok")}>
+                      {q.coverage.missing.length ? `Missing ${q.coverage.missing.join(", ")}` : "All items"}
+                    </Td>
+                  ))}
+                </SummaryRow>
+              )}
+              <SummaryRow label="Lines without a price">
+                {offers.map((q) => (
+                  <Td key={q.id} className={cn("border-l border-line text-right text-sm", q.unpriced ? "font-medium text-warn" : "text-muted")}>
+                    {q.unpriced || "None"}
+                  </Td>
+                ))}
+              </SummaryRow>
+              <SummaryRow label="Valid until">
+                {offers.map((q) => (
+                  <Td key={q.id} className="border-l border-line text-right text-sm whitespace-nowrap">
+                    {q.validUntil ? date(q.validUntil) : <span className="text-muted">—</span>}
+                  </Td>
+                ))}
+              </SummaryRow>
+              <SummaryRow label="Factory's quotation file">
+                {offers.map((q) => (
+                  <Td key={q.id} className={cn("border-l border-line text-right text-sm font-medium", q.files.length ? "text-ok" : "text-warn")}>
+                    {q.files.length ? "Attached" : "Missing"}
+                  </Td>
+                ))}
+              </SummaryRow>
             </tbody>
           </Table>
-          {mixedBases && (
-            <p className="border-t border-line px-4 py-2.5 text-xs text-warn">
-              These offers are on different price bases ({bases.map((b) => (b === "?" ? "not said" : b)).join(", ")}), so their costs are not like for like: the
-              quotation adds freight and the like to each before comparing margins.
-            </p>
-          )}
-        </Card>
-      )}
-
-      <FactoryQuotes
-        dealId={d.id}
-        quotes={s.quotes}
-        items={s.items}
-        canEdit={canEdit}
-        today={todayIn(TZ)}
-        mainCurrency={s.currency}
-        rates={settings.sales.exchangeRates}
-        saveAction={saveFactoryQuoteAction.bind(null, d.id)}
-        removeAction={removeFactoryQuoteAction.bind(null, d.id)}
-        searchFactories={searchFactoriesAction}
-        lines={{
-          add: addOfferLinesAction.bind(null, d.id),
-          edit: editOfferLineAction.bind(null, d.id),
-          move: moveOfferLineAction.bind(null, d.id),
-          remove: removeOfferLineAction.bind(null, d.id),
-          copy: copyOfferLinesAction.bind(null, d.id),
-          removeFile: removeFileAction.bind(null, d.id),
-        }}
-      />
-
-      {s.items.length > 0 && s.quotes.some((q) => q.lines.length) && (
-        <details className="group rounded-xl border border-line bg-surface shadow-card">
-          <summary className="cursor-pointer list-none border-line px-4 py-3 group-open:border-b">
-            <span className="text-sm font-semibold">Compare by item</span>
-            <span className="ml-2 text-xs text-muted">each of the customer&apos;s items and the factory lines that answer it, cheapest first (your cost per unit in {s.currency})</span>
-          </summary>
-          <div className="flex flex-col gap-5 p-4">
-            {s.items.map((it) => (
-              <section key={it.id} aria-label={`${it.parentId ? "Part" : "Item"} ${it.no}`}>
-                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="min-w-0 text-sm font-semibold">
-                    <span className="mr-1.5 text-muted tabular">{it.no}</span>
-                    <span className="whitespace-pre-line">{it.description}</span>
-                    {it.model && <span className="ml-2 text-xs font-normal text-muted">{it.model}</span>}
-                  </h3>
-                  <span className="text-sm text-muted tabular">
-                    {qty(it.quantity)} {it.unit}
-                  </span>
-                </div>
-                {it.options.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-line px-3 py-3 text-sm text-muted">
-                    {it.hasParts ? "No factory line answers it as a whole yet — see its parts below." : "No factory has answered this item yet."}
-                  </p>
-                ) : (
-                  <OptionsTable options={it.options} cheapestLineId={it.cheapestLineId} currency={s.currency} />
-                )}
-              </section>
-            ))}
-          </div>
-        </details>
-      )}
-
-      {s.items.length === 0 && s.products.length > 0 && <ProductMatrix view={s} />}
+        </div>
+      </Card>
     </div>
   );
 }
 
-/** The factory lines for one item or product, cheapest first. */
-function OptionsTable({ options, cheapestLineId, currency }: { options: SourcingView["items"][number]["options"]; cheapestLineId: string | null; currency: string }) {
+function SummaryRow({ label, strong, children }: { label: string; strong?: boolean; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-line">
-      <Table>
-        <THead>
-          <tr>
-            <Th>Factory line</Th>
-            <Th className="text-right">Their price</Th>
-            <Th className="text-right">Your cost / unit</Th>
-            <Th className="hidden text-right sm:table-cell">For their quantity</Th>
-          </tr>
-        </THead>
-        <tbody>
-          {options.map((o) => (
-            <Tr key={o.id}>
-              <Td>
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-medium">{o.factory.name}</span>
-                  {o.id === cheapestLineId && options.length > 1 && <Badge tone="ok">Cheapest</Badge>}
-                </span>
-                <span className="block text-xs text-muted">
-                  {o.no} {o.description.split("\n")[0]}
-                  {o.model ? ` · ${o.model}` : ""}
-                </span>
-                <span className="mt-0.5 block text-xs text-text-2">{o.costNote}</span>
-              </Td>
-              <Td className="text-right whitespace-nowrap tabular">
-                {money(o.unitPrice, o.currency)}
-                <span className="block text-xs text-muted">without tax</span>
-              </Td>
-              <Td className="text-right font-medium whitespace-nowrap tabular">
-                {Number(o.unitPrice) === 0 ? (
-                  <span className="text-xs font-normal text-muted">Not priced on its own</span>
-                ) : o.unitCost === null ? (
-                  <span className="text-xs font-normal text-warn">No exchange rate</span>
-                ) : (
-                  money(o.unitCost, currency)
-                )}
-              </Td>
-              <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">
-                {o.unitCost === null ? "—" : `${formatMinor(multiplyMinor(toMinor(o.unitCost), o.quantity), currency)} (${qty(o.quantity)} ${o.unit})`}
-              </Td>
-            </Tr>
-          ))}
-        </tbody>
-      </Table>
-    </div>
+    <Tr className="bg-surface-2/50">
+      <Td className={cn("sticky left-0 z-10 bg-surface-2 text-sm", strong ? "font-semibold" : "text-text-2")}>{label}</Td>
+      <Td className="hidden sm:table-cell" />
+      {children}
+    </Tr>
   );
 }
 
-/**
- * Lines copied from one offer to another, side by side: one row per product,
- * one column per factory (its model and our cost per unit), cheapest marked.
- */
-function ProductMatrix({ view }: { view: SourcingView }) {
-  const offers = view.quotes.filter((q) => view.products.some((p) => p.options.some((o) => o.quoteId === q.id)));
+function Cell({
+  empty,
+  emptyWarn,
+  noPrice,
+  noRate,
+  cheapest,
+  value,
+  model,
+}: {
+  empty: string | null;
+  emptyWarn: boolean;
+  noPrice: boolean;
+  noRate: boolean;
+  cheapest: boolean;
+  value: string | null;
+  model: string | null;
+}) {
+  if (empty)
+    return (
+      <Td className={cn("border-l border-line text-right text-xs font-medium", emptyWarn ? "bg-warn-soft/40 text-warn" : "text-muted")}>{empty}</Td>
+    );
   return (
-    <details className="group rounded-xl border border-line bg-surface shadow-card" open={view.products.length <= 40}>
-      <summary className="cursor-pointer list-none border-line px-4 py-3 group-open:border-b">
-        <span className="text-sm font-semibold">Compare product by product</span>
-        <span className="ml-2 text-xs text-muted">
-          {view.products.length} products in more than one offer · your cost per unit in {view.currency}, with tax
+    <Td className={cn("border-l border-line text-right whitespace-nowrap tabular", cheapest && "bg-ok-soft")}>
+      {noPrice ? (
+        <span className="text-xs font-medium text-warn">No price yet</span>
+      ) : noRate ? (
+        <span className="text-xs font-medium text-warn">No exchange rate</span>
+      ) : (
+        <span className={cn("font-medium", cheapest && "text-ok")}>
+          {value}
+          {cheapest && <span className="ml-1 text-xs">· cheapest</span>}
         </span>
-      </summary>
-      <div className="overflow-x-auto">
-        <Table>
-          <THead>
-            <tr>
-              <Th>Product</Th>
-              <Th className="text-right">Qty</Th>
-              {offers.map((q) => (
-                <Th key={q.id} className="text-right">
-                  {q.factory.name}
-                </Th>
-              ))}
-            </tr>
-          </THead>
-          <tbody>
-            {view.products.map((p) => (
-              <Tr key={p.key}>
-                <Td className="max-w-80">
-                  <span className="line-clamp-2 text-sm">{p.description}</span>
-                </Td>
-                <Td className="text-right whitespace-nowrap tabular">
-                  {qty(p.quantity)} {p.unit}
-                </Td>
-                {offers.map((q) => {
-                  const o = p.options.find((x) => x.quoteId === q.id);
-                  return (
-                    <Td key={q.id} className={cn("text-right whitespace-nowrap tabular", o && o.id === p.cheapestLineId && "bg-ok-soft")}>
-                      {!o ? (
-                        <span className="text-xs text-muted">not offered</span>
-                      ) : (
-                        <>
-                          {Number(o.unitPrice) === 0 ? <span className="text-xs text-muted">no price</span> : o.unitCost === null ? "—" : money(o.unitCost, view.currency)}
-                          <span className="block text-xs text-muted">{o.model ?? ""}</span>
-                        </>
-                      )}
-                    </Td>
-                  );
-                })}
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
-    </details>
+      )}
+      {model && <span className="block text-xs text-muted">{model}</span>}
+    </Td>
   );
 }

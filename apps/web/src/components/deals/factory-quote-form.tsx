@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Factory, Loader2, Plus } from "lucide-react";
 import { fxRate } from "@kebo/money";
 import { INCOTERMS, type Incoterm } from "@kebo/shared";
@@ -217,6 +217,9 @@ export function OfferHeaderForm({
   searchFactories,
   onDone,
   onCancel,
+  compact = false,
+  extra,
+  submitLabel,
 }: {
   action: Action;
   quote: FactoryQuoteView | null;
@@ -226,6 +229,11 @@ export function OfferHeaderForm({
   searchFactories: (q: string) => Promise<FactoryOption[]>;
   onDone: (state: ActionState) => void;
   onCancel?: () => void;
+  /** A new offer with just the factory and currency: the rest is filled in on the offer afterwards. */
+  compact?: boolean;
+  /** Shown above the buttons (e.g. where the new offer's lines start from). */
+  extra?: ReactNode;
+  submitLabel?: string;
 }) {
   const [s, setS] = useState<QuoteState>(() => initialState(quote, today));
   const set = <K extends keyof QuoteState>(k: K, v: QuoteState[K]) => setS((st) => ({ ...st, [k]: v }));
@@ -244,10 +252,11 @@ export function OfferHeaderForm({
       {(st) => (
         <>
           <input type="hidden" name="payload" value={JSON.stringify(payload(s, canConvert))} />
-          <div className="grid gap-4 md:grid-cols-3">
-            <Field label="Factory" htmlFor="factory" error={st.errors?.factoryId ?? st.errors?.newFactoryName} className="md:col-span-2">
+          <div className={cn("grid gap-4", compact ? "sm:grid-cols-2" : "md:grid-cols-3")}>
+            <Field label="Factory" htmlFor="factory" error={st.errors?.factoryId ?? st.errors?.newFactoryName} className={compact ? undefined : "md:col-span-2"}>
               <FactoryPicker value={s.factory} search={searchFactories} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} />
             </Field>
+            {!compact && (
             <Field label="Their reference" htmlFor="reference" optional error={st.errors?.reference}>
               <Input
                 id="reference"
@@ -257,6 +266,7 @@ export function OfferHeaderForm({
                 placeholder="Quote no."
               />
             </Field>
+            )}
             <Field
               label="Currency"
               htmlFor="currency"
@@ -294,6 +304,8 @@ export function OfferHeaderForm({
                 </label>
               </fieldset>
             )}
+            {!compact && (
+              <>
             <Field label="Received on" htmlFor="receivedOn" error={st.errors?.receivedOn}>
               <Input id="receivedOn" type="date" value={s.receivedOn} max={today} onChange={(e) => set("receivedOn", e.target.value)} />
             </Field>
@@ -352,8 +364,11 @@ export function OfferHeaderForm({
                 placeholder="e.g. 30% deposit, 70% before delivery"
               />
             </Field>
+              </>
+            )}
           </div>
 
+          {!compact && (
           <Field label="Notes" htmlFor="fq-notes" optional error={st.errors?.notes}>
             <Textarea
               id="fq-notes"
@@ -364,8 +379,10 @@ export function OfferHeaderForm({
               placeholder="Packing, samples, anything to remember about this offer"
             />
           </Field>
-          <div className="flex gap-2">
-            <SubmitButton pendingText="Saving…">{quote ? "Save the details" : "Start this offer"}</SubmitButton>
+          )}
+          {extra}
+          <div className="flex flex-wrap gap-2">
+            <SubmitButton pendingText="Saving…">{submitLabel ?? (quote ? "Save the details" : "Start this offer")}</SubmitButton>
             {onCancel && (
               <Button variant="ghost" onClick={onCancel}>
                 Cancel

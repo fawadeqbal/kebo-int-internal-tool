@@ -91,9 +91,9 @@ function OptionSummary({ o, currency, incoterm, single }: { o: OptionView; curre
           <tr>
             <Th>No.</Th>
             <Th>Description</Th>
-            <Th className="text-right">Qty</Th>
-            <Th className="text-right">Unit price</Th>
-            {showCosts && <Th className="text-right">Unit cost</Th>}
+            <Th className="hidden text-right sm:table-cell">Qty</Th>
+            <Th className="hidden text-right sm:table-cell">Unit price</Th>
+            {showCosts && <Th className="hidden text-right sm:table-cell">Unit cost</Th>}
             <Th className="text-right">Total</Th>
           </tr>
         </THead>
@@ -101,19 +101,24 @@ function OptionSummary({ o, currency, incoterm, single }: { o: OptionView; curre
           {o.lines.map((l) => (
             <Tr key={l.id}>
               <Td className="text-muted tabular">{l.no}</Td>
-              <Td className="min-w-52">
+              <Td className="sm:min-w-52">
                 <span className="block max-w-[28rem] text-sm whitespace-pre-line">{l.description}</span>
                 <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
                   {l.type !== "goods" && <Badge tone="outline">{LINE_TYPE_LABEL[l.type]}</Badge>}
                   {l.model}
                 </span>
+                {/* Phones: the quantity and prices under the description, so the table needs no sideways scroll. */}
+                <span className="mt-0.5 block text-xs text-text-2 tabular sm:hidden">
+                  {qty(l.quantity)} {l.unit} × {money(l.unitPrice, currency)}
+                  {showCosts && l.unitCost ? ` · cost ${money(l.unitCost, currency)}` : ""}
+                </span>
               </Td>
-              <Td className="text-right whitespace-nowrap tabular">
+              <Td className="hidden text-right whitespace-nowrap tabular sm:table-cell">
                 {qty(l.quantity)} {l.unit}
               </Td>
-              <Td className="text-right whitespace-nowrap tabular">{money(l.unitPrice, currency)}</Td>
+              <Td className="hidden text-right whitespace-nowrap tabular sm:table-cell">{money(l.unitPrice, currency)}</Td>
               {showCosts && (
-                <Td className="text-right whitespace-nowrap text-text-2 tabular">{l.unitCost ? money(l.unitCost, currency) : "—"}</Td>
+                <Td className="hidden text-right whitespace-nowrap text-text-2 tabular sm:table-cell">{l.unitCost ? money(l.unitCost, currency) : "—"}</Td>
               )}
               <Td className="text-right font-medium whitespace-nowrap tabular">{money(l.lineTotal, currency)}</Td>
             </Tr>

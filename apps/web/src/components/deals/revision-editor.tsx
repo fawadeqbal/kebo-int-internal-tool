@@ -351,6 +351,42 @@ export function RevisionEditor({
   const costed = lines.filter((l) => l.unitCost !== null).length;
   const itemName = (no: string) => offers.items.find((i) => i.no === no)?.description.split("\n")[0] ?? "";
 
+  /** What to look at before the revision goes to the customer, per option. */
+  const checksOf = (o: OptionState, i: number): { key: string; text: ReactNode }[] => {
+    const L = optionLetter(i);
+    const t = totalsOf(o);
+    const out: { key: string; text: ReactNode }[] = [];
+    const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
+    if (o.factoryQuoteId && !off) out.push({ key: "gone", text: <>its factory offer was removed: remove this option or choose another offer.</> });
+    const unpriced = t.lines.filter((l) => !(valid(o.prices[l.id] ?? "") && Number(numberText(o.prices[l.id]!)) > 0)).length;
+    if (unpriced) out.push({ key: "price", text: <>{unpriced} line{unpriced === 1 ? "" : "s"} without a price.</> });
+    if (off?.coverage.missing.length)
+      out.push({
+        key: "cover",
+        text: (
+          <>
+            does not include {off.coverage.missing.map((n) => `${n}${itemName(n) ? ` ${itemName(n)}` : ""}`).join(", ")}; the customer will see {off.coverage.missing.length === 1 ? "it" : "them"} missing.
+          </>
+        ),
+      });
+    if (showCosts && off) {
+      if (!gapOf(o, offers, s.incoterm)) out.push({ key: "basis", text: <>the factory&apos;s price basis is not said, so the costs to reach {s.incoterm} cannot be worked out.</> });
+      else if (t.extra.empty.length)
+        out.push({
+          key: "costs",
+          text: (
+            <>
+              {t.extra.empty.map((x) => BASIS_STEP_LABEL[x].toLowerCase()).join(" and ")} to reach {s.incoterm} {t.extra.empty.length === 1 ? "is" : "are"} not entered, so its cost and margin are too
+              low.
+            </>
+          ),
+        });
+    }
+    if (showCosts && t.costing.marginPercent !== null && t.costing.marginPercent < 0) out.push({ key: "loss", text: <>it sells below cost.</> });
+    return out.map((c) => ({ key: `${o.key}-${c.key}`, text: <><b>Option {L}</b>{c.key === "price" || c.key === "gone" ? ": " : " "}{c.text}</> }));
+  };
+  const checks = s.options.flatMap((o, i) => checksOf(o, i));
+
   return (
     <>
       <ActionForm
@@ -427,34 +463,69 @@ export function RevisionEditor({
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                <div role="tablist" aria-label="Options" className="contents">
-                {s.options.map((o, i) => {
-                  const t = totalsOf(o);
-                  return (
-                    <button
-                      key={o.key}
-                      type="button"
-                      role="tab"
-                      aria-selected={i === at}
-                      onClick={() => setActive(i)}
-                      className={cn(
-                        "flex flex-col items-start rounded-lg border px-3 py-1.5 text-left text-sm",
-                        i === at ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface hover:border-line-strong",
-                      )}
-                    >
-                      <span className="font-semibold">Option {optionLetter(i)}</span>
-                      <span className="text-xs tabular">{fmt(t.totals.total)}</span>
-                    </button>
-                  );
-                })}
+              {checks.length > 0 ? (
+                <div role="status" className="flex flex-col gap-1.5 rounded-xl border border-warn/30 bg-warn-soft/60 p-3 text-sm">
+                  <p className="flex items-center gap-2 font-semibold text-warn">
+                    <AlertTriangle className="size-4 shrink-0" aria-hidden /> Before you send R{number}
+                  </p>
+                  <ul className="flex list-disc flex-col gap-1 pl-6">
+                    {checks.map((c) => (
+                      <li key={c.key}>{c.text}</li>
+                    ))}
+                  </ul>
                 </div>
-                {addable.length > 0 && (
-                  <Button size="sm" variant="ghost" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
-                    <Plus aria-hidden /> Add an option
-                  </Button>
-                )}
-              </div>
+              ) : (
+                <p role="status" className="flex items-center gap-2 rounded-xl border border-ok/30 bg-ok-soft px-3 py-2 text-sm">
+                  <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden />
+                  <span>
+                    <b className="text-ok">Ready to send.</b> Every line has a price{showCosts ? " and the costs to reach your basis are in" : ""}.
+                  </span>
+                </p>
+              )}
+
+              <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start">
+                <div className="flex flex-col gap-2 2xl:sticky 2xl:top-20 2xl:w-64 2xl:shrink-0">
+                  <div role="tablist" aria-label="Options" className="-mx-1 flex gap-2 overflow-x-auto px-1 pt-0.5 pb-1 2xl:flex-col 2xl:overflow-visible">
+                    {s.options.map((o, i) => {
+                      const t = totalsOf(o);
+                      const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
+                      const n = checksOf(o, i).length;
+                      return (
+                        <button
+                          key={o.key}
+                          type="button"
+                          role="tab"
+                          aria-selected={i === at}
+                          onClick={() => setActive(i)}
+                          className={cn(
+                            "flex w-56 shrink-0 flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left text-sm 2xl:w-auto",
+                            i === at ? "border-primary bg-primary-soft ring-1 ring-primary" : "border-line bg-surface hover:border-line-strong",
+                          )}
+                        >
+                          <span className="flex w-full items-baseline justify-between gap-2">
+                            <span className="font-semibold">Option {optionLetter(i)}</span>
+                            <span className="font-semibold tabular">{fmt(t.totals.total)}</span>
+                          </span>
+                          <span className="w-full truncate text-xs text-text-2">
+                            {o.factoryQuoteId ? (off?.factory.name ?? "A removed offer") : "The customer's items"}
+                            {o.leadTime ? ` · ${o.leadTime}` : ""}
+                          </span>
+                          <span className="flex flex-wrap gap-1.5">
+                            {showCosts && t.costing.marginPercent !== null && <Badge tone={t.costing.marginPercent < 0 ? "bad" : "neutral"}>margin {t.costing.marginPercent.toFixed(1)}%</Badge>}
+                            {n ? <Badge tone="warn">{n} to check</Badge> : <Badge tone="ok">Ready</Badge>}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {addable.length > 0 && (
+                    <Button size="sm" variant="secondary" className="self-start border-dashed text-primary 2xl:self-stretch" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
+                      <Plus aria-hidden /> Add an option
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
 
               {adding && (
                 <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Offers to add">
@@ -738,6 +809,8 @@ export function RevisionEditor({
                   </div>
                 </div>
               </div>
+                </div>
+              </div>
             </section>
 
             <section aria-label="Terms and notes" className="grid gap-4 lg:grid-cols-2">
@@ -764,7 +837,7 @@ export function RevisionEditor({
               </Field>
             </section>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 px-3 py-2 shadow-pop backdrop-blur lg:bottom-3">
               <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
                 {submitLabel}
               </SubmitButton>
