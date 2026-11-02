@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { BASIS_STEP_LABEL, can, type BasisStep } from "@kebo/shared";
-import { Alert, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, ButtonLink, Card, CardBody, CardHeader, ChecksBox, cn, RevisionBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { FileActions } from "@/components/common/file-actions";
@@ -333,25 +333,15 @@ function DraftChecks({ r }: { r: RevisionView }) {
     if (o.costing && o.costing.marginPercent !== null && o.costing.marginPercent < 0) out.push(`${who} sells below cost.`);
     return out;
   });
-  if (!checks.length)
-    return (
-      <p role="status" className="flex items-center gap-2 rounded-lg border border-ok/30 bg-ok-soft px-3 py-2 text-sm">
-        <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden />
-        <span>
-          <b className="text-ok">Ready to send.</b> Check it with View / Print, then mark it as sent.
-        </span>
-      </p>
-    );
   return (
-    <div role="status" className="flex flex-col gap-1.5 rounded-lg border border-warn/30 bg-warn-soft/60 p-3 text-sm">
-      <p className="flex items-center gap-2 font-semibold text-warn">
-        <AlertTriangle className="size-4 shrink-0" aria-hidden /> Before you send R{r.number}
-      </p>
-      <ul className="flex list-disc flex-col gap-1 pl-6">
-        {checks.map((c) => (
-          <li key={c}>{c}</li>
-        ))}
-      </ul>
-    </div>
+    <ChecksBox
+      title={`Before you send R${r.number}`}
+      items={checks.map((c) => ({ key: c, text: c }))}
+      ready={
+        <>
+          <b className="text-ok">Ready to send.</b> Check it with View / Print, then mark it as sent.
+        </>
+      }
+    />
   );
 }

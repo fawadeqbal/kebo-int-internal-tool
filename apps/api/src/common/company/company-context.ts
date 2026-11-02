@@ -11,6 +11,8 @@ export interface CompanyInfo {
   statusReason: string | null;
   endsAt: Date | null;
   planId: string | null;
+  /** Modules switched off for this company by the platform admin. */
+  featuresOff: string[];
 }
 
 const storage = new AsyncLocalStorage<{ company: CompanyInfo | null }>();

@@ -53,6 +53,9 @@ export interface LogEntry {
 
 export interface CompanyDetail extends CompanyRow {
   warnings: string[];
+  /** What the plan includes (null: no plan, every feature) and the modules switched off for this company. */
+  planFeatures: string[] | null;
+  featuresOff: string[];
   activity: {
     signInsLast30Days: number;
     lastSignIn: { at: string; email: string } | null;

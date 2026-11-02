@@ -19,8 +19,9 @@ import {
   paymentAction,
   removePaymentAction,
   updateCompanyAction,
+  companyModulesAction,
 } from "@/app/platform/actions";
-import { ActionButton, AdminPasswordForm, CopyLink, DeleteForm, DetailsForm, ExtendForm, MakeRealForm, PaymentForm, StatusForm } from "./forms";
+import { ActionButton, AdminPasswordForm, CopyLink, DeleteForm, DetailsForm, ExtendForm, MakeRealForm, ModulesForm, PaymentForm, StatusForm } from "./forms";
 
 export const metadata = { title: "Company" };
 
@@ -150,6 +151,18 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
                   <AdminPasswordForm action={adminPasswordAction.bind(null, id)} admins={admins} />
                 </CardBody>
               )}
+            </Card>
+          )}
+
+          {live && (
+            <Card>
+              <CardHeader
+                title="Modules"
+                description="What their plan includes. Switch a module off for this company alone (a client who wants less management): it is hidden in their app and refused by the API."
+              />
+              <CardBody>
+                <ModulesForm c={c} action={companyModulesAction.bind(null, id)} />
+              </CardBody>
             </Card>
           )}
 

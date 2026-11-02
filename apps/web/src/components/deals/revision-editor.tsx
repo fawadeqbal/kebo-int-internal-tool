@@ -16,7 +16,7 @@ import {
   type BasisStep,
   type Incoterm,
 } from "@kebo/shared";
-import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Badge, Button, ChecksBox, cn, Field, Input, Select, SelectCard, SelectCardList, StickyBar, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -463,61 +463,42 @@ export function RevisionEditor({
                 )}
               </div>
 
-              {checks.length > 0 ? (
-                <div role="status" className="flex flex-col gap-1.5 rounded-xl border border-warn/30 bg-warn-soft/60 p-3 text-sm">
-                  <p className="flex items-center gap-2 font-semibold text-warn">
-                    <AlertTriangle className="size-4 shrink-0" aria-hidden /> Before you send R{number}
-                  </p>
-                  <ul className="flex list-disc flex-col gap-1 pl-6">
-                    {checks.map((c) => (
-                      <li key={c.key}>{c.text}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p role="status" className="flex items-center gap-2 rounded-xl border border-ok/30 bg-ok-soft px-3 py-2 text-sm">
-                  <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden />
-                  <span>
+              <ChecksBox
+                title={`Before you send R${number}`}
+                items={checks}
+                ready={
+                  <>
                     <b className="text-ok">Ready to send.</b> Every line has a price{showCosts ? " and the costs to reach your basis are in" : ""}.
-                  </span>
-                </p>
-              )}
+                  </>
+                }
+              />
 
               <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start">
                 <div className="flex flex-col gap-2 2xl:sticky 2xl:top-20 2xl:w-64 2xl:shrink-0">
-                  <div role="tablist" aria-label="Options" className="-mx-1 flex gap-2 overflow-x-auto px-1 pt-0.5 pb-1 2xl:flex-col 2xl:overflow-visible">
+                  <SelectCardList label="Options" column className="lg:px-0.5">
                     {s.options.map((o, i) => {
                       const t = totalsOf(o);
                       const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
                       const n = checksOf(o, i).length;
                       return (
-                        <button
+                        <SelectCard
                           key={o.key}
-                          type="button"
-                          role="tab"
-                          aria-selected={i === at}
-                          onClick={() => setActive(i)}
-                          className={cn(
-                            "flex w-56 shrink-0 flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left text-sm 2xl:w-auto",
-                            i === at ? "border-primary bg-primary-soft ring-1 ring-primary" : "border-line bg-surface hover:border-line-strong",
-                          )}
-                        >
-                          <span className="flex w-full items-baseline justify-between gap-2">
-                            <span className="font-semibold">Option {optionLetter(i)}</span>
-                            <span className="font-semibold tabular">{fmt(t.totals.total)}</span>
-                          </span>
-                          <span className="w-full truncate text-xs text-text-2">
-                            {o.factoryQuoteId ? (off?.factory.name ?? "A removed offer") : "The customer's items"}
-                            {o.leadTime ? ` · ${o.leadTime}` : ""}
-                          </span>
-                          <span className="flex flex-wrap gap-1.5">
-                            {showCosts && t.costing.marginPercent !== null && <Badge tone={t.costing.marginPercent < 0 ? "bad" : "neutral"}>margin {t.costing.marginPercent.toFixed(1)}%</Badge>}
-                            {n ? <Badge tone="warn">{n} to check</Badge> : <Badge tone="ok">Ready</Badge>}
-                          </span>
-                        </button>
+                          wide
+                          title={`Option ${optionLetter(i)}`}
+                          figure={fmt(t.totals.total)}
+                          meta={`${o.factoryQuoteId ? (off?.factory.name ?? "A removed offer") : "The customer's items"}${o.leadTime ? ` · ${o.leadTime}` : ""}`}
+                          badges={
+                            <>
+                              {showCosts && t.costing.marginPercent !== null && <Badge tone={t.costing.marginPercent < 0 ? "bad" : "neutral"}>margin {t.costing.marginPercent.toFixed(1)}%</Badge>}
+                              {n ? <Badge tone="warn">{n} to check</Badge> : <Badge tone="ok">Ready</Badge>}
+                            </>
+                          }
+                          selected={i === at}
+                          onSelect={() => setActive(i)}
+                        />
                       );
                     })}
-                  </div>
+                  </SelectCardList>
                   {addable.length > 0 && (
                     <Button size="sm" variant="secondary" className="self-start border-dashed text-primary 2xl:self-stretch" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
                       <Plus aria-hidden /> Add an option
@@ -837,7 +818,7 @@ export function RevisionEditor({
               </Field>
             </section>
 
-            <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 px-3 py-2 shadow-pop backdrop-blur lg:bottom-3">
+            <StickyBar>
               <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
                 {submitLabel}
               </SubmitButton>
@@ -847,7 +828,7 @@ export function RevisionEditor({
                 </Button>
               )}
               {dirty && requireChanges && <span className="text-xs text-warn">Unsaved changes</span>}
-            </div>
+            </StickyBar>
           </>
         )}
       </ActionForm>

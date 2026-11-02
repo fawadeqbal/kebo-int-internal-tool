@@ -70,29 +70,28 @@ export class LimitsService {
             period: plan.period,
           }
         : null,
-      features: plan ? plan.features : [...PLAN_FEATURE_KEYS],
+      features: (await this.companies.features(company)) ?? [...PLAN_FEATURE_KEYS],
       usage: { users: usage.users, storageMb: Math.round(storageMb * 10) / 10 },
       warnings,
     };
   }
 
-  /** The features of the company's plan (null: no plan, so every feature). */
-  async features(company: CompanyInfo = CompanyContext.require()): Promise<string[] | null> {
-    const plan = await this.companies.plan(company);
-    return plan ? plan.features : null;
+  /** The company's features: its plan's, less the modules switched off for it (null: every feature). */
+  features(company: CompanyInfo = CompanyContext.require()): Promise<string[] | null> {
+    return this.companies.features(company);
   }
 
-  /** Whether the company's plan includes a feature (no plan: every feature). */
+  /** Whether the company has a feature (its plan includes it and it is not switched off for the company). */
   async allows(feature: PlanFeature, company: CompanyInfo = CompanyContext.require()) {
-    const plan = await this.companies.plan(company);
-    return !plan || plan.features.includes(feature);
+    const features = await this.companies.features(company);
+    return !features || features.includes(feature);
   }
 
   /** Refuse when the company's plan does not include the feature. */
   async require(feature: PlanFeature, company?: CompanyInfo) {
     if (!(await this.allows(feature, company))) {
       throw new ForbiddenError(
-        `Your plan does not include ${planFeatureName(feature).toLowerCase()}. Ask the platform admin to switch it on.`,
+        `${planFeatureName(feature)} is not part of your company's plan. Ask the platform admin to switch it on.`,
         "plan_feature",
       );
     }

@@ -11,6 +11,7 @@ import {
   type companyUpdateInput,
   type makeRealInput,
   type subscriptionPaymentInput,
+  planFeatureName,
 } from "@kebo/shared";
 import { addDays, ConflictError, DomainError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
@@ -144,7 +145,7 @@ export class PlatformCompaniesService {
   async get(id: string) {
     const c = await this.db.company.findUnique({
       where: { id },
-      include: { plan: { select: { id: true, name: true, maxUsers: true, maxStorageMb: true } } },
+      include: { plan: { select: { id: true, name: true, maxUsers: true, maxStorageMb: true, features: true } } },
     });
     if (!c) throw new NotFoundError("Company");
     const live = c.status !== "deleted";
@@ -159,6 +160,9 @@ export class PlatformCompaniesService {
       ...this.view(c, this.today()),
       usage: summary?.usage ?? null,
       warnings: summary?.warnings ?? [],
+      /** Modules: what the plan includes (null: no plan, every one) and what is switched off for this company. */
+      planFeatures: c.plan ? c.plan.features : null,
+      featuresOff: c.featuresOff,
       activity,
       payments: payments.map((p) => ({
         id: p.id,
@@ -292,6 +296,15 @@ export class PlatformCompaniesService {
     if (input.contactName !== undefined) data.contactName = input.contactName;
     if (input.contactEmail !== undefined) data.contactEmail = input.contactEmail;
     if (input.notes !== undefined) data.notes = input.notes;
+    if (input.featuresOff !== undefined) {
+      const before = c.featuresOff ?? [];
+      const off = [...new Set(input.featuresOff)];
+      const changed = off.length !== before.length || off.some((f) => !before.includes(f));
+      if (changed) {
+        data.featuresOff = off;
+        said.push(off.length ? `modules switched off: ${off.map((f) => planFeatureName(f).toLowerCase()).join(", ")}` : "every module of the plan switched on");
+      }
+    }
     await this.db.company.update({ where: { id }, data });
     if (said.length) await this.log(actor, "update", `Changed ${c.name}: ${said.join("; ")}`, { companyId: id });
     this.companies.forget(id);

@@ -1391,6 +1391,8 @@ model Company {
   statusManual      Boolean       @default(false) @map("status_manual")
   planId            String?       @map("plan_id") @db.Uuid
   plan              Plan?         @relation(fields: [planId], references: [id])
+  /// Modules the platform admin switched off for this company, on top of its plan ("less management").
+  featuresOff       String[]      @default([]) @map("features_off")
   startsOn          DateTime      @default(dbgenerated("CURRENT_DATE")) @map("starts_on") @db.Date
   /// Paid until (clients): after it the company is overdue.
   renewsOn          DateTime?     @map("renews_on") @db.Date

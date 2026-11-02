@@ -29,6 +29,12 @@ export const PERMISSIONS = [
   /** Move an order to its next stage (or back) and fill in its dates, on deals the person handles. */
   "orders.update",
   "payments.record",
+  /** Shipments: booking, packing, bill of lading, shipping costs. */
+  "shipping.manage",
+  /** The document set and its steps through the banks. */
+  "documents.manage",
+  /** Arrival, customs, delivery, site acceptance and claims. */
+  "delivery.manage",
   /** Expenses, what factories were paid and profit & loss (managers and the super admin). */
   "expenses.manage",
   "users.manage",
@@ -92,6 +98,9 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
       },
       { permission: "orders.manage", label: "Cancel orders, remove payments, ship with money due" },
       { permission: "payments.record", label: "Record customer payments" },
+      { permission: "shipping.manage", label: "Shipping", hint: "Book shipments, packing, bill of lading or air waybill, shipping costs." },
+      { permission: "documents.manage", label: "Documents and bank", hint: "The document set and its steps through the banks." },
+      { permission: "delivery.manage", label: "Delivery and SAT", hint: "Arrival, customs, delivery, site acceptance and claims." },
       { permission: "expenses.manage", label: "Expenses, factory payments and profit & loss" },
     ],
   },
@@ -124,6 +133,9 @@ const STAFF: readonly Permission[] = [
   "quotations.manage",
   "sourcing.manage",
   "orders.update",
+  "shipping.manage",
+  "documents.manage",
+  "delivery.manage",
 ];
 
 /** The roles every installation starts with. Manager and Staff can be changed in Security; the Super Admin cannot. */
@@ -165,6 +177,9 @@ export const PERMISSION_FEATURE: Partial<Record<Permission, PlanFeature>> = {
   "reports.view": "insights",
   "audit.view": "audit_log",
   "customers.export": "excel",
+  "shipping.manage": "shipping",
+  "documents.manage": "bank_documents",
+  "delivery.manage": "delivery_sat",
 };
 
 /** Whether a plan with these features includes the permission (null: no plan, so every one). */

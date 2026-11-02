@@ -336,3 +336,11 @@ export async function deleteLeadAction(id: string, _prev: ActionState, form: For
   if (!r.ok) return r;
   redirect("/platform/leads?toast=Lead+deleted");
 }
+
+/** The modules switched off for a company (on top of its plan). */
+export async function companyModulesAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const off = form.getAll("off").map(String);
+  const r = await attempt(form, () => platformApi.patch(`/companies/${id}`, { featuresOff: off }), "Modules saved.");
+  after(id)();
+  return r;
+}

@@ -25,12 +25,22 @@ export const PLAN_FEATURES = {
   custom_roles: "Custom roles (beyond Super Admin, Manager and Staff)",
   audit_log: "Audit log (every change in one place)",
   website_form: "Website form (inquiries straight from their own website)",
+  factory_requests: "Ask factories (send the customer's list to factories and track who answered)",
+  bank_contracts: "Payment routes (bank contract / LC or direct payment, and the payment plan)",
+  production: "Factory production (ready dates and the factory's steps)",
+  shipping: "Shipping (shipments, packing, bill of lading or air waybill, shipping costs)",
+  bank_documents: "Documents and bank (the document set and its way through the banks)",
+  delivery_sat: "Delivery and SAT (arrival, customs, delivery, site acceptance, claims)",
+  orders_board: "Orders board (every open order by stage)",
 } as const;
 export type PlanFeature = keyof typeof PLAN_FEATURES;
 /** A plan feature's short name ("Expenses"), for badges. */
 export const planFeatureName = (f: string) => (PLAN_FEATURES[f as PlanFeature] ?? f).split(" (")[0];
 
-/** The ready-made plans (made once by a migration; the platform admin changes them freely). */
+/** The order-flow modules, in every plan when they were added (the platform admin takes them out of a plan or a company). */
+export const ORDER_FLOW_FEATURES = ["factory_requests", "bank_contracts", "production", "shipping", "bank_documents", "delivery_sat", "orders_board"] as const satisfies readonly PlanFeature[];
+
+/** The ready-made plans (made once by a migration; the platform admin changes them freely). The order-flow modules were added to each later. */
 export const DEFAULT_PLANS = [
   { name: "Starter", price: 49, maxUsers: 3, maxStorageMb: 2 * 1024, features: ["excel"] },
   {
@@ -60,6 +70,16 @@ export const DEFAULT_PLANS = [
 export const isMobileApp = (userAgent: string | null | undefined) => /Dart\/|okhttp|kebo app/i.test(userAgent ?? "");
 
 export const PLAN_FEATURE_KEYS = Object.keys(PLAN_FEATURES) as PlanFeature[];
+
+/**
+ * The features a company has: its plan's (no plan: every one), less the modules
+ * the platform admin switched off for it. Null: no plan and nothing switched off,
+ * so every feature, including ones added later.
+ */
+export const companyFeatures = (planFeatures: readonly string[] | null, featuresOff: readonly string[] = []): string[] | null => {
+  if (!planFeatures && !featuresOff.length) return null;
+  return (planFeatures ?? PLAN_FEATURE_KEYS).filter((f) => !featuresOff.includes(f));
+};
 
 /** How long things last (days). */
 export const LIFECYCLE = {
@@ -402,6 +422,8 @@ export const companyUpdateInput = z.object({
     .transform((v) => v || null)
     .optional(),
   notes: optionalText(2000).optional(),
+  /** Modules switched off for this company, whatever its plan includes. */
+  featuresOff: z.array(z.enum(Object.keys(PLAN_FEATURES) as [PlanFeature, ...PlanFeature[]])).max(40).optional(),
 });
 
 export const companyStatusInput = z.object({
