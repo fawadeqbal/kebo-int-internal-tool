@@ -75,7 +75,7 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
           shipments: shipmentList,
         };
       else if (doc.printable === "proforma") tools[key] = { kind: "link", label: o.proforma ? "View" : "Issue it", href: "#made" };
-      else if (doc.printable === "packing-list") tools[key] = { kind: "link", label: "Make it", href: `${d.base}/shipping#packing` };
+      else if (doc.printable === "packing-list") tools[key] = { kind: "link", label: "Make it", href: `${d.base}/shipping#lines` };
       else
         tools[key] = {
           kind: "document",

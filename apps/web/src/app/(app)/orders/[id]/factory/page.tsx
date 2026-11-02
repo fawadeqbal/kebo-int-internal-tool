@@ -6,6 +6,7 @@ import { orderMoneyOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import { FactoryOrderPanel } from "@/components/orders/flow-panels";
+import { OrderLines } from "@/components/orders/order-lines";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
 import { NewFactoryPayment } from "@/components/money/forms";
@@ -62,6 +63,9 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   if (advance) tools.factory_advance = { kind: "node", node: advance };
 
   const factories = flow?.factory.factories ?? [];
+  // Factory prices come only to people who see them.
+  const goodsLines = o.lines.filter((l) => l.type === "goods");
+  const priced = goodsLines.some((l) => l.factoryPrice) ? goodsLines : [];
   const owed = m.factories?.rows ?? [];
   return (
     <StepPage
@@ -113,6 +117,14 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
               today={now}
               canEdit={canEdit}
             />
+          </CardBody>
+        </Card>
+      )}
+      {priced.length > 0 && (
+        <Card>
+          <CardHeader title="Lines · to the factory" description="What we bought from the factory for each line, at its price (internal)." />
+          <CardBody>
+            <OrderLines set="factory" orderId={o.id} lines={priced} canEdit={false} today={now} />
           </CardBody>
         </Card>
       )}

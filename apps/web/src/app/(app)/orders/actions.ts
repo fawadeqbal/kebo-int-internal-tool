@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
+import type { OrderLineView } from "@/lib/types-orders";
 
 const refresh = (orderId: string) => {
   revalidatePath(`/orders/${orderId}`, "layout");
@@ -51,15 +52,9 @@ export async function detailsAction(orderId: string, _prev: ActionState, form: F
   return r;
 }
 
-/** How many of each goods line came in from the factory so far: payload { on, lines: [{ lineId, receivedQty }] }. */
+/** Everything ordered has come in (each goods line in full, dated today): payload { lines: [{ lineId, receivedQty }] }. */
 export async function receiptAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const body = formBody(form);
-  const all = formValues(form).all === "true";
-  const r = await attempt(
-    form,
-    () => api.put(`/orders/${orderId}/receipt`, body),
-    all ? "All goods marked as received." : "Saved what came in.",
-  );
+  const r = await attempt(form, () => api.put(`/orders/${orderId}/receipt`, formBody(form)), "All goods marked as received.");
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -69,6 +64,41 @@ export async function packingAction(orderId: string, _prev: ActionState, form: F
   const r = await attempt(form, () => api.put(`/orders/${orderId}/packing`, formBody(form)), "Packing list saved.");
   if (r.ok) refresh(orderId);
   return r;
+}
+
+/** The packing list's container and shipping marks (the order's details; nothing else changes). */
+export async function packingMarksAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(
+    form,
+    () => api.patch(`/orders/${orderId}/details`, { containerNo: v.containerNo?.trim() || null, shippingMarks: v.shippingMarks?.trim() || null }),
+    "Saved.",
+  );
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
+/** What one line's change answered: the line, or why not. */
+export type OrderLineResult = { ok: true; line: OrderLineView } | { ok: false; message: string };
+
+/**
+ * One line, changed in a step's line table: { set: "received" | "packing" |
+ * "delivered", …the fields changed }. Answers in the line table's terms.
+ */
+export async function orderLineAction(orderId: string, lineId: string, body: Record<string, unknown>): Promise<OrderLineResult> {
+  try {
+    const r = await api.patch<{ line: OrderLineView }>(`/order-lines/${lineId}`, body);
+    refresh(orderId);
+    return { ok: true, line: r.line };
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 401) return { ok: false, message: "Your session ended. Please sign in again." };
+      const field = Object.values(e.body.fieldErrors ?? {}).find((v) => v?.length)?.[0];
+      return { ok: false, message: field ?? e.message };
+    }
+    console.error("[order lines]", e);
+    return { ok: false, message: "Something went wrong. Please try again." };
+  }
 }
 
 /** Money in from the customer (managers), always in the order's currency. */

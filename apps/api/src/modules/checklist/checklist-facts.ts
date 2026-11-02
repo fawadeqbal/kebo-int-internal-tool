@@ -1,6 +1,6 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, settle, splitDeposit } from "@kebo/money";
-import { bankStepsFor, documentDone, requiredDocuments, type ChecklistFacts, type FlowFacts } from "@kebo/shared";
+import type { ChecklistFacts } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
@@ -17,7 +17,6 @@ export const checklistOrderInclude = {
   satChecks: { select: { result: true } },
   claims: { select: { status: true } },
   lines: { select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true } },
-  checklist: { where: { step: "production", key: null }, select: { doneAt: true, skippedAt: true } },
 } satisfies Prisma.OrderInclude;
 
 export type ChecklistOrderRow = Prisma.OrderGetPayload<{ include: typeof checklistOrderInclude }>;
@@ -107,40 +106,5 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
     satSignedBy: o.satSignedBy,
     claims: { open: o.claims.filter((c) => c.status === "open" || c.status === "with_factory").length, total: o.claims.length },
     closedOn: o.status === "closed" ? (o.closedAt ? dateIn(o.closedAt, timeZone) : fromDbDate(o.orderedOn)) : null,
-  };
-}
-
-/** The step line's facts (see @kebo/shared flowSteps), from the same row. */
-export function flowFactsOf(o: ChecklistOrderRow, f: ChecklistFacts): FlowFacts {
-  const required = requiredDocuments(o.paymentRoute, o.shipments[0]?.mode ?? "sea");
-  const ready = required.filter((kind) => {
-    const rows = o.documents.filter((d) => d.kind === kind);
-    if (rows.length) return rows.some((d) => documentDone(d.status));
-    return kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false;
-  }).length;
-  const bankKinds = bankStepsFor(o.paymentRoute);
-  return {
-    stage: o.stage,
-    cancelled: o.status === "cancelled",
-    route: o.paymentRoute,
-    depositIn: f.depositIn,
-    factoryOrderedOn: f.factoryOrderedOn,
-    production: { total: o.checklist.length, done: o.checklist.filter((c) => c.doneAt || c.skippedAt).length },
-    readyOn: f.readyOn,
-    shipments: {
-      total: o.shipments.length,
-      departed: o.shipments.filter((s) => ["departed", "arrived", "cleared"].includes(s.status)).length,
-      arrived: o.shipments.filter((s) => s.status === "arrived" || s.status === "cleared").length,
-    },
-    documents: { required: required.length, ready },
-    bankSteps: { required: bankKinds.length, done: o.bankSteps.filter((s) => bankKinds.includes(s.step)).length },
-    deliveredOn: f.deliveredOn,
-    sat: {
-      total: o.satChecks.length,
-      passed: o.satChecks.filter((c) => c.result === "pass").length,
-      failed: o.satChecks.filter((c) => c.result === "fail").length,
-      doneOn: f.satDoneOn,
-    },
-    openClaims: f.claims.open,
   };
 }

@@ -1,4 +1,4 @@
-import type { ISODate } from "@kebo/utils";
+import { daysBetween, type ISODate } from "@kebo/utils";
 import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute, ShipMode, ShipmentStatus } from "../enums";
 import type { PaperKind } from "./papers";
 import {
@@ -10,6 +10,7 @@ import {
   ORDER_DOCUMENT_LABEL,
   PAYMENT_ROUTE_LABEL,
   requiredDocuments,
+  SHIP_MODE_LABEL,
   type FlowStep,
 } from "./flow";
 
@@ -589,6 +590,96 @@ export function stepOfKey(key: string): FlowStep | null {
   return null;
 }
 
+/* ---------------------------------------------------------------- where a step stands */
+
+/**
+ * One plain line under a step's name on its page and its card: where the step
+ * stands in the order's own words ("Ready 2027-01-07 · day 24 of 60",
+ * "Deposit received · balance through the LC"), never a count of the
+ * checklist (the header already says "n of m done"). Empty when there is
+ * nothing useful to say. Dates are YYYY-MM-DD (the screens show them their way).
+ */
+export function stepLine(
+  step: FlowStep,
+  f: ChecklistFacts,
+  items: { key: string | null; title: string; done: boolean; skipped: boolean }[],
+  today: ISODate,
+): string {
+  const join = (...parts: (string | null | false | undefined)[]) => parts.filter(Boolean).join(" · ");
+  const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  switch (step) {
+    case "payment": {
+      if (f.paidInFullOn) return `Paid in full ${f.paidInFullOn}`;
+      const balance =
+        f.route === "letter_of_credit"
+          ? "balance through the LC"
+          : f.route === "bank_contract"
+            ? "balance through the bank contract"
+            : f.route === null
+              ? "route not chosen"
+              : `balance ${money(f.currency, f.due)} due`;
+      if (f.depositIn) return f.depositPercent > 0 ? join(`Deposit received${f.depositOn ? ` ${f.depositOn}` : ""}`, balance) : balance;
+      if (f.route === null) return "Choose how the customer pays";
+      return f.depositPercent > 0 ? `Waiting for the deposit, ${money(f.currency, f.deposit)}` : `Waiting for ${money(f.currency, f.due)}`;
+    }
+    case "factory":
+      return f.factoryOrderedOn
+        ? join(`Ordered ${f.factoryOrderedOn}`, f.readyOn ? `ready ${f.readyOn}` : "ready date not given yet")
+        : "Not ordered from the factory yet";
+    case "production": {
+      const allIn = f.goods.lines > 0 && f.goods.received >= f.goods.lines;
+      if (allIn) return "Everything has come in from the factory";
+      const goods = f.goods.received > 0 ? `${f.goods.received} of ${plural(f.goods.lines, "item")} in` : null;
+      if (!f.readyOn) return join(f.factoryOrderedOn ? "Ready date not known yet" : null, goods);
+      const late = daysBetween(f.readyOn, today);
+      if (late > 0) return join(`Ready ${f.readyOn}`, `${plural(late, "day")} late`, goods);
+      const lead = f.factoryOrderedOn ? daysBetween(f.factoryOrderedOn, f.readyOn) : 0;
+      const day = f.factoryOrderedOn ? daysBetween(f.factoryOrderedOn, today) : 0;
+      return join(`Ready ${f.readyOn}`, lead > 0 && day >= 0 ? `day ${day} of ${lead}` : null, goods);
+    }
+    case "shipping": {
+      const s = f.shipments;
+      if (!s.length) {
+        if (f.shippedOn) return join(`Shipped ${f.shippedOn}`, f.blNo && `B/L ${f.blNo}`);
+        return f.packedAt && f.packing ? join("Packing list made", plural(f.packing.packages, "package")) : "";
+      }
+      const arrived = s.filter((x) => x.arrivedOn).map((x) => x.arrivedOn!).sort();
+      if (arrived.length === s.length) return `Arrived ${arrived.at(-1)}`;
+      const going = s.find((x) => x.departedOn && !x.arrivedOn);
+      if (going) return join(`Sailed ${going.departedOn}`, going.eta && `ETA ${going.eta}`);
+      const booked = s.find((x) => x.status !== "planned");
+      if (booked)
+        return join(
+          `${SHIP_MODE_LABEL[booked.mode]}${booked.portOfDischarge ? ` to ${booked.portOfDischarge}` : ""}`,
+          booked.forwarder,
+          booked.etd && `ETD ${booked.etd}`,
+        );
+      return "Planned, not booked yet";
+    }
+    case "documents": {
+      const papers = items.filter((i) => i.key?.startsWith("doc:"));
+      const open = papers.filter((i) => !i.done && !i.skipped).map((i) => i.title);
+      const lastBank = [...f.bankSteps].sort((a, b) => a.doneOn.localeCompare(b.doneOn)).at(-1);
+      return join(
+        open.length
+          ? `Still to come: ${open.slice(0, 2).join(", ")}${open.length > 2 ? ` and ${open.length - 2} more` : ""}`
+          : papers.length
+            ? "Every paper is ready"
+            : null,
+        lastBank && `${BANK_STEP_LABEL[lastBank.step]} ${lastBank.doneOn}`,
+      );
+    }
+    case "delivery": {
+      if (f.closedOn) return `Closed ${f.closedOn}`;
+      if (f.claims.open) return plural(f.claims.open, "open claim");
+      if (f.satDoneOn) return `SAT signed off ${f.satDoneOn}`;
+      if (f.deliveredOn) return join(`Delivered ${f.deliveredOn}`, "SAT to do");
+      const arrived = f.shipments.filter((x) => x.arrivedOn).map((x) => x.arrivedOn!).sort().at(-1);
+      return arrived ? join(`Arrived ${arrived}`, "not delivered yet") : "";
+    }
+  }
+}
+
 /* ---------------------------------------------------------------- history per step */
 
 /**
@@ -618,12 +709,13 @@ export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | 
     case "flow.bank_step":
       return "documents";
     case "flow.delivery":
+    case "delivered":
     case "flow.sat":
     case "flow.claim":
       return "delivery";
     case "update":
       if ("readyOn" in nv) return "production";
-      if ("shippedOn" in nv || "blNo" in nv) return "shipping";
+      if ("shippedOn" in nv || "blNo" in nv || "containerNo" in nv || "shippingMarks" in nv) return "shipping";
       if ("proformaNo" in nv) return "documents";
       return null;
     default:

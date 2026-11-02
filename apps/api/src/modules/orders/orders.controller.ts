@@ -7,6 +7,7 @@ import {
   moveStageInput,
   ORDER_STAGES,
   orderDetailsInput,
+  orderLineInput,
   packingInput,
   paymentInput,
   receiptInput,
@@ -14,6 +15,7 @@ import {
   type EditPaymentInput,
   type MoveStageInput,
   type OrderDetailsInput,
+  type OrderLineInput,
   type PackingInput,
   type PaymentInput,
   type ReceiptInput,
@@ -121,6 +123,27 @@ export class OrdersController {
   @Get(":id/documents/:kind")
   document(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
     return this.documents.get(user, id, kind);
+  }
+}
+
+/**
+ * One line of an order, in a step's line table. Lines are added and removed on
+ * the order (the accepted quotation); here only what each step adds changes.
+ */
+@ApiTags("orders")
+@Controller("order-lines")
+export class OrderLinesController {
+  constructor(private readonly orders: OrdersService) {}
+
+  /**
+   * { set: "received", receivedQty?, receivedOn? } (orders.update) ·
+   * { set: "packing", packages?, packageType?, netWeightKg?, grossWeightKg?, cbm? } (orders.update) ·
+   * { set: "delivered", deliveredQty?, condition?, note? } (delivery.manage, Delivery & SAT on).
+   * Only the fields sent change. Answers { line, goods }.
+   */
+  @Patch(":id")
+  edit(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(orderLineInput)) body: OrderLineInput) {
+    return this.orders.editLine(user, id, body);
   }
 }
 

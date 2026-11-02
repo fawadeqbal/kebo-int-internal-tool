@@ -2,6 +2,7 @@ import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo
 import { documentTotals, fromMinor, settle } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
+  LINE_CONDITION_LABEL,
   ORDER_DOCUMENT_LABEL,
   PAYMENT_KIND_LABEL,
   PAYMENT_METHOD_LABEL,
@@ -21,6 +22,7 @@ import {
   type PaperFixField,
   type PaperKind,
   type PaperOptions,
+  type LineCondition,
   type Settings,
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
@@ -728,13 +730,18 @@ function deliveryNote(c: PaperCtx): Built {
         { key: "delivered", label: "Delivered", width: 62 },
         { key: "condition", label: "Condition", width: 82, wrap: true },
       ],
-      rows: itemRows(c, true).map((r) => ({
-        no: r.cells.no!,
-        item: r.cells.item!,
-        qty: r.cells.qty!,
-        delivered: on ? r.cells.qty! : "",
-        condition: condition ?? "",
-      })),
+      // What reached the customer line by line (the line table's Delivered columns); the order's condition otherwise.
+      rows: itemRows(c, true).map(({ line: l, cells }) => {
+        const got = Number(l.deliveredQty);
+        const cond = l.deliveredCondition ? LINE_CONDITION_LABEL[l.deliveredCondition as LineCondition] : condition;
+        return {
+          no: cells.no!,
+          item: cells.item!,
+          qty: cells.qty!,
+          delivered: got > 0 ? qty(l.deliveredQty, l.unit) : on && !l.deliveredCondition ? cells.qty! : "",
+          condition: [cond, l.deliveryNote].filter(Boolean).join(" · "),
+        };
+      }),
       sums: [],
       total: null,
       foot: null,

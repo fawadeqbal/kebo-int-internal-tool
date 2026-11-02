@@ -6,6 +6,8 @@ import { ClaimsPanel, DeliveryPanel, SatPanel } from "@/components/orders/flow-p
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
 import { addClaimAction, deliveryAction, satAction, updateClaimAction } from "../../flow-actions";
+import { OrderLines } from "@/components/orders/order-lines";
+import { DeliveredExcel } from "../goods";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
 import { StepPapers } from "../papers";
@@ -26,6 +28,9 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       .filter((x): x is string => !!x)
       .sort()
       .at(-1) ?? null;
+
+  const goodsLines = o.lines.filter((l) => l.type === "goods");
+  const delivered = goodsLines.filter((l) => Number(l.delivered?.qty) >= Number(l.quantity)).length;
 
   const tools: Record<string, AutoTool> = {};
   if (canEdit)
@@ -90,6 +95,22 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
           />
         </CardBody>
       </Card>
+      {goodsLines.length > 0 && (
+        <Card id="lines" className="scroll-mt-24">
+          <CardHeader
+            title="Lines · delivered"
+            description={
+              delivered === goodsLines.length
+                ? "Everything reached the customer."
+                : "How many of each line reached the customer, and in what condition."
+            }
+            actions={<DeliveredExcel lines={goodsLines} />}
+          />
+          <CardBody>
+            <OrderLines set="delivered" orderId={o.id} lines={goodsLines} canEdit={canEdit} today={now} />
+          </CardBody>
+        </Card>
+      )}
       <Card id="sat" className="scroll-mt-24">
         <CardHeader
           title="SAT checklist"
