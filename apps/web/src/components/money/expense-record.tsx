@@ -94,7 +94,7 @@ export function ExpenseRecord({
           label: "For",
           value: e.order ? (
             <>
-              <Link href={`/orders/${e.order.id}/money`} className="font-medium hover:text-primary">
+              <Link href={`/orders/${e.order.id}/payment`} className="font-medium hover:text-primary">
                 Order {e.order.refNo}
               </Link>
               {e.customer && (

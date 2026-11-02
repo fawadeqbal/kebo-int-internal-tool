@@ -326,7 +326,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
                       return (
                         <Tr key={o.id} className="hover:bg-surface-2/50">
                           <Td>
-                            <Link href={`/orders/${o.id}/money`} className="font-medium hover:text-primary">
+                            <Link href={`/orders/${o.id}/payment`} className="font-medium hover:text-primary">
                               {o.refNo}
                             </Link>
                             <span className="block max-w-48 truncate text-xs text-muted">
@@ -458,7 +458,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
                 {r.stuck.map((x) => (
                   <li key={x.id}>
                     <Link
-                      href={`/orders/${x.id}/money`}
+                      href={`/orders/${x.id}/payment`}
                       className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm hover:bg-surface-2/60"
                     >
                       <span className="min-w-0">

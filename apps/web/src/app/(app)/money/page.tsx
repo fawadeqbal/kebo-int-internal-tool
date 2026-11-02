@@ -706,7 +706,7 @@ async function ReceiveTab() {
                 {r.rows.map((o) => (
                   <Tr key={o.id} className="hover:bg-surface-2/50">
                     <Td>
-                      <Link href={`/orders/${o.id}/money`} className="font-medium hover:text-primary">
+                      <Link href={`/orders/${o.id}/payment`} className="font-medium hover:text-primary">
                         {o.refNo}
                       </Link>
                       <span className="block text-xs text-muted">

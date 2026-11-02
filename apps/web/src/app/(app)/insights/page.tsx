@@ -744,7 +744,7 @@ async function FactoriesTab({ i, from, to }: { i: Insights; from: string; to: st
                   sub: `paid ${x.days} days ago`,
                   value: Number(x.amount),
                   display: money(x.amount, x.currency),
-                  href: `/orders/${x.id}/money`,
+                  href: `/orders/${x.id}/payment`,
                 }))}
               />
             ) : (

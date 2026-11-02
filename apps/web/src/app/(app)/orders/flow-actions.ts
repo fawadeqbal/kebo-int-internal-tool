@@ -43,11 +43,6 @@ export async function factoryOrderAction(orderId: string, _prev: ActionState, fo
   return run(orderId, form, () => api.patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: formValues(form).factoryOrderedOn || null }), "Saved.");
 }
 
-/** payload: { steps: [{ id?, title, factoryId?, plannedOn?, doneOn?, note? }] } */
-export async function productionAction(orderId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.put(`/orders/${orderId}/production`, formBody(form)), "Production timeline saved.");
-}
-
 /* ---------------------------------------------------------------- shipping */
 
 const SHIPMENT = ["mode", "status", "forwarder", "bookingNo", "blNo", "vessel", "portOfLoading", "portOfDischarge", "containerNo", "containerType", "etd", "eta", "departedOn", "arrivedOn", "note"];

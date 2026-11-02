@@ -1,62 +1,46 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, XCircle } from "lucide-react";
-import { Badge, cn, OrderStageBadge, PageHeader, ProgressSteps } from "@kebo/ui";
+import { ArrowLeft, XCircle } from "lucide-react";
+import { PAYMENT_ROUTE_SHORT, STEP_PATH } from "@kebo/shared";
+import { Badge, cn, OrderStageBadge } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
+import { orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { FLOW_TAB } from "./flow-tab";
 import { date, money } from "@/lib/format";
-import { OrderTabs, ScrolledBar, type OrderTabLink } from "@/components/orders/order-tabs";
+import { FileActions } from "@/components/common/file-actions";
+import { ScrolledBar } from "@/components/orders/scrolled-bar";
+import { StepNav } from "@/components/orders/step-nav";
+import { docHref } from "./shared";
 
 /**
- * Every tab of an order shares a short top, so the tabs come first: the order
- * number with its step, the customer and the inquiry, and one link to what is
- * needed now. The steps themselves, with their checks and buttons, are on the
- * Overview tab only.
+ * Every page of an order shares one top: the order number with its stage, the
+ * customer, total, route and who handles it, the proforma's View / Print and
+ * Download PDF, and the order's navigation (Overview, the six steps, History).
  */
 export default async function OrderLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireUser();
   const o = await orderOf(id);
-  const [m, flow] = await Promise.all([orderMoneyOf(id), optional(() => orderFlowOf(id))]);
+  const [steps, flow] = await Promise.all([optional(() => orderStepsOf(id)), optional(() => orderFlowOf(id))]);
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
-  const late = !!o.needs?.late;
-  const due = Number(o.money.due);
-  const short = o.goods.lines - o.goods.received;
-  const latePlan = m.plan.items.some((i) => i.status === "late");
+  const route = flow?.payment.route ? PAYMENT_ROUTE_SHORT[flow.payment.route] : null;
+  const proforma = o.documents.find((d) => d.kind === "proforma");
+  const pdf = proforma ? docHref(o, proforma) : null;
+  const now = steps?.doNow;
 
-  const step = (k: string) => flow?.steps.find((s) => s.key === k);
-  const hintOf = (k: string) => (step(k)?.state === "current" ? "now" : undefined);
-  const tabs: OrderTabLink[] = [
-    { href: base, label: "Overview" },
-    { href: `${base}/money`, label: "Payments", hint: due > 0.005 ? `${money(o.money.due, o.currency)} due` : undefined, alert: latePlan },
-    ...(flow ? [{ href: `${base}/factory`, label: "Factory", hint: hintOf("factory") ?? hintOf("production") }] : []),
-    ...(o.goods.lines > 0
-      ? [
-          { href: `${base}/goods`, label: "Goods", hint: short > 0 ? `${short} short` : undefined, alert: short > 0 && late && o.stage === "in_production" },
-          { href: `${base}/packing`, label: "Packing list", hint: !o.goods.packed && o.stage === "in_production" ? "not made" : undefined },
-        ]
-      : []),
-    ...(flow?.shipping ? [{ href: `${base}/shipping`, label: "Shipping", hint: hintOf("shipping") }] : []),
-    {
-      href: `${base}/documents`,
-      label: flow?.documents ? "Documents & bank" : "Documents",
-      hint: flow?.documents ? (hintOf("documents") ?? (o.proforma ? undefined : "no proforma")) : o.proforma ? undefined : "proforma not issued",
-    },
-    ...(flow?.delivery ? [{ href: `${base}/delivery`, label: "Delivery & SAT", hint: hintOf("delivery") }] : []),
-    { href: `${base}/history`, label: "History" },
-  ];
-
-  const nextLink = open && o.needs && (
-    <Link href={base} className={cn("inline-flex max-w-full items-center gap-1.5 text-sm font-medium hover:underline", late ? "text-bad" : "text-primary")}>
-      {late ? <AlertTriangle className="size-4 shrink-0" aria-hidden /> : <ArrowRight className="size-4 shrink-0" aria-hidden />}
-      <span className="truncate">
-        Next: {o.needs.title}
-        {late ? " · late" : ` · by ${date(o.needs.due)}`}
-      </span>
-    </Link>
-  );
+  const meta = [
+    <Link key="c" href={`/customers/${o.customer.id}`} className="font-medium text-text hover:underline">
+      {o.customer.name}
+    </Link>,
+    <Link key="i" href={`/inquiries/${o.inquiry.id}`} className="hover:underline">
+      {o.inquiry.title || o.inquiry.refNo}
+    </Link>,
+    <span key="t" className="tabular">
+      {money(o.total, o.currency)}
+    </span>,
+    route && <span key="r">{route}</span>,
+    o.inquiry.assignee && <span key="a">{o.inquiry.assignee.name}</span>,
+  ].filter(Boolean);
 
   return (
     <div>
@@ -64,43 +48,49 @@ export default async function OrderLayout({ children, params }: { children: Reac
         bar={
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-2 font-medium">
-              {o.refNo} <OrderStageBadge stage={o.stage} /> <span className="hidden font-normal text-muted sm:inline">{o.customer.name}</span>
+              {o.refNo} <OrderStageBadge stage={o.stage} />{" "}
+              <span className="hidden font-normal text-muted sm:inline">{o.customer.name}</span>
             </span>
-            {o.needs && open && (
-              <span className={cn("truncate text-xs", late ? "text-bad" : "text-text-2")}>
-                Next: {o.needs.title}
-                {late ? " · late" : ` · by ${date(o.needs.due)}`}
-              </span>
+            {now && open && (
+              <Link
+                href={`${base}/${STEP_PATH[now.step]}`}
+                className={cn("truncate text-xs hover:underline", now.late ? "text-bad" : "text-text-2")}
+              >
+                Now: {now.title}
+                {now.dueOn ? ` · ${now.late ? "was due" : "due"} ${date(now.dueOn)}` : ""}
+              </Link>
             )}
           </div>
         }
       >
-        <PageHeader
-          backHref="/orders"
-          backLabel="Orders"
-          title={
-            <span className="flex flex-wrap items-center gap-2">
-              {o.refNo} <OrderStageBadge stage={o.stage} />
+        <header className="flex flex-col gap-1">
+          <Link href="/orders" className="inline-flex w-fit items-center gap-1 text-xs text-muted hover:text-text">
+            <ArrowLeft className="size-3.5" aria-hidden /> Orders
+          </Link>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="text-xl font-semibold tracking-tight tabular sm:text-2xl">{o.refNo}</h1>
+              <OrderStageBadge stage={o.stage} />
               {!open && <Badge tone="bad">Cancelled</Badge>}
-            </span>
-          }
-          description={
-            <>
-              <Link href={`/customers/${o.customer.id}`} className="font-medium text-text hover:underline">
-                {o.customer.name}
-              </Link>{" "}
-              · {o.inquiry.title} ·{" "}
-              <Link href={`/inquiries/${o.inquiry.id}`} className="hover:underline">
-                inquiry {o.inquiry.refNo}
-              </Link>
-              {o.inquiry.assignee && <> · handled by {o.inquiry.assignee.name}</>}
-            </>
-          }
-          actions={nextLink || undefined}
-        />
+              <p className="min-w-0 basis-full text-sm text-text-2 sm:basis-auto">
+                {meta.map((m, i) => (
+                  <span key={i}>
+                    {i > 0 && (
+                      <span aria-hidden className="px-1.5 text-muted">
+                        ·
+                      </span>
+                    )}
+                    {m}
+                  </span>
+                ))}
+              </p>
+            </div>
+            {pdf && <FileActions viewHref={pdf.view} pdfHref={pdf.pdf} of="proforma invoice" className="shrink-0" />}
+          </div>
+        </header>
 
         {o.cancelled && (
-          <div role="status" className="flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
+          <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">
             <XCircle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
             <div>
               <p className="font-medium">Cancelled{o.cancelled.at ? ` on ${date(o.cancelled.at)}` : ""}.</p>
@@ -109,19 +99,22 @@ export default async function OrderLayout({ children, params }: { children: Reac
             </div>
           </div>
         )}
-        {flow && (
-          <div className="mt-4">
-            <ProgressSteps
-              label="Where the order is"
-              steps={flow.steps
-                .filter((s) => s.state !== "off")
-                .map((s) => ({ key: s.key, label: s.label, sub: s.sub.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d)), state: s.state === "off" ? "todo" : s.state, href: `${base}${FLOW_TAB[s.key]}` }))}
-            />
-          </div>
-        )}
       </ScrolledBar>
 
-      <OrderTabs base={base} tabs={tabs} />
+      {steps && (
+        <StepNav
+          base={base}
+          steps={steps.steps.map((s) => ({
+            key: s.key,
+            number: s.number,
+            label: s.label,
+            state: s.state,
+            done: s.done,
+            total: s.total,
+            href: `${base}/${STEP_PATH[s.key]}`,
+          }))}
+        />
+      )}
       <div className="mt-5">{children}</div>
     </div>
   );

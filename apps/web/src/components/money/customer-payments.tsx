@@ -103,7 +103,7 @@ export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
                 return (
                   <tr key={o.id} className={cn("border-t border-line", cancelled && "text-muted")}>
                     <td className={td}>
-                      <Link href={`/orders/${o.id}/money`} className="font-medium hover:text-primary">
+                      <Link href={`/orders/${o.id}/payment`} className="font-medium hover:text-primary">
                         {o.refNo}
                       </Link>
                       <span className="block sm:hidden">
@@ -204,7 +204,7 @@ export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
                   <tr key={p.id} className={cn("border-t border-line", p.voided && "text-muted [&_td]:line-through")}>
                     <td className={cn(td, "whitespace-nowrap")}>{date(p.paidOn)}</td>
                     <td className={td}>
-                      <Link href={`/orders/${p.order.id}/money`} className="hover:text-primary">
+                      <Link href={`/orders/${p.order.id}/payment`} className="hover:text-primary">
                         {p.order.refNo}
                       </Link>
                       <span className="block text-xs text-muted sm:hidden">{PAYMENT_KIND_LABEL[p.kind]}</span>

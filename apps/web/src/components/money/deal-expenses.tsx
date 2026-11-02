@@ -66,7 +66,7 @@ export async function DealExpensesCard({
           <p className="text-sm text-muted">Nothing spent on this inquiry yet.</p>
         )}
         {deal.order && (
-          <Link href={`/orders/${deal.order.id}/money`} className="text-sm text-primary hover:underline">
+          <Link href={`/orders/${deal.order.id}/payment`} className="text-sm text-primary hover:underline">
             The order&apos;s own costs and profit
           </Link>
         )}

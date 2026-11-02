@@ -5,6 +5,8 @@ import { load } from "./session";
 import type { OrderMoney } from "./types-money";
 import type { OrderView, PaymentsView } from "./types-orders";
 import type { OrderFlow } from "./types-flow";
+import type { OrderSteps } from "./types-checklist";
+import type { HistoryEntry } from "./types";
 
 /**
  * An order's data, fetched once per request: the order layout (steps, Now
@@ -16,3 +18,16 @@ export const orderMoneyOf = cache((id: string) => api.get<OrderMoney>(`/orders/$
 
 /** The flow after acceptance (payment route, production, shipping, papers and banks, delivery and SAT). */
 export const orderFlowOf = cache((id: string) => api.get<OrderFlow>(`/orders/${id}/flow`));
+
+/** The six steps, each a checklist, and "do this now". */
+export const orderStepsOf = cache((id: string) => api.get<OrderSteps>(`/orders/${id}/steps`));
+
+/** The order's history, all of it or one step's (newest first). */
+export const orderHistoryOf = cache((id: string, step?: string, limit?: number) =>
+  api.get<(HistoryEntry & { step: string | null })[]>("/history", {
+    type: "order",
+    id,
+    ...(step ? { step } : {}),
+    ...(limit ? { limit: String(limit) } : {}),
+  }),
+);

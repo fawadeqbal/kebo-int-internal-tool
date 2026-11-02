@@ -1,60 +1,167 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { can } from "@kebo/shared";
-import { Card, CardBody, CardHeader } from "@kebo/ui";
-import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderOf } from "@/lib/order-data";
-import { optional } from "@/components/print/data";
-import { today } from "@/components/orders/today";
+import { can, SHIP_MODE_LABEL } from "@kebo/shared";
+import { Badge, Card, CardBody, CardHeader } from "@kebo/ui";
+import { date } from "@/lib/format";
 import { ShipmentsPanel } from "@/components/orders/flow-panels";
+import { Checklist, type AutoTool } from "@/components/orders/checklist";
+import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
 import { addShipmentAction, removeShipmentAction, updateShipmentAction } from "../../flow-actions";
+import { packingAction, paymentAction } from "../../actions";
+import { PaymentForm } from "../forms";
+import { PackingList } from "../goods";
+import { docHref, goodsOf } from "../shared";
+import { stageTool } from "../close-tool";
+import { stepData } from "../step-data";
 
 export const metadata = { title: "Order · shipping" };
 
-/** The shipments: sea or air, ports, forwarder, container, B/L or AWB, and the dates from booked to arrived. */
+/** Step 4, Shipping: booking, loading, sailing and arrival of each shipment, the packing list, and the balance when it is paid before or against the B/L. */
 export default async function OrderShipping({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const me = await requireUser();
-  const [o, flow] = await Promise.all([orderOf(id), optional(() => orderFlowOf(id))]);
-  if (!flow?.shipping) notFound();
-  const canEdit = can(me, "shipping.manage") && o.status !== "cancelled";
-  const shipments = flow.shipping.shipments;
-  const base = `/orders/${o.id}`;
-  return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <CardHeader
-          title={shipments.length ? `Shipping · ${shipments.length === 1 ? "1 shipment" : `${shipments.length} shipments`}` : "Shipping"}
-          description={
-            <>
-              Costs (freight, trucking, insurance) are recorded as expenses on{" "}
-              <Link href={`${base}/money`} className="text-primary hover:underline">
-                Payments
-              </Link>
-              {o.goods.lines > 0 && (
-                <>
-                  ; packages and weights on the{" "}
-                  <Link href={`${base}/packing`} className="text-primary hover:underline">
-                    Packing list
-                  </Link>
-                </>
-              )}
-              .
-            </>
-          }
+  const d = await stepData(id, "shipping");
+  const { me, o, flow, now } = d;
+  const shipping = flow?.shipping ?? null;
+  const shipments = shipping?.shipments ?? [];
+  const canShip = can(me, "shipping.manage") && d.open;
+  const canEdit = can(me, "orders.update") && d.open;
+  const canPay = can(me, "payments.record") && d.open;
+  const goods = goodsOf(o);
+  const defaults = {
+    mode: "sea" as const,
+    status: "planned" as const,
+    portOfLoading: o.incotermPlace,
+    portOfDischarge: o.portOfDischarge,
+    blNo: o.blNo,
+    containerNo: o.goods.containerNo,
+  };
+
+  const tools: Record<string, AutoTool> = {};
+  if (shipping && canShip) {
+    const first = shipments[0];
+    const ship = (label: string): AutoTool =>
+      first
+        ? { kind: "shipment", label, action: updateShipmentAction.bind(null, o.id, first.id), shipment: first, today: now }
+        : { kind: "shipment", label: "Add the shipment", action: addShipmentAction.bind(null, o.id), defaults, today: now };
+    tools.booked = ship("Add the booking");
+    tools.loaded = ship("Add the container");
+    tools.sailed = ship(first?.mode === "air" ? "Add the AWB" : "Add the B/L");
+    tools.arrived = ship("Mark arrived");
+  }
+  if (goods.length)
+    tools.packing_list = { kind: "link", label: o.goods.packed ? "Edit" : canEdit ? "Make it" : "See it", href: "#packing" };
+  if (canPay && Number(o.money.due) > 0)
+    tools.balance_in = {
+      kind: "node",
+      node: (
+        <PaymentForm
+          quiet
+          label="Record payment"
+          action={paymentAction.bind(null, o.id, o.currency)}
+          currency={o.currency}
+          depositDue={o.money.depositDue}
+          due={o.money.due}
+          today={now}
         />
-        <CardBody>
-          <ShipmentsPanel
-            addAction={addShipmentAction.bind(null, o.id)}
-            updateActions={Object.fromEntries(shipments.map((s) => [s.id, updateShipmentAction.bind(null, o.id, s.id)]))}
-            removeActions={Object.fromEntries(shipments.map((s) => [s.id, removeShipmentAction.bind(null, o.id, s.id)]))}
-            shipments={shipments}
-            defaults={{ mode: "sea", status: "planned", portOfLoading: o.incotermPlace, portOfDischarge: o.portOfDischarge, blNo: o.blNo, containerNo: o.goods.containerNo }}
-            today={today()}
-            canEdit={canEdit}
+      ),
+    };
+  const shipped = stageTool(me, o, "shipped", now);
+  if (shipped) tools.shipped = { kind: "node", node: shipped };
+  const close = stageTool(me, o, "done", now);
+  if (close) tools.closed = { kind: "node", node: close };
+
+  const s = shipments[0];
+  const showPacking = o.goods.allReceived || o.stage !== "confirmed";
+  return (
+    <StepPage
+      steps={d.steps}
+      step="shipping"
+      base={d.base}
+      side={
+        <>
+          <KeyFacts
+            editHref={canEdit ? `${d.base}#details` : undefined}
+            facts={[
+              {
+                label: "Way",
+                value: s
+                  ? `${SHIP_MODE_LABEL[s.mode]}${s.portOfLoading || s.portOfDischarge ? `, ${s.portOfLoading ?? "?"} → ${s.portOfDischarge ?? "?"}` : ""}`
+                  : (o.portOfDischarge ?? null),
+              },
+              ...(shipping
+                ? [
+                    { label: "Forwarder", value: s?.forwarder ?? null },
+                    { label: "Booking no.", value: s?.bookingNo ?? null },
+                    { label: "Container", value: s?.containerNo ?? o.goods.containerNo },
+                  ]
+                : []),
+              { label: "ETD / ETA", value: s && (s.etd || s.eta) ? `${s.etd ? date(s.etd) : "?"} / ${s.eta ? date(s.eta) : "?"}` : null },
+              { label: "Ship by", value: o.shipBy ? date(o.shipBy) : null },
+              { label: "B/L", value: s?.blNo ?? o.blNo },
+            ]}
           />
-        </CardBody>
-      </Card>
-    </div>
+          <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
+          <StepChanges entries={d.changes} historyHref={d.historyHref} />
+        </>
+      }
+    >
+      <Checklist
+        step="shipping"
+        label="Shipping"
+        items={d.items}
+        current={d.current}
+        canEdit={d.steps.canEdit}
+        run={d.run}
+        dealId={o.inquiry.id}
+        people={d.people}
+        tools={tools}
+        listHref={d.listHref}
+      />
+      {shipping && (
+        <Card id="shipments" className="scroll-mt-24">
+          <CardHeader
+            title={shipments.length ? `Shipments · ${shipments.length}` : "Shipments"}
+            description="The way, the ports, the container and the dates from booked to arrived."
+          />
+          <CardBody>
+            <ShipmentsPanel
+              addAction={addShipmentAction.bind(null, o.id)}
+              updateActions={Object.fromEntries(shipments.map((x) => [x.id, updateShipmentAction.bind(null, o.id, x.id)]))}
+              removeActions={Object.fromEntries(shipments.map((x) => [x.id, removeShipmentAction.bind(null, o.id, x.id)]))}
+              shipments={shipments}
+              defaults={defaults}
+              today={now}
+              canEdit={canShip}
+            />
+          </CardBody>
+        </Card>
+      )}
+      {goods.length > 0 && (
+        <div id="packing" className="scroll-mt-24">
+          {showPacking ? (
+            <PackingList
+              title="Packing list"
+              description={o.goods.packed ? undefined : "Packages, weights and volume for each line, before shipping."}
+              badge={o.goods.packed ? <Badge tone="ok">Done</Badge> : <Badge tone="warn">Not made yet</Badge>}
+              lines={goods}
+              containerNo={o.goods.containerNo}
+              shippingMarks={o.goods.shippingMarks}
+              packed={o.goods.packed}
+              totals={o.goods.totals}
+              canEdit={canEdit}
+              canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
+              action={packingAction.bind(null, o.id)}
+              links={docHref(o, { kind: "packing-list", label: "Packing list" })}
+            />
+          ) : (
+            <Card>
+              <CardHeader
+                title="Packing list"
+                description="Opens once production has started, for the packages, weights and volume of each line."
+                actions={<Badge tone="warn">Not made yet</Badge>}
+              />
+            </Card>
+          )}
+        </div>
+      )}
+    </StepPage>
   );
 }

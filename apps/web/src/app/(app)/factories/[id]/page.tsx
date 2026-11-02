@@ -152,7 +152,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
                           {e.deal.refNo}
                         </Link>
                       ) : e.order ? (
-                        <Link href={`/orders/${e.order.id}/money`} className="hover:text-primary">
+                        <Link href={`/orders/${e.order.id}/payment`} className="hover:text-primary">
                           {e.order.refNo}
                         </Link>
                       ) : (

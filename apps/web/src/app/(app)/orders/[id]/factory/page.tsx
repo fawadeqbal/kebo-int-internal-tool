@@ -1,67 +1,134 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { ArrowUpRight } from "lucide-react";
 import { can } from "@kebo/shared";
 import { Card, CardBody, CardHeader } from "@kebo/ui";
-import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderOf } from "@/lib/order-data";
-import { optional } from "@/components/print/data";
-import { today } from "@/components/orders/today";
-import { FactoryOrderPanel, ProductionPanel } from "@/components/orders/flow-panels";
-import { factoryOrderAction, productionAction } from "../../flow-actions";
+import { api } from "@/lib/api";
+import { orderMoneyOf } from "@/lib/order-data";
+import { date, money } from "@/lib/format";
+import type { Person } from "@/lib/types";
+import { FactoryOrderPanel } from "@/components/orders/flow-panels";
+import { Checklist, type AutoTool } from "@/components/orders/checklist";
+import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { NewFactoryPayment } from "@/components/money/forms";
+import { factoryPaymentAction } from "../../../money/actions";
+import { factoryOrderAction } from "../../flow-actions";
+import { FactoriesView } from "../money-cards";
+import { MoneySection } from "../money-sections";
+import { stepData } from "../step-data";
 
-export const metadata = { title: "Order · factory" };
+export const metadata = { title: "Order · factory order" };
 
-/** Ordering from the factory and its production timeline; what came in is on Goods from factory, what we paid them on Payments. */
+/** Step 2, Factory order: the day we ordered from the factory, and what we owe and paid each factory (people who see factory money). */
 export default async function OrderFactory({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const me = await requireUser();
-  const [o, flow] = await Promise.all([orderOf(id), optional(() => orderFlowOf(id))]);
-  if (!flow) notFound();
-  const canEdit = can(me, "orders.update") && o.status !== "cancelled";
-  const base = `/orders/${o.id}`;
-  const now = today();
+  const d = await stepData(id, "factory");
+  const { me, o, flow, now } = d;
+  const [m, people, settings] = await Promise.all([
+    orderMoneyOf(id),
+    api.get<Person[]>("/users/people"),
+    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
+  ]);
+  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
+  const canEdit = can(me, "orders.update") && d.open;
+  const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
+  const payFactory = (label: string, quiet = true) =>
+    m.factories?.canRecord && owing.length && d.open ? (
+      <NewFactoryPayment
+        quiet={quiet}
+        label={label}
+        action={factoryPaymentAction.bind(null, m.orderId, null)}
+        factories={owing}
+        people={people}
+        orderCurrency={o.currency}
+        fx={fx}
+        today={now}
+      />
+    ) : null;
+
+  const tools: Record<string, AutoTool> = {};
+  if (canEdit)
+    tools.factory_ordered = {
+      kind: "date",
+      label: "Mark as ordered",
+      action: factoryOrderAction.bind(null, o.id),
+      name: "factoryOrderedOn",
+      field: "Ordered from the factory on",
+      value: flow?.factory.orderedOn ?? null,
+      max: now,
+      save: "Save",
+      hint: "The day we confirmed the order (PO or signed proforma)",
+    };
+  const advance = payFactory("Pay the factory");
+  if (advance) tools.factory_advance = { kind: "node", node: advance };
+
+  const factories = flow?.factory.factories ?? [];
+  const owed = m.factories?.rows ?? [];
   return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <CardHeader
-          title="Order with the factory"
-          description={
-            <>
-              What we paid them is on{" "}
-              <Link href={`${base}/money`} className="text-primary hover:underline">
-                Payments
-              </Link>
-              {o.goods.lines > 0 && (
-                <>
-                  ; what came in, on{" "}
-                  <Link href={`${base}/goods`} className="text-primary hover:underline">
-                    Goods from factory
-                  </Link>
-                </>
-              )}
-              .
-            </>
-          }
-        />
-        <CardBody>
-          <FactoryOrderPanel action={factoryOrderAction.bind(null, o.id)} orderedOn={flow.factory.orderedOn} readyOn={flow.factory.readyOn} factories={flow.factory.factories} today={now} canEdit={canEdit} />
-        </CardBody>
-      </Card>
-      {flow.production && (
+    <StepPage
+      steps={d.steps}
+      step="factory"
+      base={d.base}
+      action={payFactory("Pay the factory", false)}
+      side={
+        <>
+          <KeyFacts
+            facts={[
+              { label: factories.length > 1 ? "Factories" : "Factory", value: factories.map((f) => f.name).join(", ") || null },
+              { label: "Ordered on", value: flow?.factory.orderedOn ? date(flow.factory.orderedOn) : "Not yet" },
+              { label: "Ready", value: o.readyOn ? date(o.readyOn) : "Not known yet" },
+              ...owed.map((r) => ({
+                label: owed.length > 1 ? `Paid ${r.factory.name}` : "Paid",
+                value: `${money(r.paid, r.currency)} of ${money(r.owed, r.currency)}`,
+              })),
+            ]}
+          />
+          <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
+          <StepChanges entries={d.changes} historyHref={d.historyHref} />
+        </>
+      }
+    >
+      <Checklist
+        step="factory"
+        label="Factory order"
+        items={d.items}
+        current={d.current}
+        canEdit={d.steps.canEdit}
+        run={d.run}
+        dealId={o.inquiry.id}
+        people={d.people}
+        tools={tools}
+        payNode={payFactory("Pay")}
+        listHref={d.listHref}
+      />
+      {flow && (
         <Card>
-          <CardHeader title="Production timeline" description="The factory's milestones up to ready: tick each off as they report it." />
+          <CardHeader title="Order with the factory" description="The factory, the day we ordered, and the ready date they gave." />
           <CardBody>
-            <ProductionPanel
-              action={productionAction.bind(null, o.id)}
-              steps={flow.production.steps}
-              suggested={flow.production.suggested}
-              factories={flow.factory.factories}
+            <FactoryOrderPanel
+              action={factoryOrderAction.bind(null, o.id)}
+              orderedOn={flow.factory.orderedOn}
+              readyOn={flow.factory.readyOn}
+              factories={factories}
               today={now}
               canEdit={canEdit}
             />
           </CardBody>
         </Card>
       )}
-    </div>
+      {m.factories && (
+        <MoneySection
+          id="factory-money"
+          icon={<ArrowUpRight aria-hidden />}
+          title="To the factory"
+          tag="Internal"
+          sub={
+            factories.length
+              ? `We pay ${factories.map((f) => f.name).join(", ")} for the goods`
+              : "What we owe the factories for this order"
+          }
+        >
+          <FactoriesView m={m} people={people} today={now} fx={fx} />
+        </MoneySection>
+      )}
+    </StepPage>
   );
 }
