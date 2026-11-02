@@ -21,6 +21,9 @@ export function AccountsProvider({ accounts, children }: { accounts: AccountOpti
   return <Accounts.Provider value={accounts}>{children}</Accounts.Provider>;
 }
 
+/** Our accounts (empty when none are set up, or the person does not record money). */
+export const useAccounts = () => useContext(Accounts);
+
 /**
  * Which of our accounts money moved through: only accounts in the same
  * currency, open ones (and the one already chosen). With no accounts set up

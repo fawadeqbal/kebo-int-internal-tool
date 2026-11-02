@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { api } from "./api";
 import { load } from "./session";
-import type { OrderMoney } from "./types-money";
+import type { OrderCosts, OrderMoney } from "./types-money";
 import type { OrderView, PaymentsView } from "./types-orders";
 import type { OrderFlow } from "./types-flow";
 import type { OrderSteps } from "./types-checklist";
@@ -15,6 +15,8 @@ import type { HistoryEntry } from "./types";
 export const orderOf = cache((id: string) => load(() => api.get<OrderView>(`/orders/${id}`)));
 export const orderPaymentsOf = cache((id: string) => api.get<PaymentsView>(`/orders/${id}/payments`));
 export const orderMoneyOf = cache((id: string) => api.get<OrderMoney>(`/orders/${id}/money`));
+/** The order's costs and profit (managers with the expenses feature; 403 otherwise). */
+export const orderCostsOf = cache((id: string) => api.get<OrderCosts>(`/orders/${id}/costs`));
 
 /** The flow after acceptance (payment route, production, shipping, papers and banks, delivery and SAT). */
 export const orderFlowOf = cache((id: string) => api.get<OrderFlow>(`/orders/${id}/flow`));

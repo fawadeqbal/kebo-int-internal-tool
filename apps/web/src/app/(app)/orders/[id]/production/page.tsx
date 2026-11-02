@@ -7,6 +7,7 @@ import type { Person } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { NewFactoryPayment } from "@/components/money/forms";
 import { factoryPaymentAction } from "../../../money/actions";
 import { receiptAction } from "../../actions";
@@ -86,12 +87,14 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               { label: "Goods in", value: goods.length ? `${o.goods.received} of ${o.goods.lines}` : "No goods lines" },
             ]}
           />
+          <StepCosts id={o.id} step="production" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
     >
       <Checklist
+        payFor={await expensePayTools(o.id, d.items)}
         step="production"
         label="Production"
         items={d.items}

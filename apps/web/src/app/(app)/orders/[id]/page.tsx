@@ -7,11 +7,12 @@ import { buttonClass, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderFlowOf, orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
-import { date, dateTime, money } from "@/lib/format";
+import { date, dateTime, money, whole } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { StepView } from "@/lib/types-checklist";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
+import { orderCostsSetup } from "@/components/orders/costs-data";
 import { ProgressBar, readable, StateBadge, StepChanges } from "@/components/orders/step-page";
 import { NoteForm } from "../../inquiries/[id]/panels";
 import { detailsAction, orderNoteAction } from "../actions";
@@ -93,13 +94,16 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const [steps, m, flow, recent, deal] = await Promise.all([
+  const [steps, m, flow, recent, deal, costs] = await Promise.all([
     orderStepsOf(id),
     optional(() => orderMoneyOf(id)),
     optional(() => orderFlowOf(id)),
     optional(() => orderHistoryOf(id, undefined, 3)),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
+    orderCostsSetup(id).then((x) => x?.costs ?? null),
   ]);
+  /** Still due with what was charged to the customer (the order's money), else the order's own figure. */
+  const due = m?.due ?? o.money.due;
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const c = o.currency;
@@ -118,7 +122,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const facts: Record<FlowStep, { label: string; value: ReactNode }[]> = {
     payment: [
       { label: "Received", value: money(o.money.received, c) },
-      { label: "Still due", value: money(o.money.due, c) },
+      { label: "Still due", value: money(due, c) },
     ],
     factory: [
       { label: "Ordered", value: flow?.factory.orderedOn ? date(flow.factory.orderedOn) : "Not yet" },
@@ -204,19 +208,31 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             <dl className="flex flex-col gap-2.5 px-4 py-3.5">
               <Line label="Order total" value={money(o.money.total, c)} />
               <Line label="Received" value={money(o.money.received, c)} tone="text-ok" />
-              <Line label="Still due" value={money(o.money.due, c)} tone={Number(o.money.due) > 0 ? "text-warn" : "text-ok"} />
+              <Line label="Still due" value={money(due, c)} tone={Number(due) > 0 ? "text-warn" : "text-ok"} />
               {m?.factories && (
                 <Line
                   label="We owe the factory"
                   value={owe.length === 1 ? money(owe[0]!.toPay, owe[0]!.currency) : owe.length ? `${owe.length} factories` : "Nothing"}
                 />
               )}
-              {m?.profit && <Line label="Costs spent" value={money(m.profit.expenses, c)} />}
-              {m?.profit && (
+              {costs && (
+                <Line
+                  label="Costs spent"
+                  value={
+                    <Link href={`${base}/costs`} className="hover:underline">
+                      {whole(costs.totals.spent, c)}
+                      {Number(costs.totals.notPlanned) > 0 && (
+                        <span className="text-bad"> · {Math.round(Number(costs.totals.notPlanned)).toLocaleString("en-US")} not planned</span>
+                      )}
+                    </Link>
+                  }
+                />
+              )}
+              {costs?.profit && (
                 <Line
                   label="Expected profit"
-                  value={`${money(m.profit.earned, c)}${m.profit.marginPercent !== null ? ` · ${m.profit.marginPercent.toFixed(1)}%` : ""}`}
-                  tone={Number(m.profit.earned) < 0 ? "text-bad" : undefined}
+                  value={`${whole(costs.profit.expected, c)}${costs.profit.margin !== null ? ` · ${costs.profit.margin.toFixed(1)}%` : ""}`}
+                  tone={Number(costs.profit.expected) < 0 ? "text-bad" : undefined}
                 />
               )}
             </dl>
