@@ -8,7 +8,7 @@ describe("read cache", () => {
   it("shares one computation between requests that arrive together, and forgets on a change", async () => {
     process.env.READ_CACHE_SECONDS = "60";
     const cache = new ReadCache();
-    const a = { id: "a", slug: "a", name: "A", kind: "client", status: "active", statusReason: null, endsAt: null, planId: null } as const;
+    const a = { id: "a", slug: "a", name: "A", kind: "client", status: "active", statusReason: null, endsAt: null, planId: null, featuresOff: [] as string[] } as const;
     const b = { ...a, id: "b", slug: "b", name: "B" };
     let runs = 0;
     const load = async () => {

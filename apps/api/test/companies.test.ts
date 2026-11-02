@@ -3,6 +3,7 @@ import request from "supertest";
 import { unzipSync } from "fflate";
 import bcrypt from "bcryptjs";
 import { FIRST_COMPANY_ID } from "@kebo/database";
+import { ORDER_FLOW_FEATURES } from "@kebo/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/auth/totp";
 import { PrismaService } from "../src/database/prisma.service";
@@ -621,10 +622,48 @@ describe("companies: isolation and the platform", () => {
     await api(app, keboManager).get("/insights").expect(200);
   });
 
+  it("the platform admin switches modules off for one company, on top of its plan, and back on", async () => {
+    const c = await makeCompany(`mods-${tag}`, { sampleData: false });
+    const mine = api(app, c.token);
+    // No plan: every feature, and every permission of the Super Admin.
+    const before = (await mine.get("/company").expect(200)).body;
+    expect(before.features).toEqual(expect.arrayContaining(["insights", "shipping", "delivery_sat"]));
+    expect((await mine.get("/auth/me").expect(200)).body.permissions).toEqual(expect.arrayContaining(["reports.view", "shipping.manage"]));
+    await mine.get("/insights").expect(200);
+
+    // Less management: Insights and Shipping off for this company only.
+    const saved = (await plat().patch(`/companies/${c.id}`, { featuresOff: ["insights", "shipping"] }).expect(200)).body;
+    expect(saved.featuresOff).toEqual(["insights", "shipping"]);
+    expect(saved.planFeatures).toBeNull();
+    const after = (await mine.get("/company").expect(200)).body;
+    expect(after.features).not.toContain("insights");
+    expect(after.features).not.toContain("shipping");
+    expect(after.features).toContain("delivery_sat");
+    const me = (await mine.get("/auth/me").expect(200)).body;
+    expect(me.permissions).not.toContain("reports.view");
+    expect(me.permissions).not.toContain("shipping.manage");
+    expect(me.permissions).toContain("delivery.manage");
+    const refused = await mine.get("/insights").expect(403);
+    expect(refused.body.code).toBe("plan_feature");
+    // Other companies keep theirs.
+    await api(app, keboManager).get("/insights").expect(200);
+    // Logged on the platform.
+    const log = (await plat().get(`/companies/${c.id}`).expect(200)).body.log as { summary?: string; text?: string }[];
+    expect(JSON.stringify(log)).toMatch(/modules switched off: insights, shipping/);
+    // An unknown module is refused.
+    await plat().patch(`/companies/${c.id}`, { featuresOff: ["rockets"] }).expect(422);
+
+    // Back on: everything as it was.
+    await plat().patch(`/companies/${c.id}`, { featuresOff: [] }).expect(200);
+    await mine.get("/insights").expect(200);
+    expect((await mine.get("/auth/me").expect(200)).body.permissions).toEqual(expect.arrayContaining(["reports.view", "shipping.manage"]));
+  });
+
   it("each feature the plan leaves out is refused by the API, not only hidden", async () => {
     const plans = (await plat().get("/plans").expect(200)).body as { id: string; name: string; features: string[] }[];
     const starter = plans.find((p) => p.name === "Starter")!;
-    expect(starter.features).toEqual(["excel"]);
+    // Starter: Excel, plus the order-flow modules every plan got when they were added.
+    expect([...starter.features].sort()).toEqual(["excel", ...ORDER_FLOW_FEATURES].sort());
     expect(plans.map((p) => p.name)).toEqual(expect.arrayContaining(["Starter", "Team", "Business", "Unlimited"]));
     const c = await makeCompany(`feat-${tag}`, { sampleData: true, planId: starter.id });
     const mine = api(app, c.token);

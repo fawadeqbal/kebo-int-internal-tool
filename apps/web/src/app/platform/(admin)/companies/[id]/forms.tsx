@@ -6,6 +6,7 @@ import { Button, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
+import { PLAN_FEATURE_KEYS, PLAN_FEATURES, type PlanFeature } from "@kebo/shared";
 import type { CompanyDetail, Plan } from "@/lib/types-platform";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -291,6 +292,53 @@ export function StatusForm({ action, status, manual, name }: { action: Action; s
         )}
       </div>
       <p className="text-xs text-muted">Read-only: people can look, not change. Off: nobody can sign in. Nothing is deleted.</p>
+    </ActionForm>
+  );
+}
+
+/**
+ * The modules this company uses: what its plan includes, each of which the
+ * platform admin can switch off for this company alone (a client who wants
+ * less management). Off = hidden in their app and refused by the API.
+ */
+export function ModulesForm({ c, action }: { c: CompanyDetail; action: Action }) {
+  const inPlan = (f: PlanFeature) => !c.planFeatures || c.planFeatures.includes(f);
+  const [off, setOff] = useState<string[]>(c.featuresOff);
+  return (
+    <ActionForm action={action} className="flex flex-col gap-3">
+      {() => (
+        <>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {PLAN_FEATURE_KEYS.map((f) => {
+              const plan = inPlan(f);
+              const on = plan && !off.includes(f);
+              return (
+                <li key={f}>
+                  <label className={`flex items-start gap-2.5 rounded-lg border px-3 py-2 text-sm ${plan ? "cursor-pointer border-line bg-surface" : "border-dashed border-line text-muted"}`}>
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 accent-[var(--color-primary)]"
+                      checked={on}
+                      disabled={!plan}
+                      onChange={(e) => setOff((o) => (e.target.checked ? o.filter((x) => x !== f) : [...o, f]))}
+                    />
+                    <span>
+                      <span className="block font-medium">{PLAN_FEATURES[f].split(" (")[0]}</span>
+                      <span className="block text-xs text-muted">{plan ? (PLAN_FEATURES[f].match(/\((.*)\)/)?.[1] ?? "") : "Not in their plan"}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          {off.map((f) => (
+            <input key={f} type="hidden" name="off" value={f} />
+          ))}
+          <div>
+            <SubmitButton pendingText="Saving…">Save modules</SubmitButton>
+          </div>
+        </>
+      )}
     </ActionForm>
   );
 }

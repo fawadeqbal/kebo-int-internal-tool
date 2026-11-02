@@ -1,6 +1,6 @@
 import { Global, Inject, Injectable, Module } from "@nestjs/common";
 import type { CompanyModel as Company, PlanModel as Plan } from "@kebo/database";
-import { LIFECYCLE, slugProblem } from "@kebo/shared";
+import { companyFeatures, LIFECYCLE, slugProblem } from "@kebo/shared";
 import { ENV, type Env } from "../../config/env";
 import { PrismaService } from "../../database/prisma.service";
 import type { CompanyInfo } from "./company-context";
@@ -17,6 +17,7 @@ export const toInfo = (c: Company): CompanyInfo => ({
   statusReason: c.statusReason,
   endsAt: c.endsAt,
   planId: c.planId,
+  featuresOff: c.featuresOff ?? [],
 });
 
 /**
@@ -116,6 +117,12 @@ export class CompaniesService {
     const value = this.prisma.platform.plan.findUnique({ where: { id: company.planId } });
     this.plans.set(company.planId, { at: Date.now(), value });
     return value;
+  }
+
+  /** The company's features: its plan's less what was switched off for it (null: every feature). */
+  async features(company: CompanyInfo): Promise<string[] | null> {
+    const plan = await this.plan(company);
+    return companyFeatures(plan ? plan.features : null, company.featuresOff);
   }
 
   /** Something about a company or plan changed: read it again next time. */

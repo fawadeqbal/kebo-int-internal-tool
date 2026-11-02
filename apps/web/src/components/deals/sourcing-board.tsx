@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Copy, Download, Eye, Factory, FileText, Info, ListPlus, Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Copy, Download, Eye, Factory, FileText, Info, ListPlus, Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
 import { formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, basisText, DEFAULT_TAX_RATE, type AttachmentKind } from "@kebo/shared";
-import { Badge, Button, Card, cn, Select } from "@kebo/ui";
+import { AddCard, Badge, Button, Card, ChecksBox, cn, DetailGrid, EmptyState, Select, SelectCard, SelectCardList, type DetailItem } from "@kebo/ui";
 import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
@@ -201,19 +201,19 @@ export function FactoryQuotes({
 function NoOffers({ items, canEdit, onAdd }: { items: Items; canEdit: boolean; onAdd: () => void }) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-      <Card className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-        <span className="grid size-14 place-items-center rounded-2xl bg-primary-soft text-primary">
-          <Factory className="size-7" aria-hidden />
-        </span>
-        <h2 className="text-lg font-semibold">No factory offers yet</h2>
-        <p className="max-w-md text-sm text-text-2">
-          Send the customer&apos;s list to two or three factories. When each one replies, add its offer here and compare them side by side.
-        </p>
-        {canEdit && (
-          <Button variant="primary" onClick={onAdd} className="mt-1">
-            <Plus aria-hidden /> Add the first offer
-          </Button>
-        )}
+      <Card className="flex min-w-0 flex-1 items-center justify-center">
+        <EmptyState
+          icon={Factory}
+          title="No factory offers yet"
+          description="Send the customer's list to two or three factories. When each one replies, add its offer here and compare them side by side."
+          action={
+            canEdit ? (
+              <Button variant="primary" onClick={onAdd}>
+                <Plus aria-hidden /> Add the first offer
+              </Button>
+            ) : undefined
+          }
+        />
       </Card>
       {items.length > 0 && (
         <Card className="flex flex-col gap-2 p-4 lg:w-96 lg:shrink-0">
@@ -257,57 +257,36 @@ function OfferList({
   return (
     <nav aria-label="Factory offers" className="flex flex-col gap-2 2xl:sticky 2xl:top-20 2xl:w-72 2xl:shrink-0">
       <span className="hidden text-xs font-semibold tracking-wide text-muted uppercase 2xl:block">{plural(offers.length, "offer")}</span>
-      <ul className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pt-0.5 pb-1 sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:scroll-px-0 lg:px-0.5 2xl:flex-col 2xl:overflow-visible 2xl:pb-0">
+      <SelectCardList label="Offers" column>
         {offers.map((q) => {
           const st = statusOf(q, items);
-          const on = active === q.id;
           return (
-            <li key={q.id} className="w-64 shrink-0 snap-start 2xl:w-auto">
-              <button
-                type="button"
-                onClick={() => onOpen(q.id)}
-                aria-current={on ? "true" : undefined}
-                className={cn(
-                  "flex h-full w-full flex-col items-start gap-1.5 rounded-xl border px-3.5 py-3 text-left transition-colors",
-                  on ? "border-primary bg-primary-soft ring-1 ring-primary" : "border-line bg-surface hover:border-line-strong",
-                )}
-              >
-                <span className="flex w-full items-baseline justify-between gap-2">
-                  <span className="min-w-0 font-semibold break-words">{q.factory.name}</span>
-                  <span className="shrink-0 text-sm font-semibold tabular">
-                    {q.lines.length && q.totalCost && Number(q.totalCost) > 0 ? amount(q.totalCost, mainCurrency) : <span className="font-normal text-muted">—</span>}
-                  </span>
-                </span>
-                <span className="text-xs text-text-2">
-                  {[q.basis ? basisText(q.basis, q.basisPlace) : "Basis not said", q.currency, q.leadTime].filter(Boolean).join(" · ")}
-                </span>
-                <span className="flex flex-wrap gap-1.5">
+            <SelectCard
+              key={q.id}
+              wide
+              title={q.factory.name}
+              figure={q.lines.length && q.totalCost && Number(q.totalCost) > 0 ? amount(q.totalCost, mainCurrency) : <span className="font-normal text-muted">—</span>}
+              meta={[q.basis ? basisText(q.basis, q.basisPlace) : "Basis not said", q.currency, q.leadTime].filter(Boolean).join(" · ")}
+              badges={
+                <>
                   <Badge tone={st.tone}>
                     {st.tone === "ok" ? <CheckCircle2 aria-hidden /> : null}
                     {st.label}
                   </Badge>
                   {q.lines.some((l) => l.used) && <Badge tone="primary">In the quotation</Badge>}
-                </span>
-              </button>
-            </li>
+                </>
+              }
+              selected={active === q.id}
+              onSelect={() => onOpen(q.id)}
+            />
           );
         })}
         {canEdit && (
-          <li className="w-48 shrink-0 snap-start 2xl:w-auto">
-            <button
-              type="button"
-              onClick={() => onOpen("new")}
-              aria-pressed={active === "new"}
-              className={cn(
-                "flex h-full min-h-12 w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed px-3 py-3 text-sm font-semibold text-primary",
-                active === "new" ? "border-primary bg-primary-soft" : "border-primary/40 bg-surface hover:border-primary",
-              )}
-            >
-              <Plus className="size-4" aria-hidden /> Add factory offer
-            </button>
-          </li>
+          <AddCard wide onClick={() => onOpen("new")} pressed={active === "new"}>
+            Add factory offer
+          </AddCard>
         )}
-      </ul>
+      </SelectCardList>
       <p className="hidden text-xs text-muted 2xl:block">Totals are our cost in {mainCurrency} with tax, on each factory&apos;s own price basis.</p>
     </nav>
   );
@@ -566,7 +545,7 @@ function Offer({
   };
 
   const rate = q.currency !== mainCurrency ? rateSentence({ main: mainCurrency, rates }, mainCurrency, q.currency) : null;
-  const facts: { label: string; value: string | null; warn?: string }[] = [
+  const facts: DetailItem[] = [
     { label: "Price basis", value: q.basis ? basisText(q.basis, q.basisPlace) : null, warn: "Not said" },
     { label: "Currency", value: q.fxRate === null ? null : `${q.currency}${rate ? ` · ${rate}` : ""}`, warn: `${q.currency} · no rate` },
     { label: "Lead time", value: q.leadTime },
@@ -603,64 +582,31 @@ function Offer({
         {details ? (
           <div className="rounded-xl border border-primary/30 bg-primary-soft/20 p-4">{headerForm}</div>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            {facts.map((f) => {
-              const empty = f.value === null || f.value === "";
-              if (empty && !f.warn && !canEdit) return null;
-              const body = (
-                <>
-                  <span className="block text-xs text-muted">{f.label}</span>
-                  <span className={cn("line-clamp-2 block text-sm font-medium break-words", empty ? (f.warn ? "text-warn" : "text-primary") : "text-text")}>
-                    {empty ? (f.warn ?? "+ Add") : f.value}
-                  </span>
-                </>
-              );
-              const cls = cn(
-                "min-w-0 rounded-lg border px-3 py-2 text-left",
-                empty && f.warn ? "border-warn/30 bg-warn-soft/50" : empty ? "border-dashed border-line-strong bg-surface" : "border-line bg-surface-2/50",
-              );
-              return canEdit ? (
-                <button key={f.label} type="button" onClick={() => setDetails(true)} className={cn(cls, "hover:border-primary/50")} title={`Change ${f.label.toLowerCase()}`}>
-                  {body}
-                </button>
-              ) : (
-                <div key={f.label} className={cls}>
-                  {body}
-                </div>
-              );
-            })}
-          </div>
+          <DetailGrid items={facts} onEdit={canEdit ? () => setDetails(true) : undefined} />
         )}
         {!details && q.notes && <p className="rounded-lg bg-surface-2/60 px-3 py-2 text-sm whitespace-pre-line text-text-2">{q.notes}</p>}
 
-        {q.lines.length > 0 &&
-          (issues.length ? (
-            <div role="status" className="flex flex-col gap-2 rounded-xl border border-warn/30 bg-warn-soft/60 p-3 sm:p-4">
-              <p className="flex items-center gap-2 text-sm font-semibold text-warn">
-                <AlertTriangle className="size-4" aria-hidden /> {issues.length === 1 ? "1 thing" : `${issues.length} things`} to finish this offer
-              </p>
-              <ul className="flex flex-col gap-1.5">
-                {issues.map((i) => (
-                  <li key={i.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="min-w-0">{i.text}</span>
-                    {canEdit && i.fix && (
-                      <Button size="xs" variant="secondary" onClick={() => fix(i.fix)}>
-                        {i.fix === "details" ? "Add it" : "Add the file"}
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p role="status" className="flex items-start gap-2 rounded-xl border border-ok/30 bg-ok-soft px-3 py-2.5 text-sm">
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden />
-              <span>
-                <b className="text-ok">Complete.</b> {items.length ? "Covers all the customer's items, every" : "Every"} line has a price, and their quotation file is
-                kept with it.
-              </span>
-            </p>
-          ))}
+        {q.lines.length > 0 && (
+          <ChecksBox
+            title={`${issues.length === 1 ? "1 thing" : `${issues.length} things`} to finish this offer`}
+            items={issues.map((i) => ({
+              key: i.key,
+              text: i.text,
+              action:
+                canEdit && i.fix ? (
+                  <Button size="xs" variant="secondary" onClick={() => fix(i.fix)}>
+                    {i.fix === "details" ? "Add it" : "Add the file"}
+                  </Button>
+                ) : undefined,
+            }))}
+            ready={
+              <>
+                <b className="text-ok">Complete.</b> {items.length ? "Covers all the customer's items, every" : "Every"} line has a price, and their quotation file is kept
+                with it.
+              </>
+            }
+          />
+        )}
 
         {used && canEdit && (
           <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
