@@ -8,6 +8,7 @@ import type { Person } from "@/lib/types";
 import { FactoryOrderPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { NewFactoryPayment } from "@/components/money/forms";
 import { factoryPaymentAction } from "../../../money/actions";
 import { factoryOrderAction } from "../../flow-actions";
@@ -81,12 +82,14 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
               })),
             ]}
           />
+          <StepCosts id={o.id} step="factory" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
     >
       <Checklist
+        payFor={await expensePayTools(o.id, d.items)}
         step="factory"
         label="Factory order"
         items={d.items}

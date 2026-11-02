@@ -214,15 +214,17 @@ export function StepChanges({
   entries,
   historyHref,
   showStep,
+  title,
 }: {
   entries: (HistoryEntry & { step?: string | null })[];
   historyHref: string;
   showStep?: boolean;
+  title?: string;
 }) {
   return (
     <Card>
       <CardHeader
-        title={showStep ? "Recent changes" : "Changes in this step"}
+        title={title ?? (showStep ? "Recent changes" : "Changes in this step")}
         actions={
           <Link href={historyHref} className={buttonClass("ghost", "xs")}>
             {showStep ? "History" : "All history"}

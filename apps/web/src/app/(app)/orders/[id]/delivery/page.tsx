@@ -5,6 +5,7 @@ import { date } from "@/lib/format";
 import { ClaimsPanel, DeliveryPanel, SatPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { addClaimAction, deliveryAction, satAction, updateClaimAction } from "../../flow-actions";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
@@ -58,12 +59,14 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
               { label: "Open claims", value: String(dv.claims.filter((c) => c.status === "open" || c.status === "with_factory").length) },
             ]}
           />
+          <StepCosts id={o.id} step="delivery" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
     >
       <Checklist
+        payFor={await expensePayTools(o.id, d.items)}
         step="delivery"
         label="Delivery & SAT"
         items={d.items}
