@@ -123,7 +123,7 @@ describe("automatic checklist items", () => {
       bankContract: { status: "opened", number: "LC/1", amount: "44100", currency: "USD", openedOn: "2026-10-25" },
     });
     expect(item(lc, "contract")).toMatchObject({
-      title: "LC opened",
+      title: "LC opened and checked against the order",
       done: true,
       data: [
         ["LC", "LC/1"],
@@ -132,7 +132,7 @@ describe("automatic checklist items", () => {
     });
     // The balance comes through the banks: not a Shipping item.
     expect(keys(lc)).not.toContain("shipping:balance_in");
-    expect(keys(lc).filter((k) => k.startsWith("documents:bank:"))).toHaveLength(5);
+    expect(keys(lc).filter((k) => k.startsWith("documents:bank:"))).toHaveLength(6);
     expect(keys(lc)).toContain("documents:doc:insurance");
     expect(item(facts({ route: "letter_of_credit" }), "contract")?.done).toBe(false);
   });

@@ -164,3 +164,14 @@ export function formatMinor(minor: Minor, currency: string, locale = "en-US"): s
   const amount = (minor / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${currency} ${amount}`;
 }
+
+/**
+ * Minor units ÷ a rate (PKR 1,500,000.00 at 280 PKR per USD = USD 5,357.14), worked
+ * out exactly in integers and rounded half away from zero. 0 for a missing or
+ * non-positive rate.
+ */
+export function divideMinor(minor: Minor, rate: number | string): Minor {
+  const r = exactDecimal(rate || 0);
+  if (!r || r.n <= 0n) return 0;
+  return Number(divideHalfAway(bigMinor(minor) * 10n ** BigInt(r.scale), r.n));
+}

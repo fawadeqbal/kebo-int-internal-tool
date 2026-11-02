@@ -87,6 +87,7 @@ export const ORDER_DOCUMENT_STATUS_TONE: Record<OrderDocumentStatus, Tone> = { m
 export const BANK_STEP_LABEL: Record<BankStepKind, string> = {
   sent_to_our_bank: "Documents handed to our bank",
   couriered_to_customer_bank: "Couriered to the customer's bank",
+  customer_bank_received: "Papers reached their bank",
   copies_to_customer: "Copies sent to the customer",
   customer_paid_bank: "Customer paid their bank",
   bank_paid_us: "Money reached us",
@@ -131,6 +132,9 @@ export function requiredDocuments(route: PaymentRoute | null, mode: ShipMode | n
 
 /** The documents' trip: through both banks on a bank contract or LC; straight to the customer otherwise. */
 export function bankStepsFor(route: PaymentRoute | null): BankStepKind[] {
+  if (route === "letter_of_credit")
+    // An LC's deferred days count from the day the papers reached the customer's bank.
+    return ["sent_to_our_bank", "couriered_to_customer_bank", "customer_bank_received", "copies_to_customer", "customer_paid_bank", "bank_paid_us"];
   return isBank(route) ? ["sent_to_our_bank", "couriered_to_customer_bank", "copies_to_customer", "customer_paid_bank", "bank_paid_us"] : ["copies_to_customer"];
 }
 

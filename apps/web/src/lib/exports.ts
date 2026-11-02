@@ -294,6 +294,7 @@ const CASH_KIND: Record<string, string> = {
   expense: "Expense",
   transfer_out: "Transfer out",
   transfer_in: "Transfer in",
+  refund: "Credit refunded",
 };
 
 async function cashBook(q: Q): Promise<SheetSpec> {

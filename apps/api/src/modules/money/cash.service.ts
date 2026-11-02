@@ -10,7 +10,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { checkAccount } from "./account-check";
 import { LimitsService } from "../../common/company/limits.service";
 
-type Kind = "in" | "factory" | "expense" | "transfer_out" | "transfer_in";
+type Kind = "in" | "factory" | "expense" | "transfer_out" | "transfer_in" | "refund";
 
 interface Entry {
   key: string;
@@ -55,15 +55,21 @@ export class CashService {
     const limit = toDbDate(upTo);
     for (const a of accounts) {
       const on = { gte: a.openingOn, ...(before ? { lt: limit } : { lte: limit }) };
-      const [pin, fout, eout, tout, tin] = await Promise.all([
-        this.prisma.db.payment.aggregate({ _sum: { amount: true }, where: { accountId: a.id, voidedAt: null, paidOn: on } }),
+      const [pin, rin, cout, fout, eout, tout, tin] = await Promise.all([
+        // What really arrived (in the account's currency); a transfer over several orders counts once, as the receipt.
+        this.prisma.db.payment.aggregate({ _sum: { receivedAmount: true }, where: { accountId: a.id, voidedAt: null, receiptId: null, paidOn: on } }),
+        this.prisma.db.customerReceipt.aggregate({ _sum: { receivedAmount: true }, where: { accountId: a.id, voidedAt: null, paidOn: on } }),
+        this.prisma.db.customerCredit.aggregate({ _sum: { amount: true }, where: { accountId: a.id, kind: "refund", voidedAt: null, on } }),
         this.prisma.db.factoryPayment.aggregate({ _sum: { amount: true }, where: { accountId: a.id, voidedAt: null, paidOn: on } }),
         this.prisma.db.expense.aggregate({ _sum: { amount: true }, where: { accountId: a.id, voidedAt: null, spentOn: on } }),
         this.prisma.db.moneyTransfer.aggregate({ _sum: { amountOut: true }, where: { fromAccountId: a.id, voidedAt: null, transferredOn: on } }),
         this.prisma.db.moneyTransfer.aggregate({ _sum: { amountIn: true }, where: { toAccountId: a.id, voidedAt: null, transferredOn: on } }),
       ]);
       const m = (d: Prisma.Decimal | null) => (d ? decimalToMinor(d) : 0);
-      sums.set(a.id, m(pin._sum.amount) - m(fout._sum.amount) - m(eout._sum.amount) - m(tout._sum.amountOut) + m(tin._sum.amountIn));
+      sums.set(
+        a.id,
+        m(pin._sum.receivedAmount) + m(rin._sum.receivedAmount) - m(cout._sum.amount) - m(fout._sum.amount) - m(eout._sum.amount) - m(tout._sum.amountOut) + m(tin._sum.amountIn),
+      );
     }
     return sums;
   }
@@ -224,10 +230,21 @@ export class CashService {
 
     // Expenses are a plan feature: without it they are not listed.
     const expensesOn = await this.limits.allows("expenses");
-    const [payments, factoryPaid, expenses, transfers] = await Promise.all([
+    const received = q.currency ? { receivedCurrency: q.currency } : {};
+    const [payments, receipts, refunds, factoryPaid, expenses, transfers] = await Promise.all([
+      // Payments from the customer as they arrived (any currency); a transfer over several orders is listed once, below;
+      // a payment from the customer's credit moved no money.
       this.prisma.db.payment.findMany({
-        where: { paidOn: range, ...onAccount, ...cur, ...live },
+        where: { paidOn: range, ...onAccount, ...received, ...live, receiptId: null, method: { not: "credit" } },
         include: { account: acc, customer: { select: { id: true, name: true } }, order: { select: { id: true, refNo: true } } },
+      }),
+      this.prisma.db.customerReceipt.findMany({
+        where: { paidOn: range, ...onAccount, ...received, ...live },
+        include: { account: acc, customer: { select: { id: true, name: true } }, payments: { select: { order: { select: { refNo: true } } } } },
+      }),
+      this.prisma.db.customerCredit.findMany({
+        where: { on: range, kind: "refund", ...onAccount, ...cur, ...live },
+        include: { account: acc, customer: { select: { id: true, name: true } } },
       }),
       this.prisma.db.factoryPayment.findMany({
         where: { paidOn: range, ...onAccount, ...cur, ...live },
@@ -259,14 +276,46 @@ export class CashService {
         kind: "in",
         on: fromDbDate(p.paidOn),
         at: p.createdAt,
-        minor: decimalToMinor(p.amount),
-        currency: p.currency,
+        minor: decimalToMinor(p.receivedAmount),
+        currency: p.receivedCurrency,
         account: p.account,
-        what: `${PAYMENT_KIND_LABEL[p.kind]} for ${p.order.refNo}${decimalToMinor(p.bankCharges) ? ` (bank charges ${p.bankCharges.toFixed(2)})` : ""}`,
+        what: `${PAYMENT_KIND_LABEL[p.kind]} for ${p.order.refNo}${p.receivedCurrency !== p.currency ? ` (${p.currency} ${p.amount.toFixed(2)} at ${Number(p.rate)})` : ""}${decimalToMinor(p.bankCharges) ? ` (bank charges ${p.bankCharges.toFixed(2)})` : ""}${p.paidByName ? `, paid by ${p.paidByName}` : ""}`,
         party: p.customer ? { name: p.customer.name, href: `/customers/${p.customer.id}` } : null,
         reference: p.reference,
         href: `/orders/${p.order.id}/payment`,
         voided: Boolean(p.voidedAt),
+      });
+    for (const r of receipts)
+      rows.push({
+        key: `r:${r.id}`,
+        id: r.id,
+        kind: "in",
+        on: fromDbDate(r.paidOn),
+        at: r.createdAt,
+        minor: decimalToMinor(r.receivedAmount),
+        currency: r.receivedCurrency,
+        account: r.account,
+        what: `One transfer for ${[...new Set(r.payments.map((p) => p.order.refNo))].join(", ") || "the customer's credit"}${r.receivedCurrency !== r.currency ? ` (at ${Number(r.rate)} per ${r.currency})` : ""}`,
+        party: { name: r.customer.name, href: `/customers/${r.customer.id}` },
+        reference: r.reference,
+        href: `/customers/${r.customer.id}`,
+        voided: Boolean(r.voidedAt),
+      });
+    for (const c of refunds)
+      rows.push({
+        key: `c:${c.id}`,
+        id: c.id,
+        kind: "refund",
+        on: fromDbDate(c.on),
+        at: c.createdAt,
+        minor: -decimalToMinor(c.amount),
+        currency: c.currency,
+        account: c.account,
+        what: `Credit refunded${c.note ? `: ${c.note}` : ""}`,
+        party: { name: c.customer.name, href: `/customers/${c.customer.id}` },
+        reference: null,
+        href: `/customers/${c.customer.id}`,
+        voided: Boolean(c.voidedAt),
       });
     for (const p of factoryPaid)
       rows.push({
@@ -381,7 +430,12 @@ export class CashService {
     const curOfUnassigned = account ? { currency: account.currency } : cur;
     const unassigned = none
       ? out.filter((r) => !r.voided).length
-      : (await this.prisma.db.payment.count({ where: { paidOn: range, accountId: null, voidedAt: null, ...curOfUnassigned } })) +
+      : (await this.prisma.db.payment.count({
+          where: { paidOn: range, accountId: null, voidedAt: null, receiptId: null, method: { not: "credit" }, ...(curOfUnassigned.currency ? { receivedCurrency: curOfUnassigned.currency } : {}) },
+        })) +
+        (await this.prisma.db.customerReceipt.count({
+          where: { paidOn: range, accountId: null, voidedAt: null, ...(curOfUnassigned.currency ? { receivedCurrency: curOfUnassigned.currency } : {}) },
+        })) +
         (await this.prisma.db.factoryPayment.count({ where: { paidOn: range, accountId: null, voidedAt: null, ...curOfUnassigned } })) +
         (expensesOn ? await this.prisma.db.expense.count({ where: { spentOn: range, accountId: null, voidedAt: null, ...curOfUnassigned } }) : 0);
 
@@ -402,8 +456,22 @@ export class CashService {
   async setAccount(user: SessionUser, kind: "in" | "factory" | "expense", id: string, accountId: string | null) {
     this.assertManager(user);
     if (kind === "expense") await this.limits.require("expenses");
+    // Money in: a payment (in the currency it arrived in), or one transfer over several orders.
+    const receipt = kind === "in" ? await this.prisma.db.customerReceipt.findUnique({ where: { id }, select: { receivedCurrency: true, accountId: true } }) : null;
+    if (receipt) {
+      const next = await checkAccount(this.prisma.db, accountId, receipt.receivedCurrency, receipt.accountId);
+      await this.prisma.tx(async (tx) => {
+        await tx.customerReceipt.update({ where: { id }, data: { accountId: next } });
+        await tx.payment.updateMany({ where: { receiptId: id }, data: { accountId: next } });
+        await this.audit.record(tx, { userId: user.id, action: "account_set", entityType: "payment", entityId: id, summary: next ? "Put an amount on an account" : "Took an amount off its account" });
+      });
+      return { ok: true };
+    }
     const find = {
-      in: () => this.prisma.db.payment.findUnique({ where: { id }, select: { currency: true, accountId: true } }),
+      in: () =>
+        this.prisma.db.payment
+          .findUnique({ where: { id }, select: { receivedCurrency: true, accountId: true, receiptId: true } })
+          .then((p) => p && { currency: p.receivedCurrency, accountId: p.accountId }),
       factory: () => this.prisma.db.factoryPayment.findUnique({ where: { id }, select: { currency: true, accountId: true } }),
       expense: () => this.prisma.db.expense.findUnique({ where: { id }, select: { currency: true, accountId: true } }),
     }[kind];

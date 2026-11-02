@@ -11,7 +11,7 @@ import type { ActionState } from "@/lib/actions";
 import type { ChecklistOp } from "@/app/(app)/orders/checklist-actions";
 import type { ChecklistItem } from "@/lib/types-checklist";
 import type { BankContract, BankStepView, DeliveryView, FlowDocument, ShipmentView } from "@/lib/types-flow";
-import { BankContractForm, BankStepForm, DateForm, DeliveryForm, DocumentForm, RouteForm, ShipmentForm } from "./flow-forms";
+import { BankContractForm, BankStepForm, DateForm, DeliveryForm, DocumentForm, RouteForm, ShipmentForm, type RouteTermsValue } from "./flow-forms";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** checklistAction bound to the order: (change, item id or automatic key, …). */
@@ -36,7 +36,7 @@ export type AutoTool =
       save: string;
       hint?: string;
     }
-  | { kind: "route"; label: string; action: Action; route: PaymentRoute | null; bankRoutes: boolean }
+  | { kind: "route"; label: string; action: Action; route: PaymentRoute | null; bankRoutes: boolean; terms?: RouteTermsValue }
   | { kind: "contract"; label: string; action: Action; contract: BankContract | null; lc: boolean; currency: string }
   | { kind: "shipment"; label: string; action: Action; shipment?: ShipmentView; defaults?: Partial<ShipmentView>; today: string }
   | {
@@ -387,7 +387,7 @@ function AutoForm({ tool, onDone }: { tool: AutoTool; onDone: () => void }) {
         />
       );
     case "route":
-      return <RouteForm action={tool.action} route={tool.route} bankRoutes={tool.bankRoutes} onDone={onDone} />;
+      return <RouteForm action={tool.action} route={tool.route} bankRoutes={tool.bankRoutes} terms={tool.terms} onDone={onDone} />;
     case "contract":
       return <BankContractForm action={tool.action} contract={tool.contract} lc={tool.lc} currency={tool.currency} onDone={onDone} />;
     case "shipment":

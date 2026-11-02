@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
 import { fromMinor, orderProfit, roundHalfAway, settle, type Minor } from "@kebo/money";
-import { can, LOST_REASON_LABEL, planStatus, type InquiryChannel, type InquiryStage, type LostReason } from "@kebo/shared";
+import { can, LOST_REASON_LABEL, PAYMENT_ROUTE_SHORT, planStatus, planWhen, type BalanceWhen, type InquiryChannel, type InquiryStage, type LcTerms, type LostReason } from "@kebo/shared";
 import { addDays, daysBetween, DomainError, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
@@ -811,10 +811,14 @@ export class InsightsService {
         total: true,
         stage: true,
         status: true,
+        paymentRoute: true,
+        balanceWhen: true,
+        lcTerms: true,
+        lcDays: true,
         customer: { select: { id: true, name: true } },
         inquiry: { select: { assignee: { select: { id: true, name: true } } } },
         payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, currency: true, paidOn: true } },
-        planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true } },
+        planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true, dueRule: true, dueDays: true } },
       },
     });
     const rows = orders
@@ -827,12 +831,21 @@ export class InsightsService {
         );
         if (settled.outstandingMinor <= 0) return null;
         const plan = planStatus(
-          o.planItems.map((p) => ({ id: p.id, label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })),
+          o.planItems.map((p) => ({
+            id: p.id,
+            label: p.label,
+            amountMinor: decimalToMinor(p.amount),
+            dueOn: fromDbDateOrNull(p.dueOn),
+            part: p.part,
+            dueRule: p.dueRule,
+            dueDays: p.dueDays,
+          })),
           settled.settledMinor,
           today,
           7,
         );
         const next = plan.find((p) => p.openMinor > 0) ?? null;
+        const terms = { route: o.paymentRoute, balanceWhen: o.balanceWhen as BalanceWhen | null, lcTerms: o.lcTerms as LcTerms | null, lcDays: o.lcDays };
         const late = plan.filter((p) => p.status === "late");
         const lastPaid =
           o.payments
@@ -852,7 +865,16 @@ export class InsightsService {
           due: fromMinor(settled.outstandingMinor),
           overdue: fromMinor(late.reduce((t, p) => t + p.openMinor, 0)),
           daysLate: late.length && late[0]!.dueOn ? daysBetween(late[0]!.dueOn, today) : 0,
-          next: next && { label: next.label, open: fromMinor(next.openMinor), dueOn: next.dueOn, status: next.status },
+          next: next && {
+            label: next.label,
+            open: fromMinor(next.openMinor),
+            dueOn: next.dueOn,
+            status: next.status,
+            /** When an undated part falls due ("90 days after the papers"). */
+            when: next.dueOn ? null : planWhen(next, terms) || null,
+          },
+          /** How it comes: the route ("LC", "Informal", "Bank contract"). */
+          how: o.paymentRoute ? PAYMENT_ROUTE_SHORT[o.paymentRoute] : null,
           lastPaid,
         };
       })
@@ -865,9 +887,36 @@ export class InsightsService {
       t.overdue += Math.round(Number(r.overdue) * 100);
       totals.set(r.currency, t);
     }
+    // Money we hold for customers (their credit): shown as a minus against what they owe.
+    const credits = await this.prisma.db.customerCredit.findMany({ where: { voidedAt: null }, select: { customerId: true, kind: true, amount: true, currency: true } });
+    const byCustomer = new Map<string, Record<string, number>>();
+    for (const c of credits) {
+      const b = byCustomer.get(c.customerId) ?? {};
+      const sign = c.kind === "in" ? 1 : c.kind === "used" || c.kind === "refund" ? -1 : 0;
+      b[c.currency] = (b[c.currency] ?? 0) + sign * decimalToMinor(c.amount);
+      byCustomer.set(c.customerId, b);
+    }
+    const held = new Map<string, { minor: number; customers: number }>();
+    for (const b of byCustomer.values())
+      for (const [currency, minor] of Object.entries(b)) {
+        if (minor <= 0) continue;
+        const h = held.get(currency) ?? { minor: 0, customers: 0 };
+        h.minor += minor;
+        h.customers += 1;
+        held.set(currency, h);
+      }
     return {
       rows,
-      totals: [...totals.entries()].map(([currency, t]) => ({ currency, due: fromMinor(t.due), overdue: fromMinor(t.overdue) })),
+      totals: [...totals.entries()].map(([currency, t]) => ({
+        currency,
+        due: fromMinor(t.due),
+        overdue: fromMinor(t.overdue),
+        /** What they owe less the credit we hold for them. */
+        credit: fromMinor(held.get(currency)?.minor ?? 0),
+        net: fromMinor(t.due - (held.get(currency)?.minor ?? 0)),
+      })),
+      /** Held for customers (their credit), per currency. */
+      held: [...held.entries()].map(([currency, h]) => ({ currency, amount: fromMinor(h.minor), customers: h.customers })),
     };
   }
 }

@@ -1,4 +1,4 @@
-import type { BasisStep, ExpenseCategory, InquiryStage, LostReason, PaymentKind, PaymentMethod, InstalmentStatus } from "@kebo/shared";
+import type { BasisStep, CreditKind, ExpenseCategory, FactoryDueRule, FactoryPlanStatus, InquiryStage, LostReason, PaymentKind, PaymentMethod, PaymentRoute, InstalmentStatus } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** A file kept with a record (an expense's receipt, a payment's bank slip). */
@@ -16,10 +16,25 @@ export interface OrderMoney {
   total: string;
   /** The balance terms, e.g. "Balance before shipment". */
   terms: string;
+  /** How the customer pays, from the route. */
+  route: { route: PaymentRoute | null; summary: string | null };
   received: string;
   due: string;
   plan: {
-    items: { id: string; label: string; amount: string; dueOn: string | null; paid: string; open: string; status: InstalmentStatus }[];
+    items: {
+      id: string;
+      label: string;
+      amount: string;
+      dueOn: string | null;
+      paid: string;
+      open: string;
+      status: InstalmentStatus;
+      part: string | null;
+      /** "T/T", "LC, deferred 90 days". */
+      how: string;
+      /** When an undated part falls due ("90 days after the papers"). */
+      when: string | null;
+    }[];
     matchesTotal: boolean;
     difference: string;
     next: { label: string; open: string; dueOn: string | null; status: InstalmentStatus } | null;
@@ -29,6 +44,9 @@ export interface OrderMoney {
     rows: FactoryOwed[];
     payments: FactoryPaymentView[];
     canRecord: boolean;
+    /** Each factory's payment plan with what is paid on each part. */
+    plans: FactoryPlanView[];
+    canPlan: boolean;
   } | null;
   expenses: ExpenseView[] | null;
   /** Spent on the deal before it became this order (managers). */
@@ -153,7 +171,15 @@ export interface Payable {
   owed: string;
   paid: string;
   toPay: string;
-  orders: { id: string; refNo: string; stage: string; customer: string; toPay: string }[];
+  orders: {
+    id: string;
+    refNo: string;
+    stage: string;
+    customer: string;
+    toPay: string;
+    /** The next part of the factory's payment plan and when it is due. */
+    next?: { label: string; due: string | null; open: string; status: string } | null;
+  }[];
 }
 
 interface EarnedMonth {
@@ -272,7 +298,7 @@ export interface CustomerAccount {
 export interface CashRow {
   key: string;
   id: string;
-  kind: "in" | "factory" | "expense" | "transfer_out" | "transfer_in";
+  kind: "in" | "factory" | "expense" | "transfer_out" | "transfer_in" | "refund";
   on: string;
   /** Signed: in positive, out negative. */
   amount: string;
@@ -380,7 +406,11 @@ export interface CustomerPayments {
     depositDue: string;
     payStatus: "unpaid" | "partly_paid" | "deposit_paid" | "paid" | "overpaid";
     lastPaidOn: string | null;
+    /** The next unpaid instalment (a transfer pays the oldest due first). */
+    next: { label: string; dueOn: string | null; open: string } | null;
   }[];
+  /** The money we hold for the customer. */
+  credit: CustomerCreditView;
   payments: {
     id: string;
     order: { id: string; refNo: string };
@@ -391,7 +421,53 @@ export interface CustomerPayments {
     paidOn: string;
     method: PaymentMethod;
     reference: string | null;
+    receivedAmount: string;
+    receivedCurrency: string;
+    receiptId: string | null;
     voided: boolean;
     hasFile: boolean;
   }[];
+}
+
+export interface FactoryPlanView {
+  factory: { id: string; name: string };
+  currency: string;
+  owed: string;
+  /** Saved for this order (false: the company's default until saved). */
+  saved: boolean;
+  /** The plan does not add up to what we owe (prices changed since). */
+  differs: string | null;
+  paid: string;
+  toPay: string;
+  rows: {
+    label: string;
+    percent: number | null;
+    amount: string;
+    dueRule: FactoryDueRule;
+    dueOn: string | null;
+    due: string | null;
+    paid: string;
+    open: string;
+    status: FactoryPlanStatus;
+    inDays: number | null;
+  }[];
+  next: { label: string; due: string | null; open: string; status: FactoryPlanStatus } | null;
+}
+
+/** The customer's credit (GET /customers/:id/credit, and in the customer's payments). */
+export interface CustomerCreditView {
+  balances: { currency: string; amount: string }[];
+  entries: {
+    id: string;
+    kind: CreditKind;
+    amount: string;
+    currency: string;
+    on: string;
+    note: string | null;
+    order: { id: string; refNo: string } | null;
+    account: { id: string; name: string } | null;
+    receipt: { id: string; received: string; method: string; paidOn: string } | null;
+    voided: { at: string; reason: string | null } | null;
+  }[];
+  canRecord: boolean;
 }

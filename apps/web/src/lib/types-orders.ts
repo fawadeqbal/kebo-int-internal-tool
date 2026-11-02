@@ -78,7 +78,13 @@ export interface OrderView {
     at: string;
   }[];
   /** Null `at` on orders cancelled before the date was kept (migrated data). */
-  cancelled: { at: string | null; reason: string | null } | null;
+  cancelled: {
+    at: string | null;
+    reason: string | null;
+    /** What happened to the money: credit | refund | fee; to the factory's: refund_due | loss. */
+    customerMoney?: string | null;
+    factoryMoney?: string | null;
+  } | null;
   lines: OrderLineView[];
   goods: OrderGoodsView;
   documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
@@ -145,12 +151,21 @@ export interface PaymentsView {
   due: string;
   depositDue: string;
   status: PaymentStatus;
+  /** The customer's credit in the order's currency, and whether it can pay this order now. */
+  credit: { amount: string; canUse: boolean };
   payments: {
     id: string;
     kind: PaymentKind;
     amount: string;
     bankCharges: string;
     currency: string;
+    /** What really arrived, in its currency, and the rate (units per one of the order's currency). */
+    receivedAmount: string;
+    receivedCurrency: string;
+    rate: number;
+    paidByName: string | null;
+    /** Part of one transfer over several orders (and credit). */
+    receiptId: string | null;
     paidOn: string;
     method: PaymentMethod;
     reference: string | null;

@@ -114,6 +114,7 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: "Cash",
   cheque: "Cheque",
   online: "Online payment",
+  credit: "From the customer's credit",
   other: "Other",
 };
 

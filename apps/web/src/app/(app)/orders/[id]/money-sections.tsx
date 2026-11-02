@@ -53,7 +53,8 @@ export function PaymentsReceived({
             { label: "Date", width: "w-28" },
             { label: "For" },
             { label: "Method · reference", hideBelow: "md" },
-            { label: "Amount", align: "right" },
+            { label: "Amount", align: "right", hideBelow: "sm" },
+            { label: "Counts as", align: "right" },
             { label: "Bank charges", align: "right", hideBelow: "sm" },
             { label: "Bank slip", hideBelow: "sm", width: "w-20" },
           ]}
@@ -71,6 +72,10 @@ export function PaymentsReceived({
               <span key="m" className="text-text-2">
                 {PAYMENT_METHOD_LABEL[x.method]}
                 {x.reference && ` · ${x.reference}`}
+                {x.paidByName && <span className="block text-xs text-muted">paid by {x.paidByName}</span>}
+              </span>,
+              <span key="r" className="whitespace-nowrap text-text-2">
+                {money(x.receivedAmount ?? x.amount, x.receivedCurrency ?? x.currency)}
               </span>,
               <span key="a" className="font-semibold whitespace-nowrap">
                 {money(x.amount, x.currency)}
@@ -87,7 +92,21 @@ export function PaymentsReceived({
               ),
             ],
             fields: [
-              { label: "Amount received", value: <span className="tabular">{money(x.amount, x.currency)}</span> },
+              { label: "Amount received", value: <span className="tabular">{money(x.receivedAmount ?? x.amount, x.receivedCurrency ?? x.currency)}</span> },
+              ...(x.receivedCurrency && x.receivedCurrency !== x.currency
+                ? [
+                    {
+                      label: "Rate",
+                      value: (
+                        <span className="tabular">
+                          1 {x.currency} = {x.rate} {x.receivedCurrency} · {money(x.amount, x.currency)} off the order
+                        </span>
+                      ),
+                    },
+                  ]
+                : []),
+              ...(x.paidByName ? [{ label: "Paid by", value: x.paidByName }] : []),
+              ...(x.receiptId ? [{ label: "One transfer", value: "Paid several orders (and maybe credit): changed or removed on the customer's page" }] : []),
               {
                 label: "Bank charges",
                 value: Number(x.bankCharges) > 0 ? <span className="tabular">{money(x.bankCharges, x.currency)}</span> : "None",
@@ -136,7 +155,7 @@ export function PaymentsReceived({
                 : []),
             ],
             actions:
-              (canManage || canPay) && !x.voided ? (
+              (canManage || canPay) && !x.voided && !x.receiptId ? (
                 <>
                   {canPay && (
                     <EditCustomerPayment action={editPaymentAction.bind(null, o.id, x.id, c)} payment={x} currency={c} today={now} />
@@ -151,6 +170,7 @@ export function PaymentsReceived({
             const charges = kept.reduce((t, x) => t + Number(x.bankCharges), 0);
             return [
               "Total",
+              "",
               "",
               "",
               <span key="a" className="whitespace-nowrap">

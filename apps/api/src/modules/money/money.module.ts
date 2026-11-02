@@ -29,6 +29,8 @@ import {
   type MoneyAccountInput,
   type TransferInput,
   factoryPaymentInput,
+  factoryPlanInput,
+  type FactoryPlanInput,
   paymentPlanInput,
   voidInput,
   type ExpenseInput,
@@ -37,7 +39,7 @@ import {
 } from "@kebo/shared";
 import { isISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
+import { CurrentUser, RequireFeature, RequirePermissions } from "../../common/auth/decorators";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
@@ -170,6 +172,13 @@ class MoneyController {
   @Put("orders/:id/payment-plan")
   plan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentPlanInput)) body: PaymentPlanInput) {
     return this.money.setPlan(user, id, body);
+  }
+
+  /** { factoryId, items: [{ label, percent?, amount, dueRule: on_order | on_ready | fixed, dueOn? }] } — they add up to what we owe it. */
+  @Put("orders/:id/factory-plan")
+  @RequirePermissions("sourcing.manage")
+  factoryPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPlanInput)) body: FactoryPlanInput) {
+    return this.money.setFactoryPlan(user, id, body);
   }
 
   @Post("orders/:id/factory-payments")

@@ -36,6 +36,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess } from "../orders/orders.service";
 import { MoneyService } from "../money/money.service";
+import { SettingsService } from "../settings/settings.service";
 import { checklistFactsOf, checklistOrderInclude } from "./checklist-facts";
 
 /** The settings row that keeps the company's list choices: { hidden: auto keys, saved: the company made its own list }. */
@@ -111,6 +112,7 @@ export class ChecklistService {
     private readonly clock: Clock,
     private readonly limits: LimitsService,
     private readonly money: MoneyService,
+    private readonly settings: SettingsService,
   ) {}
 
   /* ---------------------------------------------------------------- the company's choices */
@@ -177,7 +179,16 @@ export class ChecklistService {
     if (!can(user, "sourcing.manage")) return null;
     const m = await this.money.forOrder(user, orderId);
     return m.factories
-      ? m.factories.rows.map((r) => ({ name: r.factory.name, currency: r.currency, owed: r.owed, paid: r.paid, toPay: r.toPay }))
+      ? m.factories.rows.map((r) => ({
+          name: r.factory.name,
+          currency: r.currency,
+          owed: r.owed,
+          paid: r.paid,
+          toPay: r.toPay,
+          plan: m.factories!.plans
+            .find((p) => p.factory.id === r.factory.id && p.currency === r.currency)
+            ?.rows.map((x) => ({ label: x.label, dueRule: x.dueRule, due: x.due, open: x.open, status: x.status })),
+        }))
       : null;
   }
 
@@ -203,7 +214,7 @@ export class ChecklistService {
     ]);
     const tz = this.clock.timeZone;
     const today = this.clock.today();
-    const facts = checklistFactsOf(o, factories, tz);
+    const facts = checklistFactsOf(o, factories, tz, (await this.settings.get()).reminders.lcCourierDays);
     const steps = orderSteps(features);
     const overrides = new Map(rows.filter((r) => r.key).map((r) => [r.key!, r]));
     const late = (done: boolean, skipped: boolean, due: ISODate | null) => !done && !skipped && !!due && due < today;
@@ -211,7 +222,7 @@ export class ChecklistService {
     const autoView = (a: AutoItem): ChecklistItemView => {
       const r = overrides.get(a.key);
       const skipped = !a.done && !!r?.skippedAt;
-      const dueOn = fromDbDateOrNull(r?.dueOn);
+      const dueOn = fromDbDateOrNull(r?.dueOn) ?? a.due ?? null;
       return {
         id: r?.id ?? null,
         key: a.key,
@@ -229,7 +240,7 @@ export class ChecklistService {
         skipped,
         skipReason: skipped ? (r?.skipReason ?? null) : null,
         dueOn,
-        late: late(a.done, skipped, dueOn),
+        late: late(a.done, skipped, dueOn) || (!a.done && !skipped && !!a.warn),
         assignee: r?.assignee ?? null,
         note: r?.note ?? null,
         file: null,

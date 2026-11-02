@@ -29,7 +29,11 @@ export async function editPaymentAction(
   const v = formValues(form);
   const body = {
     kind: v.kind,
-    amount: v.amount,
+    amount: v.amount ?? v.receivedAmount,
+    receivedAmount: v.receivedAmount ?? v.amount,
+    receivedCurrency: v.receivedCurrency || currency,
+    rate: v.receivedCurrency && v.receivedCurrency !== currency ? v.rate || null : null,
+    paidByName: v.paidByName?.trim() || null,
     bankCharges: v.bankCharges || "0",
     currency,
     paidOn: v.paidOn,
@@ -257,5 +261,12 @@ export async function saveTargetRowAction(month: string, before: Record<string, 
     revalidatePath("/insights");
     revalidatePath("/dashboard");
   }
+  return r;
+}
+
+/** The factory's payment plan on an order (people who see factory money): its parts as JSON `payload`. */
+export async function factoryPlanAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.put(`/orders/${orderId}/factory-plan`, formBody(form)), "Plan saved.");
+  if (r.ok) refresh(orderId);
   return r;
 }

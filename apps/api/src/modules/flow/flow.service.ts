@@ -11,7 +11,11 @@ import {
   flowSteps,
   ORDER_DOCUMENT_LABEL,
   PAYMENT_ROUTE_SHORT,
+  balanceTermsOf,
+  balanceWhenOf,
+  lcChecksLine,
   requiredDocuments,
+  routeSummary,
   type BankContractInput,
   type BankStepInput,
   type BankStepKind,
@@ -46,6 +50,9 @@ import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess, OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
+import { SettingsService } from "../settings/settings.service";
+import { datePapers, lcChecksOf, rebuildRoutePlan, termsOf } from "../money/route-plan";
+import { seedFactoryPlans } from "../money/factory-plan";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
@@ -165,6 +172,7 @@ export class FlowService {
     private readonly clock: Clock,
     private readonly limits: LimitsService,
     private readonly orders: OrdersService,
+    private readonly settings: SettingsService,
   ) {}
 
   /* ---------------------------------------------------------------- guards */
@@ -213,6 +221,7 @@ export class FlowService {
       include: {
         payments: { where: { voidedAt: null } },
         bankContract: true,
+        planItems: { select: { amount: true, dueRule: true } },
         checklist: {
           where: productionWhere,
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -250,6 +259,8 @@ export class FlowService {
         courier: s?.courier ?? null,
         reference: s?.reference ?? null,
         note: s?.note ?? null,
+        /** "Money reached us": the payment that recorded it (the step is ticked by recording it). */
+        paymentId: s?.paymentId ?? null,
       };
     });
 
@@ -286,6 +297,8 @@ export class FlowService {
 
     const factories = [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
     const b = o.bankContract;
+    const terms = termsOf(o);
+    const checks = has("bank_contracts") ? lcChecksOf(o, (await this.settings.get()).reminders.lcCourierDays) : null;
     return {
       orderId: o.id,
       refNo: o.refNo,
@@ -300,6 +313,15 @@ export class FlowService {
       payment: {
         route,
         routeLabel: route ? PAYMENT_ROUTE_SHORT[route] : null,
+        /** The route's terms: informal balance before shipment or against the B/L copy; LC at sight or deferred N days. */
+        balanceWhen: terms.balanceWhen,
+        lcTerms: terms.lcTerms,
+        lcDays: terms.lcDays,
+        /** "LC, deferred 90 days". */
+        summary: routeSummary(terms),
+        /** The LC against the order (LC orders only): { key, label, ok (null: not known yet), detail }. */
+        lcChecks: checks,
+        lcChecksLine: checks ? lcChecksLine(checks) : null,
         depositIn,
         bankContract:
           has("bank_contracts") && b
@@ -461,21 +483,39 @@ export class FlowService {
 
   /* ---------------------------------------------------------------- payment route, bank contract, factory order */
 
+  /**
+   * The route and its terms build the plan: changing them rebuilds the
+   * instalments not paid yet (payments stay) and the balance terms on the papers.
+   */
   async setRoute(user: SessionUser, id: string, input: PaymentRouteInput) {
     await this.must(user, "orders.update", null, "change orders");
     if (input.route && input.route !== "informal") await this.limits.require("bank_contracts");
+    const { reminders } = await this.settings.get();
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      if (o.paymentRoute === input.route) return;
-      await tx.order.update({ where: { id }, data: { paymentRoute: input.route } });
+      const was = termsOf(o);
+      const lc = input.route === "letter_of_credit";
+      const t = {
+        route: input.route,
+        balanceWhen: input.balanceWhen ?? was.balanceWhen ?? (input.route === "informal" ? (balanceWhenOf(o.balanceTerms) ?? "before_shipment") : null),
+        lcTerms: lc ? (input.lcTerms ?? was.lcTerms ?? "at_sight") : (input.lcTerms ?? was.lcTerms),
+        lcDays: input.lcDays ?? was.lcDays,
+      };
+      if (lc && t.lcTerms === "deferred" && !t.lcDays) throw new DomainError("Say after how many days the deferred LC pays (counted from the day the papers reach their bank).");
+      if (was.route === t.route && was.balanceWhen === t.balanceWhen && was.lcTerms === t.lcTerms && was.lcDays === t.lcDays) return;
+      await tx.order.update({
+        where: { id },
+        data: { paymentRoute: t.route, balanceWhen: t.balanceWhen, lcTerms: t.lcTerms, lcDays: t.lcDays, balanceTerms: balanceTermsOf(t, o.balanceTerms) },
+      });
+      const plan = await rebuildRoutePlan(tx, o, t, reminders);
       await this.log(
         tx,
         user,
         id,
         "route",
-        `${o.refNo}: payment route ${input.route ? PAYMENT_ROUTE_SHORT[input.route] : "cleared"}`,
-        { route: o.paymentRoute },
-        { route: input.route },
+        `${o.refNo}: payment route ${t.route ? (routeSummary(t) ?? PAYMENT_ROUTE_SHORT[t.route]) : "cleared"}${plan.was !== plan.now ? " · plan rebuilt" : ""}`,
+        { route: o.paymentRoute, terms: routeSummary(was), plan: plan.was },
+        { route: t.route, terms: routeSummary(t), plan: plan.now },
       );
     });
     return this.get(user, id);
@@ -524,6 +564,8 @@ export class FlowService {
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       await tx.order.update({ where: { id }, data: { factoryOrderedOn: toDbDateOrNull(input.factoryOrderedOn) } });
+      // Ordered: each factory gets the payment plan (advance when we order, balance on the ready date).
+      if (input.factoryOrderedOn) await seedFactoryPlans(tx, id, (await this.settings.get()).sales.factoryAdvancePercent);
       await this.log(
         tx,
         user,
@@ -831,10 +873,13 @@ export class FlowService {
   async setBankStep(user: SessionUser, id: string, step: BankStepKind, input: BankStepInput) {
     await this.must(user, "documents.manage", "bank_documents", "manage the documents");
     if (input.doneOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
+    // The last step is the payment itself: one entry, not two.
+    if (step === "bank_paid_us") throw new DomainError("Record the payment for “Money reached us”: recording it ticks the step.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       if (!bankStepsFor(o.paymentRoute).includes(step)) throw new DomainError("That step is not part of this order's payment route.");
       const data = { doneOn: toDbDate(input.doneOn), courier: input.courier, reference: input.reference, note: input.note };
+      if (step === "customer_bank_received") await datePapers(tx, id, input.doneOn);
       await tx.orderBankStep.upsert({
         where: { orderId_step: { orderId: id, step } },
         create: { orderId: id, step, ...data },
@@ -857,6 +902,9 @@ export class FlowService {
     await this.must(user, "documents.manage", "bank_documents", "manage the documents");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
+      const row = await tx.orderBankStep.findFirst({ where: { orderId: id, step } });
+      if (row?.paymentId) throw new DomainError("This step was ticked by a payment. Remove the payment to undo it.");
+      if (step === "customer_bank_received") await datePapers(tx, id, null);
       const n = await tx.orderBankStep.deleteMany({ where: { orderId: id, step } });
       if (n.count) await this.log(tx, user, id, "bank_step", `${o.refNo}: ${BANK_STEP_LABEL[step]} undone`, { step }, undefined);
     });

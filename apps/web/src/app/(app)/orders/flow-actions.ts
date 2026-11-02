@@ -31,7 +31,14 @@ const pick = (form: FormData, keys: string[]) => {
 /* ---------------------------------------------------------------- payment route, bank contract, factory order */
 
 export async function routeAction(orderId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.patch(`/orders/${orderId}/route`, { route: formValues(form).route || null }), "Payment route saved.");
+  const v = formValues(form);
+  const body = {
+    route: v.route || null,
+    ...(v.balanceWhen ? { balanceWhen: v.balanceWhen } : {}),
+    ...(v.lcTerms ? { lcTerms: v.lcTerms } : {}),
+    ...(v.lcDays ? { lcDays: v.lcDays } : {}),
+  };
+  return run(orderId, form, () => api.patch(`/orders/${orderId}/route`, body), "Payment route saved. The plan follows it.");
 }
 
 const CONTRACT = ["number", "status", "customerBank", "ourBank", "amount", "currency", "openedOn", "latestShipOn", "expiresOn", "note"];

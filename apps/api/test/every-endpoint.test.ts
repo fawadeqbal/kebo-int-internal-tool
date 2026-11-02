@@ -32,7 +32,7 @@ describe("every read endpoint answers for every record", () => {
 
   it("lists and pages", async () => {
     for (const who of [manager, staff]) {
-      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true"]) await ok(who, path);
+      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true", "/money/payables"]) await ok(who, path);
     }
     for (const path of ["/reports", "/audit", "/users", "/settings", "/settings/checklist"]) await ok(admin, path);
   });
@@ -50,8 +50,17 @@ describe("every read endpoint answers for every record", () => {
   });
 
   it("every customer and factory", async () => {
-    for (const c of (await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]) await ok(manager, `/customers/${c.id}`);
+    for (const c of (await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]) {
+      await ok(manager, `/customers/${c.id}`);
+      await ok(manager, `/customers/${c.id}/credit`);
+      await ok(manager, `/payments?customerId=${c.id}`);
+    }
     for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) await ok(manager, `/factories/${f.id}`);
+  });
+
+  it("an order's money (plan, factory plans, credit) for the latest orders", async () => {
+    const orders = [...(await ok(manager, "/orders")), ...(await ok(manager, "/orders?status=cancelled"))] as { id: string }[];
+    for (const o of orders.slice(0, 25)) await ok(manager, `/orders/${o.id}/money`);
   });
 
   it("every order, its payments and its documents", async () => {

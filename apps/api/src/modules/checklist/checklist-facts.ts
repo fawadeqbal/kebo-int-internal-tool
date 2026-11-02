@@ -1,6 +1,7 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, settle, splitDeposit } from "@kebo/money";
 import type { ChecklistFacts } from "@kebo/shared";
+import { lcChecksOf } from "../money/route-plan";
 import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
@@ -11,6 +12,7 @@ export const checklistOrderInclude = {
     select: { currency: true, amount: true, bankCharges: true, paidOn: true },
   },
   bankContract: true,
+  planItems: { select: { amount: true, dueRule: true } },
   shipments: { orderBy: { createdAt: "asc" } },
   documents: { select: { kind: true, status: true, number: true, issuedOn: true } },
   bankSteps: true,
@@ -35,7 +37,7 @@ function reachedOn(payments: ChecklistOrderRow["payments"], currency: string, ta
  * The checklist's facts for one order. `factories` comes from the order's money
  * (null when the person may not see factory money).
  */
-export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string): ChecklistFacts {
+export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, lcCourierDays = 4): ChecklistFacts {
   const totalMinor = decimalToMinor(o.total);
   const percent = Number(o.depositPercent);
   const position = settle(
@@ -72,6 +74,7 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
     paidInFullOn: position.outstandingMinor === 0 ? reachedOn(o.payments, o.currency, totalMinor) : null,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
     factories,
+    lcChecks: lcChecksOf(o, lcCourierDays),
     readyOn: fromDbDateOrNull(o.readyOn),
     goods: { lines: goods.length, received },
     packedAt: o.packedAt ? dateIn(o.packedAt, timeZone) : null,

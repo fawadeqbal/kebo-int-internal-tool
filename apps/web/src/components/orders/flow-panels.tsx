@@ -22,6 +22,8 @@ import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { BankContract, BankStepView, ClaimView, DeliveryView, FlowDocument, SatCheckView, ShipmentView } from "@/lib/types-flow";
+import type { LcCheck } from "@kebo/shared";
+import { LcChecks } from "@/components/money/money-v2";
 import {
   BankContractForm,
   BankStepForm,
@@ -32,6 +34,7 @@ import {
   DocumentForm,
   RemoveButton,
   RouteForm,
+  type RouteTermsValue,
   SatEditor,
   SatSignOffForm,
   ShipmentForm,
@@ -73,6 +76,9 @@ export function RoutePanel({
   bankRoutes,
   currency,
   canEdit,
+  terms,
+  summary,
+  lcChecks,
 }: {
   routeAction: Action;
   contractAction: Action;
@@ -81,6 +87,12 @@ export function RoutePanel({
   bankRoutes: boolean;
   currency: string;
   canEdit: boolean;
+  /** The route's terms (money v2): the plan is built from them. */
+  terms?: RouteTermsValue;
+  /** "LC, deferred 90 days". */
+  summary?: string | null;
+  /** The LC checked against the order. */
+  lcChecks?: LcCheck[] | null;
 }) {
   const [editRoute, setEditRoute] = useState(false);
   const [editContract, setEditContract] = useState(false);
@@ -90,7 +102,7 @@ export function RoutePanel({
     return canEdit ? (
       <div className="flex flex-col gap-2">
         {!route && <p className="text-sm text-text-2">Choose once per order: it decides the papers and the bank steps after shipping.</p>}
-        <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} onDone={route ? () => setEditRoute(false) : undefined} />
+        <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} onDone={route ? () => setEditRoute(false) : undefined} />
       </div>
     ) : (
       <p className="text-sm text-muted">Not chosen yet.</p>
@@ -99,6 +111,7 @@ export function RoutePanel({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">{PAYMENT_ROUTE_LABEL[route]}</span>
+        {summary && <span className="text-sm text-text-2">· {summary.replace(/^(Informal|LC|Bank contract),?\s*/, "")}</span>}
         {canEdit && (
           <Button size="xs" variant="ghost" onClick={() => setEditRoute(true)}>
             <Pencil aria-hidden /> Change
@@ -125,6 +138,12 @@ export function RoutePanel({
               ]}
             />
             {contract.note && <p className="text-sm text-text-2">{contract.note}</p>}
+            {lc && lcChecks && (
+              <div className="flex flex-col gap-1 border-t border-line pt-2">
+                <p className="text-sm font-semibold">The LC against the order</p>
+                <LcChecks checks={lcChecks} />
+              </div>
+            )}
           </div>
         ) : canEdit ? (
           <div>
@@ -363,12 +382,15 @@ export function BankChainPanel({
   steps,
   today,
   canEdit,
+  reached,
 }: {
   stepActions: Record<string, Action>;
   clearActions: Record<string, Action>;
   steps: BankStepView[];
   today: string;
   canEdit: boolean;
+  /** "Money reached us" is the payment itself: its form (recording it ticks the step), for people who record payments. */
+  reached?: ReactNode;
 }) {
   const [open, setOpen] = useState<BankStepKind | null>(null);
   const st = states(steps, (s) => !!s.doneOn);
@@ -380,12 +402,17 @@ export function BankChainPanel({
         title: s.label,
         sub: (
           <>
-            {[s.doneOn ? day(s.doneOn) : null, s.courier, s.reference, s.note].filter(Boolean).join(" · ")}
+            {[s.doneOn ? day(s.doneOn) : null, s.courier, s.reference, s.note, s.step === "bank_paid_us" && !s.doneOn ? "records the payment" : null].filter(Boolean).join(" · ")}
             {open === s.step && <BankStepForm action={stepActions[s.step]!} step={s} today={today} onDone={() => setOpen(null)} />}
+            {s.step === "bank_paid_us" && !s.doneOn && reached && <div className="mt-2">{reached}</div>}
           </>
         ),
         state: st[i]!,
-        side: canEdit ? (
+        side: s.step === "bank_paid_us" && (s.paymentId || !s.doneOn) ? (
+          s.doneOn ? (
+            <span className="text-xs text-muted tabular">{short(s.doneOn)}</span>
+          ) : null
+        ) : canEdit ? (
           s.doneOn ? (
             <ActionForm action={clearActions[s.step]!} showSuccess={false}>
               <ConfirmSubmit size="xs" variant="ghost" pendingText="…" message={`Undo "${s.label}"?`}>

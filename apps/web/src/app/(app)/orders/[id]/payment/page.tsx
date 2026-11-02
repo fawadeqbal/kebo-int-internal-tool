@@ -9,10 +9,10 @@ import { RoutePanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
 import { NewExpense, PaymentPlan } from "@/components/money/forms";
+import { PlanLines, ReceivedForm, UseCredit } from "@/components/money/money-v2";
 import { expenseAction, savePlanAction } from "../../../money/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
-import { paymentAction } from "../../actions";
-import { PaymentForm } from "../forms";
+import { paymentAction, useCreditAction } from "../../actions";
 import { ProfitView } from "../money-cards";
 import { CustomerSummary, MoneySection, PaymentsReceived } from "../money-sections";
 import { stepData } from "../step-data";
@@ -41,15 +41,21 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const canRoute = can(me, "orders.update") && d.open && !!flow;
   const route = flow?.payment.route ?? null;
   const lc = route === "letter_of_credit";
+  const terms = flow ? { balanceWhen: flow.payment.balanceWhen, lcTerms: flow.payment.lcTerms, lcDays: flow.payment.lcDays } : undefined;
+  // Money in, in any currency: what arrived, the rate, what it counts as here; the rest is the customer's credit.
   const pay = (label: string, quiet = true) =>
     canPay ? (
-      <PaymentForm
+      <ReceivedForm
         quiet={quiet}
         label={label}
         action={paymentAction.bind(null, o.id, c)}
         currency={c}
+        customer={o.customer.name}
+        refNo={o.refNo}
         depositDue={p.depositDue}
         due={p.due}
+        forWhat={m.plan.next?.label ?? null}
+        fx={fx}
         today={now}
       />
     ) : null;
@@ -62,11 +68,12 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       action: routeAction.bind(null, o.id),
       route,
       bankRoutes: !!flow?.modules.bankContracts,
+      terms,
     };
   if (canRoute && flow?.modules.bankContracts && (route === "bank_contract" || lc))
     tools.contract = {
       kind: "contract",
-      label: lc ? "Add the LC" : "Add the contract",
+      label: flow.payment.bankContract ? (lc ? "Open LC" : "Open contract") : lc ? "Add the LC" : "Add the contract",
       action: bankContractAction.bind(null, o.id),
       contract: flow.payment.bankContract,
       lc,
@@ -92,7 +99,8 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
                 value: `${money(o.money.received, c)}${Number(o.money.total) > 0 ? ` · ${Math.round((Number(o.money.received) / Number(o.money.total)) * 100)}%` : ""}`,
               },
               { label: "Still due", value: money(o.money.due, c) },
-              { label: "Comes through", value: route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : "Not chosen" },
+              { label: "Comes through", value: flow?.payment.summary ?? (route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : "Not chosen") },
+              { label: "Customer credit", value: money(p.credit.amount, c) },
               ...(contract?.number ? [{ label: lc ? "LC" : "Contract", value: contract.number }] : []),
               { label: "Terms", value: termsOf(o) },
             ]}
@@ -117,7 +125,10 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       />
       {flow && (
         <Card id="route">
-          <CardHeader title="How the customer pays" description="It decides the papers and the bank steps after shipping." />
+          <CardHeader
+            title={`How ${o.customer.name} pays for ${o.refNo}`}
+            description="The route decides the plan, the papers and the bank steps. Change it and the plan is rebuilt (payments already recorded stay)."
+          />
           <CardBody>
             <RoutePanel
               routeAction={routeAction.bind(null, o.id)}
@@ -127,18 +138,42 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               bankRoutes={flow.modules.bankContracts}
               currency={c}
               canEdit={canRoute}
+              terms={terms}
+              summary={flow.payment.summary}
+              lcChecks={flow.payment.lcChecks}
             />
           </CardBody>
         </Card>
       )}
+      <Card id="plan">
+        <CardHeader
+          title="The plan"
+          description={m.route.summary ? `Built from the route: ${m.route.summary}.` : "Deposit and balance; choose the route to build the balance part."}
+          actions={
+            <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />
+          }
+        />
+        <CardBody className="flex flex-col gap-2">
+          {!m.plan.matchesTotal && (
+            <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
+              The parts do not add up to the order total ({money(m.plan.difference, c)} {Number(m.plan.difference) > 0 ? "missing" : "too much"}). Change the plan.
+            </p>
+          )}
+          <PlanLines plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} />
+        </CardBody>
+      </Card>
       <MoneySection
         id="customer"
         icon={<ArrowDownLeft aria-hidden />}
-        title="The plan and payments received"
+        title="Payments received"
         sub={`${o.customer.name} pays us · ${termsOf(o)}`}
+        action={
+          canPay && p.credit.canUse ? (
+            <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />
+          ) : undefined
+        }
       >
         <CustomerSummary o={o} />
-        <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} />
         <PaymentsReceived o={o} p={p} me={me} now={now} />
       </MoneySection>
       {m.expenses && (
