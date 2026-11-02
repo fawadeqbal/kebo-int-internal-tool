@@ -3,6 +3,7 @@ import type {
   BankStepKind,
   ClaimStatus,
   DeliveryCondition,
+  LineCondition,
   FactoryRequestStatus,
   OrderDocumentKind,
   OrderDocumentStatus,
@@ -93,6 +94,8 @@ export const BANK_STEP_LABEL: Record<BankStepKind, string> = {
 
 export const DELIVERY_CONDITION_LABEL: Record<DeliveryCondition, string> = { good: "Good", minor_damage: "Minor damage", damaged: "Damaged", partial: "Partly delivered" };
 export const DELIVERY_CONDITION_TONE: Record<DeliveryCondition, Tone> = { good: "ok", minor_damage: "warn", damaged: "bad", partial: "warn" };
+export const LINE_CONDITION_LABEL: Record<LineCondition, string> = { good: "Good", minor_damage: "Minor damage", damaged: "Damaged", missing: "Missing" };
+export const LINE_CONDITION_TONE: Record<LineCondition, Tone> = { good: "ok", minor_damage: "warn", damaged: "bad", missing: "bad" };
 
 export const SAT_RESULT_LABEL: Record<SatResult, string> = { pending: "Not checked", pass: "Pass", fail: "Fail", not_applicable: "N/A" };
 export const SAT_RESULT_TONE: Record<SatResult, Tone> = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" };

@@ -7,7 +7,7 @@ import {
   DEFAULT_CHECKLIST,
   doNow,
   FLOW_STEP_LABEL,
-  flowSteps,
+  stepLine,
   itemClosed,
   orderSteps,
   stepNumber,
@@ -36,7 +36,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess } from "../orders/orders.service";
 import { MoneyService } from "../money/money.service";
-import { checklistFactsOf, checklistOrderInclude, flowFactsOf } from "./checklist-facts";
+import { checklistFactsOf, checklistOrderInclude } from "./checklist-facts";
 
 /** The settings row that keeps the company's list choices: { hidden: auto keys, saved: the company made its own list }. */
 export const CHECKLIST_SETTING = "order_checklist";
@@ -304,7 +304,6 @@ export class ChecklistService {
       byStep.map((s) => ({ key: s.key, items: s.items.map((i) => ({ done: i.done, skipped: i.skipped, late: i.late })) })),
       cancelled,
     );
-    const lines = Object.fromEntries(flowSteps(flowFactsOf(o, facts), null).map((s) => [s.key, s.sub]));
     const stepViews: StepView[] = byStep.map((s, i) => {
       const p = stepProgress(s.items);
       const open = s.items.filter((x) => !itemClosed(x));
@@ -317,7 +316,7 @@ export class ChecklistService {
         stateLabel: STEP_STATE_LABEL[states[i]!],
         done: p.done,
         total: p.total,
-        line: lines[s.key] ?? "",
+        line: stepLine(s.key, facts, s.items, today),
         next: next && { title: next.title, dueOn: next.dueOn, late: next.late },
       };
     });

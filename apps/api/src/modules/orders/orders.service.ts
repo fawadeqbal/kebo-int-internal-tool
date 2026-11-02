@@ -21,9 +21,12 @@ import {
   type OrderDetailsInput,
   type OrderFacts,
   type OrderGoods,
+  type OrderLineInput,
   type OrderStage,
   type PackingInput,
   type ReceiptInput,
+  type LineCondition,
+  LINE_CONDITION_LABEL,
 } from "@kebo/shared";
 import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -35,6 +38,7 @@ import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../money/due";
+import { LimitsService } from "../../common/company/limits.service";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -107,6 +111,69 @@ export function goodsOf(
   };
 }
 
+type LineRow = OrderRow["lines"][number];
+
+/** What a line shows besides the order's own columns: what reached the customer (Delivery & SAT on), the factory's price (people who see factory prices). */
+interface LineShows {
+  delivered: boolean;
+  factoryPrices: boolean;
+}
+
+/** A line of the order as the screens get it: the order's columns, then what each step adds (received, packing, delivered, the factory's price). */
+function lineView(l: LineRow, no: string, show: LineShows) {
+  return {
+    id: l.id,
+    no,
+    type: l.type,
+    description: l.description,
+    model: l.model,
+    quantity: trimQty(l.quantity),
+    unit: l.unit,
+    unitPrice: l.unitPrice.toFixed(2),
+    lineTotal: l.lineTotal.toFixed(2),
+    factory: l.factory ?? null,
+    receivedQty: trimQty(l.receivedQty),
+    receivedOn: fromDbDateOrNull(l.receivedOn),
+    packing: {
+      packages: l.packages,
+      packageType: l.packageType,
+      netWeightKg: l.netWeightKg?.toFixed(2) ?? null,
+      grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null,
+      cbm: l.cbm?.toFixed(3) ?? null,
+    },
+    delivered: show.delivered
+      ? { qty: trimQty(l.deliveredQty), condition: (l.deliveredCondition as LineCondition | null) ?? null, note: l.deliveryNote }
+      : null,
+    factoryPrice:
+      show.factoryPrices && l.factoryUnitPrice !== null
+        ? { unitPrice: l.factoryUnitPrice.toFixed(2), taxRate: l.factoryTaxRate?.toString() ?? "0", currency: l.factoryCurrency }
+        : null,
+  };
+}
+
+/** The goods side of the order: what came in, whether it is packed, the container and the packing totals. */
+function goodsSummary(o: Pick<OrderRow, "lines" | "packedAt" | "containerNo" | "shippingMarks">) {
+  const g = goodsOf(o.lines, o.packedAt);
+  const goodsLines = o.lines.filter((l) => l.type === "goods");
+  const sum = (f: (l: (typeof goodsLines)[number]) => number) => goodsLines.reduce((t, l) => t + f(l), 0);
+  return {
+    lines: g.lines,
+    received: g.received,
+    allReceived: g.lines > 0 && g.received === g.lines,
+    short: g.short,
+    packed: g.packed,
+    packedAt: o.packedAt,
+    containerNo: o.containerNo,
+    shippingMarks: o.shippingMarks,
+    totals: {
+      packages: sum((l) => l.packages ?? 0),
+      netWeightKg: sum((l) => Number(l.netWeightKg ?? 0)).toFixed(2),
+      grossWeightKg: sum((l) => Number(l.grossWeightKg ?? 0)).toFixed(2),
+      cbm: sum((l) => Number(l.cbm ?? 0)).toFixed(3),
+    },
+  };
+}
+
 /**
  * An order is Confirmed → In production → Shipped → Done, moved one button at
  * a time. Nothing blocks a move: a warning (no deposit yet, money still due)
@@ -121,6 +188,7 @@ export class OrdersService {
     private readonly settings: SettingsService,
     private readonly events: EventBus,
     private readonly stages: StagesService,
+    private readonly limits: LimitsService,
   ) {}
 
   /* ---------------------------------------------------------------- creating and cancelling */
@@ -348,7 +416,8 @@ export class OrdersService {
     return to ? { to, label: STAGE_BUTTON[to], stage: ORDER_STAGE_LABEL[to], hint: ORDER_STAGE_HINT[to] } : null;
   }
 
-  private async view(o: OrderRow) {
+  private async view(o: OrderRow, user: SessionUser) {
+    const show = await this.lineShows(user);
     const m = this.moneyOf(o);
     const days = (await this.settings.get()).reminders;
     const history = await this.prisma.db.orderStageChange.findMany({
@@ -388,48 +457,8 @@ export class OrdersService {
         depositDue: fromMinor(m.position.depositOutstandingMinor),
         status: m.position.status,
       },
-      lines: o.lines.map((l, i) => ({
-        id: l.id,
-        no: numbers[i],
-        type: l.type,
-        description: l.description,
-        model: l.model,
-        quantity: trimQty(l.quantity),
-        unit: l.unit,
-        unitPrice: l.unitPrice.toFixed(2),
-        lineTotal: l.lineTotal.toFixed(2),
-        factory: l.factory ?? null,
-        receivedQty: trimQty(l.receivedQty),
-        receivedOn: fromDbDateOrNull(l.receivedOn),
-        packing: {
-          packages: l.packages,
-          packageType: l.packageType,
-          netWeightKg: l.netWeightKg?.toFixed(2) ?? null,
-          grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null,
-          cbm: l.cbm?.toFixed(3) ?? null,
-        },
-      })),
-      goods: (() => {
-        const g = goodsOf(o.lines, o.packedAt);
-        const goodsLines = o.lines.filter((l) => l.type === "goods");
-        const sum = (f: (l: (typeof goodsLines)[number]) => number) => goodsLines.reduce((t, l) => t + f(l), 0);
-        return {
-          lines: g.lines,
-          received: g.received,
-          allReceived: g.lines > 0 && g.received === g.lines,
-          short: g.short,
-          packed: g.packed,
-          packedAt: o.packedAt,
-          containerNo: o.containerNo,
-          shippingMarks: o.shippingMarks,
-          totals: {
-            packages: sum((l) => l.packages ?? 0),
-            netWeightKg: sum((l) => Number(l.netWeightKg ?? 0)).toFixed(2),
-            grossWeightKg: sum((l) => Number(l.grossWeightKg ?? 0)).toFixed(2),
-            cbm: sum((l) => Number(l.cbm ?? 0)).toFixed(3),
-          },
-        };
-      })(),
+      lines: o.lines.map((l, i) => lineView(l, numbers[i]!, show)),
+      goods: goodsSummary(o),
       next: this.nextOf(o),
       back: back ? { to: back, label: `Back to ${ORDER_STAGE_LABEL[back]}` } : null,
       needs: orderNeeds(this.facts(o), this.clock.today(), days),
@@ -460,7 +489,7 @@ export class OrdersService {
 
   async get(user: SessionUser, id: string) {
     const o = await this.load(user, id);
-    return { ...(await this.view(o)), factoryFiles: await this.factoryFilesOf(user, o.id) };
+    return { ...(await this.view(o, user)), factoryFiles: await this.factoryFilesOf(user, o.id) };
   }
 
   /**
@@ -836,6 +865,130 @@ export class OrdersService {
     return this.get(user, id);
   }
 
+  /** What the screens show of the lines for this person and company. */
+  private async lineShows(user: SessionUser): Promise<LineShows> {
+    return { delivered: await this.limits.allows("delivery_sat"), factoryPrices: can(user, "sourcing.manage") };
+  }
+
+  /**
+   * One goods line, changed in a step's line table: what came in from the
+   * factory (Production), its packing (Shipping) or what reached the customer
+   * (Delivery & SAT). Only the fields sent change. Same rules and history as
+   * the whole-list saves (PUT receipt / packing); answers the line and the
+   * order's goods summary.
+   */
+  async editLine(user: SessionUser, lineId: string, input: OrderLineInput) {
+    if (input.set === "delivered") {
+      await this.limits.require("delivery_sat");
+      if (!can(user, "delivery.manage")) throw new ForbiddenError("You cannot manage delivery and SAT.");
+    } else if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    const today = this.clock.today();
+    const orderId = await this.prisma.tx(async (tx) => {
+      // Another company's line, or a line that does not exist, is not found (row-level security).
+      const found = await tx.orderLine.findFirst({ where: { id: lineId }, select: { orderId: true } });
+      if (!found) throw new NotFoundError("Line");
+      const { o, byId } = await this.goodsLinesFor(tx, user, found.orderId, [lineId]);
+      const line = byId.get(lineId)!;
+      const name = line.description.split("\n")[0]!.slice(0, 40);
+      const of = qty(line.quantity);
+      const more = (n: number) =>
+        new DomainError(`${line.description.split("\n")[0]}: ${n} is more than the ${trimQty(line.quantity)} ${line.unit} ordered.`);
+      const record = (action: string, summary: string, oldValues: Record<string, unknown>, newValues: Record<string, unknown>) =>
+        this.audit.record(tx, { userId: user.id, action, entityType: "order", entityId: o.id, summary, oldValues, newValues });
+
+      if (input.set === "received") {
+        const was = { receivedQty: qty(line.receivedQty), receivedOn: fromDbDateOrNull(line.receivedOn) };
+        const got = input.receivedQty ?? was.receivedQty;
+        if (got > of) throw more(got);
+        if (input.receivedOn && input.receivedOn > today) throw new DomainError("The date cannot be in the future.");
+        if (input.receivedOn && got === 0) throw new DomainError("Enter how many came in before the date.");
+        // A new quantity is dated today unless a date comes with it; nothing in, no date.
+        let on = input.receivedOn !== undefined ? input.receivedOn : got !== was.receivedQty ? today : was.receivedOn;
+        if (got === 0) on = null;
+        else on ??= today;
+        if (got === was.receivedQty && on === was.receivedOn) return o.id;
+        await tx.orderLine.update({ where: { id: line.id }, data: { receivedQty: got, receivedOn: toDbDateOrNull(on) } });
+        const what =
+          got !== was.receivedQty ? `${name} ${trimQty(line.receivedQty)} → ${got}` : `${name} received on ${was.receivedOn ?? "—"} → ${on}`;
+        await record("goods_received", `${o.refNo}: received from the factory (${on ?? "nothing in"}): ${what}`, { lineId, ...was }, { lineId, receivedQty: got, receivedOn: on });
+        return o.id;
+      }
+
+      if (input.set === "packing") {
+        const num = (d: { toString(): string } | null) => (d === null ? null : Number(d.toString()));
+        const was = {
+          packages: line.packages,
+          packageType: line.packageType,
+          netWeightKg: num(line.netWeightKg),
+          grossWeightKg: num(line.grossWeightKg),
+          cbm: num(line.cbm),
+        };
+        const next = { ...was };
+        for (const k of ["packages", "packageType", "netWeightKg", "grossWeightKg", "cbm"] as const)
+          if (input[k] !== undefined) (next as Record<string, unknown>)[k] = input[k];
+        // As on the whole packing list: packages without a type are cartons.
+        if (next.packages && !next.packageType) next.packageType = "Carton";
+        if (next.netWeightKg !== null && next.grossWeightKg !== null && next.netWeightKg > next.grossWeightKg)
+          throw new DomainError(`${line.description.split("\n")[0]}: the net weight cannot be more than the gross weight.`);
+        const changed = (Object.keys(next) as (keyof typeof next)[]).filter((k) => next[k] !== was[k]);
+        if (!changed.length) return o.id;
+        await tx.orderLine.update({ where: { id: line.id }, data: next });
+        // Made once every goods line has its packages counted (as the whole list).
+        const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
+        const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
+        await tx.order.update({ where: { id: o.id }, data: { packedAt: complete ? (o.packedAt ?? new Date()) : null } });
+        const label: Record<keyof typeof next, string> = {
+          packages: "packages",
+          packageType: "packed in",
+          netWeightKg: "net kg",
+          grossWeightKg: "gross kg",
+          cbm: "CBM",
+        };
+        await record(
+          "packing_list",
+          `${o.refNo}: packing list, ${name}: ${changed.map((k) => `${label[k]} ${was[k] ?? "—"} → ${next[k] ?? "—"}`).join(", ")}${complete ? "" : " (not complete: some lines have no packages)"}`,
+          { lineId, ...Object.fromEntries(changed.map((k) => [k, was[k]])) },
+          { lineId, ...Object.fromEntries(changed.map((k) => [k, next[k]])) },
+        );
+        return o.id;
+      }
+
+      const was = {
+        deliveredQty: qty(line.deliveredQty),
+        condition: (line.deliveredCondition as LineCondition | null) ?? null,
+        note: line.deliveryNote,
+      };
+      const next = {
+        deliveredQty: input.deliveredQty ?? was.deliveredQty,
+        condition: input.condition !== undefined ? input.condition : was.condition,
+        note: input.note !== undefined ? input.note : was.note,
+      };
+      if (next.deliveredQty > of) throw more(next.deliveredQty);
+      const changed = (Object.keys(next) as (keyof typeof next)[]).filter((k) => next[k] !== was[k]);
+      if (!changed.length) return o.id;
+      await tx.orderLine.update({
+        where: { id: line.id },
+        data: { deliveredQty: next.deliveredQty, deliveredCondition: next.condition, deliveryNote: next.note },
+      });
+      const parts = [
+        `${next.deliveredQty} of ${trimQty(line.quantity)} ${line.unit}`,
+        next.condition ? LINE_CONDITION_LABEL[next.condition].toLowerCase() : null,
+        changed.includes("note") ? (next.note ? `note "${next.note}"` : "note cleared") : null,
+      ].filter(Boolean);
+      await record(
+        "delivered",
+        `${o.refNo}: delivered, ${name}: ${parts.join(", ")}`,
+        { lineId, ...Object.fromEntries(changed.map((k) => [k, was[k]])) },
+        { lineId, step: "delivery", ...Object.fromEntries(changed.map((k) => [k, next[k]])) },
+      );
+      return o.id;
+    });
+    const o = await this.load(user, orderId);
+    const numbers = orderLineNumbers(o.lines);
+    const at = o.lines.findIndex((l) => l.id === lineId);
+    return { line: lineView(o.lines[at]!, numbers[at]!, await this.lineShows(user)), goods: goodsSummary(o) };
+  }
+
   /** Dates and the B/L number, editable at any stage. Only the fields sent change; an empty one is cleared. */
   async setDetails(user: SessionUser, id: string, input: OrderDetailsInput) {
     if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
@@ -851,6 +1004,8 @@ export class OrdersService {
       if (input.blNo !== undefined) data.blNo = input.blNo;
       if (input.documentTitle !== undefined) data.documentTitle = input.documentTitle;
       if (input.portOfDischarge !== undefined) data.portOfDischarge = input.portOfDischarge;
+      if (input.containerNo !== undefined) data.containerNo = input.containerNo;
+      if (input.shippingMarks !== undefined) data.shippingMarks = input.shippingMarks;
       // Once shipped, the ship date and B/L are on the customer's documents: changing them says why.
       const shippedFacts =
         (o.stage === "shipped" || o.stage === "done") &&
@@ -864,6 +1019,8 @@ export class OrdersService {
         blNo: o.blNo,
         documentTitle: o.documentTitle,
         portOfDischarge: o.portOfDischarge,
+        containerNo: o.containerNo,
+        shippingMarks: o.shippingMarks,
       };
       await tx.order.update({ where: { id: o.id }, data });
       await this.audit.record(tx, {
@@ -871,7 +1028,10 @@ export class OrdersService {
         action: "update",
         entityType: "order",
         entityId: o.id,
-        summary: `${o.refNo}: dates and B/L changed`,
+        summary:
+          input.containerNo !== undefined || input.shippingMarks !== undefined
+            ? `${o.refNo}: container and shipping marks changed`
+            : `${o.refNo}: dates and B/L changed`,
         oldValues: before,
         newValues: { ...input, reason: undefined },
         reason,
