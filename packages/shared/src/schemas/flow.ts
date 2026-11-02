@@ -12,6 +12,7 @@ import {
   SHIP_MODES,
   SHIPMENT_STATUSES,
 } from "../enums";
+import { REQUEST_CHANNELS } from "../workflows/flow";
 import { id, isoDate, optionalAmount, optionalDate, optionalId, optionalText, text } from "./common";
 
 /**
@@ -28,6 +29,7 @@ const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
 /** Send the inquiry's spec to these factories (one request each; a factory already asked is left as it is). */
 export const factoryRequestsInput = z.object({
   factoryIds: z.array(id("Choose the factories to ask")).min(1, "Choose at least one factory").max(30),
+  channel: optionalEnum(REQUEST_CHANNELS).optional().transform((v) => v ?? null),
   sentOn: optionalDate,
   replyBy: optionalDate,
   note: optionalText(500),
@@ -36,6 +38,7 @@ export type FactoryRequestsInput = z.infer<typeof factoryRequestsInput>;
 
 export const factoryRequestUpdateInput = z.object({
   status: maybe(z.enum(FACTORY_REQUEST_STATUSES)),
+  channel: maybe(optionalEnum(REQUEST_CHANNELS)),
   replyBy: maybe(optionalDate),
   factoryQuoteId: maybe(optionalId),
   note: maybe(optionalText(500)),

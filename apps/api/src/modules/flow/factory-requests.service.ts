@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
-import { can, FACTORY_REQUEST_STATUS_LABEL, type FactoryRequestsInput, type FactoryRequestUpdateInput } from "@kebo/shared";
-import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import { can, FACTORY_REQUEST_STATUS_LABEL, type FactoryRequestsInput, type FactoryRequestUpdateInput, type RequestChannel } from "@kebo/shared";
+import { daysBetween, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -39,13 +39,16 @@ export class FactoryRequestsService {
   async list(user: SessionUser, inquiryId: string) {
     await this.must(user);
     await this.inquiry(user, inquiryId);
-    const [rows, offers] = await Promise.all([
+    const [rows, offers, factories, lastAsked, offerCounts] = await Promise.all([
       this.prisma.db.factoryRequest.findMany({
         where: { inquiryId },
         orderBy: { createdAt: "asc" },
         include: { factory: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
       }),
       this.prisma.db.factoryQuote.findMany({ where: { inquiryId, deletedAt: null }, select: { id: true, factoryId: true }, orderBy: { createdAt: "asc" } }),
+      this.prisma.db.factory.findMany({ where: { deletedAt: null }, select: { id: true, name: true, wechat: true, email: true, phone: true }, orderBy: { name: "asc" }, take: 500 }),
+      this.prisma.db.factoryRequest.groupBy({ by: ["factoryId"], _max: { sentOn: true } }),
+      this.prisma.db.factoryQuote.groupBy({ by: ["factoryId"], where: { deletedAt: null }, _count: { _all: true } }),
     ]);
     const today = this.clock.today();
     const items = rows.map((r) => {
@@ -60,13 +63,31 @@ export class FactoryRequestsService {
         sentOn: fromDbDate(r.sentOn),
         replyBy,
         late: status === "sent" && !!replyBy && replyBy < today,
+        channel: r.channel as RequestChannel | null,
+        /** Days since asked, while still waiting. */
+        waitingDays: status === "sent" ? daysBetween(fromDbDate(r.sentOn), today) : null,
         factoryQuoteId: offer,
         note: r.note,
         by: r.createdBy,
       };
     });
+    // The factories to choose from: the ones asked most recently first, then the others by name.
+    const last = new Map(lastAsked.map((l) => [l.factoryId, l._max.sentOn ? fromDbDate(l._max.sentOn) : null]));
+    const offersBy = new Map(offerCounts.map((c) => [c.factoryId, c._count._all]));
+    const asked = new Set(rows.map((r) => r.factoryId));
+    const suggestions = factories
+      .map((f) => ({
+        id: f.id,
+        name: f.name,
+        reach: [f.wechat && "WeChat", f.email && "email", f.phone && "phone"].filter(Boolean).join(", ") || null,
+        lastAskedOn: last.get(f.id) ?? null,
+        offers: offersBy.get(f.id) ?? 0,
+        askedHere: asked.has(f.id),
+      }))
+      .sort((a, b) => (b.lastAskedOn ?? "").localeCompare(a.lastAskedOn ?? "") || b.offers - a.offers || a.name.localeCompare(b.name));
     return {
       items,
+      suggestions,
       counts: {
         asked: items.length,
         quoted: items.filter((i) => i.status === "quoted").length,
@@ -97,6 +118,7 @@ export class FactoryRequestsService {
           factoryId: f.id,
           sentOn: toDbDate(input.sentOn ?? today),
           replyBy: toDbDateOrNull(input.replyBy),
+          channel: input.channel,
           note: input.note,
           createdById: user.id,
         })),
@@ -128,6 +150,7 @@ export class FactoryRequestsService {
         data: {
           ...(input.status !== undefined && { status: input.status }),
           ...(input.replyBy !== undefined && { replyBy: toDbDateOrNull(input.replyBy) }),
+          ...(input.channel !== undefined && { channel: input.channel }),
           ...(input.factoryQuoteId !== undefined && { factoryQuoteId: input.factoryQuoteId }),
           ...(input.note !== undefined && { note: input.note }),
         },

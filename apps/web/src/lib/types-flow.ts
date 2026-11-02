@@ -9,6 +9,7 @@ import type {
   OrderDocumentKind,
   OrderDocumentStatus,
   PaymentRoute,
+  RequestChannel,
   SatResult,
   ShipMode,
   ShipmentStatus,
@@ -140,9 +141,12 @@ export interface FactoryRequests {
     sentOn: string;
     replyBy: string | null;
     late: boolean;
+    channel: RequestChannel | null;
+    waitingDays: number | null;
     factoryQuoteId: string | null;
     note: string | null;
     by: { id: string; name: string };
   }[];
+  suggestions: { id: string; name: string; reach: string | null; lastAskedOn: string | null; offers: number; askedHere: boolean }[];
   counts: { asked: number; quoted: number; waiting: number; late: number };
 }

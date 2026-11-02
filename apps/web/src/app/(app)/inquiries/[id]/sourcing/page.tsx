@@ -4,7 +4,7 @@ import { basisText } from "@kebo/shared";
 import { Alert, Badge, ButtonLink, Card, cn, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { load, requirePermission } from "@/lib/session";
+import { hasFeature, load, requirePermission } from "@/lib/session";
 import { date, money, qty } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import type { FactoryQuoteView, SalesSettings, SourcingView } from "@/lib/types-deals";
@@ -84,6 +84,7 @@ export default async function SourcingPage({
       ) : (
         <FactoryQuotes
           dealId={d.id}
+          askFactories={await hasFeature("factory_requests")}
           quotes={s.quotes}
           items={s.items}
           canEdit={canEdit}

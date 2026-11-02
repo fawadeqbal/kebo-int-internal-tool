@@ -52,6 +52,11 @@ export const BANK_CONTRACT_STATUS_TONE: Record<BankContractStatus, Tone> = {
 export const FACTORY_REQUEST_STATUS_LABEL: Record<FactoryRequestStatus, string> = { sent: "Asked", quoted: "Quoted", declined: "Declined", no_reply: "No reply" };
 export const FACTORY_REQUEST_STATUS_TONE: Record<FactoryRequestStatus, Tone> = { sent: "info", quoted: "ok", declined: "neutral", no_reply: "warn" };
 
+/** How a factory was asked for a price. */
+export const REQUEST_CHANNELS = ["wechat", "email", "whatsapp", "phone", "visit", "other"] as const;
+export type RequestChannel = (typeof REQUEST_CHANNELS)[number];
+export const REQUEST_CHANNEL_LABEL: Record<RequestChannel, string> = { wechat: "WeChat", email: "Email", whatsapp: "WhatsApp", phone: "Phone", visit: "Visit", other: "Other" };
+
 export const SHIP_MODE_LABEL: Record<ShipMode, string> = { sea: "Sea", air: "Air", road: "Road", rail: "Rail" };
 export const SHIPMENT_STATUS_LABEL: Record<ShipmentStatus, string> = {
   planned: "Planned",

@@ -1203,6 +1203,8 @@ model FactoryRequest {
   factory        Factory              @relation(fields: [factoryId], references: [id], onDelete: Restrict)
   status         FactoryRequestStatus @default(sent)
   sentOn         DateTime             @map("sent_on") @db.Date
+  /// How the list was sent: wechat | email | whatsapp | phone | visit | other.
+  channel        String?              @db.VarChar(20)
   /// When we asked them to answer by.
   replyBy        DateTime?            @map("reply_by") @db.Date
   /// The offer they sent back, once entered.

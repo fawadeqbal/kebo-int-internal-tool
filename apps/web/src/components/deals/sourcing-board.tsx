@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Copy, Download, Eye, Factory, FileText, Info, ListPlus, Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
 import { formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, basisText, DEFAULT_TAX_RATE, type AttachmentKind } from "@kebo/shared";
-import { AddCard, Badge, Button, Card, ChecksBox, cn, DetailGrid, EmptyState, Select, SelectCard, SelectCardList, type DetailItem } from "@kebo/ui";
+import { AddCard, Badge, Button, buttonClass, Card, ChecksBox, cn, DetailGrid, EmptyState, Select, SelectCard, SelectCardList, type DetailItem } from "@kebo/ui";
 import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
@@ -85,6 +86,7 @@ function statusOf(q: FactoryQuoteView, items: Items): { label: string; tone: "ok
  */
 export function FactoryQuotes({
   dealId,
+  askFactories,
   quotes,
   items,
   canEdit,
@@ -98,6 +100,8 @@ export function FactoryQuotes({
   lines,
 }: {
   dealId: string;
+  /** "Ask factories" next to "Add the first offer" (the factory requests module is on). */
+  askFactories?: boolean;
   quotes: FactoryQuoteView[];
   items: Items;
   canEdit: boolean;
@@ -140,7 +144,7 @@ export function FactoryQuotes({
     setDetails(false);
   };
 
-  if (!offers.length && active !== "new") return <NoOffers items={items} canEdit={canEdit} onAdd={() => open("new")} />;
+  if (!offers.length && active !== "new") return <NoOffers items={items} canEdit={canEdit} onAdd={() => open("new")} askHref={askFactories ? `/inquiries/${dealId}#factories-asked` : null} />;
 
   return (
     <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start">
@@ -198,7 +202,7 @@ export function FactoryQuotes({
 }
 
 /** No offer yet: what to do, and what the factories quote on. */
-function NoOffers({ items, canEdit, onAdd }: { items: Items; canEdit: boolean; onAdd: () => void }) {
+function NoOffers({ items, canEdit, onAdd, askHref }: { items: Items; canEdit: boolean; onAdd: () => void; askHref: string | null }) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
       <Card className="flex min-w-0 flex-1 items-center justify-center">
@@ -208,9 +212,16 @@ function NoOffers({ items, canEdit, onAdd }: { items: Items; canEdit: boolean; o
           description="Send the customer's list to two or three factories. When each one replies, add its offer here and compare them side by side."
           action={
             canEdit ? (
-              <Button variant="primary" onClick={onAdd}>
-                <Plus aria-hidden /> Add the first offer
-              </Button>
+              <span className="flex flex-wrap justify-center gap-2">
+                <Button variant="primary" onClick={onAdd}>
+                  <Plus aria-hidden /> Add the first offer
+                </Button>
+                {askHref && (
+                  <Link href={askHref} className={buttonClass("secondary", "md")}>
+                    Ask factories
+                  </Link>
+                )}
+              </span>
             ) : undefined
           }
         />
