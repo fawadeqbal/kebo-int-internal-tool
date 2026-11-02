@@ -191,7 +191,7 @@ export class InquiriesService {
         createdBy: { select: { id: true, name: true } },
         items: { orderBy: { sortOrder: "asc" } },
         notes: { orderBy: { createdAt: "desc" } },
-        attachments: { where: { deletedAt: null, factoryQuoteId: null }, orderBy: { createdAt: "desc" } },
+        attachments: { where: { deletedAt: null, factoryQuoteId: null, replacedById: null }, orderBy: { createdAt: "desc" } },
         stageChanges: { orderBy: { changedAt: "asc" } },
         assignments: { orderBy: { assignedAt: "asc" } },
         quotation: {
@@ -717,7 +717,7 @@ export class InquiriesService {
   async zipFiles(user: SessionUser, id: string): Promise<{ data: Uint8Array; fileName: string }> {
     const i = await this.find(user, id);
     // The deal's own documents; factory offers' files stay on Factory prices.
-    const files = await this.prisma.db.attachment.findMany({ where: { inquiryId: id, deletedAt: null, factoryQuoteId: null }, orderBy: [{ createdAt: "asc" }] });
+    const files = await this.prisma.db.attachment.findMany({ where: { inquiryId: id, deletedAt: null, factoryQuoteId: null, replacedById: null }, orderBy: [{ createdAt: "asc" }] });
     if (!files.length) throw new DomainError("There are no files on this inquiry yet.");
     const total = files.reduce((t, f) => t + f.size, 0);
     if (total > 300 * 1024 * 1024) throw new DomainError("These files are over 300 MB together. Download them one by one.");

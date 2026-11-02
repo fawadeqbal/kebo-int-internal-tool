@@ -776,11 +776,24 @@ model Attachment {
   uploadedBy     User          @relation("AttachmentUploader", fields: [uploadedById], references: [id])
   deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  /// Added on an order (Documents v3: uploaded or dropped on a step): the order and the step it belongs to.
+  orderId        String?       @map("order_id") @db.Uuid
+  order          Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  /// payment | factory | production | shipping | documents | delivery
+  step           String?       @db.VarChar(20)
+  /// "Replace with a newer one": the newer file. The old one is kept (as an earlier version), out of the lists.
+  replacedById   String?       @map("replaced_by") @db.Uuid
+  replacedBy     Attachment?   @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
+  earlier        Attachment[]  @relation("AttachmentVersions")
+  /// 1 for the first file; each replacement counts up.
+  version        Int           @default(1)
 
   orderDocuments OrderDocument[]
   checklistItems OrderChecklistItem[]
 
   @@index([inquiryId])
+  @@index([orderId])
+  @@index([replacedById])
   @@index([factoryQuoteId])
   @@index([companyId])
   @@map("attachments")
@@ -1120,6 +1133,7 @@ model Order {
   satChecks    SatCheck[]
   claims       OrderClaim[]
   checklist    OrderChecklistItem[]
+  files        Attachment[]
   factoryPlan  FactoryPaymentPlan[]
   credits      CustomerCredit[]
   papers       OrderPaper[]

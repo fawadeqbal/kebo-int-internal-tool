@@ -591,7 +591,7 @@ export class OrdersService {
     });
     if (!quotes.length) return [];
     const files = await this.prisma.db.attachment.findMany({
-      where: { factoryQuoteId: { in: quotes.map((q) => q.id) }, deletedAt: null },
+      where: { factoryQuoteId: { in: quotes.map((q) => q.id) }, deletedAt: null, replacedById: null },
       orderBy: { createdAt: "asc" },
     });
     return files.map((f) => ({

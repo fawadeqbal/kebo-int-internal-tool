@@ -80,6 +80,10 @@ export interface PaperListRow {
   stateLabel: string;
   number: string | null;
   version: number | null;
+  /** The latest made version (draft or final) of a paper the app makes: Delete the draft, Versions. */
+  paperId?: string | null;
+  /** The latest version is a draft. */
+  draft?: boolean;
   /** One short line: what it is made from, or what it waits for. */
   sub: string;
   ref: string | null;
@@ -559,6 +563,8 @@ export class PapersService {
             state,
             number: latest?.number ?? (recorded ? recorded.number : built.doc.number),
             version: latest?.version ?? null,
+            paperId: latest?.id ?? null,
+            draft: latest?.status === "draft",
             sub:
               latest && state === "ready"
                 ? `version ${latest.version}${latest.finalAt ? ` · ${latest.finalAt.toISOString().slice(0, 10)}` : ""}`
@@ -656,7 +662,7 @@ export class PapersService {
     tx: Tx,
     user: SessionUser,
     o: { id: string; refNo: string },
-    action: "draft" | "final" | "again" | "hs",
+    action: "draft" | "final" | "again" | "hs" | "delete",
     kind: PaperKind,
     summary: string,
     values: Record<string, unknown>,
@@ -783,6 +789,28 @@ export class PapersService {
       });
     });
     return this.checks(user, orderId, kind, ref);
+  }
+
+  /** DELETE /papers/:id — a draft only (a final version stays as it was printed); the earlier final version, if any, is the paper again. */
+  async removeDraft(user: SessionUser, paperId: string) {
+    const p = await this.prisma.db.orderPaper.findUnique({ where: { id: paperId } });
+    if (!p) throw new NotFoundError("Paper");
+    const kind = p.kind as PaperKind;
+    const before = await this.order(user, p.orderId);
+    await this.mayMake(user, kind, before);
+    await this.prisma.tx(async (tx) => {
+      const o = await this.lock(tx, user, p.orderId);
+      const row = o.papers.find((x) => x.id === paperId);
+      if (!row) throw new NotFoundError("Paper");
+      if (row.status !== "draft")
+        throw new DomainError(`Version ${row.version} is final: it stays as it was printed. Make it again for a new version.`);
+      await tx.orderPaper.delete({ where: { id: row.id } });
+      await this.log(tx, user, o, "delete", kind, `${PAPER_LABEL[kind]} ${row.number} draft deleted (version ${row.version})`, {
+        number: row.number,
+        version: row.version,
+      });
+    });
+    return { ok: true };
   }
 
   /**

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
@@ -105,5 +105,13 @@ export class PapersController {
   @RequirePermissions("documents.manage")
   final(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(finalInput)) body: z.infer<typeof finalInput>) {
     return this.papers.final(user, id, body);
+  }
+
+  /** A draft version, deleted (Delete the draft). A final version cannot be deleted. */
+  @Delete("papers/:id")
+  @HttpCode(200)
+  @RequirePermissions("documents.manage")
+  removeDraft(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
+    return this.papers.removeDraft(user, id);
   }
 }

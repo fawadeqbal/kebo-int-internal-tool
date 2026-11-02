@@ -14,6 +14,7 @@ export * from "./workflows/flow";
 export * from "./workflows/checklist";
 export * from "./workflows/costs";
 export * from "./workflows/papers";
+export * from "./workflows/files";
 export * from "./schemas/common";
 export * from "./schemas/domain";
 export * from "./schemas/settings";
