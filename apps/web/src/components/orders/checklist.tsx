@@ -430,6 +430,7 @@ function Row({
   now: boolean;
   canEdit: boolean;
   tool?: AutoTool;
+  /** This row's Pay: the step's payment form, or the expense form filled in for it. */
   payNode?: ReactNode;
   run: ChecklistRun;
   dealId: string;
@@ -724,6 +725,7 @@ export function Checklist({
   people,
   tools = {},
   payNode,
+  payFor = {},
   listHref,
   title = "Checklist",
 }: {
@@ -739,6 +741,8 @@ export function Checklist({
   tools?: Record<string, AutoTool>;
   /** The step's payment form, for own items with the Pay tool. */
   payNode?: ReactNode;
+  /** Per own item (by id): its own Pay form instead (an expense filled in: freight, inspection…). */
+  payFor?: Record<string, ReactNode>;
   /** Settings › Order checklist, for people who keep the company's list. */
   listHref?: string;
   title?: string;
@@ -772,7 +776,7 @@ export function Checklist({
               now={i === nowItem}
               canEdit={canEdit}
               tool={i.key ? tools[i.key] : undefined}
-              payNode={payNode}
+              payNode={(i.id && payFor[i.id]) || payNode}
               run={run}
               dealId={dealId}
               people={people}

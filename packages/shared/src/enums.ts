@@ -115,6 +115,8 @@ export const EXPENSE_CATEGORIES = values(
   "inland_transport",
   "inspection",
   "customs",
+  "insurance",
+  "courier",
   "bank_charges",
   "commission",
   "rent",
@@ -128,7 +130,7 @@ export const EXPENSE_CATEGORIES = values(
  * port, sea freight, delivery, duties): on an order, they are part of its
  * planned costs up to those, and only beyond them a cost of their own.
  */
-export const BASIS_COST_CATEGORIES: readonly ExpenseCategory[] = ["freight", "inland_transport", "customs"];
+export const BASIS_COST_CATEGORIES: readonly ExpenseCategory[] = ["freight", "inland_transport", "customs", "insurance"];
 /** The company's running costs, the same every month whoever the customers are. */
 export const RUNNING_COST_CATEGORIES: readonly ExpenseCategory[] = ["rent", "salaries", "utilities", "office"];
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
@@ -136,6 +138,14 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 /** The costs between a factory's price and ours (see workflows/basis). */
 export const BASIS_STEPS = values("to_port", "freight", "insurance", "delivery", "duties");
 export type BasisStep = (typeof BASIS_STEPS)[number];
+
+/**
+ * Who bears an expense on an order: us (it cuts the order's profit), the
+ * customer (added to what they owe on the order) or the factory (taken off
+ * what we owe it).
+ */
+export const EXPENSE_BEARERS = values("us", "customer", "factory");
+export type ExpenseBearer = (typeof EXPENSE_BEARERS)[number];
 
 /* ---------------------------------------------------------------- order flow */
 

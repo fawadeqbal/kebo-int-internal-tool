@@ -47,18 +47,23 @@ export function StepMark({ state, number, size = "sm" }: { state: StepState; num
 const SR: Record<StepState, string> = { done: "done", now: "now", late: "late", todo: "later" };
 
 /**
- * The order's navigation: Overview, the steps (tick or number, and n/m done)
- * and History. A row of links from a tablet up; on a phone, "Step 3 of 6 ▾"
- * opens the same links.
+ * The order's navigation: Overview, the steps (tick or number, and n/m done),
+ * Costs (with what was spent, for managers) and History. A row of links from a
+ * tablet up; on a phone, "Step 3 of 6 ▾" opens the same links.
  */
-export function StepNav({ base, steps }: { base: string; steps: StepNavStep[] }) {
+export function StepNav({ base, steps, costs }: { base: string; steps: StepNavStep[]; costs?: { spent: string } | null }) {
   const at = usePathname();
   // A paper's Make page (/orders/:id/papers/:kind) belongs to the paper's step.
   const paper = at.slice(base.length).match(/^\/papers\/([a-z-]+)/)?.[1];
   const path = paper && isPaperKind(paper) ? `${base}/${STEP_PATH[PAPER_STEP[paper]]}` : at;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  const links = [{ href: base, label: "Overview" }, ...steps, { href: `${base}/history`, label: "History" }];
+  const links: ({ href: string; label: string; tag?: string } | StepNavStep)[] = [
+    { href: base, label: "Overview" },
+    ...steps,
+    ...(costs ? [{ href: `${base}/costs`, label: "Costs", tag: costs.spent }] : []),
+    { href: `${base}/history`, label: "History" },
+  ];
   const active = (href: string) => (href === base ? path === base : path === href || path.startsWith(`${href}/`));
   const here = steps.find((s) => active(s.href));
   const current = steps.find((s) => s.state === "now" || s.state === "late");
@@ -95,6 +100,7 @@ export function StepNav({ base, steps }: { base: string; steps: StepNavStep[] })
                 >
                   {s && <StepMark state={s.state} number={s.number} />}
                   <span>{l.label}</span>
+                  {"tag" in l && l.tag && <span className="text-[11px] text-muted tabular">{l.tag}</span>}
                   {s && (
                     <span className={cn("text-[11px] tabular", s.state === "late" ? "text-bad" : "text-muted")}>
                       {s.done}/{s.total}
@@ -118,11 +124,17 @@ export function StepNav({ base, steps }: { base: string; steps: StepNavStep[] })
         >
           <span className="min-w-0">
             <span className="block text-xs text-muted">
-              {here ? `Step ${here.number} of ${steps.length}` : active(base) ? "Overview" : "History"}
+              {here ? `Step ${here.number} of ${steps.length}` : active(base) ? "Overview" : active(`${base}/costs`) ? "Costs" : "History"}
               {!here && current ? ` · now step ${current.number}` : ""}
             </span>
             <span className="block truncate text-sm font-semibold">
-              {here ? `${here.label} · ${here.done} of ${here.total}` : active(base) ? "The order at a glance" : "Every change"}
+              {here
+                ? `${here.label} · ${here.done} of ${here.total}`
+                : active(base)
+                  ? "The order at a glance"
+                  : active(`${base}/costs`)
+                    ? `Spent ${costs?.spent ?? ""}`
+                    : "Every change"}
             </span>
           </span>
           <span className="flex shrink-0 items-center gap-2">
@@ -159,6 +171,7 @@ export function StepNav({ base, steps }: { base: string; steps: StepNavStep[] })
                   >
                     {s ? <StepMark state={s.state} number={s.number} /> : <span className="size-[18px]" aria-hidden />}
                     <span className="flex-1">{l.label}</span>
+                    {"tag" in l && l.tag && <span className="text-xs text-muted tabular">{l.tag}</span>}
                     {s && (
                       <span className={cn("text-xs tabular", s.state === "late" ? "text-bad" : "text-muted")}>
                         {s.done}/{s.total}

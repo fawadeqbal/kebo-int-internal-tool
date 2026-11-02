@@ -5,10 +5,11 @@ import { Badge, cn, OrderStageBadge } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
-import { date, money } from "@/lib/format";
+import { date, money, whole } from "@/lib/format";
 import { FileActions } from "@/components/common/file-actions";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
 import { StepNav } from "@/components/orders/step-nav";
+import { orderCostsSetup } from "@/components/orders/costs-data";
 import { docHref } from "./shared";
 
 /**
@@ -20,7 +21,11 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const { id } = await params;
   await requireUser();
   const o = await orderOf(id);
-  const [steps, flow] = await Promise.all([optional(() => orderStepsOf(id)), optional(() => orderFlowOf(id))]);
+  const [steps, flow, costs] = await Promise.all([
+    optional(() => orderStepsOf(id)),
+    optional(() => orderFlowOf(id)),
+    orderCostsSetup(id),
+  ]);
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const route = flow?.payment.route ? PAYMENT_ROUTE_SHORT[flow.payment.route] : null;
@@ -113,6 +118,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
             total: s.total,
             href: `${base}/${STEP_PATH[s.key]}`,
           }))}
+          costs={costs && { spent: whole(costs.costs.totals.spent, costs.costs.currency) }}
         />
       )}
       <div className="mt-5">{children}</div>

@@ -4,6 +4,7 @@ import { date } from "@/lib/format";
 import { ShipmentsPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { addShipmentAction, removeShipmentAction, updateShipmentAction } from "../../flow-actions";
 import { packingAction, packingMarksAction, paymentAction } from "../../actions";
 import { PaymentForm } from "../forms";
@@ -99,6 +100,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
               { label: "B/L", value: s?.blNo ?? o.blNo },
             ]}
           />
+          <StepCosts id={o.id} step="shipping" />
           <StepPapers id={o.id} dealId={o.inquiry.id} step="shipping" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
@@ -106,6 +108,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       }
     >
       <Checklist
+        payFor={await expensePayTools(o.id, d.items)}
         step="shipping"
         label="Shipping"
         items={d.items}
