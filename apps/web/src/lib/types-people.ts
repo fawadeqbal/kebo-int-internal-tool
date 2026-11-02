@@ -79,6 +79,16 @@ export interface FactoryDetail extends Factory {
     inquiry: { id: string; refNo: string; title: string };
     _count: { lines: number };
   }[];
+  /** How it works with us: answers when asked for a price, and what it is making now. */
+  record: {
+    asked: number;
+    answered: number;
+    declined: number;
+    noReply: number;
+    avgDaysToAnswer: number | null;
+    openOrders: { id: string; refNo: string; customer: string; readyOn: string | null }[];
+    lateSteps: number;
+  };
 }
 
 export interface UserRow {

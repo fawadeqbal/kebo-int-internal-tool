@@ -1,7 +1,7 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
 import { Banknote, Coins, TrendingUp, Users } from "lucide-react";
-import { can, type InquiryStage, type Priority } from "@kebo/shared";
+import { can, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
 import { Alert, Badge, Card, CardBody, CardHeader, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
@@ -105,6 +105,12 @@ export default async function DashboardPage() {
               <SalesChart />
             </Suspense>
           )}
+          <Suspense>
+            <MyOrders />
+          </Suspense>
+          <Suspense>
+            <ThisWeek today={d.today} />
+          </Suspense>
           <Card className="rounded-2xl">
             <CardHeader title="Inquiries now" description="Open inquiries by stage" />
             <CardBody className="grid grid-cols-3 gap-2">
@@ -292,6 +298,61 @@ async function SalesChart() {
       <CardBody>
         <RevenueChart data={i.series.slice(-6)} currency={i.currency} showNet={false} height={220} />
       </CardBody>
+    </Card>
+  );
+}
+
+/** My open orders by where they are in the flow (orders board module); each count opens the board at that step. */
+async function MyOrders() {
+  if (!(await hasFeature("orders_board"))) return null;
+  const board = await api.get<{ items: { id: string; current: { key: FlowStep } | null }[] }>("/order-board", { mine: "true" }).catch(() => null);
+  if (!board || !board.items.length) return null;
+  const cols: [string, string, FlowStep[]][] = [
+    ["Payment", "payment", ["payment"]],
+    ["Production", "production", ["factory", "production"]],
+    ["Shipping", "shipping", ["shipping"]],
+    ["Documents", "documents", ["documents"]],
+    ["Delivery & SAT", "delivery", ["delivery"]],
+  ];
+  const count = (steps: FlowStep[]) => board.items.filter((i) => (i.current ? steps.includes(i.current.key) : steps.includes("delivery"))).length;
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader title="My orders" description={`${board.items.length} open, by where they are`} />
+      <CardBody className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {cols.map(([label, key, steps]) => (
+          <Link key={key} href={`/orders?mine=1&stage=${key}`} className="rounded-xl border border-line p-3 transition-colors hover:border-line-strong">
+            <p className="truncate text-xs text-muted">{label}</p>
+            <p className="text-2xl font-semibold tabular">{count(steps)}</p>
+          </Link>
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
+/** The next seven days from "Needs attention": what falls due when (deposits, quotation expiry, arrivals, SATs). */
+async function ThisWeek({ today }: { today: string }) {
+  const reminders = await getReminders().catch(() => null);
+  if (!reminders) return null;
+  const end = new Date(`${today}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 7);
+  const last = end.toISOString().slice(0, 10);
+  const week = reminders.items.filter((i) => i.due && i.due >= today && i.due <= last).sort((a, b) => a.due!.localeCompare(b.due!));
+  if (!week.length) return null;
+  const dayOf = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader title="This week" description="What falls due in the next seven days" />
+      <ul className="flex flex-col divide-y divide-line">
+        {week.slice(0, 8).map((i) => (
+          <li key={i.key}>
+            <Link href={i.href} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 px-4 py-2.5 text-sm hover:bg-surface-2">
+              <span className={i.due === today ? "font-semibold text-primary" : "text-muted"}>{i.due === today ? "Today" : dayOf(i.due!)}</span>
+              <span className="min-w-0 truncate">{i.title}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

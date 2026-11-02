@@ -15,13 +15,14 @@ import {
   Inbox,
   Package,
   Undo2,
+  Ship,
 } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 import { reminderAction } from "@/app/(app)/money/actions";
 import type { Reminders } from "@/lib/types-insights";
 import { FloatingMenu } from "@/components/common/floating";
 
-const KIND_ICON = { order: Package, quote: FileText, deal: Inbox, offer: Factory, money: Banknote } as const;
+const KIND_ICON = { order: Package, quote: FileText, deal: Inbox, offer: Factory, money: Banknote, ship: Ship } as const;
 const LEVEL = {
   bad: { ring: "bg-bad-soft text-bad", label: "Urgent" },
   warn: { ring: "bg-warn-soft text-warn", label: "Soon" },

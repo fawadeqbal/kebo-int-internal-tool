@@ -1,3 +1,4 @@
+import { orderAccess } from "../orders/orders.service";
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
 import { can, type FactoryImport, type FactoryInput, type ImportResult, type ListQuery } from "@kebo/shared";
@@ -40,7 +41,7 @@ export class FactoriesService {
     return { total, page: q.page, pageSize: q.pageSize, rows };
   }
 
-  async get(id: string) {
+  async get(id: string, user?: SessionUser) {
     const f = await this.prisma.db.factory.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -54,7 +55,37 @@ export class FactoriesService {
       },
     });
     if (!f) throw new NotFoundError("Factory");
-    return f;
+    return { ...f, record: await this.record(id, user) };
+  }
+
+  /**
+   * How the factory works with us: how often it answers when asked for a price
+   * (and how fast), and the orders it is making now with any late production step.
+   */
+  private async record(id: string, user?: SessionUser) {
+    const db = this.prisma.db;
+    const [requests, quotes, orders, lateSteps] = await Promise.all([
+      db.factoryRequest.findMany({ where: { factoryId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
+      db.factoryQuote.findMany({ where: { factoryId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
+      db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, readyOn: true, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" }, take: 20 }),
+      db.productionStep.count({ where: { factoryId: id, doneOn: null, plannedOn: { lt: new Date() }, order: { status: "open" } } }),
+    ]);
+    const answered = requests.filter((r) => r.status === "quoted" || quotes.some((q) => q.inquiryId === r.inquiryId));
+    const days = answered
+      .map((r) => {
+        const q = quotes.find((x) => x.inquiryId === r.inquiryId);
+        return q ? Math.max(0, Math.round((q.receivedOn.getTime() - r.sentOn.getTime()) / 86_400_000)) : null;
+      })
+      .filter((d): d is number => d !== null);
+    return {
+      asked: requests.length,
+      answered: answered.length,
+      declined: requests.filter((r) => r.status === "declined").length,
+      noReply: requests.filter((r) => r.status === "no_reply").length,
+      avgDaysToAnswer: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
+      openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: o.readyOn ? o.readyOn.toISOString().slice(0, 10) : null })),
+      lateSteps,
+    };
   }
 
   private async assertUniqueName(name: string, exceptId?: string) {

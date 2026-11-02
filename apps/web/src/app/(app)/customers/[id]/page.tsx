@@ -56,6 +56,13 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const history = tab === "history" ? await api.get<HistoryEntry[]>("/history", { type: "customer", id }) : [];
   const canEdit = can(me, "customers.manage");
   const openOrders = c.orders.filter((o) => o.status === "open").length;
+  // Where each open order is in the flow (orders board module).
+  const steps =
+    tab === "orders" && openOrders && (await hasFeature("orders_board"))
+      ? new Map(
+          ((await api.get<{ items: { id: string; current: { label: string; sub: string } | null }[] }>("/order-board").catch(() => null))?.items ?? []).map((i) => [i.id, i.current]),
+        )
+      : null;
   const openDeals = c.inquiries.filter((d) => ["new", "sourcing", "quoted"].includes(d.stage)).length;
 
   return (
@@ -267,6 +274,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
                   <tr>
                     <Th>Order</Th>
                     <Th>Status</Th>
+                    {steps && <Th>Where it is</Th>}
                     <Th className="text-right">Total</Th>
                     <Th className="text-right">Ordered</Th>
                   </tr>
@@ -284,6 +292,25 @@ export default async function CustomerPage({ params, searchParams }: { params: P
                           {ORDER_STATUS[o.status].label}
                         </Badge>
                       </Td>
+                      {steps && (
+                        <Td className="text-sm">
+                          {o.status === "open" && steps.has(o.id) ? (
+                            (() => {
+                              const cur = steps.get(o.id);
+                              return cur ? (
+                                <>
+                                  <span className="font-medium">{cur.label}</span>
+                                  <span className="block text-xs text-muted">{cur.sub.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d))}</span>
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted">Every step done</span>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </Td>
+                      )}
                       <Td className="text-right tabular">{money(o.total, o.currency)}</Td>
                       <Td className="text-right text-xs whitespace-nowrap text-muted">{date(o.orderedOn)}</Td>
                     </Tr>
