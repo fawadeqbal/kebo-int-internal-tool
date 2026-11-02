@@ -2,7 +2,7 @@ import { cache, Suspense } from "react";
 import Link from "next/link";
 import { Banknote, Coins, TrendingUp, Users } from "lucide-react";
 import { can, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
-import { Alert, Badge, Card, CardBody, CardHeader, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
+import { Alert, Badge, Card, CardBody, CardHeader, Meter, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
@@ -106,6 +106,9 @@ export default async function DashboardPage() {
               <SalesChart />
             </Suspense>
           )}
+          <Suspense>
+            <MyTarget />
+          </Suspense>
           <Suspense>
             <MyOrders />
           </Suspense>
@@ -298,6 +301,35 @@ async function SalesChart() {
       />
       <CardBody>
         <RevenueChart data={i.series.slice(-6)} currency={i.currency} showNet={false} height={220} />
+      </CardBody>
+    </Card>
+  );
+}
+
+/** My own sales target this month, when a manager set one (Insights › Targets). */
+async function MyTarget() {
+  if (!(await hasFeature("insights"))) return null;
+  const t = await api.get<{ month: string; target: string | null; sold: string | null; percent: number | null; currency: string | null; daysLeft: number | null }>("/me/target").catch(() => null);
+  if (!t || t.target === null || t.currency === null) return null;
+  const left = Math.max(Number(t.target) - Number(t.sold ?? 0), 0);
+  const monthName = new Date(`${t.month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader title={`My ${monthName} target`} description={`${money(t.sold, t.currency)} of ${money(t.target, t.currency)}`} />
+      <CardBody>
+        <Meter
+          label="Sold this month"
+          figure={`${t.percent ?? 0}%`}
+          percent={Math.min(t.percent ?? 0, 100)}
+          tone={(t.percent ?? 0) >= 100 ? "ok" : undefined}
+          hint={
+            (t.percent ?? 0) >= 100
+              ? "Reached. Well done."
+              : t.daysLeft
+                ? `${t.daysLeft} day${t.daysLeft === 1 ? "" : "s"} left · ${money(left / t.daysLeft, t.currency)} a day to make it`
+                : `${money(left, t.currency)} to go`
+          }
+        />
       </CardBody>
     </Card>
   );

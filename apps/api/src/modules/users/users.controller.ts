@@ -50,6 +50,14 @@ export class UsersController {
     return { ok: true };
   }
 
+  /** Ask this person to turn on two-step sign-in (once a day at most). */
+  @Post(":id/two-step/remind")
+  @HttpCode(200)
+  @RequirePermissions("users.manage")
+  remindTwoStep(@CurrentUser() actor: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.users.remindTwoStep(actor, id);
+  }
+
   @Post(":id/two-step/reset")
   @HttpCode(200)
   @RequirePermissions("users.manage")

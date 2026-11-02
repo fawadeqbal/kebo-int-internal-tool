@@ -144,6 +144,10 @@ describe("order flow: from asking factories to SAT", () => {
     await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: "2099-01-01" }).expect(400);
     let f = (await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: "2026-10-27" }).expect(200)).body;
     expect(stepState(f)).toMatchObject({ factory: "done", production: "current" });
+    // The order's stage follows: ordered from the factory → In production, said in its history.
+    const moved = (await api(app, sana).get(`/orders/${orderId}`)).body;
+    expect(moved.stage).toBe("in_production");
+    expect(moved.history.at(-1)).toMatchObject({ from: "confirmed", to: "in_production", note: "ordered from the factory" });
 
     f = (
       await api(app, sana)
@@ -178,7 +182,11 @@ describe("order flow: from asking factories to SAT", () => {
     expect(ship).toMatchObject({ mode: "sea", status: "booked", portOfDischarge: "Karachi", eta: "2026-12-15" });
     await api(app, sana).patch(`/shipments/${ship.id}`, { eta: "2026-11-01" }).expect(400); // before ETD
     await api(app, sana).post(`/orders/${orderId}/shipments`, { etd: "2026-12-01", eta: "2026-11-01" }).expect(422);
-    f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "departed", blNo: "COSU6281734510", containerNo: "CSNU7154420" }).expect(200)).body;
+    expect((await api(app, sana).get(`/orders/${orderId}`)).body.stage).toBe("in_production"); // booked is not shipped
+    f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "departed", departedOn: "2026-10-30", blNo: "COSU6281734510", containerNo: "CSNU7154420" }).expect(200)).body;
+    const sailed = (await api(app, sana).get(`/orders/${orderId}`)).body;
+    expect(sailed).toMatchObject({ stage: "shipped", shippedOn: "2026-10-30", blNo: "COSU6281734510" });
+    expect(sailed.history.at(-1)).toMatchObject({ from: "in_production", to: "shipped", note: "a shipment left" });
     expect(f.steps.find((s: { key: string }) => s.key === "shipping").sub).toBe("On the way");
     f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "arrived", arrivedOn: "2026-11-01" }).expect(200)).body;
     expect(stepState(f)).toMatchObject({ shipping: "done", documents: "current" });

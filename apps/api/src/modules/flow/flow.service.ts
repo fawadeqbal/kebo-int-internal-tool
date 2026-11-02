@@ -44,7 +44,8 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess, OrdersService } from "../orders/orders.service";
+import type { DomainEvent } from "../../common/events/event-bus";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
@@ -149,6 +150,7 @@ export class FlowService {
     private readonly audit: AuditService,
     private readonly clock: Clock,
     private readonly limits: LimitsService,
+    private readonly orders: OrdersService,
   ) {}
 
   /* ---------------------------------------------------------------- guards */
@@ -463,7 +465,7 @@ export class FlowService {
   async setFactoryOrder(user: SessionUser, id: string, input: FactoryOrderInput) {
     await this.must(user, "orders.update", null, "change orders");
     if (input.factoryOrderedOn && input.factoryOrderedOn > this.clock.today()) throw new DomainError("The factory order date cannot be in the future.");
-    await this.prisma.tx(async (tx) => {
+    const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       await tx.order.update({ where: { id }, data: { factoryOrderedOn: toDbDateOrNull(input.factoryOrderedOn) } });
       await this.log(
@@ -474,7 +476,10 @@ export class FlowService {
         { factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn) },
         input,
       );
+      // Ordered from the factory: the order is in production.
+      return input.factoryOrderedOn ? this.orders.followFlow(tx, user, id, "in_production", "ordered from the factory") : null;
     });
+    await this.orders.announce(event);
     return this.get(user, id);
   }
 
@@ -533,25 +538,36 @@ export class FlowService {
 
   async addShipment(user: SessionUser, id: string, input: ShipmentInput) {
     await this.must(user, "shipping.manage", "shipping", "manage shipping");
-    await this.prisma.tx(async (tx) => {
+    const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       const s = await tx.shipment.create({ data: { orderId: id, ...this.shipmentData(input) } });
       await this.log(tx, user, id, `${o.refNo}: shipment added (${input.mode}${input.blNo ? `, B/L ${input.blNo}` : ""})`, undefined, { shipmentId: s.id, ...input });
+      return this.shipped(tx, user, id, input.status, input.departedOn, input.blNo);
     });
+    await this.orders.announce(event);
     return this.get(user, id);
   }
 
   async updateShipment(user: SessionUser, shipmentId: string, input: ShipmentUpdateInput) {
     await this.must(user, "shipping.manage", "shipping", "manage shipping");
     const orderId = await this.orderOf("shipment", shipmentId);
-    await this.prisma.tx(async (tx) => {
+    const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, orderId);
       const before = await tx.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
       const next = { etd: fromDbDateOrNull(before.etd), eta: fromDbDateOrNull(before.eta), ...input };
       if (next.etd && next.eta && next.eta < next.etd) throw new DomainError("The arrival date (ETA) cannot be before the departure date (ETD).");
       await tx.shipment.update({ where: { id: shipmentId }, data: this.shipmentData(input) });
       await this.log(tx, user, orderId, `${o.refNo}: shipment changed${input.status ? ` (${input.status})` : ""}`, { status: before.status, blNo: before.blNo }, input);
+      return this.shipped(
+        tx,
+        user,
+        orderId,
+        input.status ?? before.status,
+        input.departedOn !== undefined ? input.departedOn : fromDbDateOrNull(before.departedOn),
+        input.blNo !== undefined ? input.blNo : before.blNo,
+      );
     });
+    await this.orders.announce(event);
     return this.get(user, orderId);
   }
 
@@ -565,6 +581,12 @@ export class FlowService {
       await this.log(tx, user, orderId, `${o.refNo}: shipment removed${before.blNo ? ` (B/L ${before.blNo})` : ""}`, before, undefined);
     });
     return this.get(user, orderId);
+  }
+
+  /** A shipment that has left moves the order to Shipped (its date and B/L with it). */
+  private shipped(tx: Tx, user: SessionUser, orderId: string, status: ShipmentStatus, departedOn: string | null | undefined, blNo: string | null | undefined): Promise<DomainEvent | null> {
+    if (status !== "departed" && status !== "arrived" && status !== "cleared") return Promise.resolve(null);
+    return this.orders.followFlow(tx, user, orderId, "shipped", "a shipment left", { shippedOn: departedOn ?? null, blNo: blNo ?? null });
   }
 
   private shipmentData(input: Partial<ShipmentInput>) {

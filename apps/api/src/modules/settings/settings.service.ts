@@ -3,6 +3,7 @@ import { readSettings, SETTINGS, type Settings, type SettingsKey } from "@kebo/s
 import type { Prisma } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
+import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
 import { CompanyContext } from "../../common/company/company-context";
@@ -25,6 +26,7 @@ export class SettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly clock: Clock,
   ) {}
 
   async get(): Promise<Settings> {
@@ -82,6 +84,19 @@ export class SettingsService {
     const changed = watched.filter(
       (f) => JSON.stringify((before as Record<string, unknown>)[f]) !== JSON.stringify((value as Record<string, unknown>)[f]),
     );
+    // The date each exchange rate was last changed (kept here, whatever the form sent).
+    if (key === "sales") {
+      const b = before as Settings["sales"];
+      const v = value as Settings["sales"];
+      const today = this.clock.today();
+      v.rateDates = Object.fromEntries(
+        Object.entries(v.exchangeRates).flatMap(([c, r]) => {
+          const was = b.exchangeRates?.[c];
+          const date = was === r ? b.rateDates?.[c] : today;
+          return date ? [[c, date]] : [];
+        }),
+      );
+    }
     const reason = changed.length
       ? requireReason(typeof given === "string" ? given.slice(0, 500) : null, "settings", "money settings change")
       : typeof given === "string"

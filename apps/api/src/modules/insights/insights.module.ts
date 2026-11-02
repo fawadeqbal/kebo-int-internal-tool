@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Module, Param, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { isISODate, type ISODate } from "@kebo/utils";
@@ -40,6 +40,32 @@ class InsightsController {
   @Put("insights/targets/:month")
   setTarget(@CurrentUser() user: SessionUser, @Param("month") m: string, @Body(Validate(z.object({ amount: z.coerce.number().min(0).max(1e12).nullable() }))) body: { amount: number | null }) {
     return this.insights.setTarget(user, month.parse(m), body.amount);
+  }
+
+  /** Targets per person for a year, with the people to set them for. */
+  @RequireFeature("insights")
+  @Get("insights/targets/people")
+  personTargets(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ year: z.coerce.number().int().min(2000).max(2100) }))) q: { year: number }) {
+    return this.insights.personTargets(user, q.year);
+  }
+
+  /** { amount } in the main currency for one person and month; 0 or null removes it. */
+  @RequireFeature("insights")
+  @Put("insights/targets/:month/people/:userId")
+  setPersonTarget(
+    @CurrentUser() user: SessionUser,
+    @Param("month") m: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body(Validate(z.object({ amount: z.coerce.number().min(0).max(1e12).nullable() }))) body: { amount: number | null },
+  ) {
+    return this.insights.setPersonTarget(user, month.parse(m), userId, body.amount);
+  }
+
+  /** My own target this month and how far I am. */
+  @RequireFeature("insights")
+  @Get("me/target")
+  myTarget(@CurrentUser() user: SessionUser) {
+    return this.insights.myTarget(user);
   }
 
   /** What customers still owe, order by order (Money → To receive). */

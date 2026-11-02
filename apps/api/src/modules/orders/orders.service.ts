@@ -16,6 +16,7 @@ import {
   previousStage,
   proformaNumber,
   STAGE_BUTTON,
+  STAGE_FLOW,
   type MoveStageInput,
   type OrderDetailsInput,
   type OrderFacts,
@@ -648,6 +649,51 @@ export class OrdersService {
     });
     await this.events.publish(event);
     return this.get(user, id);
+  }
+
+  /**
+   * The order flow moved on (ordered from the factory, a shipment left): the
+   * order's stage follows by itself, forward only and only while it is open.
+   * No warnings are asked (the work already happened); the history says why.
+   * Runs inside the caller's transaction; publish the returned event after it.
+   */
+  async followFlow(tx: Tx, user: SessionUser, orderId: string, to: "in_production" | "shipped", why: string, facts: { shippedOn?: ISODate | null; blNo?: string | null } = {}) {
+    const o = await this.load(user, orderId, tx);
+    if (o.status !== "open" || STAGE_FLOW.indexOf(o.stage) >= STAGE_FLOW.indexOf(to)) return null;
+    const data: Prisma.OrderUpdateInput = { stage: to, stageSince: new Date() };
+    let shippedOn: ISODate | null = null;
+    if (to === "shipped") {
+      const today = this.clock.today();
+      shippedOn = facts.shippedOn && facts.shippedOn <= today ? facts.shippedOn : (fromDbDateOrNull(o.shippedOn) ?? today);
+      data.shippedOn = toDbDate(shippedOn);
+      if (facts.blNo && !o.blNo) data.blNo = facts.blNo;
+    }
+    await tx.order.update({ where: { id: o.id }, data });
+    await this.datePlan(tx, o, to, true, null, shippedOn);
+    await tx.orderStageChange.create({ data: { orderId: o.id, fromStage: o.stage, toStage: to, note: why, confirmed: false, byId: user.id } });
+    await this.audit.record(tx, {
+      userId: user.id,
+      action: "stage_change",
+      entityType: "order",
+      entityId: o.id,
+      summary: `${o.refNo}: ${ORDER_STAGE_LABEL[o.stage]} → ${ORDER_STAGE_LABEL[to]} by itself (${why})`,
+      oldValues: { stage: o.stage },
+      newValues: { stage: to },
+    });
+    return {
+      type: "order.stageChanged",
+      orderId: o.id,
+      refNo: o.refNo,
+      from: o.stage,
+      to,
+      actorId: user.id,
+      notify: [o.inquiry.assigneeId].filter((v): v is string => !!v),
+    } satisfies DomainEvent;
+  }
+
+  /** Publish what followFlow returned, once its transaction is committed. */
+  async announce(event: DomainEvent | null) {
+    if (event) await this.events.publish(event);
   }
 
   /**

@@ -232,3 +232,30 @@ export async function reminderAction(what: "snooze" | "done" | "restore", key: s
   if (r.ok) revalidatePath("/dashboard");
   return r;
 }
+
+/**
+ * A month's row of targets: the company's and each person's (fields `company`
+ * and `p:<userId>`). Only the fields that changed are sent; empty removes one.
+ */
+export async function saveTargetRowAction(month: string, before: Record<string, string>, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const clean = (x: string | undefined) => (x ?? "").replace(/[,\s]/g, "");
+  const changed = Object.keys(v).filter((k) => (k === "company" || k.startsWith("p:")) && clean(v[k]) !== clean(before[k]));
+  const r = await attempt(
+    form,
+    async () => {
+      for (const k of changed) {
+        const amount = clean(v[k]);
+        const body = { amount: amount ? Number(amount) : null };
+        if (k === "company") await api.put(`/insights/targets/${month}`, body);
+        else await api.put(`/insights/targets/${month}/people/${k.slice(2)}`, body);
+      }
+    },
+    changed.length ? "Targets saved." : "Nothing changed.",
+  );
+  if (r.ok) {
+    revalidatePath("/insights");
+    revalidatePath("/dashboard");
+  }
+  return r;
+}
