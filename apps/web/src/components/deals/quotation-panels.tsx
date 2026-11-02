@@ -58,7 +58,7 @@ export function StartRevision({
       </div>
     );
   return (
-    <div className="w-full rounded-xl border border-primary/30 bg-primary-soft/20 p-4">
+    <div className="w-full rounded-xl border border-primary/30 bg-primary-soft/20 p-3 sm:p-4">
       <h3 className="mb-1 text-sm font-semibold">New revision R{draft.number}</h3>
       <p className="mb-4 text-xs text-muted">{first ? "Starts with the factory offer that covers the most at the lowest cost, priced at the default margin. Add more offers as Options B, C… for the customer to choose from." : "Starts as a copy of the latest revision. Change what is different, then save the draft."}</p>
       <RevisionEditor action={action} number={draft.number} initial={draft} offers={offers} loadOffers={loadOffers} showCosts={showCosts} submitLabel={`Save R${draft.number} as a draft`} onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />

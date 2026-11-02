@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
-import { can } from "@kebo/shared";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { BASIS_STEP_LABEL, can, type BasisStep } from "@kebo/shared";
 import { Alert, ButtonLink, Card, CardBody, CardHeader, cn, RevisionBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -53,6 +53,10 @@ export default async function QuotationPage({
   const accepted = q.revisions.find((r) => r.status === "accepted");
   const order = d.orders.find((o) => o.status !== "cancelled");
   const move = (r: RevisionView) => moveRevisionAction.bind(null, d.id, r.id);
+  // The customer said no (or let it lapse) and nothing new is being drafted: the next step is a new revision, offered right there.
+  const startHere = manage && q.canStartRevision && !draft && !!live && viewing?.id === live.id && (live.status === "rejected" || live.status === "expired");
+  // R1 starts from the offer the API picks: say which, so nobody has to guess.
+  const firstOffer = q.revisions.length === 0 && startValues?.options[0]?.factoryQuoteId ? (offers?.offers.find((o) => o.factoryQuoteId === startValues.options[0]!.factoryQuoteId) ?? null) : null;
 
   // Shown to everyone who makes quotations; disabled with the API's reason when it cannot start now.
   const start = quoter && (
@@ -96,11 +100,29 @@ export default async function QuotationPage({
             description="Each option you offer is one factory's offer from the Factory prices tab, with your prices. The customer accepts one option."
           />
           <CardBody className="flex flex-col gap-3">
+            {firstOffer && manage && (
+              <div className="flex flex-col gap-0.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5 text-sm">
+                <span className="text-xs font-semibold tracking-wide text-muted uppercase">R1 will start with</span>
+                <span>
+                  <b>Option A · {firstOffer.factory.name}</b>:{" "}
+                  {firstOffer.coverage.missing.length ? `covers all but ${firstOffer.coverage.missing.join(", ")}` : "covers everything the customer asked for"}
+                  {showCosts && firstOffer.totalCost ? `, our cost ${money(firstOffer.totalCost, offers!.currency)}` : ""}, priced at your default {offers!.defaultMargin}% margin.
+                </span>
+                {offers!.offers.length > 1 && <span className="text-xs text-text-2">Add the other offers as Options B, C… inside the draft.</span>}
+              </div>
+            )}
             {quoter ? start : <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this inquiry makes the quotation."}</p>}
           </CardBody>
         </Card>
       )}
 
+      {q.revisions.length > 0 && !manage && !(accepted && order) && (
+        <Alert tone="info">
+          {quoter && q.whyNotStart
+            ? q.whyNotStart
+            : "Only the person handling this inquiry (or a manager) can change the quotation or record the customer's answer."}
+        </Alert>
+      )}
       {draft && (
         <Card className="border-primary/30">
           <CardHeader
@@ -114,7 +136,8 @@ export default async function QuotationPage({
               !manage ? <FileActions viewHref={printHref(draft)} pdfHref={pdfHref(draft)} /> : undefined
             }
           />
-          <CardBody>
+          <CardBody className="flex flex-col gap-4">
+            <DraftChecks r={draft} />
             {manage && draftValues && offers ? (
               <DraftPanel
                 key={draft.id}
@@ -172,6 +195,35 @@ export default async function QuotationPage({
                 )}
               </div>
             )}
+            {viewing.status === "sent" && viewing.validUntil < today && (
+              <Alert tone="warning">
+                <b>Its validity passed on {date(viewing.validUntil)}.</b> Ask the customer: if they still want it, start a new revision with new dates and
+                prices; if not, mark it expired.
+              </Alert>
+            )}
+            {startHere && (
+              <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2/60 p-3">
+                <p className="text-sm">
+                  {viewing.status === "rejected" ? (
+                    <>
+                      <b>The customer rejected R{viewing.number}</b>
+                      {viewing.answeredOn ? ` on ${date(viewing.answeredOn)}` : ""}.
+                    </>
+                  ) : (
+                    <>
+                      <b>R{viewing.number} expired</b>
+                      {viewing.answeredOn ? ` on ${date(viewing.answeredOn)}` : ""}.
+                    </>
+                  )}{" "}
+                  Try again with a new revision (it starts as a copy of R{viewing.number}), or close the deal as lost on{" "}
+                  <Link href={`/inquiries/${d.id}`} className="font-medium text-primary hover:underline">
+                    Overview
+                  </Link>
+                  .
+                </p>
+                {start}
+              </div>
+            )}
             {viewing.status === "superseded" && (
               <Alert tone="info">
                 R{viewing.number} was replaced by a newer revision; the customer&apos;s answer is recorded on the newest one.
@@ -188,16 +240,16 @@ export default async function QuotationPage({
             title="Revisions"
             description={q.quotation ? `${q.quotation.refNo} · the newest one is the one that counts` : undefined}
           />
-          {quoter && <div className="border-b border-line px-4 py-3">{start}</div>}
+          {quoter && !startHere && <div className="border-b border-line px-4 py-3">{start}</div>}
           <Table>
             <THead>
               <tr>
                 <Th>Revision</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Total</Th>
-                <Th>Valid until</Th>
-                <Th>Sent</Th>
-                <Th>Answered</Th>
+                <Th className="hidden sm:table-cell">Valid until</Th>
+                <Th className="hidden md:table-cell">Sent</Th>
+                <Th className="hidden md:table-cell">Answered</Th>
                 <Th className="relative">
                   <span className="sr-only">Print</span>
                 </Th>
@@ -231,9 +283,9 @@ export default async function QuotationPage({
                       money(r.total, r.currency)
                     )}
                   </Td>
-                  <Td className="whitespace-nowrap">{date(r.validUntil)}</Td>
-                  <Td className="whitespace-nowrap">{date(r.sentOn)}</Td>
-                  <Td className="whitespace-nowrap">{date(r.answeredOn)}</Td>
+                  <Td className="hidden whitespace-nowrap sm:table-cell">{date(r.validUntil)}</Td>
+                  <Td className="hidden whitespace-nowrap md:table-cell">{date(r.sentOn)}</Td>
+                  <Td className="hidden whitespace-nowrap md:table-cell">{date(r.answeredOn)}</Td>
                   <Td className="text-right whitespace-nowrap">
                     <Link href={printHref(r)} target="_blank" className="text-xs font-medium text-primary hover:underline">
                       Print
@@ -253,6 +305,53 @@ export default async function QuotationPage({
           </Table>
         </Card>
       )}
+    </div>
+  );
+}
+
+/** What to look at before a draft goes to the customer: lines without a price, items an option leaves out. */
+function DraftChecks({ r }: { r: RevisionView }) {
+  const many = r.options.length > 1;
+  const checks = r.options.flatMap((o) => {
+    const who = many ? `Option ${o.letter}` : "The quotation";
+    const out: string[] = [];
+    const unpriced = o.lines.filter((l) => !(Number(l.unitPrice) > 0)).length;
+    if (unpriced) out.push(`${who}: ${unpriced} line${unpriced === 1 ? "" : "s"} without a price.`);
+    if (o.factory && o.coverage.missing.length)
+      out.push(`${who} does not include ${o.coverage.missing.join(", ")}; the customer will see ${o.coverage.missing.length === 1 ? "it" : "them"} missing.`);
+    // People who see costs: the costs to reach our basis (freight…) are part of the price, so a missing one makes the margin look better than it is.
+    if (o.costing && o.factory) {
+      if (o.factoryBasis === null) out.push(`${who}: the factory's price basis is not said, so the costs to reach ${r.incoterm} are not in its cost.`);
+      else if (o.gap) {
+        const have = new Set((o.costs ?? []).map((c) => c.step));
+        const asLine = (step: BasisStep) => o.lines.some((l) => l.type === "charge" && l.description.toLowerCase().startsWith(BASIS_STEP_LABEL[step].toLowerCase().split(" ")[0]!));
+        const missing = o.gap.needed.filter((x) => !have.has(x) && !asLine(x));
+        if (missing.length)
+          out.push(`${who}: ${missing.map((x) => BASIS_STEP_LABEL[x].toLowerCase()).join(" and ")} to reach ${r.incoterm} ${missing.length === 1 ? "is" : "are"} not entered, so its cost and margin are too low.`);
+      }
+    }
+    if (o.costing && o.costing.marginPercent !== null && o.costing.marginPercent < 0) out.push(`${who} sells below cost.`);
+    return out;
+  });
+  if (!checks.length)
+    return (
+      <p role="status" className="flex items-center gap-2 rounded-lg border border-ok/30 bg-ok-soft px-3 py-2 text-sm">
+        <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden />
+        <span>
+          <b className="text-ok">Ready to send.</b> Check it with View / Print, then mark it as sent.
+        </span>
+      </p>
+    );
+  return (
+    <div role="status" className="flex flex-col gap-1.5 rounded-lg border border-warn/30 bg-warn-soft/60 p-3 text-sm">
+      <p className="flex items-center gap-2 font-semibold text-warn">
+        <AlertTriangle className="size-4 shrink-0" aria-hidden /> Before you send R{r.number}
+      </p>
+      <ul className="flex list-disc flex-col gap-1 pl-6">
+        {checks.map((c) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
     </div>
   );
 }
