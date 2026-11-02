@@ -38,7 +38,7 @@ import {
   type ShipmentInput,
   type ShipmentUpdateInput,
 } from "@kebo/shared";
-import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import { dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -48,6 +48,12 @@ import { orderAccess, OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
+
+type FlowAction =
+  "route" | "bank_contract" | "factory_order" | "production" | "shipment" | "document" | "bank_step" | "delivery" | "sat" | "claim";
+
+/** The production timeline is the checklist's own Production items. */
+const productionWhere = { step: "production", key: null } as const;
 
 /** What the step line is worked out from (see @kebo/shared flowSteps), for one order with its flow rows. */
 interface FlowRows {
@@ -60,7 +66,8 @@ interface FlowRows {
   packedAt: Date | null;
   deliveredOn: Date | null;
   satDoneOn: Date | null;
-  production: { doneOn: Date | null }[];
+  /** The production items of the checklist (done or skipped). */
+  checklist: { doneAt: Date | null; skippedAt: Date | null }[];
   shipments: { mode: ShipMode; status: ShipmentStatus }[];
   documents: { kind: OrderDocumentKind; status: OrderDocumentStatus }[];
   bankSteps: { step: BankStepKind }[];
@@ -83,7 +90,7 @@ export function factsOf(o: FlowRows, depositIn: boolean): FlowFacts {
     route,
     depositIn,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
-    production: { total: o.production.length, done: o.production.filter((p) => p.doneOn).length },
+    production: { total: o.checklist.length, done: o.checklist.filter((p) => p.doneAt || p.skippedAt).length },
     readyOn: fromDbDateOrNull(o.readyOn),
     shipments: {
       total: o.shipments.length,
@@ -104,10 +111,17 @@ export function factsOf(o: FlowRows, depositIn: boolean): FlowFacts {
 }
 
 /** The deposit (or everything, with no deposit) has come in, in the order's currency. */
-function depositInOf(o: { total: Prisma.Decimal; currency: string; depositPercent: Prisma.Decimal; payments: { currency: string; amount: Prisma.Decimal; bankCharges: Prisma.Decimal }[] }) {
+function depositInOf(o: {
+  total: Prisma.Decimal;
+  currency: string;
+  depositPercent: Prisma.Decimal;
+  payments: { currency: string; amount: Prisma.Decimal; bankCharges: Prisma.Decimal }[];
+}) {
   const money = settle(
     decimalToMinor(o.total),
-    o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
+    o.payments
+      .filter((p) => p.currency === o.currency)
+      .map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
     Number(o.depositPercent),
   );
   return money.depositOutstandingMinor === 0 && (Number(o.depositPercent) > 0 || money.outstandingMinor === 0);
@@ -169,10 +183,19 @@ export class FlowService {
     return o;
   }
 
-  private async log(tx: Tx, user: SessionUser, orderId: string, summary: string, oldValues?: object, newValues?: object) {
+  /** Each change has its own action (flow.route, flow.shipment…), so the order's history can show it under its step. */
+  private async log(
+    tx: Tx,
+    user: SessionUser,
+    orderId: string,
+    action: FlowAction,
+    summary: string,
+    oldValues?: object,
+    newValues?: object,
+  ) {
     await this.audit.record(tx, {
       userId: user.id,
-      action: "update",
+      action: `flow.${action}`,
       entityType: "order",
       entityId: orderId,
       summary,
@@ -190,9 +213,16 @@ export class FlowService {
       include: {
         payments: { where: { voidedAt: null } },
         bankContract: true,
-        production: { orderBy: { sortOrder: "asc" }, include: { factory: { select: { id: true, name: true } } } },
+        checklist: {
+          where: productionWhere,
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          include: { factory: { select: { id: true, name: true } } },
+        },
         shipments: { orderBy: { createdAt: "asc" } },
-        documents: { orderBy: [{ kind: "asc" }, { updatedAt: "asc" }], include: { attachment: { select: { id: true, fileName: true, size: true, deletedAt: true } } } },
+        documents: {
+          orderBy: [{ kind: "asc" }, { updatedAt: "asc" }],
+          include: { attachment: { select: { id: true, fileName: true, size: true, deletedAt: true } } },
+        },
         bankSteps: true,
         satChecks: { orderBy: { sortOrder: "asc" } },
         claims: { orderBy: { openedOn: "desc" } },
@@ -290,16 +320,16 @@ export class FlowService {
       factory: { orderedOn: fromDbDateOrNull(o.factoryOrderedOn), readyOn: fromDbDateOrNull(o.readyOn), factories },
       production: has("production")
         ? {
-            steps: o.production.map((p) => ({
+            steps: o.checklist.map((p) => ({
               id: p.id,
-              title: p.title,
+              title: p.title ?? "",
               factory: p.factory,
-              plannedOn: fromDbDateOrNull(p.plannedOn),
-              doneOn: fromDbDateOrNull(p.doneOn),
+              plannedOn: fromDbDateOrNull(p.dueOn),
+              doneOn: p.doneAt ? dateIn(p.doneAt, this.clock.timeZone) : null,
               note: p.note,
-              late: !p.doneOn && !!p.plannedOn && fromDbDate(p.plannedOn) < this.clock.today(),
+              late: !p.doneAt && !p.skippedAt && !!p.dueOn && fromDbDate(p.dueOn) < this.clock.today(),
             })),
-            suggested: o.production.length ? [] : [...DEFAULT_PRODUCTION_STEPS],
+            suggested: o.checklist.length ? [] : [...DEFAULT_PRODUCTION_STEPS],
           }
         : null,
       shipping: has("shipping") ? { shipments } : null,
@@ -359,7 +389,15 @@ export class FlowService {
       // Not recorded: the system's own papers stand as the order does.
       const system = SYSTEM_DOCUMENTS[kind];
       const status: OrderDocumentStatus =
-        kind === "proforma_invoice" ? (o.proformaNo ? "ready" : "missing") : kind === "packing_list" ? (o.packedAt ? "ready" : "missing") : "missing";
+        kind === "proforma_invoice"
+          ? o.proformaNo
+            ? "ready"
+            : "missing"
+          : kind === "packing_list"
+            ? o.packedAt
+              ? "ready"
+              : "missing"
+            : "missing";
       return [
         {
           id: null,
@@ -401,7 +439,7 @@ export class FlowService {
         currency: true,
         depositPercent: true,
         payments: { where: { voidedAt: null }, select: { currency: true, amount: true, bankCharges: true } },
-        production: { select: { doneOn: true } },
+        checklist: { where: productionWhere, select: { doneAt: true, skippedAt: true } },
         shipments: { orderBy: { createdAt: "asc" }, select: { mode: true, status: true } },
         documents: { select: { kind: true, status: true } },
         bankSteps: { select: { step: true } },
@@ -430,7 +468,15 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, id);
       if (o.paymentRoute === input.route) return;
       await tx.order.update({ where: { id }, data: { paymentRoute: input.route } });
-      await this.log(tx, user, id, `${o.refNo}: payment route ${input.route ? PAYMENT_ROUTE_SHORT[input.route] : "cleared"}`, { route: o.paymentRoute }, { route: input.route });
+      await this.log(
+        tx,
+        user,
+        id,
+        "route",
+        `${o.refNo}: payment route ${input.route ? PAYMENT_ROUTE_SHORT[input.route] : "cleared"}`,
+        { route: o.paymentRoute },
+        { route: input.route },
+      );
     });
     return this.get(user, id);
   }
@@ -438,7 +484,8 @@ export class FlowService {
   async saveBankContract(user: SessionUser, id: string, input: BankContractInput) {
     await this.must(user, "orders.update", "bank_contracts", "change orders");
     if (input.amount !== null && !input.currency) throw new DomainError("Choose the currency of the amount.");
-    if (input.openedOn && input.expiresOn && input.expiresOn < input.openedOn) throw new DomainError("The contract cannot expire before it opens.");
+    if (input.openedOn && input.expiresOn && input.expiresOn < input.openedOn)
+      throw new DomainError("The contract cannot expire before it opens.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       if (o.paymentRoute !== "bank_contract" && o.paymentRoute !== "letter_of_credit")
@@ -457,14 +504,23 @@ export class FlowService {
       };
       const before = await tx.orderBankContract.findUnique({ where: { orderId: id } });
       await tx.orderBankContract.upsert({ where: { orderId: id }, create: { orderId: id, ...data }, update: data });
-      await this.log(tx, user, id, `${o.refNo}: ${o.paymentRoute === "letter_of_credit" ? "LC" : "bank contract"} ${before ? "changed" : "added"}`, before ?? undefined, input);
+      await this.log(
+        tx,
+        user,
+        id,
+        "bank_contract",
+        `${o.refNo}: ${o.paymentRoute === "letter_of_credit" ? "LC" : "bank contract"} ${before ? "changed" : "added"}`,
+        before ?? undefined,
+        input,
+      );
     });
     return this.get(user, id);
   }
 
   async setFactoryOrder(user: SessionUser, id: string, input: FactoryOrderInput) {
     await this.must(user, "orders.update", null, "change orders");
-    if (input.factoryOrderedOn && input.factoryOrderedOn > this.clock.today()) throw new DomainError("The factory order date cannot be in the future.");
+    if (input.factoryOrderedOn && input.factoryOrderedOn > this.clock.today())
+      throw new DomainError("The factory order date cannot be in the future.");
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       await tx.order.update({ where: { id }, data: { factoryOrderedOn: toDbDateOrNull(input.factoryOrderedOn) } });
@@ -472,7 +528,10 @@ export class FlowService {
         tx,
         user,
         id,
-        input.factoryOrderedOn ? `${o.refNo}: ordered from the factory on ${input.factoryOrderedOn}` : `${o.refNo}: factory order date cleared`,
+        "factory_order",
+        input.factoryOrderedOn
+          ? `${o.refNo}: ordered from the factory on ${input.factoryOrderedOn}`
+          : `${o.refNo}: factory order date cleared`,
         { factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn) },
         input,
       );
@@ -485,32 +544,55 @@ export class FlowService {
 
   /* ---------------------------------------------------------------- production */
 
+  /**
+   * The production timeline as a whole (kept for the phone app): it is the
+   * checklist's own Production items, so rows sent with their id are changed,
+   * others added (Mark done), missing ones removed.
+   */
   async saveProduction(user: SessionUser, id: string, input: ProductionInput) {
     await this.must(user, "orders.update", "production", "change orders");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      const existing = await tx.productionStep.findMany({ where: { orderId: id } });
+      const existing = await tx.orderChecklistItem.findMany({ where: { orderId: id, ...productionWhere } });
+      const doneAt = (on: string | null, was: { doneAt: Date | null } | undefined) =>
+        on ? (was?.doneAt && dateIn(was.doneAt, this.clock.timeZone) === on ? was.doneAt : toDbDate(on)) : null;
       await this.replaceList(
         tx,
         existing.map((e) => e.id),
         input.steps,
-        (s, i) => ({
-          title: s.title,
-          factoryId: s.factoryId,
-          plannedOn: toDbDateOrNull(s.plannedOn),
-          doneOn: toDbDateOrNull(s.doneOn),
-          note: s.note,
-          sortOrder: i,
-        }),
+        (s, i) => {
+          const was = existing.find((e) => e.id === s.id);
+          const at = doneAt(s.doneOn, was);
+          return {
+            title: s.title,
+            factoryId: s.factoryId,
+            dueOn: toDbDateOrNull(s.plannedOn),
+            doneAt: at,
+            doneById: at ? (was?.doneAt ? was.doneById : user.id) : null,
+            note: s.note,
+            sortOrder: (i + 1) * 10,
+          };
+        },
         {
-          remove: (ids) => tx.productionStep.deleteMany({ where: { id: { in: ids }, orderId: id } }),
-          update: (rowId, data) => tx.productionStep.update({ where: { id: rowId }, data }),
-          create: (data) => tx.productionStep.create({ data: { ...data, orderId: id } }),
+          remove: (ids) => tx.orderChecklistItem.deleteMany({ where: { id: { in: ids }, orderId: id } }),
+          update: (rowId, data) => tx.orderChecklistItem.update({ where: { id: rowId }, data }),
+          create: (data) =>
+            tx.orderChecklistItem.create({ data: { ...data, orderId: id, step: "production", tool: "done", createdById: user.id } }),
         },
         "production step",
       );
+      // The timeline was made here: the company's list is not copied in on top of it.
+      if (!o.checklistSeededAt) await tx.order.update({ where: { id }, data: { checklistSeededAt: new Date() } });
       const done = input.steps.filter((s) => s.doneOn).length;
-      await this.log(tx, user, id, `${o.refNo}: production timeline saved (${done} of ${input.steps.length} done)`, undefined, input);
+      await this.log(
+        tx,
+        user,
+        id,
+        "production",
+        `${o.refNo}: production timeline saved (${done} of ${input.steps.length} done)`,
+        undefined,
+        { ...input, step: "production" },
+      );
     });
     return this.get(user, id);
   }
@@ -521,10 +603,16 @@ export class FlowService {
     existingIds: string[],
     items: I[],
     data: (item: I, index: number) => D,
-    ops: { remove: (ids: string[]) => Promise<unknown>; update: (id: string, d: D) => Promise<unknown>; create: (d: D) => Promise<unknown> },
+    ops: {
+      remove: (ids: string[]) => Promise<unknown>;
+      update: (id: string, d: D) => Promise<unknown>;
+      create: (d: D) => Promise<unknown>;
+    },
     what: string,
   ) {
-    for (const item of items) if (item.id && !existingIds.includes(item.id)) throw new DomainError(`That ${what} is not on this order any more. Reload and try again.`);
+    for (const item of items)
+      if (item.id && !existingIds.includes(item.id))
+        throw new DomainError(`That ${what} is not on this order any more. Reload and try again.`);
     const keep = new Set(items.map((i) => i.id).filter(Boolean) as string[]);
     const gone = existingIds.filter((x) => !keep.has(x));
     if (gone.length) await ops.remove(gone);
@@ -541,7 +629,15 @@ export class FlowService {
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       const s = await tx.shipment.create({ data: { orderId: id, ...this.shipmentData(input) } });
-      await this.log(tx, user, id, `${o.refNo}: shipment added (${input.mode}${input.blNo ? `, B/L ${input.blNo}` : ""})`, undefined, { shipmentId: s.id, ...input });
+      await this.log(
+        tx,
+        user,
+        id,
+        "shipment",
+        `${o.refNo}: shipment added (${input.mode}${input.blNo ? `, B/L ${input.blNo}` : ""})`,
+        undefined,
+        { shipmentId: s.id, ...input },
+      );
       return this.shipped(tx, user, id, input.status, input.departedOn, input.blNo);
     });
     await this.orders.announce(event);
@@ -555,9 +651,18 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, orderId);
       const before = await tx.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
       const next = { etd: fromDbDateOrNull(before.etd), eta: fromDbDateOrNull(before.eta), ...input };
-      if (next.etd && next.eta && next.eta < next.etd) throw new DomainError("The arrival date (ETA) cannot be before the departure date (ETD).");
+      if (next.etd && next.eta && next.eta < next.etd)
+        throw new DomainError("The arrival date (ETA) cannot be before the departure date (ETD).");
       await tx.shipment.update({ where: { id: shipmentId }, data: this.shipmentData(input) });
-      await this.log(tx, user, orderId, `${o.refNo}: shipment changed${input.status ? ` (${input.status})` : ""}`, { status: before.status, blNo: before.blNo }, input);
+      await this.log(
+        tx,
+        user,
+        orderId,
+        "shipment",
+        `${o.refNo}: shipment changed${input.status ? ` (${input.status})` : ""}`,
+        { status: before.status, blNo: before.blNo },
+        input,
+      );
       return this.shipped(
         tx,
         user,
@@ -578,20 +683,47 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, orderId);
       const before = await tx.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
       await tx.shipment.delete({ where: { id: shipmentId } });
-      await this.log(tx, user, orderId, `${o.refNo}: shipment removed${before.blNo ? ` (B/L ${before.blNo})` : ""}`, before, undefined);
+      await this.log(
+        tx,
+        user,
+        orderId,
+        "shipment",
+        `${o.refNo}: shipment removed${before.blNo ? ` (B/L ${before.blNo})` : ""}`,
+        before,
+        undefined,
+      );
     });
     return this.get(user, orderId);
   }
 
   /** A shipment that has left moves the order to Shipped (its date and B/L with it). */
-  private shipped(tx: Tx, user: SessionUser, orderId: string, status: ShipmentStatus, departedOn: string | null | undefined, blNo: string | null | undefined): Promise<DomainEvent | null> {
+  private shipped(
+    tx: Tx,
+    user: SessionUser,
+    orderId: string,
+    status: ShipmentStatus,
+    departedOn: string | null | undefined,
+    blNo: string | null | undefined,
+  ): Promise<DomainEvent | null> {
     if (status !== "departed" && status !== "arrived" && status !== "cleared") return Promise.resolve(null);
     return this.orders.followFlow(tx, user, orderId, "shipped", "a shipment left", { shippedOn: departedOn ?? null, blNo: blNo ?? null });
   }
 
   private shipmentData(input: Partial<ShipmentInput>) {
     const d: Prisma.ShipmentUncheckedUpdateInput = {};
-    for (const k of ["mode", "status", "forwarder", "bookingNo", "blNo", "vessel", "portOfLoading", "portOfDischarge", "containerNo", "containerType", "note"] as const) {
+    for (const k of [
+      "mode",
+      "status",
+      "forwarder",
+      "bookingNo",
+      "blNo",
+      "vessel",
+      "portOfLoading",
+      "portOfDischarge",
+      "containerNo",
+      "containerType",
+      "note",
+    ] as const) {
       if (input[k] !== undefined) (d as Record<string, unknown>)[k] = input[k];
     }
     for (const k of ["etd", "eta", "departedOn", "arrivedOn"] as const) if (input[k] !== undefined) d[k] = toDbDateOrNull(input[k]);
@@ -612,8 +744,14 @@ export class FlowService {
 
   /* ---------------------------------------------------------------- documents and the bank chain */
 
-  private async checkDocumentLinks(tx: Tx, order: { id: string; inquiryId: string }, shipmentId: string | null | undefined, attachmentId: string | null | undefined) {
-    if (shipmentId && !(await tx.shipment.findFirst({ where: { id: shipmentId, orderId: order.id } }))) throw new DomainError("That shipment is not on this order.");
+  private async checkDocumentLinks(
+    tx: Tx,
+    order: { id: string; inquiryId: string },
+    shipmentId: string | null | undefined,
+    attachmentId: string | null | undefined,
+  ) {
+    if (shipmentId && !(await tx.shipment.findFirst({ where: { id: shipmentId, orderId: order.id } })))
+      throw new DomainError("That shipment is not on this order.");
     if (attachmentId) {
       const a = await tx.attachment.findFirst({ where: { id: attachmentId, inquiryId: order.inquiryId, deletedAt: null } });
       if (!a) throw new DomainError("That file is not on this deal. Upload it to the deal's files first.");
@@ -640,7 +778,15 @@ export class FlowService {
           note: input.note,
         },
       });
-      await this.log(tx, user, id, `${o.refNo}: ${ORDER_DOCUMENT_LABEL[input.kind]} recorded (${input.status})`, undefined, input);
+      await this.log(
+        tx,
+        user,
+        id,
+        "document",
+        `${o.refNo}: ${ORDER_DOCUMENT_LABEL[input.kind]} recorded (${input.status})`,
+        undefined,
+        input,
+      );
     });
     return this.get(user, id);
   }
@@ -653,10 +799,19 @@ export class FlowService {
       await this.checkDocumentLinks(tx, o, input.shipmentId, input.attachmentId);
       const before = await tx.orderDocument.findUniqueOrThrow({ where: { id: docId } });
       const data: Prisma.OrderDocumentUncheckedUpdateInput = {};
-      for (const k of ["title", "number", "status", "shipmentId", "attachmentId", "note"] as const) if (input[k] !== undefined) (data as Record<string, unknown>)[k] = input[k];
+      for (const k of ["title", "number", "status", "shipmentId", "attachmentId", "note"] as const)
+        if (input[k] !== undefined) (data as Record<string, unknown>)[k] = input[k];
       if (input.issuedOn !== undefined) data.issuedOn = toDbDateOrNull(input.issuedOn);
       await tx.orderDocument.update({ where: { id: docId }, data });
-      await this.log(tx, user, orderId, `${o.refNo}: ${ORDER_DOCUMENT_LABEL[before.kind]} changed${input.status ? ` (${input.status})` : ""}`, { status: before.status, number: before.number }, input);
+      await this.log(
+        tx,
+        user,
+        orderId,
+        "document",
+        `${o.refNo}: ${ORDER_DOCUMENT_LABEL[before.kind]} changed${input.status ? ` (${input.status})` : ""}`,
+        { status: before.status, number: before.number },
+        input,
+      );
     });
     return this.get(user, orderId);
   }
@@ -668,7 +823,7 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, orderId);
       const before = await tx.orderDocument.findUniqueOrThrow({ where: { id: docId } });
       await tx.orderDocument.delete({ where: { id: docId } });
-      await this.log(tx, user, orderId, `${o.refNo}: ${ORDER_DOCUMENT_LABEL[before.kind]} removed`, before, undefined);
+      await this.log(tx, user, orderId, "document", `${o.refNo}: ${ORDER_DOCUMENT_LABEL[before.kind]} removed`, before, undefined);
     });
     return this.get(user, orderId);
   }
@@ -680,8 +835,20 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, id);
       if (!bankStepsFor(o.paymentRoute).includes(step)) throw new DomainError("That step is not part of this order's payment route.");
       const data = { doneOn: toDbDate(input.doneOn), courier: input.courier, reference: input.reference, note: input.note };
-      await tx.orderBankStep.upsert({ where: { orderId_step: { orderId: id, step } }, create: { orderId: id, step, ...data }, update: data });
-      await this.log(tx, user, id, `${o.refNo}: ${BANK_STEP_LABEL[step]} (${input.doneOn}${input.reference ? `, ${input.reference}` : ""})`, undefined, { step, ...input });
+      await tx.orderBankStep.upsert({
+        where: { orderId_step: { orderId: id, step } },
+        create: { orderId: id, step, ...data },
+        update: data,
+      });
+      await this.log(
+        tx,
+        user,
+        id,
+        "bank_step",
+        `${o.refNo}: ${BANK_STEP_LABEL[step]} (${input.doneOn}${input.reference ? `, ${input.reference}` : ""})`,
+        undefined,
+        { step, ...input },
+      );
     });
     return this.get(user, id);
   }
@@ -691,7 +858,7 @@ export class FlowService {
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       const n = await tx.orderBankStep.deleteMany({ where: { orderId: id, step } });
-      if (n.count) await this.log(tx, user, id, `${o.refNo}: ${BANK_STEP_LABEL[step]} undone`, { step }, undefined);
+      if (n.count) await this.log(tx, user, id, "bank_step", `${o.refNo}: ${BANK_STEP_LABEL[step]} undone`, { step }, undefined);
     });
     return this.get(user, id);
   }
@@ -701,10 +868,12 @@ export class FlowService {
   async saveDelivery(user: SessionUser, id: string, input: DeliveryInput) {
     await this.must(user, "delivery.manage", "delivery_sat", "manage delivery and SAT");
     const today = this.clock.today();
-    if ((input.deliveredOn && input.deliveredOn > today) || (input.satDoneOn && input.satDoneOn > today)) throw new DomainError("A date that has happened cannot be in the future.");
+    if ((input.deliveredOn && input.deliveredOn > today) || (input.satDoneOn && input.satDoneOn > today))
+      throw new DomainError("A date that has happened cannot be in the future.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      if (input.satEngineerId && !(await tx.user.findFirst({ where: { id: input.satEngineerId, isActive: true } }))) throw new DomainError("Choose an active person as the engineer.");
+      if (input.satEngineerId && !(await tx.user.findFirst({ where: { id: input.satEngineerId, isActive: true } })))
+        throw new DomainError("Choose an active person as the engineer.");
       const delivered = input.deliveredOn !== undefined ? input.deliveredOn : fromDbDateOrNull(o.deliveredOn);
       const satDone = input.satDoneOn !== undefined ? input.satDoneOn : fromDbDateOrNull(o.satDoneOn);
       if (satDone && !delivered) throw new DomainError("Record the delivery before signing off the SAT.");
@@ -722,11 +891,16 @@ export class FlowService {
       if (input.satDoneOn !== undefined) data.satDoneOn = toDbDateOrNull(input.satDoneOn);
       if (input.satSignedBy !== undefined) data.satSignedBy = input.satSignedBy;
       await tx.order.update({ where: { id }, data });
-      const what = input.satDoneOn ? "SAT signed off" : input.deliveredOn ? `delivered on ${input.deliveredOn}` : "delivery and SAT details changed";
+      const what = input.satDoneOn
+        ? "SAT signed off"
+        : input.deliveredOn
+          ? `delivered on ${input.deliveredOn}`
+          : "delivery and SAT details changed";
       await this.log(
         tx,
         user,
         id,
+        "delivery",
         `${o.refNo}: ${what}`,
         { deliveredOn: fromDbDateOrNull(o.deliveredOn), deliveryCondition: o.deliveryCondition, satDoneOn: fromDbDateOrNull(o.satDoneOn) },
         input,
@@ -755,7 +929,7 @@ export class FlowService {
         "SAT point",
       );
       const passed = input.checks.filter((c) => c.result === "pass").length;
-      await this.log(tx, user, id, `${o.refNo}: SAT checklist saved (${passed} of ${input.checks.length} passed)`, undefined, input);
+      await this.log(tx, user, id, "sat", `${o.refNo}: SAT checklist saved (${passed} of ${input.checks.length} passed)`, undefined, input);
     });
     return this.get(user, id);
   }
@@ -765,8 +939,10 @@ export class FlowService {
     if (input.openedOn && input.openedOn > this.clock.today()) throw new DomainError("The date cannot be in the future.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      await tx.orderClaim.create({ data: { orderId: id, title: input.title, detail: input.detail, openedOn: toDbDate(input.openedOn ?? this.clock.today()) } });
-      await this.log(tx, user, id, `${o.refNo}: claim opened: ${input.title}`, undefined, input);
+      await tx.orderClaim.create({
+        data: { orderId: id, title: input.title, detail: input.detail, openedOn: toDbDate(input.openedOn ?? this.clock.today()) },
+      });
+      await this.log(tx, user, id, "claim", `${o.refNo}: claim opened: ${input.title}`, undefined, input);
     });
     return this.get(user, id);
   }
@@ -782,7 +958,13 @@ export class FlowService {
       const resolution = input.resolution !== undefined ? input.resolution : before.resolution;
       if (closing && !resolution) throw new DomainError("Say how the claim was settled.");
       const resolvedOn =
-        input.resolvedOn !== undefined ? input.resolvedOn : closing ? this.clock.today() : status === "open" || status === "with_factory" ? null : fromDbDateOrNull(before.resolvedOn);
+        input.resolvedOn !== undefined
+          ? input.resolvedOn
+          : closing
+            ? this.clock.today()
+            : status === "open" || status === "with_factory"
+              ? null
+              : fromDbDateOrNull(before.resolvedOn);
       if (resolvedOn && resolvedOn < fromDbDate(before.openedOn)) throw new DomainError("A claim cannot be settled before it was opened.");
       await tx.orderClaim.update({
         where: { id: claimId },
@@ -794,7 +976,15 @@ export class FlowService {
           resolvedOn: toDbDateOrNull(resolvedOn),
         },
       });
-      await this.log(tx, user, orderId, `${o.refNo}: claim "${before.title}" ${CLAIM_STATUS_LABEL[status].toLowerCase()}`, { status: before.status }, input);
+      await this.log(
+        tx,
+        user,
+        orderId,
+        "claim",
+        `${o.refNo}: claim "${before.title}" ${CLAIM_STATUS_LABEL[status].toLowerCase()}`,
+        { status: before.status },
+        input,
+      );
     });
     return this.get(user, orderId);
   }

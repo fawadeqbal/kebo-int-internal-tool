@@ -1,7 +1,16 @@
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
-import { BANK_STEP_LABEL, bankStepsFor, can, OPEN_STAGES, ORDER_DOCUMENT_LABEL, requiredDocuments } from "@kebo/shared";
+import {
+  BANK_STEP_LABEL,
+  bankStepsFor,
+  can,
+  FLOW_STEP_LABEL,
+  OPEN_STAGES,
+  ORDER_DOCUMENT_LABEL,
+  requiredDocuments,
+  STEP_PATH,
+} from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
@@ -13,6 +22,7 @@ import { inquiryAccess } from "../inquiries/inquiries.service";
 import { orderAccess } from "../orders/orders.service";
 import { LeaksService } from "../money/leaks.service";
 import { LimitsService } from "../../common/company/limits.service";
+import { ChecklistService } from "../checklist/checklist.service";
 
 export type ReminderLevel = "bad" | "warn" | "info";
 export type ReminderKind = "order" | "quote" | "deal" | "offer" | "money" | "ship";
@@ -53,6 +63,7 @@ export class RemindersListService {
     private readonly leaks: LeaksService,
     private readonly cache: ReadCache,
     private readonly limits: LimitsService,
+    private readonly checklist: ChecklistService,
   ) {}
 
   async list(user: SessionUser) {
@@ -73,7 +84,9 @@ export class RemindersListService {
 
     // 1. Orders: the next step or the money each one needs (mine; managers also every late one).
     const mine = await this.orders.todo(user);
-    const late = manager ? (await this.orders.list(user, { status: "open", lateOnly: true })).filter((o) => !mine.some((m) => m.id === o.id)) : [];
+    const late = manager
+      ? (await this.orders.list(user, { status: "open", lateOnly: true })).filter((o) => !mine.some((m) => m.id === o.id))
+      : [];
     for (const o of [...mine, ...late]) {
       if (!o.needs) continue;
       const days = o.needs.late ? daysBetween(o.needs.due, today) : 0;
@@ -98,7 +111,12 @@ export class RemindersListService {
         number: true,
         sentOn: true,
         validUntil: true,
-        quotation: { select: { refNo: true, inquiry: { select: { id: true, customer: { select: { name: true } }, assignee: { select: { name: true } } } } } },
+        quotation: {
+          select: {
+            refNo: true,
+            inquiry: { select: { id: true, customer: { select: { name: true } }, assignee: { select: { name: true } } } },
+          },
+        },
       },
     });
     for (const q of quotes) {
@@ -135,7 +153,17 @@ export class RemindersListService {
     // 3. Deals: nobody on a new one, a new one not started, needed-by date passed.
     const deals = await this.prisma.db.inquiry.findMany({
       where: { ...scope, onHold: false, stage: { in: [...OPEN_STAGES] } },
-      select: { id: true, refNo: true, title: true, stage: true, createdAt: true, requiredBy: true, assigneeId: true, assignee: { select: { name: true } }, customer: { select: { name: true } } },
+      select: {
+        id: true,
+        refNo: true,
+        title: true,
+        stage: true,
+        createdAt: true,
+        requiredBy: true,
+        assigneeId: true,
+        assignee: { select: { name: true } },
+        customer: { select: { name: true } },
+      },
     });
     for (const d of deals) {
       const created = d.createdAt.toISOString().slice(0, 10);
@@ -181,8 +209,17 @@ export class RemindersListService {
     // 4. Factory prices running out on deals still open.
     if (can(user, "sourcing.manage")) {
       const offers = await this.prisma.db.factoryQuote.findMany({
-        where: { deletedAt: null, validUntil: { lte: toDbDate(addDays(today, 3)) }, inquiry: { ...scope, onHold: false, stage: { in: ["sourcing", "quoted"] } } },
-        select: { id: true, validUntil: true, factory: { select: { name: true } }, inquiry: { select: { id: true, refNo: true, assignee: { select: { name: true } } } } },
+        where: {
+          deletedAt: null,
+          validUntil: { lte: toDbDate(addDays(today, 3)) },
+          inquiry: { ...scope, onHold: false, stage: { in: ["sourcing", "quoted"] } },
+        },
+        select: {
+          id: true,
+          validUntil: true,
+          factory: { select: { name: true } },
+          inquiry: { select: { id: true, refNo: true, assignee: { select: { name: true } } } },
+        },
       });
       for (const f of offers) {
         const until = fromDbDate(f.validUntil!);
@@ -242,7 +279,11 @@ export class RemindersListService {
     return items;
   }
 
-  private async flowItems(user: SessionUser, today: ISODate, nameOf: (u: { name: string } | null | undefined) => string | null): Promise<Reminder[]> {
+  private async flowItems(
+    user: SessionUser,
+    today: ISODate,
+    nameOf: (u: { name: string } | null | undefined) => string | null,
+  ): Promise<Reminder[]> {
     const out: Reminder[] = [];
     const on = async (f: Parameters<LimitsService["allows"]>[0]) => this.limits.allows(f);
     const soon = addDays(today, 3);
@@ -251,14 +292,25 @@ export class RemindersListService {
     // Factories asked for a price that have not answered (people who see factory prices).
     if ((await on("factory_requests")) && can(user, "sourcing.manage")) {
       const waiting = await this.prisma.db.factoryRequest.findMany({
-        where: { status: "sent", sentOn: { lte: toDbDate(addDays(today, -3)) }, inquiry: { deletedAt: null, ...inquiryAccess(user), onHold: false, stage: { in: ["new", "sourcing"] } } },
+        where: {
+          status: "sent",
+          sentOn: { lte: toDbDate(addDays(today, -3)) },
+          inquiry: { deletedAt: null, ...inquiryAccess(user), onHold: false, stage: { in: ["new", "sourcing"] } },
+        },
         select: {
           id: true,
           sentOn: true,
           replyBy: true,
           factoryId: true,
           factory: { select: { name: true } },
-          inquiry: { select: { id: true, refNo: true, assignee: { select: { name: true } }, factoryQuotes: { where: { deletedAt: null }, select: { factoryId: true } } } },
+          inquiry: {
+            select: {
+              id: true,
+              refNo: true,
+              assignee: { select: { name: true } },
+              factoryQuotes: { where: { deletedAt: null }, select: { factoryId: true } },
+            },
+          },
         },
         take: 200,
       });
@@ -283,28 +335,23 @@ export class RemindersListService {
     const orders = { status: "open" as const, ...orderAccess(user) };
     const handler = { inquiry: { select: { assignee: { select: { name: true } } } } };
 
-    // Production steps past their planned date.
-    if (await on("production")) {
-      const steps = await this.prisma.db.productionStep.findMany({
-        where: { doneOn: null, plannedOn: { lt: toDbDate(today) }, order: orders },
-        select: { id: true, title: true, plannedOn: true, factory: { select: { name: true } }, order: { select: { id: true, refNo: true, ...handler } } },
-        orderBy: { plannedOn: "asc" },
-        take: 100,
+    // Checklist items past their due date (red) or due in the next days, on the orders the person may see.
+    const dated = await this.checklist.dated(user, 3);
+    for (const c of dated.slice(0, 100)) {
+      const late = days(c.due);
+      out.push({
+        key: `checklist:${c.id}:${c.due}`,
+        kind: "order",
+        level: c.late ? (late >= 3 ? "bad" : "warn") : "info",
+        title: c.late
+          ? `${c.refNo}: "${c.title}" was due ${c.due}`
+          : `${c.refNo}: "${c.title}" is due ${c.due === today ? "today" : c.due}`,
+        detail: `${FLOW_STEP_LABEL[c.step]}${c.late ? ` · ${late} day${late === 1 ? "" : "s"} late` : ""}`,
+        due: c.due,
+        href: `/orders/${c.orderId}/${STEP_PATH[c.step]}`,
+        action: "Open the step",
+        who: c.who,
       });
-      for (const p of steps) {
-        const planned = fromDbDate(p.plannedOn!);
-        out.push({
-          key: `production:${p.id}:${planned}`,
-          kind: "order",
-          level: days(planned) >= 3 ? "bad" : "warn",
-          title: `${p.order.refNo}: "${p.title}" was planned for ${planned}`,
-          detail: `${p.factory?.name ?? "The factory"} · ${days(planned)} day${days(planned) === 1 ? "" : "s"} late: ask for a new date`,
-          due: planned,
-          href: `/orders/${p.order.id}/factory`,
-          action: "Open the timeline",
-          who: nameOf(p.order.inquiry.assignee),
-        });
-      }
     }
 
     // The LC or contract: the last day to ship, and the expiry date.
@@ -334,7 +381,8 @@ export class RemindersListService {
             kind: "ship",
             level: ship < addDays(today, 4) ? "bad" : "warn",
             title: `${c.order.refNo}: must ship by ${ship} under ${name}`,
-            detail: ship < today ? "The date has passed: ask the customer to amend the LC" : `${days(ship) * -1} days left · book the shipment`,
+            detail:
+              ship < today ? "The date has passed: ask the customer to amend the LC" : `${days(ship) * -1} days left · book the shipment`,
             due: ship,
             href: `/orders/${c.order.id}/shipping`,
             action: "Book shipping",
@@ -359,7 +407,13 @@ export class RemindersListService {
     if (await on("shipping")) {
       const ships = await this.prisma.db.shipment.findMany({
         where: { status: { in: ["booked", "loaded", "departed"] }, eta: { lte: toDbDate(soon) }, order: orders },
-        select: { id: true, eta: true, portOfDischarge: true, mode: true, order: { select: { id: true, refNo: true, customer: { select: { name: true } }, ...handler } } },
+        select: {
+          id: true,
+          eta: true,
+          portOfDischarge: true,
+          mode: true,
+          order: { select: { id: true, refNo: true, customer: { select: { name: true } }, ...handler } },
+        },
       });
       for (const sh of ships) {
         const eta = fromDbDate(sh.eta!);
@@ -436,7 +490,14 @@ export class RemindersListService {
     if (await on("delivery_sat")) {
       const sats = await this.prisma.db.order.findMany({
         where: { ...orders, satDoneOn: null, satPlannedOn: { lte: toDbDate(soon) } },
-        select: { id: true, refNo: true, satPlannedOn: true, customer: { select: { name: true } }, satEngineer: { select: { name: true } }, ...handler },
+        select: {
+          id: true,
+          refNo: true,
+          satPlannedOn: true,
+          customer: { select: { name: true } },
+          satEngineer: { select: { name: true } },
+          ...handler,
+        },
       });
       for (const o of sats) {
         const on = fromDbDate(o.satPlannedOn!);
@@ -454,7 +515,13 @@ export class RemindersListService {
       }
       const claims = await this.prisma.db.orderClaim.findMany({
         where: { status: { in: ["open", "with_factory"] }, order: { ...orderAccess(user) } },
-        select: { id: true, title: true, openedOn: true, status: true, order: { select: { id: true, refNo: true, customer: { select: { name: true } }, ...handler } } },
+        select: {
+          id: true,
+          title: true,
+          openedOn: true,
+          status: true,
+          order: { select: { id: true, refNo: true, customer: { select: { name: true } }, ...handler } },
+        },
       });
       for (const c of claims) {
         const opened = fromDbDate(c.openedOn);

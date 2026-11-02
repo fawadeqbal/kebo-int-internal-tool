@@ -1,7 +1,7 @@
 import { Controller, Get, Injectable, Module, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { can } from "@kebo/shared";
+import { can, FLOW_STEPS, STEP_OF_ACTION } from "@kebo/shared";
 import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Validate } from "../../common/http/zod.pipe";
@@ -13,7 +13,13 @@ import { CustomersService } from "../parties/customers.service";
 import { PartiesModule } from "../parties/parties.module";
 import { LimitsService } from "../../common/company/limits.service";
 
-const historyQuery = z.object({ type: z.enum(["deal", "order", "customer", "factory"]), id: z.uuid("Unknown record") });
+const historyQuery = z.object({
+  type: z.enum(["deal", "order", "customer", "factory"]),
+  id: z.uuid("Unknown record"),
+  /** An order's changes in one of its steps (see @kebo/shared STEP_OF_ACTION). */
+  step: z.enum(FLOW_STEPS).optional(),
+  limit: z.coerce.number().int().min(1).max(300).optional(),
+});
 type HistoryQuery = z.infer<typeof historyQuery>;
 
 /**
@@ -89,8 +95,10 @@ export class HistoryService {
     const people = new Map(
       (await this.prisma.db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })).map((u) => [u.id, u]),
     );
-    return rows.map((r) => ({
+    const shown = (q.step ? rows.filter((r) => STEP_OF_ACTION(r.action, r.newValues) === q.step) : rows).slice(0, q.limit ?? 300);
+    return shown.map((r) => ({
       id: r.id,
+      step: STEP_OF_ACTION(r.action, r.newValues),
       at: r.createdAt,
       by: (r.userId && people.get(r.userId)) || null,
       action: r.action,
@@ -117,7 +125,7 @@ export function changesOf(oldValues: unknown, newValues: unknown) {
 class HistoryController {
   constructor(private readonly history: HistoryService) {}
 
-  /** ?type=deal|order|customer|factory&id= — who changed what, when and why (newest first). */
+  /** ?type=deal|order|customer|factory&id= — who changed what, when and why (newest first); ?step= an order's step only; ?limit= the newest n. */
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(historyQuery)) q: HistoryQuery) {
     return this.history.list(user, q);

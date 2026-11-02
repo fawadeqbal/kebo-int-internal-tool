@@ -83,10 +83,16 @@ export const checklistTemplateInput = z.object({
         tool: z.enum(CHECKLIST_TOOLS).default("done"),
         fields,
         route: optionalRoute.optional().transform((v) => v ?? null),
-        dueDays: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().int().min(0).max(3650).nullable()),
+        dueDays: z.preprocess(
+          (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+          z.number().int().min(0).max(3650).nullable(),
+        ),
       }),
     )
     .max(200),
-  hidden: z.array(z.enum(HIDEABLE_AUTO_KEYS as [string, ...string[]])).max(60).default([]),
+  hidden: z
+    .array(z.enum(HIDEABLE_AUTO_KEYS as [string, ...string[]]))
+    .max(60)
+    .default([]),
 });
 export type ChecklistTemplateInput = z.infer<typeof checklistTemplateInput>;

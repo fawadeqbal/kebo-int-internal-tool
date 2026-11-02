@@ -1,6 +1,15 @@
 import type { ISODate } from "@kebo/utils";
 import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute, ShipMode, ShipmentStatus } from "../enums";
-import { BANK_STEP_LABEL, bankStepsFor, FLOW_STEP_LABEL, FLOW_STEPS, ORDER_DOCUMENT_LABEL, PAYMENT_ROUTE_LABEL, requiredDocuments, type FlowStep } from "./flow";
+import {
+  BANK_STEP_LABEL,
+  bankStepsFor,
+  FLOW_STEP_LABEL,
+  FLOW_STEPS,
+  ORDER_DOCUMENT_LABEL,
+  PAYMENT_ROUTE_LABEL,
+  requiredDocuments,
+  type FlowStep,
+} from "./flow";
 
 /**
  * Order flow v3: every step of an order is a checklist.
@@ -63,7 +72,13 @@ export interface ChecklistFacts {
   route: PaymentRoute | null;
   /** The ship mode of the first shipment (sea when none). */
   shipMode: ShipMode | null;
-  bankContract: { status: BankContractStatus; number: string | null; amount: string | null; currency: string | null; openedOn: ISODate | null } | null;
+  bankContract: {
+    status: BankContractStatus;
+    number: string | null;
+    amount: string | null;
+    currency: string | null;
+    openedOn: ISODate | null;
+  } | null;
   /** Deposit percent of the order (0: none). */
   depositPercent: number;
   depositIn: boolean;
@@ -158,7 +173,7 @@ export const AUTO_ITEMS: Record<FlowStep, AutoItemDef[]> = {
     { key: "shipped", title: "Shipped", sort: 40 },
     { key: "arrived", title: "Arrived", sort: 70 },
     { key: "balance_in", title: "Balance received", sort: 80 },
-    { key: "closed", title: "Order closed", sort: 99 },
+    { key: "closed", title: "Order closed", sort: 1000 },
   ],
   documents: [
     // doc:<kind> (sort 10…) and bank:<step> (sort 50…) are added per order from the route and the ship mode.
@@ -167,7 +182,7 @@ export const AUTO_ITEMS: Record<FlowStep, AutoItemDef[]> = {
     { key: "delivered", title: "Delivered to the customer", sort: 10 },
     { key: "sat_done", title: "SAT signed off", sort: 20 },
     { key: "claims_closed", title: "Claims closed", sort: 30 },
-    { key: "closed", title: "Order closed", sort: 99 },
+    { key: "closed", title: "Order closed", sort: 1000 },
   ],
 };
 
@@ -189,7 +204,11 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
   const on = (feature: string) => !features || features.includes(feature);
   const bankRoute = f.route !== null && BANK.includes(f.route);
   const out: AutoItem[] = [];
-  const add = (step: FlowStep, key: string, item: Omit<AutoItem, "step" | "key" | "title" | "sort"> & { title?: string; sort?: number }) => {
+  const add = (
+    step: FlowStep,
+    key: string,
+    item: Omit<AutoItem, "step" | "key" | "title" | "sort"> & { title?: string; sort?: number },
+  ) => {
     const def = AUTO_ITEMS[step].find((d) => d.key === key);
     out.push({ step, key, title: item.title ?? def?.title ?? key, sort: item.sort ?? def?.sort ?? 50, ...item });
   };
@@ -223,7 +242,12 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
       title: `Deposit received`,
       done: f.depositIn,
       doneOn: f.depositOn,
-      data: f.depositIn ? pairs([["Amount", money(f.currency, f.deposit)], ["On", f.depositOn]]) : [],
+      data: f.depositIn
+        ? pairs([
+            ["Amount", money(f.currency, f.deposit)],
+            ["On", f.depositOn],
+          ])
+        : [],
       needs: f.depositIn ? null : `${money(f.currency, f.deposit)} (${f.depositPercent}%)`,
     });
 
@@ -257,7 +281,10 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     add("production", "factory_paid", {
       done: paid,
       doneOn: null,
-      data: owing.map((x): [string, string] => [owing.length > 1 ? x.name : paid ? "Paid" : "To pay", money(x.currency, paid ? x.owed : x.toPay)]),
+      data: owing.map((x): [string, string] => [
+        owing.length > 1 ? x.name : paid ? "Paid" : "To pay",
+        money(x.currency, paid ? x.owed : x.toPay),
+      ]),
       needs: null,
     });
   }
@@ -290,7 +317,14 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     add("shipping", "packing_list", {
       done: !!f.packedAt,
       doneOn: f.packedAt,
-      data: f.packedAt && f.packing ? pairs([["Packages", String(f.packing.packages)], ["Gross", f.packing.grossKg ? `${f.packing.grossKg} kg` : null], ["Volume", f.packing.cbm ? `${f.packing.cbm} CBM` : null]]) : [],
+      data:
+        f.packedAt && f.packing
+          ? pairs([
+              ["Packages", String(f.packing.packages)],
+              ["Gross", f.packing.grossKg ? `${f.packing.grossKg} kg` : null],
+              ["Volume", f.packing.cbm ? `${f.packing.cbm} CBM` : null],
+            ])
+          : [],
       needs: f.packedAt ? null : "packages, weights and volume per line",
     });
   if (ships) {
@@ -319,15 +353,35 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     add("shipping", "arrived", {
       title: at ? `Arrived at ${at}` : "Arrived",
       done: arrived,
-      doneOn: arrived ? (f.shipments.map((s) => s.arrivedOn).filter((d): d is string => !!d).sort().at(-1) ?? null) : null,
-      data: arrived ? pairs([["Arrived", f.shipments.map((s) => s.arrivedOn).filter((d): d is string => !!d).sort().at(-1)]]) : pairs([["ETA", first?.eta]]),
+      doneOn: arrived
+        ? (f.shipments
+            .map((s) => s.arrivedOn)
+            .filter((d): d is string => !!d)
+            .sort()
+            .at(-1) ?? null)
+        : null,
+      data: arrived
+        ? pairs([
+            [
+              "Arrived",
+              f.shipments
+                .map((s) => s.arrivedOn)
+                .filter((d): d is string => !!d)
+                .sort()
+                .at(-1),
+            ],
+          ])
+        : pairs([["ETA", first?.eta]]),
       needs: null,
     });
   } else {
     add("shipping", "shipped", {
       done: !!f.shippedOn,
       doneOn: f.shippedOn,
-      data: pairs([["Shipped", f.shippedOn], ["B/L", f.blNo]]),
+      data: pairs([
+        ["Shipped", f.shippedOn],
+        ["B/L", f.blNo],
+      ]),
       needs: f.shippedOn ? null : "ship date and B/L number",
     });
   }
@@ -337,7 +391,8 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     add("shipping", "balance_in", {
       done: isZero(f.due) || Number(f.due) < 0,
       doneOn: f.paidInFullOn,
-      data: isZero(f.due) || Number(f.due) < 0 ? pairs([["Paid in full", f.paidInFullOn ?? "yes"]]) : [["Still due", money(f.currency, f.due)]],
+      data:
+        isZero(f.due) || Number(f.due) < 0 ? pairs([["Paid in full", f.paidInFullOn ?? "yes"]]) : [["Still due", money(f.currency, f.due)]],
       needs: null,
     });
 
@@ -358,7 +413,13 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
           ["No.", ready?.number ?? system?.number ?? (kind === "bill_of_lading" || kind === "airway_bill" ? f.blNo : null)],
           ["Issued", ready?.issuedOn ?? system?.issuedOn],
         ]),
-        needs: done ? null : rows.length ? `${rows[0]!.status === "draft" ? "draft: " : ""}mark it ready` : kind === "packing_list" ? "made from the packing list" : "upload or record it",
+        needs: done
+          ? null
+          : rows.length
+            ? `${rows[0]!.status === "draft" ? "draft: " : ""}mark it ready`
+            : kind === "packing_list"
+              ? "made from the packing list"
+              : "upload or record it",
       });
     });
     bankStepsFor(f.route).forEach((step, i) => {
@@ -368,7 +429,10 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
         sort: 50 + i,
         done: !!s,
         doneOn: s?.doneOn ?? null,
-        data: pairs([["On", s?.doneOn], ["Ref.", s?.reference]]),
+        data: pairs([
+          ["On", s?.doneOn],
+          ["Ref.", s?.reference],
+        ]),
         needs: null,
       });
     });
@@ -377,11 +441,19 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
   /* Delivery & SAT */
   const delivery = on("delivery_sat");
   if (delivery) {
-    add("delivery", "delivered", { done: !!f.deliveredOn, doneOn: f.deliveredOn, data: pairs([["Delivered", f.deliveredOn]]), needs: f.deliveredOn ? null : "date and condition" });
+    add("delivery", "delivered", {
+      done: !!f.deliveredOn,
+      doneOn: f.deliveredOn,
+      data: pairs([["Delivered", f.deliveredOn]]),
+      needs: f.deliveredOn ? null : "date and condition",
+    });
     add("delivery", "sat_done", {
       done: !!f.satDoneOn,
       doneOn: f.satDoneOn,
-      data: pairs([["Signed off", f.satDoneOn], ["By", f.satSignedBy]]),
+      data: pairs([
+        ["Signed off", f.satDoneOn],
+        ["By", f.satSignedBy],
+      ]),
       needs: f.satDoneOn ? null : "every SAT point passed",
     });
     add("delivery", "claims_closed", {
@@ -392,7 +464,12 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     });
   }
   // Closing is the last item: of Delivery & SAT, or of Shipping without it.
-  add(delivery ? "delivery" : "shipping", "closed", { done: !!f.closedOn, doneOn: f.closedOn, data: pairs([["Closed", f.closedOn]]), needs: null });
+  add(delivery ? "delivery" : "shipping", "closed", {
+    done: !!f.closedOn,
+    doneOn: f.closedOn,
+    data: pairs([["Closed", f.closedOn]]),
+    needs: null,
+  });
   return out;
 }
 
@@ -416,20 +493,30 @@ const fld = (key: string, label: string, type: ChecklistFieldType = "text"): Che
 export const DEFAULT_CHECKLIST: ChecklistTemplateItem[] = [
   { step: "payment", title: "Sales contract signed by both", tool: "upload", route: "bank_contract", sort: 15 },
   { step: "payment", title: "Sales contract signed by both", tool: "upload", route: "letter_of_credit", sort: 15 },
-  { step: "production", title: "Drawings approved by the customer", tool: "fill", fields: [fld("approvedBy", "Approved by"), fld("file", "File", "file")], sort: 10 },
+  {
+    step: "production",
+    title: "Drawings approved by the customer",
+    tool: "fill",
+    fields: [fld("approvedBy", "Approved by"), fld("file", "File", "file")],
+    sort: 10,
+  },
   { step: "production", title: "Materials and parts in", tool: "done", sort: 20 },
   { step: "production", title: "Machining and assembly", tool: "done", sort: 30 },
-  { step: "production", title: "Factory test run (FAT) with video", tool: "fill", fields: [fld("date", "Date", "date"), fld("result", "Result"), fld("video", "Video", "file")], sort: 40 },
-  ...(["letter_of_credit", "bank_contract"] as const).map(
-    (route): ChecklistTemplateItem => ({
-      step: "production",
-      title: "Pre-shipment inspection",
-      tool: "fill",
-      fields: [fld("inspector", "Inspector"), fld("date", "Date", "date"), fld("result", "Passed or not")],
-      route,
-      sort: 50,
-    }),
-  ),
+  {
+    step: "production",
+    title: "Factory test run (FAT) with video",
+    tool: "fill",
+    fields: [fld("date", "Date", "date"), fld("result", "Result"), fld("video", "Video", "file")],
+    sort: 40,
+  },
+  ...(["letter_of_credit", "bank_contract"] as const).map((route): ChecklistTemplateItem => ({
+    step: "production",
+    title: "Pre-shipment inspection",
+    tool: "fill",
+    fields: [fld("inspector", "Inspector"), fld("date", "Date", "date"), fld("result", "Passed or not")],
+    route,
+    sort: 50,
+  })),
   { step: "shipping", title: "Shipping advice to the customer", tool: "send", sort: 50 },
 ];
 
@@ -474,7 +561,10 @@ export function stepStates<T extends StepItemState>(steps: { key: FlowStep; item
 }
 
 /** "Do this now": the first open item of the current step, late ones first. Null when everything is done. */
-export function doNow<T extends StepItemState>(steps: { key: FlowStep; items: T[] }[], cancelled = false): { step: FlowStep; item: T } | null {
+export function doNow<T extends StepItemState>(
+  steps: { key: FlowStep; items: T[] }[],
+  cancelled = false,
+): { step: FlowStep; item: T } | null {
   if (cancelled) return null;
   const s = steps.find((x) => !x.items.every(itemClosed));
   if (!s) return null;
@@ -534,3 +624,24 @@ export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | 
       return null;
   }
 }
+
+/** An automatic item's name from its key ("doc:insurance" → "Insurance certificate"), for history and reminders. */
+export function autoTitle(key: string): string {
+  if (key.startsWith("doc:")) return ORDER_DOCUMENT_LABEL[key.slice(4) as OrderDocumentKind] ?? key;
+  if (key.startsWith("bank:")) return BANK_STEP_LABEL[key.slice(5) as BankStepKind] ?? key;
+  for (const s of FLOW_STEPS) {
+    const d = AUTO_ITEMS[s].find((x) => x.key === key);
+    if (d) return d.title;
+  }
+  return key;
+}
+
+/** Each step's page under /orders/:id. */
+export const STEP_PATH: Record<FlowStep, string> = {
+  payment: "payment",
+  factory: "factory",
+  production: "production",
+  shipping: "shipping",
+  documents: "documents",
+  delivery: "delivery",
+};

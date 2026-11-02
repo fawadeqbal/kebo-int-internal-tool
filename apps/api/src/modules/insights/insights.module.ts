@@ -7,6 +7,7 @@ import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { MoneyModule } from "../money/money.module";
+import { ChecklistModule } from "../checklist/checklist.module";
 import { InsightsService } from "./insights.service";
 import { RemindersListService } from "./reminders-list.service";
 
@@ -99,5 +100,5 @@ class InsightsController {
   }
 }
 
-@Module({ imports: [OrdersModule, MoneyModule], controllers: [InsightsController], providers: [InsightsService, RemindersListService], exports: [InsightsService] })
+@Module({ imports: [OrdersModule, MoneyModule, ChecklistModule], controllers: [InsightsController], providers: [InsightsService, RemindersListService], exports: [InsightsService] })
 export class InsightsModule {}

@@ -61,7 +61,7 @@ describe("order flow on Home and the factory page", () => {
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { number: `LC-${tag}`, status: "opened", latestShipOn: ago(-2) }).expect(200);
     await api(app, sana).post(`/orders/${orderId}/claims`, { title: "Wrong voltage", openedOn: ago(1) }).expect(201);
     const t = await titles(sana);
-    expect(t).toEqual(expect.arrayContaining([expect.stringContaining(`"Machining" was planned for ${ago(4)}`), expect.stringContaining(`must ship by ${ago(-2)} under LC LC-${tag}`), expect.stringContaining('claim "Wrong voltage"')]));
+    expect(t).toEqual(expect.arrayContaining([expect.stringContaining(`"Machining" was due ${ago(4)}`), expect.stringContaining(`must ship by ${ago(-2)} under LC LC-${tag}`), expect.stringContaining('claim "Wrong voltage"')]));
   });
 
   it("the factory page shows how it answers and what it is making", async () => {

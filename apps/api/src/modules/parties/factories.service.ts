@@ -68,7 +68,7 @@ export class FactoriesService {
       db.factoryRequest.findMany({ where: { factoryId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
       db.factoryQuote.findMany({ where: { factoryId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
       db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, readyOn: true, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" }, take: 20 }),
-      db.productionStep.count({ where: { factoryId: id, doneOn: null, plannedOn: { lt: new Date() }, order: { status: "open" } } }),
+      db.orderChecklistItem.count({ where: { factoryId: id, step: "production", doneAt: null, skippedAt: null, dueOn: { lt: new Date() }, order: { status: "open" } } }),
     ]);
     const answered = requests.filter((r) => r.status === "quoted" || quotes.some((q) => q.inquiryId === r.inquiryId));
     const days = answered

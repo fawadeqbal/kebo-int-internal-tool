@@ -77,22 +77,59 @@ describe("automatic checklist items", () => {
   it("tick themselves from the data", () => {
     expect(item(facts(), "deposit_in")).toMatchObject({ done: false, needs: "USD 18,900.00 (30%)" });
     const paid = item(facts({ depositIn: true, depositOn: "2026-11-06" }), "deposit_in");
-    expect(paid).toMatchObject({ done: true, doneOn: "2026-11-06", data: [["Amount", "USD 18,900.00"], ["On", "2026-11-06"]] });
+    expect(paid).toMatchObject({
+      done: true,
+      doneOn: "2026-11-06",
+      data: [
+        ["Amount", "USD 18,900.00"],
+        ["On", "2026-11-06"],
+      ],
+    });
     expect(item(facts({ readyOn: "2027-01-07" }), "ready_date")).toMatchObject({ done: true, data: [["Ready", "2027-01-07"]] });
     expect(item(facts({ goods: { lines: 3, received: 3 } }), "goods_received")?.done).toBe(true);
     const sailed = facts({
       shipments: [
-        { status: "departed", mode: "sea", forwarder: "Sino Trans", bookingNo: "NGB-1", containerNo: "MSKU 1", vessel: "MSC Aurora", blNo: "MEDU1", etd: null, eta: "2027-02-06", departedOn: "2027-01-14", arrivedOn: null, portOfDischarge: "Karachi" },
+        {
+          status: "departed",
+          mode: "sea",
+          forwarder: "Sino Trans",
+          bookingNo: "NGB-1",
+          containerNo: "MSKU 1",
+          vessel: "MSC Aurora",
+          blNo: "MEDU1",
+          etd: null,
+          eta: "2027-02-06",
+          departedOn: "2027-01-14",
+          arrivedOn: null,
+          portOfDischarge: "Karachi",
+        },
       ],
     });
-    expect(item(sailed, "sailed")).toMatchObject({ done: true, data: [["Vessel", "MSC Aurora"], ["B/L", "MEDU1"], ["Sailed", "2027-01-14"]] });
+    expect(item(sailed, "sailed")).toMatchObject({
+      done: true,
+      data: [
+        ["Vessel", "MSC Aurora"],
+        ["B/L", "MEDU1"],
+        ["Sailed", "2027-01-14"],
+      ],
+    });
     expect(item(sailed, "arrived")).toMatchObject({ title: "Arrived at Karachi", done: false, data: [["ETA", "2027-02-06"]] });
     expect(item(facts({ due: "0.00", paidInFullOn: "2027-02-10" }), "balance_in")?.done).toBe(true);
   });
 
   it("the route decides the bank items, papers and bank steps", () => {
-    const lc = facts({ route: "letter_of_credit", bankContract: { status: "opened", number: "LC/1", amount: "44100", currency: "USD", openedOn: "2026-10-25" } });
-    expect(item(lc, "contract")).toMatchObject({ title: "LC opened", done: true, data: [["LC", "LC/1"], ["Amount", "USD 44,100.00"]] });
+    const lc = facts({
+      route: "letter_of_credit",
+      bankContract: { status: "opened", number: "LC/1", amount: "44100", currency: "USD", openedOn: "2026-10-25" },
+    });
+    expect(item(lc, "contract")).toMatchObject({
+      title: "LC opened",
+      done: true,
+      data: [
+        ["LC", "LC/1"],
+        ["Amount", "USD 44,100.00"],
+      ],
+    });
     // The balance comes through the banks: not a Shipping item.
     expect(keys(lc)).not.toContain("shipping:balance_in");
     expect(keys(lc).filter((k) => k.startsWith("documents:bank:"))).toHaveLength(5);
@@ -140,7 +177,13 @@ describe("steps and do now", () => {
   it("the first open item of the current step, a late one first", () => {
     const steps = [
       { key: "payment" as const, items: [{ done: true, title: "a" }] },
-      { key: "factory" as const, items: [{ done: false, title: "b" }, { done: false, late: true, title: "c" }] },
+      {
+        key: "factory" as const,
+        items: [
+          { done: false, title: "b" },
+          { done: false, late: true, title: "c" },
+        ],
+      },
       { key: "production" as const, items: [{ done: false, title: "d" }] },
     ];
     expect(stepStates(steps)).toEqual(["done", "late", "todo"]);
@@ -170,9 +213,24 @@ describe("history per step", () => {
 describe("checklist inputs", () => {
   it("an item needs a title and known fields", () => {
     expect(checklistItemInput.safeParse({ step: "production", title: "" }).success).toBe(false);
-    const ok = checklistItemInput.parse({ step: "production", title: "FAT", tool: "fill", fields: [{ key: "date", label: "Date", type: "date" }], route: "" });
+    const ok = checklistItemInput.parse({
+      step: "production",
+      title: "FAT",
+      tool: "fill",
+      fields: [{ key: "date", label: "Date", type: "date" }],
+      route: "",
+    });
     expect(ok).toMatchObject({ route: null, dueOn: null, fields: [{ key: "date" }] });
-    expect(checklistItemInput.safeParse({ step: "production", title: "x", fields: [{ key: "a", label: "A" }, { key: "a", label: "B" }] }).success).toBe(false);
+    expect(
+      checklistItemInput.safeParse({
+        step: "production",
+        title: "x",
+        fields: [
+          { key: "a", label: "A" },
+          { key: "a", label: "B" },
+        ],
+      }).success,
+    ).toBe(false);
   });
 
   it("skipping an automatic item needs a reason", () => {
@@ -183,6 +241,8 @@ describe("checklist inputs", () => {
   it("the company list takes only known automatic keys to hide", () => {
     expect(checklistTemplateInput.safeParse({ items: [], hidden: ["booked"] }).success).toBe(true);
     expect(checklistTemplateInput.safeParse({ items: [], hidden: ["closed"] }).success).toBe(false);
-    expect(DEFAULT_CHECKLIST.every((i) => checklistTemplateInput.shape.items.element.safeParse({ ...i, dueDays: null }).success)).toBe(true);
+    expect(DEFAULT_CHECKLIST.every((i) => checklistTemplateInput.shape.items.element.safeParse({ ...i, dueDays: null }).success)).toBe(
+      true,
+    );
   });
 });
