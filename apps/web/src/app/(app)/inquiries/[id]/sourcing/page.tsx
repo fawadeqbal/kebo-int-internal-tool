@@ -121,7 +121,7 @@ export default async function SourcingPage({
               {ask?.button}
               {s.quotes.length > 0 && addOffer({ variant: "secondary", open: sp.add === "1" })}
               {withLines && (
-                <Link href={current ? quotationHref : `${quotationHref}?start=1`} className={buttonClass("primary", "md")}>
+                <Link href={current ? quotationHref : `${quotationHref}?start=1`} className={buttonClass("primary", "md", "max-sm:w-full")}>
                   {current ? "Open the quotation" : "Make the quotation"}
                 </Link>
               )}

@@ -125,6 +125,7 @@ export default async function DealNeeds({ params }: { params: Promise<{ id: stri
         description={itemsLine(d)}
         canEdit={canEdit}
         view={<ItemsView items={d.items} requirements={d.requirements} />}
+        phone={<ItemsView items={d.items} requirements={d.requirements} phone />}
         edit={<ItemsEditor items={d.items} requirements={d.requirements} action={dealFieldsAction.bind(null, d.id)} upload={!quoted} />}
       />
       <ViewCard

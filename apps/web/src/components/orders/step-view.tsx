@@ -542,6 +542,7 @@ export function PanelButton({
   variant = "secondary",
   size = "md",
   icon,
+  className,
 }: {
   label: ReactNode;
   title: string;
@@ -550,11 +551,12 @@ export function PanelButton({
   variant?: "primary" | "secondary" | "ghost";
   size?: "xs" | "sm" | "md";
   icon?: ReactNode;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size={size} variant={variant} onClick={() => setOpen(true)}>
+      <Button size={size} variant={variant} onClick={() => setOpen(true)} className={className}>
         {icon} {label}
       </Button>
       {open && (

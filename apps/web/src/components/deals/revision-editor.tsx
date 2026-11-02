@@ -217,6 +217,9 @@ export function RevisionEditor({
   requireChanges,
   footer,
   onCancel,
+  part,
+  initialOption = 0,
+  startAdding = false,
 }: {
   action: Action;
   number: number;
@@ -232,12 +235,24 @@ export function RevisionEditor({
   /** Shown under the form, e.g. the draft's own actions; told whether there are unsaved changes. */
   footer?: (dirty: boolean) => ReactNode;
   onCancel?: () => void;
+  /**
+   * Only part of the form: "terms" (currency, delivery, validity, payment and
+   * the printed terms — the Quotation step's terms panel) or "options" (the
+   * options and their prices — Edit prices). The whole revision is saved
+   * either way. Default: everything.
+   */
+  part?: "terms" | "options";
+  /** The option open first (0 = A), and the "Add an option" list open at once. */
+  initialOption?: number;
+  startAdding?: boolean;
 }) {
   const [s, setS] = useState<EditorState>(() => fromDraft(initial));
   const [saved, setSaved] = useState(() => JSON.stringify(fromDraft(initial)));
   const [offers, setOffers] = useState(initialOffers);
-  const [active, setActive] = useState(0);
-  const [adding, setAdding] = useState(false);
+  const [active, setActive] = useState(initialOption);
+  const [adding, setAdding] = useState(startAdding);
+  const terms = part !== "options";
+  const options = part !== "terms";
   const [margin, setMargin] = useState(String(initialOffers.defaultMargin));
   const dirty = JSON.stringify(s) !== saved;
   const set = <K extends keyof EditorState>(k: K, v: EditorState[K]) => setS((st) => ({ ...st, [k]: v }));
@@ -401,7 +416,8 @@ export function RevisionEditor({
           <>
             <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
 
-            <section aria-label="Terms" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {terms && (
+            <section aria-label="Terms" className={cn("grid gap-4 sm:grid-cols-2", !part && "lg:grid-cols-4")}>
               <Field
                 label="Currency"
                 htmlFor={`cur-${number}`}
@@ -438,7 +454,9 @@ export function RevisionEditor({
                 </Select>
               </Field>
             </section>
+            )}
 
+            {options && (
             <section aria-label="Options" className="flex flex-col gap-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
@@ -793,8 +811,10 @@ export function RevisionEditor({
                 </div>
               </div>
             </section>
+            )}
 
-            <section aria-label="Terms and notes" className="grid gap-4 lg:grid-cols-2">
+            {terms && (
+            <section aria-label="Terms and notes" className={cn("grid gap-4", !part && "lg:grid-cols-2")}>
               <Field
                 label="Payment terms"
                 htmlFor={`pay-terms-${number}`}
@@ -813,10 +833,12 @@ export function RevisionEditor({
               >
                 <Textarea id={`del-terms-${number}`} rows={3} value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
               </Field>
-              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last" className="lg:col-span-2">
+              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last" className={cn(!part && "lg:col-span-2")}>
                 <Textarea id={`notes-${number}`} rows={3} value={s.notes} onChange={(e) => set("notes", e.target.value)} />
               </Field>
             </section>
+            )}
+            {part === "options" && <ErrorText error={st.errors?.currency ?? st.errors?.validUntil} />}
 
             <StickyBar>
               <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>

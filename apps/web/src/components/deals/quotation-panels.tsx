@@ -24,6 +24,8 @@ export function StartRevision({
   whyNot,
   showCosts,
   first,
+  defaultOpen = false,
+  label: labelAs,
 }: {
   action: Action;
   draft: RevisionDraft | null;
@@ -33,9 +35,13 @@ export function StartRevision({
   whyNot: string | null;
   showCosts: boolean;
   first: boolean;
+  /** Open the editor at once (Make the quotation from Factory prices, "Asked for changes…"). */
+  defaultOpen?: boolean;
+  /** The button's words, when not "Make the quotation (R1)" / "Start a new revision (Rn)". */
+  label?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const label = first ? "Make the quotation (R1)" : `Start a new revision${draft ? ` (R${draft.number})` : ""}`;
+  const [open, setOpen] = useState(defaultOpen && allowed);
+  const label = labelAs ?? (first ? "Make the quotation (R1)" : `Start a new revision${draft ? ` (R${draft.number})` : ""}`);
   // Nothing to offer yet: no factory offer with lines, and no list from the customer to price by hand.
   const nothing = !!offers && offers.offers.length === 0 && offers.items.length === 0;
   if (nothing)

@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL } from "@kebo/shared";
-import { Badge, Button, Field, Textarea } from "@kebo/ui";
+import { Badge, Button, cn, Field, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { LineTable } from "@/components/lines/line-table";
@@ -23,18 +23,34 @@ const rowsOf = (items: DealItem[]) =>
     key: it.id,
     parentKey: it.parentId,
     values: { description: it.description, model: it.model ?? "", quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice ?? "" },
-    badge: it.priced ? (
-      <span className="ml-1 align-middle" title="A factory has priced this: changing it will ask why">
-        <Badge tone="info">Priced</Badge>
-      </span>
-    ) : undefined,
   }));
 
+/** The items as short lines on a phone (read only). */
+function ItemsPhone({ items }: { items: DealItem[] }) {
+  return (
+    <ul className="flex flex-col divide-y divide-line text-sm">
+      {items.map((it) => (
+        <li key={it.id} className={cn("flex justify-between gap-3 py-2", it.parentId && "pl-4")}>
+          <span className="min-w-0">
+            <span className="mr-1.5 text-xs text-muted tabular">{it.no}</span>
+            {it.description.split("\n")[0]}
+            {it.model && <span className="block text-xs text-muted">{it.model}</span>}
+          </span>
+          <span className="shrink-0 text-text-2 tabular">
+            {Number(it.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {it.unit}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** What the customer needs, read only: their items in the line table (Excel export in its menu). */
-export function ItemsView({ items, requirements }: { items: DealItem[]; requirements: string | null }) {
+export function ItemsView({ items, requirements, phone = false }: { items: DealItem[]; requirements: string | null; phone?: boolean }) {
   return (
     <div className="flex flex-col gap-3">
-      {items.length > 0 && (
+      {items.length > 0 && phone && <ItemsPhone items={items} />}
+      {items.length > 0 && !phone && (
         <LineTable
           rows={rowsOf(items)}
           columns={ITEM_COLUMNS}
