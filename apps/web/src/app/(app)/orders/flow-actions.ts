@@ -68,7 +68,7 @@ export async function removeShipmentAction(orderId: string, shipmentId: string, 
 
 /* ---------------------------------------------------------------- documents and the bank chain */
 
-const DOCUMENT = ["title", "number", "issuedOn", "status", "shipmentId", "attachmentId", "note"];
+const DOCUMENT = ["title", "number", "issuedOn", "status", "shipmentId", "attachmentId", "note", "keptWhere"];
 
 export async function addDocumentAction(orderId: string, _prev: ActionState, form: FormData) {
   return run(orderId, form, () => api.post(`/orders/${orderId}/document-set`, pick(form, ["kind", ...DOCUMENT])), "Document recorded.");

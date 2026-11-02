@@ -141,6 +141,8 @@ const documentFields = {
   /** A file already on the deal (uploaded to the inquiry's files). */
   attachmentId: optionalId,
   note: optionalText(500),
+  /** Kept elsewhere: where it is (a shelf, a person, a bank, an email). */
+  keptWhere: optionalText(200),
 };
 
 export const orderDocumentInput = z.object({ kind: z.enum(ORDER_DOCUMENT_KINDS), ...documentFields, status: documentFields.status.default("draft") });

@@ -7,6 +7,8 @@ import {
   CHECKLIST_TOOLS,
   FLOW_STEP_LABEL,
   FLOW_STEPS,
+  PAPER_KINDS,
+  PAPER_LABEL,
   PAYMENT_ROUTE_SHORT,
   PAYMENT_ROUTES,
   TOOL_HINT,
@@ -15,6 +17,7 @@ import {
   type ChecklistFieldType,
   type ChecklistTool,
   type FlowStep,
+  type PaperKind,
   type PaymentRoute,
 } from "@kebo/shared";
 import { Button, cn, Input, Select } from "@kebo/ui";
@@ -146,6 +149,7 @@ export function ChecklistEditor({ initial, action }: { initial: ChecklistSetting
     items: FLOW_STEPS.flatMap((s) => items.filter((i) => i.step === s)).map(({ uid: _uid, ...i }) => ({
       ...i,
       fields: i.tool === "fill" ? i.fields.filter((f) => f.label.trim()) : [],
+      paper: i.tool === "make" || i.tool === "send" ? i.paper : null,
     })),
     hidden,
   });
@@ -281,6 +285,23 @@ export function ChecklistEditor({ initial, action }: { initial: ChecklistSetting
                     </label>
                   </div>
                   <p className="pl-6 text-xs text-muted">{TOOL_HINT[i.tool]}</p>
+                  {(i.tool === "make" || i.tool === "send") && (
+                    <label className="flex flex-col gap-1 pl-6 text-xs text-muted sm:max-w-xs">
+                      The paper
+                      <Select
+                        value={i.paper ?? ""}
+                        onChange={(e) => patch(i.uid, { paper: (e.target.value || null) as PaperKind | null })}
+                        className="h-8 text-sm"
+                      >
+                        <option value="">None (ticked by hand)</option>
+                        {PAPER_KINDS.map((k) => (
+                          <option key={k} value={k}>
+                            {PAPER_LABEL[k]}
+                          </option>
+                        ))}
+                      </Select>
+                    </label>
+                  )}
                   {i.tool === "fill" && (
                     <div className="pl-6">
                       <FieldsEditor fields={i.fields} onChange={(f) => patch(i.uid, { fields: f })} />
@@ -294,7 +315,7 @@ export function ChecklistEditor({ initial, action }: { initial: ChecklistSetting
               size="sm"
               variant="secondary"
               className="w-fit"
-              onClick={() => setItems((l) => [...l, { uid: uid(), step, title: "", tool: "done", fields: [], route: null, dueDays: null }])}
+              onClick={() => setItems((l) => [...l, { uid: uid(), step, title: "", tool: "done", fields: [], paper: null, route: null, dueDays: null }])}
             >
               <Plus aria-hidden /> Add an item to {FLOW_STEP_LABEL[step]}
             </Button>

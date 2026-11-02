@@ -17,6 +17,7 @@ import { factoryOrderAction } from "../../flow-actions";
 import { FactoriesView } from "../money-cards";
 import { MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
+import { StepPapers } from "../papers";
 
 export const metadata = { title: "Order · factory order" };
 
@@ -96,6 +97,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
             ]}
           />
           <StepCosts id={o.id} step="factory" />
+          <StepPapers id={o.id} dealId={o.inquiry.id} step="factory" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>

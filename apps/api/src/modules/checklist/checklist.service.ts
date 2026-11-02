@@ -25,6 +25,7 @@ import {
   type ChecklistTickInput,
   type ChecklistTool,
   type FlowStep,
+  type PaperKind,
   type PaymentRoute,
   type StepState,
 } from "@kebo/shared";
@@ -59,6 +60,8 @@ export interface ChecklistItemView {
   title: string;
   /** An own item's tool (automatic items open the form for their data). */
   tool: ChecklistTool | null;
+  /** Make and Send items: the paper the app makes. */
+  paper: PaperKind | null;
   fields: ChecklistField[];
   /** An own item's values by field key (files: the file's id). */
   values: Record<string, string>;
@@ -133,6 +136,7 @@ export class ChecklistService {
       title: r.title,
       tool: r.tool as ChecklistTool,
       fields: asFields(r.fields),
+      paper: (r.paper as PaperKind | null) ?? null,
       route: r.route,
       dueDays: r.dueDays,
       sort: r.sortOrder,
@@ -164,6 +168,7 @@ export class ChecklistService {
             title: t.title,
             tool: t.tool,
             fields: (t.fields ?? []) as unknown as Prisma.InputJsonValue,
+            paper: t.paper ?? null,
             route: t.route ?? null,
             dueOn: t.dueDays === null || t.dueDays === undefined ? null : toDbDate(addDays(orderedOn, t.dueDays)),
             sortOrder: t.sort,
@@ -230,6 +235,7 @@ export class ChecklistService {
         step: a.step,
         title: a.title,
         tool: null,
+        paper: null,
         fields: [],
         values: {},
         data: a.data,
@@ -268,6 +274,7 @@ export class ChecklistService {
         step: r.step as FlowStep,
         title: r.title ?? "",
         tool: r.tool as ChecklistTool,
+        paper: (r.paper as PaperKind | null) ?? null,
         fields,
         values,
         data: shown,
@@ -445,6 +452,7 @@ export class ChecklistService {
           title: input.title,
           tool: input.tool,
           fields: input.fields as unknown as Prisma.InputJsonValue,
+          paper: input.tool === "make" || input.tool === "send" ? input.paper : null,
           route: input.route,
           dueOn: toDbDateOrNull(input.dueOn),
           assigneeId: input.assigneeId,
@@ -476,7 +484,7 @@ export class ChecklistService {
     this.must(user);
     const orderId = await this.prisma.tx(async (tx) => {
       const { r, o } = await this.item(tx, user, itemId);
-      const ownOnly = (["title", "tool", "fields", "route", "data", "attachmentId"] as const).filter((k) => input[k] !== undefined);
+      const ownOnly = (["title", "tool", "fields", "paper", "route", "data", "attachmentId"] as const).filter((k) => input[k] !== undefined);
       if (r.key && ownOnly.length) this.own(r);
       await this.checkPerson(tx, input.assigneeId);
       if (input.attachmentId) await this.checkFiles(tx, o.inquiryId, [input.attachmentId]);
@@ -485,6 +493,7 @@ export class ChecklistService {
       if (input.title !== undefined) data.title = input.title;
       if (input.tool !== undefined) data.tool = input.tool;
       if (input.fields !== undefined) data.fields = input.fields as unknown as Prisma.InputJsonValue;
+      if (input.paper !== undefined) data.paper = input.paper;
       if (input.route !== undefined) data.route = input.route;
       if (input.dueOn !== undefined) data.dueOn = toDbDateOrNull(input.dueOn);
       if (input.assigneeId !== undefined) data.assigneeId = input.assigneeId;

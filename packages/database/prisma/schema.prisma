@@ -228,6 +228,8 @@ enum OrderDocumentStatus {
   missing
   draft
   ready
+  /// Kept outside the app (where: kept_where); counts as done.
+  elsewhere
 }
 
 /// The bank chain for the documents: our bank → courier to the customer's bank (copies to the customer) → they pay their bank → it reaches us.
@@ -356,6 +358,7 @@ model User {
   relChecklistCreator       OrderChecklistItem[] @relation("ChecklistCreator")
   relReceiptRecorder        CustomerReceipt[]    @relation("ReceiptRecorder")
   relCreditRecorder         CustomerCredit[]     @relation("CreditRecorder")
+  relPapersMade             OrderPaper[]         @relation("PaperMadeBy")
 
   @@unique([companyId, email])
   @@map("users")
@@ -1115,6 +1118,7 @@ model Order {
   checklist    OrderChecklistItem[]
   factoryPlan  FactoryPaymentPlan[]
   credits      CustomerCredit[]
+  papers       OrderPaper[]
 
   @@unique([companyId, refNo])
   @@unique([companyId, proformaNo])
@@ -1138,6 +1142,8 @@ model OrderLine {
   type        LineType   @default(goods)
   description String
   model       String?    @db.VarChar(120)
+  /// The customs code printed on the commercial invoice and the contract (e.g. 8422.40).
+  hsCode      String?    @map("hs_code") @db.VarChar(20)
   quantity    Decimal    @db.Decimal(12, 2)
   unit        String     @default("pcs") @db.VarChar(20)
   unitPrice   Decimal    @map("unit_price") @db.Decimal(14, 2)
@@ -1326,6 +1332,8 @@ model OrderChecklistItem {
   fields       Json          @default("[]")
   /// What the item collected, by field key.
   data         Json          @default("{}")
+  /// Make and Send items: the paper the app makes (sales-contract, shipping-advice…).
+  paper        String?       @db.VarChar(40)
   /// Only for orders paid this way.
   route        PaymentRoute?
   /// The factory a production item is about (from the old production timeline).
@@ -1365,6 +1373,8 @@ model ChecklistTemplate {
   title     String        @db.VarChar(200)
   tool      String        @default("done") @db.VarChar(10)
   fields    Json          @default("[]")
+  /// Make and Send items: the paper the app makes.
+  paper     String?       @db.VarChar(40)
   route     PaymentRoute?
   /// Due this many days after the order date (empty: no due date).
   dueDays   Int?          @map("due_days")
@@ -1430,11 +1440,50 @@ model OrderDocument {
   attachmentId String?             @map("attachment_id") @db.Uuid
   attachment   Attachment?         @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
   note         String?             @db.VarChar(500)
+  /// Kept elsewhere (status elsewhere): where it is — a shelf, a person, a bank, an email. No file in the app.
+  keptWhere    String?             @map("kept_where") @db.VarChar(200)
+  /// Made by the app: the final paper this row is.
+  paperId      String?             @map("paper_id") @db.Uuid
+  paper        OrderPaper?         @relation(fields: [paperId], references: [id], onDelete: SetNull)
   updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([orderId])
   @@index([companyId])
   @@map("order_documents")
+}
+
+/// A paper the app makes from the order (sales contract, commercial invoice, …; see @kebo/shared workflows/papers):
+/// a draft until made final; final keeps the snapshot of exactly what was printed and locks the number.
+/// "Make again" adds the next version as a draft and keeps the earlier ones.
+model OrderPaper {
+  id        String          @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String          @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company   Company         @relation(fields: [companyId], references: [id])
+  orderId   String          @map("order_id") @db.Uuid
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// The print slug: sales-contract, commercial-invoice, purchase-order…
+  kind      String          @db.VarChar(40)
+  /// Which one when an order has several of the kind (a purchase order: the factory's id); empty otherwise.
+  ref       String          @default("") @db.VarChar(60)
+  /// CI-2026-0031 (follows the order's number); the same in every version.
+  number    String          @db.VarChar(40)
+  version   Int             @default(1)
+  /// draft | final
+  status    String          @default("draft") @db.VarChar(10)
+  /// { prices, showHs, lcStatement, stamp }
+  options   Json            @default("{}")
+  /// Final: everything the paper was printed from (the API's PaperDoc), so it never changes afterwards.
+  snapshot  Json?
+  madeById  String          @map("made_by") @db.Uuid
+  madeBy    User            @relation("PaperMadeBy", fields: [madeById], references: [id])
+  madeAt    DateTime        @default(now()) @map("made_at") @db.Timestamptz
+  finalAt   DateTime?       @map("final_at") @db.Timestamptz
+  documents OrderDocument[]
+
+  @@unique([orderId, kind, ref, version])
+  @@index([companyId])
+  @@map("order_papers")
 }
 
 /// One step of the documents' trip through the banks, when it happened and its reference (DHL tracking, bank ref).
@@ -2075,6 +2124,7 @@ model Company {
   customerReceipts    CustomerReceipt[]
   customerCredits     CustomerCredit[]
   factoryPaymentPlans FactoryPaymentPlan[]
+  orderPapers         OrderPaper[]
 
   @@map("companies")
 }

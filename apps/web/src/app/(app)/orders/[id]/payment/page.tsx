@@ -15,6 +15,7 @@ import { bankContractAction, routeAction } from "../../flow-actions";
 import { paymentAction, useCreditAction } from "../../actions";
 import { CustomerSummary, MoneySection, PaymentsReceived } from "../money-sections";
 import { stepData } from "../step-data";
+import { StepPapers } from "../papers";
 import { termsOf } from "../shared";
 
 export const metadata = { title: "Order · payment" };
@@ -104,6 +105,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
             ]}
           />
           <StepCosts id={o.id} step="payment" />
+          <StepPapers id={o.id} dealId={o.inquiry.id} step="payment" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>

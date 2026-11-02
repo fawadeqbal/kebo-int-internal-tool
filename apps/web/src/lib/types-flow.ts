@@ -98,6 +98,10 @@ export interface FlowDocument {
   issuedOn: string | null;
   shipmentId: string | null;
   note: string | null;
+  /** Kept elsewhere: where it is. */
+  keptWhere: string | null;
+  /** Made by the app: the final paper. */
+  paperId: string | null;
   file: { id: string; name: string; size: number } | null;
   printable: "proforma" | "packing-list" | null;
 }

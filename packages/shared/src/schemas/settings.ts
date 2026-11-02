@@ -80,6 +80,8 @@ export const salesSettings = z.object({
   defaultPaymentTerms: z.string().trim().max(5000).default(""),
   /** Delivery terms that go on every new quotation (packing, inspection, warranty…). */
   defaultDeliveryTerms: z.string().trim().max(5000).default(""),
+  /** The warranty as it goes on sales contracts and SAT certificates. */
+  warrantyTerms: z.string().trim().max(1000).default("Warranty: 12 months from the site acceptance test (SAT), parts and service."),
   categories: z.array(z.string().trim().min(1).max(120)).default(["Machinery", "Chemicals", "Building materials", "Auto parts", "Other"]),
 });
 

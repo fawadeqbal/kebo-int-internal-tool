@@ -6,6 +6,7 @@ import {
   BANK_STEP_LABEL,
   can,
   CLAIM_STATUS_LABEL,
+  documentDone,
   DEFAULT_PRODUCTION_STEPS,
   DEFAULT_SAT_CHECKS,
   flowSteps,
@@ -87,7 +88,7 @@ export function factsOf(o: FlowRows, depositIn: boolean): FlowFacts {
   const required = requiredDocuments(route, o.shipments[0]?.mode ?? "sea");
   const ready = required.filter((kind) => {
     const rows = o.documents.filter((d) => d.kind === kind);
-    if (rows.length) return rows.some((d) => d.status === "ready");
+    if (rows.length) return rows.some((d) => documentDone(d.status));
     return kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false;
   }).length;
   const bankKinds = bankStepsFor(route);
@@ -145,6 +146,10 @@ interface DocumentView {
   issuedOn: string | null;
   shipmentId: string | null;
   note: string | null;
+  /** Kept elsewhere: where it is. */
+  keptWhere: string | null;
+  /** Made by the app: the final paper. */
+  paperId: string | null;
   file: { id: string; name: string; size: number } | null;
   printable: "proforma" | "packing-list" | null;
 }
@@ -387,6 +392,8 @@ export class FlowService {
         status: OrderDocumentStatus;
         shipmentId: string | null;
         note: string | null;
+        keptWhere: string | null;
+        paperId: string | null;
         attachment: { id: string; fileName: string; size: number; deletedAt: Date | null } | null;
       }[];
     },
@@ -402,6 +409,8 @@ export class FlowService {
       issuedOn: fromDbDateOrNull(d.issuedOn),
       shipmentId: d.shipmentId,
       note: d.note,
+      keptWhere: d.keptWhere,
+      paperId: d.paperId,
       file: d.attachment && !d.attachment.deletedAt ? { id: d.attachment.id, name: d.attachment.fileName, size: d.attachment.size } : null,
       printable: SYSTEM_DOCUMENTS[d.kind] ?? null,
     });
@@ -431,6 +440,8 @@ export class FlowService {
           issuedOn: null,
           shipmentId: null,
           note: null,
+          keptWhere: null,
+          paperId: null,
           file: null,
           printable: system ?? null,
         },
@@ -804,6 +815,7 @@ export class FlowService {
   async addDocument(user: SessionUser, id: string, input: OrderDocumentInput) {
     await this.must(user, "documents.manage", "bank_documents", "manage the documents");
     if (input.kind === "other" && !input.title) throw new DomainError("Say what the document is.");
+    if (input.status === "elsewhere" && !input.keptWhere) throw new DomainError("Say where it is kept, so anyone can find it.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       await this.checkDocumentLinks(tx, o, input.shipmentId, input.attachmentId);
@@ -818,6 +830,7 @@ export class FlowService {
           shipmentId: input.shipmentId,
           attachmentId: input.attachmentId,
           note: input.note,
+          keptWhere: input.status === "elsewhere" ? input.keptWhere : null,
         },
       });
       await this.log(
@@ -840,8 +853,11 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, orderId);
       await this.checkDocumentLinks(tx, o, input.shipmentId, input.attachmentId);
       const before = await tx.orderDocument.findUniqueOrThrow({ where: { id: docId } });
+      const status = input.status ?? before.status;
+      if (status === "elsewhere" && !(input.keptWhere !== undefined ? input.keptWhere : before.keptWhere))
+        throw new DomainError("Say where it is kept, so anyone can find it.");
       const data: Prisma.OrderDocumentUncheckedUpdateInput = {};
-      for (const k of ["title", "number", "status", "shipmentId", "attachmentId", "note"] as const)
+      for (const k of ["title", "number", "status", "shipmentId", "attachmentId", "note", "keptWhere"] as const)
         if (input[k] !== undefined) (data as Record<string, unknown>)[k] = input[k];
       if (input.issuedOn !== undefined) data.issuedOn = toDbDateOrNull(input.issuedOn);
       await tx.orderDocument.update({ where: { id: docId }, data });

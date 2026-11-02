@@ -12,6 +12,7 @@ import { PackingCard } from "../goods";
 import { docHref, goodsOf } from "../shared";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
+import { StepPapers } from "../papers";
 
 export const metadata = { title: "Order · shipping" };
 
@@ -100,6 +101,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             ]}
           />
           <StepCosts id={o.id} step="shipping" />
+          <StepPapers id={o.id} dealId={o.inquiry.id} step="shipping" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
