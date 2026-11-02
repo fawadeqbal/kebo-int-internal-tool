@@ -502,7 +502,7 @@ function Row({
   return (
     <li
       className={cn(
-        "grid grid-cols-[18px_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg px-3 py-3 sm:grid-cols-[18px_minmax(0,1fr)_auto]",
+        "grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-lg px-3 py-3",
         item.late ? "bg-bad-soft" : now && !closed ? "bg-primary-soft/70 ring-1 ring-primary/15" : "",
       )}
     >
@@ -526,7 +526,7 @@ function Row({
         )}
         {item.assignee && !closed && <span className="text-xs text-muted">· {item.assignee.name}</span>}
       </p>
-      <div className="col-[2/3] row-start-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 text-xs sm:col-[2/4]">
+      <div className="col-[2/4] row-start-2 flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 text-xs">
         <span className="flex min-w-0 flex-wrap gap-x-4 gap-y-0.5">
           {item.skipped ? (
             <span className="text-muted">Skipped{item.skipReason ? `: ${item.skipReason}` : ""}</span>
@@ -558,7 +558,10 @@ function Row({
       {(buttons || canEdit) && (
         <div
           className={cn(
-            "col-[2/3] row-start-3 flex flex-wrap items-center gap-1.5 pt-1 sm:col-[3/4] sm:row-start-1 sm:justify-end sm:pt-0",
+            // On a phone the row's buttons go under it; with none, the ⋯ stays on the title line at the right.
+            buttons
+              ? "col-[2/4] row-start-3 flex flex-wrap items-center gap-1.5 pt-1 sm:col-[3/4] sm:row-start-1 sm:justify-end sm:pt-0"
+              : "col-[3/4] row-start-1 flex items-start justify-end gap-1.5",
             "sm:has-[input:not([type=hidden]),textarea,select]:col-[2/4] sm:has-[input:not([type=hidden]),textarea,select]:row-start-3 sm:has-[input:not([type=hidden]),textarea,select]:justify-start",
           )}
         >

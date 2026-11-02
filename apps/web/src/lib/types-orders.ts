@@ -1,6 +1,6 @@
 import type { AttachedFileInfo } from "./types-money";
 import type { OfferFile } from "./types-deals";
-import type { BalanceTerms, Incoterm, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus } from "@kebo/shared";
+import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for orders (four stages), their payments and the printed documents. Keep in step with apps/api/src/modules/orders. */
@@ -114,6 +114,10 @@ export interface OrderLineView {
   receivedQty: string;
   receivedOn: string | null;
   packing: LinePacking;
+  /** What reached the customer; null when Delivery & SAT is off for the company. */
+  delivered: { qty: string; condition: LineCondition | null; note: string | null } | null;
+  /** The factory's price it was bought at; null for people who do not see factory prices (or not known). */
+  factoryPrice: { unitPrice: string; taxRate: string; currency: string | null } | null;
 }
 
 /** The goods side of GET /orders/:id: what came in from the factory and the packing list. */

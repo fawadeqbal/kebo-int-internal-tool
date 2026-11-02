@@ -232,7 +232,8 @@ export function StepChanges({
       {entries.length ? (
         <ol className="flex flex-col divide-y divide-line px-4">
           {entries.map((e) => {
-            const change = e.changes.find((c) => c.from && c.to);
+            // A summary that already says "a → b" needs no "was".
+            const change = /→/.test(e.summary ?? "") ? null : e.changes.find((c) => c.from && c.to);
             return (
               <li key={e.id} className="flex gap-2.5 py-3">
                 <span
@@ -244,7 +245,7 @@ export function StepChanges({
                 <span className="min-w-0 text-xs leading-relaxed">
                   <span className="block text-text-2">
                     <span className="font-semibold text-text">{e.by?.name ?? "System"}</span>{" "}
-                    {(e.summary ?? e.action).replace(/^[A-Z]{2,4}-\d{4}-\d+: /, "")}
+                    {readable((e.summary ?? e.action).replace(/^[A-Z]{2,4}-\d{4}-\d+: /, ""))}
                     {showStep && e.step && <span className="text-muted"> · {FLOW_STEP_LABEL[e.step as FlowStep] ?? e.step}</span>}
                   </span>
                   {change && (

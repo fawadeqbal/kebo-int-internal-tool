@@ -1143,6 +1143,11 @@ model OrderLine {
   netWeightKg   Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
   grossWeightKg Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
   cbm           Decimal?  @db.Decimal(10, 3)
+  /// What reached the customer (Delivery & SAT, goods lines): how many, in what condition
+  /// (good | minor_damage | damaged | missing) and a short note.
+  deliveredQty       Decimal @default(0) @map("delivered_qty") @db.Decimal(12, 2)
+  deliveredCondition String? @map("delivered_condition")
+  deliveryNote       String? @map("delivery_note") @db.VarChar(200)
 
   @@index([orderId])
   @@index([factoryId])
