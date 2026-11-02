@@ -9,6 +9,7 @@ import {
   BASIS_STEPS,
   INQUIRY_CHANNELS,
   INQUIRY_STAGES,
+  LINE_CONDITIONS,
   LINE_TYPES,
   LOST_REASONS,
   MONEY_ACCOUNT_KINDS,
@@ -370,6 +371,9 @@ export const orderDetailsInput = z.object({
   /** Heading over the lines on the proforma / invoice / packing list. */
   documentTitle: optionalText(200).optional(),
   portOfDischarge: optionalText(120).optional(),
+  /** The packing list's container and the marks on the cartons. */
+  containerNo: optionalText(120).optional(),
+  shippingMarks: optionalText(2000).optional(),
   reason: reasonField,
 });
 export type OrderDetailsInput = z.infer<typeof orderDetailsInput>;
@@ -410,6 +414,45 @@ export const packingInput = z.object({
     .max(300),
 });
 export type PackingInput = z.infer<typeof packingInput>;
+
+const receivedQty = z.preprocess(
+  (v) => (v === "" || v === null ? 0 : v),
+  z.coerce
+    .number()
+    .min(0, "Cannot be negative")
+    .max(10_000_000)
+    .refine((n) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6, "Use at most 2 decimals"),
+);
+
+/**
+ * One line of an order, changed in the step's line table: what came in from the
+ * factory (Production), its packing (Shipping) or what reached the customer
+ * (Delivery & SAT). Only the fields sent change; an empty one is cleared.
+ */
+export const orderLineInput = z.discriminatedUnion("set", [
+  z.object({
+    set: z.literal("received"),
+    receivedQty: receivedQty.optional(),
+    receivedOn: optionalDate.optional(),
+  }),
+  z.object({
+    set: z.literal("packing"),
+    packages: z
+      .preprocess((v) => (v === "" || v === null ? null : v), z.coerce.number().int("Whole packages only").min(0).max(1_000_000).nullable())
+      .optional(),
+    packageType: optionalText(40).optional(),
+    netWeightKg: measure(10_000_000).optional(),
+    grossWeightKg: measure(10_000_000).optional(),
+    cbm: measure(100_000).optional(),
+  }),
+  z.object({
+    set: z.literal("delivered"),
+    deliveredQty: receivedQty.optional(),
+    condition: z.preprocess((v) => (v === "" ? null : v), z.enum(LINE_CONDITIONS).nullable()).optional(),
+    note: optionalText(200).optional(),
+  }),
+]);
+export type OrderLineInput = z.infer<typeof orderLineInput>;
 
 export const cancelOrderInput = z.object({ reason: text(2000, "Say why the order is cancelled") });
 

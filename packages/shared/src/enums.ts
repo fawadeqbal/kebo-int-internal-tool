@@ -188,6 +188,10 @@ export type BankStepKind = (typeof BANK_STEP_KINDS)[number];
 export const DELIVERY_CONDITIONS = values("good", "minor_damage", "damaged", "partial");
 export type DeliveryCondition = (typeof DELIVERY_CONDITIONS)[number];
 
+/** What came to the customer, line by line (Delivery & SAT): in good order, a little damaged, damaged, or not there. */
+export const LINE_CONDITIONS = values("good", "minor_damage", "damaged", "missing");
+export type LineCondition = (typeof LINE_CONDITIONS)[number];
+
 export const SAT_RESULTS = values("pending", "pass", "fail", "not_applicable");
 export type SatResult = (typeof SAT_RESULTS)[number];
 

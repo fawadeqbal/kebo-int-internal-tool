@@ -12,7 +12,8 @@ import { NewFactoryPayment } from "@/components/money/forms";
 import { factoryPaymentAction } from "../../../money/actions";
 import { receiptAction } from "../../actions";
 import { readyDateAction } from "../../checklist-actions";
-import { GoodsExcel, GoodsReceipt } from "../goods";
+import { GoodsExcel, MarkAllReceived } from "../goods";
+import { OrderLines } from "@/components/orders/order-lines";
 import { goodsOf } from "../shared";
 import { stepData } from "../step-data";
 
@@ -46,6 +47,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       />
     ) : null;
   const goods = goodsOf(o);
+  const goodsLines = o.lines.filter((l) => l.type === "goods");
 
   const tools: Record<string, AutoTool> = {};
   if (canEdit)
@@ -58,7 +60,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       value: o.readyOn,
       save: "Save the date",
     };
-  if (goods.length) tools.goods_received = { kind: "link", label: canEdit ? "Record goods" : "See the goods", href: "#goods" };
+  if (goods.length) tools.goods_received = { kind: "link", label: canEdit ? "Record goods" : "See the goods", href: "#lines" };
   const balance = payFactory("Pay the factory");
   if (balance) tools.factory_paid = { kind: "node", node: balance };
 
@@ -106,29 +108,24 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
         listHref={d.listHref}
       />
       {goods.length > 0 && (
-        <Card id="goods" className="scroll-mt-24">
+        <Card id="lines" className="scroll-mt-24">
           <CardHeader
-            title="Goods from the factory"
+            title="Lines · from the factory"
             description={
               o.goods.allReceived
                 ? "Everything has come in."
-                : `${o.goods.received} of ${o.goods.lines} item${o.goods.lines === 1 ? "" : "s"} complete. Record what comes in as it arrives.`
+                : "Type what has come in so far on each line, as it arrives; the status follows."
             }
             actions={
               <>
                 {o.goods.allReceived && <Badge tone="ok">All in</Badge>}
+                {canEdit && !o.goods.allReceived && <MarkAllReceived lines={goods} action={receiptAction.bind(null, o.id)} />}
                 <GoodsExcel lines={goods} />
               </>
             }
           />
           <CardBody>
-            <GoodsReceipt
-              key={goods.map((l) => l.receivedQty).join()}
-              lines={goods}
-              canEdit={canEdit}
-              action={receiptAction.bind(null, o.id)}
-              today={now}
-            />
+            <OrderLines set="received" orderId={o.id} lines={goodsLines} canEdit={canEdit} today={now} />
           </CardBody>
         </Card>
       )}
