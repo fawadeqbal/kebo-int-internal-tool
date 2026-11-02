@@ -59,12 +59,15 @@ export function PaymentPlan({
   total,
   terms,
   action,
+  buttonOnly,
 }: {
   plan: OrderMoney["plan"];
   currency: string;
   total: string;
   terms: string;
   action: Action;
+  /** The plan is shown elsewhere (the line table): only the "Change the plan" button until editing. */
+  buttonOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const start = (): Row[] => plan.items.map((i) => ({ key: i.id, id: i.id, label: i.label, amount: i.amount, dueOn: i.dueOn ?? "" }));
@@ -76,6 +79,19 @@ export function PaymentPlan({
   );
   const diff = toMinor(total) - sum;
 
+  if (!editing && buttonOnly)
+    return plan.canEdit ? (
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() => {
+          setRows(start());
+          setEditing(true);
+        }}
+      >
+        <Pencil aria-hidden /> Change the plan
+      </Button>
+    ) : null;
   if (!editing)
     return (
       <section aria-label="Payment schedule" className="flex flex-col gap-2">
@@ -319,11 +335,17 @@ export function EditCustomerPayment({
     reference: string | null;
     note: string | null;
     account?: { id: string; name: string } | null;
+    /** What really arrived (money v2): its currency and the rate it was counted at. */
+    receivedAmount?: string;
+    receivedCurrency?: string;
+    rate?: number;
+    paidByName?: string | null;
   };
   currency: string;
   today: string;
 }) {
   const [open, setOpen] = useState(false);
+  const received = payment.receivedCurrency ?? currency;
   if (!open)
     return (
       <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
@@ -344,9 +366,20 @@ export function EditCustomerPayment({
                 value={(s.values?.kind as PaymentKind) ?? payment.kind}
               />
             </Field>
-            <Field label="Amount received" htmlFor="ep-amount" error={s.errors?.amount}>
-              <MoneyInput id="ep-amount" name="amount" currency={currency} defaultValue={s.values?.amount ?? payment.amount} />
+            <Field
+              label={received === currency ? "Amount received" : `Amount received (${received})`}
+              htmlFor="ep-amount"
+              hint={received === currency ? undefined : `Counted at ${payment.rate} ${received} per ${currency}; change the rate below`}
+              error={s.errors?.receivedAmount ?? s.errors?.amount}
+            >
+              <MoneyInput id="ep-amount" name="receivedAmount" currency={received} defaultValue={s.values?.receivedAmount ?? payment.receivedAmount ?? payment.amount} />
             </Field>
+            <input type="hidden" name="receivedCurrency" value={received} />
+            {received !== currency && (
+              <Field label={`Rate (${received} per 1 ${currency})`} htmlFor="ep-rate" error={s.errors?.rate}>
+                <Input id="ep-rate" name="rate" inputMode="decimal" defaultValue={s.values?.rate ?? String(payment.rate ?? "")} />
+              </Field>
+            )}
             <Field label="Bank charges" htmlFor="ep-charges" optional error={s.errors?.bankCharges}>
               <MoneyInput id="ep-charges" name="bankCharges" currency={currency} defaultValue={s.values?.bankCharges ?? payment.bankCharges} />
             </Field>
@@ -357,7 +390,7 @@ export function EditCustomerPayment({
               <Choice
                 id="ep-method"
                 name="method"
-                options={PAYMENT_METHODS}
+                options={PAYMENT_METHODS.filter((m) => m !== "credit")}
                 labels={PAYMENT_METHOD_LABEL}
                 value={(s.values?.method as PaymentMethod) ?? payment.method}
               />
@@ -365,8 +398,9 @@ export function EditCustomerPayment({
             <Field label="Bank reference" htmlFor="ep-reference" optional>
               <Input id="ep-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? payment.reference ?? ""} />
             </Field>
-            <AccountSelect id="ep-account" label="Into account" currency={currency} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
+            <AccountSelect id="ep-account" label="Into account" currency={received} defaultValue={s.values?.accountId ?? payment.account?.id} error={s.errors?.accountId} />
           </div>
+          <input type="hidden" name="paidByName" value={payment.paidByName ?? ""} />
           <input type="hidden" name="note" value={payment.note ?? ""} />
           <div className="flex gap-2">
             <SubmitButton size="sm" pendingText="Saving…">
@@ -435,6 +469,7 @@ export function FactoryPaymentForm({
   payment,
   onClose,
   onFileError,
+  prefill,
 }: {
   action: Action;
   factories: FactoryOwed[];
@@ -447,15 +482,17 @@ export function FactoryPaymentForm({
   onClose: () => void;
   /** The payment was recorded but its file was not. */
   onFileError?: (message: string) => void;
+  /** A part of the factory's payment plan to pay (its amount and what for). */
+  prefill?: { factoryId: string; amount: string; kind: PaymentKind };
 }) {
-  const first = factories.find((f) => Number(f.toPay) > 0) ?? factories[0];
+  const first = (prefill && factories.find((f) => f.factory.id === prefill.factoryId)) ?? factories.find((f) => Number(f.toPay) > 0) ?? factories[0];
   const [factoryKey, setFactoryKey] = useState(
     payment ? `${payment.factory.id}:${payment.currency}` : first ? `${first.factory.id}:${first.currency}` : "",
   );
   const chosen = factories.find((f) => `${f.factory.id}:${f.currency}` === factoryKey);
   const m = useMoneyFields(fx, orderCurrency, {
     currency: payment?.currency ?? chosen?.currency ?? orderCurrency,
-    amount: payment?.amount ?? "",
+    amount: payment?.amount ?? prefill?.amount ?? "",
     rate: payment ? String(payment.rate) : "",
   });
   // We owe each factory in its offer's currency, and only a payment in that currency counts against it.
@@ -515,7 +552,7 @@ export function FactoryPaymentForm({
                 name="kind"
                 options={PAYMENT_KINDS}
                 labels={PAYMENT_KIND_LABEL}
-                value={(s.values?.kind as PaymentKind) ?? payment?.kind ?? (chosen && Number(chosen.paid) > 0 ? "balance" : "deposit")}
+                value={(s.values?.kind as PaymentKind) ?? payment?.kind ?? prefill?.kind ?? (chosen && Number(chosen.paid) > 0 ? "balance" : "deposit")}
               />
             </Field>
             <Field label="Paid on" htmlFor="fp-paidOn" error={s.errors?.paidOn}>

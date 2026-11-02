@@ -678,8 +678,22 @@ async function ReceiveTab() {
           <Tile
             key={t.currency}
             label={`Customers owe us (${t.currency})`}
-            value={money(t.due, t.currency)}
-            hint={Number(t.overdue) > 0 ? `${money(t.overdue, t.currency)} overdue` : "Nothing overdue"}
+            value={money(t.net ?? t.due, t.currency)}
+            hint={
+              Number(t.credit ?? 0) > 0
+                ? `${money(t.credit!, t.currency)} credit taken off${Number(t.overdue) > 0 ? ` · ${money(t.overdue, t.currency)} overdue` : ""}`
+                : Number(t.overdue) > 0
+                  ? `${money(t.overdue, t.currency)} overdue`
+                  : "Nothing overdue"
+            }
+          />
+        ))}
+        {(r.held ?? []).map((h) => (
+          <Tile
+            key={`held-${h.currency}`}
+            label={`Held for customers (${h.currency})`}
+            value={money(h.amount, h.currency)}
+            hint={`credit · ${h.customers} customer${h.customers === 1 ? "" : "s"}`}
           />
         ))}
       </div>
@@ -698,6 +712,7 @@ async function ReceiveTab() {
                 <tr>
                   <Th>Order</Th>
                   <Th>Next</Th>
+                  <Th className="hidden sm:table-cell">How</Th>
                   <Th className="text-right">Received</Th>
                   <Th className="text-right">Still due</Th>
                 </tr>
@@ -722,13 +737,14 @@ async function ReceiveTab() {
                         <>
                           {o.next.label} <span className="tabular">{money(o.next.open, o.currency)}</span>
                           <span className={cn("block text-xs", o.daysLate > 0 ? "font-medium text-bad" : "text-muted")}>
-                            {o.daysLate > 0 ? `${o.daysLate} days late` : o.next.dueOn ? `due ${date(o.next.dueOn)}` : "no due date"}
+                            {o.daysLate > 0 ? `${o.daysLate} days late` : o.next.dueOn ? `due ${date(o.next.dueOn)}` : (o.next.when ?? "no due date")}
                           </span>
                         </>
                       ) : (
                         <span className="text-muted">—</span>
                       )}
                     </Td>
+                    <Td className="hidden sm:table-cell">{o.how ? <Badge>{o.how}</Badge> : <span className="text-muted">—</span>}</Td>
                     <Td className="text-right whitespace-nowrap tabular">
                       {money(o.received, o.currency)}
                       <span className="block text-xs text-muted">of {money(o.total, o.currency)}</span>
@@ -797,6 +813,12 @@ async function OweTab({ mine }: { mine: boolean }) {
                     </Link>{" "}
                     <span className="text-text-2">{o.customer}</span>{" "}
                     <span className="text-xs text-muted">· {ORDER_STAGE_LABEL[o.stage as OrderStage]}</span>
+                    {o.next && (
+                      <span className={cn("block text-xs", o.next.status === "late" ? "font-medium text-bad" : "text-muted")}>
+                        Next: {o.next.label} {money(o.next.open, r.currency)}
+                        {o.next.due ? ` · ${o.next.status === "late" ? "late since" : "due"} ${date(o.next.due)}` : " · when the ready date is known"}
+                      </span>
+                    )}
                   </span>
                   <span className="tabular">{money(o.toPay, r.currency)}</span>
                 </li>

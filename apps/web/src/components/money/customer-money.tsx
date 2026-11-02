@@ -11,6 +11,8 @@ import { ViewSwitch } from "@/components/common/view-switch";
 import { NewExpense } from "./forms";
 import { ExpenseRecord } from "./expense-record";
 import { CustomerPaymentsBody } from "./customer-payments";
+import { CustomerCredit, ReceiptForm } from "./money-v2";
+import { customerReceiptAction, refundCreditAction, useCreditAction, voidCreditAction } from "@/app/(app)/orders/actions";
 import { lostReasonLabel } from "./customer-account";
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
@@ -90,6 +92,7 @@ export async function CustomerMoney({
           )
         )}
       </div>
+      {shown === "payments" && <CreditAndReceipts customerId={customerId} customerName={customerName} pay={pay} />}
       {shown === "payments" ? <CustomerPaymentsBody d={pay} /> : a && profit && <ProfitBody a={a} {...profit} customerId={customerId} />}
     </div>
   );
@@ -335,6 +338,57 @@ function ProfitBody({
           </Link>
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * Money v2 on the customer's page: one transfer over several of their orders
+ * (oldest due first, the rest kept as credit), and the credit we hold for them
+ * with "Use on an order" and "Refund it".
+ */
+async function CreditAndReceipts({ customerId, customerName, pay }: { customerId: string; customerName: string; pay: CustomerPayments }) {
+  const canRecord = pay.credit.canRecord;
+  const hasCredit = pay.credit.entries.length > 0;
+  if (!canRecord && !hasCredit) return null;
+  const settings = await api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings");
+  const today = todayIn(TZ);
+  const open = pay.orders.filter((o) => o.status !== "cancelled" && Number(o.due) > 0);
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {canRecord && (
+        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
+          <div>
+            <h3 className="font-semibold">Money received</h3>
+            <p className="text-xs text-text-2">One transfer can pay several orders: the oldest due first is filled in for you; the rest is kept as credit.</p>
+          </div>
+          <ReceiptForm
+            action={customerReceiptAction.bind(null, customerId)}
+            customer={customerName}
+            orders={open.map((o) => ({ id: o.id, refNo: o.refNo, currency: o.currency, orderedOn: o.orderedOn, due: o.due, next: o.next }))}
+            fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
+            today={today}
+          />
+        </section>
+      )}
+      {(hasCredit || canRecord) && (
+        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
+          <div>
+            <h3 className="font-semibold">Customer credit</h3>
+            <p className="text-xs text-text-2">Money we hold for the customer: shown here, on Money › Customers owe us (as a minus), and offered when their next order wants a deposit.</p>
+          </div>
+          <CustomerCredit
+            customer={customerName}
+            credit={pay.credit}
+            orders={open.map((o) => ({ id: o.id, refNo: o.refNo, currency: o.currency, due: o.due }))}
+            useActions={Object.fromEntries(open.map((o) => [o.id, useCreditAction.bind(null, o.id)]))}
+            refundAction={refundCreditAction.bind(null, customerId)}
+            voidActions={Object.fromEntries(pay.credit.entries.filter((e) => e.kind === "refund").map((e) => [e.id, voidCreditAction.bind(null, customerId, "credit", e.id)]))}
+            canManage={canRecord}
+            today={today}
+          />
+        </section>
+      )}
     </div>
   );
 }

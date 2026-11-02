@@ -1047,6 +1047,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
           customerId: o.customerId,
           amount: p.amount,
           currency: inv.currency,
+          receivedAmount: p.amount,
+          receivedCurrency: inv.currency,
           paidOn: toDbDate(p.paid_at),
           method: map.mapPaymentMethod(p.method),
           reference: p.reference,

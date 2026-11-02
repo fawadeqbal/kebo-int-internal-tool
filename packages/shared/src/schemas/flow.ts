@@ -13,6 +13,7 @@ import {
   SHIPMENT_STATUSES,
 } from "../enums";
 import { REQUEST_CHANNELS } from "../workflows/flow";
+import { BALANCE_WHENS, LC_TERMS } from "../workflows/money-route";
 import { id, isoDate, optionalAmount, optionalDate, optionalId, optionalText, text } from "./common";
 
 /**
@@ -47,7 +48,17 @@ export type FactoryRequestUpdateInput = z.infer<typeof factoryRequestUpdateInput
 
 /* ---------------------------------------------------------------- payment route and bank contract */
 
-export const paymentRouteInput = z.object({ route: optionalEnum(PAYMENT_ROUTES) });
+/**
+ * How the customer pays, and the route's terms (the route builds the plan):
+ * informal → the balance before shipment or against the B/L copy; LC → at
+ * sight or deferred N days. Terms not sent stay as they are.
+ */
+export const paymentRouteInput = z.object({
+  route: optionalEnum(PAYMENT_ROUTES),
+  balanceWhen: z.preprocess((v) => (v === "" ? undefined : v), z.enum(BALANCE_WHENS).optional()),
+  lcTerms: z.preprocess((v) => (v === "" ? undefined : v), z.enum(LC_TERMS).optional()),
+  lcDays: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().int("Whole days").min(0).max(720).optional()),
+});
 export type PaymentRouteInput = z.infer<typeof paymentRouteInput>;
 
 export const bankContractInput = z.object({

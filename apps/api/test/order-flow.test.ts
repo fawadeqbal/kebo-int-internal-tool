@@ -127,7 +127,8 @@ describe("order flow: from asking factories to SAT", () => {
     ).body;
     expect(f.payment).toMatchObject({ route: "letter_of_credit", routeLabel: "LC", bankContract: { number: "LC/HBL/2026/118", status: "opened", amount: 26500, currency: "USD" } });
     expect(f.documents.set.map((d: { kind: string }) => d.kind)).toEqual(requiredDocuments("letter_of_credit"));
-    expect(f.documents.bankSteps).toHaveLength(5);
+    // An LC's trip has "Papers reached their bank" too (its deferred days count from there).
+    expect(f.documents.bankSteps).toHaveLength(6);
     // An amount needs its currency; an LC cannot expire before it opens.
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { amount: 100 }).expect(400);
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { openedOn: "2026-10-25", expiresOn: "2026-10-01" }).expect(400);
@@ -216,16 +217,24 @@ describe("order flow: from asking factories to SAT", () => {
 
     await api(app, sana).put(`/orders/${orderId}/bank-steps/teleported`, { doneOn: "2026-11-01" }).expect(422);
     await api(app, sana).put(`/orders/${orderId}/bank-steps/sent_to_our_bank`, { doneOn: "2099-01-01" }).expect(400);
-    const steps = ["sent_to_our_bank", "couriered_to_customer_bank", "copies_to_customer", "customer_paid_bank", "bank_paid_us"];
+    const steps = ["sent_to_our_bank", "couriered_to_customer_bank", "customer_bank_received", "copies_to_customer", "customer_paid_bank"];
     for (const step of steps) {
-      f = (await api(app, sana).put(`/orders/${orderId}/bank-steps/${step}`, { doneOn: "2026-11-01", ...(step === "couriered_to_customer_bank" && { courier: "DHL", reference: "1234567890" }) }).expect(200)).body;
+      await api(app, sana).put(`/orders/${orderId}/bank-steps/${step}`, { doneOn: "2026-11-01", ...(step === "couriered_to_customer_bank" && { courier: "DHL", reference: "1234567890" }) }).expect(200);
     }
+    // "Money reached us" is the payment itself: ticked by recording it, never on its own.
+    await api(app, sana).put(`/orders/${orderId}/bank-steps/bank_paid_us`, { doneOn: "2026-11-01" }).expect(400);
+    const reached = async () =>
+      (await api(app, admin).post(`/orders/${orderId}/payments`, { kind: "balance", amount: "1.00", currency: "USD", paidOn: "2026-11-01", bankStep: "bank_paid_us" }).expect(201)).body.createdId as string;
+    const paymentId = await reached();
+    f = await flow();
     expect(f.documents.bankSteps.find((b: { step: string }) => b.step === "couriered_to_customer_bank")).toMatchObject({ courier: "DHL", reference: "1234567890" });
     expect(stepState(f)).toMatchObject({ documents: "done", delivery: "current" });
     // Undone and done again.
-    f = (await api(app, sana).delete(`/orders/${orderId}/bank-steps/bank_paid_us`).expect(200)).body;
-    expect(stepState(f).documents).toBe("current");
-    await api(app, sana).put(`/orders/${orderId}/bank-steps/bank_paid_us`, { doneOn: "2026-11-01" }).expect(200);
+    await api(app, sana).delete(`/orders/${orderId}/bank-steps/bank_paid_us`).expect(400);
+    await api(app, admin).post(`/payments/${paymentId}/void`, { reason: "Recorded on the wrong day" }).expect(200);
+    expect(stepState(await flow()).documents).toBe("current");
+    await reached();
+    expect(stepState(await flow()).documents).toBe("done");
   });
 
   it("delivery, SAT by our engineer, and a claim", async () => {
@@ -363,10 +372,10 @@ describe("order flow tables are company tables", () => {
         join pg_class pa on pa.oid = k.confrelid
         join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
        where k.contype = 'f' and cl.relrowsecurity and pa.relrowsecurity and a.attname <> 'company_id'
-         and cl.relname in ('factory_requests', 'order_bank_contracts', 'production_steps', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders', 'order_checklist_items', 'checklist_templates', 'order_papers')
+         and cl.relname in ('factory_requests', 'order_bank_contracts', 'production_steps', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders', 'order_checklist_items', 'checklist_templates', 'payments', 'customer_receipts', 'customer_credits', 'factory_payment_plans', 'order_papers')
          and not exists (select 1 from pg_trigger t where t.tgrelid = k.conrelid and t.tgname = left('same_company_' || k.conname, 63))`;
     expect(unchecked).toEqual([]);
-    for (const t of ["factory_requests", "order_bank_contracts", "production_steps", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims", "order_checklist_items", "checklist_templates", "order_papers"]) {
+    for (const t of ["factory_requests", "order_bank_contracts", "production_steps", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims", "order_checklist_items", "checklist_templates", "customer_receipts", "customer_credits", "factory_payment_plans", "order_papers"]) {
       const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean; policies: bigint }[]>(
         `select c.relrowsecurity as rls, (select count(*) from pg_policies p where p.tablename = c.relname) as policies from pg_class c where c.relname = $1`,
         t,

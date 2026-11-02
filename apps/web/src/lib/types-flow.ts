@@ -1,4 +1,7 @@
 import type {
+  BalanceWhen,
+  LcCheck,
+  LcTerms,
   BankContractStatus,
   BankStepKind,
   ClaimStatus,
@@ -24,6 +27,14 @@ export interface OrderFlow {
   payment: {
     route: PaymentRoute | null;
     routeLabel: string | null;
+    balanceWhen: BalanceWhen | null;
+    lcTerms: LcTerms | null;
+    lcDays: number | null;
+    /** "LC, deferred 90 days". */
+    summary: string | null;
+    /** The LC against the order (LC orders): ok null = not known yet. */
+    lcChecks: LcCheck[] | null;
+    lcChecksLine: string | null;
     depositIn: boolean;
     bankContract: BankContract | null;
   };
@@ -102,6 +113,8 @@ export interface BankStepView {
   courier: string | null;
   reference: string | null;
   note: string | null;
+  /** "Money reached us": the payment that recorded it. */
+  paymentId?: string | null;
 }
 
 export interface SatCheckView {

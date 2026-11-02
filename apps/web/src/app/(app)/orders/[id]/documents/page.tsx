@@ -16,7 +16,9 @@ import type { DealDetail } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { DocumentsPanel } from "@/components/deals/documents-panel";
 import { describeFileAction } from "../../../inquiries/actions";
-import { issueProformaAction, orderRemoveFileAction } from "../../actions";
+import { issueProformaAction, orderRemoveFileAction, paymentAction } from "../../actions";
+import { ReceivedForm } from "@/components/money/money-v2";
+import { orderPaymentsOf } from "@/lib/order-data";
 import { docHref } from "../shared";
 import { stepData } from "../step-data";
 import { StepPapers } from "../papers";
@@ -88,14 +90,38 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
         };
     }
     for (const b of papers.bankSteps)
-      tools[`bank:${b.step}`] = {
-        kind: "bankStep",
-        label: "Mark done",
-        action: bankStepAction.bind(null, o.id, b.step),
-        step: b,
-        today: now,
-      };
+      if (b.step !== "bank_paid_us")
+        tools[`bank:${b.step}`] = {
+          kind: "bankStep",
+          label: "Mark done",
+          action: bankStepAction.bind(null, o.id, b.step),
+          step: b,
+          today: now,
+        };
   }
+  // "Money reached us" is the payment itself: recording it (credited amount, bank charges, account, MT103) ticks the step.
+  const canPay = can(me, "payments.record") && open && !!papers?.bankSteps.some((b) => b.step === "bank_paid_us" && !b.doneOn);
+  const [pays, settings] = canPay
+    ? await Promise.all([orderPaymentsOf(o.id), api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings")])
+    : [null, null];
+  const reached =
+    pays && settings ? (
+      <ReceivedForm
+        quiet
+        label="Record it"
+        action={paymentAction.bind(null, o.id, o.currency)}
+        currency={o.currency}
+        customer={o.customer.name}
+        refNo={o.refNo}
+        due={pays.due}
+        depositDue={pays.depositDue}
+        forWhat="Balance"
+        fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
+        today={now}
+        reached={{ title: `Money reached us${flow?.payment.bankContract?.number ? ` · ${route === "letter_of_credit" ? "LC" : "contract"} ${flow.payment.bankContract.number}` : ""}` }}
+      />
+    ) : null;
+  if (reached) tools["bank:bank_paid_us"] = { kind: "node", node: reached };
   const required = papers?.set.filter((x) => x.required) ?? [];
   const contract = flow?.payment.bankContract;
 
@@ -188,6 +214,7 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
                 steps={papers.bankSteps}
                 today={now}
                 canEdit={canPapers}
+                reached={reached}
               />
             </div>
           </CardBody>

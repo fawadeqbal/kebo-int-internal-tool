@@ -6,26 +6,28 @@ import {
   formatMinor,
   fromMinor,
   fxRate,
-  multiplyMinor,
   orderCosting,
   orderProfit,
   planTotalMinor,
   roundHalfAway,
   settle,
   toMinor,
-  withTaxMinor,
   type Minor,
 } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
   can,
+  planHow,
   plannedAndSpent,
   planStatus,
+  planWhen,
+  routeSummary,
   STEP_OF_CATEGORY,
   type ExpenseBearer,
   type ExpenseCategory,
   type ExpenseInput,
   type FactoryPaymentInput,
+  type FactoryPlanInput,
   type FlowStep,
   type PaymentPlanInput,
   type RepayInput,
@@ -38,6 +40,8 @@ import { checkAccount } from "./account-check";
 import { ordersOwingFactories } from "./due";
 import { convert, costingsOf, MainMoney, orderRate, paysBasis } from "./order-money";
 import { fileView } from "./payment-file-view";
+import { factoryPlansOf, owedByFactory } from "./factory-plan";
+import { termsOf } from "./route-plan";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
 import { Clock } from "../../common/time/clock.service";
@@ -125,17 +129,7 @@ export class MoneyService {
    * factory's currency. Changing or removing the factory's offer later changes nothing.
    */
   private owedByFactory(lines: Prisma.OrderLineGetPayload<{ include: (typeof linesWithFactory)["include"] }>[]) {
-    const owed = new Map<string, { factory: FactoryRow; currency: string; owedMinor: Minor; lines: number }>();
-    for (const l of lines) {
-      if (!l.factory || l.factoryUnitPrice === null || !l.factoryCurrency) continue;
-      const key = `${l.factory.id}:${l.factoryCurrency}`;
-      const unit = withTaxMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0);
-      const cur = owed.get(key) ?? { factory: l.factory, currency: l.factoryCurrency, owedMinor: 0, lines: 0 };
-      cur.owedMinor += multiplyMinor(unit, l.quantity.toString());
-      cur.lines += 1;
-      owed.set(key, cur);
-    }
-    return owed;
+    return owedByFactory<FactoryRow>(lines);
   }
 
   /**
@@ -204,8 +198,17 @@ export class MoneyService {
       live.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
       Number(o.depositPercent),
     );
+    const terms = termsOf(o);
     const plan = planStatus(
-      o.planItems.map((p) => ({ id: p.id, label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })),
+      o.planItems.map((p) => ({
+        id: p.id,
+        label: p.label,
+        amountMinor: decimalToMinor(p.amount),
+        dueOn: fromDbDateOrNull(p.dueOn),
+        part: p.part,
+        dueRule: p.dueRule,
+        dueDays: p.dueDays,
+      })),
       position.settledMinor,
       today,
       s.reminders.dueSoonDays,
@@ -324,6 +327,8 @@ export class MoneyService {
       currency: o.currency,
       total: fromMinor(totalMinor),
       terms: BALANCE_TERMS_LABEL[o.balanceTerms],
+      /** How the customer pays, from the route ("LC, deferred 90 days"); null until chosen. */
+      route: { route: terms.route, summary: routeSummary(terms) },
       received: fromMinor(position.settledMinor),
       /** Still due: the order total and what was charged to the customer, less what came in. */
       due: fromMinor(dueMinor),
@@ -339,6 +344,12 @@ export class MoneyService {
           paid: fromMinor(p.paidMinor),
           open: fromMinor(p.openMinor),
           status: p.status,
+          /** deposit | balance (built from the route), null when typed by hand. */
+          part: p.part,
+          /** "T/T", "LC, deferred 90 days". */
+          how: planHow(p.part, terms),
+          /** When an undated part falls due ("90 days after the papers"). */
+          when: p.dueOn ? null : planWhen(p, terms) || null,
         })),
         /** The instalments must add up to the order total; a different sum is shown as a problem to fix. */
         matchesTotal: planSum === totalMinor,
@@ -375,6 +386,9 @@ export class MoneyService {
               file: fileView(p),
             })),
             canRecord: can(user, "payments.record") && o.status !== "cancelled",
+            /** Each factory's payment plan (advance on order, balance on the ready date) with what is paid on each part. */
+            plans: await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays),
+            canPlan: can(user, "sourcing.manage") && o.status !== "cancelled",
           }
         : null,
       expenses: seeExpenses ? o.expenses.map((e) => this.expenseView(e)) : null,
@@ -602,6 +616,55 @@ export class MoneyService {
     return this.forOrder(user, o.id);
   }
 
+  /**
+   * The factory's payment plan on this order: its parts in order (they add up
+   * to what we owe it on the order's lines), each due when we order, on the
+   * ready date (it moves with it) or on a fixed day.
+   */
+  async setFactoryPlan(user: SessionUser, orderId: string, input: FactoryPlanInput) {
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot change what we pay the factories.");
+    await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
+      const o = await this.orders.load(user, orderId, tx);
+      if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+      const f = await tx.factory.findFirst({ where: { id: input.factoryId } });
+      if (!f) throw new DomainError("Choose a factory of this order.");
+      const lines = await tx.orderLine.findMany({ where: { orderId, factoryId: f.id }, include: { factory: { select: { id: true, name: true } } } });
+      const owed = [...owedByFactory(lines).values()][0];
+      if (!owed) throw new DomainError(`${f.name} has no lines with a price on this order.`);
+      const sum = input.items.reduce((t, i) => t + toMinor(i.amount), 0);
+      if (sum !== owed.owedMinor)
+        throw new DomainError(`The parts add up to ${formatMinor(sum, owed.currency)}, but we owe ${f.name} ${formatMinor(owed.owedMinor, owed.currency)}. Make them match.`);
+      for (const i of input.items) if (i.dueRule === "fixed" && !i.dueOn) throw new DomainError(`Give “${i.label}” its date.`);
+      const before = await tx.factoryPaymentPlan.findMany({ where: { orderId, factoryId: f.id }, orderBy: { sortOrder: "asc" } });
+      await tx.factoryPaymentPlan.deleteMany({ where: { orderId, factoryId: f.id } });
+      await tx.factoryPaymentPlan.createMany({
+        data: input.items.map((i, n) => ({
+          orderId,
+          factoryId: f.id,
+          label: i.label,
+          percent: i.percent,
+          amount: i.amount,
+          currency: owed.currency,
+          dueRule: i.dueRule,
+          dueOn: i.dueRule === "fixed" ? toDbDateOrNull(i.dueOn) : null,
+          sortOrder: n,
+        })),
+      });
+      const describe = (rows: { label: string; amount: string; dueRule: string }[]) => rows.map((r) => `${r.label} ${r.amount} (${r.dueRule})`).join("; ");
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "payment_out_plan",
+        entityType: "order",
+        entityId: orderId,
+        summary: `${o.refNo}: plan for paying ${f.name} set`,
+        oldValues: { plan: describe(before.map((b) => ({ label: b.label, amount: b.amount.toFixed(2), dueRule: b.dueRule }))) },
+        newValues: { plan: describe(input.items.map((i) => ({ label: i.label, amount: fromMinor(toMinor(i.amount)), dueRule: i.dueRule }))) },
+      });
+    });
+    return this.forOrder(user, orderId);
+  }
+
   /** What we still owe each factory across all orders that are not cancelled (people who see costs). */
   async payables(user: SessionUser, mine: boolean) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
@@ -632,9 +695,11 @@ export class MoneyService {
         currency: string;
         owedMinor: Minor;
         paidMinor: Minor;
-        orders: { id: string; refNo: string; stage: string; customer: string; toPay: string }[];
+        orders: { id: string; refNo: string; stage: string; customer: string; toPay: string; next: { label: string; due: string | null; open: string; status: string } | null }[];
       }
     >();
+    const s = await this.settings.get();
+    const today = this.clock.today();
     for (const o of orders) {
       const owedHere = this.owedByFactory(o.lines);
       const takenOff = expensesOn
@@ -655,7 +720,11 @@ export class MoneyService {
         const row = byFactory.get(key) ?? { factory: f.factory, currency: f.currency, owedMinor: 0, paidMinor: 0, orders: [] };
         row.owedMinor += f.owedMinor;
         row.paidMinor += paid;
-        row.orders.push({ id: o.id, refNo: o.refNo, stage: o.stage, customer: o.customer.name, toPay: fromMinor(left) });
+        // The next part of its payment plan (advance, balance on the ready date…): when it is due.
+        const plan = (await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays)).find(
+          (p) => `${p.factory.id}:${p.currency}` === key,
+        );
+        row.orders.push({ id: o.id, refNo: o.refNo, stage: o.stage, customer: o.customer.name, toPay: fromMinor(left), next: plan?.next ?? null });
         byFactory.set(key, row);
       }
     }

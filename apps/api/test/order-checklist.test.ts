@@ -130,7 +130,7 @@ describe("order checklist", () => {
       "Ready date from the factory",
       "Machining and assembly",
       "Factory test run (FAT) with video",
-      "Factory paid in full",
+      "Balance paid to the factory",
       "Goods received from the factory",
     ]);
     // Limited to a bank route: not on an order without one.
@@ -252,8 +252,8 @@ describe("order checklist", () => {
     const s = await steps();
     expect(find(s, "Pre-shipment inspection")).toMatchObject({ route: "letter_of_credit", step: "production" });
     expect(find(s, "Sales contract signed by both")).toMatchObject({ step: "payment" });
-    expect(auto(s, "contract")).toMatchObject({ title: "LC opened", done: false });
-    expect(s.items.filter((i) => i.key?.startsWith("bank:"))).toHaveLength(5);
+    expect(auto(s, "contract")).toMatchObject({ title: "LC opened and checked against the order", done: false });
+    expect(s.items.filter((i) => i.key?.startsWith("bank:"))).toHaveLength(6);
     expect(auto(s, "balance_in")).toBeUndefined();
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "informal" }).expect(200);
   });

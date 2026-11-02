@@ -124,8 +124,12 @@ export interface Receivables {
     due: string;
     overdue: string;
     daysLate: number;
-    next: { label: string; open: string; dueOn: string | null; status: string } | null;
+    next: { label: string; open: string; dueOn: string | null; status: string; when?: string | null } | null;
+    /** How it comes (the route): "LC", "Informal", "Bank contract". */
+    how?: string | null;
     lastPaid: string | null;
   }[];
-  totals: { currency: string; due: string; overdue: string }[];
+  totals: { currency: string; due: string; overdue: string; credit?: string; net?: string }[];
+  /** Money held for customers (their credit). */
+  held?: { currency: string; amount: string; customers: number }[];
 }

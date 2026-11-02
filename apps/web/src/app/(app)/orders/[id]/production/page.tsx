@@ -34,11 +34,14 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
     optional(() => api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings")),
   ]);
   const owing = m?.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
-  const payFactory = (label: string) =>
+  // "Balance paid to the factory": the factory payment form filled in with the plan's next part.
+  const nextPart = m?.factories?.plans.find((p) => p.next && Number(p.next.open) > 0) ?? null;
+  const payFactory = (label: string, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
     m?.factories?.canRecord && owing.length && d.open && settings ? (
       <NewFactoryPayment
         quiet
         label={label}
+        prefill={prefill}
         action={factoryPaymentAction.bind(null, m.orderId, null)}
         factories={owing}
         people={people ?? []}
@@ -62,7 +65,10 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       save: "Save the date",
     };
   if (goods.length) tools.goods_received = { kind: "link", label: canEdit ? "Record goods" : "See the goods", href: "#lines" };
-  const balance = payFactory("Pay the factory");
+  const balance = payFactory(
+    nextPart ? `Pay ${nextPart.next!.label.toLowerCase()}` : "Pay the factory",
+    nextPart ? { factoryId: nextPart.factory.id, amount: nextPart.next!.open, kind: "balance" } : undefined,
+  );
   if (balance) tools.factory_paid = { kind: "node", node: balance };
 
   const left = o.readyOn ? Math.round((Date.parse(`${o.readyOn}T00:00:00Z`) - Date.parse(`${now}T00:00:00Z`)) / DAY) : null;

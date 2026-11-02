@@ -21,6 +21,7 @@ import {
 } from "../enums";
 import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
+import { CANCEL_CUSTOMER_MONEY, CANCEL_FACTORY_MONEY, FACTORY_DUE_RULES } from "../workflows/money-route";
 import { FLOW_STEPS } from "../workflows/flow";
 
 /** A yes/no that may be left out (left out on a change: kept as it was). */
@@ -454,21 +455,58 @@ export const orderLineInput = z.discriminatedUnion("set", [
 ]);
 export type OrderLineInput = z.infer<typeof orderLineInput>;
 
-export const cancelOrderInput = z.object({ reason: text(2000, "Say why the order is cancelled") });
+/**
+ * Cancelling an order. With money received: keep it as the customer's credit
+ * (the default), refund it (now: account and date; or later, from the credit),
+ * or keep it as a cancellation fee. With money paid to the factory: a refund
+ * expected from the factory, or a loss on the order.
+ */
+export const cancelOrderInput = z.object({
+  reason: text(2000, "Say why the order is cancelled"),
+  customerMoney: z.preprocess((v) => (v === "" ? undefined : v), z.enum(CANCEL_CUSTOMER_MONEY).optional()),
+  /** Refund now (else it stays as credit until refunded). */
+  refundNow: bool.default(false),
+  refundAccountId: optionalId,
+  refundOn: optionalDate,
+  factoryMoney: z.preprocess((v) => (v === "" ? undefined : v), z.enum(CANCEL_FACTORY_MONEY).optional()),
+});
+export type CancelOrderInput = z.infer<typeof cancelOrderInput>;
 
 /* ---------------------------------------------------------------- payments */
 
+/** Another order of the same customer (same currency) a transfer also pays. */
+export const paymentPartInput = z.object({
+  orderId: id("Choose the order"),
+  amount: amount().refine((v) => (v as number) > 0, "Each part must be more than 0"),
+});
+
+/**
+ * Money in from the customer. Older clients send `amount` + `currency` (the
+ * order's currency). Money v2 sends what really arrived (`receivedAmount`,
+ * `receivedCurrency`, the `rate`: units of it per one unit of the order's
+ * currency; from Settings when empty) and then `amount` is the part for this
+ * order (blank: what it counts as, up to what is still due). What is left over
+ * pays `parts` (other orders) and the rest becomes the customer's credit.
+ */
 export const paymentInput = z.object({
   kind: z.enum(PAYMENT_KINDS),
-  amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+  amount: optionalAmount.optional().transform((v) => v ?? null),
   bankCharges: amountOr(0),
   currency,
   paidOn: isoDate(),
   method: z.enum(PAYMENT_METHODS).default("bank_transfer"),
   reference: optionalText(120),
   note: optionalText(2000),
-  /** Which of our accounts it arrived in (same currency). */
+  /** Which of our accounts it arrived in (the received currency). */
   accountId: optionalId,
+  receivedAmount: optionalAmount.optional().transform((v) => v ?? null),
+  receivedCurrency: z.preprocess((v) => (v === "" || v === null ? undefined : v), currency.optional()),
+  rate: optionalRate.optional().transform((v) => v ?? null),
+  /** Someone paying for the customer (their agent). */
+  paidByName: optionalText(120).optional().transform((v) => v ?? null),
+  parts: z.array(paymentPartInput).max(20).default([]),
+  /** "Money reached us": the payment ticks this bank step. */
+  bankStep: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["bank_paid_us"]).optional()),
 });
 export type PaymentInput = z.infer<typeof paymentInput>;
 
@@ -477,6 +515,62 @@ export const voidPaymentInput = z.object({ reason: text(2000, "Say why this paym
 /** Changing a recorded payment says why (asked with code "reason_needed"; kept in the order's history). */
 export const editPaymentInput = paymentInput.extend({ reason: optionalText(500).optional() });
 export type EditPaymentInput = z.infer<typeof editPaymentInput>;
+
+/**
+ * One transfer from the customer recorded on their page: what arrived, the
+ * orders' currency and rate, and the parts per order (oldest due first is
+ * filled in for you); the rest becomes their credit.
+ */
+export const customerReceiptInput = z.object({
+  receivedAmount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+  receivedCurrency: currency,
+  /** The orders' currency (and the credit's). */
+  currency,
+  rate: optionalRate,
+  paidOn: isoDate(),
+  method: z.enum(PAYMENT_METHODS).default("bank_transfer"),
+  reference: optionalText(120),
+  paidByName: optionalText(120),
+  note: optionalText(2000),
+  accountId: optionalId,
+  parts: z.array(paymentPartInput).max(20).default([]),
+});
+export type CustomerReceiptInput = z.infer<typeof customerReceiptInput>;
+
+/** Paying (part of) an order from the customer's credit. */
+export const useCreditInput = z.object({
+  amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+  on: optionalDate,
+});
+export type UseCreditInput = z.infer<typeof useCreditInput>;
+
+/** Paying the customer's credit back. */
+export const creditRefundInput = z.object({
+  amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
+  currency,
+  on: isoDate(),
+  accountId: optionalId,
+  note: optionalText(500),
+});
+export type CreditRefundInput = z.infer<typeof creditRefundInput>;
+
+/** The factory's payment plan on an order: its parts in order (they add up to what we owe it). */
+export const factoryPlanInput = z.object({
+  factoryId: id("Choose the factory"),
+  items: z
+    .array(
+      z.object({
+        label: text(80, "Name each part, e.g. Advance"),
+        percent: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().min(0).max(100).nullable()),
+        amount: amount(),
+        dueRule: z.enum(FACTORY_DUE_RULES),
+        dueOn: optionalDate,
+      }),
+    )
+    .min(1, "Add at least one part")
+    .max(12),
+});
+export type FactoryPlanInput = z.infer<typeof factoryPlanInput>;
 
 /* ---------------------------------------------------------------- payment plan */
 

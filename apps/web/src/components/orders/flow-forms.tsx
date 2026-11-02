@@ -21,6 +21,8 @@ import {
   SHIP_MODES,
   SHIPMENT_STATUS_LABEL,
   SHIPMENT_STATUSES,
+  type BalanceWhen,
+  type LcTerms,
   type OrderDocumentKind,
   type PaymentRoute,
   type SatResult,
@@ -70,20 +72,108 @@ const ROUTE_TEXT: Record<PaymentRoute, string> = {
   letter_of_credit: "The customer's bank opens an LC; it pays our bank against the shipping documents. Safest, slowest.",
 };
 
-/** How the customer pays: three cards, one choice; bank routes only when the company has bank contracts. */
-export function RouteForm({ action, route, bankRoutes, onDone }: { action: Action; route: PaymentRoute | null; bankRoutes: boolean; onDone?: () => void }) {
+/** The route's terms: informal balance before shipment or against the B/L copy; LC at sight or deferred N days. */
+export interface RouteTermsValue {
+  balanceWhen: BalanceWhen | null;
+  lcTerms: LcTerms | null;
+  lcDays: number | null;
+}
+
+/** Two or three choices side by side (a small segmented control inside a form). */
+function Pills<T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex w-fit rounded-lg border border-line bg-surface-2 p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn("rounded-md px-3 py-1 text-sm", value === o.value ? "bg-surface font-medium shadow-xs" : "text-text-2 hover:text-text")}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * How the customer pays: three cards, one choice (bank routes only when the
+ * company has bank contracts), and the route's terms. The route builds the
+ * plan: changing it rebuilds the parts not paid yet.
+ */
+export function RouteForm({
+  action,
+  route,
+  bankRoutes,
+  onDone,
+  terms,
+}: {
+  action: Action;
+  route: PaymentRoute | null;
+  bankRoutes: boolean;
+  onDone?: () => void;
+  terms?: RouteTermsValue;
+}) {
   const [pick, setPick] = useState<PaymentRoute | null>(route);
+  const [when, setWhen] = useState<BalanceWhen>(terms?.balanceWhen ?? "before_shipment");
+  const [lcTerms, setLcTerms] = useState<LcTerms>(terms?.lcTerms ?? "at_sight");
+  const [lcDays, setLcDays] = useState(terms?.lcDays ? String(terms.lcDays) : "90");
   const options = (["informal", "bank_contract", "letter_of_credit"] as const).filter((r) => r === "informal" || bankRoutes);
+  const changed =
+    pick !== route ||
+    (pick === "informal" && when !== (terms?.balanceWhen ?? "before_shipment")) ||
+    (pick === "letter_of_credit" && (lcTerms !== (terms?.lcTerms ?? "at_sight") || (lcTerms === "deferred" && lcDays !== String(terms?.lcDays ?? ""))));
   return (
     <ActionForm action={action} onDone={onDone} keepFields className="flex flex-col gap-3">
       <input type="hidden" name="route" value={pick ?? ""} />
+      {pick === "informal" && <input type="hidden" name="balanceWhen" value={when} />}
+      {pick === "letter_of_credit" && <input type="hidden" name="lcTerms" value={lcTerms} />}
+      {pick === "letter_of_credit" && lcTerms === "deferred" && <input type="hidden" name="lcDays" value={lcDays} />}
       <SelectCardList label="How the customer pays">
         {options.map((r) => (
           <SelectCard key={r} title={PAYMENT_ROUTE_LABEL[r].replace(/ \(.*\)$/, "")} meta={ROUTE_TEXT[r]} selected={pick === r} onSelect={() => setPick(r)} />
         ))}
       </SelectCardList>
+      {pick === "informal" && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-text-2">The balance</span>
+          <Pills
+            label="When the balance is paid"
+            value={when}
+            onChange={setWhen}
+            options={[
+              { value: "before_shipment", label: "Before shipment" },
+              { value: "against_bl_copy", label: "Against the B/L copy" },
+            ]}
+          />
+        </div>
+      )}
+      {pick === "letter_of_credit" && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-text-2">The LC pays</span>
+          <Pills
+            label="LC terms"
+            value={lcTerms}
+            onChange={setLcTerms}
+            options={[
+              { value: "at_sight", label: "At sight" },
+              { value: "deferred", label: "Deferred" },
+            ]}
+          />
+          {lcTerms === "deferred" && (
+            <span className="flex items-center gap-2 text-text-2">
+              <Input aria-label="Days after the papers reach their bank" inputMode="numeric" className="w-20 tabular" value={lcDays} onChange={(e) => setLcDays(e.target.value.replace(/\D/g, ""))} />
+              days after the papers reach their bank
+            </span>
+          )}
+        </div>
+      )}
+      {route && <p className="text-xs text-muted">Change it and the plan is rebuilt (payments already recorded stay).</p>}
       <div className="flex flex-wrap gap-2">
-        <SubmitButton size="sm" pendingText="Saving…" disabled={!pick || pick === route}>
+        <SubmitButton size="sm" pendingText="Saving…" disabled={!pick || !changed || (pick === "letter_of_credit" && lcTerms === "deferred" && !Number(lcDays))}>
           Save the payment route
         </SubmitButton>
         {onDone && (

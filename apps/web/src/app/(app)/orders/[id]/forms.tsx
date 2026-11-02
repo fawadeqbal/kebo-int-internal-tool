@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind } from "@kebo/shared";
-import { Alert, Button, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Button, cn, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
@@ -374,8 +374,36 @@ export function VoidPayment({ action }: { action: Action }) {
 
 /* ---------------------------------------------------------------- cancelling */
 
-export function CancelOrderForm({ action }: { action: Action }) {
+/**
+ * Cancel an order (MoneyV2Cancel). Money is never left hanging: with money
+ * received it asks what happens to it (keep as credit, refund now or later,
+ * keep as a fee); with money paid to the factory, a refund expected from the
+ * factory or a loss on this order.
+ */
+export function CancelOrderForm({
+  action,
+  refNo,
+  customer,
+  received,
+  currency,
+  factoryPaid = [],
+  today,
+}: {
+  action: Action;
+  refNo?: string;
+  customer?: string;
+  /** Money received on the order (its currency). */
+  received?: string;
+  currency?: string;
+  /** Money paid to the factories ("CNY 30,000.00 to Wenzhou Works"). */
+  factoryPaid?: string[];
+  today?: string;
+}) {
   const [open, setOpen] = useState(false);
+  const [customerMoney, setCustomerMoney] = useState<"credit" | "refund" | "fee">("credit");
+  const [refundNow, setRefundNow] = useState(true);
+  const [factoryMoney, setFactoryMoney] = useState<"refund_due" | "loss">("refund_due");
+  const moneyIn = Number(received ?? 0) > 0 && currency;
   if (!open)
     return (
       <div>
@@ -384,21 +412,83 @@ export function CancelOrderForm({ action }: { action: Action }) {
         </Button>
       </div>
     );
+  const choice = (value: string, chosen: string, title: string, text: string, pick: () => void) => (
+    <button
+      key={value}
+      type="button"
+      role="radio"
+      aria-checked={chosen === value}
+      onClick={pick}
+      className={cn(
+        "flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left",
+        chosen === value ? "border-primary bg-primary-soft ring-1 ring-primary" : "border-line bg-surface hover:border-line-strong",
+      )}
+    >
+      <span className={cn("mt-1 size-4 shrink-0 rounded-full border-2", chosen === value ? "border-primary bg-primary shadow-[inset_0_0_0_3px_var(--surface)]" : "border-line-strong")} aria-hidden />
+      <span>
+        <span className="block font-semibold">{title}</span>
+        <span className="block text-xs text-text-2">{text}</span>
+      </span>
+    </button>
+  );
   return (
-    <ActionForm action={action} onDone={() => setOpen(false)} className="flex flex-col gap-3">
+    <ActionForm action={action} onDone={() => setOpen(false)} keepFields className="flex flex-col gap-3">
       {(s) => (
         <>
-          <Field label="Why is it cancelled?" htmlFor="cancel-reason" error={s.errors?.reason}>
+          {refNo && <p className="font-semibold">Cancel {refNo}</p>}
+          {moneyIn && (
+            <>
+              <input type="hidden" name="customerMoney" value={customerMoney} />
+              <p className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-sm">
+                <AlertTriangle className="size-4 shrink-0 text-warn" aria-hidden />
+                {currency} {Number(received).toLocaleString("en-US", { minimumFractionDigits: 2 })} was received on this order. What happens to it?
+              </p>
+              <div role="radiogroup" aria-label="Money received" className="grid gap-2 sm:grid-cols-3">
+                {choice("credit", customerMoney, "Keep as credit", `${customer ?? "The customer"}'s credit, for the next order.`, () => setCustomerMoney("credit"))}
+                {choice("refund", customerMoney, "Refund it", "Record the refund now or later (amount, account, date).", () => setCustomerMoney("refund"))}
+                {choice("fee", customerMoney, "Keep as a fee", "A cancellation charge: counts as income, not owed back.", () => setCustomerMoney("fee"))}
+              </div>
+              {customerMoney === "refund" && (
+                <div className="grid gap-3 rounded-lg border border-line bg-surface-2/60 p-3 sm:grid-cols-3">
+                  <input type="hidden" name="refundNow" value={refundNow ? "true" : "false"} />
+                  <Field label="Refund" htmlFor="cx-now">
+                    <Select id="cx-now" value={refundNow ? "now" : "later"} onChange={(e) => setRefundNow(e.target.value === "now")}>
+                      <option value="now">Now</option>
+                      <option value="later">Later (kept as credit until then)</option>
+                    </Select>
+                  </Field>
+                  {refundNow && <AccountSelect id="cx-account" label="Paid from" currency={currency} defaultValue={s.values?.refundAccountId} error={s.errors?.refundAccountId} />}
+                  {refundNow && (
+                    <Field label="On" htmlFor="cx-on" error={s.errors?.refundOn}>
+                      <Input id="cx-on" name="refundOn" type="date" max={today} defaultValue={s.values?.refundOn ?? today} />
+                    </Field>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {factoryPaid.length > 0 && (
+            <>
+              <input type="hidden" name="factoryMoney" value={factoryMoney} />
+              <p className="text-sm text-text-2">Paid to the factory: {factoryPaid.join(", ")}.</p>
+              <div role="radiogroup" aria-label="Money paid to the factory" className="grid gap-2 sm:grid-cols-2">
+                {choice("refund_due", factoryMoney, "Refund expected", "The factory pays it back; it stays on the order until then.", () => setFactoryMoney("refund_due"))}
+                {choice("loss", factoryMoney, "A loss on this order", "Recorded as the order's expense, borne by us.", () => setFactoryMoney("loss"))}
+              </div>
+            </>
+          )}
+          <Field label="Why is it cancelled" htmlFor="cancel-reason" error={s.errors?.reason}>
             <Textarea id="cancel-reason" name="reason" rows={2} className="min-h-0" defaultValue={s.values?.reason} />
           </Field>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+              Keep the order
+            </Button>
             <SubmitButton size="sm" variant="danger" pendingText="Cancelling…">
               Cancel the order
             </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              Keep it
-            </Button>
           </div>
+          {!moneyIn && !factoryPaid.length && <p className="text-xs text-muted">No money was received or paid on this order.</p>}
         </>
       )}
     </ActionForm>

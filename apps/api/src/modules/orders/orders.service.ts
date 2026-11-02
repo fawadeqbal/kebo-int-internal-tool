@@ -4,8 +4,9 @@ import { fromMinor, fxRate, settle } from "@kebo/money";
 import {
   can,
   checkMove,
+  balanceWhenOf,
   customerLetters,
-  defaultPlan,
+  routePlan,
   depositOf,
   dueOf,
   nextStage,
@@ -17,6 +18,7 @@ import {
   proformaNumber,
   STAGE_BUTTON,
   STAGE_FLOW,
+  type CancelOrderInput,
   type MoveStageInput,
   type OrderDetailsInput,
   type OrderFacts,
@@ -39,6 +41,8 @@ import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../money/due";
 import { LimitsService } from "../../common/company/limits.service";
+import { checkAccount } from "../money/account-check";
+import { factoryPlansOf } from "../money/factory-plan";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -264,18 +268,27 @@ export class OrdersService {
         },
       },
     });
-    // The customer's payment plan starts from the terms (deposit dated, balance dated when the ship date is known).
+    // The customer's payment plan starts from the terms (deposit dated, balance dated when the ship date is known);
+    // choosing the route later rebuilds the parts not paid yet.
     const days = (await this.settings.get()).reminders;
-    const plan = defaultPlan(decimalToMinor(option.total), Number(rev.depositPercent), acceptedOn, days.depositDays);
+    const plan = routePlan(
+      decimalToMinor(option.total),
+      Number(rev.depositPercent),
+      { route: null, balanceWhen: balanceWhenOf(rev.balanceTerms), lcTerms: null, lcDays: null },
+      acceptedOn,
+      days.depositDays,
+    );
     await tx.paymentPlanItem.createMany({
       data: plan.map((p, i) => ({
         orderId: order.id,
         label: p.label,
         amount: fromMinor(p.amountMinor),
         dueOn: toDbDateOrNull(p.dueOn),
+        part: p.part,
         sortOrder: i,
       })),
     });
+    if (balanceWhenOf(rev.balanceTerms)) await tx.order.update({ where: { id: order.id }, data: { balanceWhen: balanceWhenOf(rev.balanceTerms) } });
     await this.audit.record(tx, {
       userId: actorId,
       action: "create",
@@ -297,25 +310,95 @@ export class OrdersService {
   /**
    * The customer called it off. The accepted revision becomes "void" and the
    * deal "lost" (customer cancelled); it can be reopened and quoted again.
-   * Money already received stays recorded on the order.
+   * Money already received stays recorded on the order; what happens to it is
+   * said: kept as the customer's credit (the default), refunded (now, or later
+   * from the credit), or kept as a cancellation fee. Money paid to the factory
+   * is a refund expected from the factory (the default) or a loss on the order
+   * (an expense, borne by us).
    */
-  async cancel(user: SessionUser, id: string, reason: string) {
+  async cancel(user: SessionUser, id: string, reason: string, money: Partial<CancelOrderInput> = {}) {
     if (!can(user, "orders.manage")) throw new ForbiddenError("Only a manager can cancel an order.");
+    const today = this.clock.today();
+    if (money.refundOn && money.refundOn > today) throw new DomainError("The refund date cannot be in the future.");
+    const cashBook = await this.limits.allows("cash_book");
+    const { sales } = await this.settings.get();
     const events = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
       if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
-      await tx.order.update({ where: { id }, data: { status: "cancelled", cancelledAt: new Date(), cancelReason: reason } });
+      // Money in from the customer (in the order's currency), and money out to the factories (per factory and currency).
+      const inMinor = o.payments.filter((p) => p.currency === o.currency).reduce((t, p) => t + decimalToMinor(p.amount), 0);
+      const factoryPaid = await tx.factoryPayment.findMany({ where: { orderId: id, voidedAt: null }, include: { factory: { select: { id: true, name: true } } } });
+      const customerMoney = inMinor > 0 ? (money.customerMoney ?? "credit") : null;
+      const factoryMoney = factoryPaid.length ? (money.factoryMoney ?? "refund_due") : null;
+      const on = toDbDate(money.refundOn ?? today);
+      if (customerMoney === "credit" || customerMoney === "refund")
+        await tx.customerCredit.create({
+          data: { customerId: o.customerId, kind: "in", amount: fromMinor(inMinor), currency: o.currency, orderId: id, on: toDbDate(today), note: `Kept from cancelled ${o.refNo}`, recordedById: user.id },
+        });
+      if (customerMoney === "refund" && money.refundNow)
+        await tx.customerCredit.create({
+          data: {
+            customerId: o.customerId,
+            kind: "refund",
+            amount: fromMinor(inMinor),
+            currency: o.currency,
+            orderId: id,
+            accountId: await checkAccount(tx, money.refundAccountId, o.currency, null, cashBook),
+            on,
+            note: `Refund for cancelled ${o.refNo}`,
+            recordedById: user.id,
+          },
+        });
+      if (customerMoney === "fee")
+        await tx.customerCredit.create({
+          data: { customerId: o.customerId, kind: "fee", amount: fromMinor(inMinor), currency: o.currency, orderId: id, on: toDbDate(today), note: `Cancellation fee on ${o.refNo}`, recordedById: user.id },
+        });
+      if (factoryMoney === "loss") {
+        // One expense per factory and currency, borne by us (no account: the money already left with the factory payment).
+        const byKey = new Map<string, { factory: { id: string; name: string }; currency: string; minor: number }>();
+        for (const p of factoryPaid) {
+          const k = `${p.factoryId}:${p.currency}`;
+          const cur = byKey.get(k) ?? { factory: p.factory, currency: p.currency, minor: 0 };
+          cur.minor += decimalToMinor(p.amount);
+          byKey.set(k, cur);
+        }
+        for (const x of byKey.values()) {
+          const rate = fxRate(x.currency, sales.currency, sales.currency, sales.exchangeRates);
+          if (rate === null) throw new DomainError(`There is no exchange rate for ${x.currency} in Settings: add it before recording the loss.`);
+          await tx.expense.create({
+            data: {
+              orderId: id,
+              customerId: o.customerId,
+              inquiryId: o.inquiryId,
+              factoryId: x.factory.id,
+              category: "other",
+              step: "factory",
+              borneBy: "us",
+              description: `Paid to ${x.factory.name}, lost when ${o.refNo} was cancelled`.slice(0, 200),
+              amount: fromMinor(x.minor),
+              currency: x.currency,
+              rate,
+              spentOn: toDbDate(today),
+              recordedById: user.id,
+            },
+          });
+        }
+      }
+      await tx.order.update({
+        where: { id },
+        data: { status: "cancelled", cancelledAt: new Date(), cancelReason: reason, cancelCustomerMoney: customerMoney, cancelFactoryMoney: factoryMoney },
+      });
       await tx.quotationRevision.update({ where: { id: o.revisionId }, data: { status: "void" } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "cancel",
         entityType: "order",
         entityId: id,
-        summary: `Cancelled order ${o.refNo}`,
+        summary: `Cancelled order ${o.refNo}${customerMoney ? ` · ${o.currency} ${fromMinor(inMinor)} received: ${customerMoney === "credit" ? "kept as credit" : customerMoney === "fee" ? "kept as a fee" : money.refundNow ? "refunded" : "to refund"}` : ""}${factoryMoney ? ` · paid to the factory: ${factoryMoney === "loss" ? "a loss" : "refund expected"}` : ""}`,
         reason,
         oldValues: { status: o.status },
-        newValues: { status: "cancelled" },
+        newValues: { status: "cancelled", customerMoney, factoryMoney },
       });
       const inquiry = await tx.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId } });
       const moved = await this.stages.after(tx, inquiry, "order_cancelled", user.id);
@@ -471,7 +554,10 @@ export class OrdersService {
         by: h.by,
         at: h.at,
       })),
-      cancelled: o.status === "cancelled" ? { at: o.cancelledAt, reason: o.cancelReason } : null,
+      cancelled:
+        o.status === "cancelled"
+          ? { at: o.cancelledAt, reason: o.cancelReason, customerMoney: o.cancelCustomerMoney, factoryMoney: o.cancelFactoryMoney }
+          : null,
       documents: this.documentsOf(o),
       /** null until issued (the proforma is a draft without a number until then). */
       proforma: o.proformaNo ? { number: o.proformaNo, issuedOn: fromDbDateOrNull(o.proformaIssuedOn) } : null,
@@ -608,6 +694,17 @@ export class OrdersService {
       if (!c) continue;
       const on = fromDbDate(c.dueOn!);
       if (!i.needs || on < i.needs.due) i.needs = { title: c.title ?? "Checklist item", due: on, late: on < today };
+    }
+    // A factory's part (the advance, the balance on the ready date) due soon or late, for people who see factory money.
+    if (can(user, "sourcing.manage")) {
+      const { sales } = await this.settings.get();
+      for (const i of all.filter((x) => x.status === "open")) {
+        for (const p of await factoryPlansOf(this.prisma.db, i.id, sales.factoryAdvancePercent, today, soon)) {
+          const n = p.next;
+          if (!n?.due || (n.status !== "due" && n.status !== "late")) continue;
+          if (!i.needs || n.due < i.needs.due) i.needs = { title: `Pay ${p.factory.name}: ${n.label} ${p.currency} ${n.open}`, due: n.due, late: n.due < today };
+        }
+      }
     }
     const items = all.filter((i) => i.needs);
     return items.sort((a, b) => Number(b.needs!.late) - Number(a.needs!.late) || a.needs!.due.localeCompare(b.needs!.due));
@@ -763,7 +860,8 @@ export class OrdersService {
     if (to === "in_production" && readyOn && o.balanceTerms === "before_shipment") due = readyOn;
     if (to === "shipped" && shippedOn)
       due = o.balanceTerms === "before_shipment" ? shippedOn : addDays(shippedOn, (await this.settings.get()).reminders.balanceDays);
-    if (due) await tx.paymentPlanItem.updateMany({ where: { orderId: o.id, dueOn: null }, data: { dueOn: toDbDate(due) } });
+    // An LC's balance is dated by the bank step "Papers reached their bank", never here.
+    if (due) await tx.paymentPlanItem.updateMany({ where: { orderId: o.id, dueOn: null, dueRule: null }, data: { dueOn: toDbDate(due) } });
   }
 
   /* ---------------------------------------------------------------- goods */

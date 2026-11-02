@@ -73,6 +73,8 @@ export const salesSettings = z.object({
   quotationValidityDays: days(15),
   defaultDepositPercent: z.coerce.number().min(0).max(100).default(30),
   defaultBalanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
+  /** The advance we pay a factory when we order (its payment plan starts from it). */
+  factoryAdvancePercent: z.coerce.number().min(0).max(100).default(30),
   defaultIncoterm: z.enum(INCOTERMS).default("FOB"),
   /** Payment terms that go on every new quotation (beyond the deposit and balance). */
   defaultPaymentTerms: z.string().trim().max(5000).default(""),
@@ -98,6 +100,8 @@ export const reminderSettings = z.object({
   balanceDays: days(DEFAULT_ORDER_REMINDER_DAYS.balanceDays, 365),
   /** Tell the managers when an order is this many days late. */
   escalateAfterDays: days(3, 60),
+  /** An LC check: days the courier takes the papers to the customer's bank. */
+  lcCourierDays: days(4, 60),
 });
 
 export const notificationSettings = z.object({

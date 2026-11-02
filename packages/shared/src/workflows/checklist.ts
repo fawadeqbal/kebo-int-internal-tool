@@ -1,4 +1,5 @@
 import { daysBetween, type ISODate } from "@kebo/utils";
+import { lcChecksLine, type LcCheck } from "./money-route";
 import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute, ShipMode, ShipmentStatus } from "../enums";
 import type { PaperKind } from "./papers";
 import {
@@ -92,8 +93,22 @@ export interface ChecklistFacts {
   due: string;
   paidInFullOn: ISODate | null;
   factoryOrderedOn: ISODate | null;
-  /** Money owed to the factories, or null when the person may not see factory money. */
-  factories: { name: string; currency: string; owed: string; paid: string; toPay: string }[] | null;
+  /**
+   * Money owed to the factories, or null when the person may not see factory money; `plan`: its payment
+   * plan's parts (advance when ordered, balance on the ready date) with where each stands.
+   */
+  factories:
+    | {
+        name: string;
+        currency: string;
+        owed: string;
+        paid: string;
+        toPay: string;
+        plan?: { label: string; dueRule: string; due: ISODate | null; open: string; status: string }[];
+      }[]
+    | null;
+  /** An LC order: the LC checked against the order (amount, currency, ship-by, expiry); null otherwise. */
+  lcChecks?: LcCheck[] | null;
   readyOn: ISODate | null;
   goods: { lines: number; received: number };
   packedAt: ISODate | null;
@@ -138,6 +153,10 @@ export interface AutoItem {
   /** What it still needs, when open. */
   needs: string | null;
   routes?: readonly PaymentRoute[];
+  /** Its own due date from the data (the factory balance on the ready date); a stored due date wins. */
+  due?: ISODate | null;
+  /** Shown like a late item while open (an LC check that fails). */
+  warn?: boolean;
 }
 
 const BANK: readonly PaymentRoute[] = ["bank_contract", "letter_of_credit"];
@@ -165,7 +184,7 @@ export const AUTO_ITEMS: Record<FlowStep, AutoItemDef[]> = {
   ],
   production: [
     { key: "ready_date", title: "Ready date from the factory", sort: 25 },
-    { key: "factory_paid", title: "Factory paid in full", sort: 80 },
+    { key: "factory_paid", title: "Balance paid to the factory", sort: 80 },
     { key: "goods_received", title: "Goods received from the factory", sort: 90 },
   ],
   shipping: [
@@ -227,16 +246,26 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     if (bankRoute) {
       const c = f.bankContract;
       const lc = f.route === "letter_of_credit";
+      // An LC is also checked against the order: a check that fails keeps it open, shown like a late item.
+      const checks = lc ? (f.lcChecks ?? []) : [];
+      const failing = checks.filter((x) => x.ok === false);
+      const opened = !!c && c.status !== "draft";
       add("payment", "contract", {
-        title: lc ? "LC opened" : "Bank contract opened",
-        done: !!c && c.status !== "draft",
+        title: lc ? "LC opened and checked against the order" : "Bank contract opened",
+        done: opened && !failing.length,
         doneOn: c?.openedOn ?? null,
         data: pairs([
           [lc ? "LC" : "Contract", c?.number],
           ["Amount", c?.amount ? money(c.currency, c.amount) : null],
+          ["Checks", lc && c && checks.length ? lcChecksLine(checks) : null],
         ]),
-        needs: c ? `the ${lc ? "LC" : "contract"} to open` : `the ${lc ? "LC" : "contract"} number, banks and amount`,
+        needs: failing.length
+          ? failing.map((x) => `${x.label.toLowerCase()}: ${x.detail}`).join(" · ")
+          : c
+            ? `the ${lc ? "LC" : "contract"} to open`
+            : `the ${lc ? "LC" : "contract"} number, banks and amount`,
         routes: BANK,
+        warn: failing.length > 0,
       });
     }
   }
@@ -263,12 +292,22 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
   });
   const owing = f.factories?.filter((x) => Number(x.owed) > 0) ?? [];
   if (owing.length) {
-    const advance = owing.every((x) => Number(x.paid) > 0);
+    // The advance: the plan's parts due when we order, paid (no plan: anything paid).
+    const advanceOf = (x: (typeof owing)[number]) => x.plan?.filter((p) => p.dueRule === "on_order") ?? [];
+    const advance = owing.every((x) => (advanceOf(x).length ? advanceOf(x).every((p) => p.status === "paid") : Number(x.paid) > 0));
     add("factory", "factory_advance", {
       done: advance,
       doneOn: null,
       data: advance ? owing.map((x): [string, string] => [owing.length > 1 ? x.name : "Paid", money(x.currency, x.paid)]) : [],
-      needs: advance ? null : owing.map((x) => `${x.name}: nothing paid yet`).join(" · "),
+      needs: advance
+        ? null
+        : owing
+            .map((x) => {
+              const open = advanceOf(x).find((p) => p.status !== "paid");
+              return open ? `${x.name}: ${open.label} ${money(x.currency, open.open)}` : `${x.name}: nothing paid yet`;
+            })
+            .join(" · "),
+      due: owing.map((x) => advanceOf(x).find((p) => p.status !== "paid")?.due ?? null).find((d) => !!d) ?? null,
     });
   }
 
@@ -281,14 +320,17 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
   });
   if (owing.length) {
     const paid = owing.every((x) => isZero(x.toPay) || Number(x.toPay) < 0);
+    // Due when the factory's balance is (the ready date): late once that passes unpaid.
+    const balanceDue = owing.map((x) => x.plan?.filter((p) => p.status !== "paid").at(-1)?.due ?? null).filter((d): d is string => !!d).sort()[0] ?? null;
     add("production", "factory_paid", {
       done: paid,
       doneOn: null,
-      data: owing.map((x): [string, string] => [
-        owing.length > 1 ? x.name : paid ? "Paid" : "To pay",
-        money(x.currency, paid ? x.owed : x.toPay),
-      ]),
+      data: [
+        ...owing.map((x): [string, string] => [owing.length > 1 ? x.name : paid ? "Paid" : "To pay", money(x.currency, paid ? x.owed : x.toPay)]),
+        ...pairs([["Due", paid ? null : balanceDue]]),
+      ],
       needs: null,
+      due: paid ? null : balanceDue,
     });
   }
   if (f.goods.lines > 0)

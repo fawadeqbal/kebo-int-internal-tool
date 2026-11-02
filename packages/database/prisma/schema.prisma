@@ -163,6 +163,8 @@ enum PaymentMethod {
   cash
   cheque
   online
+  /// Paid from the customer's credit (money we already held for them).
+  credit
   other
 }
 
@@ -234,6 +236,8 @@ enum OrderDocumentStatus {
 enum BankStepKind {
   sent_to_our_bank
   couriered_to_customer_bank
+  /// The papers reached the customer's bank (an LC's deferred days count from here).
+  customer_bank_received
   copies_to_customer
   customer_paid_bank
   bank_paid_us
@@ -352,6 +356,8 @@ model User {
   relChecklistAssignee      OrderChecklistItem[] @relation("ChecklistAssignee")
   relChecklistDoneBy        OrderChecklistItem[] @relation("ChecklistDoneBy")
   relChecklistCreator       OrderChecklistItem[] @relation("ChecklistCreator")
+  relReceiptRecorder        CustomerReceipt[]    @relation("ReceiptRecorder")
+  relCreditRecorder         CustomerCredit[]     @relation("CreditRecorder")
   relPapersMade             OrderPaper[]         @relation("PaperMadeBy")
 
   @@unique([companyId, email])
@@ -531,6 +537,8 @@ model Customer {
   orders    Order[]
   payments  Payment[]
   expenses  Expense[]
+  receipts  CustomerReceipt[]
+  credits   CustomerCredit[]
 
   @@index([name])
   @@index([country])
@@ -596,6 +604,7 @@ model Factory {
   requests        FactoryRequest[]
   productionSteps ProductionStep[]
   checklistItems  OrderChecklistItem[]
+  paymentPlans    FactoryPaymentPlan[]
 
   @@index([name])
   @@index([ownerId])
@@ -1015,74 +1024,82 @@ model QuoteLine {
 // ============================================================================
 
 model Order {
-  id                String             @id @default(uuid()) @db.Uuid
+  id                  String             @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId         String             @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company           Company            @relation(fields: [companyId], references: [id])
+  companyId           String             @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company             Company            @relation(fields: [companyId], references: [id])
   /// SO-2026-0001
-  refNo             String             @map("ref_no") @db.VarChar(30)
-  inquiryId         String             @map("inquiry_id") @db.Uuid
-  inquiry           Inquiry            @relation(fields: [inquiryId], references: [id])
-  revisionId        String             @unique @map("revision_id") @db.Uuid
-  revision          QuotationRevision  @relation(fields: [revisionId], references: [id])
-  customerId        String             @map("customer_id") @db.Uuid
-  customer          Customer           @relation(fields: [customerId], references: [id])
-  status            OrderStatus        @default(open)
-  stage             OrderStage         @default(confirmed)
+  refNo               String             @map("ref_no") @db.VarChar(30)
+  inquiryId           String             @map("inquiry_id") @db.Uuid
+  inquiry             Inquiry            @relation(fields: [inquiryId], references: [id])
+  revisionId          String             @unique @map("revision_id") @db.Uuid
+  revision            QuotationRevision  @relation(fields: [revisionId], references: [id])
+  customerId          String             @map("customer_id") @db.Uuid
+  customer            Customer           @relation(fields: [customerId], references: [id])
+  status              OrderStatus        @default(open)
+  stage               OrderStage         @default(confirmed)
   /// When the order entered its current stage.
-  stageSince        DateTime           @default(now()) @map("stage_since") @db.Timestamptz
-  orderedOn         DateTime           @map("ordered_on") @db.Date
+  stageSince          DateTime           @default(now()) @map("stage_since") @db.Timestamptz
+  orderedOn           DateTime           @map("ordered_on") @db.Date
   /// The proforma invoice's number once issued, e.g. KEB260916TN07 (prefix, issue date, customer letters, the handler's count this year).
-  proformaNo        String?            @map("proforma_no") @db.VarChar(40)
-  proformaIssuedOn  DateTime?          @map("proforma_issued_on") @db.Date
+  proformaNo          String?            @map("proforma_no") @db.VarChar(40)
+  proformaIssuedOn    DateTime?          @map("proforma_issued_on") @db.Date
   /// Ship date promised to the customer.
-  shipBy            DateTime?          @map("ship_by") @db.Date
+  shipBy              DateTime?          @map("ship_by") @db.Date
   /// Ready date the factory confirmed.
-  readyOn           DateTime?          @map("ready_on") @db.Date
-  shippedOn         DateTime?          @map("shipped_on") @db.Date
-  blNo              String?            @map("bl_no") @db.VarChar(60)
+  readyOn             DateTime?          @map("ready_on") @db.Date
+  shippedOn           DateTime?          @map("shipped_on") @db.Date
+  blNo                String?            @map("bl_no") @db.VarChar(60)
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
-  documentTitle     String?            @map("document_title") @db.VarChar(200)
+  documentTitle       String?            @map("document_title") @db.VarChar(200)
   /// Where the goods are unloaded, e.g. "Hairatan, Afghanistan" (the port of loading is the Incoterm place).
-  portOfDischarge   String?            @map("port_of_discharge") @db.VarChar(120)
+  portOfDischarge     String?            @map("port_of_discharge") @db.VarChar(120)
   /// When the packing list was filled in (null: not yet).
-  packedAt          DateTime?          @map("packed_at") @db.Timestamptz
-  containerNo       String?            @map("container_no") @db.VarChar(120)
-  shippingMarks     String?            @map("shipping_marks")
-  currency          String             @db.Char(3)
-  total             Decimal            @db.Decimal(14, 2)
-  depositPercent    Decimal            @map("deposit_percent") @db.Decimal(5, 2)
-  balanceTerms      BalanceTerms       @map("balance_terms")
-  incoterm          Incoterm
-  incotermPlace     String?            @map("incoterm_place") @db.VarChar(80)
+  packedAt            DateTime?          @map("packed_at") @db.Timestamptz
+  containerNo         String?            @map("container_no") @db.VarChar(120)
+  shippingMarks       String?            @map("shipping_marks")
+  currency            String             @db.Char(3)
+  total               Decimal            @db.Decimal(14, 2)
+  depositPercent      Decimal            @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms        BalanceTerms       @map("balance_terms")
+  incoterm            Incoterm
+  incotermPlace       String?            @map("incoterm_place") @db.VarChar(80)
   /// The main currency when the order was made, and how many of the order's currency one unit of it bought
   /// (USD order, USD main: 1; CNY order: 7.1). Revenue and costs are turned into the main currency at this rate,
   /// so changing the rates in Settings never moves past months. Empty: not known (Settings is used).
-  mainCurrency      String?            @map("main_currency") @db.Char(3)
-  mainRate          Decimal?           @map("main_rate") @db.Decimal(24, 14)
+  mainCurrency        String?            @map("main_currency") @db.Char(3)
+  mainRate            Decimal?           @map("main_rate") @db.Decimal(24, 14)
   /// How the customer pays (informal, bank contract, LC); empty until chosen.
-  paymentRoute      PaymentRoute?      @map("payment_route")
+  paymentRoute        PaymentRoute?      @map("payment_route")
+  /// Informal route: the balance before shipment or against the B/L copy (before_shipment | against_bl_copy).
+  balanceWhen         String?            @map("balance_when") @db.VarChar(20)
+  /// LC route: at_sight | deferred, and the deferred days counted from "papers reached their bank".
+  lcTerms             String?            @map("lc_terms") @db.VarChar(10)
+  lcDays              Int?               @map("lc_days")
   /// When we placed the order with the factory.
-  factoryOrderedOn  DateTime?          @map("factory_ordered_on") @db.Date
+  factoryOrderedOn    DateTime?          @map("factory_ordered_on") @db.Date
   /// Delivery at the customer's and the condition the goods arrived in.
-  deliveredOn       DateTime?          @map("delivered_on") @db.Date
-  deliveryCondition DeliveryCondition? @map("delivery_condition")
-  deliveryNote      String?            @map("delivery_note")
+  deliveredOn         DateTime?          @map("delivered_on") @db.Date
+  deliveryCondition   DeliveryCondition? @map("delivery_condition")
+  deliveryNote        String?            @map("delivery_note")
   /// The site acceptance test: our engineer, when, and who signed for the customer.
-  satEngineerId     String?            @map("sat_engineer") @db.Uuid
-  satEngineer       User?              @relation("OrderSatEngineer", fields: [satEngineerId], references: [id], onDelete: SetNull)
-  satPlannedOn      DateTime?          @map("sat_planned_on") @db.Date
-  satDoneOn         DateTime?          @map("sat_done_on") @db.Date
-  satSignedBy       String?            @map("sat_signed_by") @db.VarChar(120)
-  closedAt          DateTime?          @map("closed_at") @db.Timestamptz
+  satEngineerId       String?            @map("sat_engineer") @db.Uuid
+  satEngineer         User?              @relation("OrderSatEngineer", fields: [satEngineerId], references: [id], onDelete: SetNull)
+  satPlannedOn        DateTime?          @map("sat_planned_on") @db.Date
+  satDoneOn           DateTime?          @map("sat_done_on") @db.Date
+  satSignedBy         String?            @map("sat_signed_by") @db.VarChar(120)
+  closedAt            DateTime?          @map("closed_at") @db.Timestamptz
   /// When the company's checklist was copied into the order (null: not yet; it is copied on first read).
-  checklistSeededAt DateTime?          @map("checklist_seeded_at") @db.Timestamptz
-  cancelledAt       DateTime?          @map("cancelled_at") @db.Timestamptz
-  cancelReason      String?            @map("cancel_reason")
-  createdById       String             @map("created_by") @db.Uuid
-  createdBy         User               @relation("OrderCreator", fields: [createdById], references: [id])
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+  checklistSeededAt   DateTime?          @map("checklist_seeded_at") @db.Timestamptz
+  cancelledAt         DateTime?          @map("cancelled_at") @db.Timestamptz
+  cancelReason        String?            @map("cancel_reason")
+  /// Money received when it was cancelled: credit | refund | fee; money paid to the factory: refund_due | loss.
+  cancelCustomerMoney String?            @map("cancel_customer_money") @db.VarChar(10)
+  cancelFactoryMoney  String?            @map("cancel_factory_money") @db.VarChar(12)
+  createdById         String             @map("created_by") @db.Uuid
+  createdBy           User               @relation("OrderCreator", fields: [createdById], references: [id])
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
   lines        OrderLine[]
   stageChanges OrderStageChange[]
@@ -1099,6 +1116,8 @@ model Order {
   satChecks    SatCheck[]
   claims       OrderClaim[]
   checklist    OrderChecklistItem[]
+  factoryPlan  FactoryPaymentPlan[]
+  credits      CustomerCredit[]
   papers       OrderPaper[]
 
   @@unique([companyId, refNo])
@@ -1141,19 +1160,19 @@ model OrderLine {
   factoryCurrency  String?  @map("factory_currency") @db.Char(3)
 
   /// How many have come in from the factory so far (goods lines), and when last.
-  receivedQty   Decimal   @default(0) @map("received_qty") @db.Decimal(12, 2)
-  receivedOn    DateTime? @map("received_on") @db.Date
+  receivedQty        Decimal   @default(0) @map("received_qty") @db.Decimal(12, 2)
+  receivedOn         DateTime? @map("received_on") @db.Date
   /// The packing list, filled in before shipping (goods lines).
-  packages      Int?
-  packageType   String?   @map("package_type") @db.VarChar(40)
-  netWeightKg   Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
-  grossWeightKg Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
-  cbm           Decimal?  @db.Decimal(10, 3)
+  packages           Int?
+  packageType        String?   @map("package_type") @db.VarChar(40)
+  netWeightKg        Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
+  grossWeightKg      Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
+  cbm                Decimal?  @db.Decimal(10, 3)
   /// What reached the customer (Delivery & SAT, goods lines): how many, in what condition
   /// (good | minor_damage | damaged | missing) and a short note.
-  deliveredQty       Decimal @default(0) @map("delivered_qty") @db.Decimal(12, 2)
-  deliveredCondition String? @map("delivered_condition")
-  deliveryNote       String? @map("delivery_note") @db.VarChar(200)
+  deliveredQty       Decimal   @default(0) @map("delivered_qty") @db.Decimal(12, 2)
+  deliveredCondition String?   @map("delivered_condition")
+  deliveryNote       String?   @map("delivery_note") @db.VarChar(200)
 
   @@index([orderId])
   @@index([factoryId])
@@ -1481,6 +1500,9 @@ model OrderBankStep {
   courier   String?      @db.VarChar(60)
   reference String?      @db.VarChar(120)
   note      String?      @db.VarChar(500)
+  /// "Money reached us": the payment that recorded it.
+  paymentId String?      @map("payment_id") @db.Uuid
+  payment   Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
   @@unique([orderId, step])
   @@index([companyId])
@@ -1545,6 +1567,11 @@ model PaymentPlanItem {
   /// Null until known (a balance before shipment is dated when the ship date is).
   dueOn     DateTime? @map("due_on") @db.Date
   sortOrder Int       @default(0) @map("sort_order")
+  /// Built from the route: deposit | balance (null: typed by hand).
+  part      String?   @db.VarChar(10)
+  /// after_papers: due `dueDays` after the papers reached the customer's bank (LC).
+  dueRule   String?   @map("due_rule") @db.VarChar(20)
+  dueDays   Int?      @map("due_days")
 
   @@index([orderId])
   @@index([dueOn])
@@ -1665,42 +1692,56 @@ model Expense {
 }
 
 model Payment {
-  id           String        @id @default(uuid()) @db.Uuid
+  id               String           @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company      Company       @relation(fields: [companyId], references: [id])
-  kind         PaymentKind
-  orderId      String        @map("order_id") @db.Uuid
-  order        Order         @relation(fields: [orderId], references: [id])
+  companyId        String           @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company          Company          @relation(fields: [companyId], references: [id])
+  kind             PaymentKind
+  orderId          String           @map("order_id") @db.Uuid
+  order            Order            @relation(fields: [orderId], references: [id])
   /// Incoming: the customer who paid.
-  customerId   String?       @map("customer_id") @db.Uuid
-  customer     Customer?     @relation(fields: [customerId], references: [id])
-  /// What arrived from the customer.
-  amount       Decimal       @db.Decimal(14, 2)
+  customerId       String?          @map("customer_id") @db.Uuid
+  customer         Customer?        @relation(fields: [customerId], references: [id])
+  /// What it counts as on the order, in the order's currency (received ÷ rate, to the cent).
+  amount           Decimal          @db.Decimal(14, 2)
   /// Taken by banks on the way; still counts towards settling the amount due.
-  bankCharges  Decimal       @default(0) @map("bank_charges") @db.Decimal(14, 2)
-  currency     String        @db.Char(3)
-  paidOn       DateTime      @map("paid_on") @db.Date
-  method       PaymentMethod @default(bank_transfer)
-  reference    String?       @db.VarChar(120)
-  note         String?
+  bankCharges      Decimal          @default(0) @map("bank_charges") @db.Decimal(14, 2)
+  currency         String           @db.Char(3)
+  /// What really arrived (into the account, in its currency) and the rate agreed: units of the received
+  /// currency per one unit of the order's currency. Kept, so later rate changes never move it.
+  receivedAmount   Decimal          @map("received_amount") @db.Decimal(14, 2)
+  receivedCurrency String           @map("received_currency") @db.Char(3)
+  rate             Decimal          @default(1) @db.Decimal(24, 14)
+  /// Someone paying for the customer (their agent, a relative).
+  paidByName       String?          @map("paid_by_name") @db.VarChar(120)
+  /// One transfer split over several orders (and the customer's credit).
+  receiptId        String?          @map("receipt_id") @db.Uuid
+  receipt          CustomerReceipt? @relation(fields: [receiptId], references: [id])
+  paidOn           DateTime         @map("paid_on") @db.Date
+  method           PaymentMethod    @default(bank_transfer)
+  reference        String?          @db.VarChar(120)
+  note             String?
   /// Which of our accounts the money moved through (cash, a bank, a wallet).
-  accountId    String?       @map("account_id") @db.Uuid
-  account      MoneyAccount? @relation(fields: [accountId], references: [id])
+  accountId        String?          @map("account_id") @db.Uuid
+  account          MoneyAccount?    @relation(fields: [accountId], references: [id])
   /// A photo or PDF proving the payment (bank slip, transfer screenshot).
-  fileKey      String?       @map("file_key")
-  fileName     String?       @map("file_name") @db.VarChar(255)
-  fileType     String?       @map("file_type") @db.VarChar(150)
-  fileSize     Int?          @map("file_size")
-  recordedById String        @map("recorded_by") @db.Uuid
-  recordedBy   User          @relation("PaymentRecorder", fields: [recordedById], references: [id])
-  voidedAt     DateTime?     @map("voided_at") @db.Timestamptz
-  voidReason   String?       @map("void_reason")
-  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  fileKey          String?          @map("file_key")
+  fileName         String?          @map("file_name") @db.VarChar(255)
+  fileType         String?          @map("file_type") @db.VarChar(150)
+  fileSize         Int?             @map("file_size")
+  recordedById     String           @map("recorded_by") @db.Uuid
+  recordedBy       User             @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  voidedAt         DateTime?        @map("voided_at") @db.Timestamptz
+  voidReason       String?          @map("void_reason")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  bankSteps OrderBankStep[]
+  credits   CustomerCredit[]
 
   @@index([orderId])
   @@index([paidOn])
   @@index([accountId])
+  @@index([receiptId])
   @@index([companyId])
   @@map("payments")
 }
@@ -1735,9 +1776,11 @@ model MoneyAccount {
   payments        Payment[]
   factoryPayments FactoryPayment[]
   expenses        Expense[]
-  expensesRepaid  Expense[]        @relation("ExpenseRepaidFrom")
-  transfersOut    MoneyTransfer[]  @relation("TransferFrom")
-  transfersIn     MoneyTransfer[]  @relation("TransferTo")
+  expensesRepaid  Expense[]         @relation("ExpenseRepaidFrom")
+  transfersOut    MoneyTransfer[]   @relation("TransferFrom")
+  transfersIn     MoneyTransfer[]   @relation("TransferTo")
+  receipts        CustomerReceipt[]
+  credits         CustomerCredit[]
 
   @@unique([companyId, name])
   @@map("money_accounts")
@@ -1772,6 +1815,122 @@ model MoneyTransfer {
   @@index([transferredOn])
   @@index([companyId])
   @@map("money_transfers")
+}
+
+/**
+ * One transfer from a customer that pays several orders (oldest due first) and
+ * leaves the rest as their credit. Its payments carry `receipt_id`; the cash
+ * book shows the transfer once, for the whole amount.
+ */
+model CustomerReceipt {
+  id               String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId        String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company          Company       @relation(fields: [companyId], references: [id])
+  customerId       String        @map("customer_id") @db.Uuid
+  customer         Customer      @relation(fields: [customerId], references: [id])
+  /// What arrived, in the currency it arrived in, and the rate to the orders' currency (units per 1).
+  receivedAmount   Decimal       @map("received_amount") @db.Decimal(14, 2)
+  receivedCurrency String        @map("received_currency") @db.Char(3)
+  /// The orders' currency (and the credit's) and how many received units make one of it.
+  currency         String        @db.Char(3)
+  rate             Decimal       @default(1) @db.Decimal(24, 14)
+  accountId        String?       @map("account_id") @db.Uuid
+  account          MoneyAccount? @relation(fields: [accountId], references: [id])
+  paidOn           DateTime      @map("paid_on") @db.Date
+  method           PaymentMethod @default(bank_transfer)
+  reference        String?       @db.VarChar(120)
+  paidByName       String?       @map("paid_by_name") @db.VarChar(120)
+  note             String?
+  recordedById     String        @map("recorded_by") @db.Uuid
+  recordedBy       User          @relation("ReceiptRecorder", fields: [recordedById], references: [id])
+  voidedAt         DateTime?     @map("voided_at") @db.Timestamptz
+  voidReason       String?       @map("void_reason")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  payments Payment[]
+  credits  CustomerCredit[]
+
+  @@index([customerId])
+  @@index([accountId])
+  @@index([paidOn])
+  @@index([companyId])
+  @@map("customer_receipts")
+}
+
+/**
+ * The customer's credit, as a ledger in one currency per row: in (money left
+ * over, or kept from a cancelled order), used (paid an order: payment_id),
+ * refund (paid back from account_id), fee (kept from a cancelled order as income;
+ * not part of the balance). Balance = in − used − refund.
+ */
+model CustomerCredit {
+  id           String           @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId    String           @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company      Company          @relation(fields: [companyId], references: [id])
+  customerId   String           @map("customer_id") @db.Uuid
+  customer     Customer         @relation(fields: [customerId], references: [id])
+  /// in | used | refund | fee
+  kind         String           @db.VarChar(10)
+  amount       Decimal          @db.Decimal(14, 2)
+  currency     String           @db.Char(3)
+  receiptId    String?          @map("receipt_id") @db.Uuid
+  receipt      CustomerReceipt? @relation(fields: [receiptId], references: [id])
+  paymentId    String?          @map("payment_id") @db.Uuid
+  payment      Payment?         @relation(fields: [paymentId], references: [id])
+  /// The order it came from (cancelled) or was used on.
+  orderId      String?          @map("order_id") @db.Uuid
+  order        Order?           @relation(fields: [orderId], references: [id])
+  /// A refund: the account it was paid from.
+  accountId    String?          @map("account_id") @db.Uuid
+  account      MoneyAccount?    @relation(fields: [accountId], references: [id])
+  on           DateTime         @db.Date
+  note         String?          @db.VarChar(500)
+  recordedById String           @map("recorded_by") @db.Uuid
+  recordedBy   User             @relation("CreditRecorder", fields: [recordedById], references: [id])
+  voidedAt     DateTime?        @map("voided_at") @db.Timestamptz
+  voidReason   String?          @map("void_reason")
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([customerId])
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([receiptId])
+  @@index([accountId])
+  @@index([companyId])
+  @@map("customer_credits")
+}
+
+/**
+ * What we agreed to pay one factory for an order, in parts: an advance when we
+ * order, the balance when they say ready (its date follows the order's ready
+ * date), or on a fixed day. Paid status comes from the factory payments.
+ */
+model FactoryPaymentPlan {
+  id        String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company   Company   @relation(fields: [companyId], references: [id])
+  orderId   String    @map("order_id") @db.Uuid
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  factoryId String    @map("factory_id") @db.Uuid
+  factory   Factory   @relation(fields: [factoryId], references: [id])
+  label     String    @db.VarChar(80)
+  percent   Decimal?  @db.Decimal(5, 2)
+  amount    Decimal   @db.Decimal(14, 2)
+  currency  String    @db.Char(3)
+  /// on_order | on_ready | fixed
+  dueRule   String    @map("due_rule") @db.VarChar(10)
+  dueOn     DateTime? @map("due_on") @db.Date
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([orderId, factoryId])
+  @@index([factoryId])
+  @@index([companyId])
+  @@map("factory_payment_plans")
 }
 
 // ============================================================================
@@ -1962,6 +2121,9 @@ model Company {
   orderClaims         OrderClaim[]
   checklistItems      OrderChecklistItem[]
   checklistTemplates  ChecklistTemplate[]
+  customerReceipts    CustomerReceipt[]
+  customerCredits     CustomerCredit[]
+  factoryPaymentPlans FactoryPaymentPlan[]
   orderPapers         OrderPaper[]
 
   @@map("companies")

@@ -5,6 +5,17 @@ import { api, ApiError } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { OrderLineView } from "@/lib/types-orders";
 
+/** The other orders a transfer pays, sent as JSON (empty when missing or unreadable). */
+const partsOf = (json: string | undefined): unknown[] => {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json) as unknown;
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+};
+
 const refresh = (orderId: string) => {
   revalidatePath(`/orders/${orderId}`, "layout");
   revalidatePath("/orders");
@@ -101,12 +112,23 @@ export async function orderLineAction(orderId: string, lineId: string, body: Rec
   }
 }
 
-/** Money in from the customer (managers), always in the order's currency. */
+/**
+ * Money in from the customer (managers): what arrived (any currency, the rate),
+ * this order's part, other orders it also pays, the rest as the customer's
+ * credit; "Money reached us" ticks the bank step with it.
+ */
 export async function paymentAction(orderId: string, currency: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
+  const parts = partsOf(v.parts);
+  const received = v.receivedAmount ?? v.amount;
   const body = {
     kind: v.kind,
-    amount: v.amount,
+    // Money v2: `amount` is this order's part (blank: what it counts as, up to what is due).
+    amount: v.receivedAmount !== undefined ? v.amount || null : v.amount,
+    receivedAmount: received,
+    receivedCurrency: v.receivedCurrency || currency,
+    rate: v.receivedCurrency && v.receivedCurrency !== currency ? v.rate || null : null,
+    paidByName: v.paidByName?.trim() || null,
     bankCharges: v.bankCharges || "0",
     currency,
     paidOn: v.paidOn,
@@ -114,6 +136,8 @@ export async function paymentAction(orderId: string, currency: string, _prev: Ac
     reference: v.reference?.trim() || null,
     note: v.note?.trim() || null,
     accountId: v.accountId || null,
+    parts,
+    ...(v.bankStep ? { bankStep: v.bankStep } : {}),
   };
   const r = await attempt(form, () => api.post(`/orders/${orderId}/payments`, body), "Payment recorded.");
   if (r.ok) refresh(orderId);
@@ -130,7 +154,15 @@ export async function voidPaymentAction(orderId: string, paymentId: string, _pre
 
 export async function cancelOrderAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/orders/${orderId}/cancel`, { reason: v.reason }), "Order cancelled.");
+  const body = {
+    reason: v.reason,
+    ...(v.customerMoney ? { customerMoney: v.customerMoney } : {}),
+    ...(v.factoryMoney ? { factoryMoney: v.factoryMoney } : {}),
+    refundNow: v.refundNow === "true",
+    refundAccountId: v.refundAccountId || null,
+    refundOn: v.refundOn || null,
+  };
+  const r = await attempt(form, () => api.post(`/orders/${orderId}/cancel`, body), "Order cancelled.");
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -168,5 +200,59 @@ export async function orderRemoveFileAction(
     revalidatePath(`/orders/${orderId}`, "layout");
     revalidatePath(`/inquiries/${dealId}`);
   }
+  return r;
+}
+
+/** Pays (part of) the order from the customer's credit (managers). */
+export async function useCreditAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(form, () => api.post(`/orders/${orderId}/use-credit`, { amount: v.amount, on: v.on || null }), "Paid from the customer's credit.");
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
+const refreshCustomer = (customerId: string) => {
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/orders", "layout");
+  revalidatePath("/money");
+};
+
+/** One transfer over several of the customer's orders; the rest becomes their credit. */
+export async function customerReceiptAction(customerId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const parts = partsOf(v.parts);
+  const body = {
+    receivedAmount: v.receivedAmount,
+    receivedCurrency: v.receivedCurrency,
+    currency: v.currency,
+    rate: v.receivedCurrency !== v.currency ? v.rate || null : null,
+    paidOn: v.paidOn,
+    method: v.method,
+    reference: v.reference?.trim() || null,
+    paidByName: v.paidByName?.trim() || null,
+    note: v.note?.trim() || null,
+    accountId: v.accountId || null,
+    parts,
+  };
+  const r = await attempt(form, () => api.post(`/customers/${customerId}/receipts`, body), "Payment recorded.");
+  if (r.ok) refreshCustomer(customerId);
+  return r;
+}
+
+/** Pays the customer's credit back (managers). */
+export async function refundCreditAction(customerId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const body = { amount: v.amount, currency: v.currency, on: v.on, accountId: v.accountId || null, note: v.note?.trim() || null };
+  const r = await attempt(form, () => api.post(`/customers/${customerId}/credit/refund`, body), "Refund recorded.");
+  if (r.ok) refreshCustomer(customerId);
+  return r;
+}
+
+/** A refund or a transfer recorded by mistake (managers). */
+export async function voidCreditAction(customerId: string, kind: "credit" | "receipt", id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const path = kind === "credit" ? `/customer-credits/${id}/void` : `/customer-receipts/${id}/void`;
+  const r = await attempt(form, () => api.post(path, { reason: v.reason }), "Removed.");
+  if (r.ok) refreshCustomer(customerId);
   return r;
 }

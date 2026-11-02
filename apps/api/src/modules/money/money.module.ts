@@ -29,6 +29,8 @@ import {
   type MoneyAccountInput,
   type TransferInput,
   factoryPaymentInput,
+  factoryPlanInput,
+  type FactoryPlanInput,
   paymentPlanInput,
   repayInput,
   voidInput,
@@ -182,6 +184,13 @@ class MoneyController {
   @Put("orders/:id/payment-plan")
   plan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentPlanInput)) body: PaymentPlanInput) {
     return this.money.setPlan(user, id, body);
+  }
+
+  /** { factoryId, items: [{ label, percent?, amount, dueRule: on_order | on_ready | fixed, dueOn? }] } — they add up to what we owe it. */
+  @Put("orders/:id/factory-plan")
+  @RequirePermissions("sourcing.manage")
+  factoryPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPlanInput)) body: FactoryPlanInput) {
+    return this.money.setFactoryPlan(user, id, body);
   }
 
   @Post("orders/:id/factory-payments")

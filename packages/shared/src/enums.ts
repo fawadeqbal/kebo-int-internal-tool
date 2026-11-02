@@ -101,7 +101,7 @@ export type PaymentKind = (typeof PAYMENT_KINDS)[number];
 export const MONEY_ACCOUNT_KINDS = values("cash", "bank", "wallet");
 export type MoneyAccountKind = (typeof MONEY_ACCOUNT_KINDS)[number];
 
-export const PAYMENT_METHODS = values("bank_transfer", "letter_of_credit", "cash", "cheque", "online", "other");
+export const PAYMENT_METHODS = values("bank_transfer", "letter_of_credit", "cash", "cheque", "online", "credit", "other");
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 /** What a cost was for. Order expenses belong to one order; general ones to the company (rent, salaries…). */
@@ -183,7 +183,7 @@ export type OrderDocumentKind = (typeof ORDER_DOCUMENT_KINDS)[number];
 export const ORDER_DOCUMENT_STATUSES = values("missing", "draft", "ready", "elsewhere");
 export type OrderDocumentStatus = (typeof ORDER_DOCUMENT_STATUSES)[number];
 
-export const BANK_STEP_KINDS = values("sent_to_our_bank", "couriered_to_customer_bank", "copies_to_customer", "customer_paid_bank", "bank_paid_us");
+export const BANK_STEP_KINDS = values("sent_to_our_bank", "couriered_to_customer_bank", "customer_bank_received", "copies_to_customer", "customer_paid_bank", "bank_paid_us");
 export type BankStepKind = (typeof BANK_STEP_KINDS)[number];
 
 export const DELIVERY_CONDITIONS = values("good", "minor_damage", "damaged", "partial");

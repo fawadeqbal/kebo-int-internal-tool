@@ -101,7 +101,6 @@ describe("orders: four stages", () => {
     const o = await order();
     const deposit = Number(o.money.deposit);
     await api(app, sana).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: "2026-10-21" }).expect(403);
-    await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "PKR", paidOn: "2026-10-21" }).expect(400);
     await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: "2099-01-01" }).expect(400);
     const paid = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: (deposit - 25).toFixed(2), bankCharges: "25", currency: "USD", paidOn: "2026-10-21", reference: "TT-1" }).expect(201)).body;
     expect(paid).toMatchObject({ status: "deposit_paid", received: deposit.toFixed(2) });
@@ -111,7 +110,13 @@ describe("orders: four stages", () => {
       recordedBy: { name: expect.any(String) },
       after: { received: deposit.toFixed(2), due: (Number(o.total) - deposit).toFixed(2) },
     });
-    await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: (Number(o.total) + 1).toFixed(2), currency: "USD", paidOn: "2026-10-21" }).expect(400); // more than due
+    // More than is due is never refused: the rest becomes the customer's credit (one transfer: the order's part and the credit).
+    const over = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: (Number(o.total) + 1).toFixed(2), currency: "USD", paidOn: "2026-10-21" }).expect(201)).body;
+    expect(over).toMatchObject({ due: "0.00" });
+    const receiptId = over.payments.at(-1).receiptId as string;
+    expect(receiptId).toBeTruthy();
+    // Recorded by mistake: the transfer goes, with its credit.
+    await api(app, manager).post(`/customer-receipts/${receiptId}/void`, { reason: "Test" }).expect(200);
     expect((await order()).money).toMatchObject({ received: deposit.toFixed(2), depositDue: "0.00" });
   });
 

@@ -11,7 +11,8 @@ import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { NewFactoryPayment } from "@/components/money/forms";
-import { factoryPaymentAction } from "../../../money/actions";
+import { FactoryPlanCard } from "@/components/money/money-v2";
+import { factoryPaymentAction, factoryPlanAction } from "../../../money/actions";
 import { factoryOrderAction } from "../../flow-actions";
 import { FactoriesView } from "../money-cards";
 import { MoneySection } from "../money-sections";
@@ -33,11 +34,12 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   const canEdit = can(me, "orders.update") && d.open;
   const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
-  const payFactory = (label: string, quiet = true) =>
+  const payFactory = (label: string, quiet = true, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
     m.factories?.canRecord && owing.length && d.open ? (
       <NewFactoryPayment
         quiet={quiet}
         label={label}
+        prefill={prefill}
         action={factoryPaymentAction.bind(null, m.orderId, null)}
         factories={owing}
         people={people}
@@ -60,7 +62,14 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       save: "Save",
       hint: "The day we confirmed the order (PO or signed proforma)",
     };
-  const advance = payFactory("Pay the factory");
+  // The advance: the factory payment form filled in with the plan's part due when we order.
+  const advancePart = m.factories?.plans.find((p) => p.rows.some((r) => r.dueRule === "on_order" && r.status !== "paid")) ?? null;
+  const advanceRow = advancePart?.rows.find((r) => r.dueRule === "on_order" && r.status !== "paid");
+  const advance = payFactory(
+    "Pay the factory",
+    true,
+    advancePart && advanceRow ? { factoryId: advancePart.factory.id, amount: advanceRow.open, kind: "deposit" } : undefined,
+  );
   if (advance) tools.factory_advance = { kind: "node", node: advance };
 
   const factories = flow?.factory.factories ?? [];
@@ -131,6 +140,38 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           </CardBody>
         </Card>
       )}
+      {m.factories?.plans.map((plan) => {
+        const next = plan.rows.find((r) => r.status !== "paid");
+        const paidInOrder = m.factories!.payments
+          .filter((x) => !x.voided && x.factory.id === plan.factory.id && x.currency === plan.currency)
+          .reduce((t, x) => t + Number(x.inOrderCurrency), 0);
+        return (
+          <Card key={`${plan.factory.id}:${plan.currency}`} id={`plan-${plan.factory.id}`}>
+            <CardHeader
+              title={`What we pay ${plan.factory.name} · ${o.refNo}`}
+              description="Agreed once per factory on the order: an advance when we order, the balance when they say ready (or on a fixed day)."
+            />
+            <CardBody>
+              <FactoryPlanCard
+                plan={plan}
+                action={factoryPlanAction.bind(null, o.id)}
+                canPlan={!!m.factories?.canPlan && d.open}
+                orderCurrency={o.currency}
+                paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
+                pay={
+                  next && Number(next.open) > 0
+                    ? payFactory(`Pay ${next.label.toLowerCase()}`, true, {
+                        factoryId: plan.factory.id,
+                        amount: next.open,
+                        kind: next.dueRule === "on_order" ? "deposit" : "balance",
+                      })
+                    : null
+                }
+              />
+            </CardBody>
+          </Card>
+        );
+      })}
       {m.factories && (
         <MoneySection
           id="factory-money"
