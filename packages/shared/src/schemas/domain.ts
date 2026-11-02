@@ -3,6 +3,7 @@ import {
   ATTACHMENT_KINDS,
   BALANCE_TERMS,
   CUSTOMER_TYPES,
+  EXPENSE_BEARERS,
   EXPENSE_CATEGORIES,
   INCOTERMS,
   BASIS_STEPS,
@@ -19,6 +20,13 @@ import {
 } from "../enums";
 import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
+import { FLOW_STEPS } from "../workflows/flow";
+
+/** A yes/no that may be left out (left out on a change: kept as it was). */
+const optionalBool = z.preprocess(
+  (v) => (v === undefined || v === null || v === "" ? undefined : v === true || v === "true" || v === "on" || v === "1"),
+  z.boolean().optional(),
+);
 
 /**
  * Why a change was made. Optional in the schema: the API asks for it (409
@@ -502,9 +510,26 @@ export const expenseInput = z.object({
   paidById: optionalId,
   reference: optionalText(120),
   note: optionalText(2000),
+  /**
+   * On an order: the step it belongs to (null: none). Left out on a change: kept;
+   * on a new expense: the usual step of its kind.
+   */
+  step: z.enum(FLOW_STEPS).nullish(),
+  /** Who bears it: us (profit), the customer (added to what they owe) or the factory (taken off what we owe it; needs `factoryId`). */
+  borneBy: z.enum(EXPENSE_BEARERS).optional(),
+  /** Paid by `paidById` from their own money: shows under "To repay" until it is repaid. */
+  ownMoney: optionalBool,
   reason: optionalText(500).optional(),
 });
 export type ExpenseInput = z.infer<typeof expenseInput>;
+
+/** Paying back someone who paid an expense from their own money. */
+export const repayInput = z.object({
+  repaidOn: isoDate(),
+  /** Which of our accounts the money left from (same currency as the expense). */
+  accountId: optionalId,
+});
+export type RepayInput = z.infer<typeof repayInput>;
 
 export const voidInput = z.object({ reason: text(500, "Say why it is removed") });
 

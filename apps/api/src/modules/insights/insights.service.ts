@@ -200,8 +200,9 @@ export class InsightsService {
         where o.status <> 'cancelled' and o.ordered_on between ${loadFrom}::date and ${to}::date`,
       // Amounts in minor units and days as text straight from the database (no Decimal or Date objects to build).
       seeExpenses
-        ? this.prisma.db.$queryRaw<{ id: string; orderId: string | null; category: string; on: ISODate; minor: number; rate: number }[]>`
-            select id, order_id as "orderId", category, to_char(spent_on, 'YYYY-MM-DD') as "on", (amount * 100)::float8 as minor, rate::float8 as rate
+        ? this.prisma.db.$queryRaw<{ id: string; orderId: string | null; category: string; on: ISODate; minor: number; rate: number; ours: boolean }[]>`
+            select id, order_id as "orderId", category, to_char(spent_on, 'YYYY-MM-DD') as "on", (amount * 100)::float8 as minor, rate::float8 as rate,
+                   borne_by = 'us' as ours
             from expenses where voided_at is null and spent_on between ${loadFrom}::date and ${to}::date`
         : Promise.resolve([]),
       // What arrived (bank charges apart), at the order's own rate.
@@ -274,7 +275,7 @@ export class InsightsService {
       fx,
     );
     const counted = countedExpenses(
-      expenses.map((e) => ({ id: e.id, orderId: e.orderId, category: e.category, spentOn: e.on, mainMinor: convert(e.minor, e.rate) })),
+      expenses.filter((e) => e.ours).map((e) => ({ id: e.id, orderId: e.orderId, category: e.category, spentOn: e.on, mainMinor: convert(e.minor, e.rate) })),
       basis,
     );
 
@@ -308,7 +309,8 @@ export class InsightsService {
     }
     for (const e of expenses) {
       const v = convert(e.minor, e.rate);
-      const cost = counted.get(e.id) ?? v;
+      // Charged to the customer or taken off what we owe a factory: money out, but not a cost of ours.
+      const cost = e.ours ? (counted.get(e.id) ?? v) : 0;
       events.push({
         on: e.on,
         add: (f) => {
