@@ -22,7 +22,8 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 const OTHER = "__other__";
 
-const ITEM_COLUMNS: LineColumn[] = [
+/** The customer's items as the line table shows them (the form, and Needs → What they need). */
+export const ITEM_COLUMNS: LineColumn[] = [
   { key: "description", label: "Description", width: "minmax(0,1fr)", input: "textarea", required: "Each item needs a description", placeholder: "What it is: size, material, standard…" },
   { key: "model", label: "Model / part no.", width: "8rem", input: "text", maxLength: 120, placeholder: "Model" },
   { key: "quantity", label: "Qty", width: "5rem", input: "number", align: "right", required: "Enter a quantity", placeholder: "Qty" },

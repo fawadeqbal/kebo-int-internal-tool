@@ -138,6 +138,8 @@ export interface DetailField {
   wide?: boolean;
   /** Shown in the panel but not changed there (e.g. worked out). */
   hint?: string;
+  /** Shown in the card when it is empty, instead of "+ Add" or "—" (e.g. a file's own add button). */
+  empty?: ReactNode;
 }
 
 const filled = (f: DetailField) => f.value !== null && f.value !== undefined && f.value !== "";
@@ -423,6 +425,8 @@ export function DetailsCard({
             <dd className="min-w-0 text-sm font-medium break-words text-text tabular">
               {filled(f) ? (
                 (f.show ?? (f.type === "date" && f.value && ISO.test(f.value) ? dayLabel(f.value) : f.value))
+              ) : f.empty !== undefined ? (
+                f.empty
               ) : editable && f.name ? (
                 <AddInPlace f={f} action={action!} />
               ) : (
@@ -436,6 +440,10 @@ export function DetailsCard({
     </ViewCard>
   );
 }
+
+const LinesClose = createContext<() => void>(() => {});
+/** Inside a LinesCard's edit mode: back to the read-only lines (an editor that saves as a whole). */
+export const useCloseLines = () => useContext(LinesClose);
 
 /**
  * A view card for a set of lines: read-only until "Edit lines", then the
@@ -505,7 +513,7 @@ export function LinesCard({
       >
         <div className="p-4">
           {editing ? (
-            edit
+            <LinesClose.Provider value={() => setEditing(false)}>{edit}</LinesClose.Provider>
           ) : phone ? (
             <>
               <div className="sm:hidden">{phone}</div>

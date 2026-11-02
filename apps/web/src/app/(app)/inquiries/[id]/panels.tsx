@@ -1,110 +1,126 @@
 "use client";
 
-import { useState } from "react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
 import { Button, Field, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { PanelBody, PanelButton, useClosePanel } from "@/components/orders/step-view";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/** The two decisions people make by hand: mark lost (with a reason) or start / reopen. Everything else moves by itself. */
-export function StagePanel({ stage, action, canReopen }: { stage: InquiryStage; action: Action; canReopen: boolean }) {
-  const moves = MANUAL_MOVES[stage].filter((m) => !m.reopen || canReopen);
-  const [to, setTo] = useState<InquiryStage | null>(null);
-  if (!moves.length) return <p className="text-sm text-muted">{stage === "won" ? "Changes now go through the order." : "Closed."}</p>;
-  const lost = to === "lost";
+/** A panel form's Save / Cancel. */
+function Buttons({ save, danger }: { save: string; danger?: boolean }) {
+  const close = useClosePanel();
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        {moves.map((m) => (
-          <Button
-            key={m.to}
-            size="sm"
-            variant={m.to === "lost" ? "danger-ghost" : "secondary"}
-            onClick={() => setTo(to === m.to ? null : m.to)}
-            aria-pressed={to === m.to}
-          >
-            {m.label}
-          </Button>
-        ))}
-      </div>
-      {to && (
-        <ActionForm
-          action={action}
-          onDone={() => setTo(null)}
-          className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2/60 p-3"
-        >
-          {(s) => (
-            <>
-              <input type="hidden" name="to" value={to} />
-              {lost && (
-                <Field label="Why was it lost?" htmlFor="lostReason" error={s.errors?.lostReason}>
-                  <Select id="lostReason" name="lostReason" defaultValue={s.values?.lostReason ?? ""}>
-                    <option value="" disabled>
-                      Choose a reason
-                    </option>
-                    {LOST_REASONS.map((r) => (
-                      <option key={r} value={r}>
-                        {LOST_REASON_LABEL[r]}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
-              <Field label="Note" optional htmlFor="note">
-                <Textarea id="note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
-              </Field>
-              <div className="flex gap-2">
-                <SubmitButton size="sm" variant={lost ? "danger" : "primary"} pendingText="Saving…">
-                  Confirm
-                </SubmitButton>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setTo(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </>
-          )}
-        </ActionForm>
-      )}
+    <div className="flex gap-2">
+      <SubmitButton size="sm" variant={danger ? "danger" : "primary"} pendingText="Saving…">
+        {save}
+      </SubmitButton>
+      <Button type="button" size="sm" variant="ghost" onClick={close}>
+        Cancel
+      </Button>
     </div>
   );
 }
 
-export function HoldPanel({ onHold, action }: { onHold: boolean; action: Action }) {
-  const [open, setOpen] = useState(false);
-  if (!open)
-    return (
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-        {onHold ? "Resume" : "Put on hold"}
-      </Button>
-    );
+/** Mark lost (with a reason), start working, or reopen: the moves people make by hand. Everything else moves by itself. */
+function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
+  const close = useClosePanel();
+  const lost = to === "lost";
   return (
-    <ActionForm action={action} onDone={() => setOpen(false)} className="flex flex-col gap-3">
-      <input type="hidden" name="onHold" value={onHold ? "false" : "true"} />
-      <Field label={onHold ? "Note" : "What are we waiting for?"} optional={onHold} htmlFor="hold-note">
-        <Textarea
-          id="hold-note"
-          name="note"
-          rows={2}
-          className="min-h-0"
-          placeholder={onHold ? "" : "e.g. new drawings from the customer"}
-        />
-      </Field>
-      <div className="flex gap-2">
-        <SubmitButton size="sm" pendingText="Saving…">
-          {onHold ? "Resume" : "Put on hold"}
-        </SubmitButton>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
-    </ActionForm>
+    <PanelBody>
+      <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
+        {(s) => (
+          <>
+            <input type="hidden" name="to" value={to} />
+            {lost && (
+              <Field label="Why was it lost?" htmlFor="lostReason" error={s.errors?.lostReason}>
+                <Select id="lostReason" name="lostReason" defaultValue={s.values?.lostReason ?? ""}>
+                  <option value="" disabled>
+                    Choose a reason
+                  </option>
+                  {LOST_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {LOST_REASON_LABEL[r]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+            <Field label="Note" optional htmlFor="note">
+              <Textarea id="note" name="note" rows={3} className="min-h-0" defaultValue={s.values?.note} />
+            </Field>
+            <Buttons save="Confirm" danger={lost} />
+          </>
+        )}
+      </ActionForm>
+    </PanelBody>
   );
 }
 
-export function AssignPanel({
+function HoldForm({ onHold, action }: { onHold: boolean; action: Action }) {
+  const close = useClosePanel();
+  return (
+    <PanelBody>
+      <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
+        <input type="hidden" name="onHold" value={onHold ? "false" : "true"} />
+        <Field label={onHold ? "Note" : "What are we waiting for?"} optional={onHold} htmlFor="hold-note">
+          <Textarea id="hold-note" name="note" rows={3} className="min-h-0" placeholder={onHold ? "" : "e.g. new drawings from the customer"} />
+        </Field>
+        <Buttons save={onHold ? "Resume" : "Put on hold"} />
+      </ActionForm>
+    </PanelBody>
+  );
+}
+
+/** The quiet decisions under the side cards: put on hold / resume, mark as lost, start, reopen. */
+export function DecisionButtons({
+  stage,
+  onHold,
+  canHold,
+  canReopen,
+  stageAction,
+  holdAction,
+}: {
+  stage: InquiryStage;
+  onHold: boolean;
+  canHold: boolean;
+  canReopen: boolean;
+  stageAction: Action;
+  holdAction: Action;
+}) {
+  const moves = MANUAL_MOVES[stage].filter((m) => !m.reopen || canReopen);
+  if (!moves.length && !canHold) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {canHold && (
+        <PanelButton
+          variant="ghost"
+          size="sm"
+          label={onHold ? "Resume" : "Put on hold"}
+          title={onHold ? "Resume the inquiry" : "Put the inquiry on hold"}
+          description={onHold ? "It goes back to the lists as active." : "It stays where it is, marked on hold, until resumed."}
+          body={<HoldForm onHold={onHold} action={holdAction} />}
+        />
+      )}
+      {moves.map((m) => (
+        <PanelButton
+          key={m.to}
+          variant="ghost"
+          size="sm"
+          label={m.to === "lost" ? "Mark as lost" : m.label}
+          title={m.to === "lost" ? "Mark the inquiry as lost" : m.label}
+          description={m.to === "lost" ? "The reason shows on reports. A manager can reopen it." : undefined}
+          body={<StageForm to={m.to} action={stageAction} />}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Handled by: choose who (managers), or take it yourself. */
+export function AssignForm({
   action,
   people,
   current,
@@ -117,35 +133,35 @@ export function AssignPanel({
   canAssignOthers: boolean;
   meId: string;
 }) {
-  if (!canAssignOthers)
-    return current ? null : (
-      <ActionForm action={action}>
-        <input type="hidden" name="assigneeId" value={meId} />
-        <SubmitButton size="sm" pendingText="Saving…">
-          Take it
-        </SubmitButton>
-      </ActionForm>
-    );
+  const close = useClosePanel();
   return (
-    <ActionForm action={action} className="flex flex-wrap items-end gap-2">
-      {(s) => (
-        <>
-          <Field label="Handled by" htmlFor="assigneeId" className="flex-1">
-            <Select id="assigneeId" name="assigneeId" defaultValue={s.values?.assigneeId ?? current ?? ""}>
-              <option value="">Nobody</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <SubmitButton size="sm" variant="secondary" pendingText="Saving…">
-            Save
-          </SubmitButton>
-        </>
-      )}
-    </ActionForm>
+    <PanelBody>
+      <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
+        {(s) =>
+          canAssignOthers ? (
+            <>
+              <Field label="Handled by" htmlFor="assigneeId">
+                <Select id="assigneeId" name="assigneeId" defaultValue={s.values?.assigneeId ?? current ?? ""}>
+                  <option value="">Nobody</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Buttons save="Save" />
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="assigneeId" value={meId} />
+              <p className="text-sm text-text-2">You will handle this inquiry.</p>
+              <Buttons save="Take it" />
+            </>
+          )
+        }
+      </ActionForm>
+    </PanelBody>
   );
 }
 

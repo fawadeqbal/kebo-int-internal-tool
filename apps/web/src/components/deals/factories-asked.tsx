@@ -43,6 +43,7 @@ export function FactoriesAsked({
   canEdit,
   today,
   closed,
+  startAsking = false,
 }: {
   data: FactoryRequests;
   ask: Action;
@@ -57,8 +58,10 @@ export function FactoriesAsked({
   canEdit: boolean;
   today: string;
   closed: boolean;
+  /** Open the ask form at once when nobody has been asked yet (the "Ask factories" button's panel). */
+  startAsking?: boolean;
 }) {
-  const [asking, setAsking] = useState(false);
+  const [asking, setAsking] = useState(startAsking && data.items.length === 0 && canEdit && !closed);
   return (
     <div className="flex flex-col gap-3">
       {asking ? (
