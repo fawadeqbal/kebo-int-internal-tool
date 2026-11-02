@@ -29,7 +29,9 @@ import {
   type ShipmentStatus,
   type ClaimInput,
   type ClaimUpdateInput,
+  type DeliveryAllGoodInput,
   type DeliveryInput,
+  type SatAllPassedInput,
   type FactoryOrderInput,
   type OrderDocumentInput,
   type OrderDocumentKind,
@@ -43,7 +45,7 @@ import {
   type ShipmentInput,
   type ShipmentUpdateInput,
 } from "@kebo/shared";
-import { dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import { addDays, dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -281,6 +283,9 @@ export class FlowService {
       portOfDischarge: s.portOfDischarge,
       containerNo: s.containerNo,
       containerType: s.containerType,
+      sealNo: s.sealNo,
+      loadedOn: fromDbDateOrNull(s.loadedOn),
+      vgmKg: s.vgmKg === null ? null : s.vgmKg.toString(),
       etd: fromDbDateOrNull(s.etd),
       eta: fromDbDateOrNull(s.eta),
       departedOn: fromDbDateOrNull(s.departedOn),
@@ -344,7 +349,12 @@ export class FlowService {
               }
             : null,
       },
-      factory: { orderedOn: fromDbDateOrNull(o.factoryOrderedOn), readyOn: fromDbDateOrNull(o.readyOn), factories },
+      factory: {
+        orderedOn: fromDbDateOrNull(o.factoryOrderedOn),
+        orderNo: o.factoryOrderNo,
+        readyOn: fromDbDateOrNull(o.readyOn),
+        factories,
+      },
       production: has("production")
         ? {
             steps: o.checklist.map((p) => ({
@@ -366,6 +376,7 @@ export class FlowService {
             deliveredOn: fromDbDateOrNull(o.deliveredOn),
             condition: o.deliveryCondition,
             note: o.deliveryNote,
+            receivedBy: o.deliveryReceivedBy,
             satEngineer: o.satEngineer,
             satPlannedOn: fromDbDateOrNull(o.satPlannedOn),
             satDoneOn: fromDbDateOrNull(o.satDoneOn),
@@ -568,28 +579,37 @@ export class FlowService {
     return this.get(user, id);
   }
 
+  /** The day we ordered from the factory and their order number; only the fields sent change. */
   async setFactoryOrder(user: SessionUser, id: string, input: FactoryOrderInput) {
     await this.must(user, "orders.update", null, "change orders");
     if (input.factoryOrderedOn && input.factoryOrderedOn > this.clock.today())
       throw new DomainError("The factory order date cannot be in the future.");
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      await tx.order.update({ where: { id }, data: { factoryOrderedOn: toDbDateOrNull(input.factoryOrderedOn) } });
+      const was = { factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn), factoryOrderNo: o.factoryOrderNo };
+      const data: Prisma.OrderUncheckedUpdateInput = {};
+      if (input.factoryOrderedOn !== undefined) data.factoryOrderedOn = toDbDateOrNull(input.factoryOrderedOn);
+      if (input.factoryOrderNo !== undefined) data.factoryOrderNo = input.factoryOrderNo;
+      if (!Object.keys(data).length) return null;
+      await tx.order.update({ where: { id }, data });
+      const ordered = input.factoryOrderedOn !== undefined ? input.factoryOrderedOn : was.factoryOrderedOn;
       // Ordered: each factory gets the payment plan (advance when we order, balance on the ready date).
       if (input.factoryOrderedOn) await seedFactoryPlans(tx, id, (await this.settings.get()).sales.factoryAdvancePercent);
-      await this.log(
-        tx,
-        user,
-        id,
-        "factory_order",
-        input.factoryOrderedOn
-          ? `${o.refNo}: ordered from the factory on ${input.factoryOrderedOn}`
-          : `${o.refNo}: factory order date cleared`,
-        { factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn) },
-        input,
-      );
+      const parts = [
+        input.factoryOrderedOn !== undefined
+          ? input.factoryOrderedOn
+            ? `ordered from the factory on ${input.factoryOrderedOn}`
+            : "factory order date cleared"
+          : null,
+        input.factoryOrderNo !== undefined && input.factoryOrderNo !== was.factoryOrderNo
+          ? input.factoryOrderNo
+            ? `their order no. ${input.factoryOrderNo}`
+            : "their order no. cleared"
+          : null,
+      ].filter(Boolean);
+      await this.log(tx, user, id, "factory_order", `${o.refNo}: ${parts.join(", ") || "factory order saved"}`, was, input);
       // Ordered from the factory: the order is in production.
-      return input.factoryOrderedOn ? this.orders.followFlow(tx, user, id, "in_production", "ordered from the factory") : null;
+      return input.factoryOrderedOn && ordered ? this.orders.followFlow(tx, user, id, "in_production", "ordered from the factory") : null;
     });
     await this.orders.announce(event);
     return this.get(user, id);
@@ -775,11 +795,13 @@ export class FlowService {
       "portOfDischarge",
       "containerNo",
       "containerType",
+      "sealNo",
+      "vgmKg",
       "note",
     ] as const) {
       if (input[k] !== undefined) (d as Record<string, unknown>)[k] = input[k];
     }
-    for (const k of ["etd", "eta", "departedOn", "arrivedOn"] as const) if (input[k] !== undefined) d[k] = toDbDateOrNull(input[k]);
+    for (const k of ["loadedOn", "etd", "eta", "departedOn", "arrivedOn"] as const) if (input[k] !== undefined) d[k] = toDbDateOrNull(input[k]);
     return d as Prisma.ShipmentUncheckedCreateWithoutOrderInput;
   }
 
@@ -950,6 +972,7 @@ export class FlowService {
       if (input.deliveredOn !== undefined) data.deliveredOn = toDbDateOrNull(input.deliveredOn);
       if (input.deliveryCondition !== undefined) data.deliveryCondition = input.deliveryCondition;
       if (input.deliveryNote !== undefined) data.deliveryNote = input.deliveryNote;
+      if (input.deliveryReceivedBy !== undefined) data.deliveryReceivedBy = input.deliveryReceivedBy;
       if (input.satEngineerId !== undefined) data.satEngineerId = input.satEngineerId;
       if (input.satPlannedOn !== undefined) data.satPlannedOn = toDbDateOrNull(input.satPlannedOn);
       if (input.satDoneOn !== undefined) data.satDoneOn = toDbDateOrNull(input.satDoneOn);
@@ -1052,4 +1075,174 @@ export class FlowService {
     });
     return this.get(user, orderId);
   }
+  /* ---------------------------------------------------------------- one tap */
+
+  /**
+   * POST /orders/:id/delivery/all-good — "All delivered OK": every goods line
+   * delivered in full and in good condition, and the delivery dated (today
+   * unless a day is sent; a date already recorded stays). One history entry.
+   */
+  async deliveryAllGood(user: SessionUser, id: string, input: DeliveryAllGoodInput) {
+    await this.must(user, "delivery.manage", "delivery_sat", "manage delivery and SAT");
+    const on = input.deliveredOn ?? this.clock.today();
+    if (on > this.clock.today()) throw new DomainError("A date that has happened cannot be in the future.");
+    await this.prisma.tx(async (tx) => {
+      const o = await this.lockOrder(tx, user, id);
+      const lines = await tx.orderLine.findMany({ where: { orderId: id, type: "goods" }, select: { id: true, quantity: true } });
+      for (const l of lines)
+        await tx.orderLine.update({ where: { id: l.id }, data: { deliveredQty: l.quantity, deliveredCondition: "good" } });
+      const deliveredOn = fromDbDateOrNull(o.deliveredOn) ?? on;
+      await tx.order.update({ where: { id }, data: { deliveredOn: toDbDate(deliveredOn), deliveryCondition: "good" } });
+      await this.log(
+        tx,
+        user,
+        id,
+        "delivery",
+        `${o.refNo}: all delivered in good condition on ${deliveredOn} (${lines.length} line${lines.length === 1 ? "" : "s"})`,
+        { deliveredOn: fromDbDateOrNull(o.deliveredOn), deliveryCondition: o.deliveryCondition },
+        { deliveredOn, deliveryCondition: "good", lines: lines.length, allGood: true },
+      );
+    });
+    return this.get(user, id);
+  }
+
+  /**
+   * POST /orders/:id/sat/all-passed — "All passed": every SAT point not marked
+   * N/A passes (none yet: the usual points, passed) and the SAT is signed off
+   * (today unless a day is sent) by the person named. Needs the delivery.
+   */
+  async satAllPassed(user: SessionUser, id: string, input: SatAllPassedInput) {
+    await this.must(user, "delivery.manage", "delivery_sat", "manage delivery and SAT");
+    const on = input.satDoneOn ?? this.clock.today();
+    if (on > this.clock.today()) throw new DomainError("A date that has happened cannot be in the future.");
+    await this.prisma.tx(async (tx) => {
+      const o = await this.lockOrder(tx, user, id);
+      const delivered = fromDbDateOrNull(o.deliveredOn);
+      if (!delivered) throw new DomainError("Record the delivery before signing off the SAT.");
+      if (on < delivered) throw new DomainError("The SAT cannot be signed off before the delivery.");
+      const checks = await tx.satCheck.findMany({ where: { orderId: id } });
+      if (checks.length)
+        await tx.satCheck.updateMany({ where: { orderId: id, result: { in: ["pending", "fail"] } }, data: { result: "pass" } });
+      else
+        await tx.satCheck.createMany({
+          data: DEFAULT_SAT_CHECKS.map((item, i) => ({ orderId: id, item, result: "pass" as const, sortOrder: i })),
+        });
+      const signedBy = input.satSignedBy !== undefined ? input.satSignedBy : o.satSignedBy;
+      await tx.order.update({ where: { id }, data: { satDoneOn: toDbDate(on), satSignedBy: signedBy } });
+      const points = checks.length || DEFAULT_SAT_CHECKS.length;
+      await this.log(
+        tx,
+        user,
+        id,
+        "sat",
+        `${o.refNo}: SAT all passed (${points} point${points === 1 ? "" : "s"}), signed off on ${on}${signedBy ? ` by ${signedBy}` : ""}`,
+        { satDoneOn: fromDbDateOrNull(o.satDoneOn), satSignedBy: o.satSignedBy },
+        { satDoneOn: on, satSignedBy: signedBy, allPassed: true },
+      );
+    });
+    return this.get(user, id);
+  }
+
+  /* ---------------------------------------------------------------- what the light rows fill in */
+
+  /**
+   * GET /orders/:id/defaults — what a step's row can fill in for the person
+   * from earlier orders and the quote: the forwarder of the last order on the
+   * same route (same ports, else the same factory), the banks of this
+   * customer's last LC or bank contract, the lead time of the accepted quote
+   * (and the ready date it gives) and the factory's price basis. Only orders
+   * the person may see are looked at; nothing is saved.
+   */
+  async defaults(user: SessionUser, id: string) {
+    const o = await this.prisma.db.order.findFirst({
+      where: { id, ...orderAccess(user) },
+      select: {
+        id: true,
+        customerId: true,
+        incotermPlace: true,
+        portOfDischarge: true,
+        factoryOrderedOn: true,
+        revisionId: true,
+        shipments: { orderBy: { createdAt: "asc" }, take: 1, select: { portOfLoading: true, portOfDischarge: true } },
+        lines: { where: { factoryId: { not: null } }, select: { factoryId: true } },
+      },
+    });
+    if (!o) throw new NotFoundError("Order");
+    const features = await this.limits.features();
+    const has = (f: PlanFeature) => !features || features.includes(f);
+    const others = { id: { not: id }, ...orderAccess(user) };
+    const ci = (v: string) => ({ equals: v.trim(), mode: "insensitive" as const });
+
+    // The forwarder: same port pair first, then the same factory.
+    let forwarder: { name: string; refNo: string; why: "route" | "factory" } | null = null;
+    if (has("shipping")) {
+      const pol = o.shipments[0]?.portOfLoading ?? o.incotermPlace;
+      const pod = o.shipments[0]?.portOfDischarge ?? o.portOfDischarge;
+      const pick = { forwarder: true, order: { select: { refNo: true } } } as const;
+      const byRoute =
+        pol && pod
+          ? await this.prisma.db.shipment.findFirst({
+              where: { forwarder: { not: null }, portOfLoading: ci(pol), portOfDischarge: ci(pod), order: others },
+              orderBy: { createdAt: "desc" },
+              select: pick,
+            })
+          : null;
+      const factoryIds = [...new Set(o.lines.map((l) => l.factoryId!))];
+      const byFactory =
+        !byRoute && factoryIds.length
+          ? await this.prisma.db.shipment.findFirst({
+              where: { forwarder: { not: null }, order: { ...others, lines: { some: { factoryId: { in: factoryIds } } } } },
+              orderBy: { createdAt: "desc" },
+              select: pick,
+            })
+          : null;
+      const hit = byRoute ?? byFactory;
+      if (hit?.forwarder) forwarder = { name: hit.forwarder, refNo: hit.order.refNo, why: byRoute ? "route" : "factory" };
+    }
+
+    // The banks of this customer's last LC or bank contract.
+    let banks: { customerBank: string | null; ourBank: string | null; refNo: string } | null = null;
+    if (has("bank_contracts")) {
+      const last = await this.prisma.db.orderBankContract.findFirst({
+        where: { OR: [{ customerBank: { not: null } }, { ourBank: { not: null } }], order: { ...others, customerId: o.customerId } },
+        orderBy: { createdAt: "desc" },
+        select: { customerBank: true, ourBank: true, order: { select: { refNo: true } } },
+      });
+      if (last) banks = { customerBank: last.customerBank, ourBank: last.ourBank, refNo: last.order.refNo };
+    }
+
+    // The lead time of the accepted quote, and the ready date it gives from the day we ordered (or today).
+    const rev = await this.prisma.db.quotationRevision.findUnique({
+      where: { id: o.revisionId },
+      select: {
+        leadTime: true,
+        options: {
+          where: { status: "accepted" },
+          take: 1,
+          select: { leadTime: true, factoryBasis: true, factoryBasisPlace: true },
+        },
+      },
+    });
+    const option = rev?.options[0] ?? null;
+    const text = option?.leadTime ?? rev?.leadTime ?? null;
+    const days = leadDays(text);
+    const from = fromDbDateOrNull(o.factoryOrderedOn) ?? this.clock.today();
+    return {
+      forwarder,
+      banks,
+      leadTime: text ? { text, days, from, readyOn: days ? addDays(from, days) : null } : null,
+      priceBasis: can(user, "sourcing.manage") && option?.factoryBasis ? { basis: option.factoryBasis, place: option.factoryBasisPlace } : null,
+    };
+  }
+}
+
+/** "45 days", "8-10 weeks", "2 months after the deposit" → days (the longer end of a range); null when it says no number. */
+export function leadDays(text: string | null): number | null {
+  if (!text) return null;
+  const m = /(\d+)(?:\s*(?:-|–|to)\s*(\d+))?\s*(working days?|days?|weeks?|wks?|months?)/i.exec(text);
+  if (!m) return null;
+  const n = Number(m[2] ?? m[1]);
+  const unit = m[3]!.toLowerCase();
+  const days = unit.startsWith("month") ? n * 30 : unit.startsWith("w") && !unit.startsWith("working") ? n * 7 : unit.startsWith("working") ? Math.ceil((n * 7) / 5) : n;
+  return days > 0 && days <= 730 ? days : null;
 }

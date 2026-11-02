@@ -72,6 +72,7 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/orders/${o.id}/payments`);
       await ok(manager, `/orders/${o.id}/flow`);
       await ok(manager, `/orders/${o.id}/steps`);
+      await ok(manager, `/orders/${o.id}/defaults`);
       await ok(manager, `/history?type=order&id=${o.id}&step=production`);
       for (const kind of ["proforma", "packing-list"]) await ok(manager, `/orders/${o.id}/documents/${kind}`);
       const papers = (await ok(manager, `/orders/${o.id}/papers`)) as { papers: { kind: string; ref: string | null; makeable: boolean; live: boolean }[] };

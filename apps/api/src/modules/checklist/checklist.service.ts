@@ -249,7 +249,8 @@ export class ChecklistService {
         late: late(a.done, skipped, dueOn) || (!a.done && !skipped && !!a.warn),
         assignee: r?.assignee ?? null,
         note: r?.note ?? null,
-        file: null,
+        // A file kept with the item (loading photos, the B/L copy).
+        file: r?.attachment && !r.attachment.deletedAt ? { id: r.attachment.id, name: r.attachment.fileName } : null,
         route: null,
         sort: a.sort,
       };
@@ -598,8 +599,10 @@ export class ChecklistService {
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, orderId);
       await this.checkPerson(tx, input.assigneeId);
+      if (input.attachmentId) await this.checkFiles(tx, o.inquiryId, [input.attachmentId]);
       const before = await tx.orderChecklistItem.findUnique({ where: { orderId_key: { orderId, key } } });
       const data = {
+        ...(input.attachmentId !== undefined && { attachmentId: input.attachmentId }),
         ...(input.dueOn !== undefined && { dueOn: toDbDateOrNull(input.dueOn) }),
         ...(input.assigneeId !== undefined && { assigneeId: input.assigneeId }),
         ...(input.note !== undefined && { note: input.note }),
@@ -618,7 +621,9 @@ export class ChecklistService {
           ? `skipped "${name}": ${input.skipReason}`
           : input.skipped === false
             ? `un-skipped "${name}"`
-            : `changed "${name}"`;
+            : input.attachmentId
+              ? `kept a file with "${name}"`
+              : `changed "${name}"`;
       await this.log(
         tx,
         user,
