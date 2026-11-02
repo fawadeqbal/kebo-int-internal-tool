@@ -1,17 +1,20 @@
 import { Eye, FileText } from "lucide-react";
-import { ATTACHMENT_KIND_LABEL, can } from "@kebo/shared";
-import { Badge, buttonClass, Card, CardBody, CardHeader } from "@kebo/ui";
+import { ATTACHMENT_KIND_LABEL, can, ORDER_DOCUMENT_STATUS_LABEL, ORDER_DOCUMENT_STATUS_TONE } from "@kebo/shared";
+import { Badge, buttonClass, Card, CardHeader } from "@kebo/ui";
 import { ConfirmSubmit } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { api } from "@/lib/api";
 import { FileActions } from "@/components/common/file-actions";
-import { BankChainPanel, PaperSetPanel } from "@/components/orders/flow-panels";
-import { DOCUMENT_PAPER, PAYMENT_ROUTE_LABEL, PAYMENT_ROUTE_SHORT, type OrderDocumentKind } from "@kebo/shared";
+import { DOCUMENT_PAPER, PAYMENT_ROUTE_SHORT, type OrderDocumentKind } from "@kebo/shared";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { StepChanges, StepFiles, StepPage, StepViewDivider, ViewPair } from "@/components/orders/step-page";
+import { ViewCard } from "@/components/orders/step-view";
+import { BankChainEdit, PaperSetEdit } from "@/components/orders/view-panels";
+import { lightAction } from "../../light-actions";
+import type { FlowDocument } from "@/lib/types-flow";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { addDocumentAction, bankStepAction, clearBankStepAction, removeDocumentAction, updateDocumentAction } from "../../flow-actions";
-import { date, money } from "@/lib/format";
+import { date } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { DocumentsPanel } from "@/components/deals/documents-panel";
@@ -80,24 +83,40 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
       else if (doc.printable === "proforma") tools[key] = { kind: "link", label: o.proforma ? "View" : "Issue it", href: "#made" };
       else if (doc.printable === "packing-list") tools[key] = { kind: "link", label: "Make it", href: `${d.base}/shipping#lines` };
       else
+        // A paper from outside (the B/L, the certificate of origin…): its file, the number if it has one.
         tools[key] = {
-          kind: "document",
-          label: "Record it",
+          kind: "light",
+          label: "Upload it",
           action: addDocumentAction.bind(null, o.id),
-          docKind: doc.kind as OrderDocumentKind,
-          files,
-          shipments: shipmentList,
+          fixed: { kind: doc.kind, status: "ready" },
+          fields: [
+            { name: "attachmentId", label: "The file (PDF or photo)", type: "file", required: true },
+            { name: "number", label: "Number", value: doc.kind === "bill_of_lading" || doc.kind === "airway_bill" ? (o.blNo ?? "") : "" },
+            { name: "issuedOn", label: "Issued on", type: "date", value: now, max: now },
+          ],
+          chips: [{ label: "Note", field: { name: "note", label: "Note", placeholder: "e.g. original + 3 copies" } }],
+          hint: "Kept with the item and in the deal's files. Kept elsewhere instead? Say where in Papers below.",
+          save: "Save and tick",
         };
     }
-    for (const b of papers.bankSteps)
-      if (b.step !== "bank_paid_us")
-        tools[`bank:${b.step}`] = {
-          kind: "bankStep",
-          label: "Mark done",
-          action: bankStepAction.bind(null, o.id, b.step),
-          step: b,
-          today: now,
-        };
+    for (const b of papers.bankSteps) {
+      if (b.step === "bank_paid_us") continue;
+      const action = lightAction.bind(null, o.id, `bank:${b.step}`);
+      tools[`bank:${b.step}`] =
+        b.step === "couriered_to_customer_bank"
+          ? {
+              kind: "light",
+              label: "Add the tracking no.",
+              action,
+              fields: [
+                { name: "reference", label: "Tracking no.", value: b.reference, required: true },
+                { name: "courier", label: "Courier", value: b.courier ?? "DHL" },
+                { name: "doneOn", label: "Sent on", type: "date", value: b.doneOn ?? now, max: now, required: true },
+              ],
+              chips: [{ label: "Note", field: { name: "note", label: "Note" } }],
+            }
+          : { kind: "tap", tap: { label: "Done today", action, on: now } };
+    }
   }
   // "Money reached us" is the payment itself: recording it (credited amount, bank charges, account, MT103) ticks the step.
   const canPay = can(me, "payments.record") && open && !!papers?.bankSteps.some((b) => b.step === "bank_paid_us" && !b.doneOn);
@@ -123,7 +142,31 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
     ) : null;
   if (reached) tools["bank:bank_paid_us"] = { kind: "node", node: reached };
   const required = papers?.set.filter((x) => x.required) ?? [];
-  const contract = flow?.payment.bankContract;
+  const extra = papers?.set.filter((x) => !x.required && x.id) ?? [];
+  const sourceOf = (x: FlowDocument) =>
+    x.paperId
+      ? "made by the app"
+      : x.file
+        ? `uploaded · ${x.file.name}`
+        : x.status === "elsewhere"
+          ? `kept elsewhere${x.keptWhere ? `: ${x.keptWhere}` : ""}`
+          : x.printable
+            ? "made from the order"
+            : x.id
+              ? "recorded"
+              : "not in yet";
+  const paperRow = (x: FlowDocument) => (
+    <li key={x.id ?? x.kind} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 py-2.5">
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{x.label}</span>
+        <span className="block text-xs text-muted">
+          {[x.number, x.issuedOn ? date(x.issuedOn) : null, sourceOf(x)].filter(Boolean).join(" · ")}
+        </span>
+      </span>
+      <Badge tone={ORDER_DOCUMENT_STATUS_TONE[x.status]}>{ORDER_DOCUMENT_STATUS_LABEL[x.status]}</Badge>
+    </li>
+  );
+  const readyCount = required.filter((x) => x.status === "ready" || x.status === "elsewhere").length;
 
   return (
     <StepPage
@@ -132,24 +175,6 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
       base={d.base}
       side={
         <>
-          <KeyFacts
-            facts={[
-              {
-                label: "Route",
-                value: route
-                  ? `${PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "")}${contract?.number ? ` ${contract.number}` : ""}`
-                  : "Not chosen",
-              },
-              ...(papers
-                ? [{ label: "Papers ready", value: `${required.filter((x) => x.status === "ready").length} of ${required.length}` }]
-                : []),
-              ...(contract?.expiresOn
-                ? [{ label: route === "letter_of_credit" ? "LC expires" : "Contract expires", value: date(contract.expiresOn) }]
-                : []),
-              { label: "Balance due", value: Number(o.money.due) > 0 ? money(o.money.due, o.currency) : "Nothing" },
-            ]}
-          />
-          <StepCosts id={o.id} step="documents" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? "#files" : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
@@ -167,59 +192,77 @@ export default async function OrderDocuments({ params }: { params: Promise<{ id:
         people={d.people}
         tools={tools}
         listHref={d.listHref}
+        me={me.name}
+        today={now}
       />
-      <StepPapers
-        id={o.id}
-        dealId={o.inquiry.id}
-        step="documents"
-        variant="main"
-        title="Papers"
-        description="Made by the app, uploaded, or kept elsewhere: all three count as done."
-      />
+      <StepViewDivider />
       {papers && (
-        <Card>
-          <CardHeader
-            title="Documents through the banks"
-            description={
-              route
-                ? `${PAYMENT_ROUTE_SHORT[route]} route${flow?.payment.bankContract?.number ? ` · ${flow.payment.bankContract.number}` : ""}: the papers the shipment needs and where they are`
-                : "Choose how the customer pays on Payments: it decides the papers and bank steps"
-            }
-          />
-          <CardBody className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <div className="flex min-w-0 flex-col gap-2">
-              <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">Document set</h3>
-              <PaperSetPanel
+        <ViewCard
+          title="Paper set"
+          description={
+            route
+              ? `${PAYMENT_ROUTE_SHORT[route]} route${flow?.payment.bankContract?.number ? ` · ${flow.payment.bankContract.number}` : ""}: the papers the shipment needs and where each is`
+              : "Choose how the customer pays on Payment: it decides the papers and bank steps"
+          }
+          meter={{ n: readyCount, of: required.length, word: "ready" }}
+          canEdit={canPapers}
+          panel={{
+            title: "Edit the paper set",
+            description: "Record, change or remove each paper. Made by the app, uploaded or kept elsewhere: all three count as done.",
+            body: (
+              <PaperSetEdit
                 addAction={addDocumentAction.bind(null, o.id)}
-                updateActions={Object.fromEntries(
-                  papers.set.filter((d) => d.id).map((d) => [d.id!, updateDocumentAction.bind(null, o.id, d.id!)]),
-                )}
-                removeActions={Object.fromEntries(
-                  papers.set.filter((d) => d.id).map((d) => [d.id!, removeDocumentAction.bind(null, o.id, d.id!)]),
-                )}
+                updateActions={Object.fromEntries(papers.set.filter((x) => x.id).map((x) => [x.id!, updateDocumentAction.bind(null, o.id, x.id!)]))}
+                removeActions={Object.fromEntries(papers.set.filter((x) => x.id).map((x) => [x.id!, removeDocumentAction.bind(null, o.id, x.id!)]))}
                 set={papers.set}
                 files={files}
                 shipments={shipmentList}
                 printButtons={print}
-                canEdit={canPapers}
               />
-            </div>
-            <div className="flex min-w-0 flex-col gap-2">
-              <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">
-                {route === "informal" || !route ? "To the customer" : "Through the banks"}
-              </h3>
-              <BankChainPanel
+            ),
+          }}
+        >
+          <ul className="flex flex-col divide-y divide-line px-4">{[...required, ...extra].map(paperRow)}</ul>
+        </ViewCard>
+      )}
+      {papers && papers.bankSteps.length > 0 && (
+        <ViewCard
+          title={route === "informal" || !route ? "To the customer" : "Bank steps"}
+          meter={{ n: papers.bankSteps.filter((b) => b.doneOn).length, of: papers.bankSteps.length, word: "done" }}
+          canEdit={canPapers}
+          panel={{
+            title: "Edit the bank steps",
+            description: "Each step's date, and the courier and tracking number. Saving updates the checklist.",
+            body: (
+              <BankChainEdit
                 stepActions={Object.fromEntries(papers.bankSteps.map((b) => [b.step, bankStepAction.bind(null, o.id, b.step)]))}
                 clearActions={Object.fromEntries(papers.bankSteps.map((b) => [b.step, clearBankStepAction.bind(null, o.id, b.step)]))}
                 steps={papers.bankSteps}
                 today={now}
-                canEdit={canPapers}
-                reached={reached}
               />
-            </div>
-          </CardBody>
-        </Card>
+            ),
+          }}
+        >
+          <ol className="flex flex-col divide-y divide-line px-4">
+            {papers.bankSteps.map((b, i) => (
+              <li key={b.step} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2.5 text-sm">
+                <span className="min-w-0">
+                  <span className="mr-1.5 text-xs text-muted tabular">{i + 1}</span>
+                  <span className={b.doneOn ? "font-medium" : "text-text-2"}>{b.label}</span>
+                  {(b.courier || b.reference) && (
+                    <span className="block pl-4 text-xs text-muted">{[b.courier, b.reference].filter(Boolean).join(" · ")}</span>
+                  )}
+                </span>
+                <span className="text-xs text-muted tabular">{b.doneOn ? date(b.doneOn) : "—"}</span>
+              </li>
+            ))}
+          </ol>
+        </ViewCard>
       )}
+      <ViewPair>
+        <StepPapers id={o.id} dealId={o.inquiry.id} step="documents" title="Papers" outsideSet={!!papers} />
+        <StepCosts id={o.id} step="documents" />
+      </ViewPair>
       <Card id="made" className="scroll-mt-24">
         <CardHeader title="Made from the order" description="Made whenever you open them, so they are always up to date." />
         <ul className="flex flex-col divide-y divide-line">

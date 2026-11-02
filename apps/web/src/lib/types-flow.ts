@@ -38,7 +38,7 @@ export interface OrderFlow {
     depositIn: boolean;
     bankContract: BankContract | null;
   };
-  factory: { orderedOn: string | null; readyOn: string | null; factories: { id: string; name: string }[] };
+  factory: { orderedOn: string | null; orderNo?: string | null; readyOn: string | null; factories: { id: string; name: string }[] };
   production: { steps: ProductionStepView[]; suggested: string[] } | null;
   shipping: { shipments: ShipmentView[] } | null;
   documents: { set: FlowDocument[]; bankSteps: BankStepView[] } | null;
@@ -80,6 +80,10 @@ export interface ShipmentView {
   portOfDischarge: string | null;
   containerNo: string | null;
   containerType: string | null;
+  sealNo?: string | null;
+  loadedOn?: string | null;
+  /** The container's verified gross mass, kg ("21500.5"). */
+  vgmKg?: string | null;
   etd: string | null;
   eta: string | null;
   departedOn: string | null;
@@ -139,6 +143,8 @@ export interface DeliveryView {
   deliveredOn: string | null;
   condition: DeliveryCondition | null;
   note: string | null;
+  /** Who received the goods at the customer's. */
+  receivedBy?: string | null;
   satEngineer: { id: string; name: string } | null;
   satPlannedOn: string | null;
   satDoneOn: string | null;
@@ -166,4 +172,12 @@ export interface FactoryRequests {
   }[];
   suggestions: { id: string; name: string; reach: string | null; lastAskedOn: string | null; offers: number; askedHere: boolean }[];
   counts: { asked: number; quoted: number; waiting: number; late: number };
+}
+
+/** GET /orders/:id/defaults — what a step's row fills in from earlier orders and the quote. */
+export interface OrderDefaults {
+  forwarder: { name: string; refNo: string; why: "route" | "factory" } | null;
+  banks: { customerBank: string | null; ourBank: string | null; refNo: string } | null;
+  leadTime: { text: string; days: number | null; from: string; readyOn: string | null } | null;
+  priceBasis: { basis: string; place: string | null } | null;
 }

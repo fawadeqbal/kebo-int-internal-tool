@@ -110,20 +110,24 @@ export function RouteForm({
   bankRoutes,
   onDone,
   terms,
+  suggest,
 }: {
   action: Action;
   route: PaymentRoute | null;
   bankRoutes: boolean;
   onDone?: () => void;
   terms?: RouteTermsValue;
+  /** Not chosen yet: the route the quote's terms point to, picked for the person to check. */
+  suggest?: PaymentRoute | null;
 }) {
-  const [pick, setPick] = useState<PaymentRoute | null>(route);
+  const [pick, setPick] = useState<PaymentRoute | null>(route ?? (suggest && (suggest === "informal" || bankRoutes) ? suggest : null));
   const [when, setWhen] = useState<BalanceWhen>(terms?.balanceWhen ?? "before_shipment");
   const [lcTerms, setLcTerms] = useState<LcTerms>(terms?.lcTerms ?? "at_sight");
   const [lcDays, setLcDays] = useState(terms?.lcDays ? String(terms.lcDays) : "90");
   const options = (["informal", "bank_contract", "letter_of_credit"] as const).filter((r) => r === "informal" || bankRoutes);
   const changed =
     pick !== route ||
+    route === null ||
     (pick === "informal" && when !== (terms?.balanceWhen ?? "before_shipment")) ||
     (pick === "letter_of_credit" && (lcTerms !== (terms?.lcTerms ?? "at_sight") || (lcTerms === "deferred" && lcDays !== String(terms?.lcDays ?? ""))));
   return (

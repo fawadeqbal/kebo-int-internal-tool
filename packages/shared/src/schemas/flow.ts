@@ -75,8 +75,11 @@ export const bankContractInput = z.object({
 });
 export type BankContractInput = z.infer<typeof bankContractInput>;
 
-/** When we placed the order with the factory (empty: not yet). */
-export const factoryOrderInput = z.object({ factoryOrderedOn: optionalDate });
+/**
+ * When we placed the order with the factory (empty: not yet) and the factory's own number for it. Only the
+ * fields sent change (the phone app sends the date alone).
+ */
+export const factoryOrderInput = z.object({ factoryOrderedOn: optionalDate.optional(), factoryOrderNo: optionalText(60).optional() });
 export type FactoryOrderInput = z.infer<typeof factoryOrderInput>;
 
 /* ---------------------------------------------------------------- production */
@@ -111,6 +114,14 @@ const shipmentFields = {
   portOfDischarge: optionalText(120),
   containerNo: optionalText(120),
   containerType: optionalText(20),
+  sealNo: optionalText(40),
+  /** The day the container was loaded. */
+  loadedOn: optionalDate,
+  /** The container's verified gross mass, kg (optional). */
+  vgmKg: z.preprocess(
+    (v) => (v === "" || v === null ? null : typeof v === "string" ? v.replace(/,/g, "").trim() : v),
+    z.coerce.number().min(0, "Cannot be negative").max(99_999_999).nullable(),
+  ),
   etd: optionalDate,
   eta: optionalDate,
   departedOn: optionalDate,
@@ -121,7 +132,12 @@ const etaAfterEtd = (v: { etd?: string | null; eta?: string | null }) => !v.etd 
 const etaMessage = { message: "The arrival date (ETA) cannot be before the departure date (ETD)", path: ["eta"] };
 
 export const shipmentInput = z
-  .object({ ...shipmentFields, mode: shipmentFields.mode.default("sea"), status: shipmentFields.status.default("planned") })
+  .object({
+    ...shipmentFields,
+    mode: shipmentFields.mode.default("sea"),
+    status: shipmentFields.status.default("planned"),
+    vgmKg: shipmentFields.vgmKg.optional().transform((v) => v ?? null),
+  })
   .refine(etaAfterEtd, etaMessage);
 export type ShipmentInput = z.infer<typeof shipmentInput>;
 
@@ -167,6 +183,8 @@ export const deliveryInput = z.object({
   deliveredOn: maybe(optionalDate),
   deliveryCondition: maybe(optionalEnum(DELIVERY_CONDITIONS)),
   deliveryNote: maybe(optionalText(2000)),
+  /** Who received the goods at the customer's. */
+  deliveryReceivedBy: maybe(optionalText(120)),
   satEngineerId: maybe(optionalId),
   satPlannedOn: maybe(optionalDate),
   satDoneOn: maybe(optionalDate),
@@ -181,6 +199,14 @@ export const satInput = z.object({
     .max(80),
 });
 export type SatInput = z.infer<typeof satInput>;
+
+/** One tap on Delivery & SAT: every goods line delivered in full and in good condition, on this day (empty: today). */
+export const deliveryAllGoodInput = z.object({ deliveredOn: optionalDate.optional() });
+export type DeliveryAllGoodInput = z.infer<typeof deliveryAllGoodInput>;
+
+/** One tap on the SAT: every open point passed, signed off on this day (empty: today) by this person. */
+export const satAllPassedInput = z.object({ satDoneOn: optionalDate.optional(), satSignedBy: optionalText(120).optional() });
+export type SatAllPassedInput = z.infer<typeof satAllPassedInput>;
 
 export const claimInput = z.object({
   title: text(160, "Say what is wrong"),

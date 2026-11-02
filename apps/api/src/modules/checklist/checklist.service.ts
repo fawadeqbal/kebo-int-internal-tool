@@ -6,6 +6,7 @@ import {
   can,
   DEFAULT_CHECKLIST,
   doNow,
+  fillSplit,
   FLOW_STEP_LABEL,
   stepLine,
   itemClosed,
@@ -249,7 +250,8 @@ export class ChecklistService {
         late: late(a.done, skipped, dueOn) || (!a.done && !skipped && !!a.warn),
         assignee: r?.assignee ?? null,
         note: r?.note ?? null,
-        file: null,
+        // A file kept with the item (loading photos, the B/L copy).
+        file: r?.attachment && !r.attachment.deletedAt ? { id: r.attachment.id, name: r.attachment.fileName } : null,
         route: null,
         sort: a.sort,
       };
@@ -266,7 +268,10 @@ export class ChecklistService {
       const shown = fields
         .filter((f) => values[f.key])
         .map((f): [string, string] => [f.label, files.includes(f.key) ? (fileNames.get(values[f.key]!) ?? "attached") : values[f.key]!]);
-      const missing = fields.filter((f) => f.type !== "file" && !values[f.key]).map((f) => f.label.toLowerCase());
+      // What ticks it: the fields asked up front (the rest are optional, one tap away).
+      const missing = fillSplit(fields)
+        .required.filter((f) => !values[f.key])
+        .map((f) => f.label.toLowerCase());
       return {
         id: r.id,
         key: null,
@@ -518,7 +523,7 @@ export class ChecklistService {
       const fields = asFields(r.fields);
       const values = { ...asData(r.data), ...(await this.cleanData(tx, o.inquiryId, fields, input.data)) };
       if (r.tool === "fill") {
-        const missing = fields.filter((f) => f.type !== "file" && !values[f.key]);
+        const missing = fillSplit(fields).required.filter((f) => !values[f.key]);
         if (missing.length) throw new DomainError(`Fill in ${missing.map((f) => f.label.toLowerCase()).join(", ")}.`);
       }
       const attachmentId = input.attachmentId ?? r.attachmentId;
@@ -598,8 +603,10 @@ export class ChecklistService {
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, orderId);
       await this.checkPerson(tx, input.assigneeId);
+      if (input.attachmentId) await this.checkFiles(tx, o.inquiryId, [input.attachmentId]);
       const before = await tx.orderChecklistItem.findUnique({ where: { orderId_key: { orderId, key } } });
       const data = {
+        ...(input.attachmentId !== undefined && { attachmentId: input.attachmentId }),
         ...(input.dueOn !== undefined && { dueOn: toDbDateOrNull(input.dueOn) }),
         ...(input.assigneeId !== undefined && { assigneeId: input.assigneeId }),
         ...(input.note !== undefined && { note: input.note }),
@@ -618,7 +625,9 @@ export class ChecklistService {
           ? `skipped "${name}": ${input.skipReason}`
           : input.skipped === false
             ? `un-skipped "${name}"`
-            : `changed "${name}"`;
+            : input.attachmentId
+              ? `kept a file with "${name}"`
+              : `changed "${name}"`;
       await this.log(
         tx,
         user,

@@ -17,6 +17,7 @@ export async function StepPapers({
   variant = "side",
   title,
   description,
+  outsideSet,
 }: {
   id: string;
   dealId: string;
@@ -24,11 +25,15 @@ export async function StepPapers({
   variant?: "side" | "main";
   title?: string;
   description?: string;
+  /** Documents & bank's view: only the papers outside the paper set (LC papers, the cover letter); the set has its own card. */
+  outsideSet?: boolean;
 }) {
   const papers = await optional(() => orderPapersOf(id));
   if (!papers) return null;
   const rows =
-    step === "documents" ? papers.papers.filter((r) => r.inSet || r.step === "documents") : papers.papers.filter((r) => r.step === step);
+    step === "documents"
+      ? papers.papers.filter((r) => (outsideSet ? !r.inSet && r.step === "documents" : r.inSet || r.step === "documents"))
+      : papers.papers.filter((r) => r.step === step);
   return (
     <PapersCard
       rows={rows}

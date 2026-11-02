@@ -4,7 +4,7 @@ import { api } from "./api";
 import { load } from "./session";
 import type { OrderCosts, OrderMoney } from "./types-money";
 import type { OrderView, PaymentsView } from "./types-orders";
-import type { OrderFlow } from "./types-flow";
+import type { OrderDefaults, OrderFlow } from "./types-flow";
 import type { OrderSteps } from "./types-checklist";
 import type { HistoryEntry } from "./types";
 import type { OrderPapers } from "./types-papers";
@@ -18,6 +18,9 @@ export const orderPaymentsOf = cache((id: string) => api.get<PaymentsView>(`/ord
 export const orderMoneyOf = cache((id: string) => api.get<OrderMoney>(`/orders/${id}/money`));
 /** The order's costs and profit (managers with the expenses feature; 403 otherwise). */
 export const orderCostsOf = cache((id: string) => api.get<OrderCosts>(`/orders/${id}/costs`));
+
+/** What a step's row fills in from earlier orders and the quote (the forwarder, the banks, the lead time). */
+export const orderDefaultsOf = cache((id: string) => api.get<OrderDefaults>(`/orders/${id}/defaults`));
 
 /** The flow after acceptance (payment route, production, shipping, papers and banks, delivery and SAT). */
 export const orderFlowOf = cache((id: string) => api.get<OrderFlow>(`/orders/${id}/flow`));

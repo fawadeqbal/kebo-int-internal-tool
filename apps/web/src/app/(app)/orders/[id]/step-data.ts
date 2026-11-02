@@ -2,7 +2,7 @@ import "server-only";
 import { can, STEP_PATH, type FlowStep } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderHistoryOf, orderOf, orderStepsOf } from "@/lib/order-data";
+import { orderDefaultsOf, orderFlowOf, orderHistoryOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import type { Person } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
@@ -12,11 +12,12 @@ import { checklistAction } from "../checklist-actions";
 export async function stepData(id: string, step: FlowStep) {
   const me = await requireUser();
   const o = await orderOf(id);
-  const [steps, flow, people, changes] = await Promise.all([
+  const [steps, flow, people, changes, defaults] = await Promise.all([
     orderStepsOf(id),
     optional(() => orderFlowOf(id)),
     optional(() => api.get<Person[]>("/users/people")),
     optional(() => orderHistoryOf(id, step, 4)),
+    optional(() => orderDefaultsOf(id)),
   ]);
   const base = `/orders/${o.id}`;
   const view = steps.steps.find((s) => s.key === step) ?? null;
@@ -27,6 +28,8 @@ export async function stepData(id: string, step: FlowStep) {
     flow,
     people: (people ?? []).map((p) => ({ id: p.id, name: p.name })),
     changes: changes ?? [],
+    /** What the rows fill in from earlier orders and the quote. */
+    defaults: defaults ?? { forwarder: null, banks: null, leadTime: null, priceBasis: null },
     base,
     now: today(),
     open: o.status !== "cancelled",

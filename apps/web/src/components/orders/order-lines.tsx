@@ -344,3 +344,23 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
     </div>
   );
 }
+
+/**
+ * The lines as short text lines (a phone's read-only view, board
+ * OrderV4Phone): the number and name, then the step's figure.
+ */
+export function PhoneLines({ set, lines }: { set: LineSet; lines: OrderLineView[] }) {
+  if (!lines.length) return <p className="text-sm text-muted">No goods lines on this order.</p>;
+  return (
+    <ul className="flex flex-col divide-y divide-line" aria-label="Lines">
+      {lines.map((l) => (
+        <li key={l.id} className={cn("py-2.5", l.no.includes(".") && "pl-3")}>
+          <p className="text-sm font-medium">
+            <span className="font-normal text-muted tabular">{l.no}</span> {head(l.description)}
+          </p>
+          <p className="text-xs text-muted">{phoneLine(set, valuesOf(l))}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}

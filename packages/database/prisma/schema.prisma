@@ -1078,10 +1078,14 @@ model Order {
   lcDays              Int?               @map("lc_days")
   /// When we placed the order with the factory.
   factoryOrderedOn    DateTime?          @map("factory_ordered_on") @db.Date
+  /// The factory's own number for our order ("their order no.").
+  factoryOrderNo      String?            @map("factory_order_no") @db.VarChar(60)
   /// Delivery at the customer's and the condition the goods arrived in.
   deliveredOn         DateTime?          @map("delivered_on") @db.Date
   deliveryCondition   DeliveryCondition? @map("delivery_condition")
   deliveryNote        String?            @map("delivery_note")
+  /// Who received the goods at the customer's.
+  deliveryReceivedBy  String?            @map("delivery_received_by") @db.VarChar(120)
   /// The site acceptance test: our engineer, when, and who signed for the customer.
   satEngineerId       String?            @map("sat_engineer") @db.Uuid
   satEngineer         User?              @relation("OrderSatEngineer", fields: [satEngineerId], references: [id], onDelete: SetNull)
@@ -1406,6 +1410,11 @@ model Shipment {
   containerNo     String?        @map("container_no") @db.VarChar(120)
   /// 20GP, 40HQ, LCL…
   containerType   String?        @map("container_type") @db.VarChar(20)
+  sealNo          String?        @map("seal_no") @db.VarChar(40)
+  /// The day the container was loaded.
+  loadedOn        DateTime?      @map("loaded_on") @db.Date
+  /// The container's verified gross mass (VGM), kg.
+  vgmKg           Decimal?       @map("vgm_kg") @db.Decimal(10, 2)
   etd             DateTime?      @db.Date
   eta             DateTime?      @db.Date
   departedOn      DateTime?      @map("departed_on") @db.Date

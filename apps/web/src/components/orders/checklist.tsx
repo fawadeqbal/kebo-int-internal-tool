@@ -4,7 +4,7 @@ import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Lock, Minus, MoreHorizontal, Paperclip, Plus, Upload } from "lucide-react";
-import { TOOL_LABEL, type FlowStep, type OrderDocumentKind, type PaymentRoute } from "@kebo/shared";
+import { fillSplit, TOOL_LABEL, type FlowStep, type OrderDocumentKind, type PaymentRoute } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { FloatingMenu } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
@@ -12,6 +12,7 @@ import type { ChecklistOp } from "@/app/(app)/orders/checklist-actions";
 import type { ChecklistItem } from "@/lib/types-checklist";
 import type { BankContract, BankStepView, DeliveryView, FlowDocument, ShipmentView } from "@/lib/types-flow";
 import { BankContractForm, BankStepForm, DateForm, DeliveryForm, DocumentForm, RouteForm, ShipmentForm, type RouteTermsValue } from "./flow-forms";
+import { LightForm, sendTo, TapButton, uploadFile, type LightChip, type LightField, type LightTap } from "./light-form";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** checklistAction bound to the order: (change, item id or automatic key, …). */
@@ -36,7 +37,7 @@ export type AutoTool =
       save: string;
       hint?: string;
     }
-  | { kind: "route"; label: string; action: Action; route: PaymentRoute | null; bankRoutes: boolean; terms?: RouteTermsValue }
+  | { kind: "route"; label: string; action: Action; route: PaymentRoute | null; bankRoutes: boolean; terms?: RouteTermsValue; suggest?: PaymentRoute | null }
   | { kind: "contract"; label: string; action: Action; contract: BankContract | null; lc: boolean; currency: string }
   | { kind: "shipment"; label: string; action: Action; shipment?: ShipmentView; defaults?: Partial<ShipmentView>; today: string }
   | {
@@ -49,7 +50,27 @@ export type AutoTool =
       shipments: { id: string; label: string }[];
     }
   | { kind: "bankStep"; label: string; action: Action; step: BankStepView; today: string }
-  | { kind: "delivery"; label: string; action: Action; d: DeliveryView; people: { id: string; name: string }[]; today: string };
+  | { kind: "delivery"; label: string; action: Action; d: DeliveryView; people: { id: string; name: string }[]; today: string }
+  /**
+   * Order v4: a light row. Only the fields that tick it (filled in), optional
+   * ones as "+ chips", and maybe a one-tap button beside it ("Ordered today").
+   */
+  | {
+      kind: "light";
+      label: string;
+      action: Action;
+      fields: LightField[];
+      chips?: LightChip[];
+      save?: string;
+      hint?: string;
+      tap?: LightTap;
+      /** The exception: "Short or damaged? Open the lines". */
+      also?: { label: string; href: string };
+      /** Values sent along that are not asked (the paper's kind and status). */
+      fixed?: Record<string, string>;
+    }
+  /** A one-tap item ("All received", "Arrived today", "Done today"), with its exception. */
+  | { kind: "tap"; tap: LightTap; also?: { label: string; href: string } };
 
 /* ---------------------------------------------------------------- small helpers */
 
@@ -73,20 +94,14 @@ function sourceOf(key: string) {
 }
 
 /** Sends a file to the deal's files and answers its id (server actions cap bodies at 1 MB, so files go through a route). */
-export async function uploadToDeal(dealId: string, file: File, note: string): Promise<{ id?: string; error?: string }> {
-  const body = new FormData();
-  body.set("file", file, file.name);
-  body.set("kind", "other");
-  body.set("note", note.slice(0, 300));
-  try {
-    const res = await fetch(`/files/inquiries/${dealId}`, { method: "POST", body });
-    const json = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-    if (!res.ok) return { error: json.error ?? (res.status === 413 ? "This file is too large." : `Upload failed (${res.status})`) };
-    return { id: json.id };
-  } catch {
-    return { error: "The connection dropped. Try again." };
-  }
-}
+export const uploadToDeal = uploadFile;
+
+/** The checklist's action with a JSON body, answered as it is (a light form refreshes the page itself). */
+const runJson = (run: ChecklistRun, op: ChecklistOp, target: string, body: Record<string, unknown>) => {
+  const form = new FormData();
+  form.set("payload", JSON.stringify(body));
+  return run(op, target, {}, form);
+};
 
 /** One call of the checklist's action with a JSON body; refreshes the page when it worked. */
 function useRun(run: ChecklistRun) {
@@ -387,7 +402,7 @@ function AutoForm({ tool, onDone }: { tool: AutoTool; onDone: () => void }) {
         />
       );
     case "route":
-      return <RouteForm action={tool.action} route={tool.route} bankRoutes={tool.bankRoutes} terms={tool.terms} onDone={onDone} />;
+      return <RouteForm action={tool.action} route={tool.route} bankRoutes={tool.bankRoutes} terms={tool.terms} suggest={tool.suggest} onDone={onDone} />;
     case "contract":
       return <BankContractForm action={tool.action} contract={tool.contract} lc={tool.lc} currency={tool.currency} onDone={onDone} />;
     case "shipment":
@@ -414,20 +429,74 @@ function AutoForm({ tool, onDone }: { tool: AutoTool; onDone: () => void }) {
 
 /* ---------------------------------------------------------------- one row */
 
-type Open = null | "tool" | "edit" | "due" | "note" | "skip" | "attach";
+type Open = null | "edit" | "due" | "note" | "skip" | "attach";
+
+/** Values a label makes clearer in a done row's one line ("Seal 0048812", "B/L MEDU1234567"). */
+const LABELLED = new Set(["Seal", "Their no.", "B/L", "AWB", "Ref.", "Vessel", "By", "Due"]);
+
+/** A done row's data in one plain line: "Sino Trans · NGB-77812 · ETD 14 Jan". */
+function oneLine(data: [string, string][]) {
+  return data
+    .map(([l, v]) => (ISO.test(v) ? (l === "On" ? short(v) : `${l} ${short(v)}`) : LABELLED.has(l) ? `${l} ${v}` : v))
+    .join(" · ");
+}
+
+/** The fields people usually fill with their own name. */
+const ME_FIELD = /inspector|witness|checked.?by|engineer/i;
+
+/** An own Fill in / Upload item as a light row: what ticks it up front (dates today, the witness me), the rest as chips. */
+function ownLight(item: ChecklistItem, today: string, me?: string): { fields: LightField[]; chips: LightChip[] } {
+  const { upfront, later, required } = fillSplit(item.fields);
+  const req = new Set(required.map((f) => f.key));
+  const asField = (f: ChecklistItem["fields"][number], up: boolean): LightField => ({
+    name: f.key,
+    label: f.label,
+    type: f.type === "file" ? "file" : f.type === "date" ? "date" : f.type === "number" ? "number" : "text",
+    value: item.values[f.key] && f.type !== "file" ? item.values[f.key] : up && f.type === "date" ? today : up && ME_FIELD.test(f.key + f.label) ? (me ?? "") : "",
+    required: up && req.has(f.key),
+  });
+  const fields = upfront.map((f) => asField(f, true));
+  if (item.tool === "upload") fields.push({ name: "$file", label: "The file", type: "file", required: !item.file, hint: item.file ? `Now: ${item.file.name}` : undefined });
+  const chips: LightChip[] = later.map((f) => ({ label: f.label, field: asField(f, false) }));
+  if (item.tool !== "upload") chips.push({ label: "File copy", field: { name: "$file", label: "File copy", type: "file" } });
+  if (!item.note) chips.push({ label: "Note", field: { name: "$note", label: "Note", type: "textarea" } });
+  return { fields, chips };
+}
+
+/** Attach a file to a row (an own item, or one that ticks itself): it goes to the deal's files and stays with the item. */
+function AttachForm({ item, dealId, run, onDone }: { item: ChecklistItem; dealId: string; run: ChecklistRun; onDone: () => void }) {
+  return (
+    <LightForm
+      fields={[{ name: "file", label: item.file ? "A new file (replaces it)" : "The file", type: "file", required: true }]}
+      dealId={dealId}
+      fileNote={item.title}
+      save="Keep the file"
+      hint="Kept with the item and in the deal's files."
+      onDone={onDone}
+      onSubmit={(v) => (item.auto ? runJson(run, "auto", item.key!, { attachmentId: v.file }) : runJson(run, "edit", item.id!, { attachmentId: v.file }))}
+    />
+  );
+}
 
 function Row({
   item,
   now,
+  active,
+  onActive,
   canEdit,
   tool,
   payNode,
   run,
   dealId,
   people,
+  me,
+  today,
 }: {
   item: ChecklistItem;
   now: boolean;
+  /** Its form is open (the current item, or the one the person opened). */
+  active: boolean;
+  onActive: (open: boolean) => void;
   canEdit: boolean;
   tool?: AutoTool;
   /** This row's Pay: the step's payment form, or the expense form filled in for it. */
@@ -435,9 +504,13 @@ function Row({
   run: ChecklistRun;
   dealId: string;
   people: { id: string; name: string }[];
+  me?: string;
+  today: string;
 }) {
   const [open, setOpen] = useState<Open>(null);
+  const [changing, setChanging] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [tapError, setTapError] = useState<string | null>(null);
   const more = useRef<HTMLButtonElement>(null);
   const { call, pending, error } = useRun(run);
   const close = () => setOpen(null);
@@ -446,52 +519,92 @@ function Row({
   // Make and Send items open the paper's Make page (/orders/:id/papers/:kind).
   const orderBase = usePathname().split("/").slice(0, 3).join("/");
   const makes = (item.tool === "make" || item.tool === "send") && !!item.paper;
+  // A form of its own: an automatic item's light or full form, an own Fill in / Upload item.
+  const formTool = item.auto && tool && tool.kind !== "link" && tool.kind !== "node" && tool.kind !== "tap";
+  const ownForm = !item.auto && canEdit && (item.tool === "fill" || item.tool === "upload") && !makes;
+  const showForm = (active && !closed && (formTool || ownForm)) || changing;
+  const hideForm = () => {
+    setChanging(false);
+    onActive(false);
+  };
+  const buttonTone = now ? "primary" : "secondary";
 
-  // The row's own button: Mark done, Fill in, Upload, Pay; an automatic item's form.
+  // The row's buttons: Mark done, Fill in, Upload, Pay; an automatic item's one tap or its form.
   let buttons: ReactNode = null;
-  if (!item.auto && makes && open !== "tool")
+  if (!item.auto && makes)
     buttons = (
       <Link href={`${orderBase}/papers/${item.paper}`} className={buttonClass(closed ? "ghost" : now ? "primary" : "secondary", "xs")}>
         {closed ? "View" : item.tool === "send" ? "Make and send" : "Make"}
       </Link>
     );
-  else if (canEdit && !item.auto && !closed && open !== "tool") {
-    const primary = now ? "primary" : "secondary";
-    if (item.tool === "fill" || item.tool === "upload")
+  else if (canEdit && !item.auto && !closed && !showForm) {
+    if (ownForm)
       buttons = (
-        <Button size="xs" variant={primary} onClick={() => setOpen("tool")}>
-          {item.tool === "upload" && <Upload aria-hidden />}{" "}
-          {item.tool === "upload" ? "Upload" : item.fields.length ? TOOL_LABEL.fill : "Mark done"}
+        <Button size="xs" variant={buttonTone} onClick={() => onActive(true)}>
+          {item.tool === "upload" && <Upload aria-hidden />} {item.tool === "upload" ? "Upload" : item.fields.length ? TOOL_LABEL.fill : "Mark done"}
         </Button>
       );
     else
       buttons = (
         <>
           {item.tool === "pay" && payNode}
-          <Button size="xs" variant={primary} disabled={pending} onClick={() => call("tick", item.id!, {})}>
+          <Button size="xs" variant={buttonTone} disabled={pending} onClick={() => call("tick", item.id!, {})}>
             {pending ? "Ticking…" : item.tool === "pay" ? "Mark paid" : "Mark done"}
           </Button>
         </>
       );
-  } else if (item.auto && tool && open !== "tool") {
+  } else if (item.auto && tool && !closed) {
     if (tool.kind === "link")
       buttons = (
-        <Link href={tool.href} className={buttonClass(closed ? "ghost" : now ? "primary" : "secondary", "xs")}>
+        <Link href={tool.href} className={buttonClass(now ? "primary" : "secondary", "xs")}>
           {tool.label}
         </Link>
       );
-    else if (tool.kind === "node") buttons = closed ? null : tool.node;
-    else
+    else if (tool.kind === "node") buttons = tool.node;
+    else if (tool.kind === "tap")
       buttons = (
-        <Button size="xs" variant={closed ? "ghost" : now ? "primary" : "secondary"} onClick={() => setOpen("tool")}>
-          {closed ? "Change" : tool.label}
+        <>
+          <TapButton tap={tool.tap} primary={now} onError={setTapError} />
+          {tool.also && (
+            <Link href={tool.also.href} className={buttonClass("ghost", "xs")}>
+              {tool.also.label}
+            </Link>
+          )}
+        </>
+      );
+    else if (tool.kind === "light")
+      buttons = (
+        <>
+          {tool.tap && <TapButton tap={tool.tap} primary={now && !showForm} onError={setTapError} />}
+          {!showForm && (
+            <Button size="xs" variant={tool.tap ? "ghost" : buttonTone} onClick={() => onActive(true)}>
+              {tool.label}
+            </Button>
+          )}
+          {tool.also && !showForm && (
+            <Link href={tool.also.href} className={buttonClass("ghost", "xs")}>
+              {tool.also.label}
+            </Link>
+          )}
+        </>
+      );
+    else if (!showForm)
+      buttons = (
+        <Button size="xs" variant={buttonTone} onClick={() => onActive(true)}>
+          {tool.label}
         </Button>
       );
-  }
+  } else if (item.auto && tool?.kind === "link" && closed && /^(View|See)/.test(tool.label))
+    buttons = (
+      <Link href={tool.href} className={buttonClass("ghost", "xs")}>
+        {tool.label}
+      </Link>
+    );
 
   // Who and when; an automatic item whose data already says the date shows nothing more.
   const dated = item.data.some(([, v]) => v === item.doneOn);
   const whoWhen = item.done && !(item.auto && dated) ? [item.doneBy?.name, short(item.doneOn)].filter(Boolean).join(" · ") : "";
+  const changeable = closed && !item.skipped && (formTool || (!item.auto && canEdit && !makes));
   const menuItem = (label: string, on: () => void, danger?: boolean) => (
     <button
       type="button"
@@ -509,11 +622,49 @@ function Row({
     </button>
   );
 
+  // The form under the row.
+  let form: ReactNode = null;
+  if (showForm) {
+    if (item.auto && tool?.kind === "light")
+      form = (
+        <LightForm
+          fields={tool.fields}
+          chips={tool.chips}
+          dealId={dealId}
+          fileNote={item.title}
+          save={changing ? "Save" : (tool.save ?? "Save and tick")}
+          hint={tool.hint}
+          onSubmit={sendTo(tool.action, tool.fixed)}
+          onDone={hideForm}
+        />
+      );
+    else if (item.auto && tool) form = <AutoForm tool={tool} onDone={hideForm} />;
+    else if (!item.auto && changing) form = <FillForm item={item} dealId={dealId} run={run} mode="edit" onDone={hideForm} />;
+    else if (!item.auto) {
+      const { fields, chips } = ownLight(item, today, me);
+      form = (
+        <LightForm
+          fields={fields}
+          chips={chips}
+          dealId={dealId}
+          fileNote={item.title}
+          onDone={hideForm}
+          onSubmit={async (v) => {
+            const data = Object.fromEntries(item.fields.map((f) => [f.key, v[f.key] ?? ""]).filter(([, x]) => x !== ""));
+            const r = await runJson(run, "tick", item.id!, { data, ...(v.$file && { attachmentId: v.$file }) });
+            if (r.ok && v.$note) await runJson(run, "edit", item.id!, { note: v.$note });
+            return r;
+          }}
+        />
+      );
+    }
+  }
+
   return (
     <li
       className={cn(
         "grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-lg px-3 py-3",
-        item.late ? "bg-bad-soft" : now && !closed ? "bg-primary-soft/70 ring-1 ring-primary/15" : "",
+        item.late ? "bg-bad-soft" : (now || showForm) && !closed ? "bg-primary-soft/70 ring-1 ring-primary/15" : "",
       )}
     >
       <span className="row-start-1 mt-0.5">
@@ -540,6 +691,8 @@ function Row({
         <span className="flex min-w-0 flex-wrap gap-x-4 gap-y-0.5">
           {item.skipped ? (
             <span className="text-muted">Skipped{item.skipReason ? `: ${item.skipReason}` : ""}</span>
+          ) : item.done ? (
+            item.data.length > 0 && <span className="font-medium text-text tabular">{oneLine(item.data)}</span>
           ) : (
             <>
               {item.data.map(([l, v]) => (
@@ -547,18 +700,18 @@ function Row({
                   {l} <span className="font-medium text-text tabular">{value(v)}</span>
                 </span>
               ))}
-              {item.file && (
-                <a
-                  href={`/files/${item.file.id}?view=1`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                >
-                  <Paperclip className="size-3" aria-hidden /> {item.file.name}
-                </a>
-              )}
-              {!item.done && item.needs && <span className="text-muted">Needs: {item.needs}</span>}
+              {item.needs && !showForm && <span className="text-muted">Needs: {item.needs}</span>}
             </>
+          )}
+          {item.file && (
+            <a
+              href={`/files/${item.file.id}?view=1`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+            >
+              <Paperclip className="size-3" aria-hidden /> {item.file.name}
+            </a>
           )}
           {item.note && <span className="text-text-2 italic">{item.note}</span>}
         </span>
@@ -591,9 +744,10 @@ function Row({
               </button>
               {menu && (
                 <FloatingMenu anchor={() => more.current} onClose={() => setMenu(false)} label={item.title} width={220}>
-                  {!item.auto && menuItem("Change the details", () => setOpen("edit"))}
+                  {changeable && menuItem("Change the details", () => (setOpen(null), setChanging(true)))}
+                  {!item.auto && !closed && menuItem("Change the details", () => setOpen("edit"))}
                   {menuItem("Set due date and person", () => setOpen("due"))}
-                  {!item.auto && menuItem("Attach a file", () => setOpen("attach"))}
+                  {menuItem(item.file ? "Replace the file" : "Attach a file", () => setOpen("attach"))}
                   {menuItem(item.note ? "Change the note" : "Add a note", () => setOpen("note"))}
                   {((!item.auto && closed) || (item.auto && item.skipped)) &&
                     menuItem(item.skipped ? "Don't skip" : "Untick", () =>
@@ -615,20 +769,12 @@ function Row({
         </div>
       )}
 
-      {(open || (error && !open)) && (
-        <div className="col-[1/-1] row-start-4 pt-2 sm:col-[2/-1]">
-          {!open && error && <Alert tone="error">{error}</Alert>}
-          {open === "tool" && item.auto && tool && <AutoForm tool={tool} onDone={close} />}
-          {open === "tool" && !item.auto && <FillForm item={item} dealId={dealId} run={run} mode="tick" onDone={close} />}
-          {(open === "edit" || open === "attach") && (
-            <FillForm
-              item={{ ...item, tool: open === "attach" ? "upload" : item.tool }}
-              dealId={dealId}
-              run={run}
-              mode="edit"
-              onDone={close}
-            />
-          )}
+      {(form || open || error || tapError) && (
+        <div className="col-[1/-1] row-start-4 flex flex-col gap-2 pt-2 sm:col-[2/-1]">
+          {!open && (error || tapError) && <Alert tone="error">{error ?? tapError}</Alert>}
+          {!open && form}
+          {open === "edit" && <FillForm item={item} dealId={dealId} run={run} mode="edit" onDone={close} />}
+          {open === "attach" && <AttachForm item={item} dealId={dealId} run={run} onDone={close} />}
           {open === "due" && (
             <DueForm
               item={item}
@@ -709,10 +855,12 @@ function AddItem({ step, label, run }: { step: FlowStep; label: string; run: Che
 }
 
 /**
- * A step's checklist (board OrderV3Item): one row per job with the tool to do
- * it and the data it collected. Round boxes tick themselves from the data;
- * square ones are the company's own, ticked with their tool. People without
- * orders.update see the rows only.
+ * A step's checklist (board OrderV4Shipping), the only place you work: each
+ * item asks only what ticks it. Done rows stay closed with their data in one
+ * line; only the current item (the first open one, or the one opened) shows
+ * its small form, filled in with what we know; one-tap items save at once.
+ * Round boxes tick themselves from the data; square ones are the company's
+ * own. People without orders.update see the rows only.
  */
 export function Checklist({
   step,
@@ -728,11 +876,13 @@ export function Checklist({
   payFor = {},
   listHref,
   title = "Checklist",
+  me,
+  today,
 }: {
   step: FlowStep;
   label: string;
   items: ChecklistItem[];
-  /** This is the order's current step: its first open item is highlighted. */
+  /** This is the order's current step: its first open item is highlighted and opened. */
   current: boolean;
   canEdit: boolean;
   run: ChecklistRun;
@@ -746,10 +896,18 @@ export function Checklist({
   /** Settings › Order checklist, for people who keep the company's list. */
   listHref?: string;
   title?: string;
+  /** The person's name (a witness or inspector field starts with it). */
+  me?: string;
+  /** Today (YYYY-MM-DD), for the dates a row fills in. */
+  today: string;
 }) {
   const done = items.filter((i) => i.done || i.skipped).length;
   const open = items.filter((i) => !i.done && !i.skipped);
   const nowItem = current ? (open.find((i) => i.late) ?? open[0]) : undefined;
+  const keyOf = (i: ChecklistItem) => i.id ?? i.key ?? i.title;
+  // Only one row shows its form: the current item until another is opened (or it is closed).
+  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
+  const activeKey = chosen === undefined ? (canEdit && nowItem ? keyOf(nowItem) : null) : chosen;
   return (
     <Card>
       <CardHeader
@@ -758,7 +916,7 @@ export function Checklist({
             {title} · {done} of {items.length}
           </>
         }
-        description="Each item has the tool to do it. Fill it in and it ticks; round items tick themselves."
+        description="Each item asks only what ticks it. Everything else: Edit in the view below."
         actions={
           listHref ? (
             <Link href={listHref} className={buttonClass("ghost", "xs")}>
@@ -771,15 +929,19 @@ export function Checklist({
         <ul className="flex flex-col gap-1 divide-y divide-line/70 p-2">
           {items.map((i) => (
             <Row
-              key={i.id ?? i.key}
+              key={keyOf(i)}
               item={i}
               now={i === nowItem}
+              active={activeKey === keyOf(i)}
+              onActive={(o) => setChosen(o ? keyOf(i) : null)}
               canEdit={canEdit}
               tool={i.key ? tools[i.key] : undefined}
               payNode={(i.id && payFor[i.id]) || payNode}
               run={run}
               dealId={dealId}
               people={people}
+              me={me}
+              today={today}
             />
           ))}
         </ul>

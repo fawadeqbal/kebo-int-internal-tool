@@ -7,7 +7,9 @@ import {
   bankStepInput,
   claimInput,
   claimUpdateInput,
+  deliveryAllGoodInput,
   deliveryInput,
+  satAllPassedInput,
   factoryOrderInput,
   factoryRequestsInput,
   factoryRequestUpdateInput,
@@ -23,7 +25,9 @@ import {
   type BankStepKind,
   type ClaimInput,
   type ClaimUpdateInput,
+  type DeliveryAllGoodInput,
   type DeliveryInput,
+  type SatAllPassedInput,
   type FactoryOrderInput,
   type FactoryRequestsInput,
   type FactoryRequestUpdateInput,
@@ -57,6 +61,15 @@ export class OrderFlowController {
   @Get(":id/flow")
   get(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
     return this.flow.get(user, id);
+  }
+
+  /**
+   * What a step's row fills in from earlier orders and the quote (nothing is saved): the forwarder of the last
+   * order on this route, the banks of this customer's last LC, the quote's lead time and the factory's price basis.
+   */
+  @Get(":id/defaults")
+  defaults(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
+    return this.flow.defaults(user, id);
   }
 
   /** { route: informal | bank_contract | letter_of_credit | null } */
@@ -130,6 +143,24 @@ export class OrderFlowController {
   @RequireFeature("delivery_sat")
   delivery(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(deliveryInput)) body: DeliveryInput) {
     return this.flow.saveDelivery(user, id, body);
+  }
+
+  /** { deliveredOn? } — "All delivered OK": every goods line in full and in good condition (today unless a day is sent). */
+  @Post(":id/delivery/all-good")
+  @HttpCode(200)
+  @RequirePermissions("delivery.manage")
+  @RequireFeature("delivery_sat")
+  deliveryAllGood(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(deliveryAllGoodInput)) body: DeliveryAllGoodInput) {
+    return this.flow.deliveryAllGood(user, id, body);
+  }
+
+  /** { satDoneOn?, satSignedBy? } — "All passed": every open SAT point passes and the SAT is signed off. */
+  @Post(":id/sat/all-passed")
+  @HttpCode(200)
+  @RequirePermissions("delivery.manage")
+  @RequireFeature("delivery_sat")
+  satAllPassed(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(satAllPassedInput)) body: SatAllPassedInput) {
+    return this.flow.satAllPassed(user, id, body);
   }
 
   /** { checks: [{ id?, item, result, note? }] } — the whole SAT checklist, in order. */

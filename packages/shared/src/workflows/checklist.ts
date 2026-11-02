@@ -93,6 +93,8 @@ export interface ChecklistFacts {
   due: string;
   paidInFullOn: ISODate | null;
   factoryOrderedOn: ISODate | null;
+  /** The factory's own number for our order. */
+  factoryOrderNo?: string | null;
   /**
    * Money owed to the factories, or null when the person may not see factory money; `plan`: its payment
    * plan's parts (advance when ordered, balance on the ready date) with where each stands.
@@ -119,6 +121,8 @@ export interface ChecklistFacts {
     forwarder: string | null;
     bookingNo: string | null;
     containerNo: string | null;
+    sealNo?: string | null;
+    loadedOn?: ISODate | null;
     vessel: string | null;
     blNo: string | null;
     etd: ISODate | null;
@@ -287,7 +291,10 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
   add("factory", "factory_ordered", {
     done: !!f.factoryOrderedOn,
     doneOn: f.factoryOrderedOn,
-    data: pairs([["Ordered", f.factoryOrderedOn]]),
+    data: pairs([
+      ["Their no.", f.factoryOrderNo],
+      ["Ordered", f.factoryOrderedOn],
+    ]),
     needs: f.factoryOrderedOn ? null : "the day we confirmed the order with the factory",
   });
   const owing = f.factories?.filter((x) => Number(x.owed) > 0) ?? [];
@@ -377,8 +384,12 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     add("shipping", "loaded", {
       title: air ? "Handed to the airline" : "Loaded",
       done: !!loaded,
-      doneOn: null,
-      data: pairs([["Container", loaded?.containerNo]]),
+      doneOn: loaded?.loadedOn ?? null,
+      data: pairs([
+        ["Container", loaded?.containerNo],
+        ["Seal", loaded?.sealNo],
+        ["Loaded", loaded?.loadedOn],
+      ]),
       needs: loaded ? null : air ? null : "container number",
     });
     const sailed = f.shipments.find((s) => SAILED.includes(s.status));
@@ -534,6 +545,22 @@ export interface ChecklistTemplateItem {
   dueDays?: number | null;
   /** Where it sits among the step's items (the automatic ones are at 10, 20, …). */
   sort: number;
+}
+
+/**
+ * Order v4, light rows: a fill item asks its date fields (filled with today)
+ * and its first two other fields up front; the rest are "+ chips" one tap
+ * away. The non-file fields asked up front are the ones that tick it.
+ */
+export function fillSplit<F extends ChecklistField>(fields: readonly F[]): { upfront: F[]; later: F[]; required: F[] } {
+  const firstTwo = new Set(
+    fields
+      .filter((f) => f.type !== "date")
+      .slice(0, 2)
+      .map((f) => f.key),
+  );
+  const upfront = fields.filter((f) => f.type === "date" || firstTwo.has(f.key));
+  return { upfront, later: fields.filter((f) => !upfront.includes(f)), required: upfront.filter((f) => f.type !== "file") };
 }
 
 const fld = (key: string, label: string, type: ChecklistFieldType = "text"): ChecklistField => ({ key, label, type });

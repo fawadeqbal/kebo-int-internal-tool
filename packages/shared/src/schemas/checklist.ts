@@ -74,6 +74,8 @@ export const checklistAutoInput = z
     note: maybe(optionalText(1000)),
     skipped: maybe(z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean())),
     skipReason: maybe(optionalText(300)),
+    /** A file kept with the item (loading photos, the B/L copy): one of the deal's files. */
+    attachmentId: maybe(optionalId),
   })
   .refine((v) => v.skipped !== true || !!v.skipReason, { message: "Say why it is skipped", path: ["skipReason"] });
 export type ChecklistAutoInput = z.infer<typeof checklistAutoInput>;

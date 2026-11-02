@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
-import { can, DELIVERY_CONDITION_LABEL } from "@kebo/shared";
-import { Card, CardBody, CardHeader } from "@kebo/ui";
+import { can, DELIVERY_CONDITION_LABEL, DELIVERY_CONDITIONS, SAT_RESULT_LABEL } from "@kebo/shared";
+import { Badge, CardBody } from "@kebo/ui";
 import { date } from "@/lib/format";
-import { ClaimsPanel, DeliveryPanel, SatPanel } from "@/components/orders/flow-panels";
+import { ClaimsPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { KeyFacts, StepChanges, StepFiles, StepPage } from "@/components/orders/step-page";
+import { StepChanges, StepFiles, StepPage, StepViewDivider, ViewPair } from "@/components/orders/step-page";
+import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
+import { SatEdit } from "@/components/orders/view-panels";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
-import { addClaimAction, deliveryAction, satAction, updateClaimAction } from "../../flow-actions";
-import { OrderLines } from "@/components/orders/order-lines";
+import { addClaimAction, satAction, updateClaimAction } from "../../flow-actions";
+import { fieldsAction, lightAction } from "../../light-actions";
+import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { DeliveredExcel } from "../goods";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
@@ -15,7 +18,13 @@ import { StepPapers } from "../papers";
 
 export const metadata = { title: "Order · delivery and SAT" };
 
-/** Step 6, Delivery & SAT: delivery and its condition, the site acceptance test by our engineer, any claims, and closing the order. */
+const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;
+
+/**
+ * Step 6, Delivery & SAT: the checklist (delivered, SAT, claims, closing),
+ * then the view: the delivery, the lines as delivered, the SAT results, the
+ * claims, the papers and the costs.
+ */
 export default async function OrderDelivery({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const d = await stepData(id, "delivery");
@@ -23,30 +32,65 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   if (!flow?.delivery) notFound();
   const dv = flow.delivery;
   const canEdit = can(me, "delivery.manage") && d.open;
-  const arrived =
-    flow.shipping?.shipments
-      .map((s) => s.arrivedOn)
-      .filter((x): x is string => !!x)
-      .sort()
-      .at(-1) ?? null;
 
   const goodsLines = o.lines.filter((l) => l.type === "goods");
   const delivered = goodsLines.filter((l) => Number(l.delivered?.qty) >= Number(l.quantity)).length;
+  const openClaims = dv.claims.filter((c) => c.status === "open" || c.status === "with_factory").length;
 
   const tools: Record<string, AutoTool> = {};
-  if (canEdit)
+  if (canEdit) {
     tools.delivered = {
-      kind: "delivery",
-      label: "Record the delivery",
-      action: deliveryAction.bind(null, o.id),
-      d: dv,
-      people: d.people,
-      today: now,
+      kind: "tap",
+      tap: { label: "All delivered OK", action: lightAction.bind(null, o.id, "delivered_all"), on: now },
+      also: goodsLines.length ? { label: "Short or damaged? Open the lines", href: "#edit-lines" } : undefined,
     };
-  tools.sat_done = { kind: "link", label: canEdit ? "Open the SAT" : "See the SAT", href: "#sat" };
+    tools.sat_done = {
+      kind: "light",
+      label: "Sign it off",
+      action: lightAction.bind(null, o.id, "sat_all"),
+      fields: [
+        { name: "satSignedBy", label: "Signed for the customer by", value: dv.satSignedBy, required: true, placeholder: "e.g. Mr. Imran, QA head" },
+        { name: "satDoneOn", label: "Passed on", type: "date", value: now, max: now, required: true },
+      ],
+      save: "All passed",
+      hint: "Every open point passes. A point failed? Edit the SAT results below.",
+      also: { label: "A point failed? Open the SAT", href: "#sat" },
+    };
+  } else tools.sat_done = { kind: "link", label: "See the SAT", href: "#sat" };
   tools.claims_closed = { kind: "link", label: "Claims", href: "#claims" };
   const close = stageTool(me, o, "done", now);
   if (close) tools.closed = { kind: "node", node: close };
+
+  const day = (v: string | null) => (v ? date(v) : null);
+  const fields: DetailField[] = [
+    { name: "deliveredOn", label: "Delivered on", value: dv.deliveredOn, type: "date", max: now, show: day(dv.deliveredOn), group: "Delivery" },
+    {
+      name: "deliveryCondition",
+      label: "Condition",
+      value: dv.condition,
+      type: "select",
+      options: DELIVERY_CONDITIONS.map((c) => ({ value: c, label: DELIVERY_CONDITION_LABEL[c] })),
+      show: dv.condition ? DELIVERY_CONDITION_LABEL[dv.condition] : null,
+      group: "Delivery",
+    },
+    { name: "deliveryReceivedBy", label: "Received by", value: dv.receivedBy, group: "Delivery", placeholder: "e.g. Mr. Imran, stores" },
+    { name: "satPlannedOn", label: "SAT planned", value: dv.satPlannedOn, type: "date", show: day(dv.satPlannedOn), group: "Site acceptance test" },
+    { name: "satDoneOn", label: "SAT done", value: dv.satDoneOn, type: "date", max: now, show: day(dv.satDoneOn), group: "Site acceptance test" },
+    {
+      name: "satEngineerId",
+      label: "Our engineer",
+      value: dv.satEngineer?.id ?? null,
+      type: "select",
+      options: [{ value: "", label: "—" }, ...d.people.map((p) => ({ value: p.id, label: p.name }))],
+      show: dv.satEngineer?.name ?? null,
+      group: "Site acceptance test",
+    },
+    { name: "satSignedBy", label: "Signed by", value: dv.satSignedBy, group: "Site acceptance test", placeholder: "e.g. Mr. Ali, QA head" },
+    { label: "Claims open", value: String(openClaims), uncounted: true },
+    { name: "deliveryNote", label: "Note on the delivery", value: dv.note, type: "textarea", panelOnly: true, uncounted: true, wide: true, group: "Note" },
+  ];
+  // Add in place picks the first option: a person, not "—".
+  const shownFields = fields.map((f) => (f.name === "satEngineerId" && !f.value ? { ...f, options: f.options!.slice(1) } : f));
 
   return (
     <StepPage
@@ -55,18 +99,6 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       base={d.base}
       side={
         <>
-          <KeyFacts
-            facts={[
-              { label: "Delivered", value: dv.deliveredOn ? date(dv.deliveredOn) : "Not yet" },
-              { label: "Condition", value: dv.condition ? DELIVERY_CONDITION_LABEL[dv.condition] : null },
-              { label: "Our engineer", value: dv.satEngineer?.name ?? null },
-              { label: "SAT planned", value: dv.satPlannedOn ? date(dv.satPlannedOn) : null },
-              { label: "SAT signed off", value: dv.satDoneOn ? date(dv.satDoneOn) : null },
-              { label: "Open claims", value: String(dv.claims.filter((c) => c.status === "open" || c.status === "with_factory").length) },
-            ]}
-          />
-          <StepCosts id={o.id} step="delivery" />
-          <StepPapers id={o.id} dealId={o.inquiry.id} step="delivery" />
           <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
@@ -84,55 +116,61 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
         people={d.people}
         tools={tools}
         listHref={d.listHref}
+        me={me.name}
+        today={now}
       />
-      <Card>
-        <CardHeader title="Delivery and site acceptance" description={o.customer.name} />
-        <CardBody>
-          <DeliveryPanel
-            action={deliveryAction.bind(null, o.id)}
-            d={dv}
-            people={d.people}
-            arrivedOn={arrived}
-            today={now}
-            canEdit={canEdit}
-          />
-        </CardBody>
-      </Card>
+      <StepViewDivider />
+      <DetailsCard
+        title="Delivery"
+        description={canEdit ? undefined : o.customer.name}
+        fields={shownFields}
+        action={fieldsAction.bind(null, o.id, "delivery")}
+        canEdit={canEdit}
+        panelTitle="Edit the delivery and SAT"
+      />
       {goodsLines.length > 0 && (
-        <Card id="lines" className="scroll-mt-24">
-          <CardHeader
-            title="Lines · delivered"
-            description={
-              delivered === goodsLines.length
-                ? "Everything reached the customer."
-                : "How many of each line reached the customer, and in what condition."
-            }
-            actions={<DeliveredExcel lines={goodsLines} />}
-          />
-          <CardBody>
-            <OrderLines set="delivered" orderId={o.id} lines={goodsLines} canEdit={canEdit} today={now} />
-          </CardBody>
-        </Card>
-      )}
-      <Card id="sat" className="scroll-mt-24">
-        <CardHeader
-          title="SAT checklist"
-          description={
-            dv.satDoneOn ? "Signed off; reopen the SAT to change it." : "What our engineer checks on site, from the customer's URS."
-          }
+        <LinesCard
+          title="Lines · delivered"
+          description={delivered === goodsLines.length ? "Everything reached the customer." : "How many of each line reached the customer, and in what condition."}
+          canEdit={canEdit}
+          view={<OrderLines set="delivered" orderId={o.id} lines={goodsLines} canEdit={false} today={now} />}
+          edit={<OrderLines set="delivered" orderId={o.id} lines={goodsLines} canEdit today={now} />}
+          phone={<PhoneLines set="delivered" lines={goodsLines} />}
+          actions={<DeliveredExcel lines={goodsLines} />}
+          editActions={<DeliveredExcel lines={goodsLines} />}
         />
-        <CardBody>
-          <SatPanel
-            action={satAction.bind(null, o.id)}
-            checks={dv.sat}
-            suggested={dv.suggestedSat}
-            locked={!!dv.satDoneOn}
-            canEdit={canEdit}
-          />
-        </CardBody>
-      </Card>
-      <Card id="claims" className="scroll-mt-24">
-        <CardHeader title="Claims" description="Damage, missing parts or faults after delivery, and how each was settled." />
+      )}
+      <ViewCard
+        id="sat"
+        title="SAT results"
+        description={dv.satDoneOn ? `Signed off ${date(dv.satDoneOn)}${dv.satSignedBy ? ` by ${dv.satSignedBy}` : ""}.` : "What our engineer checks on site, from the customer's URS."}
+        meter={dv.sat.length ? { n: dv.sat.filter((c) => c.result === "pass" || c.result === "not_applicable").length, of: dv.sat.length, word: "passed" } : undefined}
+        canEdit={canEdit}
+        panel={{
+          title: "Edit the SAT points",
+          description: "Each point: Pass, Fail or N/A, and a note. Saving updates the checklist.",
+          body: <SatEdit action={satAction.bind(null, o.id)} checks={dv.sat} suggested={dv.suggestedSat} locked={!!dv.satDoneOn} />,
+        }}
+      >
+        {dv.sat.length ? (
+          <ul className="flex flex-col divide-y divide-line px-4">
+            {dv.sat.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm">{c.item}</span>
+                  {c.note && <span className="block text-xs text-muted">{c.note}</span>}
+                </span>
+                <Badge tone={RESULT_TONE[c.result]}>{SAT_RESULT_LABEL[c.result]}</Badge>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="px-4 py-3.5 text-xs text-muted">
+            No points yet. {dv.suggestedSat.length} usual points are ready to start from{canEdit ? " (Edit)" : ""}; &ldquo;All passed&rdquo; uses them.
+          </p>
+        )}
+      </ViewCard>
+      <ViewCard id="claims" title="Claims" description="Damage, missing parts or faults after delivery, and how each was settled." canEdit={false}>
         <CardBody>
           <ClaimsPanel
             addAction={addClaimAction.bind(null, o.id)}
@@ -142,7 +180,11 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
             canEdit={canEdit}
           />
         </CardBody>
-      </Card>
+      </ViewCard>
+      <ViewPair>
+        <StepPapers id={o.id} dealId={o.inquiry.id} step="delivery" />
+        <StepCosts id={o.id} step="delivery" />
+      </ViewPair>
     </StepPage>
   );
 }
