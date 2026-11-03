@@ -8,7 +8,8 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { LineTable } from "@/components/lines/line-table";
 import { localLineHandlers } from "@/components/lines/local-lines";
-import { EditPanel, PanelBody, useCloseLines } from "@/components/orders/step-view";
+import { useCloseLines } from "@/components/orders/step-view";
+import { PanelBody, SidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { DealItem } from "@/lib/types";
 import { ITEM_COLUMNS } from "./deal-form";
@@ -182,7 +183,7 @@ export function DocumentsButton({
         {children}
       </button>
       {open && (
-        <EditPanel
+        <SidePanel
           title="URS & documents"
           description="The customer's URS, drawings, photos and specifications. Also shown on the order."
           onClose={() => setOpen(false)}
@@ -190,7 +191,7 @@ export function DocumentsButton({
           <PanelBody>
             <DocumentsPanel dealId={dealId} files={files} canUpload />
           </PanelBody>
-        </EditPanel>
+        </SidePanel>
       )}
     </>
   );

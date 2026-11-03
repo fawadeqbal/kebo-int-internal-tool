@@ -7,7 +7,8 @@ import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS } fr
 import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelButton, useClosePanel, ViewCard } from "@/components/orders/step-view";
+import { PanelButton, ViewCard } from "@/components/orders/step-view";
+import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { money, qty } from "@/lib/format";
 import type { OptionView, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";

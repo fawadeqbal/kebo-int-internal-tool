@@ -26,7 +26,7 @@ import { localLineHandlers } from "@/components/lines/local-lines";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
-import { PANEL_FORM, PanelActions, PanelSection } from "@/components/orders/step-view";
+import { PANEL_FORM, PanelActions, PanelSection } from "@/components/common/panel";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
