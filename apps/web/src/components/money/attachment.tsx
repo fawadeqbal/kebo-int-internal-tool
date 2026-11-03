@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Paperclip, Trash2, Upload, X } from "lucide-react";
 import { Alert, Button, buttonClass, cn, Field, Input } from "@kebo/ui";
+import { saveThenSend } from "@kebo/utils";
 import type { ActionState } from "@/lib/actions";
 import type { AttachedFileInfo } from "@/lib/types-money";
 import { FileChip, useFileTools } from "@/components/files/file-tools";
@@ -26,6 +27,53 @@ export async function uploadFile(url: string, file: File): Promise<string | null
   } catch {
     return "The connection dropped. Try again.";
   }
+}
+
+type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
+
+/**
+ * A form's save with its chosen file sent right after, inside the same call
+ * (see saveThenSend): the file goes even when saving takes the form off the
+ * page (a payment that ticks the checklist row it was opened from), and the
+ * page is refreshed once it is in, so it shows in Files with the file tools.
+ * `onError` hears when the file did not follow; with the form gone, the
+ * browser says it instead.
+ */
+export function useSaveThenSend(
+  action: Action,
+  file: File | null,
+  url: (id: string) => string,
+  what: string,
+  onError?: (message: string) => void,
+  idOf?: (data: unknown) => string | null | undefined,
+): Action {
+  const router = useRouter();
+  const chosen = useRef(file);
+  const mounted = useRef(true);
+  const hear = useRef(onError);
+  useEffect(() => {
+    chosen.current = file;
+    hear.current = onError;
+  });
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  return async (prev, form) => {
+    const f = chosen.current;
+    const r = await saveThenSend(() => action(prev, form), f, (id) => uploadFile(url(id), f!), idOf);
+    if (r.ok && f) {
+      router.refresh();
+      if (r.fileError) {
+        const message = `${what}, but its file was not: ${r.fileError} Open it to add the file again.`;
+        if (mounted.current && hear.current) hear.current(message);
+        else window.alert(message);
+      }
+    }
+    return r;
+  };
 }
 
 /** Choose a photo or PDF in a form; it is sent once the record is saved. */

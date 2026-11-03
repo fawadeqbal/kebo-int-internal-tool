@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Copy, Pencil, Plus, X } from "lucide-react";
 import { toMinor, formatMinor } from "@kebo/money";
 import {
@@ -24,7 +23,7 @@ import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { AccountSelect } from "./accounts";
-import { FilePicker, uploadFile } from "./attachment";
+import { FilePicker, uploadFile, useSaveThenSend } from "./attachment";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
@@ -501,21 +500,18 @@ export function FactoryPaymentForm({
   const mismatch = !!owedIn && m.currency !== owedIn && !kept;
   const left = chosen && Number(chosen.toPay) > 0 && m.currency === chosen.currency ? chosen.toPay : null;
   const [file, setFile] = useState<File | null>(null);
-  const [sending, setSending] = useState(false);
-  const router = useRouter();
-  const done = async (s: ActionState) => {
-    const id = (s.data as { createdId?: string } | undefined)?.createdId;
-    if (file && id) {
-      setSending(true);
-      const error = await uploadFile(`/files/factory-payments/${id}`, file);
-      setSending(false);
-      router.refresh();
-      if (error) onFileError?.(`The payment is recorded, but its file was not: ${error} Open the payment to add it again.`);
-    }
-    onClose();
-  };
+  // The slip goes with the save itself: paying the advance ticks the checklist row this form was opened from.
+  const save = useSaveThenSend(
+    action,
+    file,
+    (id) => `/files/factory-payments/${id}`,
+    "The payment is recorded",
+    onFileError,
+    (d) => (d as { createdId?: string } | undefined)?.createdId ?? payment?.id,
+  );
+  const done = () => onClose();
   return (
-    <ActionForm action={action} onDone={done} className={framed}>
+    <ActionForm action={save} onDone={done} className={framed}>
       {(s) => (
         <>
           <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a factory"}</p>
@@ -655,8 +651,8 @@ export function FactoryPaymentForm({
             <Textarea id="fp-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note ?? payment?.note ?? ""} />
           </Field>
           <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…" disabled={mismatch || sending}>
-              {sending ? "Sending the file…" : payment ? "Save the change" : "Record the payment"}
+            <SubmitButton size="sm" pendingText={file ? "Saving, sending the file…" : "Saving…"} disabled={mismatch}>
+              {payment ? "Save the change" : "Record the payment"}
             </SubmitButton>
             <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               Cancel
@@ -794,8 +790,6 @@ export function ExpenseForm({
   const [category, setCategory] = useState<ExpenseCategory>(from?.category ?? DEFAULT_KIND[forWhom]);
   const [kindTouched, setKindTouched] = useState(Boolean(from));
   const [file, setFile] = useState<File | null>(null);
-  const [sending, setSending] = useState(false);
-  const router = useRouter();
   const m = useMoneyFields(fx, mainCurrency, { currency: from?.currency ?? mainCurrency, amount: from?.amount ?? "", rate: expense ? String(expense.rate) : "" });
 
   const setForWhom = (to: ForWhom) => {
@@ -828,20 +822,18 @@ export function ExpenseForm({
         { value: "order", label: "An order" },
       ];
 
-  const done = async (s: ActionState) => {
-    const id = (s.data as { id?: string } | undefined)?.id ?? expense?.id;
-    if (file && id) {
-      setSending(true);
-      const error = await uploadReceipt(id, file);
-      setSending(false);
-      router.refresh();
-      if (error) onReceiptError?.(`The expense is saved, but the receipt was not: ${error} Open the expense to add it again.`);
-    }
-    onClose();
-  };
+  const save = useSaveThenSend(
+    action,
+    file,
+    (id) => `/files/expenses/${id}`,
+    "The expense is saved",
+    onReceiptError,
+    (d) => (d as { id?: string } | undefined)?.id ?? expense?.id,
+  );
+  const done = () => onClose();
 
   return (
-    <ActionForm action={action} onDone={done} className={framed} keepFields>
+    <ActionForm action={save} onDone={done} className={framed} keepFields>
       {(s) => (
         <>
           <p className="text-sm font-medium">{expense ? "Change the expense" : template ? "Add it again" : "New expense"}</p>
@@ -1022,10 +1014,10 @@ export function ExpenseForm({
             <FilePicker id="ex-receipt" label="Receipt or ticket" file={file} onChange={setFile} current={expense?.receipt?.name} className="sm:col-span-3" />
           </div>
           <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…" disabled={sending}>
-              {sending ? "Sending the receipt…" : expense ? "Save the change" : "Add the expense"}
+            <SubmitButton size="sm" pendingText={file ? "Saving, sending the receipt…" : "Saving…"}>
+              {expense ? "Save the change" : "Add the expense"}
             </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={sending}>
+            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
           </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import {
@@ -28,7 +27,7 @@ import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
 import type { CustomerCreditView, FactoryPlanView, OrderMoney } from "@/lib/types-money";
 import { AccountSelect } from "./accounts";
-import { FilePicker, uploadFile } from "./attachment";
+import { FilePicker, useSaveThenSend } from "./attachment";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -167,27 +166,17 @@ function ReceivedFields({
   const [part, setPart] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>(reached ? "bank_transfer" : "bank_transfer");
   const [file, setFile] = useState<File | null>(null);
-  const [sending, setSending] = useState(false);
-  const router = useRouter();
   const chargesMinor = toMinor(charges);
   const auto = Math.max(Math.min(a.countsMinor, dueMinor - chargesMinor), 0);
   const partMinor = part === null ? auto : toMinor(part);
   const leftMinor = a.countsMinor - partMinor;
   const tooMuch = partMinor + chargesMinor > dueMinor;
   const kind = Number(depositDue) > 0 ? "deposit" : "balance";
-  const done = async (s: ActionState) => {
-    const id = (s.data as { createdId?: string } | undefined)?.createdId;
-    if (file && id) {
-      setSending(true);
-      const error = await uploadFile(`/files/payments/${id}`, file);
-      setSending(false);
-      router.refresh();
-      if (error) onFileError(`The payment is recorded, but its file was not: ${error} Open the payment below to add it again.`);
-    }
-    onClose();
-  };
+  // The slip goes with the save itself: recording the deposit ticks the checklist row this form was opened from.
+  const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", onFileError);
+  const done = () => onClose();
   return (
-    <ActionForm action={action} onDone={done} keepFields className={framed}>
+    <ActionForm action={save} onDone={done} keepFields className={framed}>
       {(s) => (
         <>
           <div className="-mx-3 -mt-3 border-b border-line px-3 py-2.5 sm:-mx-4 sm:-mt-4 sm:px-4">
@@ -339,8 +328,8 @@ function ReceivedFields({
               <Button type="button" size="sm" variant="ghost" onClick={onClose}>
                 Cancel
               </Button>
-              <SubmitButton size="sm" pendingText="Recording…" disabled={sending || a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
-                {sending ? "Sending the file…" : reached ? "Record and tick" : "Record the payment"}
+              <SubmitButton size="sm" pendingText={file ? "Recording, sending the file…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
+                {reached ? "Record and tick" : "Record the payment"}
               </SubmitButton>
             </div>
           </div>
