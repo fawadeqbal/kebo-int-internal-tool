@@ -20,6 +20,12 @@ String? appPathFor(String? href) {
   return null;
 }
 
+/// Opens [href] on the web, in the phone's browser.
+Future<void> openWeb(BuildContext context, String href) async {
+  final ok = await launchUrl(Uri.parse('${context.api.server}$href'), mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) toast(context, 'Open this on the web: $href');
+}
+
 /// Opens [href] in the app when the page is here; otherwise on the web.
 Future<void> openLink(BuildContext context, String? href) async {
   final inApp = appPathFor(href);

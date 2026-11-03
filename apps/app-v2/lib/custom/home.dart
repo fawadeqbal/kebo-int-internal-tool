@@ -85,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   button: true,
                   label: 'Account',
                   excludeSemantics: true,
+                  onTap: () => context.go('/more'),
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: () => context.go('/more'),
@@ -109,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 button: true,
                 label: 'Search inquiries, orders, customers, factories',
                 excludeSemantics: true,
+                onTap: () => context.push('/search'),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(Gap.radiusSm),
                   onTap: () => context.push('/search'),

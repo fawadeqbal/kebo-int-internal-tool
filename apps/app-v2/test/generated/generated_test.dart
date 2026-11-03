@@ -308,7 +308,7 @@ void main() {
       ),
     });
     expect(find.text('Order number'), findsWidgets);
-    for (final t in <String>['Money', 'Next', 'Papers', 'Files', 'Details']) {
+    for (final t in <String>['Steps', 'Money', 'Papers', 'Files', 'Details']) {
       final section = find.byKey(ValueKey('section:$t'));
       await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
       expect(section, findsOneWidget);

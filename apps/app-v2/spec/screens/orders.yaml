@@ -18,12 +18,11 @@ frame: record
 entity: Order
 path: /orders/:id
 tab: Orders
-header: { title: refNo, sub: [customer.name, inquiry.title, stage] }
+header: { title: refNo, sub: [customer.name, inquiry.assignee.name, total], badge: stage }
 sections:
+  - { title: Steps, custom: OrderFlow }       # do now, step chips, the step's checklist; tap a row to tick it
   - title: Money
     fields: [money.total, money.charged, money.received, money.bankCharges, money.due]
-  - title: Next
-    fields: [needs.title, needs.due, next.label, next.hint]
   - title: Papers
     custom: OrderPapers        # lib/custom/order_papers.dart: every paper as a PDF, the internal copy too
   - title: Files

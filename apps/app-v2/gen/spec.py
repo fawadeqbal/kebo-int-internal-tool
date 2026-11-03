@@ -86,6 +86,7 @@ class Spec:
     enums: dict[str, dict[str, dict]]  # name → value → {label, tone}
     entities: dict[str, Entity]
     screens: dict[str, Screen]
+    ticks: dict = field(default_factory=dict)
 
 
 def _docs(path: Path) -> list[dict]:
@@ -190,7 +191,9 @@ def load() -> Spec:
                 raise SpecError(f"{path.name}: screen {name} is defined twice")
             screens[name] = Screen(name=name, frame=d["frame"], entity=d.get("entity", ""), raw=d, source=path.name)
 
-    spec = Spec(app=app, enums=enums, entities=entities, screens=screens)
+    ticks_path = SPEC / "ticks.yaml"
+    ticks = _docs(ticks_path)[0] if ticks_path.exists() else {}
+    spec = Spec(app=app, enums=enums, entities=entities, screens=screens, ticks=ticks)
     check(spec)
     return spec
 
@@ -224,7 +227,33 @@ def text_item(item: Any) -> dict:
     raise SpecError(f"write a field name or {{ of: field, text: '…' }}, not {item!r}")
 
 
+METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
+
+
+def check_ticks(spec: Spec) -> None:
+    for key, t in (spec.ticks.get("ticks") or {}).items():
+        where = f"ticks.yaml: {key}"
+        method, _, path = str(t.get("write", "")).partition(" ")
+        if method not in METHODS or not path.startswith("/api/"):
+            raise SpecError(f"{where}: write must be 'METHOD /api/…'")
+        names = set((t.get("fields") or {}).keys())
+        for f in inline_fields(key, t.get("fields") or {}, where):
+            if f.kind == "enum" and f.ref not in spec.enums:
+                raise SpecError(f"{where}: no enum '{f.ref}'")
+        for k, src in (t.get("prefill") or {}).items():
+            if k not in names:
+                raise SpecError(f"{where}: prefill names '{k}', which is not a field")
+            for one in src if isinstance(src, list) else [src]:
+                if one != "today" and not str(one).split(".")[0] in ("flow", "defaults", "order"):
+                    raise SpecError(f"{where}: prefill '{one}' must start with flow., defaults., order. or be today")
+        if "{kind}" in path + str(t.get("send")) and not key.startswith("doc:"):
+            raise SpecError(f"{where}: {{kind}} only works on doc:* items")
+        if "{step}" in path and not key.startswith("bank:"):
+            raise SpecError(f"{where}: {{step}} only works on bank:* items")
+
+
 def check(spec: Spec) -> None:
+    check_ticks(spec)
     for e in spec.entities.values():
         for f in e.fields.values():
             where = f"{e.source}: {e.name}.{f.name}"

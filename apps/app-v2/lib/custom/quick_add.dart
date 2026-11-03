@@ -48,6 +48,7 @@ Future<void> showQuickAdd(BuildContext context) async {
                   button: true,
                   label: '${a.title}, ${a.sub}',
                   excludeSemantics: true,
+                  onTap: () => Navigator.pop(ctx, a),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(Gap.radius),
                     onTap: () => Navigator.pop(ctx, a),

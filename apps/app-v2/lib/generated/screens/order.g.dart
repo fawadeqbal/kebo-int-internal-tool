@@ -9,6 +9,7 @@ import '../enums.g.dart';
 import '../models.g.dart';
 import '../repos.g.dart';
 import '../../custom/order_files.dart';
+import '../../custom/order_flow.dart';
 import '../../custom/order_papers.dart';
 
 class OrderScreen extends StatelessWidget {
@@ -19,20 +20,16 @@ class OrderScreen extends StatelessWidget {
   Widget build(BuildContext context) => RecordFrame<Order>(
     load: (api) => OrderRepo(api).get(id),
     title: (x) => x.refNo,
-    sub: (x) => [x.customer?.name, x.inquiry?.title, OrderStageEnum.label(x.stage)],
+    sub: (x) => [x.customer?.name, x.inquiry?.assignee?.name, fmtMoney(x.total, x.currency)],
+    badges: (x) => [OrderStageEnum.badge(x.stage)],
     sections: (x) => [
+      CustomSection('Steps', OrderFlow(x, title: 'Steps')),
       KvSection('Money', [
         ('Total', fmtMoney(x.money?.total, x.currency)),
         ('Charged to the customer', fmtMoney(x.money?.charged, x.currency)),
         ('Received', fmtMoney(x.money?.received, x.currency)),
         ('Bank charges', fmtMoney(x.money?.bankCharges, x.currency)),
         ('Still due', fmtMoney(x.money?.due, x.currency)),
-      ]),
-      KvSection('Next', [
-        ('Needs', x.needs?.title),
-        ('By', fmtDate(x.needs?.due)),
-        ('Next step', x.next?.label),
-        ('Why', x.next?.hint),
       ]),
       CustomSection('Papers', OrderPapers(x, title: 'Papers')),
       CustomSection('Files', OrderFiles(x, title: 'Files')),

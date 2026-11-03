@@ -14,6 +14,7 @@ reasons:
   reassign: [Workload, Person is away, Better fit for this product]
   hold: [Customer is deciding, Waiting for the factory, Waiting for documents]
   reopen: [Customer came back, Marked lost by mistake]
+  skip: [Not needed for this order, Customer does it, Done another way]
   quoteAnswer: [Price too high, Customer bought elsewhere, No reply from the customer, Project cancelled]
 
 # Lists of values. A tone is one of the five status meanings shared with the web:
@@ -21,6 +22,9 @@ reasons:
 enums:
   CustomerType: { company: Company, individual: Person }
   Currency: { USD: USD, CNY: CNY, PKR: PKR }
+  PaymentRoute: { informal: Informal, bank_contract: Bank contract, letter_of_credit: Letter of credit (LC) }
+  BalanceWhen: { before_shipment: Before shipment, against_bl_copy: Against the B/L copy }
+  LcTerms: { at_sight: At sight, deferred: Deferred }
   Incoterm: { EXW: EXW, FCA: FCA, FAS: FAS, FOB: FOB, CFR: CFR, CIF: CIF, CPT: CPT, CIP: CIP, DAP: DAP, DPU: DPU, DDP: DDP }
   InquiryStage:
     new: { label: New, tone: neutral }

@@ -13,12 +13,18 @@ extension JsonRead on Json {
   bool boolean(String k) => this[k] == true;
 
   /// A text deeper in: `o.at('customer.name')`; null when any step is missing.
-  String? at(String path) {
+  String? at(String path) => switch (_walk(path)) { String s when s.isNotEmpty => s, num n => '$n', _ => null };
+
+  /// The list deeper in: `flow.listAt('shipping.shipments')`.
+  List<Json> listAt(String path) => switch (_walk(path)) { List<dynamic> l => [for (final e in l) if (e is Map<String, dynamic>) e], _ => const [] };
+
+  /// Follows map keys and list positions: "shipping.shipments.0.blNo".
+  Object? _walk(String path) {
     Object? v = this;
     for (final p in path.split('.')) {
-      v = v is Map<String, dynamic> ? v[p] : null;
+      v = switch (v) { Map<String, dynamic> m => m[p], List<dynamic> l => int.tryParse(p) is int && int.parse(p) < l.length ? l[int.parse(p)] : null, _ => null };
     }
-    return switch (v) { String s when s.isNotEmpty => s, num n => '$n', _ => null };
+    return v;
   }
 
   DateTime? date(String k) => switch (this[k]) { String s => DateTime.tryParse(s), _ => null };

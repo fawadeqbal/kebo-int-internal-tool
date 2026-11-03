@@ -40,7 +40,11 @@ class FormSheet extends StatefulWidget {
     this.duplicateFlag,
     this.intro,
     this.danger = false,
+    this.extra,
   });
+
+  /// More under the fields that keeps its own state (e.g. a photo to attach).
+  final Widget Function(StateSetter setState)? extra;
 
   /// Red Save: it ends or removes something.
   final bool danger;
@@ -70,6 +74,7 @@ class FormSheet extends StatefulWidget {
     String? duplicateFlag,
     String? intro,
     bool danger = false,
+    Widget Function(StateSetter setState)? extra,
   }) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -87,6 +92,7 @@ class FormSheet extends StatefulWidget {
         duplicateFlag: duplicateFlag,
         intro: intro,
         danger: danger,
+        extra: extra,
       ),
     );
     return saved ?? false;
@@ -219,6 +225,7 @@ class _FormSheetState extends State<FormSheet> {
                 ],
                 if (problem != null) ...[MessageBanner(problem!, tone: Tone.bad), const SizedBox(height: Gap.lg)],
                 for (final g in widget.groups) ..._group(context, g),
+                if (widget.extra != null) widget.extra!(setState),
               ],
             ),
           ),

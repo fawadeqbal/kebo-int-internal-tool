@@ -114,7 +114,20 @@ class ContactAction {
 
 /// What a row shows. Built by the generated screens from the spec.
 class RowData {
-  const RowData({required this.title, this.sub = const [], this.badge, this.value, this.actions = const [], this.onTap, this.tone, this.trailing, this.strong = false});
+  const RowData(
+      {required this.title,
+      this.sub = const [],
+      this.badge,
+      this.value,
+      this.actions = const [],
+      this.onTap,
+      this.tone,
+      this.trailing,
+      this.leading,
+      this.strong = false});
+
+  /// An icon before the text (a checklist state, a file kind).
+  final Widget? leading;
   final String? title;
 
   /// A coloured mark at the start: how urgent it is (late, due soon…).
@@ -146,6 +159,7 @@ class PhoneRow extends StatelessWidget {
     final body = Padding(
       padding: const EdgeInsets.symmetric(vertical: Gap.md),
       child: Row(children: [
+        if (data.leading != null) ...[data.leading!, const SizedBox(width: Gap.md)],
         if (data.tone != null) ...[
           ExcludeSemantics(
             child: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.fg(data.tone!), shape: BoxShape.circle)),

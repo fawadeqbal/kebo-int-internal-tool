@@ -17,6 +17,41 @@ abstract final class CurrencyEnum {
   static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
 }
 
+abstract final class PaymentRouteEnum {
+  static const values = <String>['informal', 'bank_contract', 'letter_of_credit'];
+  static const labels = <String, String>{
+    'informal': 'Informal',
+    'bank_contract': 'Bank contract',
+    'letter_of_credit': 'Letter of credit (LC)',
+  };
+  static const tones = <String, Tone>{
+    'informal': Tone.neutral,
+    'bank_contract': Tone.neutral,
+    'letter_of_credit': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class BalanceWhenEnum {
+  static const values = <String>['before_shipment', 'against_bl_copy'];
+  static const labels = <String, String>{
+    'before_shipment': 'Before shipment',
+    'against_bl_copy': 'Against the B/L copy',
+  };
+  static const tones = <String, Tone>{'before_shipment': Tone.neutral, 'against_bl_copy': Tone.neutral};
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class LcTermsEnum {
+  static const values = <String>['at_sight', 'deferred'];
+  static const labels = <String, String>{'at_sight': 'At sight', 'deferred': 'Deferred'};
+  static const tones = <String, Tone>{'at_sight': Tone.neutral, 'deferred': Tone.neutral};
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
 abstract final class IncotermEnum {
   static const values = <String>['EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
   static const labels = <String, String>{
