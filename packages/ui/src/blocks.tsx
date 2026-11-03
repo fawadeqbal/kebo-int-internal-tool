@@ -389,7 +389,7 @@ export function SectionNav({
               )}
             >
               {l.label}
-              {l.count !== undefined && l.count !== null && l.count !== "" && <span className={cn("tabular", l.alert ? "text-bad" : "opacity-80")}>{l.count}</span>}
+              {l.count !== undefined && l.count !== null && l.count !== "" && <span className={cn("tabular", l.alert && "text-bad")}>{l.count}</span>}
             </Link>
           ))}
         </nav>

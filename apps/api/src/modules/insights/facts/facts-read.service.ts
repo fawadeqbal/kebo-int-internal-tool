@@ -8,6 +8,7 @@ import { Clock } from "../../../common/time/clock.service";
 import { LimitsService } from "../../../common/company/limits.service";
 import type { SessionUser } from "../../../common/auth/session-user";
 import { convert, MainMoney } from "../../money/order-money";
+import { positionsSql } from "../../money/due";
 import { factsCtxOf } from "./compute";
 import { FactsService } from "./facts.service";
 
@@ -148,6 +149,14 @@ export class FactsReadService {
     return new Map([...rows.map((r) => [r.id, r.name] as [string, string]), ["nobody", "Nobody"]]);
   }
 
+  /** Customers' countries, for a grouping by customer. */
+  private async countries(keys: string[]): Promise<Map<string, string>> {
+    const ids = keys.filter((k) => /^[0-9a-f-]{36}$/.test(k));
+    if (!ids.length) return new Map();
+    const rows = await this.prisma.db.customer.findMany({ where: { id: { in: ids } }, select: { id: true, country: true } });
+    return new Map(rows.map((r) => [r.id, r.country]));
+  }
+
   /**
    * Orders (not cancelled) by when they were ordered, added up per period × group: sales, profit, margin, what
    * came in and is still due (overdue on today), shipping on time and speed, paying in full and on time.
@@ -160,6 +169,7 @@ export class FactsReadService {
              sum(f.total_main)::text as sales, sum(f.costed_main)::text as costed, sum(f.cost_main)::text as cost,
              sum(f.profit_quote_main)::text as "profitQuote", sum(f.profit_expected_main)::text as "profitExpected",
              sum(f.expenses_main)::text as expenses, sum(f.costs_over_plan_main)::text as "costsOverPlan",
+             coalesce(sum(f.profit_expected_main) filter (where f.shipped_on is not null and f.paid_in_full_on is not null), 0)::text as "profitDone",
              count(*) filter (where f.costs_over_plan_main > 0)::int as "ordersOverPlan",
              sum(f.received_main)::text as received, sum(f.due_main)::text as due,
              sum(${openSql(today, 1, null)})::text as overdue,
@@ -173,6 +183,7 @@ export class FactsReadService {
       where f.status <> 'cancelled' ${this.span(q, "f.ordered_on")} ${this.filter(q, "order")}
       group by 1, 2 order by 1, 2`;
     const names = await this.labels(q.by, rows.map((r) => String(r.key)));
+    const countries = q.by === "customer" ? await this.countries(rows.map((r) => String(r.key))) : null;
     return {
       currency,
       seeMoney,
@@ -185,6 +196,8 @@ export class FactsReadService {
           period: r.period as string,
           key: r.key as string,
           label: names.get(String(r.key)) ?? String(r.key),
+          /** By customer: the customer's country. */
+          country: countries ? (countries.get(String(r.key)) ?? null) : undefined,
           orders: r.orders as number,
           customers: r.customers as number,
           sales: amount(r.sales),
@@ -199,6 +212,8 @@ export class FactsReadService {
           expenses: seeExpenses ? amount(r.expenses) : null,
           costsOverPlan: seeExpenses ? amount(r.costsOverPlan) : null,
           ordersOverPlan: seeExpenses ? (r.ordersOverPlan as number) : null,
+          /** Expected profit on the orders already shipped and paid in full: profit made so far. */
+          profitDone: seeExpenses ? amount(r.profitDone) : null,
           received: amount(r.received),
           due: amount(r.due),
           overdue: amount(r.overdue),
@@ -473,6 +488,96 @@ export class FactsReadService {
         ? [...kinds.entries()].map(([category, k]) => ({ category, amount: fromMinor(k.minor), orders: k.orders.size })).sort((a, b) => toMinor(b.amount) - toMinor(a.amount))
         : null,
       missingRates: fx.missingRates,
+    };
+  }
+
+  /**
+   * What stands today and needs attention (Insights › Overview and Money): quotations still open and what
+   * they are likely to bring, quotations running out this week, customers overdue, factories late on their
+   * ready dates, orders of the span under 10% margin, and (money) what is owed each way in its own currency.
+   */
+  async now(user: SessionUser, q: Span) {
+    const { seeMoney, seeExpenses, today, currency, ctx } = await this.open(user);
+    const db = this.prisma.db;
+    const week = new Date(Date.parse(`${today}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
+    const yearAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 365 * 86_400_000).toISOString().slice(0, 10);
+    const [[quotes], [decided], [expiring], overdue, late, [low]] = await Promise.all([
+      db.$queryRaw<{ count: number; value: string }[]>`
+        select count(*)::int as count, coalesce(sum(f.quoted_value_main), 0)::text as value
+        from inquiry_facts f where f.outcome = 'open' and f.first_quote_on is not null`,
+      db.$queryRaw<{ won: number; lost: number }[]>`
+        select count(*) filter (where f.outcome = 'won')::int as won, count(*) filter (where f.outcome = 'lost')::int as lost
+        from inquiry_facts f where f.closed_on > ${yearAgo}::date`,
+      // The latest quotation sent on each open inquiry, valid until within the next 7 days.
+      db.$queryRaw<{ count: number; value: string }[]>`
+        select count(*)::int as count, coalesce(sum(f.quoted_value_main), 0)::text as value
+        from inquiry_facts f
+        join quotations qn on qn.inquiry_id = f.inquiry_id
+        join lateral (select r.valid_until from quotation_revisions r where r.quotation_id = qn.id and r.deleted_at is null and r.status = 'sent'
+                      order by r.number desc limit 1) r on true
+        where f.outcome = 'open' and r.valid_until between ${today}::date and ${week}::date`,
+      db.$queryRaw<{ customerId: string; name: string; amount: string; days: number }[]>`
+        select x.customer_id as "customerId", c.name, sum(x.overdue)::text as amount, max(x.days)::int as days
+        from (select f.customer_id, ${openSql(today, 1, null)} as overdue,
+                     (select max(${today}::date - (p ->> 'dueOn')::date) from jsonb_array_elements(f.open_parts) p
+                      where (p ->> 'dueOn')::date < ${today}::date and (p ->> 'open')::numeric > 0) as days
+              from order_facts f where f.status <> 'cancelled') x
+        join customers c on c.id = x.customer_id
+        where x.overdue > 0 group by 1, 2 order by max(x.days) desc, 2`,
+      // Goods not ready yet, past the date the factory promised (open orders).
+      db.$queryRaw<{ factoryId: string; name: string; days: number; orders: number }[]>`
+        select f.factory_id as "factoryId", x.name, max(${today}::date - f.ready_promised)::int as days, count(*)::int as orders
+        from factory_order_facts f join factories x on x.id = f.factory_id
+        where f.status = 'open' and f.ready_actual is null and f.ready_promised < ${today}::date
+        group by 1, 2 order by 3 desc, 2`,
+      db.$queryRaw<{ count: number; over: string }[]>`
+        select count(*)::int as count, coalesce(sum(f.costs_over_plan_main), 0)::text as over
+        from order_facts f
+        where f.status <> 'cancelled' and f.costed_main > 0 and ${seeExpenses ? Prisma.sql`f.margin` : Prisma.sql`f.margin_quote`} < 10
+        ${this.span(q, "f.ordered_on")}`,
+    ]);
+    const won = decided!.won;
+    const winRate = pct(won, won + decided!.lost);
+    let byCurrency: { currency: string; toReceive: string; toPay: string }[] | null = null;
+    if (seeMoney) {
+      // As held: what customers owe in each order's currency (the shared position), what we owe factories in theirs.
+      const due = (await positionsSql(db, ctx.fx)).filter((r) => r.dueMinor > 0);
+      const cur = await db.order.findMany({ where: { id: { in: due.map((r) => r.id) } }, select: { id: true, currency: true } });
+      const curOf = new Map(cur.map((o) => [o.id, o.currency]));
+      const pay = await db.$queryRaw<{ currency: string; toPay: string }[]>`
+        select f.currency, sum(f.to_pay)::text as "toPay" from factory_order_facts f
+        where f.status <> 'cancelled' and f.currency is not null group by 1 having sum(f.to_pay) <> 0`;
+      const map = new Map<string, { receive: number; pay: number }>();
+      const at = (c: string) => map.get(c) ?? (map.set(c, { receive: 0, pay: 0 }), map.get(c)!);
+      for (const r of due) at(curOf.get(r.id) ?? currency).receive += Math.round(r.dueMinor);
+      for (const r of pay) at(r.currency).pay += toMinor(r.toPay);
+      byCurrency = [...map.entries()]
+        .sort((a, b) => (a[0] === currency ? -1 : b[0] === currency ? 1 : a[0].localeCompare(b[0])))
+        .map(([c, v]) => ({ currency: c, toReceive: fromMinor(v.receive), toPay: fromMinor(v.pay) }));
+    }
+    return {
+      currency,
+      today,
+      seeMoney,
+      seeExpenses,
+      openQuotes: {
+        count: quotes!.count,
+        value: amount(quotes!.value),
+        /** Won ÷ decided over the last 12 months. */
+        winRate,
+        /** What they are likely to bring: their value × that win rate. */
+        likely: winRate === null ? null : fromMinor(Math.round((toMinor(amount(quotes!.value)) * winRate) / 100)),
+      },
+      expiring: { count: expiring!.count, value: amount(expiring!.value) },
+      overdue: {
+        customers: overdue.length,
+        amount: fromMinor(overdue.reduce((t, r) => t + toMinor(amount(r.amount)), 0)),
+        /** The longest overdue first. */
+        list: overdue.slice(0, 5).map((r) => ({ customerId: r.customerId, name: r.name, amount: amount(r.amount), days: r.days })),
+      },
+      lateFactories: late.map((r) => ({ factoryId: r.factoryId, name: r.name, days: r.days, orders: r.orders })),
+      lowMargin: { orders: low!.count, costsOverPlan: seeExpenses ? amount(low!.over) : null },
+      byCurrency,
     };
   }
 
