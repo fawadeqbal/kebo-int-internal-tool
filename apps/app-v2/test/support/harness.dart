@@ -70,6 +70,7 @@ void phoneSize(WidgetTester tester) {
 Widget _app(Session session, Widget home) => AppScope(
       session: session,
       child: MaterialApp.router(
+        debugShowCheckedModeBanner: false,
         theme: appTheme(Brightness.light),
         routerConfig: GoRouter(routes: [
           GoRoute(path: '/', builder: (c, s) => home),

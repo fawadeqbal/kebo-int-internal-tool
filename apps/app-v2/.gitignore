@@ -49,3 +49,6 @@ app.*.map.json
 
 # Python
 __pycache__/
+
+# Pictures made by test/shots (flutter test --tags shots --update-goldens)
+test/shots/out/
