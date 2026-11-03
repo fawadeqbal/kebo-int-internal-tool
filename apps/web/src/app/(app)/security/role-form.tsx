@@ -1,16 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { PERMISSION_FEATURE, PERMISSION_GROUPS, permissionInPlan, planFeatureName, type Permission } from "@kebo/shared";
-import { Alert, buttonClass, Checkbox, cn, Field, Input, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { Alert, Checkbox, cn, Field, Input, Textarea } from "@kebo/ui";
+import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { useFeatures } from "@/components/common/features";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
+
+type RoleFormProps = Parameters<typeof RoleForm>[0];
+
+/**
+ * A role in the side panel: "New role" over the roles (?panel=new-role) or
+ * "Edit role · name" over the role (?panel=edit-role). A new role opens its
+ * own page when made; an edit closes the panel with "Saved".
+ */
+export function RolePanel({ name, title, description, ...form }: Omit<RoleFormProps, "onSaved"> & { name: string; title: string; description?: string }) {
+  const panel = useSidePanel(name);
+  if (!panel.open) return null;
+  return (
+    <SidePanel title={title} description={description} onClose={() => panel.close()}>
+      <PanelBody>
+        <RoleForm
+          {...form}
+          onSaved={(message) => {
+            toast(message ?? "Saved");
+            panel.close();
+          }}
+        />
+      </PanelBody>
+    </SidePanel>
+  );
+}
 
 /**
  * A role: its name, what it is for, its permissions in groups (with "all" per
@@ -25,8 +50,11 @@ export function RoleForm({
   isMine = false,
   locked = false,
   submitLabel,
+  onSaved,
 }: {
   action: Action;
+  /** After a save (an edit; a new role goes to its page). */
+  onSaved?: (message?: string) => void;
   role?: { name: string; description: string | null; permissions: Permission[]; superAdmin: boolean; requireTwoStep: boolean };
   /** The editor's own permissions; null for a Super Admin (may give anything). */
   mine: Permission[] | null;
@@ -36,6 +64,7 @@ export function RoleForm({
   locked?: boolean;
   submitLabel: string;
 }) {
+  const close = useClosePanel();
   const superAdmin = !!role?.superAdmin;
   const fixed = superAdmin || locked;
   const [picked, setPicked] = useState<Set<Permission>>(() => new Set(role?.permissions ?? ["dashboard.view"]));
@@ -51,12 +80,12 @@ export function RoleForm({
       return n;
     });
   return (
-    <ActionForm action={action} keepFields className="flex flex-col gap-5">
+    <ActionForm action={action} keepFields showSuccess={false} className={PANEL_FORM} onDone={(r) => onSaved?.(r.message)}>
       {(s) => (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Name" htmlFor="name" error={s.errors?.name} hint={superAdmin ? "The Super Admin role keeps its name." : locked ? "Renaming roles is part of custom roles." : "What people will see, e.g. Accounts or Sales (China)."}>
-              <Input id="name" name="name" defaultValue={s.values?.name ?? role?.name} readOnly={fixed} autoFocus={!role} aria-invalid={!!s.errors?.name} />
+              <Input id="name" name="name" defaultValue={s.values?.name ?? role?.name} readOnly={fixed} aria-invalid={!!s.errors?.name} />
             </Field>
             <Field label="What it is for" htmlFor="description" error={s.errors?.description} hint="Shown when someone is given the role.">
               <Textarea id="description" name="description" rows={2} defaultValue={s.values?.description ?? role?.description ?? ""} maxLength={300} />
@@ -83,7 +112,7 @@ export function RoleForm({
               <Alert tone="info">Changing what a role allows is part of custom roles, which your company&apos;s plan does not include. The description and the two-step rule still change here.</Alert>
             )}
             {s.errors?.permissions && <p className="text-sm text-bad">{s.errors.permissions[0]}</p>}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4">
               {PERMISSION_GROUPS.map((g) => {
                 const open = g.items.filter((i) => may(i.permission));
                 const all = open.length > 0 && open.every((i) => picked.has(i.permission));
@@ -143,12 +172,13 @@ export function RoleForm({
             </div>
           </fieldset>
 
-          <div className="flex justify-end gap-2 border-t border-line pt-4">
-            <Link href="/security" className={buttonClass("ghost")}>
-              Cancel
-            </Link>
+          <PanelActions>
             <SubmitButton pendingText="Saving…">{submitLabel}</SubmitButton>
-          </div>
+            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
+              Cancel
+            </button>
+            <PanelKeys />
+          </PanelActions>
         </>
       )}
     </ActionForm>

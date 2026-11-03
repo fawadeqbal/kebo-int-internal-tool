@@ -23,12 +23,29 @@ export interface SettingField {
   maxPixels?: number;
 }
 
+/**
+ * One card of a settings section (design system: Settings frame): its values
+ * read-only, ✎ Edit opens them in the side panel. `switches`: on/off rows that
+ * save as they are switched, no panel.
+ */
+export interface SettingCard {
+  key: string;
+  title: string;
+  /** What it holds, in one line. */
+  description: string;
+  fields: string[];
+  switches?: boolean;
+  /** Shows the top of the documents as these values make it. */
+  preview?: boolean;
+}
+
 export interface SettingGroup {
   key: SettingsKey;
   title: string;
   description: string;
   save: string;
   fields: SettingField[];
+  cards: SettingCard[];
 }
 
 const days = (name: string, label: string, hint: string): SettingField => ({ name, label, hint, kind: "number", unit: "days" });
@@ -63,6 +80,27 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "invoiceFooter", label: "Invoice footer", kind: "textarea", wide: true, hint: "A line at the bottom of every invoice, e.g. thanks or payment notes" },
       { name: "proformaPrefix", label: "Proforma number starts with", kind: "text", hint: "e.g. ABC in ABC260916TN07 (then the issue date, the customer's letters and the handler's count this year)" },
       { name: "stamp", label: "Company stamp", kind: "image", wide: true, noun: "stamp", hint: "The red seal printed on proforma invoices. A PNG or JPEG under 300 KB, scanned on white." },
+    ],
+    cards: [
+      {
+        key: "brand",
+        title: "The top of your documents",
+        description: "Logo, title and names printed at the top of every quotation, invoice and packing list.",
+        fields: ["logo", "brandMark", "brandTagline", "name", "nameLocal"],
+        preview: true,
+      },
+      {
+        key: "contact",
+        title: "Contact details",
+        description: "Printed under the top of every document, so customers know how to reach you.",
+        fields: ["taxNo", "address", "phone", "website", "email", "email2"],
+      },
+      {
+        key: "invoices",
+        title: "On invoices",
+        description: "How customers pay you, the line at the bottom, the proforma number and the stamp.",
+        fields: ["bankDetails", "invoiceFooter", "proformaPrefix", "stamp"],
+      },
     ],
   },
   {
@@ -100,6 +138,38 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "warrantyTerms", label: "Warranty on sales contracts", kind: "textarea", wide: true, hint: "Printed on the sales contract and the SAT certificate" },
       { name: "categories", label: "Product categories", kind: "lines", wide: true, hint: "One per line. Every inquiry is filed under one of these." },
     ],
+    cards: [
+      {
+        key: "currencies",
+        title: "Currencies",
+        description: "The main currency of reports and totals, and what one unit of it buys in the others.",
+        fields: ["currency"],
+      },
+      {
+        key: "quotations",
+        title: "New quotations start with",
+        description: "Margin, validity, deposit and terms. People can change them on each quotation.",
+        fields: ["defaultMarginPercent", "quotationValidityDays", "defaultDepositPercent", "defaultBalanceTerms", "defaultIncoterm"],
+      },
+      {
+        key: "factory",
+        title: "Factory offers start with",
+        description: "Tax and the advance we pay when we order. Each offer can say otherwise.",
+        fields: ["factoryTaxIncluded", "factoryTaxRate", "factoryAdvancePercent"],
+      },
+      {
+        key: "terms",
+        title: "Printed terms",
+        description: "Payment, delivery and warranty wording on new quotations and contracts.",
+        fields: ["defaultPaymentTerms", "defaultDeliveryTerms", "warrantyTerms"],
+      },
+      {
+        key: "categories",
+        title: "Product categories",
+        description: "Every inquiry is filed under one of these.",
+        fields: ["categories"],
+      },
+    ],
   },
   {
     key: "reminders",
@@ -115,6 +185,20 @@ export const SETTING_GROUPS: SettingGroup[] = [
       days("balanceDays", "Remind about the balance after shipping", "If money is still due this many days after the goods were shipped, chase the customer for the balance"),
       days("escalateAfterDays", "Tell the managers after", "When an order is this many days late on what it needs, the managers are told"),
     ],
+    cards: [
+      {
+        key: "inquiries",
+        title: "Inquiries and quotations",
+        description: "When someone is nudged about an inquiry that waits, and how far ahead due dates warn.",
+        fields: ["newDays", "sourcingDays", "dueSoonDays"],
+      },
+      {
+        key: "orders",
+        title: "Orders",
+        description: "When the person handling an order is reminded, and when the managers are told.",
+        fields: ["depositDays", "productionDays", "balanceDays", "escalateAfterDays"],
+      },
+    ],
   },
   {
     key: "notifications",
@@ -127,6 +211,21 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "dealWonOrLost", label: "An inquiry is won or lost", kind: "bool" },
       { name: "paymentReceived", label: "A customer payment is recorded", kind: "bool" },
       { name: "dailySummary", label: "Daily summary", kind: "bool", hint: "Each morning: new inquiries, late orders and money due" },
+    ],
+    cards: [
+      {
+        key: "recipients",
+        title: "Who gets the emails",
+        description: "The admin list: up to 20 addresses. They get the emails switched on below.",
+        fields: ["emails"],
+      },
+      {
+        key: "which",
+        title: "Which emails",
+        description: "Each switch saves at once.",
+        fields: ["newInquiry", "dealWonOrLost", "paymentReceived", "dailySummary"],
+        switches: true,
+      },
     ],
   },
 ];

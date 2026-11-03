@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { SITE_ICONS, siteContent, type SiteContent, type SiteIcon } from "@kebo/shared";
 import { Button, Card, CardBody, CardHeader, Checkbox, cn, Field, Input, Select, Textarea } from "@kebo/ui";
@@ -9,6 +9,7 @@ import { ActionForm } from "@/components/common/action-form";
 import { SITE_ICON } from "@/components/site/icons";
 import type { SitePlan } from "@/components/site/marketing";
 import { saveSiteAction } from "./actions";
+import { SITE_DIRTY_EVENT } from "./publish";
 
 type Errors = Record<string, string>;
 
@@ -44,6 +45,10 @@ export function SiteEditor({ initial, plans }: { initial: SiteContent; plans: Si
   const [tried, setTried] = useState(false);
   const errors = useMemo(() => (tried ? problems(c) : {}), [c, tried]);
   const dirty = JSON.stringify(c) !== JSON.stringify(initial);
+  // One primary on the page: Save the draft while there are changes, else Publish in the header (it listens).
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(SITE_DIRTY_EVENT, { detail: dirty }));
+  }, [dirty]);
   const set = <K extends keyof SiteContent>(k: K, v: SiteContent[K]) => setC((x) => ({ ...x, [k]: v }));
   const err = (k: string) => (errors[k] ? [errors[k]] : undefined);
 
@@ -370,6 +375,7 @@ export function SiteEditor({ initial, plans }: { initial: SiteContent; plans: Si
               : "No changes since the last save."}
         </p>
         <SubmitButton
+          variant={dirty ? "primary" : "secondary"}
           pendingText="Saving…"
           disabled={!dirty}
           onClick={(e) => {

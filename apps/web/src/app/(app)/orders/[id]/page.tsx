@@ -91,7 +91,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
               </span>
             </span>
           </p>
-          <Link href={`${base}/${STEP_PATH[doNow.step]}`} className={buttonClass(doNow.late ? "danger" : "primary", "sm", "w-fit")}>
+          <Link href={`${base}/${STEP_PATH[doNow.step]}`} className={buttonClass("primary", "sm", "w-fit")}>
             Open {doNow.label}
           </Link>
         </section>

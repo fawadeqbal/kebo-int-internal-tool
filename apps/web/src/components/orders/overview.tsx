@@ -578,7 +578,7 @@ export function WhatNext({ f, base }: { f: OverviewFacts; base: string }) {
           </ol>
           <div className="flex flex-wrap gap-2">
             {stepsShown.map((s, k) => (
-              <Link key={s} href={`${base}/${STEP_PATH[s]}`} className={buttonClass(k === 0 ? "primary" : "ghost", "sm")}>
+              <Link key={s} href={`${base}/${STEP_PATH[s]}`} className={buttonClass(k === 0 ? "secondary" : "ghost", "sm")}>
                 Open {f.nextItems.find((i) => i.step === s)!.stepLabel}
               </Link>
             ))}

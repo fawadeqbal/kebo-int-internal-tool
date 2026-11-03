@@ -398,6 +398,57 @@ export function SectionNav({
   );
 }
 
+/* ---------------------------------------------------------------- SectionList (Settings frame) */
+
+/**
+ * The Settings frame (design system: page frames · Settings): a list of the
+ * module's sections, always visible — down the left from a laptop up, a row
+ * of chips that scrolls sideways on a phone and a tablet, the current one
+ * filled — and the section's cards beside it.
+ */
+export function SectionList({
+  label,
+  items,
+  children,
+  wide,
+  className,
+}: {
+  label: string;
+  items: SectionNavItem[];
+  children: ReactNode;
+  /** Sections with tables: the cards take the whole width (otherwise a readable column). */
+  wide?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-6", className)}>
+      <nav aria-label={label} className="no-print lg:sticky lg:top-20">
+        <ul className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+          {items.map((l) => (
+            <li key={l.href} className="shrink-0">
+              <Link
+                href={l.href}
+                aria-current={l.active ? "page" : undefined}
+                className={cn(
+                  "flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap lg:h-auto lg:rounded-md lg:px-2.5 lg:py-1.5 lg:text-sm",
+                  l.active ? "bg-primary-soft font-semibold text-primary" : "bg-surface-2 text-text-2 hover:text-text lg:bg-transparent lg:font-normal lg:hover:bg-surface-2",
+                )}
+              >
+                {l.mark}
+                <span>{l.label}</span>
+                {l.count !== undefined && l.count !== null && l.count !== "" && (
+                  <span className={cn("ml-auto text-[11px] tabular", l.alert ? "text-bad" : "text-muted")}>{l.count}</span>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className={cn("flex min-w-0 flex-col gap-4", !wide && "max-w-3xl")}>{children}</div>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- StickyBar */
 
 /** Save and Cancel of a long form, kept in view; above the phone's bottom bar. */
