@@ -3,6 +3,8 @@ import {
   appMakesDocument,
   APP_DOCUMENT_KINDS,
   buyerChanges,
+  packingListNo,
+  paperNumber,
   ORDER_DOCUMENT_KINDS,
   paymentSentenceOf,
   routeAsAccepted,
@@ -65,5 +67,12 @@ describe("papers that never move: the buyer", () => {
     expect(buyerChanges(onOrder, { ...onOrder })).toEqual([]);
     expect(buyerChanges(onOrder, { ...onOrder, address: "New road", taxNo: "NTN-1", regNo: null })).toEqual(["address", "tax no."]);
     expect(buyerChanges(null, { name: "X" })).toEqual(["name"]);
+  });
+});
+
+describe("the packing list's number", () => {
+  it("is the order's, with PL in front: one formula for the list, the Papers list and the cover letter", () => {
+    expect(packingListNo("SO-2026-0005")).toBe("PL-2026-0005");
+    expect(packingListNo("SO-2026-0031")).toBe(paperNumber("SO-2026-0031", "commercial-invoice").replace(/^CI-/, "PL-"));
   });
 });

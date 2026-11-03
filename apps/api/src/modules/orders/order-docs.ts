@@ -3,6 +3,7 @@ import { documentTotals, fromMinor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
   balanceTermsOf,
+  packingListNo,
   portsOf,
   routeAsAccepted,
   routePaymentSentence,
@@ -34,7 +35,6 @@ export const ORDER_DOCUMENTS = ["proforma", "packing-list"] as const;
 export type OrderDocKind = (typeof ORDER_DOCUMENTS)[number];
 
 const TITLE: Record<OrderDocKind, string> = { proforma: "Proforma invoice", "packing-list": "Packing list" };
-const PREFIX: Record<OrderDocKind, string> = { proforma: "PI", "packing-list": "PL" };
 
 /** "30% deposit, balance against B/L copy": only the first letter of the terms is lowered, so "B/L" stays as written. */
 export function paymentTermsOf(depositPercent: number, balanceTerms: BalanceTerms): string {
@@ -81,7 +81,7 @@ export interface DocCtx {
 
 /** The document's number: the proforma's once issued (null before), the packing list's from the order's. */
 export const docNumber = (o: { refNo: string; proformaNo: string | null }, kind: OrderDocKind) =>
-  kind === "proforma" ? o.proformaNo : o.refNo.replace(/^[A-Z]+-/, `${PREFIX[kind]}-`);
+  kind === "proforma" ? o.proformaNo : packingListNo(o.refNo);
 
 /** The packing list is made final once the order is shipped and its packing is filled in. */
 export const packingFinalNow = (o: { stage: string; packedAt: Date | null }) => !!o.packedAt && (o.stage === "shipped" || o.stage === "done");

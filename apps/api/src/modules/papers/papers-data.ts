@@ -17,6 +17,7 @@ import {
   type FactoryDueRule,
   documentDone,
   documentsInUse,
+  packingListNo,
   portsOf as portsOfOrder,
   shipByVsLc,
   SAT_RESULT_LABEL,
@@ -1101,7 +1102,7 @@ function coverLetter(c: PaperCtx): Built {
     const row = c.o.documents.find((d) => d.kind === kind && d.number);
     if (row) return row.number;
     if (kind === "proforma_invoice") return c.o.proformaNo;
-    if (kind === "packing_list") return paperNumber(c.o.refNo, "commercial-invoice").replace(/^CI-/, "PL-");
+    if (kind === "packing_list") return packingListNo(c.o.refNo);
     return null;
   };
   const papers: { label: string; number: string | null; set: [number, number] }[] = [
