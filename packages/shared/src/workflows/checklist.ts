@@ -112,6 +112,8 @@ export interface ChecklistFacts {
     | null;
   /** An LC order: the LC checked against the order (amount, currency, ship-by, expiry); null otherwise. */
   lcChecks?: LcCheck[] | null;
+  /** The route is still the one the quotation's terms implied (the order started on it). */
+  routeFromQuotation?: boolean;
   /** The order's ready date: the latest of its factories', once each has given one. */
   readyOn: ISODate | null;
   /** Each factory's own ready date (one per factory; one row, factory null, when the lines name none). */
@@ -251,7 +253,7 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
     add("payment", "route", {
       done: f.route !== null,
       doneOn: null,
-      data: pairs([["Route", f.route ? PAYMENT_ROUTE_LABEL[f.route].replace(/ \(.*\)$/, "") : null]]),
+      data: pairs([["Route", f.route ? `${PAYMENT_ROUTE_LABEL[f.route].replace(/ \(.*\)$/, "")}${f.routeFromQuotation ? " · from the quotation" : ""}` : null]]),
       needs: f.route ? null : "how the customer pays",
     });
     if (bankRoute) {

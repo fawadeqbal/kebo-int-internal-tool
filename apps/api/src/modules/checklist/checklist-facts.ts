@@ -1,8 +1,8 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import type { ChecklistFacts } from "@kebo/shared";
+import { routeFromQuotation, type ChecklistFacts } from "@kebo/shared";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
-import { lcChecksOf } from "../money/route-plan";
+import { lcChecksOf, termsOf } from "../money/route-plan";
 import { readyByOf, readyOnOf, readySelect } from "../orders/ready";
 import { chargedExpenses, positionOf, type MoneyCtx } from "../money/position";
 import { dateIn, type ISODate } from "@kebo/utils";
@@ -82,6 +82,7 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
     factoryOrderNo: o.factoryOrderNo,
     factories,
     lcChecks: lcChecksOf({ ...o, readyOn: readyOnOf(o) }, lcCourierDays),
+    routeFromQuotation: routeFromQuotation(termsOf(o), o.balanceTerms),
     readyOn: readyOnOf(o),
     // Each factory's own date (production items per factory); one row when the lines name no factory.
     readyBy: readyByOf(o).map((r) => ({ factory: o.lines.find((l) => l.factoryId === r.factoryId)?.factory?.name ?? null, readyOn: r.readyOn })),

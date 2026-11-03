@@ -27,6 +27,8 @@ export interface OrderFlow {
   payment: {
     route: PaymentRoute | null;
     routeLabel: string | null;
+    /** Still the route the quotation's terms implied (the order started on it). */
+    fromQuotation?: boolean;
     balanceWhen: BalanceWhen | null;
     lcTerms: LcTerms | null;
     lcDays: number | null;
@@ -38,7 +40,15 @@ export interface OrderFlow {
     depositIn: boolean;
     bankContract: BankContract | null;
   };
-  factory: { orderedOn: string | null; orderNo?: string | null; readyOn: string | null; factories: { id: string; name: string }[] };
+  factory: {
+    orderedOn: string | null;
+    orderNo?: string | null;
+    /** The order's ready date: the latest of its factories' (known once each has given one). */
+    readyOn: string | null;
+    /** Each factory's own ready date (factoryId null: the goods of an order whose lines name no factory). */
+    readyBy?: { factoryId: string | null; name: string | null; readyOn: string | null }[];
+    factories: { id: string; name: string }[];
+  };
   production: { steps: ProductionStepView[]; suggested: string[] } | null;
   shipping: { shipments: ShipmentView[] } | null;
   documents: { set: FlowDocument[]; bankSteps: BankStepView[] } | null;

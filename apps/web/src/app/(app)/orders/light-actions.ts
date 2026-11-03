@@ -43,6 +43,9 @@ const CONTRACT = ["number", "status", "customerBank", "ourBank", "amount", "curr
 const DELIVERY = ["deliveredOn", "deliveryCondition", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy"];
 const DETAILS = ["shipBy", "readyOn", "shippedOn", "blNo", "portOfDischarge", "containerNo", "shippingMarks", "documentTitle"];
 
+/** A factory's own ready date field on the Factory card: "readyOn__<factory id>". */
+const READY_OF = "readyOn__";
+
 const pick = (v: Record<string, string>, keys: string[]) => Object.fromEntries(keys.filter((k) => k in v).map((k) => [k, v[k]]));
 
 /** A shipment only moves forward: planned → booked → loaded → departed → arrived (cleared stays). */
@@ -111,7 +114,10 @@ export async function fieldsAction(orderId: string, target: string, _prev: Actio
         }
         case "factory": {
           const fo = pick(v, ["factoryOrderedOn", "factoryOrderNo"]);
-          const details = pick(v, ["readyOn", "shipBy"]);
+          const details: Record<string, unknown> = pick(v, ["readyOn", "shipBy"]);
+          // One ready date per factory: "readyOn__<factory id>" fields are each factory's own.
+          const each = Object.keys(v).filter((k) => k.startsWith(READY_OF));
+          if (each.length) details.readyBy = each.map((k) => ({ factoryId: k.slice(READY_OF.length), readyOn: v[k] || null }));
           if (Object.keys(fo).length) await api.patch(`/orders/${orderId}/factory-order`, fo);
           if (Object.keys(details).length) await api.patch(`/orders/${orderId}/details`, { ...details, reason: reasonOf(form) });
           return null;

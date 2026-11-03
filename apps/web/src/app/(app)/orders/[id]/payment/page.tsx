@@ -115,7 +115,17 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
 
   // How they pay: the route and its terms, and on a bank route the LC or contract (+ Add each value).
   const fields: DetailField[] = [
-    { label: "Route", value: route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : null },
+    {
+      label: "Route",
+      // The order started on the route the quotation's terms implied: said so, and changeable.
+      value: route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : null,
+      show: route ? (
+        <span>
+          {PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "")}
+          {flow?.payment.fromQuotation && <span className="font-normal text-text-2"> · from the quotation</span>}
+        </span>
+      ) : null,
+    },
     {
       label: "Deposit",
       // The deposit the plan asks for; the % accepted on the quotation beside it when the plan was changed.
@@ -188,6 +198,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               bankRoutes={flow.modules.bankContracts}
               currency={c}
               terms={terms}
+              fromQuotation={flow.payment.fromQuotation}
             />
           ) : undefined
         }

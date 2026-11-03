@@ -113,12 +113,15 @@ export function RouteForm({
   onDone,
   terms,
   suggest,
+  fromQuotation,
 }: {
   action: Action;
   route: PaymentRoute | null;
   bankRoutes: boolean;
   onDone?: () => void;
   terms?: RouteTermsValue;
+  /** The order started on this route: the one the quotation's terms implied. */
+  fromQuotation?: boolean;
   /** Not chosen yet: the route the quote's terms point to, picked for the person to check. */
   suggest?: PaymentRoute | null;
 }) {
@@ -177,7 +180,11 @@ export function RouteForm({
           )}
         </div>
       )}
-      {route && <p className="text-xs text-muted">Change it and the plan is rebuilt (payments already recorded stay).</p>}
+      {route && (
+        <p className="text-xs text-muted">
+          {fromQuotation ? "From the quotation's terms. " : ""}Change it and the plan is rebuilt (payments already recorded and instalments changed by hand stay).
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         <SubmitButton size="sm" pendingText="Saving…" disabled={!pick || !changed || (pick === "letter_of_credit" && lcTerms === "deferred" && !Number(lcDays))}>
           Save the payment route

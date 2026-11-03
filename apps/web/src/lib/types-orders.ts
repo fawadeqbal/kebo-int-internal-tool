@@ -58,7 +58,10 @@ export interface OrderView {
   shipBy: string | null;
   /** While ship-by is empty: when the customer wanted it (the deal's "wanted by"). */
   shipBySuggested?: string | null;
+  /** The latest of the factories' ready dates (known once each has given one). */
   readyOn: string | null;
+  /** Each factory's own ready date. */
+  readyBy?: { factoryId: string | null; name: string | null; readyOn: string | null }[];
   /** The shipments', never the order's: the earliest day one left, and Shipment 1's B/L. */
   shippedOn: string | null;
   blNo: string | null;

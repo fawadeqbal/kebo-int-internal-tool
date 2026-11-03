@@ -25,6 +25,7 @@ import { MoneyInput } from "@/components/common/money-input";
 import { LineTable, type LineColumn, type LineResult, type LineRow } from "@/components/lines/line-table";
 import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
+import { dueText } from "@/lib/format";
 import type { CustomerCreditView, FactoryPlanView, OrderMoney } from "@/lib/types-money";
 import { useBankBand } from "@/components/orders/bank-tracker";
 import { AccountSelect } from "./accounts";
@@ -166,7 +167,6 @@ function ReceivedFields({
   const partMinor = part === null ? auto : toMinor(part);
   const leftMinor = a.countsMinor - partMinor;
   const tooMuch = partMinor + chargesMinor > dueMinor;
-  const kind = Number(depositDue) > 0 ? "deposit" : "balance";
   // The slip goes with the save itself: recording the deposit ticks the checklist row this form was opened from.
   const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", onFileError);
   const done = () => onClose();
@@ -180,7 +180,6 @@ function ReceivedFields({
               Record what really happened: the currency and account it arrived in, who paid, and the rate. The system works out what it covers on the order.
             </p>
           </div>
-          <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="receivedCurrency" value={a.received} />
           <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
           <input type="hidden" name="method" value={method} />
@@ -332,14 +331,12 @@ export function ReachedForm({
   const chargesMinor = toMinor(charges);
   const partMinor = Math.max(Math.min(a.countsMinor, dueMinor - chargesMinor), 0);
   const leftMinor = a.countsMinor - partMinor;
-  const kind = Number(depositDue) > 0 ? "deposit" : "balance";
   const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", band.error);
   const leftDue = Math.max(dueMinor - a.countsMinor - chargesMinor, 0);
   return (
     <ActionForm action={save} onDone={band.close} keepFields className="@container flex min-h-0 flex-1 flex-col">
       {(s) => (
         <>
-          <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="receivedCurrency" value={a.received} />
           <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
           <input type="hidden" name="method" value="bank_transfer" />
@@ -946,13 +943,13 @@ export function PlanLines({ plan, currency, total, received, due }: { plan: Orde
   const rows: LineRow[] = plan.items.map((i) => ({
     key: i.id,
     parentKey: null,
-    values: { label: i.label, how: i.how, due: i.dueOn ? day(i.dueOn) : (i.when ?? ""), amount: fromMinor(toMinor(i.amount)), paid: fromMinor(toMinor(i.paid)), status: i.status, paidOn: "" },
+    values: { label: i.label, how: i.how, due: dueText(i), amount: fromMinor(toMinor(i.amount)), paid: fromMinor(toMinor(i.paid)), status: i.status, paidOn: "" },
   }));
   const columns: LineColumn[] = [
     // Fixed widths: the line table gives a flexible column 16rem at least, more than a step page's card has.
     { key: "label", label: "Part", width: "8rem" },
     { key: "how", label: "How", width: "7rem", phoneHidden: true },
-    { key: "due", label: "Due", width: "7.5rem" },
+    { key: "due", label: "Due", width: "10rem" },
     { key: "amount", label: `Amount ${currency}`, width: "6.5rem", align: "right", format: (v) => <span className="tabular">{grouped(v.amount)}</span> },
     { key: "paid", label: "Received", width: "6rem", align: "right", phoneHidden: true, format: (v) => <span className="tabular">{grouped(v.paid)}</span> },
     {

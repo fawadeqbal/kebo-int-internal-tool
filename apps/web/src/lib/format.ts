@@ -12,3 +12,17 @@ export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d
 export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, TZ);
 export const timeAgo = (d: Date | string) => ago(d, TZ);
 export const qty = (q: string | number) => Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+/** "1 Apr" (a calendar day, no year). */
+const dayMonth = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/**
+ * When an instalment falls due, as its rule says and with the date it gives now: "On the ready date (1 Apr)",
+ * "14 days after shipping (15 Apr)", "On the ready date · not known yet"; a fixed one: its date.
+ */
+export function dueText(i: { dueOn: string | null; rule?: string | null; when?: string | null }): string {
+  const rule = i.rule ? i.rule.charAt(0).toUpperCase() + i.rule.slice(1) : null;
+  if (rule) return i.dueOn ? `${rule} (${dayMonth(i.dueOn)})` : `${rule} · not known yet`;
+  if (i.dueOn) return date(i.dueOn);
+  return i.when ? i.when.charAt(0).toUpperCase() + i.when.slice(1) : "No date yet";
+}
