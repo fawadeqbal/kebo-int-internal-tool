@@ -947,7 +947,7 @@ export function PlanLines({ plan, currency, total, received, due }: { plan: Orde
     // Fixed widths: the line table gives a flexible column 16rem at least, more than a step page's card has.
     { key: "label", label: "Part", width: "8rem" },
     { key: "how", label: "How", width: "7rem", phoneHidden: true },
-    { key: "due", label: "Due", width: "10rem" },
+    { key: "due", label: "Due", width: "7.5rem" },
     { key: "amount", label: `Amount ${currency}`, width: "6.5rem", align: "right", format: (v) => <span className="tabular">{grouped(v.amount)}</span> },
     { key: "paid", label: "Received", width: "6rem", align: "right", phoneHidden: true, format: (v) => <span className="tabular">{grouped(v.paid)}</span> },
     {
