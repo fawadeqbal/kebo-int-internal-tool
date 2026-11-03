@@ -1,7 +1,7 @@
 import { daysBetween, type ISODate } from "@kebo/utils";
 import { lcChecksLine, type LcCheck } from "./money-route";
 import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute, ShipMode, ShipmentStatus } from "../enums";
-import type { PaperKind } from "./papers";
+import { documentsInUse, type PaperKind } from "./papers";
 import {
   BANK_STEP_LABEL,
   bankStepsFor,
@@ -10,7 +10,6 @@ import {
   FLOW_STEPS,
   ORDER_DOCUMENT_LABEL,
   PAYMENT_ROUTE_LABEL,
-  requiredDocuments,
   SHIP_MODE_LABEL,
   type FlowStep,
 } from "./flow";
@@ -142,6 +141,8 @@ export interface ChecklistFacts {
   satSignedBy: string | null;
   claims: { open: number; total: number };
   closedOn: ISODate | null;
+  /** Settings › Papers we use: the papers the company switched off (their doc:* items are left out unless done). */
+  papersOff?: readonly string[];
 }
 
 export interface AutoItem {
@@ -455,7 +456,9 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
   /* Documents & bank */
   if (docs) {
     const mode = first?.mode ?? f.shipMode ?? "sea";
-    requiredDocuments(f.route, mode).forEach((kind, i) => {
+    const doneKind = (kind: OrderDocumentKind) =>
+      f.documents.some((d) => d.kind === kind && documentDone(d.status)) || (kind === "proforma_invoice" ? !!f.proforma : kind === "packing_list" ? !!f.packedAt : false);
+    documentsInUse(f.route, mode, f.papersOff, doneKind).forEach((kind, i) => {
       const rows = f.documents.filter((d) => d.kind === kind);
       const ready = rows.find((d) => documentDone(d.status));
       const system = kind === "proforma_invoice" ? f.proforma : null;

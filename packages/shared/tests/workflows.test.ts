@@ -18,6 +18,16 @@ import {
   revisionInput,
   stageMoveInput,
   type OrderFacts,
+  documentsInUse,
+  documentSwitch,
+  documentUsed,
+  PAPER_KINDS,
+  PAPER_SWITCH_GROUPS,
+  PAPER_SWITCHES,
+  paperUsed,
+  readSettings,
+  requiredDocuments,
+  SETTINGS,
 } from "../src";
 
 describe("inquiry stages", () => {
@@ -357,5 +367,29 @@ describe("devices", () => {
     expect(deviceOf("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:131.0) Gecko/20100101 Firefox/131.0")).toBe("Firefox on Mac");
     expect(deviceOf("Dart/3.5 (dart:io)")).toBe("Kebo app");
     expect(deviceOf(null)).toBe("Unknown device");
+  });
+});
+
+describe("papers we use", () => {
+  it("starts with every paper on", () => {
+    expect(readSettings({}).papers).toEqual({ off: [] });
+    expect(PAPER_SWITCHES.every((k) => paperUsed([], k))).toBe(true);
+    // Every paper the app makes is in the list, with the order's own and the ones others issue.
+    expect(PAPER_SWITCHES).toEqual(expect.arrayContaining([...PAPER_KINDS, "proforma", "packing-list", "bill_of_lading", "certificate_of_origin", "insurance"]));
+    expect(PAPER_SWITCH_GROUPS.flatMap((g) => g.keys).sort()).toEqual([...PAPER_SWITCHES].sort());
+  });
+
+  it("keeps known keys once", () => {
+    expect(SETTINGS.papers.parse({ off: ["insurance", "nope", "insurance", "bill-of-exchange"] })).toEqual({ off: ["insurance", "bill-of-exchange"] });
+  });
+
+  it("leaves switched-off papers out of the set, unless already in", () => {
+    const all = documentsInUse("letter_of_credit", "sea", []);
+    expect(all).toEqual(requiredDocuments("letter_of_credit", "sea"));
+    const off = ["insurance", "certificate_of_origin", "proforma"];
+    expect(documentsInUse("letter_of_credit", "sea", off)).toEqual(all.filter((k) => !["insurance", "certificate_of_origin", "proforma_invoice"].includes(k)));
+    expect(documentsInUse("letter_of_credit", "sea", off, (k) => k === "insurance")).toContain("insurance");
+    expect(documentSwitch("other")).toBeNull();
+    expect(documentUsed(off, "other")).toBe(true);
   });
 });

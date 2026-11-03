@@ -9,6 +9,7 @@ import { SETTING_GROUPS } from "./groups";
 import { AddressCard } from "./address/card";
 import { WebsiteFormCard } from "./website-form/card";
 import { OrderChecklistCard } from "./order-checklist/card";
+import { PapersCard } from "./papers/card";
 
 export const metadata = { title: "Settings" };
 
@@ -24,13 +25,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const tabs: { key: string; title: string }[] = [
     ...SETTING_GROUPS,
     { key: "order-checklist", title: "Order checklist" },
+    { key: "papers", title: "Papers we use" },
     { key: "website-form", title: "Website form" },
     ...(process.env.BASE_DOMAIN ? [{ key: "address", title: "Company address" }] : []),
   ];
   const address = sp.tab === "address" && !!process.env.BASE_DOMAIN;
   const websiteForm = sp.tab === "website-form";
   const checklist = sp.tab === "order-checklist";
-  const own = address ? "address" : websiteForm ? "website-form" : checklist ? "order-checklist" : null;
+  const papers = sp.tab === "papers";
+  const own = address ? "address" : websiteForm ? "website-form" : checklist ? "order-checklist" : papers ? "papers" : null;
   const group = SETTING_GROUPS.find((g) => g.key === sp.tab) ?? SETTING_GROUPS[0]!;
   return (
     <div>
@@ -67,6 +70,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <WebsiteFormCard />
           ) : checklist ? (
             <OrderChecklistCard />
+          ) : papers ? (
+            <PapersCard value={settings.papers} />
           ) : (
             <SettingsGroupForm
               key={group.key}
