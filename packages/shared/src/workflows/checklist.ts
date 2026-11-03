@@ -571,15 +571,6 @@ export const DEFAULT_CHECKLIST: ChecklistTemplateItem[] = [
   { step: "payment", title: "Sales contract signed by both", tool: "upload", route: "letter_of_credit", sort: 15 },
   {
     step: "production",
-    title: "Drawings approved by the customer",
-    tool: "fill",
-    fields: [fld("approvedBy", "Approved by"), fld("file", "File", "file")],
-    sort: 10,
-  },
-  { step: "production", title: "Materials and parts in", tool: "done", sort: 20 },
-  { step: "production", title: "Machining and assembly", tool: "done", sort: 30 },
-  {
-    step: "production",
     title: "Factory test run (FAT) with video",
     tool: "fill",
     fields: [fld("date", "Date", "date"), fld("result", "Result"), fld("video", "Video", "file")],
