@@ -34,14 +34,18 @@ String? isoDay(DateTime? d) => d?.toIso8601String().substring(0, 10);
 
 /// One page of a list endpoint: `{ total, page, pageSize, rows }`.
 class Paged<T> {
-  const Paged(this.rows, {required this.total, required this.page, required this.pageSize});
+  const Paged(this.rows, {required this.total, required this.page, required this.pageSize, this.counts = const {}});
 
   factory Paged.fromJson(Json j, T Function(Json) read) => Paged(
         j.list('rows', read),
         total: j.integer('total'),
         page: j.integer('page'),
         pageSize: j.integer('pageSize'),
+        counts: {for (final e in (j['counts'] as Map<String, dynamic>? ?? const {}).entries) if (e.value is num) e.key: (e.value as num).toInt()},
       );
+
+  /// How many there are of each kind (`{ quoted: 4, won: 153 }`), for the filter chips.
+  final Map<String, int> counts;
 
   /// An endpoint that answers with every row at once.
   factory Paged.all(List<T> rows) => Paged(rows, total: rows.length, page: 1, pageSize: rows.length);

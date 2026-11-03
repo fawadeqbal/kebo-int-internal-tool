@@ -14,7 +14,7 @@ void main() {
         title: 'Orders',
         searchHint: 'Search',
         localSearch: true,
-        load: (api, q, page) async => Paged.all(rows),
+        load: (api, q, page, query) async => Paged.all(rows),
         row: (x) => RowData(title: x),
       ),
       const {},

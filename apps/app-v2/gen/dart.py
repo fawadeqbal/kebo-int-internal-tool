@@ -10,7 +10,8 @@ STRINGY = {"id", "text", "multiline", "email", "phone", "country", "money"}
 
 FORM_KIND = {
     "text": "text", "multiline": "multiline", "email": "email", "phone": "phone", "country": "country",
-    "int": "integer", "bool": "toggle", "date": "date", "datetime": "date", "money": "decimal", "enum": "choice",
+    "int": "integer", "number": "decimal", "bool": "toggle", "date": "date", "datetime": "date", "money": "decimal",
+    "enum": "choice", "pick": "pick",
 }
 
 
@@ -32,12 +33,14 @@ def nullable(f: Field) -> bool:
         return False
     if f.kind == "id":
         return False
-    if f.kind in ("date", "datetime", "money", "obj"):
+    if f.kind in ("date", "datetime", "money", "obj", "raw", "pick"):
         return True
     return not (f.required or f.default is not None)
 
 
 def dart_type(f: Field) -> str:
+    if f.kind == "raw":
+        return "Object?"
     base = {
         "int": "int", "bool": "bool", "date": "DateTime", "datetime": "DateTime",
         "obj": f.ref or "", "list": f"List<{f.ref}>",
@@ -47,6 +50,8 @@ def dart_type(f: Field) -> str:
 
 def from_json(f: Field) -> str:
     k = q(f.name)
+    if f.kind == "raw":
+        return f"j[{k}]"
     if f.kind == "list":
         return f"j.list({k}, {f.ref}.fromJson)"
     if f.kind == "obj":
@@ -64,7 +69,7 @@ def from_json(f: Field) -> str:
 
 def to_json(f: Field) -> str | None:
     """The value sent back to the API, or None when the field is not sent."""
-    if f.kind == "obj" or (f.readonly and f.kind != "id"):
+    if f.kind in ("obj", "raw") or (f.readonly and f.kind != "id"):
         return None
     n = f.name
     if f.kind == "list":
@@ -80,7 +85,7 @@ def enum_class(name: str) -> str:
     return f"{name}Enum"
 
 
-def field_def(spec: Spec, e: Entity, f: Field) -> str:
+def field_def(spec: Spec, e: Entity | None, f: Field) -> str:
     """`FieldDef(...)`: what a form needs to show and check one field."""
     args = [q(f.name), q(f.label), f"FieldKind.{FORM_KIND[f.kind]}"]
     if f.required:
@@ -95,6 +100,10 @@ def field_def(spec: Spec, e: Entity, f: Field) -> str:
         args.append(f"options: {enum_class(f.ref)}.labels")
     if f.default is not None:
         args.append(f"defaultValue: {q(str(f.default))}")
+    if f.kind == "pick":
+        args.append(f"source: {q(f.source)}")
+    if f.suggest:
+        args.append(f"suggestions: [{', '.join(q(x) for x in spec.app['reasons'][f.suggest])}]")
     return f"FieldDef({', '.join(args)})"
 
 
@@ -136,6 +145,10 @@ def display(spec: Spec, entity: str, item, var: str) -> str:
             out = f"'${{{v}}}'"
     else:
         out = v
+    if it.get("with"):
+        # "800" with unit → "800 pcs": a second field written after the first.
+        other = resolve(spec, entity, ".".join([*it["of"].split(".")[:-1], it["with"]]), entity)
+        out = f"joinWords([{out}, {access(other, var)}])"
     if it.get("text") and f.kind != "int":
         out = f"fill({q(it['text'])}, {out})"
     return out
@@ -183,6 +196,12 @@ def sample(spec: Spec, entity: str, depth: int = 0) -> dict:
             out[f.name] = "+92 300 1234567"
         elif f.kind == "int":
             out[f.name] = 2
+        elif f.kind == "number":
+            out[f.name] = "2"
+        elif f.kind == "raw":
+            out[f.name] = None
+        elif f.kind == "pick":
+            out[f.name] = f"{snake(f.name)}-1"
         elif f.kind == "bool":
             out[f.name] = False
         elif f.kind == "date":

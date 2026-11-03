@@ -15,7 +15,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "spec"
 
-SCALARS = {"id", "text", "multiline", "email", "phone", "country", "int", "bool", "date", "datetime", "money"}
+SCALARS = {"id", "text", "multiline", "email", "phone", "country", "int", "number", "bool", "date", "datetime", "money", "raw"}
 FRAMES = {"list", "record", "sheet"}
 TONES = {"neutral", "info", "ok", "warn", "bad"}
 CONTACT_ACTIONS = {"phone", "whatsapp", "email"}
@@ -23,6 +23,16 @@ CONTACT_ACTIONS = {"phone", "whatsapp", "email"}
 
 class SpecError(Exception):
     pass
+
+
+class _Loader(yaml.SafeLoader):
+    """YAML where only true/false are booleans: a field called "no" or "on" stays a name."""
+
+
+_Loader.yaml_implicit_resolvers = {
+    k: [(tag, rx) for tag, rx in v if tag != "tag:yaml.org,2002:bool"] for k, v in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+_Loader.add_implicit_resolver("tag:yaml.org,2002:bool", __import__("re").compile(r"^(?:true|True|TRUE|false|False|FALSE)$"), list("tTfF"))
 
 
 def words(name: str) -> str:
@@ -45,6 +55,8 @@ class Field:
     upper: bool = False
     default: Any = None
     currency: str | None = None  # money: the field holding the currency
+    source: str | None = None  # pick: where the choices come from (an API list, or "settings:<path>")
+    suggest: str | None = None  # text: a list of quick reasons in app.yaml
 
 
 @dataclass
@@ -78,7 +90,7 @@ class Spec:
 
 def _docs(path: Path) -> list[dict]:
     try:
-        return [d for d in yaml.safe_load_all(path.read_text()) if d]
+        return [d for d in yaml.load_all(path.read_text(), Loader=_Loader) if d]
     except yaml.YAMLError as e:
         raise SpecError(f"{path.name}: not valid YAML: {e}") from e
 
@@ -96,13 +108,16 @@ def _field(ent: str, name: str, raw: Any, where: str) -> Field:
         kind, ref = "obj", raw.pop("obj")
     elif "list" in raw:
         kind, ref = "list", raw.pop("list")
+    elif "pick" in raw:
+        kind = "pick"
+        raw["source"] = raw.pop("pick")
     else:
         kind = str(raw.pop("type", ""))
     required = kind.endswith("!")
     kind = kind.rstrip("!")
-    if kind not in SCALARS | {"enum", "obj", "list"}:
+    if kind not in SCALARS | {"enum", "obj", "list", "pick"}:
         raise SpecError(f"{where}: {ent}.{name}: unknown type '{kind}' (use one of {', '.join(sorted(SCALARS))}, enum, obj, list)")
-    known = {"label", "readonly", "max", "min", "hint", "upper", "default", "currency", "required"}
+    known = {"label", "readonly", "max", "min", "hint", "upper", "default", "currency", "required", "source", "suggest"}
     extra = set(raw) - known
     if extra:
         raise SpecError(f"{where}: {ent}.{name}: unknown key(s) {', '.join(sorted(extra))}")
@@ -119,7 +134,14 @@ def _field(ent: str, name: str, raw: Any, where: str) -> Field:
         upper=bool(raw.get("upper")),
         default=raw.get("default"),
         currency=raw.get("currency"),
+        source=raw.get("source"),
+        suggest=raw.get("suggest"),
     )
+
+
+def inline_fields(owner: str, raw: dict, where: str) -> list[Field]:
+    """Fields written inside a screen (an action's form)."""
+    return [_field(owner, k, v, where) for k, v in (raw or {}).items()]
 
 
 def load() -> Spec:
@@ -212,6 +234,8 @@ def check(spec: Spec) -> None:
                 raise SpecError(f"{where}: no entity '{f.ref}'")
             if f.kind == "money" and not f.currency:
                 raise SpecError(f"{where}: money needs 'currency: <field>' (a field of this record or of the one holding it)")
+            if f.suggest and f.suggest not in (spec.app.get("reasons") or {}):
+                raise SpecError(f"{where}: suggest: no reasons '{f.suggest}' in app.yaml")
             if f.kind == "enum" and f.default is not None and str(f.default) not in spec.enums[f.ref]:
                 raise SpecError(f"{where}: default '{f.default}' is not a value of {f.ref}")
         for r in e.rules:
@@ -249,9 +273,22 @@ def check(spec: Spec) -> None:
             for a in primaries + (raw.get("more") or []):
                 if a.get("sheet") and a["sheet"] not in spec.screens:
                     raise SpecError(f"{where}: no sheet '{a['sheet']}'")
+                if not (a.get("sheet") or a.get("delete") or a.get("post")):
+                    raise SpecError(f"{where}: action '{a.get('label')}' needs sheet, delete or post")
+                for k in (a.get("when") or {}):
+                    if k not in ent.fields:
+                        raise SpecError(f"{where}: action '{a.get('label')}': when: {ent.name} has no field '{k}'")
+                for f in inline_fields(s.name, a.get("fields") or {}, where):
+                    if f.kind == "enum" and f.ref not in spec.enums:
+                        raise SpecError(f"{where}: action '{a.get('label')}': no enum '{f.ref}'")
+                    if f.suggest and f.suggest not in (spec.app.get("reasons") or {}):
+                        raise SpecError(f"{where}: action '{a.get('label')}': no reasons '{f.suggest}'")
             h = raw.get("header") or {}
-            for item in [h.get("title", "")] + list(h.get("sub", [])):
+            for item in [h.get("title", ""), *h.get("sub", []), *([h["badge"]] if h.get("badge") else []), *h.get("flags", [])]:
                 resolve(spec, ent.name, text_item(item)["of"], where)
+            for fl in h.get("flags", []):
+                if fl.get("tone", "neutral") not in TONES or not fl.get("label"):
+                    raise SpecError(f"{where}: a flag needs a label and a tone of {', '.join(sorted(TONES))}")
             for sec in raw.get("sections") or []:
                 if "custom" in sec:
                     if not re.fullmatch(r"[A-Z][A-Za-z0-9]+", str(sec["custom"])):

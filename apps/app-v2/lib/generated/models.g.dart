@@ -284,6 +284,369 @@ abstract final class OrderRowFields {
   static Json blank() => {};
 }
 
+class Inquiry {
+  const Inquiry({
+    this.id = '',
+    this.refNo,
+    this.customerId,
+    this.contactId,
+    this.channel = 'email',
+    this.category,
+    this.title,
+    this.requirements,
+    this.priority = 'normal',
+    this.requiredBy,
+    this.assigneeId,
+    this.items = const [],
+    this.stage,
+    this.onHold = false,
+    this.overdue = false,
+    this.lostReason,
+    this.lostNote,
+    this.customer,
+    this.contact,
+    this.assignee,
+    this.quotation,
+    this.notes = const [],
+    this.attachments,
+    this.stageChanges = const [],
+    this.orders,
+    this.createdAt,
+  });
+
+  final String id;
+  final String? refNo;
+  final String? customerId;
+  final String? contactId;
+  final String channel;
+  final String? category;
+  final String? title;
+  final String? requirements;
+  final String priority;
+  final DateTime? requiredBy;
+  final String? assigneeId;
+  final List<RequestedItem> items;
+  final String? stage;
+  final bool onHold;
+  final bool overdue;
+  final String? lostReason;
+  final String? lostNote;
+  final InquiryCustomer? customer;
+  final Contact? contact;
+  final Person? assignee;
+  final QuotationRef? quotation;
+  final List<Note> notes;
+  final Object? attachments;
+  final List<StageChange> stageChanges;
+  final Object? orders;
+  final DateTime? createdAt;
+
+  factory Inquiry.fromJson(Json j) => Inquiry(
+    id: j.str('id'),
+    refNo: j.strOrNull('refNo'),
+    customerId: j.strOrNull('customerId'),
+    contactId: j.strOrNull('contactId'),
+    channel: j.str('channel', 'email'),
+    category: j.strOrNull('category'),
+    title: j.strOrNull('title'),
+    requirements: j.strOrNull('requirements'),
+    priority: j.str('priority', 'normal'),
+    requiredBy: j.date('requiredBy'),
+    assigneeId: j.strOrNull('assigneeId'),
+    items: j.list('items', RequestedItem.fromJson),
+    stage: j.strOrNull('stage'),
+    onHold: j.boolean('onHold'),
+    overdue: j.boolean('overdue'),
+    lostReason: j.strOrNull('lostReason'),
+    lostNote: j.strOrNull('lostNote'),
+    customer: j.obj('customer', InquiryCustomer.fromJson),
+    contact: j.obj('contact', Contact.fromJson),
+    assignee: j.obj('assignee', Person.fromJson),
+    quotation: j.obj('quotation', QuotationRef.fromJson),
+    notes: j.list('notes', Note.fromJson),
+    attachments: j['attachments'],
+    stageChanges: j.list('stageChanges', StageChange.fromJson),
+    orders: j['orders'],
+    createdAt: j.date('createdAt'),
+  );
+
+  Json toJson() => {
+    if (id.isNotEmpty) 'id': id,
+    'customerId': customerId,
+    'contactId': contactId,
+    'channel': channel,
+    'category': category,
+    'title': title,
+    'requirements': requirements,
+    'priority': priority,
+    'requiredBy': isoDay(requiredBy),
+    'assigneeId': assigneeId,
+    'items': items.map((e) => e.toJson()).toList(),
+    'createdAt': createdAt?.toIso8601String(),
+  };
+}
+
+abstract final class InquiryFields {
+  static const customerId = FieldDef(
+    'customerId',
+    'Customer',
+    FieldKind.pick,
+    required: true,
+    source: '/api/customers/names',
+  );
+  static const contactId = FieldDef('contactId', 'Contact id', FieldKind.text);
+  static const channel = FieldDef(
+    'channel',
+    'Channel',
+    FieldKind.choice,
+    options: InquiryChannelEnum.labels,
+    defaultValue: 'email',
+  );
+  static const category = FieldDef(
+    'category',
+    'Category',
+    FieldKind.pick,
+    required: true,
+    source: 'settings:sales.categories',
+  );
+  static const title = FieldDef(
+    'title',
+    'Title',
+    FieldKind.text,
+    max: 200,
+    hint: 'Short name, e.g. Bottling line 6000 bph',
+  );
+  static const requirements = FieldDef(
+    'requirements',
+    'Their message',
+    FieldKind.multiline,
+    max: 20000,
+    hint: 'Paste their message. Or add their items below.',
+  );
+  static const priority = FieldDef(
+    'priority',
+    'Priority',
+    FieldKind.choice,
+    options: PriorityEnum.labels,
+    defaultValue: 'normal',
+  );
+  static const requiredBy = FieldDef('requiredBy', 'Needed by', FieldKind.date);
+  static const assigneeId = FieldDef('assigneeId', 'Handled by', FieldKind.pick, source: '/api/users/people');
+  static const createdAt = FieldDef('createdAt', 'Received', FieldKind.date);
+  static const rules = <AnyOf>[
+    AnyOf(['requirements', 'items'], 'Write what the customer needs, or add their list of items'),
+  ];
+
+  /// A new, empty Inquiry as a form starts it.
+  static Json blank() => {'channel': 'email', 'priority': 'normal', 'items': <Json>[]};
+}
+
+class InquiryCustomer {
+  const InquiryCustomer({this.id = '', this.name, this.country, this.contacts = const []});
+
+  final String id;
+  final String? name;
+  final String? country;
+  final List<Contact> contacts;
+
+  factory InquiryCustomer.fromJson(Json j) => InquiryCustomer(
+    id: j.str('id'),
+    name: j.strOrNull('name'),
+    country: j.strOrNull('country'),
+    contacts: j.list('contacts', Contact.fromJson),
+  );
+
+  Json toJson() => {if (id.isNotEmpty) 'id': id, 'name': name, 'country': country};
+}
+
+abstract final class InquiryCustomerFields {
+  static const name = FieldDef('name', 'Name', FieldKind.text);
+  static const country = FieldDef('country', 'Country', FieldKind.country);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty InquiryCustomer as a form starts it.
+  static Json blank() => {};
+}
+
+class RequestedItem {
+  const RequestedItem({
+    this.id = '',
+    this.no,
+    this.parentId,
+    this.description = '',
+    this.model,
+    this.quantity = '',
+    this.unit = 'pcs',
+    this.targetPrice,
+  });
+
+  final String id;
+  final String? no;
+  final String? parentId;
+  final String description;
+  final String? model;
+  final String quantity;
+  final String unit;
+  final String? targetPrice;
+
+  factory RequestedItem.fromJson(Json j) => RequestedItem(
+    id: j.str('id'),
+    no: j.strOrNull('no'),
+    parentId: j.strOrNull('parentId'),
+    description: j.str('description'),
+    model: j.strOrNull('model'),
+    quantity: j.str('quantity'),
+    unit: j.str('unit', 'pcs'),
+    targetPrice: j.strOrNull('targetPrice'),
+  );
+
+  Json toJson() => {
+    if (id.isNotEmpty) 'id': id,
+    'parentId': parentId,
+    'description': description,
+    'model': model,
+    'quantity': quantity,
+    'unit': unit,
+    'targetPrice': targetPrice,
+  };
+}
+
+abstract final class RequestedItemFields {
+  static const parentId = FieldDef('parentId', 'Parent id', FieldKind.text);
+  static const description = FieldDef('description', 'What', FieldKind.text, required: true, max: 2000);
+  static const model = FieldDef('model', 'Model', FieldKind.text, max: 120);
+  static const quantity = FieldDef('quantity', 'Qty', FieldKind.decimal, required: true);
+  static const unit = FieldDef('unit', 'Unit', FieldKind.text, max: 20, defaultValue: 'pcs');
+  static const targetPrice = FieldDef('targetPrice', 'Target price', FieldKind.decimal);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty RequestedItem as a form starts it.
+  static Json blank() => {'unit': 'pcs'};
+}
+
+class QuotationRef {
+  const QuotationRef({this.refNo, this.latest});
+
+  final String? refNo;
+  final RevisionRef? latest;
+
+  factory QuotationRef.fromJson(Json j) =>
+      QuotationRef(refNo: j.strOrNull('refNo'), latest: j.obj('latest', RevisionRef.fromJson));
+
+  Json toJson() => {'refNo': refNo};
+}
+
+abstract final class QuotationRefFields {
+  static const refNo = FieldDef('refNo', 'Quotation', FieldKind.text);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty QuotationRef as a form starts it.
+  static Json blank() => {};
+}
+
+class RevisionRef {
+  const RevisionRef({this.number = 0, this.status, this.currency, this.total});
+
+  final int number;
+  final String? status;
+  final String? currency;
+  final String? total;
+
+  factory RevisionRef.fromJson(Json j) => RevisionRef(
+    number: j.integer('number'),
+    status: j.strOrNull('status'),
+    currency: j.strOrNull('currency'),
+    total: j.strOrNull('total'),
+  );
+
+  Json toJson() => {'number': number, 'status': status, 'currency': currency, 'total': total};
+}
+
+abstract final class RevisionRefFields {
+  static const number = FieldDef('number', 'Number', FieldKind.integer);
+  static const status = FieldDef('status', 'Status', FieldKind.choice, options: RevisionStatusEnum.labels);
+  static const currency = FieldDef('currency', 'Currency', FieldKind.text);
+  static const total = FieldDef('total', 'Total', FieldKind.decimal);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty RevisionRef as a form starts it.
+  static Json blank() => {};
+}
+
+class Note {
+  const Note({this.id = '', this.body, this.authorId, this.createdAt});
+
+  final String id;
+  final String? body;
+  final String? authorId;
+  final DateTime? createdAt;
+
+  factory Note.fromJson(Json j) => Note(
+    id: j.str('id'),
+    body: j.strOrNull('body'),
+    authorId: j.strOrNull('authorId'),
+    createdAt: j.date('createdAt'),
+  );
+
+  Json toJson() => {
+    if (id.isNotEmpty) 'id': id,
+    'body': body,
+    'authorId': authorId,
+    'createdAt': createdAt?.toIso8601String(),
+  };
+}
+
+abstract final class NoteFields {
+  static const body = FieldDef('body', 'Body', FieldKind.text);
+  static const authorId = FieldDef('authorId', 'Author id', FieldKind.text);
+  static const createdAt = FieldDef('createdAt', 'Created at', FieldKind.date);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty Note as a form starts it.
+  static Json blank() => {};
+}
+
+class StageChange {
+  const StageChange({this.id = '', this.fromStage, this.toStage, this.cause, this.note, this.changedAt});
+
+  final String id;
+  final String? fromStage;
+  final String? toStage;
+  final String? cause;
+  final String? note;
+  final DateTime? changedAt;
+
+  factory StageChange.fromJson(Json j) => StageChange(
+    id: j.str('id'),
+    fromStage: j.strOrNull('fromStage'),
+    toStage: j.strOrNull('toStage'),
+    cause: j.strOrNull('cause'),
+    note: j.strOrNull('note'),
+    changedAt: j.date('changedAt'),
+  );
+
+  Json toJson() => {
+    if (id.isNotEmpty) 'id': id,
+    'fromStage': fromStage,
+    'toStage': toStage,
+    'cause': cause,
+    'note': note,
+    'changedAt': changedAt?.toIso8601String(),
+  };
+}
+
+abstract final class StageChangeFields {
+  static const fromStage = FieldDef('fromStage', 'From stage', FieldKind.choice, options: InquiryStageEnum.labels);
+  static const toStage = FieldDef('toStage', 'Moved to', FieldKind.choice, options: InquiryStageEnum.labels);
+  static const cause = FieldDef('cause', 'Cause', FieldKind.text);
+  static const note = FieldDef('note', 'Note', FieldKind.text);
+  static const changedAt = FieldDef('changedAt', 'On', FieldKind.date);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty StageChange as a form starts it.
+  static Json blank() => {};
+}
+
 class Order {
   const Order({
     this.id = '',
@@ -567,4 +930,148 @@ abstract final class OrderDocumentRefFields {
 
   /// A new, empty OrderDocumentRef as a form starts it.
   static Json blank() => {};
+}
+
+class FactoryQuote {
+  const FactoryQuote({
+    this.factoryId,
+    this.receivedOn,
+    this.currency = 'CNY',
+    this.basis,
+    this.basisPlace,
+    this.taxIncluded = false,
+    this.taxRate,
+    this.validUntil,
+    this.leadTime,
+    this.advancePercent,
+    this.reference,
+    this.notes,
+    this.lines = const [],
+  });
+
+  final String? factoryId;
+  final DateTime? receivedOn;
+  final String currency;
+  final String? basis;
+  final String? basisPlace;
+  final bool taxIncluded;
+  final String? taxRate;
+  final DateTime? validUntil;
+  final String? leadTime;
+  final String? advancePercent;
+  final String? reference;
+  final String? notes;
+  final List<FactoryLine> lines;
+
+  factory FactoryQuote.fromJson(Json j) => FactoryQuote(
+    factoryId: j.strOrNull('factoryId'),
+    receivedOn: j.date('receivedOn'),
+    currency: j.str('currency', 'CNY'),
+    basis: j.strOrNull('basis'),
+    basisPlace: j.strOrNull('basisPlace'),
+    taxIncluded: j.boolean('taxIncluded'),
+    taxRate: j.strOrNull('taxRate'),
+    validUntil: j.date('validUntil'),
+    leadTime: j.strOrNull('leadTime'),
+    advancePercent: j.strOrNull('advancePercent'),
+    reference: j.strOrNull('reference'),
+    notes: j.strOrNull('notes'),
+    lines: j.list('lines', FactoryLine.fromJson),
+  );
+
+  Json toJson() => {
+    'factoryId': factoryId,
+    'receivedOn': isoDay(receivedOn),
+    'currency': currency,
+    'basis': basis,
+    'basisPlace': basisPlace,
+    'taxIncluded': taxIncluded,
+    'taxRate': taxRate,
+    'validUntil': isoDay(validUntil),
+    'leadTime': leadTime,
+    'advancePercent': advancePercent,
+    'reference': reference,
+    'notes': notes,
+    'lines': lines.map((e) => e.toJson()).toList(),
+  };
+}
+
+abstract final class FactoryQuoteFields {
+  static const factoryId = FieldDef(
+    'factoryId',
+    'Factory',
+    FieldKind.pick,
+    required: true,
+    source: '/api/factories?pageSize=100',
+  );
+  static const receivedOn = FieldDef('receivedOn', 'Received on', FieldKind.date, required: true);
+  static const currency = FieldDef(
+    'currency',
+    'Currency',
+    FieldKind.choice,
+    options: CurrencyEnum.labels,
+    defaultValue: 'CNY',
+  );
+  static const basis = FieldDef('basis', 'Price basis', FieldKind.choice, options: IncotermEnum.labels);
+  static const basisPlace = FieldDef('basisPlace', 'Place', FieldKind.text, max: 60, hint: 'e.g. Ningbo');
+  static const taxIncluded = FieldDef('taxIncluded', 'Tax is in their prices', FieldKind.toggle);
+  static const taxRate = FieldDef('taxRate', 'Tax %', FieldKind.decimal, hint: '0 when they add none');
+  static const validUntil = FieldDef('validUntil', 'Valid until', FieldKind.date);
+  static const leadTime = FieldDef('leadTime', 'Lead time', FieldKind.text, max: 120, hint: 'e.g. 45 days');
+  static const advancePercent = FieldDef(
+    'advancePercent',
+    'Advance %',
+    FieldKind.decimal,
+    hint: 'What they ask when we order',
+  );
+  static const reference = FieldDef('reference', 'Their reference', FieldKind.text, max: 80);
+  static const notes = FieldDef('notes', 'Notes', FieldKind.multiline, max: 5000);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty FactoryQuote as a form starts it.
+  static Json blank() => {'currency': 'CNY', 'taxIncluded': false, 'lines': <Json>[]};
+}
+
+class FactoryLine {
+  const FactoryLine({
+    this.requestedItemId,
+    this.description = '',
+    this.quantity = '',
+    this.unit = 'pcs',
+    this.unitPrice,
+  });
+
+  final String? requestedItemId;
+  final String description;
+  final String quantity;
+  final String unit;
+  final String? unitPrice;
+
+  factory FactoryLine.fromJson(Json j) => FactoryLine(
+    requestedItemId: j.strOrNull('requestedItemId'),
+    description: j.str('description'),
+    quantity: j.str('quantity'),
+    unit: j.str('unit', 'pcs'),
+    unitPrice: j.strOrNull('unitPrice'),
+  );
+
+  Json toJson() => {
+    'requestedItemId': requestedItemId,
+    'description': description,
+    'quantity': quantity,
+    'unit': unit,
+    'unitPrice': unitPrice,
+  };
+}
+
+abstract final class FactoryLineFields {
+  static const requestedItemId = FieldDef('requestedItemId', 'Requested item id', FieldKind.text);
+  static const description = FieldDef('description', 'Item', FieldKind.text, required: true, max: 2000);
+  static const quantity = FieldDef('quantity', 'Qty', FieldKind.decimal, required: true);
+  static const unit = FieldDef('unit', 'Unit', FieldKind.text, max: 20, defaultValue: 'pcs');
+  static const unitPrice = FieldDef('unitPrice', 'Their price', FieldKind.decimal);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty FactoryLine as a form starts it.
+  static Json blank() => {'unit': 'pcs'};
 }

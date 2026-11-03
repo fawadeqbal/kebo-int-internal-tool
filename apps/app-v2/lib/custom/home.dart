@@ -193,7 +193,7 @@ class NeedsScreen extends StatelessWidget {
         title: 'Needs you',
         searchHint: 'Order, customer, what…',
         localSearch: true,
-        load: (api, q, page) async => Paged.all((await api.get('/api/reminders')).list('items', (m) => m)),
+        load: (api, q, page, query) async => Paged.all((await api.get('/api/reminders')).list('items', (m) => m)),
         row: (n) => needRow(context, n),
         onOpen: (context, n) => openLink(context, n.strOrNull('href')),
       );

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'core/scope.dart';
 import 'core/session.dart';
 import 'custom/alerts.dart';
-import 'custom/coming.dart';
 import 'custom/home.dart';
 import 'custom/more.dart';
 import 'custom/search.dart';
@@ -48,7 +47,6 @@ class _AppState extends State<App> {
           GoRoute(path: '/needs', builder: (c, s) => const NeedsScreen()),
           GoRoute(path: '/alerts', builder: (c, s) => const AlertsScreen()),
           GoRoute(path: '/search', builder: (c, s) => const SearchScreen()),
-          GoRoute(path: '/inquiries', builder: (c, s) => const ComingScreen(title: 'Inquiries', phase: 'phase 2')),
           GoRoute(path: '/more', builder: (c, s) => const MoreScreen()),
           ...generatedRoutes,
         ],

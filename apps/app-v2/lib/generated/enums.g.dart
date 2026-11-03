@@ -17,6 +17,38 @@ abstract final class CurrencyEnum {
   static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
 }
 
+abstract final class IncotermEnum {
+  static const values = <String>['EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
+  static const labels = <String, String>{
+    'EXW': 'EXW',
+    'FCA': 'FCA',
+    'FAS': 'FAS',
+    'FOB': 'FOB',
+    'CFR': 'CFR',
+    'CIF': 'CIF',
+    'CPT': 'CPT',
+    'CIP': 'CIP',
+    'DAP': 'DAP',
+    'DPU': 'DPU',
+    'DDP': 'DDP',
+  };
+  static const tones = <String, Tone>{
+    'EXW': Tone.neutral,
+    'FCA': Tone.neutral,
+    'FAS': Tone.neutral,
+    'FOB': Tone.neutral,
+    'CFR': Tone.neutral,
+    'CIF': Tone.neutral,
+    'CPT': Tone.neutral,
+    'CIP': Tone.neutral,
+    'DAP': Tone.neutral,
+    'DPU': Tone.neutral,
+    'DDP': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
 abstract final class InquiryStageEnum {
   static const values = <String>['new', 'sourcing', 'quoted', 'won', 'lost'];
   static const labels = <String, String>{
@@ -27,11 +59,104 @@ abstract final class InquiryStageEnum {
     'lost': 'Lost',
   };
   static const tones = <String, Tone>{
-    'new': Tone.info,
-    'sourcing': Tone.info,
-    'quoted': Tone.warn,
+    'new': Tone.neutral,
+    'sourcing': Tone.warn,
+    'quoted': Tone.info,
     'won': Tone.ok,
     'lost': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class PriorityEnum {
+  static const values = <String>['low', 'normal', 'high', 'urgent'];
+  static const labels = <String, String>{'low': 'Low', 'normal': 'Normal', 'high': 'High', 'urgent': 'Urgent'};
+  static const tones = <String, Tone>{
+    'low': Tone.neutral,
+    'normal': Tone.neutral,
+    'high': Tone.neutral,
+    'urgent': Tone.bad,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class InquiryChannelEnum {
+  static const values = <String>['website', 'whatsapp', 'wechat', 'email', 'phone', 'visit', 'other'];
+  static const labels = <String, String>{
+    'website': 'Website form',
+    'whatsapp': 'WhatsApp',
+    'wechat': 'WeChat',
+    'email': 'Email',
+    'phone': 'Phone',
+    'visit': 'Visit',
+    'other': 'Other',
+  };
+  static const tones = <String, Tone>{
+    'website': Tone.neutral,
+    'whatsapp': Tone.neutral,
+    'wechat': Tone.neutral,
+    'email': Tone.neutral,
+    'phone': Tone.neutral,
+    'visit': Tone.neutral,
+    'other': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class LostReasonEnum {
+  static const values = <String>[
+    'price_too_high',
+    'no_reply',
+    'factory_cannot_supply',
+    'bought_elsewhere',
+    'customer_cancelled',
+    'duplicate_or_spam',
+    'other',
+  ];
+  static const labels = <String, String>{
+    'price_too_high': 'Price too high',
+    'no_reply': 'No reply from customer',
+    'factory_cannot_supply': 'Factory can\'t make it or meet the date',
+    'bought_elsewhere': 'Customer bought elsewhere',
+    'customer_cancelled': 'Customer cancelled',
+    'duplicate_or_spam': 'Duplicate or spam',
+    'other': 'Other',
+  };
+  static const tones = <String, Tone>{
+    'price_too_high': Tone.neutral,
+    'no_reply': Tone.neutral,
+    'factory_cannot_supply': Tone.neutral,
+    'bought_elsewhere': Tone.neutral,
+    'customer_cancelled': Tone.neutral,
+    'duplicate_or_spam': Tone.neutral,
+    'other': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class RevisionStatusEnum {
+  static const values = <String>['draft', 'sent', 'accepted', 'rejected', 'expired', 'superseded', 'void'];
+  static const labels = <String, String>{
+    'draft': 'Draft',
+    'sent': 'Sent',
+    'accepted': 'Accepted',
+    'rejected': 'Rejected',
+    'expired': 'Expired',
+    'superseded': 'Replaced',
+    'void': 'Void',
+  };
+  static const tones = <String, Tone>{
+    'draft': Tone.neutral,
+    'sent': Tone.info,
+    'accepted': Tone.ok,
+    'rejected': Tone.bad,
+    'expired': Tone.warn,
+    'superseded': Tone.neutral,
+    'void': Tone.neutral,
   };
   static String? label(String? v) => v == null ? null : labels[v] ?? v;
   static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);

@@ -54,8 +54,10 @@ class Api {
 
   Future<Json> get(String path, {Map<String, Object?>? query}) => _map(() => _dio.get<Object?>(path, queryParameters: _clean(query)));
 
+  /// A list endpoint: a plain list, or the `rows` of a page.
   Future<List<Json>> getList(String path, {Map<String, Object?>? query}) async {
-    final data = await _send(() => _dio.get<Object?>(path, queryParameters: _clean(query)));
+    var data = await _send(() => _dio.get<Object?>(path, queryParameters: _clean(query)));
+    if (data is Map<String, dynamic> && data['rows'] is List) data = data['rows'];
     return data is List ? [for (final e in data) if (e is Map<String, dynamic>) e] : const [];
   }
 

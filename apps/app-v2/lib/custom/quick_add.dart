@@ -95,7 +95,7 @@ Future<Json?> pickOrder(BuildContext context) => showModalBottomSheet<Json>(
           title: 'Which order?',
           searchHint: 'Order, customer or product',
           localSearch: true,
-          load: (api, q, page) async => Paged.all(await api.getList('/api/orders')),
+          load: (api, q, page, query) async => Paged.all(await api.getList('/api/orders')),
           row: (o) => RowData(
             title: o.str('refNo'),
             sub: [o.at('customer.name'), o.at('inquiry.title')],

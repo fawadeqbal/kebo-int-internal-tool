@@ -8,6 +8,9 @@ import 'package:kebo_app/generated/models.g.dart';
 import 'package:kebo_app/generated/screens/customer.g.dart';
 import 'package:kebo_app/generated/screens/customer_form.g.dart';
 import 'package:kebo_app/generated/screens/customers.g.dart';
+import 'package:kebo_app/generated/screens/inquiries.g.dart';
+import 'package:kebo_app/generated/screens/inquiry.g.dart';
+import 'package:kebo_app/generated/screens/inquiry_form.g.dart';
 import 'package:kebo_app/generated/screens/order.g.dart';
 import 'package:kebo_app/generated/screens/orders.g.dart';
 
@@ -57,6 +60,74 @@ void main() {
       '{"id": "order_row-1", "refNo": "OrderRow number", "status": "open", "total": "1250.50", "currency": "USD", "orderedOn": "2026-10-28"}',
     ) as Json;
     final x = OrderRow.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('Inquiry reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "inquiry-1", "refNo": "Inquiry number", "customerId": "customer_id-1", "contactId": "Inquiry contact id", "channel": "email", "category": "category-1", "title": "Inquiry title", "requirements": "Inquiry their message", "priority": "normal", "requiredBy": "2026-10-28", "assigneeId": "assignee_id-1", "items": [{"id": "requested_item-1", "no": "RequestedItem no", "parentId": "RequestedItem parent id", "description": "RequestedItem what", "model": "RequestedItem model", "quantity": "2", "unit": "RequestedItem unit", "targetPrice": "2"}], "stage": "new", "onHold": false, "overdue": false, "lostReason": "price_too_high", "lostNote": "Inquiry note", "customer": {"id": "inquiry_customer-1", "name": "InquiryCustomer name", "country": "PK", "contacts": [{"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}]}, "contact": {"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}, "assignee": {"id": "person-1", "name": "Person name"}, "quotation": {"refNo": "QuotationRef quotation", "latest": {"number": 2, "status": "draft", "currency": "USD", "total": "1250.50"}}, "notes": [{"id": "note-1", "body": "Note body", "authorId": "Note author id", "createdAt": "2026-10-28T09:00:00.000Z"}], "attachments": null, "stageChanges": [{"id": "stage_change-1", "fromStage": "new", "toStage": "new", "cause": "StageChange cause", "note": "StageChange note", "changedAt": "2026-10-28T09:00:00.000Z"}], "orders": null, "createdAt": "2026-10-28T09:00:00.000Z"}',
+    ) as Json;
+    final x = Inquiry.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('InquiryCustomer reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "inquiry_customer-1", "name": "InquiryCustomer name", "country": "PK", "contacts": [{"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}]}',
+    ) as Json;
+    final x = InquiryCustomer.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('RequestedItem reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "requested_item-1", "no": "RequestedItem no", "parentId": "RequestedItem parent id", "description": "RequestedItem what", "model": "RequestedItem model", "quantity": "2", "unit": "RequestedItem unit", "targetPrice": "2"}',
+    ) as Json;
+    final x = RequestedItem.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('QuotationRef reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"refNo": "QuotationRef quotation", "latest": {"number": 2, "status": "draft", "currency": "USD", "total": "1250.50"}}',
+    ) as Json;
+    final x = QuotationRef.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('RevisionRef reads and writes its JSON', () {
+    final j = jsonDecode('{"number": 2, "status": "draft", "currency": "USD", "total": "1250.50"}') as Json;
+    final x = RevisionRef.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('Note reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "note-1", "body": "Note body", "authorId": "Note author id", "createdAt": "2026-10-28T09:00:00.000Z"}',
+    ) as Json;
+    final x = Note.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('StageChange reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "stage_change-1", "fromStage": "new", "toStage": "new", "cause": "StageChange cause", "note": "StageChange note", "changedAt": "2026-10-28T09:00:00.000Z"}',
+    ) as Json;
+    final x = StageChange.fromJson(j);
     final back = x.toJson();
     for (final k in back.keys) {
       if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
@@ -126,6 +197,26 @@ void main() {
       if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
     }
   });
+  test('FactoryQuote reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"factoryId": "factory_id-1", "receivedOn": "2026-10-28", "currency": "CNY", "basis": "EXW", "basisPlace": "FactoryQuote place", "taxIncluded": false, "taxRate": "2", "validUntil": "2026-10-28", "leadTime": "FactoryQuote lead time", "advancePercent": "2", "reference": "FactoryQuote their reference", "notes": "FactoryQuote notes", "lines": [{"requestedItemId": "FactoryLine requested item id", "description": "FactoryLine item", "quantity": "2", "unit": "FactoryLine unit", "unitPrice": "2"}]}',
+    ) as Json;
+    final x = FactoryQuote.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('FactoryLine reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"requestedItemId": "FactoryLine requested item id", "description": "FactoryLine item", "quantity": "2", "unit": "FactoryLine unit", "unitPrice": "2"}',
+    ) as Json;
+    final x = FactoryLine.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
   testWidgets('Customers lists the rows and passes the accessibility checks', (tester) async {
     await pumpScreen(tester, const CustomersScreen(), {
       '/api/customers': jsonDecode(
@@ -156,6 +247,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Name is needed'), findsWidgets);
     expect(find.text('Country is needed'), findsWidgets);
+    await expectAccessible(tester);
+  });
+  testWidgets('Inquiries lists the rows and passes the accessibility checks', (tester) async {
+    await pumpScreen(tester, const InquiriesScreen(), {
+      '/api/inquiries': jsonDecode(
+        '{"total": 1, "page": 1, "pageSize": 25, "rows": [{"id": "inquiry-1", "refNo": "Inquiry number", "customerId": "customer_id-1", "contactId": "Inquiry contact id", "channel": "email", "category": "category-1", "title": "Inquiry title", "requirements": "Inquiry their message", "priority": "normal", "requiredBy": "2026-10-28", "assigneeId": "assignee_id-1", "items": [{"id": "requested_item-1", "no": "RequestedItem no", "parentId": "RequestedItem parent id", "description": "RequestedItem what", "model": "RequestedItem model", "quantity": "2", "unit": "RequestedItem unit", "targetPrice": "2"}], "stage": "new", "onHold": false, "overdue": false, "lostReason": "price_too_high", "lostNote": "Inquiry note", "customer": {"id": "inquiry_customer-1", "name": "InquiryCustomer name", "country": "PK", "contacts": [{"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}]}, "contact": {"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}, "assignee": {"id": "person-1", "name": "Person name"}, "quotation": {"refNo": "QuotationRef quotation", "latest": {"number": 2, "status": "draft", "currency": "USD", "total": "1250.50"}}, "notes": [{"id": "note-1", "body": "Note body", "authorId": "Note author id", "createdAt": "2026-10-28T09:00:00.000Z"}], "attachments": null, "stageChanges": [{"id": "stage_change-1", "fromStage": "new", "toStage": "new", "cause": "StageChange cause", "note": "StageChange note", "changedAt": "2026-10-28T09:00:00.000Z"}], "orders": null, "createdAt": "2026-10-28T09:00:00.000Z"}]}',
+      ),
+    });
+    expect(find.text('Inquiries'), findsWidgets);
+    expect(find.text('Inquiry title'), findsOneWidget);
+    await expectAccessible(tester);
+  });
+  testWidgets('Inquiry shows the record and passes the accessibility checks', (tester) async {
+    await pumpScreen(tester, const InquiryScreen(id: 'inquiry-1'), {
+      '/api/inquiries/inquiry-1': jsonDecode(
+        '{"id": "inquiry-1", "refNo": "Inquiry number", "customerId": "customer_id-1", "contactId": "Inquiry contact id", "channel": "email", "category": "category-1", "title": "Inquiry title", "requirements": "Inquiry their message", "priority": "normal", "requiredBy": "2026-10-28", "assigneeId": "assignee_id-1", "items": [{"id": "requested_item-1", "no": "RequestedItem no", "parentId": "RequestedItem parent id", "description": "RequestedItem what", "model": "RequestedItem model", "quantity": "2", "unit": "RequestedItem unit", "targetPrice": "2"}], "stage": "new", "onHold": false, "overdue": false, "lostReason": "price_too_high", "lostNote": "Inquiry note", "customer": {"id": "inquiry_customer-1", "name": "InquiryCustomer name", "country": "PK", "contacts": [{"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}]}, "contact": {"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}, "assignee": {"id": "person-1", "name": "Person name"}, "quotation": {"refNo": "QuotationRef quotation", "latest": {"number": 2, "status": "draft", "currency": "USD", "total": "1250.50"}}, "notes": [{"id": "note-1", "body": "Note body", "authorId": "Note author id", "createdAt": "2026-10-28T09:00:00.000Z"}], "attachments": null, "stageChanges": [{"id": "stage_change-1", "fromStage": "new", "toStage": "new", "cause": "StageChange cause", "note": "StageChange note", "changedAt": "2026-10-28T09:00:00.000Z"}], "orders": null, "createdAt": "2026-10-28T09:00:00.000Z"}',
+      ),
+    });
+    expect(find.text('Inquiry title'), findsWidgets);
+    for (final t in <String>[
+      'Next',
+      'Needs',
+      'Details',
+      'Factory prices',
+      'Quotation',
+      'Contacts',
+      'Notes',
+      'Files',
+      'Changes',
+    ]) {
+      final section = find.byKey(ValueKey('section:$t'));
+      await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
+      expect(section, findsOneWidget);
+    }
+    await expectAccessible(tester);
+  });
+  testWidgets('InquiryForm checks required fields before sending', (tester) async {
+    await pumpSheet(tester, (context) => InquiryFormSheet.create(context));
+    await tester.tap(find.text('Save inquiry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Customer is needed'), findsWidgets);
+    expect(find.text('Category is needed'), findsWidgets);
     await expectAccessible(tester);
   });
   testWidgets('Orders lists the rows and passes the accessibility checks', (tester) async {

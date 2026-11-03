@@ -38,9 +38,17 @@ class FormSheet extends StatefulWidget {
     required this.send,
     this.rules = const [],
     this.duplicateFlag,
+    this.intro,
+    this.danger = false,
   });
 
+  /// Red Save: it ends or removes something.
+  final bool danger;
+
   final String title, save;
+
+  /// A line under the title saying what saving does ("This makes the order…").
+  final String? intro;
   final List<FormGroup> groups;
   final List<AnyOf> rules;
   final Json initial;
@@ -60,6 +68,8 @@ class FormSheet extends StatefulWidget {
     required Future<Object?> Function(Api api, Json body) send,
     List<AnyOf> rules = const [],
     String? duplicateFlag,
+    String? intro,
+    bool danger = false,
   }) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -75,6 +85,8 @@ class FormSheet extends StatefulWidget {
         send: send,
         rules: rules,
         duplicateFlag: duplicateFlag,
+        intro: intro,
+        danger: danger,
       ),
     );
     return saved ?? false;
@@ -136,7 +148,7 @@ class _FormSheetState extends State<FormSheet> {
     return errors.isEmpty;
   }
 
-  Future<void> _save({bool anyway = false}) async {
+  Future<void> _save({bool anyway = false, String? reason}) async {
     if (busy) return;
     final ok = _check();
     setState(() => problem = ok ? null : 'Some details need fixing. They are marked below.');
@@ -147,6 +159,7 @@ class _FormSheetState extends State<FormSheet> {
       if (e.value is String) body[e.key] = (e.value as String).trim();
     }
     if (anyway && widget.duplicateFlag != null) body[widget.duplicateFlag!] = true;
+    if (reason != null) body['reason'] = reason;
     try {
       await widget.send(context.api, body);
       if (mounted) Navigator.pop(context, true);
@@ -157,6 +170,11 @@ class _FormSheetState extends State<FormSheet> {
         errors.addAll(e.fieldErrors);
         problem = e.message;
       });
+      if (e.code == 'reason_needed') {
+        final why = await askReason(context, e);
+        if (why != null && mounted) await _save(anyway: anyway, reason: why);
+        return;
+      }
       if (e.code == 'duplicate' && widget.duplicateFlag != null) {
         final lines = e.matches.map((m) => '• ${m.str('label')} — ${m.str('detail')}').join('\n');
         final go = await confirmDialog(context, title: 'Already known?', text: '${e.message}\n\n$lines', yes: 'Save anyway');
@@ -195,6 +213,10 @@ class _FormSheetState extends State<FormSheet> {
             child: ListView(
               padding: const EdgeInsets.all(Gap.lg),
               children: [
+                if (widget.intro != null) ...[
+                  Text(widget.intro!, style: context.text.bodyMedium?.copyWith(color: c.text2)),
+                  const SizedBox(height: Gap.lg),
+                ],
                 if (problem != null) ...[MessageBanner(problem!, tone: Tone.bad), const SizedBox(height: Gap.lg)],
                 for (final g in widget.groups) ..._group(context, g),
               ],
@@ -206,6 +228,7 @@ class _FormSheetState extends State<FormSheet> {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(
+                style: widget.danger ? FilledButton.styleFrom(backgroundColor: c.badSolid) : null,
                 onPressed: busy ? null : _save,
                 child: busy
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -294,4 +317,38 @@ class _FormSheetState extends State<FormSheet> {
       if (!g.folded || isOpen) ...body else const SizedBox(height: Gap.sm),
     ];
   }
+}
+
+
+/// The server wants to know why something already used is changed (409 "reason_needed"):
+/// its question, its quick choices as chips, or the person's own words. Null when cancelled.
+Future<String?> askReason(BuildContext context, ApiException e) {
+  final choices = [for (final c in (e.data['choices'] as List<dynamic>? ?? const [])) '$c'];
+  final ctl = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => AlertDialog(
+        title: Text('Why the change?', style: ctx.text.titleMedium),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(e.message, style: ctx.text.bodyMedium),
+            const SizedBox(height: Gap.md),
+            Wrap(spacing: Gap.sm, runSpacing: Gap.xs, children: [
+              for (final c in choices) ActionChip(label: Text(c), onPressed: () => setState(() => ctl.text = c)),
+            ]),
+            const SizedBox(height: Gap.sm),
+            TextField(controller: ctl, maxLength: 500, decoration: const InputDecoration(hintText: 'Or write why')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => ctl.text.trim().isEmpty ? null : Navigator.pop(ctx, ctl.text.trim()),
+            child: const Text('Save with this reason'),
+          ),
+        ],
+      ),
+    ),
+  ).whenComplete(ctl.dispose);
 }

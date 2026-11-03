@@ -57,3 +57,9 @@ String? fmtShort(String? amount, String? currency) {
   final text = a >= 1e6 ? '${(n / 1e6).toStringAsFixed(1)}M' : a >= 1e4 ? '${(n / 1e3).toStringAsFixed(1)}k' : NumberFormat('#,##0', 'en_US').format(n);
   return currency == null ? text : '$currency $text';
 }
+
+/// Words with a value, joined with spaces: "800 pcs"; null when none has one.
+String? joinWords(Iterable<String?> parts) {
+  final s = parts.whereType<String>().where((x) => x.trim().isNotEmpty).join(' ');
+  return s.isEmpty ? null : s;
+}

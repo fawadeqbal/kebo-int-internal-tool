@@ -74,7 +74,7 @@ class KvRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: Gap.sm),
         child: value.length > 32 || value.contains('\n')
-            ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Text(label, style: context.text.bodySmall?.copyWith(color: c.text2)),
                 const SizedBox(height: 2),
                 Text(value, style: context.text.bodyMedium),

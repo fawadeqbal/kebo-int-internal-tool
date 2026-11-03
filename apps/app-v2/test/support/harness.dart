@@ -16,6 +16,14 @@ class FakeServer implements HttpClientAdapter {
   final Map<String, Object?> answers;
   final calls = <RequestOptions>[];
 
+  /// The JSON body of the last [method] call to [path].
+  Map<String, dynamic>? sent(String method, String path) {
+    for (final c in calls.reversed) {
+      if (c.method == method && c.path == path && c.data is Map) return Map<String, dynamic>.from(c.data as Map);
+    }
+    return null;
+  }
+
   @override
   Future<ResponseBody> fetch(RequestOptions o, Stream<Uint8List>? body, Future<void>? cancel) async {
     calls.add(o);
@@ -31,9 +39,13 @@ class FakeServer implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// The fake server of the last screen pumped: what the app asked and sent.
+late FakeServer lastServer;
+
 /// Signed in as someone who may do everything.
 Session fakeSession(Map<String, Object?> answers, {Set<String> permissions = const {'*'}}) {
-  final dio = Dio()..httpClientAdapter = FakeServer(answers);
+  lastServer = FakeServer(answers);
+  final dio = Dio()..httpClientAdapter = lastServer;
   final s = _AllowAll(Api(server: 'https://test.example', dio: dio), permissions);
   s.status = SessionStatus.signedIn;
   s.me = Me(id: 'me', name: 'Sana', email: 'sana@example.com', permissions: permissions);

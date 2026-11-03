@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:intl/intl.dart';
+
+import '../core/json.dart';
+import '../core/scope.dart';
 import '../generated/countries.g.dart';
 import 'theme.dart';
 
-enum FieldKind { text, multiline, email, phone, country, integer, decimal, toggle, date, choice }
+enum FieldKind { text, multiline, email, phone, country, integer, decimal, toggle, date, choice, pick }
 
 /// One field of a form, as the spec describes it. Generated as `<Entity>Fields.<name>`.
 class FieldDef {
   const FieldDef(this.key, this.label, this.kind,
-      {this.required = false, this.max, this.hint, this.upper = false, this.options = const {}, this.defaultValue});
+      {this.required = false,
+      this.max,
+      this.hint,
+      this.upper = false,
+      this.options = const {},
+      this.defaultValue,
+      this.source,
+      this.suggestions = const []});
 
   final String key, label;
   final FieldKind kind;
@@ -21,6 +32,12 @@ class FieldDef {
   /// value → label, for choices.
   final Map<String, String> options;
   final String? defaultValue;
+
+  /// pick: where the choices come from: an API list of `{id, name}`, or "settings:sales.categories".
+  final String? source;
+
+  /// Quick answers shown as chips under a text field ("Workload", "Person is away").
+  final List<String> suggestions;
 
   static final _email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
@@ -48,7 +65,7 @@ class AnyOf {
 
   bool ok(Map<String, Object?> values) => keys.any((k) {
         final v = values[k];
-        return v != null && (v is! String || v.trim().isNotEmpty);
+        return v != null && (v is! String || v.trim().isNotEmpty) && (v is! List || v.isNotEmpty);
       });
 }
 
@@ -97,6 +114,8 @@ class _FieldEditorState extends State<FieldEditor> {
     final Widget input = switch (d.kind) {
       FieldKind.choice => _choice(context),
       FieldKind.country => _country(context),
+      FieldKind.pick => _pick(context),
+      FieldKind.date => _date(context),
       _ => TextField(
           controller: _ctl,
           onChanged: (v) => widget.onChanged(d.upper ? v.toUpperCase() : v),
@@ -130,7 +149,20 @@ class _FieldEditorState extends State<FieldEditor> {
         ExcludeSemantics(child: label),
         const SizedBox(height: 6),
         input,
-        if (widget.error != null && (d.kind == FieldKind.choice || d.kind == FieldKind.country)) ...[
+        if (d.suggestions.isNotEmpty) ...[
+          const SizedBox(height: Gap.sm),
+          Wrap(spacing: Gap.sm, runSpacing: Gap.xs, children: [
+            for (final s in d.suggestions)
+              ActionChip(
+                label: Text(s),
+                onPressed: () {
+                  _ctl.text = s;
+                  widget.onChanged(s);
+                },
+              ),
+          ]),
+        ],
+        if (widget.error != null && const {FieldKind.choice, FieldKind.country, FieldKind.pick, FieldKind.date}.contains(d.kind)) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(Gap.md, 6, Gap.md, 0),
             child: Text(widget.error!, style: context.text.bodySmall?.copyWith(color: c.bad)),
@@ -140,10 +172,10 @@ class _FieldEditorState extends State<FieldEditor> {
     );
   }
 
-  /// Up to four options: chips, all visible. More: a menu.
+  /// Up to eight options: chips, all visible. More: a searchable list.
   Widget _choice(BuildContext context) {
     final d = widget.def;
-    if (d.options.length <= 4) {
+    if (d.options.length <= 8) {
       return Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
         for (final e in d.options.entries)
           ChoiceChip(
@@ -153,11 +185,15 @@ class _FieldEditorState extends State<FieldEditor> {
           ),
       ]);
     }
-    return DropdownButtonFormField<String>(
-      initialValue: d.options.containsKey(widget.value) ? widget.value as String : null,
-      items: [for (final e in d.options.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-      onChanged: widget.onChanged,
-      decoration: InputDecoration(errorText: widget.error),
+    return _box(
+      context,
+      shown: d.options[widget.value],
+      hint: 'Choose',
+      icon: Icons.expand_more,
+      onTap: () async {
+        final picked = await pickFrom(context, title: d.label, options: d.options);
+        if (picked != null) widget.onChanged(picked);
+      },
     );
   }
 
@@ -178,6 +214,151 @@ class _FieldEditorState extends State<FieldEditor> {
         ),
         child: Text(name ?? 'Choose a country', style: context.text.bodyLarge?.copyWith(color: name == null ? c.muted : c.text)),
       ),
+    );
+  }
+}
+
+extension on _FieldEditorState {
+  /// A box that opens a chooser; shows the chosen label or a hint.
+  Widget _box(BuildContext context, {required String? shown, required String hint, required IconData icon, required VoidCallback onTap}) {
+    final c = context.colors;
+    return InkWell(
+      borderRadius: BorderRadius.circular(Gap.radiusSm),
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          suffixIcon: Icon(icon),
+          enabledBorder: widget.error == null ? null : OutlineInputBorder(borderSide: BorderSide(color: c.bad)),
+        ),
+        child: Text(shown ?? hint, style: context.text.bodyLarge?.copyWith(color: shown == null ? c.muted : c.text)),
+      ),
+    );
+  }
+
+  Widget _pick(BuildContext context) {
+    final d = widget.def;
+    return FutureBuilder<Map<String, String>>(
+      future: Choices.of(context, d.source!),
+      builder: (context, snap) {
+        final options = snap.data ?? const <String, String>{};
+        final v = widget.value as String?;
+        return _box(
+          context,
+          shown: v == null || v.isEmpty ? null : options[v] ?? (snap.hasData ? v : '…'),
+          hint: 'Choose',
+          icon: Icons.expand_more,
+          onTap: () async {
+            final picked = await pickFrom(context, title: d.label, options: options);
+            if (picked != null) widget.onChanged(picked);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _date(BuildContext context) {
+    final v = widget.value is String ? DateTime.tryParse(widget.value as String) : null;
+    return _box(
+      context,
+      shown: v == null ? null : DateFormat('d MMM yyyy').format(v),
+      hint: 'Choose a date',
+      icon: Icons.calendar_today_outlined,
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: v ?? now,
+          firstDate: DateTime(now.year - 5),
+          lastDate: DateTime(now.year + 5),
+        );
+        if (picked != null) widget.onChanged(picked.toIso8601String().substring(0, 10));
+      },
+    );
+  }
+}
+
+/// Choices loaded once per source and kept while the app runs.
+abstract final class Choices {
+  static final _cache = <String, Future<Map<String, String>>>{};
+
+  static Future<Map<String, String>> of(BuildContext context, String source) {
+    final api = context.api;
+    // Per sign-in: another person or company sees other choices.
+    return _cache.putIfAbsent('${api.token}|$source', () async {
+      try {
+        if (source.startsWith('settings:')) {
+          Object? v = await api.get('/api/settings');
+          for (final p in source.substring(9).split('.')) {
+            v = v is Map<String, dynamic> ? v[p] : null;
+          }
+          return {for (final x in (v as List<dynamic>? ?? const [])) '$x': '$x'};
+        }
+        return {for (final r in await api.getList(source)) r.str('id'): r.str('name')};
+      } catch (_) {
+        _cache.remove('${api.token}|$source'); // try again next time
+        return const {};
+      }
+    });
+  }
+
+  /// Forget everything, e.g. after signing out.
+  static void clear() => _cache.clear();
+}
+
+/// A searchable list of choices in a sheet; the chosen key, or null.
+Future<String?> pickFrom(BuildContext context, {required String title, required Map<String, String> options}) =>
+    showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
+      builder: (ctx) => _ChoiceSheet(title: title, options: options),
+    );
+
+class _ChoiceSheet extends StatefulWidget {
+  const _ChoiceSheet({required this.title, required this.options});
+  final String title;
+  final Map<String, String> options;
+
+  @override
+  State<_ChoiceSheet> createState() => _ChoiceSheetState();
+}
+
+class _ChoiceSheetState extends State<_ChoiceSheet> {
+  String q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = widget.options.entries.where((e) => q.isEmpty || e.value.toLowerCase().contains(q)).toList();
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.85,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.sm),
+          child: Semantics(header: true, child: Text(widget.title, style: context.text.titleLarge)),
+        ),
+        if (widget.options.length > 8)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.sm),
+            child: TextField(
+              autofocus: true,
+              onChanged: (v) => setState(() => q = v.trim().toLowerCase()),
+              decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search)),
+            ),
+          ),
+        Expanded(
+          child: rows.isEmpty
+              ? Center(child: Text('Nothing to choose', style: context.text.bodySmall))
+              : ListView.builder(
+                  itemCount: rows.length,
+                  itemBuilder: (ctx, i) => ListTile(
+                    minTileHeight: Gap.tap,
+                    title: Text(rows[i].value),
+                    onTap: () => Navigator.pop(ctx, rows[i].key),
+                  ),
+                ),
+        ),
+      ]),
     );
   }
 }

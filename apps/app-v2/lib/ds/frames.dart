@@ -1,13 +1,16 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Badge;
 import 'package:go_router/go_router.dart';
 
 import '../core/api.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
+import 'fields.dart';
+import 'form_sheet.dart';
 import 'format.dart';
 import 'theme.dart';
+import 'tone.dart';
 import 'widgets.dart';
 
 // ---------------------------------------------------------------- list
@@ -20,21 +23,41 @@ class AddAction {
   final Future<bool> Function(BuildContext context) open;
 }
 
+/// A chip above a list: what it asks the API for, and which counts make its number.
+class ListFilter {
+  const ListFilter(this.label, {this.query = const {}, this.count = const []});
+  final String label;
+  final Map<String, String> query;
+  final List<String> count;
+}
+
 /// Every list: a search box, rows that open on tap, pages loaded as you scroll,
 /// pull to refresh, and one "New" button.
 class ListFrame<T> extends StatefulWidget {
-  const ListFrame(
-      {super.key, required this.title, required this.load, required this.row, this.onOpen, this.searchHint, this.add, this.localSearch = false});
+  const ListFrame({
+    super.key,
+    required this.title,
+    required this.load,
+    required this.row,
+    this.onOpen,
+    this.searchHint,
+    this.add,
+    this.localSearch = false,
+    this.filters = const [],
+  });
 
   final String title;
   final String? searchHint;
-  final Future<Paged<T>> Function(Api api, String? q, int page) load;
+  final Future<Paged<T>> Function(Api api, String? q, int page, Map<String, String> query) load;
   final RowData Function(T x) row;
   final void Function(BuildContext context, T x)? onOpen;
   final AddAction? add;
 
   /// The API sends every row at once: search them on the phone.
   final bool localSearch;
+
+  /// Chips above the list; the first is chosen at the start.
+  final List<ListFilter> filters;
 
   @override
   State<ListFrame<T>> createState() => _ListFrameState<T>();
@@ -46,6 +69,8 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
   bool loading = false, more = true;
   String? error, q;
   Timer? _debounce;
+  int filter = 0;
+  Map<String, int> counts = const {};
   int _ask = 0;
 
   @override
@@ -75,11 +100,13 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
       error = null;
     });
     try {
-      final p = await widget.load(context.api, widget.localSearch ? null : q, page + 1);
+      final query = widget.filters.isEmpty ? const <String, String>{} : widget.filters[filter].query;
+      final p = await widget.load(context.api, widget.localSearch ? null : q, page + 1, query);
       if (!mounted || ask != _ask) return;
       setState(() {
         rows.addAll(widget.localSearch && q != null ? p.rows.where(_matches) : p.rows);
         total = widget.localSearch ? rows.length : p.total;
+        if (p.counts.isNotEmpty) counts = p.counts;
         page = p.page == 0 ? page + 1 : p.page;
         more = p.hasMore;
       });
@@ -107,6 +134,11 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
     });
   }
 
+  String _chip(ListFilter f) {
+    if (f.count.isEmpty || counts.isEmpty) return f.label;
+    return '${f.label} ${f.count.fold<int>(0, (n, k) => n + (counts[k] ?? 0))}';
+  }
+
   Future<void> _add() async {
     if (await widget.add!.open(context) && mounted) {
       toast(context, 'Saved');
@@ -124,13 +156,15 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
     } else if (rows.isEmpty && loading) {
       body = const LoadingView();
     } else if (rows.isEmpty) {
-      body = ListView(children: [
-        EmptyState(
-          title: q == null ? 'Nothing here yet' : 'No match for "$q"',
-          text: q == null ? null : 'Try fewer letters, or a phone number or email.',
-          action: add != null && q == null ? FilledButton(onPressed: _add, child: Text(add.label)) : null,
-        ),
-      ]);
+      body = ListView(
+        children: [
+          EmptyState(
+            title: q == null ? 'Nothing here yet' : 'No match for "$q"',
+            text: q == null ? null : 'Try fewer letters, or a phone number or email.',
+            action: add != null && q == null ? FilledButton(onPressed: _add, child: Text(add.label)) : null,
+          ),
+        ],
+      );
     } else {
       body = NotificationListener<ScrollNotification>(
         onNotification: (n) {
@@ -147,20 +181,25 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
                 child: Center(
                   child: loading
                       ? const LoadingView()
-                      : Text(count(total, '{} in all', '{} in all') ?? '', style: ctx.text.bodySmall?.copyWith(color: c.muted)),
+                      : Text(
+                          count(total, '{} in all', '{} in all') ?? '',
+                          style: ctx.text.bodySmall?.copyWith(color: c.muted),
+                        ),
                 ),
               );
             }
             final x = rows[i];
             final d = widget.row(x);
-            return PhoneRow(RowData(
-              title: d.title,
-              sub: d.sub,
-              badge: d.badge,
-              value: d.value,
-              actions: d.actions,
-              onTap: widget.onOpen == null ? null : () => widget.onOpen!(ctx, x),
-            ));
+            return PhoneRow(
+              RowData(
+                title: d.title,
+                sub: d.sub,
+                badge: d.badge,
+                value: d.value,
+                actions: d.actions,
+                onTap: widget.onOpen == null ? null : () => widget.onOpen!(ctx, x),
+              ),
+            );
           },
         ),
       );
@@ -172,19 +211,54 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
           if (add != null)
             Padding(
               padding: const EdgeInsets.only(right: Gap.md),
-              child: FilledButton.icon(onPressed: _add, icon: const Icon(Icons.add, size: 18), label: const Text('New')),
+              child: FilledButton.icon(
+                onPressed: _add,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('New'),
+              ),
             ),
         ],
       ),
-      body: Column(children: [
-        if (widget.searchHint != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xs, Gap.lg, Gap.sm),
-            child: SearchField(hint: widget.searchHint!, onChanged: _search),
+      body: Column(
+        children: [
+          if (widget.searchHint != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xs, Gap.lg, Gap.sm),
+              child: SearchField(hint: widget.searchHint!, onChanged: _search),
+            ),
+          if (widget.filters.isNotEmpty)
+            SizedBox(
+              height: Gap.tap,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: Gap.lg),
+                children: [
+                  for (final (i, f) in widget.filters.indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(right: Gap.sm),
+                      child: Center(
+                        child: ChoiceChip(
+                          label: Text(_chip(f)),
+                          selected: i == filter,
+                          onSelected: (_) {
+                            setState(() => filter = i);
+                            _ask++;
+                            loading = false;
+                            _reload();
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          if (error != null && rows.isNotEmpty)
+            Padding(padding: const EdgeInsets.all(Gap.lg), child: MessageBanner(error!)),
+          Expanded(
+            child: RefreshIndicator(onRefresh: _reload, child: body),
           ),
-        if (error != null && rows.isNotEmpty) Padding(padding: const EdgeInsets.all(Gap.lg), child: MessageBanner(error!)),
-        Expanded(child: RefreshIndicator(onRefresh: _reload, child: body)),
-      ]),
+        ],
+      ),
     );
   }
 }
@@ -193,14 +267,28 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
 
 /// A button on a record. [run] returns true when the record changed (it reloads).
 class RecordAction<T> {
-  const RecordAction({required this.label, required this.run, this.perm}) : confirm = null, delete = null;
+  const RecordAction({required this.label, required this.run, this.perm, this.visible, this.danger = false})
+    : confirm = null,
+      delete = null;
 
   /// Asks [confirm], deletes, goes back, says so.
-  const RecordAction.delete({required this.label, required this.confirm, required Future<void> Function(Api api, T x) run, this.perm})
-      : delete = run,
-        run = null;
+  const RecordAction.delete({
+    required this.label,
+    required this.confirm,
+    required Future<void> Function(Api api, T x) run,
+    this.perm,
+    this.visible,
+  }) : delete = run,
+       run = null,
+       danger = true;
 
   final String label;
+
+  /// Shown only when this says so (e.g. "Resume" only when on hold).
+  final bool Function(T x)? visible;
+
+  /// Red in the menu: it ends or removes something.
+  final bool danger;
   final String? perm, confirm;
   final Future<bool> Function(BuildContext context, T x)? run;
   final Future<void> Function(Api api, T x)? delete;
@@ -228,13 +316,29 @@ class JumpChip extends StatelessWidget {
           alignment: Alignment.center,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(999), border: Border.all(color: c.line)),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: c.line),
+            ),
             child: Text(label, style: context.text.labelMedium),
           ),
         ),
       ),
     );
   }
+}
+
+/// Lets a hand-written section reload the record it sits on (after it changed something).
+class RecordScope extends InheritedWidget {
+  const RecordScope({super.key, required this.reload, required super.child});
+  final Future<void> Function() reload;
+
+  static Future<void> reloadOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<RecordScope>()?.reload() ?? Future.value();
+
+  @override
+  bool updateShouldNotify(RecordScope old) => false;
 }
 
 sealed class SectionDef {
@@ -264,11 +368,23 @@ class ListSection extends SectionDef {
 /// Every record: title and details, one primary button, ⋯ for the rest, and
 /// sections in a fixed order. The section names at the top jump to each one.
 class RecordFrame<T> extends StatefulWidget {
-  const RecordFrame({super.key, required this.load, required this.title, required this.sections, this.sub, this.primary, this.more = const []});
+  const RecordFrame({
+    super.key,
+    required this.load,
+    required this.title,
+    required this.sections,
+    this.sub,
+    this.badges,
+    this.primary,
+    this.more = const [],
+  });
 
   final Future<T> Function(Api api) load;
   final String? Function(T x) title;
   final List<String?> Function(T x)? sub;
+
+  /// Status words under the title: the stage, "On hold", "Late".
+  final List<Badge?> Function(T x)? badges;
   final RecordAction<T>? primary;
   final List<RecordAction<T>> more;
   final List<SectionDef> Function(T x) sections;
@@ -336,8 +452,10 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
       );
     }
     final sections = widget.sections(v);
-    final primary = widget.primary != null && context.can(widget.primary!.perm) ? widget.primary : null;
-    final more = widget.more.where((a) => context.can(a.perm)).toList();
+    bool shown(RecordAction<T> a) => context.can(a.perm) && (a.visible?.call(v) ?? true);
+    final primary = widget.primary != null && shown(widget.primary!) ? widget.primary : null;
+    final more = widget.more.where(shown).toList();
+    final badges = widget.badges?.call(v).whereType<Badge>().toList() ?? const <Badge>[];
     final sub = joinParts(widget.sub?.call(v) ?? const []);
     return Scaffold(
       appBar: AppBar(
@@ -349,37 +467,53 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
               onSelected: _do,
               itemBuilder: (_) => [
                 for (final a in more)
-                  PopupMenuItem(value: a, child: Text(a.label, style: TextStyle(color: a.delete != null ? c.bad : null))),
+                  PopupMenuItem(
+                    value: a,
+                    child: Text(a.label, style: TextStyle(color: a.danger ? c.bad : null)),
+                  ),
               ],
             ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        // Every section is built at once (a record has a handful), so the chips can jump to any of them.
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.xl),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Semantics(header: true, child: Text(widget.title(v) ?? '', style: context.text.titleLarge)),
-            if (sub.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(sub, style: context.text.bodySmall?.copyWith(color: c.text2)),
-            ],
-            if (primary != null) ...[
-              const SizedBox(height: Gap.md),
-              Align(alignment: Alignment.centerLeft, child: FilledButton(onPressed: () => _do(primary), child: Text(primary.label))),
-            ],
-            const SizedBox(height: Gap.md),
-            _jump(context, sections),
-            for (final s in sections) ...[
-              const SizedBox(height: Gap.md),
-              KeyedSubtree(
-                key: keys.putIfAbsent(s.title, GlobalKey.new),
-                child: KeyedSubtree(key: ValueKey('section:${s.title}'), child: _section(context, s)),
-              ),
-            ],
-          ]),
+      body: RecordScope(
+        reload: _load,
+        child: RefreshIndicator(
+          onRefresh: _load,
+          // Every section is built at once (a record has a handful), so the chips can jump to any of them.
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(header: true, child: Text(widget.title(v) ?? '', style: context.text.titleLarge)),
+                if (sub.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(sub, style: context.text.bodySmall?.copyWith(color: c.text2)),
+                ],
+                if (badges.isNotEmpty) ...[
+                  const SizedBox(height: Gap.sm),
+                  Wrap(spacing: Gap.sm, runSpacing: Gap.xs, children: [for (final b in badges) StatusBadge(b)]),
+                ],
+                if (primary != null) ...[
+                  const SizedBox(height: Gap.md),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton(onPressed: () => _do(primary), child: Text(primary.label)),
+                  ),
+                ],
+                const SizedBox(height: Gap.md),
+                _jump(context, sections),
+                for (final s in sections) ...[
+                  const SizedBox(height: Gap.md),
+                  KeyedSubtree(
+                    key: keys.putIfAbsent(s.title, GlobalKey.new),
+                    child: KeyedSubtree(key: ValueKey('section:${s.title}'), child: _section(context, s)),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -387,21 +521,25 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
 
   /// The section names as chips: visible, not hidden tabs. A tap scrolls there.
   Widget _jump(BuildContext context, List<SectionDef> sections) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          for (final s in sections)
-            Padding(
-              padding: const EdgeInsets.only(right: Gap.sm),
-              child: JumpChip(
-                label: s is ListSection && s.rows.isNotEmpty ? '${s.title} ${s.rows.length}' : s.title,
-                onTap: () {
-                  final ctx = keys[s.title]?.currentContext;
-                  if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250), alignment: 0.02);
-                },
-              ),
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: [
+        for (final s in sections)
+          Padding(
+            padding: const EdgeInsets.only(right: Gap.sm),
+            child: JumpChip(
+              label: s is ListSection && s.rows.isNotEmpty ? '${s.title} ${s.rows.length}' : s.title,
+              onTap: () {
+                final ctx = keys[s.title]?.currentContext;
+                if (ctx != null) {
+                  Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250), alignment: 0.02);
+                }
+              },
             ),
-        ]),
-      );
+          ),
+      ],
+    ),
+  );
 
   Widget _section(BuildContext context, SectionDef s) {
     final c = context.colors;
@@ -432,4 +570,46 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
         );
     }
   }
+}
+
+/// An action described in the spec: asks [fields] (if any), then posts [send] + the
+/// answers to [path]. True when it was done (the record reloads).
+Future<bool> postAction(
+  BuildContext context, {
+  required String title,
+  required String path,
+  Map<String, Object?> send = const {},
+  List<FieldDef> fields = const [],
+  bool danger = false,
+}) async {
+  if (fields.isEmpty) {
+    Object? reason;
+    while (true) {
+      try {
+        await context.api.post(path, {...send, 'reason': ?reason});
+        return true;
+      } on ApiException catch (e) {
+        if (!context.mounted) return false;
+        if (e.code == 'reason_needed' && reason == null) {
+          reason = await askReason(context, e);
+          if (reason != null && context.mounted) continue;
+          return false;
+        }
+        toast(context, e.message);
+        return false;
+      }
+    }
+  }
+  return FormSheet.open(
+    context,
+    title: title,
+    save: title.replaceAll('…', ''),
+    groups: [FormGroup(fields: fields)],
+    initial: {
+      for (final f in fields)
+        if (f.defaultValue != null) f.key: f.defaultValue,
+    },
+    send: (api, body) => api.post(path, {...send, ...body}),
+    danger: danger,
+  );
 }

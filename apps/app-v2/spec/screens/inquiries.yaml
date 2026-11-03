@@ -1,0 +1,107 @@
+screen: Inquiries
+frame: list
+entity: Inquiry
+path: /inquiries
+tab: Inquiries
+title: Inquiries
+search: Product, customer or number
+filters:
+  - { label: Open, query: { stage: open }, count: [new, sourcing, quoted] }
+  - { label: Mine, query: { assignee: me } }
+  - { label: Getting prices, query: { stage: sourcing }, count: [sourcing] }
+  - { label: Quoted, query: { stage: quoted }, count: [quoted] }
+  - { label: Late, query: { stage: overdue }, count: [overdue] }
+  - { label: On hold, query: { stage: on_hold }, count: [on_hold] }
+  - { label: Won, query: { stage: won }, count: [won] }
+  - { label: Lost, query: { stage: lost }, count: [lost] }
+row:
+  title: title
+  sub: [customer.name, refNo, assignee.name]
+  badge: stage
+  value: quotation.latest.total
+open: Inquiry
+add: InquiryForm
+
+---
+screen: Inquiry
+frame: record
+entity: Inquiry
+path: /inquiries/:id
+tab: Inquiries
+header:
+  title: title
+  sub: [customer.name, refNo, assignee.name]
+  badge: stage
+  flags: [{ of: onHold, label: On hold, tone: warn }, { of: overdue, label: Late, tone: bad }]
+sections:
+  - { title: Next, custom: InquiryNext }               # the one primary button of the page lives here
+  - title: Needs
+    list: items
+    row: { title: description, sub: [{ of: quantity, with: unit }, model] }
+    empty: No list of items yet
+  - { title: Details, fields: [requirements, category, priority, requiredBy, channel, createdAt] }
+  - { title: Factory prices, custom: InquiryPrices, perm: sourcing.manage }
+  - { title: Quotation, custom: InquiryQuote }
+  - title: Contacts
+    list: customer.contacts
+    row: { title: name, sub: [position, phone, email] }
+    actions: [phone, whatsapp, email]
+    empty: No contacts
+  - { title: Notes, custom: InquiryNotes }
+  - { title: Files, custom: InquiryFiles }
+  - title: Changes
+    list: stageChanges
+    row: { title: toStage, sub: [changedAt, note] }
+more:
+  - label: Edit
+    sheet: InquiryForm
+    perm: inquiries.create
+  - label: Take it
+    post: /api/inquiries/{id}/assign
+    send: { assigneeId: $me }
+    when: { assigneeId: null, stage: [new, sourcing, quoted] }
+  - label: Hand it to…
+    post: /api/inquiries/{id}/assign
+    perm: inquiries.assign
+    when: { stage: [new, sourcing, quoted] }
+    fields:
+      assigneeId: { pick: /api/users/people, required: true, label: Who }
+      reason: { type: text, suggest: reassign, label: Why }
+  - label: Put on hold
+    post: /api/inquiries/{id}/hold
+    send: { onHold: true }
+    when: { onHold: false, stage: [new, sourcing, quoted] }
+    fields:
+      reason: { type: text, suggest: hold, label: Why }
+      note: { type: multiline, max: 2000 }
+  - label: Resume
+    post: /api/inquiries/{id}/hold
+    send: { onHold: false }
+    when: { onHold: true }
+  - label: Mark as lost
+    post: /api/inquiries/{id}/stage
+    send: { to: lost }
+    when: { stage: [new, sourcing, quoted] }
+    danger: true
+    fields:
+      lostReason: { enum: LostReason, required: true, label: Why }
+      note: { type: multiline, max: 2000 }
+  - label: Reopen
+    post: /api/inquiries/{id}/stage
+    send: { to: sourcing }
+    perm: inquiries.reopen
+    when: { stage: [lost] }
+    fields:
+      reason: { type: text, suggest: reopen, label: Why }
+  - { label: Delete inquiry, delete: true, perm: inquiries.delete, confirm: "Delete this inquiry? Its quotation and factory prices go too." }
+
+---
+screen: InquiryForm
+frame: sheet
+entity: Inquiry
+title: { create: New inquiry, edit: Edit inquiry }
+save: Save inquiry
+groups:
+  - fields: [customerId, category, title, requirements]
+  - { title: Items, list: items, add: Add an item, fields: [description, model, quantity, unit] }
+  - { title: More details, folded: true, fields: [priority, requiredBy, assigneeId] }

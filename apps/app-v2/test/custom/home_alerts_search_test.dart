@@ -78,7 +78,8 @@ void main() {
   test('web links open the app page when the app has it', () {
     expect(appPathFor('/orders/5e258e2e-7869-4225-a99e-4ad5cf0afc68?tab=money'), '/orders/5e258e2e-7869-4225-a99e-4ad5cf0afc68');
     expect(appPathFor('/customers/5e258e2e-7869-4225-a99e-4ad5cf0afc68'), '/customers/5e258e2e-7869-4225-a99e-4ad5cf0afc68');
-    expect(appPathFor('/inquiries/5e258e2e-7869-4225-a99e-4ad5cf0afc68'), isNull);
+    expect(appPathFor('/inquiries/5e258e2e-7869-4225-a99e-4ad5cf0afc68/sourcing'), '/inquiries/5e258e2e-7869-4225-a99e-4ad5cf0afc68');
+    expect(appPathFor('/factories/5e258e2e-7869-4225-a99e-4ad5cf0afc68'), isNull);
     expect(appPathFor(null), isNull);
   });
 

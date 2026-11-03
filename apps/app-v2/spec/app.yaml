@@ -9,17 +9,43 @@ tabs:
   - { label: Orders, icon: orders, path: /orders }
   - { label: More, icon: more, path: /more }
 
+# Quick reasons offered as chips (the person may also write their own words).
+reasons:
+  reassign: [Workload, Person is away, Better fit for this product]
+  hold: [Customer is deciding, Waiting for the factory, Waiting for documents]
+  reopen: [Customer came back, Marked lost by mistake]
+  quoteAnswer: [Price too high, Customer bought elsewhere, No reply from the customer, Project cancelled]
+
 # Lists of values. A tone is one of the five status meanings shared with the web:
 # neutral, info, ok, warn, bad.
 enums:
   CustomerType: { company: Company, individual: Person }
   Currency: { USD: USD, CNY: CNY, PKR: PKR }
+  Incoterm: { EXW: EXW, FCA: FCA, FAS: FAS, FOB: FOB, CFR: CFR, CIF: CIF, CPT: CPT, CIP: CIP, DAP: DAP, DPU: DPU, DDP: DDP }
   InquiryStage:
-    new: { label: New, tone: info }
-    sourcing: { label: Getting prices, tone: info }
-    quoted: { label: Quoted, tone: warn }
+    new: { label: New, tone: neutral }
+    sourcing: { label: Getting prices, tone: warn }
+    quoted: { label: Quoted, tone: info }
     won: { label: Won, tone: ok }
     lost: { label: Lost, tone: neutral }
+  Priority: { low: Low, normal: Normal, high: High, urgent: { label: Urgent, tone: bad } }
+  InquiryChannel: { website: Website form, whatsapp: WhatsApp, wechat: WeChat, email: Email, phone: Phone, visit: Visit, other: Other }
+  LostReason:
+    price_too_high: Price too high
+    no_reply: No reply from customer
+    factory_cannot_supply: Factory can't make it or meet the date
+    bought_elsewhere: Customer bought elsewhere
+    customer_cancelled: Customer cancelled
+    duplicate_or_spam: Duplicate or spam
+    other: Other
+  RevisionStatus:
+    draft: { label: Draft, tone: neutral }
+    sent: { label: Sent, tone: info }
+    accepted: { label: Accepted, tone: ok }
+    rejected: { label: Rejected, tone: bad }
+    expired: { label: Expired, tone: warn }
+    superseded: { label: Replaced, tone: neutral }
+    void: { label: Void, tone: neutral }
   OrderStage:
     confirmed: { label: Confirmed, tone: info }
     in_production: { label: In production, tone: info }
