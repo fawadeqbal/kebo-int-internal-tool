@@ -3,8 +3,8 @@
 import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, Lock, Minus, MoreHorizontal, Plus, Upload } from "lucide-react";
-import { fillSplit, TOOL_LABEL, type FlowStep, type OrderDocumentKind, type PaymentRoute } from "@kebo/shared";
+import { ArrowRight, Check, Lock, Minus, MoreHorizontal, Plus, Upload } from "lucide-react";
+import { fillSplit, itemLink, STEP_PATH, TOOL_LABEL, type FlowStep, type ItemLink, type OrderDocumentKind, type PaymentRoute } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardHeader, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { FloatingMenu } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
@@ -14,6 +14,7 @@ import type { BankContract, BankStepView, DeliveryView, FlowDocument, ShipmentVi
 import { BankContractForm, BankStepForm, DateForm, DeliveryForm, DocumentForm, RouteForm, ShipmentForm, type RouteTermsValue } from "./flow-forms";
 import { LightForm, sendTo, TapButton, uploadFile, type LightChip, type LightField, type LightTap } from "./light-form";
 import { FileChip } from "@/components/files/file-tools";
+import { goTo, goToHash, useTargetsHere } from "./go-to";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 /** checklistAction bound to the order: (change, item id or automatic key, …). */
@@ -428,6 +429,39 @@ function AutoForm({ tool, onDone }: { tool: AutoTool; onDone: () => void }) {
   }
 }
 
+/* ---------------------------------------------------------------- where its data lives */
+
+/**
+ * A way to an item's data (board Fix25Links): on this page a button that
+ * scrolls there and lights it up; on another step a link that opens it there.
+ * The chip says where ("Shipment · container →"); the row's data line is the
+ * same way, as text.
+ */
+function ToData({ link, page, orderBase, chip, children }: { link: ItemLink; page: FlowStep; orderBase: string; chip?: boolean; children: ReactNode }) {
+  const here = link.step === null || link.step === page;
+  const className = chip
+    ? "inline-flex max-w-full items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-primary"
+    : "text-left hover:underline hover:decoration-primary/60 underline-offset-2 focus-visible:outline-2 focus-visible:outline-primary rounded-sm";
+  const label = chip ? `Go to ${link.label}` : undefined;
+  const body = (
+    <>
+      {chip ? <span className="truncate">{children}</span> : children}
+      {chip && <ArrowRight className="size-3 shrink-0" aria-hidden />}
+    </>
+  );
+  if (here)
+    return (
+      <button type="button" className={className} aria-label={label} title={chip ? undefined : `Show it in ${link.label}`} onClick={() => goTo(link.targets, link.label)}>
+        {body}
+      </button>
+    );
+  return (
+    <Link href={`${orderBase}/${STEP_PATH[link.step!]}${goToHash(link.targets)}`} className={className} aria-label={label} title={chip ? undefined : `Open ${link.label}`}>
+      {body}
+    </Link>
+  );
+}
+
 /* ---------------------------------------------------------------- one row */
 
 type Open = null | "edit" | "due" | "note" | "skip" | "attach";
@@ -481,6 +515,7 @@ function AttachForm({ item, dealId, run, onDone }: { item: ChecklistItem; dealId
 
 function Row({
   item,
+  page,
   now,
   active,
   onActive,
@@ -494,6 +529,8 @@ function Row({
   today,
 }: {
   item: ChecklistItem;
+  /** The step of the page the checklist is on (a link to it stays on the page). */
+  page: FlowStep;
   now: boolean;
   /** Its form is open (the current item, or the one the person opened). */
   active: boolean;
@@ -520,6 +557,18 @@ function Row({
   // Make and Send items open the paper's Make page (/orders/:id/papers/:kind).
   const orderBase = usePathname().split("/").slice(0, 3).join("/");
   const makes = (item.tool === "make" || item.tool === "send") && !!item.paper;
+  // Where its data lives: a chip next to the title (one on this page shows only when the page has the place).
+  const found = itemLink({ key: item.key, tool: item.tool, title: item.title, file: item.file });
+  const onPage = useTargetsHere(found && (found.step === null || found.step === page) ? found.targets : null);
+  const link = found && onPage ? found : null;
+  const toData = (children: ReactNode) =>
+    link ? (
+      <ToData link={link} page={page} orderBase={orderBase}>
+        {children}
+      </ToData>
+    ) : (
+      children
+    );
   // A form of its own: an automatic item's light or full form, an own Fill in / Upload item.
   const formTool = item.auto && tool && tool.kind !== "link" && tool.kind !== "node" && tool.kind !== "tap";
   const ownForm = !item.auto && canEdit && (item.tool === "fill" || item.tool === "upload") && !makes;
@@ -683,6 +732,11 @@ function Row({
             <Lock className="size-3" aria-hidden /> {sourceOf(item.key!)}
           </span>
         )}
+        {link && (
+          <ToData link={link} page={page} orderBase={orderBase} chip>
+            {link.label}
+          </ToData>
+        )}
         {item.dueOn && !closed && (
           <span className={cn("text-xs", item.late ? "font-medium text-bad" : "text-muted")}>
             due {short(item.dueOn)}
@@ -696,14 +750,19 @@ function Row({
           {item.skipped ? (
             <span className="text-muted">Skipped{item.skipReason ? `: ${item.skipReason}` : ""}</span>
           ) : item.done ? (
-            item.data.length > 0 && <span className="font-medium text-text tabular">{oneLine(item.data)}</span>
+            item.data.length > 0 && toData(<span className="font-medium text-text tabular">{oneLine(item.data)}</span>)
           ) : (
             <>
-              {item.data.map(([l, v]) => (
-                <span key={l} className="text-muted">
-                  {l} <span className="font-medium text-text tabular">{value(v)}</span>
-                </span>
-              ))}
+              {item.data.length > 0 &&
+                toData(
+                  <span className="inline-flex flex-wrap gap-x-4 gap-y-0.5">
+                    {item.data.map(([l, v]) => (
+                      <span key={l} className="text-muted">
+                        {l} <span className="font-medium text-text tabular">{value(v)}</span>
+                      </span>
+                    ))}
+                  </span>,
+                )}
               {item.needs && !showForm && <span className="text-muted">Needs: {item.needs}</span>}
             </>
           )}
@@ -932,6 +991,7 @@ export function Checklist({
             <Row
               key={keyOf(i)}
               item={i}
+              page={step}
               now={i === nowItem}
               active={activeKey === keyOf(i)}
               onActive={(o) => setChosen(o ? keyOf(i) : null)}

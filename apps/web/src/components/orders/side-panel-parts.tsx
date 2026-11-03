@@ -51,6 +51,7 @@ export function SidePanelCard({ children, label }: { children: ReactNode; label:
  * (phone) — then an optional footer (the costs' total).
  */
 export function SideSection({
+  target,
   title,
   count,
   action,
@@ -59,6 +60,8 @@ export function SideSection({
   dense,
   children,
 }: {
+  /** Where checklist links land (see goTo). */
+  target?: string;
   title: string;
   count?: number;
   action?: ReactNode;
@@ -71,7 +74,7 @@ export function SideSection({
   const [all, setAll] = useState(false);
   const rows = Children.toArray(children);
   return (
-    <section aria-label={title} className="border-b border-line px-3.5 pt-2.5 pb-2 last:border-b-0">
+    <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className="border-b border-line px-3.5 pt-2.5 pb-2 last:border-b-0">
       <div className="mb-0.5 flex min-h-7 items-center justify-between gap-2">
         <h3 className="text-[13px] font-semibold">
           {title}
@@ -169,7 +172,7 @@ export function SideFileRow({ file, set }: { file: OrderFile; set: OrderFile[] }
   const tools = useFileTools();
   const where = file.attachedTo.label.replace(/^(Checklist|Paper|Inquiry|Step) · /, "");
   return (
-    <li className="flex h-[34px] items-center gap-2 border-b border-line last:border-b-0">
+    <li data-target={`file.${file.sourceId}`} className="flex h-[34px] items-center gap-2 border-b border-line last:border-b-0">
       <FileIcon file={file} />
       <button
         type="button"

@@ -234,6 +234,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           shipments.map((s, i) => (
             <DetailsCard
               key={s.id}
+              target="shipment"
               id={i === 0 ? "shipments" : undefined}
               title={shipments.length > 1 ? `Shipment ${i + 1}` : "Shipment"}
               fields={shipmentFields(s, shipBy)}
@@ -245,6 +246,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         ) : (
           <DetailsCard
             id="shipments"
+            target="shipment"
             title="Shipment"
             description={canShip ? "Not booked yet: + Add any value starts the shipment, from the order's ports." : "Not booked yet."}
             fields={shipmentFields(fresh, shipBy)}
@@ -256,6 +258,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       ) : (
         <DetailsCard
           id="shipments"
+          target="shipment"
           title="Shipping"
           fields={[
             { name: "portOfDischarge", label: "To", value: o.portOfDischarge },
@@ -271,7 +274,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       )}
       {goods.length > 0 &&
         (showPacking ? (
-          <div id="lines" className="scroll-mt-24">
+          <div id="lines" data-target="lines.packing" data-target-card="" className="scroll-mt-24 rounded-xl">
             <PackingCard
               toggle
               title="Lines · packing"
@@ -291,7 +294,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             />
           </div>
         ) : (
-          <Card id="lines" className="scroll-mt-24">
+          <Card id="lines" data-target="lines.packing" data-target-card="" className="scroll-mt-24">
             <CardHeader
               title="Lines · packing"
               description="Opens once production has started, for the packages, weights and volume of each line."

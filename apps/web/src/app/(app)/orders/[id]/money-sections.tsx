@@ -189,6 +189,7 @@ export function PaymentsReceived({
 /** One part of the tab: what it is and whose money, its one button, then its tables. */
 export function MoneySection({
   id,
+  target,
   icon,
   title,
   sub,
@@ -197,6 +198,8 @@ export function MoneySection({
   children,
 }: {
   id: string;
+  /** Where checklist links land (see goTo). */
+  target?: string;
   icon: React.ReactNode;
   title: string;
   sub: string;
@@ -205,7 +208,13 @@ export function MoneySection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24 overflow-hidden rounded-xl border border-line bg-surface">
+    <section
+      id={id}
+      data-target={target}
+      data-target-card={target ? "" : undefined}
+      aria-labelledby={`${id}-title`}
+      className="scroll-mt-24 overflow-hidden rounded-xl border border-line bg-surface"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="flex min-w-0 items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-text-2 [&_svg]:size-4">

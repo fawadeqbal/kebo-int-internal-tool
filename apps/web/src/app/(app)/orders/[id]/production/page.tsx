@@ -148,6 +148,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       />
       <StepViewDivider />
       <DetailsCard
+        target="production"
         title="Production"
         fields={fields}
         action={fieldsAction.bind(null, o.id, "factory")}
@@ -157,6 +158,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       />
       {goods.length > 0 && (
         <LinesCard
+          target="lines.received"
           title="Lines · from the factory"
           description={o.goods.allReceived ? "Everything has come in." : "What has come in so far on each line; the status follows."}
           canEdit={canEdit}

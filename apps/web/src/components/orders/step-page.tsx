@@ -6,6 +6,7 @@ import { Badge, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
 import { date, dateTime } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/types";
 import type { OrderSteps, StepView } from "@/lib/types-checklist";
+import { GoToOnLoad } from "./go-to";
 
 /** Dates in a step's line ("Ordered 2026-11-08") as people read them. */
 export const readable = (line: string) => line.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d));
@@ -185,6 +186,8 @@ export function StepPage({
       prevNext={<PrevNext base={base} steps={steps.steps} here={step} />}
     >
       {children}
+      {/* A checklist link from another step ("#goto=…") lands here lit up. */}
+      <GoToOnLoad />
     </StepFrame>
   );
 }

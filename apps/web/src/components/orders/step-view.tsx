@@ -283,12 +283,12 @@ function AddInPlace({ f, action, shown }: { f: DetailField; action: Action; show
     });
   if (!open && shown !== undefined)
     return (
-      <span className="group/value inline-flex max-w-full items-baseline gap-1.5">
+      <span className="inline-flex max-w-full items-baseline gap-1.5">
         <span className="min-w-0">{shown}</span>
         <button
           type="button"
           onClick={() => (setV(initial()), setOpen(true))}
-          className="grid size-5 shrink-0 translate-y-0.5 place-items-center self-start rounded text-primary opacity-0 transition-opacity group-hover/value:opacity-100 hover:bg-primary-soft focus-visible:opacity-100 [@media(hover:none)]:hidden"
+          className="grid size-5 shrink-0 translate-y-0.5 place-items-center self-start rounded text-primary opacity-0 transition-opacity group-hover/field:opacity-100 hover:bg-primary-soft focus-visible:opacity-100 [@media(hover:none)]:hidden"
           aria-label={`Change the ${f.label.toLowerCase()}`}
           title={`Change the ${f.label.toLowerCase()}`}
         >
@@ -465,7 +465,7 @@ export function DetailsCard({
       id={id}
       target={target}
       title={title}
-      description={description ?? (editable ? "Click + Add to fill one value right here; Edit opens everything." : undefined)}
+      description={description ?? (editable ? "Click + Add, or a value's pencil, to change it right here; Edit opens everything." : undefined)}
       meter={{ n, of: counted.length }}
       canEdit={canEdit && hasPanel}
       actions={actions}
@@ -484,7 +484,7 @@ export function DetailsCard({
           <div
             key={f.name ?? f.label}
             data-target={target ? `${target}.${f.target ?? f.name ?? f.label.toLowerCase()}` : undefined}
-            className="-mx-1.5 flex min-w-0 flex-col gap-0.5 px-1.5 py-0.5"
+            className="group/field -mx-1.5 flex min-w-0 flex-col gap-0.5 px-1.5 py-0.5"
           >
             <dt className="text-xs text-muted">{f.label}</dt>
             <dd className="min-w-0 text-sm font-medium break-words text-text tabular">

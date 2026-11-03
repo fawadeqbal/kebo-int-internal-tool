@@ -136,7 +136,7 @@ export function PapersTable({
   );
 
   return (
-    <Card id="papers" className="scroll-mt-24">
+    <Card id="papers" data-target="papers" data-target-card="" className="scroll-mt-24">
       <CardHeader title="Papers" description={description} />
       <div className="flex flex-col px-4 pt-3 pb-3.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -384,6 +384,7 @@ function PaperLine({
   return (
     <div
       role="row"
+      data-target={`paper.${r.docKind ?? r.kind}`}
       data-drop-attach={canRecord && drop ? drop : undefined}
       data-drop-label={r.label}
       className={cn("border-b border-line px-2 last:border-b-0", open && "-mx-2 rounded-lg bg-primary-soft px-4")}

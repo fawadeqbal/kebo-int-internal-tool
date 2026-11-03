@@ -381,6 +381,7 @@ export function FileRow({
   const [menu, setMenu] = useState(false);
   return (
     <li
+      data-target={`file.${file.sourceId}`}
       className={cn(
         "grid items-center gap-x-3 gap-y-0.5 border-b border-line py-2 last:border-b-0",
         onSelect ? "grid-cols-[20px_18px_minmax(0,1fr)_auto]" : "grid-cols-[18px_minmax(0,1fr)_auto]",
