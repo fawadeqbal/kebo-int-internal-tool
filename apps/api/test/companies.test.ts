@@ -616,10 +616,10 @@ describe("companies: isolation and the platform", () => {
       .expect(400);
     expect(third.body.error).toMatch(/allows 2 people/);
     // Insights is not in the plan.
-    const insights = await mine.get("/insights").expect(403);
+    const insights = await mine.get("/insights/target").expect(403);
     expect(insights.body.code).toBe("plan_feature");
     // Kebo has no plan: everything.
-    await api(app, keboManager).get("/insights").expect(200);
+    await api(app, keboManager).get("/insights/target").expect(200);
   });
 
   it("the platform admin switches modules off for one company, on top of its plan, and back on", async () => {
@@ -629,7 +629,7 @@ describe("companies: isolation and the platform", () => {
     const before = (await mine.get("/company").expect(200)).body;
     expect(before.features).toEqual(expect.arrayContaining(["insights", "shipping", "delivery_sat"]));
     expect((await mine.get("/auth/me").expect(200)).body.permissions).toEqual(expect.arrayContaining(["reports.view", "shipping.manage"]));
-    await mine.get("/insights").expect(200);
+    await mine.get("/insights/target").expect(200);
 
     // Less management: Insights and Shipping off for this company only.
     const saved = (await plat().patch(`/companies/${c.id}`, { featuresOff: ["insights", "shipping"] }).expect(200)).body;
@@ -643,10 +643,10 @@ describe("companies: isolation and the platform", () => {
     expect(me.permissions).not.toContain("reports.view");
     expect(me.permissions).not.toContain("shipping.manage");
     expect(me.permissions).toContain("delivery.manage");
-    const refused = await mine.get("/insights").expect(403);
+    const refused = await mine.get("/insights/target").expect(403);
     expect(refused.body.code).toBe("plan_feature");
     // Other companies keep theirs.
-    await api(app, keboManager).get("/insights").expect(200);
+    await api(app, keboManager).get("/insights/target").expect(200);
     // Logged on the platform.
     const log = (await plat().get(`/companies/${c.id}`).expect(200)).body.log as { summary?: string; text?: string }[];
     expect(JSON.stringify(log)).toMatch(/modules switched off: insights, shipping/);
@@ -655,7 +655,7 @@ describe("companies: isolation and the platform", () => {
 
     // Back on: everything as it was.
     await plat().patch(`/companies/${c.id}`, { featuresOff: [] }).expect(200);
-    await mine.get("/insights").expect(200);
+    await mine.get("/insights/target").expect(200);
     expect((await mine.get("/auth/me").expect(200)).body.permissions).toEqual(expect.arrayContaining(["reports.view", "shipping.manage"]));
   });
 
@@ -676,7 +676,7 @@ describe("companies: isolation and the platform", () => {
     await off(await mine.get("/audit"));
     await off(await mine.post("/roles", { name: "Extra", permissions: [] }));
     await off(await mine.get("/money/cash-book"));
-    await off(await mine.get("/insights"));
+    await off(await mine.get("/insights/target"));
     await off(await mine.get("/reports"));
     await off(await mine.get("/reports/leaks"));
     await off(await mine.get("/money/profit-and-loss"));
@@ -733,9 +733,9 @@ describe("companies: isolation and the platform", () => {
         .expect(201)
     ).body;
     await plat().patch(`/companies/${c.id}`, { planId: insightsOnly.id }).expect(200);
-    const ins = (await mine.get("/insights").expect(200)).body;
-    expect(ins.kpis.netProfit).toBeNull();
-    expect(ins.kpis.expenses).toBeNull();
+    const ins = (await mine.get("/insights/facts/orders/groups?period=all").expect(200)).body;
+    expect(ins.seeExpenses).toBe(false);
+    for (const r of ins.rows) expect([r.profitExpected, r.expenses]).toEqual([null, null]);
     // A bigger plan switches them on at once.
     const business = plans.find((p) => p.name === "Business")!;
     await plat().patch(`/companies/${c.id}`, { planId: business.id }).expect(200);
