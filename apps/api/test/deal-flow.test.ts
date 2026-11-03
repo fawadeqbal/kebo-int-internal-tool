@@ -214,5 +214,9 @@ describe("a whole deal through the API", () => {
     const held = await api(app, staff).get("/inquiries?stage=on_hold&assignee=me").expect(200);
     expect(held.body.rows.map((r: { id: string }) => r.id)).toContain(inquiryId);
     expect(held.body.counts.sourcing).toBeGreaterThan(0);
+    // The list's chips: on hold and past needed-by are counted for the same search too.
+    expect(held.body.counts.on_hold).toBe(held.body.total);
+    const one = await api(app, staff).get(`/inquiries?q=${encodeURIComponent(`Gulf Valves ${tag}`)}`).expect(200);
+    expect(one.body.counts).toMatchObject({ sourcing: 1, on_hold: 1, overdue: 0 });
   });
 });

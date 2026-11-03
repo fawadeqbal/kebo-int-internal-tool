@@ -11,7 +11,7 @@ const OWN = "a,button,input,select,textarea,label,summary,[role=menu],[role=menu
  * A list's table (design system: List frame). Rows are DataRow: a click on a
  * row opens it, hover lights it, its first cell's link opens it from the
  * keyboard (Enter), and its ⋯ (RowMenu) sits in the last cell. The header
- * stays in view while the page scrolls (from a laptop up; on smaller screens
+ * stays in view while the page scrolls (from 1280px up; on smaller screens
  * a wide table scrolls sideways instead). Not for tables of lines you edit
  * (LineTable).
  *
@@ -40,9 +40,10 @@ export function DataTable({ label, children, clearParam, className }: { label: s
     <div
       ref={box}
       className={cn(
-        "w-full overflow-x-auto lg:overflow-x-visible",
-        // The header row sticks under the app's top bar while the list scrolls.
-        "lg:[&_thead_th]:sticky lg:[&_thead_th]:top-14 lg:[&_thead_th]:z-[1] [&_thead_th]:bg-surface-2",
+        "w-full overflow-x-auto xl:overflow-x-visible",
+        // The header row sticks under the app's top bar while the list scrolls (from 1280px, where every list fits;
+        // narrower, a wide table scrolls sideways instead of losing its last columns).
+        "xl:[&_thead_th]:sticky xl:[&_thead_th]:top-14 xl:[&_thead_th]:z-[1] [&_thead_th]:bg-surface-2",
         className,
       )}
       onClick={(e) => {

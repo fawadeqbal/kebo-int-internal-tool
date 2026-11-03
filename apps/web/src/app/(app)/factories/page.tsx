@@ -1,126 +1,175 @@
 import Link from "next/link";
-import { Factory as FactoryIcon } from "lucide-react";
-import {
-  buildHref,
-  ButtonLink,
-  Card,
-  EmptyState,
-  FilterBar,
-  LinkTabs,
-  PageHeader,
-  Pagination,
-  SearchField,
-  Table,
-  Td,
-  Th,
-  THead,
-  toPage,
-  Tr,
-} from "@kebo/ui";
+import { Plus } from "lucide-react";
+import { can } from "@kebo/shared";
+import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
-import { importFactoriesAction } from "./actions";
+import { DataTable } from "@/components/common/data-table";
+import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
+import { importFactoriesAction, removeFactoryAction } from "./actions";
 import { requirePermission } from "@/lib/session";
 import type { Paged } from "@/lib/types";
 import type { FactoryRow } from "@/lib/types-people";
 
 export const metadata = { title: "Factories" };
 
-/** The suppliers the team buys from, who looks after each, and how many price quotes each has. ?mine=1: the ones I look after. */
-export default async function FactoriesPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; mine?: string }> }) {
-  await requirePermission("sourcing.manage");
+type Params = Record<string, string | undefined>;
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** How to reach them, in a few words. */
+const reach = (f: FactoryRow) => [f.phone, f.wechat && `WeChat ${f.wechat}`, f.email].filter(Boolean).join(" · ");
+
+/**
+ * Factories (design system: List frame): the suppliers the team buys from,
+ * who looks after each and how many price quotes each has. New factory is the
+ * one primary (its own page for now); search, All / Mine chips with counts and
+ * Excel in one row; rows open the factory, ⋯ at the end; 25 a page. ?mine=1:
+ * the ones I look after. Prices and costs here are never shown to customers.
+ */
+export default async function FactoriesPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const me = await requirePermission("sourcing.manage");
   const sp = await searchParams;
   const mine = sp.mine === "1";
-  const data = await api.get<Paged<FactoryRow>>("/factories", { q: sp.q, page: toPage(sp.page), mine: mine ? "true" : undefined });
   const keep = { q: sp.q, mine: mine ? "1" : undefined };
+  const href = (patch: Params) => buildHref("/factories", keep, { page: undefined, ...patch });
+  const [data, other] = await Promise.all([
+    api.get<Paged<FactoryRow>>("/factories", { q: sp.q, page: toPage(sp.page), mine: mine ? "true" : undefined }),
+    // The other chip's count (for the same search).
+    api.get<Paged<FactoryRow>>("/factories", { q: sp.q, pageSize: 1, mine: mine ? undefined : "true" }),
+  ]);
+  const all = mine ? other.total : data.total;
+  const mineCount = mine ? data.total : other.total;
+  const canRemove = can(me, "inquiries.updateAny");
+
+  const rowMenu = (f: FactoryRow): MenuEntry[] => [
+    { label: "Open", href: `/factories/${f.id}` },
+    { label: "Edit", href: `/factories/${f.id}/edit` },
+    { label: "Copy link", copy: `/factories/${f.id}` },
+    ...(canRemove
+      ? [
+          { separator: true as const },
+          {
+            label: "Remove…",
+            danger: true as const,
+            confirm: { title: `Remove ${f.name}?`, body: "It will no longer appear in lists and pickers. Its past prices stay on their inquiries.", confirmLabel: "Remove" },
+            action: removeFactoryAction.bind(null, f.id),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div>
       <PageHeader
         title="Factories"
-        description="The suppliers we source from. Prices and costs here are never shown to customers."
-        actions={
+        summary={
           <>
-            <PartyExcel kind="factories" importAction={importFactoriesAction} exportHref={buildHref("/sheets/export/factories", {}, keep)} />
-            <ButtonLink href="/factories/new" variant="primary">
-              New factory
-            </ButtonLink>
+            {plural(all, "factory", "factories")}
+            {mineCount > 0 && ` · ${mineCount} looked after by you`}
+            <span className="max-sm:hidden"> · prices and costs here are never shown to customers</span>
           </>
         }
+        primary={
+          <ButtonLink href="/factories/new" variant="primary">
+            <Plus aria-hidden /> <span className="sm:hidden">New</span>
+            <span className="max-sm:hidden">New factory</span>
+          </ButtonLink>
+        }
       />
-      <LinkTabs
-        label="Which factories"
-        className="mb-4"
-        tabs={[
-          { href: buildHref("/factories", keep, { mine: undefined, page: undefined }), label: "All factories", active: !mine },
-          { href: buildHref("/factories", keep, { mine: "1", page: undefined }), label: "My factories", active: mine },
+
+      <ListToolbar
+        search={{ placeholder: "Search factory or contact person…", value: sp.q, clearHref: href({ q: undefined }) }}
+        keep={keep}
+        chips={[
+          { key: "all", label: "All", count: all, href: href({ mine: undefined }), active: !mine },
+          { key: "mine", label: "Mine", count: mineCount, href: href({ mine: "1" }), active: mine },
         ]}
+        label="Filter factories"
+        end={<PartyExcel kind="factories" importAction={importFactoriesAction} exportHref={buildHref("/sheets/export/factories", {}, keep)} />}
       />
-      <Card className="overflow-hidden p-0">
-        <FilterBar>
-          <form className="flex flex-1 flex-wrap items-center gap-2">
-            {mine && <input type="hidden" name="mine" value="1" />}
-            <SearchField
-              defaultValue={sp.q}
-              placeholder="Search factory or contact person…"
-              clearHref={mine ? "/factories?mine=1" : "/factories"}
-              className="min-w-56 flex-1 sm:max-w-80"
-            />
-          </form>
-        </FilterBar>
+
+      <Card className="overflow-clip p-0">
         {data.rows.length === 0 ? (
-          <EmptyState
-            icon={FactoryIcon}
-            title={sp.q ? `No factory matches "${sp.q}"` : mine ? "No factories are yours yet" : "No factories yet"}
-            description={
-              sp.q
-                ? "Try part of the name, or add it as a new factory."
-                : mine
-                  ? "Choose “Looked after by” on a factory to make it yours."
-                  : "Factories are added here, or when you record a factory's prices on an inquiry."
-            }
-            action={<ButtonLink href="/factories/new">New factory</ButtonLink>}
-          />
+          all === 0 && !sp.q ? (
+            <EmptyState
+              framed
+              title="No factories yet"
+              description="The suppliers you buy from show here, with who looks after each. They are added here, or when you record a factory's prices on an inquiry."
+              action={
+                <ButtonLink href="/factories/new" size="sm">
+                  <Plus aria-hidden /> Add the first factory
+                </ButtonLink>
+              }
+            />
+          ) : (
+            <EmptyState
+              framed
+              title={mine && !sp.q ? "No factories are yours yet" : "No factories match these filters"}
+              description={mine && !sp.q ? "Choose “Looked after by” on a factory to make it yours." : "Try part of the name or the contact, or clear the filters."}
+              action={
+                <ButtonLink href="/factories" size="sm">
+                  {mine && !sp.q ? "All factories" : "Clear filters"}
+                </ButtonLink>
+              }
+            />
+          )
         ) : (
-          <Table>
-            <THead>
-              <tr>
-                <Th>Factory</Th>
-                <Th>Contact</Th>
-                <Th>Looked after by</Th>
-                <Th className="text-right">Price quotes</Th>
-              </tr>
-            </THead>
-            <tbody>
+          <>
+            <PhoneList label="Factories">
               {data.rows.map((f) => (
-                <Tr key={f.id} className="hover:bg-surface-2/50">
-                  <Td>
-                    <Link href={`/factories/${f.id}`} className="font-medium hover:text-primary">
-                      {f.name}
-                    </Link>
-                    {f.address && <span className="block max-w-72 truncate text-xs text-muted">{f.address}</span>}
-                  </Td>
-                  <Td>
-                    {f.contactPerson || f.phone || f.wechat || f.email ? (
-                      <>
-                        <span className="block text-sm">{f.contactPerson ?? "—"}</span>
-                        <span className="block max-w-60 truncate text-xs text-muted">
-                          {[f.phone, f.wechat && `WeChat ${f.wechat}`, f.email].filter(Boolean).join(" · ")}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted">No contact details</span>
-                    )}
-                  </Td>
-                  <Td className="text-sm">{f.owner?.name ?? <span className="text-xs text-muted">Nobody yet</span>}</Td>
-                  <Td className="text-right tabular">{f._count.quotes || <span className="text-muted">0</span>}</Td>
-                </Tr>
+                <PhoneRow
+                  key={f.id}
+                  href={`/factories/${f.id}`}
+                  title={f.name}
+                  line={`${f.contactPerson ?? "No contact person"} · ${f.owner ? `looked after by ${f.owner.name}` : "nobody looks after it yet"}`}
+                  figure={plural(f._count.quotes, "quote")}
+                />
               ))}
-            </tbody>
-          </Table>
+            </PhoneList>
+            <DataTable label="Factories" className="max-sm:hidden">
+              <THead>
+                <tr>
+                  <Th>Factory</Th>
+                  <Th>Contact</Th>
+                  <Th>Looked after by</Th>
+                  <Th className="text-right">Price quotes</Th>
+                  <Th className="w-12">
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                </tr>
+              </THead>
+              <tbody>
+                {data.rows.map((f) => (
+                  <DataRow key={f.id} href={`/factories/${f.id}`}>
+                    <Td>
+                      <Link href={`/factories/${f.id}`} className="font-semibold hover:text-primary">
+                        {f.name}
+                      </Link>
+                      {f.address && <span className="block max-w-72 truncate text-xs text-text-2">{f.address}</span>}
+                    </Td>
+                    <Td>
+                      {f.contactPerson || reach(f) ? (
+                        <>
+                          <span className="block text-sm">{f.contactPerson ?? "—"}</span>
+                          <span className="block max-w-60 truncate text-xs text-text-2">{reach(f)}</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-text-2">No contact details</span>
+                      )}
+                    </Td>
+                    <Td className="text-sm">{f.owner?.name ?? <span className="text-xs text-text-2">Nobody yet</span>}</Td>
+                    <Td className="text-right tabular">{f._count.quotes || <span className="text-muted">0</span>}</Td>
+                    <Td className="text-right">
+                      <RowMenu items={rowMenu(f)} label={`Actions for ${f.name}`} />
+                    </Td>
+                  </DataRow>
+                ))}
+              </tbody>
+            </DataTable>
+          </>
         )}
-        {data.total > data.pageSize && (
-          <Pagination base="/factories" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
-        )}
+        <Pager base="/factories" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
       </Card>
     </div>
   );
