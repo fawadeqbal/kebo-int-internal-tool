@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, FileText, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { FLOW_STEP_LABEL, STEP_PATH, type FlowStep, type StepState } from "@kebo/shared";
 import { Badge, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
 import { date, dateTime } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/types";
-import type { ChecklistItem, OrderSteps, StepView } from "@/lib/types-checklist";
+import type { OrderSteps, StepView } from "@/lib/types-checklist";
 
 /** Dates in a step's line ("Ordered 2026-11-08") as people read them. */
 export const readable = (line: string) => line.replace(/\d{4}-\d{2}-\d{2}/g, (d) => date(d));
@@ -146,10 +146,10 @@ function PrevNext({ base, steps, here }: { base: string; steps: StepView[]; here
 }
 
 /**
- * Every step page (order v4): the header card, then the checklist and, under
- * "What this step holds", the step's read-only view on the left (details,
- * lines, papers and costs) and the side cards (files, changes) on the right,
- * then the way to the step before and after.
+ * Every step page (order v5): the header card, then the checklist and, under
+ * "What this step holds", the step's read-only view (details, lines) on the
+ * left and the side panel (papers, costs, files, changes: StepSidePanel) on the
+ * right — below on a phone — then the way to the step before and after.
  */
 export function StepPage({
   steps,
@@ -197,49 +197,6 @@ export function StepViewDivider() {
       <span className="h-px flex-1 bg-line" aria-hidden />
       <span className="text-xs text-muted">view only · change with Edit</span>
     </div>
-  );
-}
-
-/** Papers and Costs side by side on a wide screen, one under the other below. */
-export function ViewPair({ children }: { children: ReactNode }) {
-  return <div className="grid items-start gap-5 lg:grid-cols-2 [&>*]:min-w-0">{children}</div>;
-}
-
-/** The files the step's items keep, and where to add more. */
-export function StepFiles({ items, addHref }: { items: ChecklistItem[]; addHref?: string }) {
-  const files = new Map<string, string>();
-  for (const i of items) {
-    if (i.file) files.set(i.file.id, i.file.name);
-    for (const f of i.fields)
-      if (f.type === "file" && i.values[f.key]) files.set(i.values[f.key]!, i.data.find(([l]) => l === f.label)?.[1] ?? "File");
-  }
-  return (
-    <Card>
-      <CardHeader title="Files" />
-      <div className="flex flex-wrap gap-2 px-4 py-3.5">
-        {[...files].map(([id, name]) => (
-          <a
-            key={id}
-            href={`/files/${id}?view=1`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-2 px-3 py-1 text-xs font-medium hover:border-line-strong"
-          >
-            <FileText className="size-3.5 shrink-0 text-muted" aria-hidden />
-            <span className="truncate">{name}</span>
-          </a>
-        ))}
-        {!files.size && <p className="w-full text-xs text-muted">No files on this step yet.</p>}
-        {addHref && (
-          <Link
-            href={addHref}
-            className="inline-flex items-center gap-1 rounded-full border border-dashed border-primary/40 px-3 py-1 text-xs font-medium text-primary hover:bg-primary-soft"
-          >
-            <Plus className="size-3.5" aria-hidden /> Add files
-          </Link>
-        )}
-      </div>
-    </Card>
   );
 }
 

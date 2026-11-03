@@ -50,7 +50,7 @@ export function PaymentEdit({
           <BankContractForm action={contractAction} contract={contract} lc={route === "letter_of_credit"} currency={currency} onDone={close} />
         </section>
       )}
-      <p className="text-xs text-muted">Changes show in &ldquo;Changes in this step&rdquo;.</p>
+      <p className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</p>
     </PanelBody>
   );
 }

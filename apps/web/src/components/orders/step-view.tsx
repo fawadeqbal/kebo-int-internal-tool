@@ -103,7 +103,7 @@ function PanelFooter({ save = "Save" }: { save?: string }) {
       <Button type="button" size="sm" variant="ghost" onClick={close}>
         Cancel
       </Button>
-      <span className="text-xs text-muted">Changes show in &ldquo;Changes in this step&rdquo;.</span>
+      <span className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</span>
     </div>
   );
 }

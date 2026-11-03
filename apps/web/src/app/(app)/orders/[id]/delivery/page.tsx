@@ -4,17 +4,17 @@ import { Badge, CardBody } from "@kebo/ui";
 import { date } from "@/lib/format";
 import { ClaimsPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { SatEdit } from "@/components/orders/view-panels";
-import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
+import { expensePayTools } from "@/components/orders/costs-card";
 import { addClaimAction, satAction, updateClaimAction } from "../../flow-actions";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { DeliveredExcel } from "../goods";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
-import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · delivery and SAT" };
 
@@ -97,12 +97,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       steps={d.steps}
       step="delivery"
       base={d.base}
-      side={
-        <>
-          <StepFilesSide id={o.id} step="delivery" />
-          <StepChanges entries={d.changes} historyHref={d.historyHref} />
-        </>
-      }
+      side={<StepSidePanel id={o.id} step="delivery" changes={d.changes} historyHref={d.historyHref} />}
     >
       <Checklist
         payFor={await expensePayTools(o.id, d.items)}
@@ -181,8 +176,6 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
           />
         </CardBody>
       </ViewCard>
-      <StepPapers id={o.id} step="delivery" />
-      <StepCosts id={o.id} step="delivery" />
     </StepPage>
   );
 }

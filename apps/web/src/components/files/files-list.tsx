@@ -1,14 +1,13 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, Plus, X } from "lucide-react";
-import { fileSize, type FlowStep, type OrderFileGroup } from "@kebo/shared";
+import type { FlowStep, OrderFileGroup } from "@kebo/shared";
 import { Alert, Button, buttonClass, Card, CardHeader, cn, Input } from "@kebo/ui";
 import type { OrderFile, OrderFiles } from "@/lib/types-files";
 import { useIsPhone } from "@/components/common/floating";
-import { downloadHref, FileIcon, FileMenuButton, FileRow, guessKind, shortDay, uploadToOrder, useFileTools } from "./file-tools";
+import { downloadHref, FileRow, guessKind, uploadToOrder, useFileTools } from "./file-tools";
 
 /** Picks files and sends each to the order (to `step`), then refreshes the page. */
 export function UploadButton({
@@ -222,69 +221,6 @@ export function FilesOfOrder({ data, step }: { data: OrderFiles; step: FlowStep 
         </p>
       </div>
     </Card>
-  );
-}
-
-/**
- * A step's "Files" side card: the files of this step (wherever they were
- * added: a checklist row, a paper, a payment, dropped on the page), each
- * opening here with the same tools, and the way to all of the order's files.
- */
-export function StepFilesCard({
-  files,
-  orderId,
-  step,
-  canUpload,
-}: {
-  files: OrderFile[];
-  orderId: string;
-  step: FlowStep;
-  canUpload: boolean;
-}) {
-  return (
-    <Card>
-      <CardHeader
-        title={`Files of this step · ${files.length}`}
-        actions={
-          <Link href={`/orders/${orderId}/documents#files`} className={buttonClass("ghost", "xs")}>
-            All files
-          </Link>
-        }
-      />
-      <div className="px-4 py-2">
-        {files.length ? (
-          <ul className="flex flex-col divide-y divide-line">
-            {files.map((f) => (
-              <StepFileItem key={f.id} file={f} set={files} />
-            ))}
-          </ul>
-        ) : (
-          <p className="py-1.5 text-xs text-muted">No files on this step yet. Drop them on the page, or add one.</p>
-        )}
-        {canUpload && (
-          <div className="flex flex-wrap items-center gap-2 py-2">
-            <UploadButton orderId={orderId} step={step} label="Add files" variant="ghost" className="text-primary" />
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function StepFileItem({ file, set }: { file: OrderFile; set: OrderFile[] }) {
-  const tools = useFileTools();
-  const where = file.attachedTo.label.replace(/^(Checklist|Paper|Inquiry|Step) · /, "");
-  return (
-    <li className="flex items-center gap-2 py-2">
-      <FileIcon file={file} />
-      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => tools?.view(file, set)}>
-        <span className="block truncate text-sm font-medium hover:text-primary">{file.name}</span>
-        <span className="block truncate text-xs text-muted">
-          {where} · {shortDay(file.at)} · {fileSize(file.size)}
-        </span>
-      </button>
-      <FileMenuButton file={file} set={set} />
-    </li>
   );
 }
 

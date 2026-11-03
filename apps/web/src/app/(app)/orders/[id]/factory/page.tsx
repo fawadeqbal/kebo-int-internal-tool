@@ -7,9 +7,10 @@ import { date } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
-import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
+import { expensePayTools } from "@/components/orders/costs-card";
 import { NewFactoryPayment } from "@/components/money/forms";
 import { FactoryPlanCard } from "@/components/money/money-v2";
 import { factoryPaymentAction, factoryPlanAction } from "../../../money/actions";
@@ -17,7 +18,6 @@ import { fieldsAction, lightAction } from "../../light-actions";
 import { FactoriesView } from "../money-cards";
 import { MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
-import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · factory order" };
 
@@ -110,12 +110,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       step="factory"
       base={d.base}
       action={payFactory("Pay the factory", false)}
-      side={
-        <>
-          <StepFilesSide id={o.id} step="factory" />
-          <StepChanges entries={d.changes} historyHref={d.historyHref} />
-        </>
-      }
+      side={<StepSidePanel id={o.id} step="factory" changes={d.changes} historyHref={d.historyHref} />}
     >
       <Checklist
         payFor={await expensePayTools(o.id, d.items)}
@@ -194,8 +189,6 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           <FactoriesView m={m} people={people} today={now} fx={fx} />
         </MoneySection>
       )}
-      <StepPapers id={o.id} step="factory" />
-      <StepCosts id={o.id} step="factory" />
     </StepPage>
   );
 }

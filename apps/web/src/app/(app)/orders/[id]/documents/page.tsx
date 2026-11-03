@@ -5,7 +5,8 @@ import { api } from "@/lib/api";
 import { orderFilesOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { Checklist } from "@/components/orders/checklist";
-import { StepChanges, StepPage } from "@/components/orders/step-page";
+import { StepPage } from "@/components/orders/step-page";
+import { StepChangesCompact } from "@/components/orders/side-panel";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { PapersTable, type PaperLineRow, type PapersTab } from "@/components/orders/papers-table";
 import { BankTracker, type BankStepLine, type BankStepTool } from "@/components/orders/bank-tracker";
@@ -190,7 +191,7 @@ export default async function OrderDocuments({
           </>
         ) : undefined
       }
-      side={<StepChanges entries={d.changes} historyHref={d.historyHref} />}
+      side={<StepChangesCompact entries={d.changes} historyHref={d.historyHref} />}
     >
       {own.length > 0 && (
         <Checklist
