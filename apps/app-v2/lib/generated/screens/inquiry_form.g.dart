@@ -29,6 +29,7 @@ abstract final class InquiryFormSheet {
         ],
         rules: RequestedItemFields.rules,
         blank: RequestedItemFields.blank,
+        asLines: true,
       ),
     ),
     FormGroup(

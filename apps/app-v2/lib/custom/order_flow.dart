@@ -7,6 +7,7 @@ import '../ds/ds.dart';
 import '../generated/models.g.dart';
 import '../generated/ticks.g.dart';
 import 'links.dart';
+import 'order_lines.dart';
 
 const _stepTone = {'done': Tone.ok, 'late': Tone.bad, 'now': Tone.info};
 
@@ -271,6 +272,21 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
   final web = key == null ? null : tickOnWeb[key];
   final form = web == null && pattern != null ? tickForms[pattern] : null;
 
+  // Line tasks: every line of the order in the line list.
+  if (canEdit && !item.boolean('skipped') && (key == 'goods_received' || key == 'packing_list')) {
+    try {
+      final o = await context.api.get('/api/orders/${order.id}');
+      if (!context.mounted) return null;
+      final lines = o.list('lines', (m) => m);
+      final saved = key == 'goods_received'
+          ? await openGoodsReceived(context, order.id, order.refNo, lines)
+          : await openPacking(context, order.id, order.refNo, lines);
+      return saved ? 'Saved · $title' : null;
+    } on ApiException catch (e) {
+      if (context.mounted) toast(context, e.message);
+      return null;
+    }
+  }
   if (!canEdit) {
     await _info(context, order, title, 'You can see this order but not change it.', item);
     return null;

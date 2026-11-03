@@ -671,6 +671,7 @@ class Order {
     this.needs,
     this.next,
     this.documents = const [],
+    this.lines,
   });
 
   final String id;
@@ -695,6 +696,7 @@ class Order {
   final OrderNeeds? needs;
   final OrderNext? next;
   final List<OrderDocumentRef> documents;
+  final Object? lines;
 
   factory Order.fromJson(Json j) => Order(
     id: j.str('id'),
@@ -719,6 +721,7 @@ class Order {
     needs: j.obj('needs', OrderNeeds.fromJson),
     next: j.obj('next', OrderNext.fromJson),
     documents: j.list('documents', OrderDocumentRef.fromJson),
+    lines: j['lines'],
   );
 
   Json toJson() => {

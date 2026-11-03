@@ -415,7 +415,8 @@ def sheet_screen(spec: Spec, s: Screen) -> str:
             add = q(g.get("add", "Add"))
             ga.append(
                 f"list: ListDef({q(lf.name)}, itemLabel: {q(sub.name)}, addLabel: {add}, min: {lf.min or 0}, "
-                f"fields: [{fl}], rules: {sub.name}Fields.rules, blank: {sub.name}Fields.blank)"
+                f"fields: [{fl}], rules: {sub.name}Fields.rules, blank: {sub.name}Fields.blank"
+                + (", asLines: true" if g.get("lines") else "") + ")"
             )
         else:
             ga.append(f"fields: [{', '.join(f'{e.name}Fields.{f}' for f in g['fields'])}]")

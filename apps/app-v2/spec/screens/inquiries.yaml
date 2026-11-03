@@ -103,5 +103,5 @@ title: { create: New inquiry, edit: Edit inquiry }
 save: Save inquiry
 groups:
   - fields: [customerId, category, title, requirements]
-  - { title: Items, list: items, add: Add an item, fields: [description, model, quantity, unit] }
+  - { title: Items, list: items, lines: true, add: Add an item, fields: [description, model, quantity, unit] }
   - { title: More details, folded: true, fields: [priority, requiredBy, assigneeId] }

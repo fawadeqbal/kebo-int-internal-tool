@@ -176,60 +176,113 @@ class _InquiryPricesState extends State<InquiryPrices> {
   }
 }
 
-/// The form for a factory's offer: its terms, then their price for each of the
-/// customer's items (rows without a price are left out). True when saved.
+/// A factory's offer in two steps: its terms in a sheet, then their price for every item in the
+/// line list (typed in the rows; rows without a price are left out). True when saved.
 Future<bool> openOfferSheet(BuildContext context, Inquiry inquiry) async {
+  final api = context.api;
   Json settings = const {};
   try {
-    settings = (await context.api.get('/api/settings')).obj('sales', (s) => s) ?? const {};
+    settings = (await api.get('/api/settings')).obj('sales', (s) => s) ?? const {};
   } on ApiException {
     // The company defaults are a convenience; the form works without them.
   }
   if (!context.mounted) return false;
-  return FormSheet.open(
+  Json? terms;
+  final next = await FormSheet.open(
     context,
     title: 'Add a factory offer',
-    save: 'Add the offer',
+    save: 'Next: their prices ›',
     initial: {
       ...FactoryQuoteFields.blank(),
       'receivedOn': DateTime.now().toIso8601String().substring(0, 10),
       'taxIncluded': settings['factoryTaxIncluded'] == true,
       'taxRate': '${settings['factoryTaxRate'] ?? 0}',
-      'lines': [
-        for (final i in inquiry.items)
-          {'requestedItemId': i.id, 'description': i.description, 'quantity': i.quantity, 'unit': i.unit, 'unitPrice': ''},
-      ],
     },
     groups: const [
       FormGroup(fields: [FactoryQuoteFields.factoryId, FactoryQuoteFields.receivedOn, FactoryQuoteFields.currency, FactoryQuoteFields.basis, FactoryQuoteFields.basisPlace]),
       FormGroup(fields: [FactoryQuoteFields.taxIncluded, FactoryQuoteFields.taxRate]),
       FormGroup(
-        title: 'Their prices',
-        list: ListDef('lines',
-            itemLabel: 'Line',
-            addLabel: 'Add a line they added',
-            fields: [FactoryLineFields.description, FactoryLineFields.quantity, FactoryLineFields.unit, FactoryLineFields.unitPrice],
-            blank: FactoryLineFields.blank),
-      ),
-      FormGroup(
         title: 'More details',
         folded: true,
-        fields: [
-          FactoryQuoteFields.validUntil,
-          FactoryQuoteFields.leadTime,
-          FactoryQuoteFields.advancePercent,
-          FactoryQuoteFields.reference,
-          FactoryQuoteFields.notes,
-        ],
+        fields: [FactoryQuoteFields.validUntil, FactoryQuoteFields.leadTime, FactoryQuoteFields.advancePercent, FactoryQuoteFields.reference, FactoryQuoteFields.notes],
       ),
     ],
-    send: (api, body) {
-      // A line is sent only with a price: the factory may not quote every item.
-      final lines = [
-        for (final l in (body['lines'] as List<dynamic>).cast<Json>())
-          if ('${l['unitPrice'] ?? ''}'.trim().isNotEmpty) l,
-      ];
-      return api.post('/api/inquiries/${inquiry.id}/factory-quotes', {...body, 'lines': lines});
-    },
+    // Nothing is sent yet: the prices come next.
+    send: (api, body) async => terms = body,
+  );
+  if (!next || terms == null || !context.mounted) return false;
+  final t = terms!;
+  final cur = '${t['currency'] ?? 'CNY'}';
+  final rates = (settings['exchangeRates'] as Map<String, dynamic>?) ?? const {};
+  final rate = cur == 'USD' ? 1 : num.tryParse('${rates[cur] ?? ''}');
+  final tax = t['taxIncluded'] == true ? 0 : (num.tryParse('${t['taxRate'] ?? 0}') ?? 0);
+  num? n(Object? v) => v == null || '$v'.trim().isEmpty ? null : num.tryParse('$v'.replaceAll(',', ''));
+  final items = {for (final i in inquiry.items) i.id: i};
+  return openLines(
+    context,
+    rows: [
+      for (final i in inquiry.items)
+        LineRow(
+          key: i.id,
+          no: i.no ?? '',
+          title: i.description,
+          sub: joinParts([joinWords([i.quantity, i.unit]), i.model]),
+          values: {'unitPrice': '', 'quantity': i.quantity, 'unit': i.unit, 'model': i.model ?? '', 'taxRate': ''},
+        ),
+    ],
+    spec: LineSpec(
+      title: 'Their prices',
+      subtitle: joinParts([cur, tax == 0 ? 'tax in their prices or none' : '+$tax% tax']),
+      inline: FieldDef('unitPrice', 'Their price', FieldKind.decimal, hint: 'Price'),
+      fields: const [
+        FieldDef('unitPrice', 'Their price', FieldKind.decimal),
+        FieldDef('quantity', 'Quantity', FieldKind.decimal, required: true),
+        FieldDef('unit', 'Unit', FieldKind.text, max: 20),
+        FieldDef('model', 'Their model', FieldKind.text, max: 120),
+        FieldDef('taxRate', 'Tax %', FieldKind.decimal, hint: 'Empty: the offer\'s tax'),
+      ],
+      filters: [
+        LineFilter('All', (r, v) => true),
+        LineFilter('No price', (r, v) => n(v['unitPrice']) == null),
+        LineFilter('Priced', (r, v) => n(v['unitPrice']) != null),
+      ],
+      rowTone: (r, v) => n(v['unitPrice']) != null ? Tone.ok : null,
+      summary: (rows, valueOf) {
+        final priced = rows.where((r) => n(valueOf(r)['unitPrice']) != null).toList();
+        final sum = priced.fold<num>(0, (s, r) => s + (n(valueOf(r)['unitPrice']) ?? 0) * (n(valueOf(r)['quantity']) ?? 0));
+        final withTax = sum * (1 + tax / 100);
+        return LineSummary(
+          rate == null ? 'Their total $cur ${withTax.toStringAsFixed(0)}' : 'Our cost about USD ${(withTax / rate).toStringAsFixed(0)}',
+          '${priced.length} of ${rows.length} priced · $cur ${withTax.toStringAsFixed(0)}',
+        );
+      },
+      addLabel: 'A line they added',
+      addFields: const [
+        FieldDef('description', 'What', FieldKind.text, required: true, max: 2000),
+        FieldDef('quantity', 'Quantity', FieldKind.decimal, required: true),
+        FieldDef('unit', 'Unit', FieldKind.text, max: 20, defaultValue: 'pcs'),
+        FieldDef('unitPrice', 'Their price', FieldKind.decimal, required: true),
+      ],
+      saveLabel: 'Add the offer',
+      save: (changes) async {
+        final lines = <Json>[
+          for (final e in changes.entries)
+            if (n(e.value['unitPrice']) != null)
+              e.value['_new'] == true
+                  ? {'description': e.value['description'], 'quantity': '${e.value['quantity']}', 'unit': e.value['unit'] ?? 'pcs', 'unitPrice': '${e.value['unitPrice']}'}
+                  : {
+                      'requestedItemId': e.key,
+                      'description': items[e.key]?.description ?? '',
+                      'quantity': '${e.value['quantity'] ?? items[e.key]?.quantity}',
+                      'unit': e.value['unit'] ?? items[e.key]?.unit ?? 'pcs',
+                      'model': e.value['model'],
+                      'unitPrice': '${e.value['unitPrice']}',
+                      if (n(e.value['taxRate']) != null) 'taxRate': '${e.value['taxRate']}',
+                    },
+        ];
+        if (lines.isEmpty) throw ApiException('Type at least one price.');
+        await api.post('/api/inquiries/${inquiry.id}/factory-quotes', {...t, 'lines': lines});
+      },
+    ),
   );
 }

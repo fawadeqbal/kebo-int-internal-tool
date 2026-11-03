@@ -206,8 +206,6 @@ const tickOnWeb = <String, String>{
   'balance_in': 'Money received comes to the phone in phase 4.',
   'factory_advance': 'Payments to factories come to the phone in phase 4.',
   'factory_paid': 'Payments to factories come to the phone in phase 4.',
-  'goods_received': 'Counting each line is easier on the web.',
-  'packing_list': 'The packing list is a table of every line; make it on the web.',
   'claims_closed': 'Claims are closed on the web.',
   'bank:bank_paid_us': 'The bank\'s payment is recorded as money received on the web.',
 };

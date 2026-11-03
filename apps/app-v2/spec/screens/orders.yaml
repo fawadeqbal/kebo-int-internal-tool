@@ -21,6 +21,7 @@ tab: Orders
 header: { title: refNo, sub: [customer.name, inquiry.assignee.name, total], badge: stage }
 sections:
   - { title: Steps, custom: OrderFlow }       # do now, step chips, the step's checklist; tap a row to tick it
+  - { title: Goods, custom: OrderLines }      # the first lines, See all, goods received, packing list
   - title: Money
     fields: [money.total, money.charged, money.received, money.bankCharges, money.due]
   - title: Papers

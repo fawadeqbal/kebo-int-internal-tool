@@ -26,7 +26,7 @@ Map<String, Object?> _server() => {
         'items': [
           {'key': 'booked', 'step': 'shipping', 'title': 'Space booked', 'done': true, 'data': [['Forwarder', 'Sino Trans']]},
           {'key': 'sailed', 'step': 'shipping', 'title': 'Sailed · bill of lading', 'done': false, 'needs': 'vessel, B/L number, sailed on'},
-          {'key': 'goods_received', 'step': 'shipping', 'title': 'Goods received', 'done': false},
+          {'key': 'claims_closed', 'step': 'shipping', 'title': 'Claims closed', 'done': false},
         ],
       },
       '/api/orders/o1/flow': {
@@ -74,9 +74,9 @@ void main() {
 
   testWidgets('an item done on the web says so', (tester) async {
     await pumpScreen(tester, const OrderScreen(id: 'o1'), _server());
-    await tester.tap(find.text('Goods received'));
+    await tester.tap(find.text('Claims closed'));
     await tester.pumpAndSettle();
-    expect(find.text('Counting each line is easier on the web.'), findsOneWidget);
+    expect(find.text('Claims are closed on the web.'), findsOneWidget);
     expect(find.text('Open on the web'), findsOneWidget);
   });
 }

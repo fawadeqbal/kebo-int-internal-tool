@@ -4,6 +4,8 @@ import '../core/api.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
 import 'fields.dart';
+import 'format.dart';
+import 'items_editor.dart';
 import 'theme.dart';
 import 'tone.dart';
 import 'widgets.dart';
@@ -11,7 +13,16 @@ import 'widgets.dart';
 /// Repeating items inside a form, e.g. a customer's contacts.
 class ListDef {
   const ListDef(this.key,
-      {required this.itemLabel, required this.addLabel, required this.fields, required this.blank, this.min = 0, this.rules = const []});
+      {required this.itemLabel,
+      required this.addLabel,
+      required this.fields,
+      required this.blank,
+      this.min = 0,
+      this.rules = const [],
+      this.asLines = false});
+
+  /// Long lists (items, lines): a summary here and a full-screen editor, not a card per item.
+  final bool asLines;
   final String key, itemLabel, addLabel;
   final int min;
   final List<FieldDef> fields;
@@ -251,7 +262,30 @@ class _FormSheetState extends State<FormSheet> {
   List<Widget> _group(BuildContext context, FormGroup g) {
     final c = context.colors;
     final body = <Widget>[];
-    if (g.list != null) {
+    if (g.list != null && g.list!.asLines) {
+      final l = g.list!;
+      final items = _items(l.key);
+      final tops = items.where((i) => i['parentId'] == null && i['partOf'] == null && i['_parent'] == null).length;
+      final bad = errors.keys.any((k) => k == l.key || k.startsWith('${l.key}.'));
+      if (bad) body.add(Text(errors[l.key] ?? 'Some items need fixing: open them', style: context.text.bodySmall?.copyWith(color: c.bad)));
+      for (final (i, it) in items.take(3).indexed) {
+        body.add(PhoneRow(
+          RowData(title: '${it['no'] ?? i + 1}  ${it['description'] ?? ''}', sub: [joinWords(['${it['quantity'] ?? ''}', '${it['unit'] ?? ''}'])]),
+          divider: i < items.length - 1 && i < 2,
+        ));
+      }
+      body.add(Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          icon: Icon(items.isEmpty ? Icons.add : Icons.list, size: 18),
+          label: Text(items.isEmpty ? l.addLabel : 'All ${count(tops, '1 item', '{} items')} · edit ›'),
+          onPressed: () async {
+            final next = await openItems(context, items: items, fields: l.fields, blank: l.blank, title: g.title ?? l.itemLabel);
+            if (next != null) _set(values, l.key, next);
+          },
+        ),
+      ));
+    } else if (g.list != null) {
       final l = g.list!;
       final items = _items(l.key);
       if (errors[l.key] != null) body.add(Text(errors[l.key]!, style: context.text.bodySmall?.copyWith(color: c.bad)));

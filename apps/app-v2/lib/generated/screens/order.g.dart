@@ -10,6 +10,7 @@ import '../models.g.dart';
 import '../repos.g.dart';
 import '../../custom/order_files.dart';
 import '../../custom/order_flow.dart';
+import '../../custom/order_lines.dart';
 import '../../custom/order_papers.dart';
 
 class OrderScreen extends StatelessWidget {
@@ -24,6 +25,7 @@ class OrderScreen extends StatelessWidget {
     badges: (x) => [OrderStageEnum.badge(x.stage)],
     sections: (x) => [
       CustomSection('Steps', OrderFlow(x, title: 'Steps')),
+      CustomSection('Goods', OrderLines(x, title: 'Goods')),
       KvSection('Money', [
         ('Total', fmtMoney(x.money?.total, x.currency)),
         ('Charged to the customer', fmtMoney(x.money?.charged, x.currency)),

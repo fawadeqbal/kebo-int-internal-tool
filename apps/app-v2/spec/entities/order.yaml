@@ -24,6 +24,7 @@ fields:
   needs: { obj: OrderNeeds }
   next: { obj: OrderNext }
   documents: { list: OrderDocumentRef, readonly: true }
+  lines: { type: raw }               # goods and charges: lib/custom/order_lines.dart
 
 ---
 entity: CustomerRef
