@@ -130,6 +130,8 @@ export interface FactoryQuoteView {
   leadTime: string | null;
   moq: string | null;
   paymentTerms: string | null;
+  /** The advance the factory asks when we order, in % (null: the company's default). */
+  advancePercent: number | null;
   notes: string | null;
   fxRate: number | null;
   lines: FactoryQuoteLineView[];

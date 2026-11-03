@@ -16,6 +16,7 @@ import {
   balanceWhenOf,
   lcChecksLine,
   documentsInUse,
+  routeFromQuotation,
   routeSummary,
   type BankContractInput,
   type BankStepInput,
@@ -54,7 +55,8 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess, OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 import { SettingsService } from "../settings/settings.service";
-import { datePapers, lcChecksOf, rebuildRoutePlan, termsOf } from "../money/route-plan";
+import { lcChecksOf, rebuildRoutePlan, termsOf } from "../money/route-plan";
+import { readyByOf, readyOnOf, readySelect } from "../orders/ready";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
 import { seedFactoryPlans } from "../money/factory-plan";
 import { onPrimaryShipment, SHIPMENT_ORDER } from "../orders/shipment-facts";
@@ -73,7 +75,9 @@ interface FlowRows {
   status: string;
   paymentRoute: PaymentRoute | null;
   factoryOrderedOn: Date | null;
-  readyOn: Date | null;
+  /** Each factory's ready date, and the factories on the lines (the order's ready date is the latest). */
+  factories: { factoryId: string | null; readyOn: Date | null }[];
+  lines: { factoryId: string | null }[];
   proformaNo: string | null;
   packedAt: Date | null;
   deliveredOn: Date | null;
@@ -120,7 +124,7 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
     depositIn,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
     production: { total: o.checklist.length, done: o.checklist.filter((p) => p.doneAt || p.skippedAt).length },
-    readyOn: fromDbDateOrNull(o.readyOn),
+    readyOn: readyOnOf(o),
     shipments: {
       total: o.shipments.length,
       departed: o.shipments.filter((s) => ["departed", "arrived", "cleared"].includes(s.status)).length,
@@ -252,7 +256,8 @@ export class FlowService {
         satChecks: { orderBy: { sortOrder: "asc" } },
         claims: { orderBy: { openedOn: "desc" } },
         satEngineer: { select: { id: true, name: true } },
-        lines: { where: { factoryId: { not: null } }, select: { factory: { select: { id: true, name: true } } } },
+        lines: { where: { factoryId: { not: null } }, select: { factoryId: true, factory: { select: { id: true, name: true } } } },
+        ...readySelect,
       },
     });
     if (!o) throw new NotFoundError("Order");
@@ -320,7 +325,7 @@ export class FlowService {
     const factories = [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
     const b = o.bankContract;
     const terms = termsOf(o);
-    const checks = has("bank_contracts") ? lcChecksOf(o, settings.reminders.lcCourierDays) : null;
+    const checks = has("bank_contracts") ? lcChecksOf({ ...o, readyOn: readyOnOf(o) }, settings.reminders.lcCourierDays) : null;
     return {
       orderId: o.id,
       refNo: o.refNo,
@@ -335,6 +340,8 @@ export class FlowService {
       payment: {
         route,
         routeLabel: route ? PAYMENT_ROUTE_SHORT[route] : null,
+        /** Still the route the quotation's terms implied (the order started on it; changing it is fine). */
+        fromQuotation: routeFromQuotation(terms, o.balanceTerms),
         /** The route's terms: informal balance before shipment or against the B/L copy; LC at sight or deferred N days. */
         balanceWhen: terms.balanceWhen,
         lcTerms: terms.lcTerms,
@@ -364,7 +371,9 @@ export class FlowService {
       factory: {
         orderedOn: fromDbDateOrNull(o.factoryOrderedOn),
         orderNo: o.factoryOrderNo,
-        readyOn: fromDbDateOrNull(o.readyOn),
+        readyOn: readyOnOf(o),
+        /** Each factory's own ready date (the order's is the latest of them). */
+        readyBy: readyByOf(o).map((r) => ({ factoryId: r.factoryId, name: factories.find((f) => f.id === r.factoryId)?.name ?? null, readyOn: r.readyOn })),
         factories,
       },
       production: has("production")
@@ -486,7 +495,8 @@ export class FlowService {
         status: true,
         paymentRoute: true,
         factoryOrderedOn: true,
-        readyOn: true,
+        ...readySelect,
+        lines: { select: { factoryId: true } },
         proformaNo: true,
         packedAt: true,
         deliveredOn: true,
@@ -548,7 +558,7 @@ export class FlowService {
         // The balance terms stay as accepted: the papers word the terms from the route itself.
         data: { paymentRoute: t.route, balanceWhen: t.balanceWhen, lcTerms: t.lcTerms, lcDays: t.lcDays },
       });
-      const plan = await rebuildRoutePlan(tx, o, t, reminders);
+      const plan = await rebuildRoutePlan(tx, o, was, t, reminders);
       await this.log(
         tx,
         user,
@@ -992,7 +1002,6 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, id);
       if (!bankStepsFor(o.paymentRoute).includes(step)) throw new DomainError("That step is not part of this order's payment route.");
       const data = { doneOn: toDbDate(input.doneOn), courier: input.courier, reference: input.reference, note: input.note };
-      if (step === "customer_bank_received") await datePapers(tx, id, input.doneOn);
       await tx.orderBankStep.upsert({
         where: { orderId_step: { orderId: id, step } },
         create: { orderId: id, step, ...data },
@@ -1017,7 +1026,6 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, id);
       const row = await tx.orderBankStep.findFirst({ where: { orderId: id, step } });
       if (row?.paymentId) throw new DomainError("This step was ticked by a payment. Remove the payment to undo it.");
-      if (step === "customer_bank_received") await datePapers(tx, id, null);
       const n = await tx.orderBankStep.deleteMany({ where: { orderId: id, step } });
       if (n.count) await this.log(tx, user, id, "bank_step", `${o.refNo}: ${BANK_STEP_LABEL[step]} undone`, { step }, undefined);
     });

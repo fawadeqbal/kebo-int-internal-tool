@@ -153,7 +153,15 @@ export function OfferDetails({
       value: q.validUntil,
       show: q.validUntil ? dateText(q.validUntil) : undefined,
     },
-    { name: "paymentTerms", label: "Payment terms", value: q.paymentTerms, placeholder: "e.g. 30% / 70% before shipment" },
+    {
+      name: "advancePercent",
+      label: "Advance when we order",
+      type: "number",
+      value: q.advancePercent === null ? null : String(q.advancePercent),
+      show: q.advancePercent === null ? undefined : `${q.advancePercent}% · starts the factory's plan, printed on the PO`,
+      placeholder: "e.g. 30",
+    },
+    { name: "paymentTerms", label: "Payment terms (note)", value: q.paymentTerms, placeholder: "e.g. 70% before shipment, by T/T" },
     { name: "moq", label: "Minimum order", value: q.moq },
     { name: "reference", label: "Their ref.", value: q.reference, placeholder: "Their quote no." },
     {

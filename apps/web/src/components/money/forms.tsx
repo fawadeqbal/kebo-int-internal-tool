@@ -17,6 +17,7 @@ import {
   type InstalmentStatus,
   type PaymentKind,
   type PaymentMethod,
+  type PlanDueRule,
 } from "@kebo/shared";
 import { Alert, Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -28,7 +29,7 @@ import { FilePicker, uploadFile, useSaveThenSend } from "./attachment";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
-import { date, money } from "@/lib/format";
+import { dueText, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { ExpenseView, FactoryOwed, FactoryPaymentView, OrderMoney } from "@/lib/types-money";
 
@@ -46,7 +47,16 @@ const STATUS_TONE: Record<InstalmentStatus, "ok" | "info" | "warn" | "bad" | "ne
 
 /* ---------------------------------------------------------------- the plan */
 
-type Row = { key: string; id: string | null; label: string; amount: string; dueOn: string };
+type Row = { key: string; id: string | null; label: string; amount: string; dueOn: string; dueRule: PlanDueRule | ""; dueDays: string };
+
+/** When an instalment falls due: on a date, or with the order's dates (worked out each time, so it moves with them). */
+const RULES: { value: PlanDueRule | ""; label: string }[] = [
+  { value: "fixed", label: "On a date" },
+  { value: "on_ready", label: "On the ready date" },
+  { value: "on_ship_plus_days", label: "Days after shipping" },
+  { value: "after_papers", label: "After the papers (LC)" },
+  { value: "", label: "No date yet" },
+];
 
 /**
  * The customer's instalments, ticked off as money comes in (the earliest is
@@ -70,7 +80,16 @@ export function PaymentPlan({
   buttonOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const start = (): Row[] => plan.items.map((i) => ({ key: i.id, id: i.id, label: i.label, amount: i.amount, dueOn: i.dueOn ?? "" }));
+  const start = (): Row[] =>
+    plan.items.map((i) => ({
+      key: i.id,
+      id: i.id,
+      label: i.label,
+      amount: i.amount,
+      dueOn: i.dueRule === "fixed" || !i.dueRule ? (i.dueOn ?? "") : "",
+      dueRule: i.dueRule ?? (i.dueOn ? "fixed" : ""),
+      dueDays: i.dueDays === null ? "" : String(i.dueDays),
+    }));
   const [rows, setRows] = useState<Row[]>(start);
   const set = (key: string, p: Partial<Row>) => setRows((r) => r.map((x) => (x.key === key ? { ...x, ...p } : x)));
   const sum = rows.reduce(
@@ -128,9 +147,9 @@ export function PaymentPlan({
                 <tr key={i.id} className="border-t border-line">
                   <td className="px-3 py-2.5 align-top">
                     <span className="font-medium">{i.label}</span>
-                    <span className="block text-xs text-muted sm:hidden">{i.dueOn ? `due ${date(i.dueOn)}` : "when the ship date is known"}</span>
+                    <span className="block text-xs text-muted sm:hidden">{dueText(i)}</span>
                   </td>
-                  <td className="hidden px-3 py-2.5 align-top text-text-2 sm:table-cell">{i.dueOn ? date(i.dueOn) : <span className="text-muted">When the ship date is known</span>}</td>
+                  <td className={cn("hidden px-3 py-2.5 align-top sm:table-cell", i.dueOn ? "text-text-2" : "text-muted")}>{dueText(i)}</td>
                   <td className="px-3 py-2.5 text-right align-top tabular">{money(i.amount, currency)}</td>
                   <td className={cn("hidden px-3 py-2.5 text-right align-top tabular sm:table-cell", Number(i.paid) > 0 ? "" : "text-muted")}>{money(i.paid, currency)}</td>
                   <td className="px-3 py-2.5 align-top">
@@ -147,7 +166,14 @@ export function PaymentPlan({
     );
 
   const body = {
-    items: rows.map((r) => ({ id: r.id, label: r.label.trim(), amount: r.amount.replace(",", "."), dueOn: r.dueOn || null })),
+    items: rows.map((r) => ({
+      id: r.id,
+      label: r.label.trim(),
+      amount: r.amount.replace(",", "."),
+      dueRule: r.dueRule || null,
+      dueOn: r.dueRule === "fixed" ? r.dueOn || null : null,
+      ...(r.dueRule === "on_ship_plus_days" || r.dueRule === "after_papers" ? { dueDays: r.dueDays || "0" } : {}),
+    })),
   };
   return (
     <ActionForm action={action} onDone={() => setEditing(false)} className={framed}>
@@ -169,13 +195,44 @@ export function PaymentPlan({
                 <div className="w-40">
                   <MoneyInput aria-label={`Instalment ${n + 1} amount`} currency={currency} value={r.amount} onChange={(e) => set(r.key, { amount: e.target.value })} />
                 </div>
-                <Input
-                  aria-label={`Instalment ${n + 1} due date`}
-                  type="date"
-                  value={r.dueOn}
-                  onChange={(e) => set(r.key, { dueOn: e.target.value })}
-                  className="w-40"
-                />
+                <Select
+                  aria-label={`Instalment ${n + 1} falls due`}
+                  value={r.dueRule}
+                  onChange={(e) => {
+                    const rule = e.target.value as Row["dueRule"];
+                    set(r.key, { dueRule: rule, ...(rule === "on_ship_plus_days" && !r.dueDays ? { dueDays: "14" } : {}) });
+                  }}
+                  className="w-48"
+                >
+                  {RULES.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </Select>
+                {r.dueRule === "fixed" && (
+                  <Input
+                    aria-label={`Instalment ${n + 1} due date`}
+                    type="date"
+                    value={r.dueOn}
+                    onChange={(e) => set(r.key, { dueOn: e.target.value })}
+                    className="w-40"
+                  />
+                )}
+                {(r.dueRule === "on_ship_plus_days" || r.dueRule === "after_papers") && (
+                  <span className="flex items-center gap-1.5 text-xs text-text-2">
+                    <Input
+                      aria-label={`Instalment ${n + 1} days after`}
+                      type="number"
+                      min={0}
+                      max={3650}
+                      value={r.dueDays}
+                      onChange={(e) => set(r.key, { dueDays: e.target.value })}
+                      className="w-20"
+                    />
+                    days
+                  </span>
+                )}
                 <Button
                   size="icon-xs"
                   variant="ghost"
@@ -211,6 +268,8 @@ export function PaymentPlan({
                     label: "",
                     amount: diff > 0 ? formatMinor(diff, currency).replace(/[^0-9.]/g, "") : "",
                     dueOn: "",
+                    dueRule: "fixed",
+                    dueDays: "",
                   },
                 ])
               }
@@ -351,7 +410,7 @@ export function EditCustomerPayment({
       {(s) => (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="What for" htmlFor="ep-kind">
+            <Field label="What for" htmlFor="ep-kind" hint="Worked out from what the money pays; choose “Other” only for money that is not for the plan">
               <Choice
                 id="ep-kind"
                 name="kind"

@@ -134,6 +134,11 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
               documentTitle: o.documentTitle,
               portOfDischarge: o.portOfDischarge,
             }}
+            readyEach={
+              (o.readyBy ?? []).filter((r) => r.factoryId).length > 1
+                ? { count: (o.readyBy ?? []).filter((r) => r.factoryId).length, href: `/orders/${o.id}/factory#factory` }
+                : null
+            }
             shown={{
               shipBy: o.shipBy ? date(o.shipBy) : null,
               readyOn: o.readyOn ? date(o.readyOn) : null,

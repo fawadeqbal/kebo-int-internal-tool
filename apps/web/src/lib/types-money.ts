@@ -1,4 +1,5 @@
 import type {
+  PlanDueRule,
   BasisStep,
   CostRowStatus,
   CreditKind,
@@ -53,7 +54,14 @@ export interface OrderMoney {
       how: string;
       /** When an undated part falls due ("90 days after the papers"). */
       when: string | null;
+      /** fixed | on_ready | on_ship_plus_days | after_papers (null: no date yet): the date is worked out from it. */
+      dueRule: PlanDueRule | null;
+      dueDays: number | null;
+      /** "on the ready date", "14 days after shipping" (a fixed date: null). */
+      rule: string | null;
     }[];
+    /** The order's dates the rules read (the ready date: the latest factory's). */
+    dates: { readyOn: string | null; shippedOn: string | null; papersOn: string | null };
     matchesTotal: boolean;
     difference: string;
     next: { label: string; open: string; dueOn: string | null; status: InstalmentStatus } | null;
@@ -536,6 +544,8 @@ export interface CustomerPayments {
 export interface FactoryPlanView {
   factory: { id: string; name: string };
   currency: string;
+  /** This factory's own ready date (its "on the ready date" parts fall due then). */
+  readyOn?: string | null;
   owed: string;
   /** Saved for this order (false: the company's default until saved). */
   saved: boolean;

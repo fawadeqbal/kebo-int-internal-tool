@@ -53,14 +53,109 @@ export interface RouteTerms {
   lcDays: number | null;
 }
 
+/**
+ * When an instalment falls due (owner, 3 Nov 2026: the customer's plan follows the dates like the factory's):
+ * - fixed: on its own date (typed by hand, or the deposit's: some days after the order);
+ * - on_ready: the order's ready date (the latest factory's; the ship date when none is known);
+ * - on_ship_plus_days: `dueDays` after the goods left (the earliest shipment's departure);
+ * - after_papers: `dueDays` after the papers reached the customer's bank (an LC).
+ * Only a fixed row keeps a date; the others are worked out each time (planItemDue), so moving the ready or
+ * ship date moves them. No rule: no date yet.
+ */
+export const PLAN_DUE_RULES = ["fixed", "on_ready", "on_ship_plus_days", "after_papers"] as const;
+export type PlanDueRule = (typeof PLAN_DUE_RULES)[number];
+export const PLAN_DUE_RULE_LABEL: Record<PlanDueRule, string> = {
+  fixed: "On a date",
+  on_ready: "On the ready date",
+  on_ship_plus_days: "Days after shipping",
+  after_papers: "After the papers (LC)",
+};
+
+/** The order's dates an instalment's rule reads. */
+export interface PlanDates {
+  /** The order's ready date: the latest of its factories' (orderReadyOn). */
+  readyOn: ISODate | null;
+  /** Shipped on: the earliest day one of its shipments left. */
+  shippedOn: ISODate | null;
+  /** The papers reached the customer's bank (the bank step). */
+  papersOn: ISODate | null;
+}
+
+export interface PlanRuleItem {
+  dueRule: string | null;
+  dueOn: ISODate | null;
+  dueDays: number | null;
+}
+
+/** An instalment's date, worked out now from its rule and the order's dates. */
+export function planItemDue(item: PlanRuleItem, d: PlanDates): ISODate | null {
+  switch (item.dueRule) {
+    case "on_ready":
+      return d.readyOn ?? d.shippedOn;
+    case "on_ship_plus_days":
+      return d.shippedOn ? addDays(d.shippedOn, Math.max(item.dueDays ?? 0, 0)) : null;
+    case "after_papers":
+      return d.papersOn ? addDays(d.papersOn, Math.max(item.dueDays ?? 0, 0)) : null;
+    default:
+      return item.dueOn;
+  }
+}
+
+/** "on the ready date", "14 days after shipping", "90 days after the papers": the rule in words (null: a date). */
+export function dueRuleWords(item: { dueRule: string | null; dueDays: number | null }): string | null {
+  const days = Math.max(item.dueDays ?? 0, 0);
+  switch (item.dueRule) {
+    case "on_ready":
+      return "on the ready date";
+    case "on_ship_plus_days":
+      return days ? `${days} day${days === 1 ? "" : "s"} after shipping` : "when the goods leave";
+    case "after_papers":
+      return days ? `${days} days after the papers` : "when the papers reach their bank";
+    default:
+      return null;
+  }
+}
+
+/** "Deposit 30%": a deposit's name from its amount (so a deposit changed to 50% says 50%). */
+export function depositLabel(amountMinor: Minor, totalMinor: Minor): string {
+  if (totalMinor <= 0) return "Deposit";
+  const pct = Math.round((amountMinor * 10_000) / totalMinor) / 100;
+  return `Deposit ${pct}%`;
+}
+
+/**
+ * An instalment's name: a deposit's from its amount ("Deposit 30%"), a balance's from the route ("Balance
+ * through the LC", "Payment" when there is no deposit); a row typed by hand keeps the name given.
+ */
+export function planItemLabel(item: { label: string; part: string | null; amountMinor: Minor }, totalMinor: Minor, t: RouteTerms, hasDeposit: boolean): string {
+  if (item.part === "deposit") return depositLabel(item.amountMinor, totalMinor);
+  if (item.part === "balance") return balanceLabel(t, hasDeposit ? 1 : 0);
+  return item.label;
+}
+
+/**
+ * The plan as it stands now: each instalment named from its amount and dated from its rule and the order's
+ * dates. Every screen, paper and reminder reads the plan through this.
+ */
+export function livePlan<T extends { label: string; part: string | null; amountMinor: Minor } & PlanRuleItem>(
+  items: T[],
+  totalMinor: Minor,
+  t: RouteTerms,
+  d: PlanDates,
+): (T & { label: string; dueOn: ISODate | null; storedOn: ISODate | null })[] {
+  const hasDeposit = items.some((i) => i.part === "deposit" && i.amountMinor > 0);
+  return items.map((i) => ({ ...i, label: planItemLabel(i, totalMinor, t, hasDeposit), dueOn: planItemDue(i, d), storedOn: i.dueOn }));
+}
+
 /** One instalment of a plan built from the route. */
 export interface RoutePlanItem {
   label: string;
   amountMinor: Minor;
+  /** A fixed row's date (the deposit's); null for the others (worked out from the rule). */
   dueOn: ISODate | null;
   part: PlanPart;
-  /** after_papers: due `dueDays` after the papers reached the customer's bank. */
-  dueRule: "after_papers" | null;
+  dueRule: PlanDueRule;
+  /** on_ship_plus_days / after_papers: the days after. */
   dueDays: number | null;
 }
 
@@ -79,6 +174,8 @@ export function balanceLabel(t: RouteTerms, depositPercent: number): string {
   if (t.route === "letter_of_credit") return "Balance through the LC";
   if (t.route === "bank_contract") return "Balance through the banks";
   if (t.route === "informal") return t.balanceWhen === "against_bl_copy" ? "Balance against B/L copy" : "Balance before shipment";
+  if (t.balanceWhen === "before_shipment") return "Balance before shipment";
+  if (t.balanceWhen === "against_bl_copy") return "Balance against B/L copy";
   return "Balance";
 }
 
@@ -93,9 +190,11 @@ export function planHow(part: string | null, t: RouteTerms): string {
   return "";
 }
 
-/** "90 days after the papers", "when the papers reach their bank": when an undated part falls due. */
+/** "90 days after the papers", "on the ready date": when an instalment falls due, in words (a dated row: ""). */
 export function planWhen(item: { part: string | null; dueRule: string | null; dueDays: number | null }, t: RouteTerms): string {
-  if (item.dueRule === "after_papers") return item.dueDays ? `${item.dueDays} days after the papers` : "when the papers reach their bank";
+  const words = dueRuleWords(item);
+  if (words) return words;
+  if (item.dueRule === "fixed") return "";
   if (item.part === "balance") {
     if (t.route === "bank_contract") return "when the banks present the papers";
     if (t.route === "informal" && t.balanceWhen === "against_bl_copy") return "against the B/L copy";
@@ -104,12 +203,14 @@ export function planWhen(item: { part: string | null; dueRule: string | null; du
   return "";
 }
 
+/** The balance is due by the ready date ("before shipment"): an informal route not against the B/L copy, or no route with terms that said so. */
+export const balanceBeforeShipment = (t: RouteTerms) =>
+  (t.route === "informal" && t.balanceWhen !== "against_bl_copy") || (t.route === null && t.balanceWhen === "before_shipment");
+
 /**
- * The plan an order's route builds: the deposit (dated a few days after the
- * order) and the balance part of the route. An LC's balance is due when the
- * papers reach the customer's bank (at sight) or N days after (deferred); its
- * date follows that bank step. Informal and bank-contract balances are dated
- * when the ready or ship date is known (as before).
+ * The plan an order's route builds: the deposit (fixed, a few days after the order) and the balance part of
+ * the route with its rule: an LC's when the papers reach the customer's bank (at sight) or N days after
+ * (deferred); a balance before shipment on the ready date; any other some days after the goods leave.
  */
 export function routePlan(
   totalMinor: Minor,
@@ -117,22 +218,22 @@ export function routePlan(
   t: RouteTerms,
   orderedOn: ISODate,
   depositDays: number,
-  papersReachedOn: ISODate | null = null,
+  balanceDays = 14,
 ): RoutePlanItem[] {
   const { deposit, balance } = splitDeposit(totalMinor, depositPercent);
   const items: RoutePlanItem[] = [];
   if (deposit > 0)
-    items.push({ label: `Deposit ${depositPercent}%`, amountMinor: deposit, dueOn: addDays(orderedOn, depositDays), part: "deposit", dueRule: null, dueDays: null });
+    items.push({ label: depositLabel(deposit, totalMinor), amountMinor: deposit, dueOn: addDays(orderedOn, depositDays), part: "deposit", dueRule: "fixed", dueDays: null });
   if (balance > 0) {
     const lc = t.route === "letter_of_credit";
-    const days = lc ? (t.lcTerms === "deferred" ? Math.max(t.lcDays ?? 0, 0) : 0) : null;
+    const rule: PlanDueRule = lc ? "after_papers" : balanceBeforeShipment(t) ? "on_ready" : "on_ship_plus_days";
     items.push({
       label: balanceLabel(t, deposit > 0 ? depositPercent : 0),
       amountMinor: balance,
-      dueOn: lc && papersReachedOn ? addDays(papersReachedOn, days ?? 0) : null,
+      dueOn: null,
       part: "balance",
-      dueRule: lc ? "after_papers" : null,
-      dueDays: days,
+      dueRule: rule,
+      dueDays: lc ? (t.lcTerms === "deferred" ? Math.max(t.lcDays ?? 0, 0) : 0) : rule === "on_ship_plus_days" ? Math.max(balanceDays, 0) : null,
     });
   }
   return items;
@@ -143,32 +244,86 @@ export interface StoredPlanItem {
   label: string;
   amountMinor: Minor;
   dueOn: ISODate | null;
+  part?: string | null;
+  dueRule?: string | null;
+  dueDays?: number | null;
 }
 
 /**
- * Rebuilding the plan when the route changes: the instalments already paid in
- * full stay as they are (payments stay too); the rest is replaced by the new
- * route's parts for what is left (the new parts are taken in order, less what
- * the kept ones already cover).
+ * A stored instalment still as the route built it: same part, rule and days, a deposit of the same amount on
+ * the same date. A balance is the rest of the order whatever its amount, so only its timing counts (a date
+ * typed on it makes it fixed: changed by hand).
  */
-export function rebuildPlan<T extends StoredPlanItem>(existing: T[], settledMinor: Minor, fresh: RoutePlanItem[]): { keep: T[]; add: RoutePlanItem[] } {
-  const paid = payInstalments(existing, settledMinor);
-  const keep: T[] = [];
-  for (const p of paid) {
+export function asBuilt(row: StoredPlanItem, built: RoutePlanItem[]): boolean {
+  if (!row.part) return false;
+  const g = built.find((b) => b.part === row.part);
+  if (!g) return false;
+  if (g.dueRule !== (row.dueRule ?? null) || (g.dueDays ?? null) !== (row.dueDays ?? null)) return false;
+  return g.part !== "deposit" || (g.amountMinor === row.amountMinor && g.dueOn === row.dueOn);
+}
+
+/**
+ * Rebuilding the plan when the route changes: the instalments already paid in full stay (payments stay
+ * too), and so do the ones someone changed by hand (with `built`, the plan the old route built: a row no
+ * longer as built was edited). The rest is replaced by the new route's parts for what is left: a kept part
+ * covers the same part first (a deposit edited to 50% leaves the new deposit out and the balance smaller);
+ * paid rows of no part cover from the first part on, edited rows of no part from the last (a balance split
+ * by hand leaves the deposit as it is).
+ */
+export function rebuildPlan<T extends StoredPlanItem>(existing: T[], settledMinor: Minor, fresh: RoutePlanItem[], built?: RoutePlanItem[]): { keep: T[]; add: RoutePlanItem[] } {
+  const paid = new Set<string>();
+  for (const p of payInstalments(existing, settledMinor)) {
     if (p.openMinor > 0) break;
-    keep.push(p.item);
+    paid.add(p.item.id);
   }
-  let covered = keep.reduce((t, k) => t + k.amountMinor, 0);
-  const add: RoutePlanItem[] = [];
-  for (const f of fresh) {
-    if (covered >= f.amountMinor) {
-      covered -= f.amountMinor;
-      continue;
-    }
-    add.push({ ...f, amountMinor: f.amountMinor - covered });
-    covered = 0;
+  const keep = existing.filter((r) => paid.has(r.id) || (built !== undefined && !asBuilt(r, built)));
+  const left = fresh.map((f) => f.amountMinor);
+  const byPart = new Map<string, Minor>();
+  let fromStart = 0;
+  let fromEnd = 0;
+  for (const k of keep) {
+    if (k.part && fresh.some((f) => f.part === k.part)) byPart.set(k.part, (byPart.get(k.part) ?? 0) + k.amountMinor);
+    else if (paid.has(k.id)) fromStart += k.amountMinor;
+    else fromEnd += k.amountMinor;
   }
+  fresh.forEach((f, i) => {
+    const c = Math.min(byPart.get(f.part) ?? 0, left[i]!);
+    left[i]! -= c;
+    byPart.set(f.part, (byPart.get(f.part) ?? 0) - c);
+  });
+  for (const v of byPart.values()) fromStart += v;
+  for (let i = 0; i < fresh.length; i++) {
+    const c = Math.min(fromStart, left[i]!);
+    left[i]! -= c;
+    fromStart -= c;
+  }
+  for (let i = fresh.length - 1; i >= 0; i--) {
+    const c = Math.min(fromEnd, left[i]!);
+    left[i]! -= c;
+    fromEnd -= c;
+  }
+  const add = fresh.flatMap((f, i) => (left[i]! > 0 ? [{ ...f, amountMinor: left[i]! }] : []));
   return { keep, add };
+}
+
+/**
+ * The route an order starts with, from the terms the customer accepted (shown "from the quotation", and
+ * changeable): letter of credit → the LC route (at sight); before shipment / against the B/L copy → informal
+ * with that balance timing; after arrival → none yet.
+ */
+export function routeFromTerms(terms: BalanceTerms): RouteTerms {
+  if (terms === "letter_of_credit") return { route: "letter_of_credit", balanceWhen: null, lcTerms: "at_sight", lcDays: null };
+  if (terms === "before_shipment" || terms === "against_bl_copy") return { route: "informal", balanceWhen: terms, lcTerms: null, lcDays: null };
+  return { route: null, balanceWhen: null, lcTerms: null, lcDays: null };
+}
+
+/** The order is still on the route its quotation's terms implied (shown "from the quotation"). */
+export function routeFromQuotation(t: RouteTerms, accepted: BalanceTerms): boolean {
+  const q = routeFromTerms(accepted);
+  if (!t.route || t.route !== q.route) return false;
+  if (t.route === "informal") return (t.balanceWhen ?? "before_shipment") === q.balanceWhen;
+  if (t.route === "letter_of_credit") return (t.lcTerms ?? "at_sight") === "at_sight";
+  return true;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
+import { decimalToMinor, fromDbDate } from "@kebo/database";
 import { fromMinor, orderMoney as moneyOfOrder, roundHalfAway, type Minor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, PAYMENT_ROUTE_SHORT, planStatus, planWhen, type BalanceWhen, type InquiryChannel, type InquiryStage, type LcTerms, type LostReason } from "@kebo/shared";
 import { addDays, daysBetween, DomainError, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
@@ -14,6 +14,7 @@ import { MoneyService } from "../money/money.service";
 import { ordersWithMoneyDue } from "../money/due";
 import { chargedExpenses, fxOf, positionOf } from "../money/position";
 import { basisOfOrders, convert, costingsOf, countedExpenses, MainMoney } from "../money/order-money";
+import { livePlansOf } from "../money/plan-live";
 
 const ymOf = (d: ISODate) => d.slice(0, 7);
 const ymParts = (ym: string) => ym.split("-").map(Number) as [number, number];
@@ -396,6 +397,7 @@ export class InsightsService {
     const openOrders = await this.prisma.db.order.findMany({
       where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fxOf({ sales }, await this.limits.allows("expenses"))) } },
       select: {
+        id: true,
         currency: true,
         mainCurrency: true,
         mainRate: true,
@@ -406,6 +408,8 @@ export class InsightsService {
         expenses: chargedExpenses,
       },
     });
+    // The plans as they stand now: each instalment dated from its rule and the order's dates.
+    const openPlans = await livePlansOf(this.prisma.db, openOrders.map((o) => o.id));
     const aging = { notDue: 0, d30: 0, d60: 0, d90: 0, older: 0 };
     let toReceive = 0;
     let overdue = 0;
@@ -414,12 +418,7 @@ export class InsightsService {
       const settled = positionOf(o, fxOf({ sales }, await this.limits.allows("expenses")));
       if (settled.dueMinor <= 0) continue;
       toReceive += fx.order(settled.dueMinor, o);
-      const plan = planStatus(
-        o.planItems.map((p) => ({ id: p.id, label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })),
-        settled.settledMinor,
-        today,
-        0,
-      );
+      const plan = planStatus(openPlans.get(o.id)?.items ?? [], settled.settledMinor, today, 0);
       const charged = settled.dueMinor - plan.reduce((t, p) => t + Math.max(p.openMinor, 0), 0);
       if (charged > 0) aging.notDue += fx.order(charged, o);
       for (const p of plan) {
@@ -832,24 +831,13 @@ export class InsightsService {
         planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true, dueRule: true, dueDays: true } },
       },
     });
+    const livePlans = await livePlansOf(this.prisma.db, orders.map((o) => o.id));
     const rows = orders
       .map((o) => {
         const settled = positionOf(o, fx);
         if (settled.dueMinor <= 0) return null;
-        const plan = planStatus(
-          o.planItems.map((p) => ({
-            id: p.id,
-            label: p.label,
-            amountMinor: decimalToMinor(p.amount),
-            dueOn: fromDbDateOrNull(p.dueOn),
-            part: p.part,
-            dueRule: p.dueRule,
-            dueDays: p.dueDays,
-          })),
-          settled.settledMinor,
-          today,
-          7,
-        );
+        // Dated from each instalment's rule and the order's dates as they are now.
+        const plan = planStatus(livePlans.get(o.id)?.items ?? [], settled.settledMinor, today, 7);
         const next = plan.find((p) => p.openMinor > 0) ?? null;
         const terms = { route: o.paymentRoute, balanceWhen: o.balanceWhen as BalanceWhen | null, lcTerms: o.lcTerms as LcTerms | null, lcDays: o.lcDays };
         const late = plan.filter((p) => p.status === "late");

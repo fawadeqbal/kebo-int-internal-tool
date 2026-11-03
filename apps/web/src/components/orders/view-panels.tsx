@@ -27,6 +27,7 @@ export function PaymentEdit({
   bankRoutes,
   currency,
   terms,
+  fromQuotation,
 }: {
   routeAction: Action;
   contractAction: Action;
@@ -35,6 +36,7 @@ export function PaymentEdit({
   bankRoutes: boolean;
   currency: string;
   terms?: RouteTermsValue;
+  fromQuotation?: boolean;
 }) {
   const close = useClosePanel();
   const bank = route === "bank_contract" || route === "letter_of_credit";
@@ -42,7 +44,7 @@ export function PaymentEdit({
     <PanelBody className="flex flex-col gap-6">
       <section>
         <h3 className={h}>The route</h3>
-        <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} onDone={close} />
+        <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} fromQuotation={fromQuotation} onDone={close} />
       </section>
       {bank && bankRoutes && (
         <section>

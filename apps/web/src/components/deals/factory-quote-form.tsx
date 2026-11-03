@@ -242,6 +242,8 @@ export interface QuoteState {
   leadTime: string;
   moq: string;
   paymentTerms: string;
+  /** The advance they ask when we order, % ("": the company's default). */
+  advancePercent: string;
   notes: string;
   /** Their prices have the tax in them (null: a new offer, the company's default). */
   taxIncluded: boolean | null;
@@ -262,6 +264,7 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
     leadTime: quote?.leadTime ?? "",
     moq: quote?.moq ?? "",
     paymentTerms: quote?.paymentTerms ?? "",
+    advancePercent: quote?.advancePercent === null || quote?.advancePercent === undefined ? "" : String(quote.advancePercent),
     notes: quote?.notes ?? "",
     taxIncluded: quote ? quote.taxIncluded : null,
     taxRate: quote ? String(quote.taxRate) : "",
@@ -283,6 +286,8 @@ function payload(s: QuoteState, convertible?: boolean) {
     leadTime: s.leadTime,
     moq: s.moq,
     paymentTerms: s.paymentTerms,
+    // Not set: a new offer takes the company's default; an edited one keeps its own.
+    ...(s.advancePercent.trim() === "" ? {} : { advancePercent: s.advancePercent.trim() }),
     notes: s.notes,
     // Not set (a new offer): the company's default.
     ...(s.taxIncluded === null ? {} : { taxIncluded: s.taxIncluded }),
@@ -566,8 +571,21 @@ export function OfferHeaderForm({
               <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime}>
                 <Input id="leadTime" value={s.leadTime} onChange={(e) => set("leadTime", e.target.value)} maxLength={120} placeholder="e.g. 25 days after deposit" />
               </Field>
-              <Field label="Payment terms" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms}>
-                <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 30% deposit, 70% before shipment" />
+<Field label="Advance when we order" htmlFor="advancePercent" optional hint="Starts the factory's payment plan; printed on the PO" error={st.errors?.advancePercent}>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    id="advancePercent"
+                    inputMode="decimal"
+                    className="w-24 tabular"
+                    value={s.advancePercent}
+                    onChange={(e) => set("advancePercent", e.target.value.replace(/[^0-9.]/g, ""))}
+                    placeholder="default"
+                  />
+                  <span className="text-sm text-text-2">%</span>
+                </div>
+              </Field>
+              <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms}>
+                <Input id="paymentTerms" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 70% before shipment, by T/T" />
               </Field>
             </PanelSection>
             <PanelSection className="sm:grid-cols-1">
@@ -699,7 +717,20 @@ export function OfferHeaderForm({
             <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
               <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} />
             </Field>
-            <Field label="Payment terms" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} className="md:col-span-3">
+<Field label="Advance when we order" htmlFor="advancePercent" optional hint="Starts the factory's payment plan; printed on the PO" error={st.errors?.advancePercent}>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  id="advancePercent"
+                  inputMode="decimal"
+                  className="w-24 tabular"
+                  value={s.advancePercent}
+                  onChange={(e) => set("advancePercent", e.target.value.replace(/[^0-9.]/g, ""))}
+                  placeholder="default"
+                />
+                <span className="text-sm text-text-2">%</span>
+              </div>
+            </Field>
+            <Field label="Payment terms (note)" htmlFor="paymentTerms" optional error={st.errors?.paymentTerms} className="md:col-span-2">
               <Input
                 id="paymentTerms"
                 value={s.paymentTerms}

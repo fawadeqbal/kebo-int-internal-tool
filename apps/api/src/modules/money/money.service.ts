@@ -11,6 +11,7 @@ import {
   plannedAndSpent,
   planStatus,
   planWhen,
+  dueRuleWords,
   routeSummary,
   STEP_OF_CATEGORY,
   shippedOnOf,
@@ -22,6 +23,7 @@ import {
   type FlowStep,
   type PaymentPlanInput,
   type RepayInput,
+  type PlanDueRule,
 } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
@@ -40,6 +42,7 @@ import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
+import { livePlanOf } from "./plan-live";
 
 const person = { select: { id: true, name: true } } as const;
 
@@ -151,20 +154,9 @@ export class MoneyService {
     // Where the order stands with the customer: the same position as every screen and paper (charged expenses included).
     const position = positionOf(o, fx);
     const terms = termsOf(o);
-    const plan = planStatus(
-      o.planItems.map((p) => ({
-        id: p.id,
-        label: p.label,
-        amountMinor: decimalToMinor(p.amount),
-        dueOn: fromDbDateOrNull(p.dueOn),
-        part: p.part,
-        dueRule: p.dueRule,
-        dueDays: p.dueDays,
-      })),
-      position.settledMinor,
-      today,
-      s.reminders.dueSoonDays,
-    );
+    // The plan as it stands now: each instalment dated from its rule and the order's dates, named from its amount.
+    const live = await livePlanOf(this.prisma.db, o.id);
+    const plan = planStatus(live.items, position.settledMinor, today, s.reminders.dueSoonDays);
     const planSum = planTotalMinor(plan);
     const next = plan.find((p) => p.status !== "paid") ?? null;
 
@@ -289,9 +281,16 @@ export class MoneyService {
           part: p.part,
           /** "T/T", "LC, deferred 90 days". */
           how: planHow(p.part, terms),
+          /** fixed | on_ready | on_ship_plus_days | after_papers (null: no date yet); the date is worked out from it. */
+          dueRule: p.dueRule,
+          dueDays: p.dueDays,
+          /** "on the ready date", "14 days after shipping": the rule in words (a fixed date: null). */
+          rule: dueRuleWords(p),
           /** When an undated part falls due ("90 days after the papers"). */
           when: p.dueOn ? null : planWhen(p, terms) || null,
         })),
+        /** The order's dates the rules read (the ready date: the latest factory's). */
+        dates: live.dates,
         /** The instalments must add up to the order total; a different sum is shown as a problem to fix. */
         matchesTotal: planSum === totalMinor,
         difference: fromMinor(totalMinor - planSum),
@@ -400,10 +399,32 @@ export class MoneyService {
           `The instalments add up to ${formatMinor(sum, o.currency)}, but the order is ${formatMinor(total, o.currency)}. Make them match.`,
         );
       const before = await tx.paymentPlanItem.findMany({ where: { orderId }, orderBy: { sortOrder: "asc" } });
-      const describe = (rows: { label: string; amount: string; dueOn: string | null }[]) =>
-        rows.map((r) => `${r.label} ${r.amount}${r.dueOn ? ` by ${r.dueOn}` : ""}`).join("; ");
-      const was = describe(before.map((b) => ({ label: b.label, amount: b.amount.toFixed(2), dueOn: fromDbDateOrNull(b.dueOn) })));
-      const now = describe(input.items.map((i) => ({ label: i.label, amount: fromMinor(toMinor(i.amount)), dueOn: i.dueOn })));
+      const live = await livePlanOf(tx, orderId);
+      const { reminders } = await this.settings.get();
+      // Each row's due rule: as sent; else a date typed makes it fixed (unless it is the date its rule gives now),
+      // and no date keeps the rule it had. Only a fixed row keeps a date; the others are worked out each time.
+      const rows = input.items.map((i, n) => {
+        const old = i.id ? before.find((b) => b.id === i.id) : undefined;
+        const oldRule = old?.dueRule && old.dueRule !== "fixed" ? (old.dueRule as PlanDueRule) : null;
+        const rule: PlanDueRule | null =
+          i.dueRule !== undefined
+            ? i.dueRule
+            : i.dueOn
+              ? oldRule && live.items.find((x) => x.id === old!.id)?.dueOn === i.dueOn
+                ? oldRule
+                : "fixed"
+              : oldRule;
+        if (rule === "fixed" && !i.dueOn) throw new DomainError(`Give “${i.label}” its date.`);
+        const dueDays =
+          rule === "on_ship_plus_days" ? (i.dueDays ?? old?.dueDays ?? reminders.balanceDays) : rule === "after_papers" ? (i.dueDays ?? old?.dueDays ?? 0) : null;
+        return { id: i.id, label: i.label, amount: i.amount, dueOn: rule === "fixed" ? i.dueOn : null, dueRule: rule, dueDays, sortOrder: n };
+      });
+      const describe = (rows: { label: string; amount: string; dueOn: string | null; dueRule: string | null; dueDays: number | null }[]) =>
+        rows.map((r) => `${r.label} ${r.amount}${r.dueOn ? ` by ${r.dueOn}` : dueRuleWords(r) ? ` ${dueRuleWords(r)}` : ""}`).join("; ");
+      const was = describe(
+        before.map((b) => ({ label: b.label, amount: b.amount.toFixed(2), dueOn: fromDbDateOrNull(b.dueOn), dueRule: b.dueRule, dueDays: b.dueDays })),
+      );
+      const now = describe(rows.map((r) => ({ ...r, amount: fromMinor(toMinor(r.amount)) })));
       if (was === now) return;
       const paid = o.payments.some((p) => p.currency === o.currency);
       const reason = paid
@@ -411,11 +432,11 @@ export class MoneyService {
         : (input.reason ?? null);
       const keep = new Set(before.map((b) => b.id));
       await tx.paymentPlanItem.deleteMany({
-        where: { orderId, id: { notIn: input.items.map((i) => i.id).filter((id): id is string => !!id && keep.has(id)) } },
+        where: { orderId, id: { notIn: rows.map((i) => i.id).filter((id): id is string => !!id && keep.has(id)) } },
       });
-      for (const [n, i] of input.items.entries()) {
-        const row = { label: i.label, amount: i.amount, dueOn: toDbDateOrNull(i.dueOn), sortOrder: n };
-        if (i.id && keep.has(i.id)) await tx.paymentPlanItem.update({ where: { id: i.id }, data: row });
+      for (const { id, ...r } of rows) {
+        const row = { label: r.label, amount: r.amount, dueOn: toDbDateOrNull(r.dueOn), dueRule: r.dueRule, dueDays: r.dueDays, sortOrder: r.sortOrder };
+        if (id && keep.has(id)) await tx.paymentPlanItem.update({ where: { id }, data: row });
         else await tx.paymentPlanItem.create({ data: { ...row, orderId } });
       }
       await this.audit.record(tx, {

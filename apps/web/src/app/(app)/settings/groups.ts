@@ -94,6 +94,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
         hint: "How a new factory offer starts. Each offer can say otherwise.",
       },
       { name: "factoryTaxRate", label: "Factory tax", kind: "number", unit: "%", hint: "A new offer's tax %: 0 unless the factories charge tax, e.g. 13% VAT in China" },
+      { name: "factoryAdvancePercent", label: "Factory advance", kind: "number", unit: "%", hint: "A new offer's advance when we order: the factory's payment plan starts from it. Each offer can say otherwise." },
       { name: "defaultPaymentTerms", label: "Payment terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the deposit and balance, e.g. By T/T; L/C at sight accepted" },
       { name: "defaultDeliveryTerms", label: "Delivery terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the delivery time, e.g. packing, inspection, warranty" },
       { name: "warrantyTerms", label: "Warranty on sales contracts", kind: "textarea", wide: true, hint: "Printed on the sales contract and the SAT certificate" },

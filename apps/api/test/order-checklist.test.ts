@@ -153,7 +153,7 @@ describe("order checklist", () => {
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "informal" }).expect(200);
     s = await steps();
     expect(auto(s, "deposit_in")).toMatchObject({ done: true, doneOn: day(-1) });
-    expect(auto(s, "route")).toMatchObject({ done: true, data: [["Route", "Informal"]] });
+    expect(auto(s, "route")).toMatchObject({ done: true, data: [["Route", "Informal · from the quotation"]] });
     expect(s.steps[0]).toMatchObject({ key: "payment", state: "done" });
     expect(s.steps[1]).toMatchObject({ key: "factory", state: "now" });
     await api(app, sana)

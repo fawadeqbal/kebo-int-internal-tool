@@ -62,6 +62,9 @@ describe("one money truth", () => {
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "sent" }).expect(200);
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "accepted" }).expect(200);
     const o = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0];
+    // Won and ordered months ago: this month's reports elsewhere (top customers) are left as they are.
+    await prisma.platform.$executeRaw`update orders set ordered_on = ordered_on - 75 where id = ${o.id}::uuid`;
+    await prisma.platform.$executeRaw`update inquiries set closed_at = closed_at - interval '75 days' where id = ${inquiry.id}::uuid`;
     return { orderId: o.id as string, refNo: o.refNo as string, customerId: customer.id as string, factoryId };
   }
   const order = async (id: string) => (await api(app, manager).get(`/orders/${id}`).expect(200)).body;
@@ -214,7 +217,7 @@ describe("one money truth", () => {
       // CNY 1,000 + 13% × 10 = CNY 11,300: the default plan is 30% (3,390) on order and 7,910 on the ready date.
       o = await makeOrder({ taxRate: 13 });
       await api(app, manager).patch(`/orders/${o.orderId}/factory-order`, { factoryOrderedOn: day(-20) }).expect(200);
-      await db().order.update({ where: { id: o.orderId }, data: { readyOn: new Date(`${day(-3)}T00:00:00Z`) } });
+      await api(app, manager).patch(`/orders/${o.orderId}/details`, { readyOn: day(-3) }).expect(200);
       await api(app, manager)
         .post(`/orders/${o.orderId}/factory-payments`, { factoryId: o.factoryId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: day(-15) })
         .expect(201);

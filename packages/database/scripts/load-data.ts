@@ -422,7 +422,6 @@ async function main() {
         stageSince: new Date(`${stageSince}T09:00:00Z`),
         closedAt: oStage === "done" ? new Date(`${stageSince}T09:00:00Z`) : null,
         orderedOn: toDbDate(orderedOn),
-        readyOn: oStage === "confirmed" ? null : toDbDate(addDays(orderedOn, int(15, 40))),
         shipBy: toDbDate(addDays(orderedOn, int(30, 45))),
         currency: "USD",
         total: fromMinor(accepted.total),
@@ -480,12 +479,18 @@ async function main() {
           at: new Date(`${stageDay(st)}T09:00:00Z`),
         })),
     });
+    // The factory's ready date (one per factory; this order has one).
+    if (oStage !== "confirmed") await db.orderFactory.create({ data: { orderId: order.id, factoryId: factory.id, readyOn: toDbDate(addDays(orderedOn, int(15, 40))) } });
+    // The deposit on its date, the balance 14 days after the goods leave (worked out from the ship date).
     await db.paymentPlanItem.createMany({
       data: defaultPlan(accepted.total, 30, orderedOn, 7).map((p, k) => ({
         orderId: order.id,
         label: p.label,
         amount: fromMinor(p.amountMinor),
-        dueOn: p.dueOn ? toDbDate(p.dueOn) : shippedOn ? toDbDate(addDays(shippedOn, 14)) : null,
+        dueOn: p.dueOn ? toDbDate(p.dueOn) : null,
+        part: p.dueOn ? "deposit" : "balance",
+        dueRule: p.dueOn ? "fixed" : "on_ship_plus_days",
+        dueDays: p.dueOn ? null : 14,
         sortOrder: k,
       })),
     });

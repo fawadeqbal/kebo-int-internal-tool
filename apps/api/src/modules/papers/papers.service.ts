@@ -65,6 +65,7 @@ import {
   BUILDERS,
   factoriesOf,
   hsMissing,
+  livePlanOfPaper,
   paperOrderInclude,
   positionOf,
   reportItem,
@@ -523,7 +524,7 @@ export class PapersService {
       }
       if (kind === "payment-request") {
         const pos = positionOf(c);
-        o.planItems.forEach((p, i) =>
+        livePlanOfPaper(o).forEach((p, i) =>
           out.push(
             row({
               ...base,
@@ -533,7 +534,7 @@ export class PapersService {
               // Given when the plan row was made: a rebuilt plan keeps the numbers of the rows it keeps.
               number: paperNumber(o.refNo, kind, p.requestNo ?? i + 1),
               version: null,
-              sub: `${o.currency} ${p.amount.toFixed(2)}${p.dueOn ? ` · due ${fromDbDate(p.dueOn)}` : ""}`,
+              sub: `${o.currency} ${fromMinor(p.amountMinor)}${p.dueOn ? ` · due ${p.dueOn}` : ""}`,
               ref: p.id,
               makeable: false,
               inSet: false,
@@ -913,7 +914,16 @@ export class PapersService {
         );
         break;
       }
-      case "readyOn":
+      case "readyOn": {
+        // A purchase order's ready date is its factory's own (one per factory); elsewhere, every factory's.
+        const factoryId = kind === "purchase-order" ? (refIn ?? o.lines.find((l) => l.factoryId)?.factoryId ?? null) : null;
+        await this.orders.setDetails(
+          user,
+          orderId,
+          orderDetailsInput.parse(factoryId ? { readyBy: [{ factoryId, readyOn: v }] } : { readyOn: v }),
+        );
+        break;
+      }
       case "shipBy":
       case "portOfDischarge":
         await this.orders.setDetails(user, orderId, orderDetailsInput.parse({ [input.field]: v }));

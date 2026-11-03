@@ -57,6 +57,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const names = factories.map((f) => f.name).join(", ");
   const orderedOn = flow?.factory.orderedOn ?? null;
   const orderNo = flow?.factory.orderNo ?? null;
+  const readyBy = (flow?.factory.readyBy ?? []).filter((r) => r.factoryId);
 
   const tools: Record<string, AutoTool> = {};
   if (canEdit)
@@ -94,14 +95,35 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
     { name: "factoryOrderNo", label: "Their order no.", value: orderNo, group: "The order with the factory" },
     { name: "factoryOrderedOn", label: "Ordered on", value: orderedOn, type: "date", max: now, group: "The order with the factory" },
     ...(can(me, "sourcing.manage") ? [{ label: "Price basis", value: basis, uncounted: !basis }] : []),
-    {
-      name: "readyOn",
-      label: "Ready (factory says)",
-      value: o.readyOn,
-      type: "date" as const,
-      group: "Ready date",
-      hint: defaults.leadTime ? `Lead time on the quote: ${defaults.leadTime.text}` : undefined,
-    },
+    // One ready date per factory (each factory's PO, plan and production read its own); the order's is the latest.
+    ...(readyBy.length > 1
+      ? [
+          ...readyBy.map((r) => ({
+            name: `readyOn__${r.factoryId}`,
+            label: `Ready · ${r.name ?? "factory"}`,
+            value: r.readyOn,
+            type: "date" as const,
+            group: "Ready date, each factory's",
+            hint: defaults.leadTime ? `Lead time on the quote: ${defaults.leadTime.text}` : undefined,
+          })),
+          {
+            label: "Order ready (the latest)",
+            value: flow?.factory.readyOn ? date(flow.factory.readyOn) : null,
+            uncounted: true,
+            cardOnly: true,
+            group: "Ready date, each factory's",
+          },
+        ]
+      : [
+          {
+            name: "readyOn",
+            label: "Ready (factory says)",
+            value: o.readyOn,
+            type: "date" as const,
+            group: "Ready date",
+            hint: defaults.leadTime ? `Lead time on the quote: ${defaults.leadTime.text}` : undefined,
+          },
+        ]),
   ];
 
   return (
@@ -157,7 +179,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           <Card key={`${plan.factory.id}:${plan.currency}`} id={`plan-${plan.factory.id}`} data-target="factory.plan" data-target-card="">
             <CardHeader
               title={`What we pay ${plan.factory.name} · ${o.refNo}`}
-              description="Agreed once per factory on the order: an advance when we order, the balance when they say ready (or on a fixed day)."
+              description={`Agreed once per factory on the order: an advance when we order, the balance on ${plan.factory.name}'s ready date${plan.readyOn ? ` (${date(plan.readyOn)})` : ""} (or on a fixed day).`}
             />
             <CardBody>
               <FactoryPlanCard

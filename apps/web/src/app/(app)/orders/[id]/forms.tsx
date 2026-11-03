@@ -163,6 +163,7 @@ export function DetailsCard({
   shipment,
   lc,
   suggestShipBy,
+  readyEach,
 }: {
   action: Action;
   canEdit: boolean;
@@ -186,6 +187,8 @@ export function DetailsCard({
   lc?: { latest: string | null; late: boolean } | null;
   /** While ship-by is empty: the deal's "wanted by" (YYYY-MM-DD and as read). */
   suggestShipBy?: { on: string; shown: string } | null;
+  /** An order from several factories: each gives its own ready date (edited on the Factory step); this is the latest. */
+  readyEach?: { count: number; href: string } | null;
 }) {
   const [editing, setEditing] = useState(false);
   const fromShipment = (filled: boolean) =>
@@ -214,7 +217,15 @@ export function DetailsCard({
   const rows: { label: string; value: ReactNode; note?: ReactNode }[] = [
     ...fixed,
     { label: "Ship by", value: shipBy },
-    { label: "Ready at factory", value: shown.readyOn },
+    {
+      label: "Ready at factory",
+      value: shown.readyOn,
+      note: readyEach ? (
+        <a href={readyEach.href} className="text-xs font-normal text-primary hover:underline">
+          the latest of {readyEach.count} factories · edit in Factory
+        </a>
+      ) : undefined,
+    },
     { label: "Shipped on", value: shown.shippedOn, note: fromShipment(!!shown.shippedOn) },
     { label: "B/L no.", value: shown.blNo, note: fromShipment(!!shown.blNo) },
     { label: "Container", value: values.containerNo, note: fromShipment(!!values.containerNo) },
@@ -272,9 +283,19 @@ export function DetailsCard({
                 >
                   <Input id="d-shipBy" name="shipBy" type="date" defaultValue={s.values?.shipBy ?? values.shipBy ?? suggestShipBy?.on ?? ""} />
                 </Field>
-                <Field label="Ready on" htmlFor="d-readyOn" optional hint="When the factory expects the goods ready" error={s.errors?.readyOn}>
-                  <Input id="d-readyOn" name="readyOn" type="date" defaultValue={s.values?.readyOn ?? values.readyOn ?? ""} />
-                </Field>
+                {readyEach ? (
+                  <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
+                    Each of the {readyEach.count} factories gives its own ready date:{" "}
+                    <a href={readyEach.href} className="font-medium text-primary hover:underline">
+                      edit them on the Factory step
+                    </a>
+                    .
+                  </p>
+                ) : (
+                  <Field label="Ready on" htmlFor="d-readyOn" optional hint="When the factory expects the goods ready" error={s.errors?.readyOn}>
+                    <Input id="d-readyOn" name="readyOn" type="date" defaultValue={s.values?.readyOn ?? values.readyOn ?? ""} />
+                  </Field>
+                )}
                 {shipment.onShipping ? (
                   <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
                     Shipped on, the B/L and the container are {shipment.label}&apos;s:{" "}

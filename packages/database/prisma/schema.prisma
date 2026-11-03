@@ -605,6 +605,7 @@ model Factory {
   productionSteps ProductionStep[]
   checklistItems  OrderChecklistItem[]
   paymentPlans    FactoryPaymentPlan[]
+  orderParts      OrderFactory[]
 
   @@index([name])
   @@index([ownerId])
@@ -829,6 +830,9 @@ model FactoryQuote {
   leadTime     String?   @map("lead_time") @db.VarChar(120)
   moq          String?   @db.VarChar(60)
   paymentTerms String?   @map("payment_terms")
+  /// The advance the factory asks when we order, in % (empty: the company's default in Settings). Seeds the
+  /// factory's payment plan on the order and is printed on the purchase order; paymentTerms stays as a note.
+  advancePercent Decimal? @map("advance_percent") @db.Decimal(5, 2)
   notes        String?
   createdById  String    @map("created_by") @db.Uuid
   createdBy    User      @relation("FactoryQuoteCreator", fields: [createdById], references: [id])
@@ -1074,8 +1078,7 @@ model Order {
   /// Ship date promised to the customer (ours: with an LC its latest shipment date is shown beside it, and a
   /// ship-by later than that is warned about).
   shipBy              DateTime?          @map("ship_by") @db.Date
-  /// Ready date the factory confirmed.
-  readyOn             DateTime?          @map("ready_on") @db.Date
+  // The ready date is each factory's (OrderFactory.readyOn); the order's is the latest of them (worked out).
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
   documentTitle       String?            @map("document_title") @db.VarChar(200)
   /// The contract destination, e.g. "Hairatan, Afghanistan": printed on the proforma and the contract, and the
@@ -1149,6 +1152,8 @@ model Order {
   checklist    OrderChecklistItem[]
   files        Attachment[]
   factoryPlan  FactoryPaymentPlan[]
+  /// Each factory's ready date (the order's ready date is the latest of them).
+  factories    OrderFactory[]
   credits      CustomerCredit[]
   papers       OrderPaper[]
 
@@ -1606,12 +1611,15 @@ model PaymentPlanItem {
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   label     String    @db.VarChar(80)
   amount    Decimal   @db.Decimal(14, 2)
-  /// Null until known (a balance before shipment is dated when the ship date is).
+  /// The date of a `fixed` row (typed by hand, or the deposit's); rows with another rule have none stored:
+  /// their date is worked out each time from the order's dates (@kebo/shared planItemDue).
   dueOn     DateTime? @map("due_on") @db.Date
   sortOrder Int       @default(0) @map("sort_order")
   /// Built from the route: deposit | balance (null: typed by hand).
   part      String?   @db.VarChar(10)
-  /// after_papers: due `dueDays` after the papers reached the customer's bank (LC).
+  /// When it falls due: fixed (dueOn) | on_ready (the order's ready date, the latest factory's) |
+  /// on_ship_plus_days (`dueDays` after the goods left) | after_papers (`dueDays` after the papers reached
+  /// the customer's bank, LC); null: no date yet.
   dueRule   String?   @map("due_rule") @db.VarChar(20)
   dueDays   Int?      @map("due_days")
   /// Its payment request's number (PR-2026-0031-n), given when the row is made and never changed or reused
@@ -1983,6 +1991,28 @@ model FactoryPaymentPlan {
   @@map("factory_payment_plans")
 }
 
+/// One factory's part of an order: the ready date it gave (one per factory; the order's ready date is the
+/// latest of them). factoryId null: the goods of an order whose lines name no factory.
+model OrderFactory {
+  id        String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company   Company   @relation(fields: [companyId], references: [id])
+  orderId   String    @map("order_id") @db.Uuid
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  factoryId String?   @map("factory_id") @db.Uuid
+  factory   Factory?  @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  readyOn   DateTime? @map("ready_on") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  /// One row per factory of the order (nulls not distinct: one row for an order with no factory).
+  @@unique([orderId, factoryId])
+  @@index([factoryId])
+  @@index([companyId])
+  @@map("order_factories")
+}
+
 // ============================================================================
 // Insights: monthly sales targets, and each person's reminders done or snoozed
 // ============================================================================
@@ -2174,6 +2204,7 @@ model Company {
   customerReceipts    CustomerReceipt[]
   customerCredits     CustomerCredit[]
   factoryPaymentPlans FactoryPaymentPlan[]
+  orderFactories      OrderFactory[]
   orderPapers         OrderPaper[]
 
   @@map("companies")

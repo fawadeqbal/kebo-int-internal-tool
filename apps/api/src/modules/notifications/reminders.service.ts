@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
 import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus, shippedOnOf } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -13,6 +13,8 @@ import { InsightsService } from "../insights/insights.service";
 import { ordersWithMoneyDue } from "../money/due";
 import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../money/position";
 import { LimitsService } from "../../common/company/limits.service";
+import { readyOnOf, readySelect } from "../orders/ready";
+import { livePlansOf } from "../money/plan-live";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -108,10 +110,13 @@ export class RemindersService {
         planItems: { orderBy: { sortOrder: "asc" } },
         expenses: chargedExpenses,
         inquiry: { select: { id: true, assigneeId: true } },
-        lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } },
+        lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true, factoryId: true } },
         shipments: { select: { departedOn: true } },
+        ...readySelect,
       },
     });
+    // The customer's plans as they stand now: each instalment dated from its rule and the order's dates.
+    const plans = await livePlansOf(this.prisma.db, orders.map((o) => o.id));
     // Collected first and sent per person: a few one by one, many as one summary,
     // so a backlog (e.g. right after the import of old orders) does not bury people every morning.
     type Late = { orderId: string; refNo: string; title: string; due: string; lateBy: number };
@@ -127,7 +132,7 @@ export class RemindersService {
           status: o.status,
           currency: o.currency,
           stageSince: dateIn(o.stageSince, this.clock.timeZone),
-          readyOn: fromDbDateOrNull(o.readyOn),
+          readyOn: readyOnOf(o),
           shippedOn: shippedOnOf(o.shipments.map((x) => ({ departedOn: fromDbDateOrNull(x.departedOn) }))),
           goods: goodsOf(o.lines, o.packedAt),
         },
@@ -170,7 +175,7 @@ export class RemindersService {
     //    and managers once when it becomes late (the order reminders above keep chasing after that).
     for (const o of orders) {
       const received = positionOf(o, fx).settledMinor;
-      const plan = planStatus(o.planItems.map((p) => ({ id: p.id, label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })), received, today, s.reminders.dueSoonDays);
+      const plan = planStatus(plans.get(o.id)?.items ?? [], received, today, s.reminders.dueSoonDays);
       for (const p of plan) {
         if (p.status === "due_soon") await note([o.inquiry.assigneeId ?? managers[0]], { type: "reminder.instalment", title: `${o.refNo}: ${instalmentSentence(p.label, p.openMinor, o.currency, p.dueOn)} — remind the customer`, link: links.orderMoney(o.id), dedupeKey: `plan-soon:${p.id}:${p.dueOn}` });
         if (p.status === "late") await note([o.inquiry.assigneeId, ...managers], { type: "reminder.instalmentLate", title: `${o.refNo}: ${instalmentSentence(p.label, p.openMinor, o.currency, p.dueOn)} — not paid yet`, link: links.orderMoney(o.id), dedupeKey: `plan-late:${p.id}:${p.dueOn}` });
