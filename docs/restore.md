@@ -140,3 +140,13 @@ docker compose ps                                  # all healthy
 ```
 
 Then sign in, open a few inquiries and orders, and download a file and a PDF.
+
+## Clean start (wipe to an empty install)
+
+`deploy/server/clean-start.sh` wipes the installation back to an empty install: every company, person, customer, factory, inquiry, order, payment, paper, file and the whole history. It first shows what is there, asks for the new starting accounts (Super Admin, Manager, Staff of Kebo) and the platform admin, and needs `DELETE EVERYTHING` typed. Before deleting anything it takes its own backup, `backups/clean-start-<time>-db.sql.gz` (checked) and `backups/clean-start-<time>-files.tar.gz`, kept until you delete them. Then it drops and re-creates the database, empties the file store, applies the migrations, seeds the accounts and adds the platform admin (it prints the link to set the password).
+
+```bash
+cd /opt/kebo-desk && sudo bash deploy/server/clean-start.sh
+```
+
+To undo it, restore those two backups as above.
