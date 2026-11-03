@@ -3,31 +3,18 @@
 @Tags(['shots'])
 library;
 
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kebo_app/custom/order_lines.dart';
 import 'package:kebo_app/ds/ds.dart';
 
 import '../ds/line_list_test.dart' show lines120;
 import '../support/harness.dart';
+import 'fonts.dart';
 
-Future<void> _fonts() async {
-  final inter = FontLoader('Inter');
-  for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
-    inter.addFont(Future.value(ByteData.sublistView(File('assets/fonts/Inter-$w.ttf').readAsBytesSync())));
-  }
-  await inter.load();
-  final icons = FontLoader('MaterialIcons');
-  final sdk = Platform.environment['FLUTTER_ROOT'] ?? '/home/claude/flutter-sdk';
-  icons.addFont(Future.value(ByteData.sublistView(File('$sdk/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf').readAsBytesSync())));
-  await icons.load();
-}
 
 void main() {
-  setUpAll(_fonts);
+  setUpAll(loadShotFonts);
 
   Future<void> shot(WidgetTester tester, String name) async {
     await tester.pumpAndSettle();

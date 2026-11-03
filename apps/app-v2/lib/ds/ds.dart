@@ -10,6 +10,7 @@ export 'frames.dart';
 export 'items_editor.dart';
 export 'line_list.dart';
 export 'nav.dart';
+export 'share_sheet.dart';
 export 'tab_def.dart';
 export 'theme.dart';
 export 'tone.dart';

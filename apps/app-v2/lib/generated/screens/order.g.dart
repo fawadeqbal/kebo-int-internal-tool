@@ -11,6 +11,7 @@ import '../repos.g.dart';
 import '../../custom/order_files.dart';
 import '../../custom/order_flow.dart';
 import '../../custom/order_lines.dart';
+import '../../custom/order_money_section.dart';
 import '../../custom/order_papers.dart';
 
 class OrderScreen extends StatelessWidget {
@@ -26,13 +27,7 @@ class OrderScreen extends StatelessWidget {
     sections: (x) => [
       CustomSection('Steps', OrderFlow(x, title: 'Steps')),
       CustomSection('Goods', OrderLines(x, title: 'Goods')),
-      KvSection('Money', [
-        ('Total', fmtMoney(x.money?.total, x.currency)),
-        ('Charged to the customer', fmtMoney(x.money?.charged, x.currency)),
-        ('Received', fmtMoney(x.money?.received, x.currency)),
-        ('Bank charges', fmtMoney(x.money?.bankCharges, x.currency)),
-        ('Still due', fmtMoney(x.money?.due, x.currency)),
-      ]),
+      CustomSection('Money', OrderMoneySection(x, title: 'Money')),
       CustomSection('Papers', OrderPapers(x, title: 'Papers')),
       CustomSection('Files', OrderFiles(x, title: 'Files')),
       KvSection('Details', [

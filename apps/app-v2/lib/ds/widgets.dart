@@ -283,10 +283,14 @@ class LoadingView extends StatelessWidget {
 }
 
 /// A short note at the bottom of the screen after something happened.
-void toast(BuildContext context, String message) {
+void toast(BuildContext context, String message, {String? action, VoidCallback? onAction}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
+    ..showSnackBar(SnackBar(
+      content: Text(message),
+      duration: Duration(seconds: action == null ? 4 : 8),
+      action: action == null || onAction == null ? null : SnackBarAction(label: action, onPressed: onAction),
+    ));
 }
 
 /// Asks before something that cannot be undone. True when confirmed.

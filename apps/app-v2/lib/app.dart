@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'core/scope.dart';
 import 'core/session.dart';
 import 'custom/alerts.dart';
+import 'custom/approvals.dart';
 import 'custom/home.dart';
 import 'custom/more.dart';
 import 'custom/search.dart';
@@ -48,6 +49,7 @@ class _AppState extends State<App> {
           GoRoute(path: '/alerts', builder: (c, s) => const AlertsScreen()),
           GoRoute(path: '/search', builder: (c, s) => const SearchScreen()),
           GoRoute(path: '/more', builder: (c, s) => const MoreScreen()),
+          GoRoute(path: '/approvals', builder: (c, s) => const ApprovalsScreen()),
           ...generatedRoutes,
         ],
       ),

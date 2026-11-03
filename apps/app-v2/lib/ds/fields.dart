@@ -20,7 +20,8 @@ class FieldDef {
       this.options = const {},
       this.defaultValue,
       this.source,
-      this.suggestions = const []});
+      this.suggestions = const [],
+      this.showIf});
 
   final String key, label;
   final FieldKind kind;
@@ -38,6 +39,24 @@ class FieldDef {
 
   /// Quick answers shown as chips under a text field ("Workload", "Person is away").
   final List<String> suggestions;
+
+  /// Shown only when this says so (e.g. the rate when two currencies differ). Hidden fields are not checked or sent.
+  final bool Function(Map<String, Object?> values)? showIf;
+
+  bool shownIn(Map<String, Object?> values) => showIf?.call(values) ?? true;
+
+  /// The same field with a few things changed (e.g. a narrower [showIf]).
+  FieldDef copyWith({String? label, bool? required, String? hint, Map<String, String>? options, bool Function(Map<String, Object?>)? showIf}) =>
+      FieldDef(key, label ?? this.label, kind,
+          required: required ?? this.required,
+          max: max,
+          hint: hint ?? this.hint,
+          upper: upper,
+          options: options ?? this.options,
+          defaultValue: defaultValue,
+          source: source,
+          suggestions: suggestions,
+          showIf: showIf ?? this.showIf);
 
   static final _email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
@@ -85,6 +104,14 @@ class _FieldEditorState extends State<FieldEditor> {
   late final _ctl = TextEditingController(text: _text(widget.value));
 
   static String _text(Object? v) => v == null ? '' : '$v';
+
+  @override
+  void didUpdateWidget(FieldEditor old) {
+    super.didUpdateWidget(old);
+    // Filled in from another field (e.g. the rate after the currency changed).
+    final next = _text(widget.value);
+    if (widget.value != old.value && next != _ctl.text) _ctl.text = next;
+  }
 
   @override
   void dispose() {
@@ -172,29 +199,26 @@ class _FieldEditorState extends State<FieldEditor> {
     );
   }
 
-  /// Up to eight options: chips, all visible. More: a searchable list.
+  /// Up to eight options: chips, all visible. More: the first seven as chips (the chosen one too)
+  /// and "More…" for a searchable list of all.
   Widget _choice(BuildContext context) {
     final d = widget.def;
-    if (d.options.length <= 8) {
-      return Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
-        for (final e in d.options.entries)
-          ChoiceChip(
-            label: Text(e.value),
-            selected: widget.value == e.key,
-            onSelected: (_) => widget.onChanged(e.key),
-          ),
-      ]);
-    }
-    return _box(
-      context,
-      shown: d.options[widget.value],
-      hint: 'Choose',
-      icon: Icons.expand_more,
-      onTap: () async {
-        final picked = await pickFrom(context, title: d.label, options: d.options);
-        if (picked != null) widget.onChanged(picked);
-      },
-    );
+    final all = d.options.entries.toList();
+    final shown = all.length <= 8 ? all : [...all.take(7), ...all.skip(7).where((e) => e.key == widget.value)];
+    return Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
+      for (final e in shown)
+        ChoiceChip(label: Text(e.value), selected: widget.value == e.key, onSelected: (_) => widget.onChanged(e.key)),
+      if (all.length > 8)
+        ActionChip(
+          avatar: const Icon(Icons.expand_more, size: 18),
+          label: const Text('More…'),
+          tooltip: 'All ${all.length} choices for ${d.label}',
+          onPressed: () async {
+            final picked = await pickFrom(context, title: d.label, options: d.options);
+            if (picked != null) widget.onChanged(picked);
+          },
+        ),
+    ]);
   }
 
   Widget _country(BuildContext context) {

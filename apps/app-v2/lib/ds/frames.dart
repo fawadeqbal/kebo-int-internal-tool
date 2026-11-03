@@ -40,6 +40,7 @@ class ListFrame<T> extends StatefulWidget {
     required this.load,
     required this.row,
     this.onOpen,
+    this.onDecide,
     this.searchHint,
     this.add,
     this.localSearch = false,
@@ -51,6 +52,9 @@ class ListFrame<T> extends StatefulWidget {
   final Future<Paged<T>> Function(Api api, String? q, int page, Map<String, String> query) load;
   final RowData Function(T x) row;
   final void Function(BuildContext context, T x)? onOpen;
+
+  /// Instead of [onOpen]: a row decided in a sheet; the list reloads when it says true.
+  final Future<bool> Function(BuildContext context, T x)? onDecide;
   final AddAction? add;
 
   /// The API sends every row at once: search them on the phone.
@@ -197,7 +201,13 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
                 badge: d.badge,
                 value: d.value,
                 actions: d.actions,
-                onTap: widget.onOpen == null ? null : () => widget.onOpen!(ctx, x),
+                onTap: widget.onDecide != null
+                    ? () async {
+                        if (await widget.onDecide!(ctx, x) && mounted) _reload();
+                      }
+                    : widget.onOpen == null
+                        ? null
+                        : () => widget.onOpen!(ctx, x),
               ),
             );
           },

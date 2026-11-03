@@ -28,6 +28,10 @@ class FakeServer implements HttpClientAdapter {
   Future<ResponseBody> fetch(RequestOptions o, Stream<Uint8List>? body, Future<void>? cancel) async {
     calls.add(o);
     final hit = answers.containsKey(o.path);
+    // A file (a PDF, a photo): its bytes as they are.
+    if (hit && answers[o.path] is Uint8List) {
+      return ResponseBody.fromBytes(answers[o.path]! as Uint8List, 200, headers: {Headers.contentTypeHeader: ['application/pdf']});
+    }
     return ResponseBody.fromString(
       jsonEncode(hit ? answers[o.path] : {'error': 'Not found'}),
       hit ? 200 : 404,
@@ -80,17 +84,19 @@ Widget _app(Session session, Widget home) => AppScope(
     );
 
 /// Shows [screen] at phone size with the server answering from [answers].
-Future<void> pumpScreen(WidgetTester tester, Widget screen, Map<String, Object?> answers) async {
+/// [permissions]: what the signed-in person may do (everything by default).
+Future<void> pumpScreen(WidgetTester tester, Widget screen, Map<String, Object?> answers, {Set<String> permissions = const {'*'}}) async {
   phoneSize(tester);
-  await tester.pumpWidget(_app(fakeSession(answers), screen));
+  await tester.pumpWidget(_app(fakeSession(answers, permissions: permissions), screen));
   await tester.pumpAndSettle();
 }
 
 /// Opens a form sheet with [open], at phone size.
-Future<void> pumpSheet(WidgetTester tester, Future<bool> Function(BuildContext context) open, {Map<String, Object?> answers = const {}}) async {
+Future<void> pumpSheet(WidgetTester tester, Future<bool> Function(BuildContext context) open,
+    {Map<String, Object?> answers = const {}, Set<String> permissions = const {'*'}}) async {
   phoneSize(tester);
   await tester.pumpWidget(_app(
-    fakeSession(answers),
+    fakeSession(answers, permissions: permissions),
     Builder(builder: (context) => Scaffold(body: Center(child: FilledButton(onPressed: () => open(context), child: const Text('Open'))))),
   ));
   await tester.tap(find.text('Open'));

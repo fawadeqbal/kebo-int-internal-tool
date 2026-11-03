@@ -50,6 +50,38 @@ enums:
     expired: { label: Expired, tone: warn }
     superseded: { label: Replaced, tone: neutral }
     void: { label: Void, tone: neutral }
+  # Money (labels as on the web: packages/shared/src/labels.ts). "credit" is not offered: the web's "Use credit" does that.
+  PaymentMethod: { bank_transfer: Bank transfer (T/T), letter_of_credit: Letter of credit (L/C), cash: Cash, cheque: Cheque, online: Online payment, other: Other }
+  ExpenseCategory:
+    inland_transport: Inland transport
+    travel: Travel & tickets
+    hotel: Hotels
+    meals: Meals & entertainment
+    inspection: Inspection
+    courier: Courier
+    freight: Sea / air freight
+    samples: Samples
+    gifts: Gifts
+    customs: Customs & documents
+    insurance: Insurance
+    bank_charges: Bank charges
+    commission: Commission
+    office: Office
+    utilities: Electricity, internet & phone
+    rent: Rent
+    salaries: Salaries
+    other: Other
+  ExpenseBearer: { us: Us, customer: The customer, factory: The factory }
+  # A payment plan row: the customer's plan and the factory's plan share these.
+  PlanStatus:
+    paid: { label: Paid, tone: ok }
+    part_paid: { label: Part paid, tone: info }
+    part: { label: Part paid, tone: info }
+    late: { label: Late, tone: bad }
+    due_soon: { label: Due soon, tone: warn }
+    due: { label: Due, tone: warn }
+    open: { label: Not due yet, tone: neutral }
+    later: { label: Not due yet, tone: neutral }
   OrderStage:
     confirmed: { label: Confirmed, tone: info }
     in_production: { label: In production, tone: info }

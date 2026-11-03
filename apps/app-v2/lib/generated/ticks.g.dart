@@ -202,10 +202,6 @@ const tickForms = <String, TickForm>{
 
 /// Items ticked on the web for now, and why.
 const tickOnWeb = <String, String>{
-  'deposit_in': 'Money received comes to the phone in phase 4.',
-  'balance_in': 'Money received comes to the phone in phase 4.',
-  'factory_advance': 'Payments to factories come to the phone in phase 4.',
-  'factory_paid': 'Payments to factories come to the phone in phase 4.',
   'claims_closed': 'Claims are closed on the web.',
-  'bank:bank_paid_us': 'The bank\'s payment is recorded as money received on the web.',
+  'bank:bank_paid_us': 'The bank\'s payment is recorded as Money received (Money reached us).',
 };

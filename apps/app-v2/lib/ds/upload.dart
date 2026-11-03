@@ -149,3 +149,52 @@ class _UploadSheetState extends State<_UploadSheet> {
     );
   }
 }
+
+/// A photo or file kept with a form until it is saved: the bank slip, the receipt, the pages.
+/// A photo shows as a picture; Retake and Remove change it.
+class FileTile extends StatelessWidget {
+  const FileTile({super.key, required this.label, required this.picked, required this.onPicked, this.add = 'Take a photo or attach', this.hint});
+  final String label, add;
+  final String? hint;
+  final PickedFile? picked;
+  final ValueChanged<PickedFile?> onPicked;
+
+  static bool _isImage(String name) => const {'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'}.contains(name.split('.').last.toLowerCase());
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final p = picked;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Text(label, style: context.text.labelMedium),
+        Text('  optional', style: context.text.labelSmall?.copyWith(color: c.muted, fontWeight: FontWeight.w400)),
+      ]),
+      const SizedBox(height: 6),
+      if (p == null)
+        OutlinedButton.icon(onPressed: () async => onPicked(await pickFile(context)), icon: const Icon(Icons.photo_camera_outlined, size: 18), label: Text(add))
+      else
+        Row(children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(Gap.radiusSm),
+            child: _isImage(p.name)
+                ? Image.memory(p.bytes, width: 64, height: 64, fit: BoxFit.cover, semanticLabel: '$label photo')
+                : Container(width: 64, height: 64, color: c.surface2, child: Icon(Icons.insert_drive_file_outlined, color: c.primary)),
+          ),
+          const SizedBox(width: Gap.md),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(p.name, style: context.text.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(fileSize(p.bytes.length), style: context.text.bodySmall?.copyWith(color: c.text2)),
+            ]),
+          ),
+          TextButton(onPressed: () async => onPicked(await pickFile(context) ?? p), child: Text(_isImage(p.name) ? 'Retake' : 'Change')),
+          TextButton(onPressed: () => onPicked(null), child: Text('Remove', style: TextStyle(color: c.bad))),
+        ]),
+      if (hint != null) ...[
+        const SizedBox(height: 4),
+        Text(hint!, style: context.text.bodySmall?.copyWith(color: c.muted)),
+      ],
+    ]);
+  }
+}

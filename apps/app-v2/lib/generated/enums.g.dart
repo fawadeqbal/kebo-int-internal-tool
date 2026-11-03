@@ -197,6 +197,127 @@ abstract final class RevisionStatusEnum {
   static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
 }
 
+abstract final class PaymentMethodEnum {
+  static const values = <String>['bank_transfer', 'letter_of_credit', 'cash', 'cheque', 'online', 'other'];
+  static const labels = <String, String>{
+    'bank_transfer': 'Bank transfer (T/T)',
+    'letter_of_credit': 'Letter of credit (L/C)',
+    'cash': 'Cash',
+    'cheque': 'Cheque',
+    'online': 'Online payment',
+    'other': 'Other',
+  };
+  static const tones = <String, Tone>{
+    'bank_transfer': Tone.neutral,
+    'letter_of_credit': Tone.neutral,
+    'cash': Tone.neutral,
+    'cheque': Tone.neutral,
+    'online': Tone.neutral,
+    'other': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class ExpenseCategoryEnum {
+  static const values = <String>[
+    'inland_transport',
+    'travel',
+    'hotel',
+    'meals',
+    'inspection',
+    'courier',
+    'freight',
+    'samples',
+    'gifts',
+    'customs',
+    'insurance',
+    'bank_charges',
+    'commission',
+    'office',
+    'utilities',
+    'rent',
+    'salaries',
+    'other',
+  ];
+  static const labels = <String, String>{
+    'inland_transport': 'Inland transport',
+    'travel': 'Travel & tickets',
+    'hotel': 'Hotels',
+    'meals': 'Meals & entertainment',
+    'inspection': 'Inspection',
+    'courier': 'Courier',
+    'freight': 'Sea / air freight',
+    'samples': 'Samples',
+    'gifts': 'Gifts',
+    'customs': 'Customs & documents',
+    'insurance': 'Insurance',
+    'bank_charges': 'Bank charges',
+    'commission': 'Commission',
+    'office': 'Office',
+    'utilities': 'Electricity, internet & phone',
+    'rent': 'Rent',
+    'salaries': 'Salaries',
+    'other': 'Other',
+  };
+  static const tones = <String, Tone>{
+    'inland_transport': Tone.neutral,
+    'travel': Tone.neutral,
+    'hotel': Tone.neutral,
+    'meals': Tone.neutral,
+    'inspection': Tone.neutral,
+    'courier': Tone.neutral,
+    'freight': Tone.neutral,
+    'samples': Tone.neutral,
+    'gifts': Tone.neutral,
+    'customs': Tone.neutral,
+    'insurance': Tone.neutral,
+    'bank_charges': Tone.neutral,
+    'commission': Tone.neutral,
+    'office': Tone.neutral,
+    'utilities': Tone.neutral,
+    'rent': Tone.neutral,
+    'salaries': Tone.neutral,
+    'other': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class ExpenseBearerEnum {
+  static const values = <String>['us', 'customer', 'factory'];
+  static const labels = <String, String>{'us': 'Us', 'customer': 'The customer', 'factory': 'The factory'};
+  static const tones = <String, Tone>{'us': Tone.neutral, 'customer': Tone.neutral, 'factory': Tone.neutral};
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class PlanStatusEnum {
+  static const values = <String>['paid', 'part_paid', 'part', 'late', 'due_soon', 'due', 'open', 'later'];
+  static const labels = <String, String>{
+    'paid': 'Paid',
+    'part_paid': 'Part paid',
+    'part': 'Part paid',
+    'late': 'Late',
+    'due_soon': 'Due soon',
+    'due': 'Due',
+    'open': 'Not due yet',
+    'later': 'Not due yet',
+  };
+  static const tones = <String, Tone>{
+    'paid': Tone.ok,
+    'part_paid': Tone.info,
+    'part': Tone.info,
+    'late': Tone.bad,
+    'due_soon': Tone.warn,
+    'due': Tone.warn,
+    'open': Tone.neutral,
+    'later': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
 abstract final class OrderStageEnum {
   static const values = <String>['confirmed', 'in_production', 'shipped', 'done'];
   static const labels = <String, String>{

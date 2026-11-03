@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
@@ -52,7 +54,15 @@ class FormSheet extends StatefulWidget {
     this.intro,
     this.danger = false,
     this.extra,
+    this.live,
+    this.onChange,
   });
+
+  /// A summary under the fields that follows what is typed (e.g. "Left due USD 0.00").
+  final Widget Function(Json values)? live;
+
+  /// Called after a field changes, to fill others from it (e.g. the rate when the currency changes).
+  final FutureOr<void> Function(Json values, String key)? onChange;
 
   /// More under the fields that keeps its own state (e.g. a photo to attach).
   final Widget Function(StateSetter setState)? extra;
@@ -86,6 +96,8 @@ class FormSheet extends StatefulWidget {
     String? intro,
     bool danger = false,
     Widget Function(StateSetter setState)? extra,
+    Widget Function(Json values)? live,
+    FutureOr<void> Function(Json values, String key)? onChange,
   }) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -104,6 +116,8 @@ class FormSheet extends StatefulWidget {
         intro: intro,
         danger: danger,
         extra: extra,
+        live: live,
+        onChange: onChange,
       ),
     );
     return saved ?? false;
@@ -131,13 +145,17 @@ class _FormSheetState extends State<FormSheet> {
   void _set(Json target, String key, Object? v) => setState(() {
         target[key] = v;
         changed = true;
+        if (identical(target, values)) {
+          final r = widget.onChange?.call(values, key);
+          if (r is Future) r.then((_) => mounted ? setState(() {}) : null);
+        }
       });
 
   /// Checks everything; fills [errors] and opens the groups that have one.
   bool _check() {
     errors.clear();
     void checkFields(Json src, List<FieldDef> defs, List<AnyOf> rules, String prefix) {
-      for (final d in defs) {
+      for (final d in defs.where((d) => d.shownIn(src))) {
         final e = d.check(src[d.key]);
         if (e != null) errors['$prefix${d.key}'] = e;
       }
@@ -172,6 +190,12 @@ class _FormSheetState extends State<FormSheet> {
     if (!ok) return;
     setState(() => busy = true);
     final body = _copy(values);
+    // Fields not shown are not sent (two fields may share a key, e.g. an account per currency).
+    final fields = [for (final g in widget.groups) ...g.fields];
+    final shown = {for (final d in fields.where((d) => d.shownIn(values))) d.key};
+    for (final d in fields.where((d) => !shown.contains(d.key))) {
+      body.remove(d.key);
+    }
     for (final e in body.entries.toList()) {
       if (e.value is String) body[e.key] = (e.value as String).trim();
     }
@@ -236,6 +260,7 @@ class _FormSheetState extends State<FormSheet> {
                 ],
                 if (problem != null) ...[MessageBanner(problem!, tone: Tone.bad), const SizedBox(height: Gap.lg)],
                 for (final g in widget.groups) ..._group(context, g),
+                if (widget.live != null) ...[widget.live!(values), const SizedBox(height: Gap.lg)],
                 if (widget.extra != null) widget.extra!(setState),
               ],
             ),
@@ -331,9 +356,9 @@ class _FormSheetState extends State<FormSheet> {
         ),
       ));
     } else {
-      for (final d in g.fields) {
+      for (final d in g.fields.where((d) => d.shownIn(values))) {
         body
-          ..add(FieldEditor(def: d, value: values[d.key], error: errors[d.key], onChanged: (v) => _set(values, d.key, v)))
+          ..add(FieldEditor(key: ValueKey('field.${d.key}'), def: d, value: values[d.key], error: errors[d.key], onChanged: (v) => _set(values, d.key, v)))
           ..add(const SizedBox(height: Gap.lg));
       }
     }

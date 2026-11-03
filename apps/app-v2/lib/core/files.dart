@@ -106,11 +106,13 @@ class FileStore {
       await FilePicker.saveFile(fileName: f.name, bytes: f.bytes, mimeType: f.mime, dialogTitle: 'Save ${f.name}') != null || kIsWeb;
 
   /// The phone's share sheet (WhatsApp, email, WeChat…).
-  Future<bool> share(LoadedFile f) async {
+  /// [text] goes with the file (WhatsApp shows it as the caption; email as the body).
+  Future<bool> share(LoadedFile f, {String? text, String? subject}) async {
     final r = await SharePlus.instance.share(ShareParams(
       files: [XFile.fromData(f.bytes, name: f.name, mimeType: f.mime)],
       fileNameOverrides: [f.name],
-      subject: f.name,
+      subject: subject ?? f.name,
+      text: text,
     ));
     return r.status == ShareResultStatus.success || r.status == ShareResultStatus.unavailable;
   }

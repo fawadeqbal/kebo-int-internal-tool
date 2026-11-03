@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../core/scope.dart';
 import '../ds/ds.dart';
+import 'approvals.dart';
+import 'money.dart';
+import 'quick_add.dart';
 
 /// More: the screens that are not tabs, and the account.
 class MoreScreen extends StatelessWidget {
@@ -19,7 +22,19 @@ class MoreScreen extends StatelessWidget {
           SectionCard(
             title: 'Work',
             child: Column(children: [
-              PhoneRow(RowData(title: 'Customers', sub: const ['contacts, inquiries and orders'], onTap: () => openPage(context, '/customers')), divider: false),
+              PhoneRow(RowData(title: 'Customers', sub: const ['contacts, inquiries and orders'], onTap: () => openPage(context, '/customers')),
+                  divider: seesApprovals(context) || canAddExpense(context)),
+              if (seesApprovals(context))
+                PhoneRow(
+                  RowData(
+                    title: context.can(permRecord) || context.can(permExpenses) ? 'To approve' : 'Sent for approval',
+                    sub: const ['money received and expenses added by staff'],
+                    onTap: () => openPage(context, '/approvals'),
+                  ),
+                  divider: canAddExpense(context),
+                ),
+              if (canAddExpense(context))
+                PhoneRow(RowData(title: 'Add an expense', sub: const ['for an order or the company'], onTap: () => addExpense(context)), divider: false),
             ]),
           ),
           const SizedBox(height: Gap.md),

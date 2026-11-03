@@ -7,6 +7,7 @@ import '../ds/ds.dart';
 import '../generated/models.g.dart';
 import '../generated/ticks.g.dart';
 import 'links.dart';
+import 'money.dart';
 import 'order_lines.dart';
 
 const _stepTone = {'done': Tone.ok, 'late': Tone.bad, 'now': Tone.info};
@@ -59,8 +60,9 @@ class _OrderFlowState extends State<OrderFlow> {
   }
 
   /// After a change: this section and the record (money, papers, files) read again.
+  /// An empty [message]: the form already said what happened (e.g. with "Share receipt").
   Future<void> _changed(String message) async {
-    toast(context, message);
+    if (message.isNotEmpty) toast(context, message);
     await _load();
     if (mounted) await RecordScope.reloadOf(context);
   }
@@ -287,6 +289,29 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
       return null;
     }
   }
+  // Money: the same forms as the order's Money section; saving them ticks the item.
+  final open = !item.boolean('done') && !item.boolean('skipped');
+  if (open && (key == 'deposit_in' || key == 'balance_in' || key == 'bank:bank_paid_us')) {
+    if (!canAddMoney(context)) {
+      await _info(context, order, title, 'Money received is added by people who handle payments.', item);
+      return null;
+    }
+    return await openMoneyReceived(context, orderId: order.id, refNo: order.refNo ?? '', customer: order.customer?.name) ? '' : null;
+  }
+  if (open && (key == 'factory_advance' || key == 'factory_paid')) {
+    try {
+      final money = await context.api.get('/api/orders/${order.id}/money');
+      if (!context.mounted) return null;
+      if (!money.boolAt('factories.canRecord')) {
+        await _info(context, order, title, 'Payments to factories are recorded by managers.', item);
+        return null;
+      }
+      return await openFactoryPayment(context, orderId: order.id, refNo: order.refNo ?? '', money: money) ? '' : null;
+    } on ApiException catch (e) {
+      if (context.mounted) toast(context, e.message);
+      return null;
+    }
+  }
   if (!canEdit) {
     await _info(context, order, title, 'You can see this order but not change it.', item);
     return null;
@@ -365,7 +390,11 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
     ],
     extra: form.file == null
         ? null
-        : (setState) => _PagesPicker(picked: pages, onPicked: (p) => setState(() => pages = p), kind: form.file!.kind),
+        : (setState) => FileTile(
+              label: form.file!.kind == 'photo' ? 'Photos' : 'The paper',
+              add: form.file!.kind == 'photo' ? 'Add a photo' : 'Snap or attach it',
+              picked: pages,
+              onPicked: (p) => setState(() => pages = p)),
     send: (api, body) async {
       final answers = {...send, ...body};
       // The file goes up first: its id may be part of the answer.
@@ -488,33 +517,3 @@ Future<void> _info(BuildContext context, Order order, String title, String why, 
     );
 
 /// "Pages or photo" under a tick form: optional, one file, the camera first.
-class _PagesPicker extends StatelessWidget {
-  const _PagesPicker({required this.picked, required this.onPicked, required this.kind});
-  final PickedFile? picked;
-  final ValueChanged<PickedFile?> onPicked;
-  final String kind;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final p = picked;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(kind == 'photo' ? 'Photos' : 'The paper', style: context.text.labelMedium),
-      const SizedBox(height: 6),
-      if (p == null)
-        OutlinedButton.icon(
-          onPressed: () async => onPicked(await pickFile(context)),
-          icon: const Icon(Icons.photo_camera_outlined, size: 18),
-          label: Text(kind == 'photo' ? 'Add a photo' : 'Snap or attach it'),
-        )
-      else
-        Row(children: [
-          Icon(Icons.insert_drive_file_outlined, color: c.primary),
-          const SizedBox(width: Gap.sm),
-          Expanded(child: Text(p.name, style: context.text.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
-          TextButton(onPressed: () => onPicked(null), child: Text('Remove', style: TextStyle(color: c.bad))),
-        ]),
-      Text('optional', style: context.text.labelSmall?.copyWith(color: c.muted, fontWeight: FontWeight.w400)),
-    ]);
-  }
-}

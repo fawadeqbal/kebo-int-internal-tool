@@ -18,6 +18,12 @@ extension JsonRead on Json {
   /// The list deeper in: `flow.listAt('shipping.shipments')`.
   List<Json> listAt(String path) => switch (_walk(path)) { List<dynamic> l => [for (final e in l) if (e is Map<String, dynamic>) e], _ => const [] };
 
+  /// An object deeper in: `money.objAt('plan.next')`.
+  Json? objAt(String path) => switch (_walk(path)) { Map<String, dynamic> m => m, _ => null };
+
+  /// A yes/no deeper in: `money.boolAt('factories.canRecord')`; false when missing.
+  bool boolAt(String path) => _walk(path) == true;
+
   /// Follows map keys and list positions: "shipping.shipments.0.blNo".
   Object? _walk(String path) {
     Object? v = this;
