@@ -16,6 +16,13 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   intl: ^0.20.3
   url_launcher: ^6.3.3
+  pdfrx: 2.6.5
+  share_plus: ^13.3.1
+  file_picker: ^13.2.0
+  path_provider: ^2.1.6
+  open_filex: ^5.0.0
+  video_player: ^2.14.1
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:

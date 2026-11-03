@@ -17,3 +17,15 @@ class CustomerRepo {
   Future<Customer> update(String id, Json body) async => Customer.fromJson(await api.put('/api/customers/$id', body));
   Future<void> delete(String id) => api.delete('/api/customers/$id');
 }
+
+class OrderRepo {
+  const OrderRepo(this.api);
+  final Api api;
+
+  Future<Paged<Order>> list({String? q, int page = 1, Map<String, Object?> filters = const {}}) async =>
+      Paged.all((await api.getList('/api/orders', query: {'q': q, ...filters})).map(Order.fromJson).toList());
+  Future<Order> get(String id) async => Order.fromJson(await api.get('/api/orders/$id'));
+  Future<Order> create(Json body) async => Order.fromJson(await api.post('/api/orders', body));
+  Future<Order> update(String id, Json body) async => Order.fromJson(await api.put('/api/orders/$id', body));
+  Future<void> delete(String id) => api.delete('/api/orders/$id');
+}

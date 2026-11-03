@@ -28,8 +28,13 @@ class _AppState extends State<App> {
       final status = widget.session.status;
       final atSignIn = state.matchedLocation == '/sign-in';
       if (status == SessionStatus.starting) return null;
-      if (status != SessionStatus.signedIn) return atSignIn ? null : '/sign-in';
-      return atSignIn ? '/home' : null;
+      if (status != SessionStatus.signedIn) {
+        // Remember where the person was going, to go there after signing in.
+        return atSignIn ? null : Uri(path: '/sign-in', queryParameters: state.uri.path == '/home' ? null : {'from': state.uri.toString()}).toString();
+      }
+      if (!atSignIn) return null;
+      final from = state.uri.queryParameters['from'];
+      return from != null && from.startsWith('/') && !from.startsWith('//') ? from : '/home';
     },
     routes: [
       GoRoute(path: '/sign-in', builder: (c, s) => const SignInScreen()),
@@ -38,7 +43,6 @@ class _AppState extends State<App> {
         routes: [
           GoRoute(path: '/home', builder: (c, s) => const ComingScreen(title: 'Home', phase: 'phase 1')),
           GoRoute(path: '/inquiries', builder: (c, s) => const ComingScreen(title: 'Inquiries', phase: 'phase 2')),
-          GoRoute(path: '/orders', builder: (c, s) => const ComingScreen(title: 'Orders', phase: 'phase 3')),
           GoRoute(path: '/more', builder: (c, s) => const MoreScreen()),
           ...generatedRoutes,
         ],

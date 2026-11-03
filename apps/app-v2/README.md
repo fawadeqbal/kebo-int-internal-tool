@@ -29,6 +29,20 @@ Every screen is one of three frames (`lib/ds/frames.dart`, `lib/ds/form_sheet.da
 The generator refuses a spec with a missing field, a screen pointing nowhere, more than one primary button,
 or a form editing a read-only field.
 
+## Files and papers
+
+Every file opens inside the app (`lib/ds/file_viewer.dart`, `lib/core/files.dart`):
+
+- PDFs with pages, zoom and "page 2 of 5"; photos with zoom; videos; text. Other kinds (Word, Excel, zip, HEIC) open in another app.
+- Share (WhatsApp, email, WeChat…), Save to phone, Open in another app, Load again: on every file.
+- A download bar while it loads; a copy is kept on the phone, so a file seen once opens without a connection (with a note saying so).
+- Papers of an order (`lib/custom/order_papers.dart`): every paper the system makes, the accepted quotation and
+  uploaded papers. The quotation and the proforma also have their internal copy (costs, margin, payments), marked
+  "for us only". Sharing or saving a paper or file is noted in the order's history, like on the web.
+- Files of an order (`lib/custom/order_files.dart`): grouped like the web; Add takes a photo, picks a photo or video, or a file.
+
+A record screen puts a hand-written section in its place with `custom: WidgetName` in the spec.
+
 ## Commands (in apps/app-v2)
 
 ```sh

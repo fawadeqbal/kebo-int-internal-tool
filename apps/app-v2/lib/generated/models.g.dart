@@ -283,3 +283,288 @@ abstract final class OrderRowFields {
   /// A new, empty OrderRow as a form starts it.
   static Json blank() => {};
 }
+
+class Order {
+  const Order({
+    this.id = '',
+    this.refNo,
+    this.status,
+    this.stage,
+    this.customer,
+    this.inquiry,
+    this.orderedOn,
+    this.readyOn,
+    this.shippedOn,
+    this.shipBy,
+    this.incoterm,
+    this.incotermPlace,
+    this.portOfDischarge,
+    this.blNo,
+    this.currency,
+    this.total,
+    this.received,
+    this.due,
+    this.money,
+    this.needs,
+    this.next,
+    this.documents = const [],
+  });
+
+  final String id;
+  final String? refNo;
+  final String? status;
+  final String? stage;
+  final CustomerRef? customer;
+  final InquiryRef? inquiry;
+  final DateTime? orderedOn;
+  final DateTime? readyOn;
+  final DateTime? shippedOn;
+  final DateTime? shipBy;
+  final String? incoterm;
+  final String? incotermPlace;
+  final String? portOfDischarge;
+  final String? blNo;
+  final String? currency;
+  final String? total;
+  final String? received;
+  final String? due;
+  final OrderMoney? money;
+  final OrderNeeds? needs;
+  final OrderNext? next;
+  final List<OrderDocumentRef> documents;
+
+  factory Order.fromJson(Json j) => Order(
+    id: j.str('id'),
+    refNo: j.strOrNull('refNo'),
+    status: j.strOrNull('status'),
+    stage: j.strOrNull('stage'),
+    customer: j.obj('customer', CustomerRef.fromJson),
+    inquiry: j.obj('inquiry', InquiryRef.fromJson),
+    orderedOn: j.date('orderedOn'),
+    readyOn: j.date('readyOn'),
+    shippedOn: j.date('shippedOn'),
+    shipBy: j.date('shipBy'),
+    incoterm: j.strOrNull('incoterm'),
+    incotermPlace: j.strOrNull('incotermPlace'),
+    portOfDischarge: j.strOrNull('portOfDischarge'),
+    blNo: j.strOrNull('blNo'),
+    currency: j.strOrNull('currency'),
+    total: j.strOrNull('total'),
+    received: j.strOrNull('received'),
+    due: j.strOrNull('due'),
+    money: j.obj('money', OrderMoney.fromJson),
+    needs: j.obj('needs', OrderNeeds.fromJson),
+    next: j.obj('next', OrderNext.fromJson),
+    documents: j.list('documents', OrderDocumentRef.fromJson),
+  );
+
+  Json toJson() => {
+    if (id.isNotEmpty) 'id': id,
+    'refNo': refNo,
+    'status': status,
+    'stage': stage,
+    'orderedOn': isoDay(orderedOn),
+    'readyOn': isoDay(readyOn),
+    'shippedOn': isoDay(shippedOn),
+    'shipBy': isoDay(shipBy),
+    'incoterm': incoterm,
+    'incotermPlace': incotermPlace,
+    'portOfDischarge': portOfDischarge,
+    'blNo': blNo,
+    'currency': currency,
+    'total': total,
+    'received': received,
+    'due': due,
+  };
+}
+
+abstract final class OrderFields {
+  static const refNo = FieldDef('refNo', 'Number', FieldKind.text);
+  static const status = FieldDef('status', 'Status', FieldKind.choice, options: OrderStatusEnum.labels);
+  static const stage = FieldDef('stage', 'Stage', FieldKind.choice, options: OrderStageEnum.labels);
+  static const orderedOn = FieldDef('orderedOn', 'Ordered', FieldKind.date);
+  static const readyOn = FieldDef('readyOn', 'Goods ready', FieldKind.date);
+  static const shippedOn = FieldDef('shippedOn', 'Shipped', FieldKind.date);
+  static const shipBy = FieldDef('shipBy', 'Ship by', FieldKind.date);
+  static const incoterm = FieldDef('incoterm', 'Incoterm', FieldKind.text);
+  static const incotermPlace = FieldDef('incotermPlace', 'Incoterm place', FieldKind.text);
+  static const portOfDischarge = FieldDef('portOfDischarge', 'Port of discharge', FieldKind.text);
+  static const blNo = FieldDef('blNo', 'Bill of lading', FieldKind.text);
+  static const currency = FieldDef('currency', 'Currency', FieldKind.text);
+  static const total = FieldDef('total', 'Total', FieldKind.decimal);
+  static const received = FieldDef('received', 'Received', FieldKind.decimal);
+  static const due = FieldDef('due', 'Still due', FieldKind.decimal);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty Order as a form starts it.
+  static Json blank() => {};
+}
+
+class CustomerRef {
+  const CustomerRef({this.id = '', this.name, this.country});
+
+  final String id;
+  final String? name;
+  final String? country;
+
+  factory CustomerRef.fromJson(Json j) =>
+      CustomerRef(id: j.str('id'), name: j.strOrNull('name'), country: j.strOrNull('country'));
+
+  Json toJson() => {if (id.isNotEmpty) 'id': id, 'name': name, 'country': country};
+}
+
+abstract final class CustomerRefFields {
+  static const name = FieldDef('name', 'Name', FieldKind.text);
+  static const country = FieldDef('country', 'Country', FieldKind.country);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty CustomerRef as a form starts it.
+  static Json blank() => {};
+}
+
+class InquiryRef {
+  const InquiryRef({this.id = '', this.refNo, this.title, this.assignee});
+
+  final String id;
+  final String? refNo;
+  final String? title;
+  final Person? assignee;
+
+  factory InquiryRef.fromJson(Json j) => InquiryRef(
+    id: j.str('id'),
+    refNo: j.strOrNull('refNo'),
+    title: j.strOrNull('title'),
+    assignee: j.obj('assignee', Person.fromJson),
+  );
+
+  Json toJson() => {if (id.isNotEmpty) 'id': id, 'refNo': refNo, 'title': title};
+}
+
+abstract final class InquiryRefFields {
+  static const refNo = FieldDef('refNo', 'Inquiry', FieldKind.text);
+  static const title = FieldDef('title', 'Title', FieldKind.text);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty InquiryRef as a form starts it.
+  static Json blank() => {};
+}
+
+class OrderMoney {
+  const OrderMoney({
+    this.total,
+    this.charged,
+    this.deposit,
+    this.depositPercent = 0,
+    this.received,
+    this.bankCharges,
+    this.due,
+  });
+
+  final String? total;
+  final String? charged;
+  final String? deposit;
+  final int depositPercent;
+  final String? received;
+  final String? bankCharges;
+  final String? due;
+
+  factory OrderMoney.fromJson(Json j) => OrderMoney(
+    total: j.strOrNull('total'),
+    charged: j.strOrNull('charged'),
+    deposit: j.strOrNull('deposit'),
+    depositPercent: j.integer('depositPercent'),
+    received: j.strOrNull('received'),
+    bankCharges: j.strOrNull('bankCharges'),
+    due: j.strOrNull('due'),
+  );
+
+  Json toJson() => {
+    'total': total,
+    'charged': charged,
+    'deposit': deposit,
+    'depositPercent': depositPercent,
+    'received': received,
+    'bankCharges': bankCharges,
+    'due': due,
+  };
+}
+
+abstract final class OrderMoneyFields {
+  static const total = FieldDef('total', 'Total', FieldKind.decimal);
+  static const charged = FieldDef('charged', 'Charged to the customer', FieldKind.decimal);
+  static const deposit = FieldDef('deposit', 'Deposit', FieldKind.decimal);
+  static const depositPercent = FieldDef('depositPercent', 'Deposit %', FieldKind.integer);
+  static const received = FieldDef('received', 'Received', FieldKind.decimal);
+  static const bankCharges = FieldDef('bankCharges', 'Bank charges', FieldKind.decimal);
+  static const due = FieldDef('due', 'Still due', FieldKind.decimal);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty OrderMoney as a form starts it.
+  static Json blank() => {};
+}
+
+class OrderNeeds {
+  const OrderNeeds({this.title, this.due, this.late = false});
+
+  final String? title;
+  final DateTime? due;
+  final bool late;
+
+  factory OrderNeeds.fromJson(Json j) =>
+      OrderNeeds(title: j.strOrNull('title'), due: j.date('due'), late: j.boolean('late'));
+
+  Json toJson() => {'title': title, 'due': isoDay(due), 'late': late};
+}
+
+abstract final class OrderNeedsFields {
+  static const title = FieldDef('title', 'Needs', FieldKind.text);
+  static const due = FieldDef('due', 'By', FieldKind.date);
+  static const late = FieldDef('late', 'Late', FieldKind.toggle);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty OrderNeeds as a form starts it.
+  static Json blank() => {'late': false};
+}
+
+class OrderNext {
+  const OrderNext({this.label, this.hint});
+
+  final String? label;
+  final String? hint;
+
+  factory OrderNext.fromJson(Json j) => OrderNext(label: j.strOrNull('label'), hint: j.strOrNull('hint'));
+
+  Json toJson() => {'label': label, 'hint': hint};
+}
+
+abstract final class OrderNextFields {
+  static const label = FieldDef('label', 'Next step', FieldKind.text);
+  static const hint = FieldDef('hint', 'Why', FieldKind.text);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty OrderNext as a form starts it.
+  static Json blank() => {};
+}
+
+class OrderDocumentRef {
+  const OrderDocumentRef({this.kind, this.label, this.revisionId});
+
+  final String? kind;
+  final String? label;
+  final String? revisionId;
+
+  factory OrderDocumentRef.fromJson(Json j) =>
+      OrderDocumentRef(kind: j.strOrNull('kind'), label: j.strOrNull('label'), revisionId: j.strOrNull('revisionId'));
+
+  Json toJson() => {'kind': kind, 'label': label, 'revisionId': revisionId};
+}
+
+abstract final class OrderDocumentRefFields {
+  static const kind = FieldDef('kind', 'Kind', FieldKind.text);
+  static const label = FieldDef('label', 'Label', FieldKind.text);
+  static const revisionId = FieldDef('revisionId', 'Revision id', FieldKind.text);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty OrderDocumentRef as a form starts it.
+  static Json blank() => {};
+}

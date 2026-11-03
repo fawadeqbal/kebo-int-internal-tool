@@ -210,8 +210,8 @@ def check(spec: Spec) -> None:
                 raise SpecError(f"{where}: no enum '{f.ref}' in app.yaml")
             if f.kind in ("obj", "list") and f.ref not in spec.entities:
                 raise SpecError(f"{where}: no entity '{f.ref}'")
-            if f.kind == "money" and (not f.currency or f.currency not in e.fields):
-                raise SpecError(f"{where}: money needs 'currency: <field>' naming a field of {e.name}")
+            if f.kind == "money" and not f.currency:
+                raise SpecError(f"{where}: money needs 'currency: <field>' (a field of this record or of the one holding it)")
             if f.kind == "enum" and f.default is not None and str(f.default) not in spec.enums[f.ref]:
                 raise SpecError(f"{where}: default '{f.default}' is not a value of {f.ref}")
         for r in e.rules:
@@ -253,9 +253,12 @@ def check(spec: Spec) -> None:
             for item in [h.get("title", "")] + list(h.get("sub", [])):
                 resolve(spec, ent.name, text_item(item)["of"], where)
             for sec in raw.get("sections") or []:
-                if "fields" in sec:
+                if "custom" in sec:
+                    if not re.fullmatch(r"[A-Z][A-Za-z0-9]+", str(sec["custom"])):
+                        raise SpecError(f"{where}: custom: '{sec['custom']}' must be a widget name like OrderPapers")
+                elif "fields" in sec:
                     for f in sec["fields"]:
-                        resolve(spec, ent.name, f, where)
+                        resolve(spec, ent.name, text_item(f)["of"], where)
                 elif "list" in sec:
                     lf = resolve(spec, ent.name, sec["list"], where)[-1]
                     if lf.kind != "list":
@@ -265,7 +268,7 @@ def check(spec: Spec) -> None:
                         if a not in CONTACT_ACTIONS or a not in spec.entities[lf.ref].fields:
                             raise SpecError(f"{where}: action '{a}' must be one of {', '.join(sorted(CONTACT_ACTIONS))} and a field of {lf.ref}")
                 else:
-                    raise SpecError(f"{where}: a section needs 'fields' or 'list'")
+                    raise SpecError(f"{where}: a section needs 'fields', 'list' or 'custom'")
         if s.frame == "sheet":
             if not raw.get("save"):
                 raise SpecError(f"{where}: a sheet needs a 'save' label")

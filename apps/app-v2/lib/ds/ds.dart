@@ -2,6 +2,8 @@
 library;
 
 export 'fields.dart';
+export 'file_viewer.dart';
+export 'upload.dart';
 export 'form_sheet.dart';
 export 'format.dart';
 export 'frames.dart';

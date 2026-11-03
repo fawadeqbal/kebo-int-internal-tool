@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
+
+import 'files.dart';
 
 import 'json.dart';
 
@@ -58,6 +63,47 @@ class Api {
   Future<Json> put(String path, Object body) => _map(() => _dio.put<Object?>(path, data: body));
   Future<Json> patch(String path, Object body) => _map(() => _dio.patch<Object?>(path, data: body));
   Future<void> delete(String path) => _send(() => _dio.delete<Object?>(path));
+
+  /// A file with its name from Content-Disposition; [progress] goes 0 → 1 when the size is known.
+  Future<Downloaded> download(String path, {void Function(double)? progress}) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        path,
+        options: Options(responseType: ResponseType.bytes, receiveTimeout: const Duration(minutes: 3)),
+        onReceiveProgress: progress == null ? null : (got, total) => total > 0 ? progress(got / total) : null,
+      );
+      return Downloaded(
+        Uint8List.fromList(res.data ?? const []),
+        fileName: fileNameFrom(res.headers.value('content-disposition')),
+        type: res.headers.value('content-type')?.split(';').first.trim(),
+      );
+    } on DioException catch (e) {
+      // The error body came as bytes: read it as the usual JSON.
+      final data = e.response?.data;
+      if (data is List<int>) {
+        Object? body;
+        try {
+          body = jsonDecode(utf8.decode(data));
+        } catch (_) {
+          body = {'error': utf8.decode(data, allowMalformed: true).trim()};
+        }
+        throw _error(DioException(requestOptions: e.requestOptions, response: Response(requestOptions: e.requestOptions, statusCode: e.response?.statusCode, data: body)));
+      }
+      throw _error(e);
+    }
+  }
+
+  /// multipart/form-data: one `file` and the text [fields]. [progress] goes 0 → 1.
+  Future<Json> upload(String path, {required Uint8List bytes, required String fileName, Map<String, String?> fields = const {}, void Function(double)? progress}) =>
+      _map(() => _dio.post<Object?>(
+            path,
+            data: FormData.fromMap({
+              for (final e in fields.entries) if (e.value != null && e.value!.isNotEmpty) e.key: e.value,
+              'file': MultipartFile.fromBytes(bytes, filename: fileName),
+            }),
+            options: Options(sendTimeout: const Duration(minutes: 5), receiveTimeout: const Duration(minutes: 2)),
+            onSendProgress: progress == null ? null : (sent, total) => total > 0 ? progress(sent / total) : null,
+          ));
 
   static Map<String, Object?>? _clean(Map<String, Object?>? q) =>
       q == null ? null : {for (final e in q.entries) if (e.value != null && e.value != '') e.key: e.value};

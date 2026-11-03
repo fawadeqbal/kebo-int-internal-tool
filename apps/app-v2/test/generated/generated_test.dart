@@ -8,6 +8,8 @@ import 'package:kebo_app/generated/models.g.dart';
 import 'package:kebo_app/generated/screens/customer.g.dart';
 import 'package:kebo_app/generated/screens/customer_form.g.dart';
 import 'package:kebo_app/generated/screens/customers.g.dart';
+import 'package:kebo_app/generated/screens/order.g.dart';
+import 'package:kebo_app/generated/screens/orders.g.dart';
 
 import '../support/harness.dart';
 
@@ -60,6 +62,70 @@ void main() {
       if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
     }
   });
+  test('Order reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "order-1", "refNo": "Order number", "status": "open", "stage": "confirmed", "customer": {"id": "customer_ref-1", "name": "CustomerRef name", "country": "PK"}, "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title", "assignee": {"id": "person-1", "name": "Person name"}}, "orderedOn": "2026-10-28", "readyOn": "2026-10-28", "shippedOn": "2026-10-28", "shipBy": "2026-10-28", "incoterm": "Order incoterm", "incotermPlace": "Order incoterm place", "portOfDischarge": "Order port of discharge", "blNo": "Order bill of lading", "currency": "USD", "total": "1250.50", "received": "1250.50", "due": "1250.50", "money": {"total": "1250.50", "charged": "1250.50", "deposit": "1250.50", "depositPercent": 2, "received": "1250.50", "bankCharges": "1250.50", "due": "1250.50"}, "needs": {"title": "OrderNeeds needs", "due": "2026-10-28", "late": false}, "next": {"label": "OrderNext next step", "hint": "OrderNext why"}, "documents": [{"kind": "OrderDocumentRef kind", "label": "OrderDocumentRef label", "revisionId": "OrderDocumentRef revision id"}]}',
+    ) as Json;
+    final x = Order.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('CustomerRef reads and writes its JSON', () {
+    final j = jsonDecode('{"id": "customer_ref-1", "name": "CustomerRef name", "country": "PK"}') as Json;
+    final x = CustomerRef.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('InquiryRef reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title", "assignee": {"id": "person-1", "name": "Person name"}}',
+    ) as Json;
+    final x = InquiryRef.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('OrderMoney reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"total": "1250.50", "charged": "1250.50", "deposit": "1250.50", "depositPercent": 2, "received": "1250.50", "bankCharges": "1250.50", "due": "1250.50"}',
+    ) as Json;
+    final x = OrderMoney.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('OrderNeeds reads and writes its JSON', () {
+    final j = jsonDecode('{"title": "OrderNeeds needs", "due": "2026-10-28", "late": false}') as Json;
+    final x = OrderNeeds.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('OrderNext reads and writes its JSON', () {
+    final j = jsonDecode('{"label": "OrderNext next step", "hint": "OrderNext why"}') as Json;
+    final x = OrderNext.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('OrderDocumentRef reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"kind": "OrderDocumentRef kind", "label": "OrderDocumentRef label", "revisionId": "OrderDocumentRef revision id"}',
+    ) as Json;
+    final x = OrderDocumentRef.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
   testWidgets('Customers lists the rows and passes the accessibility checks', (tester) async {
     await pumpScreen(tester, const CustomersScreen(), {
       '/api/customers': jsonDecode(
@@ -90,6 +156,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Name is needed'), findsWidgets);
     expect(find.text('Country is needed'), findsWidgets);
+    await expectAccessible(tester);
+  });
+  testWidgets('Orders lists the rows and passes the accessibility checks', (tester) async {
+    await pumpScreen(tester, const OrdersScreen(), {
+      '/api/orders': jsonDecode(
+        '[{"id": "order-1", "refNo": "Order number", "status": "open", "stage": "confirmed", "customer": {"id": "customer_ref-1", "name": "CustomerRef name", "country": "PK"}, "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title", "assignee": {"id": "person-1", "name": "Person name"}}, "orderedOn": "2026-10-28", "readyOn": "2026-10-28", "shippedOn": "2026-10-28", "shipBy": "2026-10-28", "incoterm": "Order incoterm", "incotermPlace": "Order incoterm place", "portOfDischarge": "Order port of discharge", "blNo": "Order bill of lading", "currency": "USD", "total": "1250.50", "received": "1250.50", "due": "1250.50", "money": {"total": "1250.50", "charged": "1250.50", "deposit": "1250.50", "depositPercent": 2, "received": "1250.50", "bankCharges": "1250.50", "due": "1250.50"}, "needs": {"title": "OrderNeeds needs", "due": "2026-10-28", "late": false}, "next": {"label": "OrderNext next step", "hint": "OrderNext why"}, "documents": [{"kind": "OrderDocumentRef kind", "label": "OrderDocumentRef label", "revisionId": "OrderDocumentRef revision id"}]}]',
+      ),
+    });
+    expect(find.text('Orders'), findsWidgets);
+    expect(find.text('Order number'), findsOneWidget);
+    await expectAccessible(tester);
+  });
+  testWidgets('Order shows the record and passes the accessibility checks', (tester) async {
+    await pumpScreen(tester, const OrderScreen(id: 'order-1'), {
+      '/api/orders/order-1': jsonDecode(
+        '{"id": "order-1", "refNo": "Order number", "status": "open", "stage": "confirmed", "customer": {"id": "customer_ref-1", "name": "CustomerRef name", "country": "PK"}, "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title", "assignee": {"id": "person-1", "name": "Person name"}}, "orderedOn": "2026-10-28", "readyOn": "2026-10-28", "shippedOn": "2026-10-28", "shipBy": "2026-10-28", "incoterm": "Order incoterm", "incotermPlace": "Order incoterm place", "portOfDischarge": "Order port of discharge", "blNo": "Order bill of lading", "currency": "USD", "total": "1250.50", "received": "1250.50", "due": "1250.50", "money": {"total": "1250.50", "charged": "1250.50", "deposit": "1250.50", "depositPercent": 2, "received": "1250.50", "bankCharges": "1250.50", "due": "1250.50"}, "needs": {"title": "OrderNeeds needs", "due": "2026-10-28", "late": false}, "next": {"label": "OrderNext next step", "hint": "OrderNext why"}, "documents": [{"kind": "OrderDocumentRef kind", "label": "OrderDocumentRef label", "revisionId": "OrderDocumentRef revision id"}]}',
+      ),
+    });
+    expect(find.text('Order number'), findsWidgets);
+    for (final t in <String>['Money', 'Next', 'Papers', 'Files', 'Details']) {
+      final section = find.byKey(ValueKey('section:$t'));
+      await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
+      expect(section, findsOneWidget);
+    }
     await expectAccessible(tester);
   });
 }

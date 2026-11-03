@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api.dart';
+import 'files.dart';
 import 'json.dart';
 
 enum SessionStatus { starting, signedOut, needsCode, signedIn }
@@ -32,6 +33,9 @@ class Session extends ChangeNotifier {
 
   final Api api;
   final FlutterSecureStorage _storage;
+
+  /// Downloads, the kept copies, save and share.
+  late final FileStore files = FileStore(api);
 
   SessionStatus status = SessionStatus.starting;
   Me? me;

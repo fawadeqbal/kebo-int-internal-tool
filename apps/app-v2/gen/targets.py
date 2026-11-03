@@ -6,7 +6,7 @@ import re
 import pycountry
 
 from .dart import (
-    access, dart_json, dart_type, display, enum_class, field_def, from_json, lower_first, nullable, q, sample, snake, to_json,
+    access, dart_json, dart_type, display, enum_class, field_def, from_json, label_of, nullable, q, sample, snake, to_json,
 )
 from .spec import ROOT, Entity, Screen, Spec, SpecError, resolve
 
@@ -246,7 +246,7 @@ def _row(spec: Spec, entity: str, row: dict, var: str, actions: list[str] | None
     return f"RowData({', '.join(args)})"
 
 
-def _imports(spec: Spec, s: Screen, extra: set[str]) -> str:
+def _imports(spec: Spec, s: Screen, extra: set[str], custom: set[str] | None = None) -> str:
     lines = [
         "import 'package:flutter/material.dart';",
         "import '../../core/scope.dart';",
@@ -258,6 +258,8 @@ def _imports(spec: Spec, s: Screen, extra: set[str]) -> str:
     ]
     for name in sorted(extra):
         lines.append(f"import '{snake(name)}.g.dart';")
+    for name in sorted(custom or ()):
+        lines.append(f"import '../../custom/{snake(name)}.dart';")
     return HEAD + "// ignore_for_file: unused_import\n" + "\n".join(lines) + "\n"
 
 
@@ -271,6 +273,8 @@ def list_screen(spec: Spec, s: Screen) -> str:
     ]
     if r.get("search"):
         args.append(f"searchHint: {q(r['search'])}")
+        if not e.paged:
+            args.append("localSearch: true")
     if r.get("open"):
         target = spec.screens[r["open"]]
         path = target.raw["path"].replace(":id", "${x.id}")
@@ -319,11 +323,14 @@ def record_screen(spec: Spec, s: Screen) -> str:
         args.append(f"primary: {action(r['primary'])}")
     if r.get("more"):
         args.append(f"more: [{', '.join(action(a) for a in r['more'])}]")
-    secs = []
+    secs, custom = [], set()
     for sec in r.get("sections") or []:
         title = q(sec["title"])
-        if "fields" in sec:
-            pairs = ", ".join(f"({q(resolve(spec, e.name, p, e.name)[-1].label)}, {display(spec, e.name, p, 'x')})" for p in sec["fields"])
+        if "custom" in sec:
+            custom.add(sec["custom"])
+            secs.append(f"CustomSection({title}, {sec['custom']}(x, title: {title}))")
+        elif "fields" in sec:
+            pairs = ", ".join(f"({q(label_of(spec, e.name, p))}, {display(spec, e.name, p, 'x')})" for p in sec["fields"])
             secs.append(f"KvSection({title}, [{pairs}])")
         else:
             chain = resolve(spec, e.name, sec["list"], e.name)
@@ -332,7 +339,7 @@ def record_screen(spec: Spec, s: Screen) -> str:
             empty = f", empty: {q(sec['empty'])}" if sec.get("empty") else ""
             secs.append(f"ListSection({title}, [for (final y in {access(chain, 'x')}) {row}]{empty})")
     args.append(f"sections: (x) => [{', '.join(secs)}]")
-    return f"""{_imports(spec, s, extra)}
+    return f"""{_imports(spec, s, extra, custom)}
 class {screen_class(s)} extends StatelessWidget {{
   const {screen_class(s)}({{super.key, required this.id}});
   final String id;

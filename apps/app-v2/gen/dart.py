@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 
-from .spec import Entity, Field, Spec, resolve, text_item
+from .spec import Entity, Field, Spec, SpecError, resolve, text_item
 
 STRINGY = {"id", "text", "multiline", "email", "phone", "country", "money"}
 
@@ -119,8 +119,7 @@ def display(spec: Spec, entity: str, item, var: str) -> str:
     elif f.kind in ("date", "datetime"):
         out = f"fmtDate({v})"
     elif f.kind == "money":
-        cur = access(chain[:-1], var) if len(chain) > 1 else var
-        out = f"fmtMoney({v}, {cur}{'?.' if len(chain) > 1 and nullable(chain[-2]) else '.'}{f.currency})"
+        out = f"fmtMoney({v}, {currency_of(spec, entity, chain, var)})"
     elif f.kind == "bool":
         out = f"({v} == true ? {q(f.label)} : null)"
     elif f.kind == "int":
@@ -142,8 +141,27 @@ def display(spec: Spec, entity: str, item, var: str) -> str:
     return out
 
 
-def label_of(spec: Spec, entity: str, path: str) -> str:
-    return resolve(spec, entity, path, entity)[-1].label
+def currency_of(spec: Spec, entity: str, chain: list[Field], var: str) -> str:
+    """The currency of a money field: its own record's field, else the nearest record holding it."""
+    name = chain[-1].currency
+    owners = [entity] + [f.ref for f in chain[:-1]]  # the record at each level
+    for level in range(len(chain) - 1, -1, -1):
+        if name in spec.entities[owners[level]].fields:
+            base = access(chain[:level], var) if level else var
+            dot = "?." if level and nullable(chain[level - 1]) else "."
+            return f"{base}{dot}{name}"
+    raise SpecError(f"{entity}: no '{name}' field holds the currency of {chain[-1].name}")
+
+
+def label_of(spec: Spec, entity: str, item) -> str:
+    """The label shown for a path: given, else the field's; "x.name" takes x's label."""
+    it = text_item(item)
+    if it.get("label"):
+        return it["label"]
+    chain = resolve(spec, entity, it["of"], entity)
+    if len(chain) > 1 and chain[-1].name == "name":
+        return chain[-2].label
+    return chain[-1].label
 
 
 # ---------------------------------------------------------------- samples for tests

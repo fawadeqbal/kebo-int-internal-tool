@@ -37,6 +37,24 @@ abstract final class InquiryStageEnum {
   static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
 }
 
+abstract final class OrderStageEnum {
+  static const values = <String>['confirmed', 'in_production', 'shipped', 'done'];
+  static const labels = <String, String>{
+    'confirmed': 'Confirmed',
+    'in_production': 'In production',
+    'shipped': 'Shipped',
+    'done': 'Done',
+  };
+  static const tones = <String, Tone>{
+    'confirmed': Tone.info,
+    'in_production': Tone.info,
+    'shipped': Tone.info,
+    'done': Tone.ok,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
 abstract final class OrderStatusEnum {
   static const values = <String>['open', 'closed', 'cancelled'];
   static const labels = <String, String>{'open': 'Open', 'closed': 'Done', 'cancelled': 'Cancelled'};

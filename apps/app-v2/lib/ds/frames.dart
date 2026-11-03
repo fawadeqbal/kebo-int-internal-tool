@@ -23,7 +23,8 @@ class AddAction {
 /// Every list: a search box, rows that open on tap, pages loaded as you scroll,
 /// pull to refresh, and one "New" button.
 class ListFrame<T> extends StatefulWidget {
-  const ListFrame({super.key, required this.title, required this.load, required this.row, this.onOpen, this.searchHint, this.add});
+  const ListFrame(
+      {super.key, required this.title, required this.load, required this.row, this.onOpen, this.searchHint, this.add, this.localSearch = false});
 
   final String title;
   final String? searchHint;
@@ -31,6 +32,9 @@ class ListFrame<T> extends StatefulWidget {
   final RowData Function(T x) row;
   final void Function(BuildContext context, T x)? onOpen;
   final AddAction? add;
+
+  /// The API sends every row at once: search them on the phone.
+  final bool localSearch;
 
   @override
   State<ListFrame<T>> createState() => _ListFrameState<T>();
@@ -71,11 +75,11 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
       error = null;
     });
     try {
-      final p = await widget.load(context.api, q, page + 1);
+      final p = await widget.load(context.api, widget.localSearch ? null : q, page + 1);
       if (!mounted || ask != _ask) return;
       setState(() {
-        rows.addAll(p.rows);
-        total = p.total;
+        rows.addAll(widget.localSearch && q != null ? p.rows.where(_matches) : p.rows);
+        total = widget.localSearch ? rows.length : p.total;
         page = p.page == 0 ? page + 1 : p.page;
         more = p.hasMore;
       });
@@ -84,6 +88,13 @@ class _ListFrameState<T> extends State<ListFrame<T>> {
     } finally {
       if (mounted && ask == _ask) setState(() => loading = false);
     }
+  }
+
+  bool _matches(T x) {
+    final d = widget.row(x);
+    final words = q!.toLowerCase().split(RegExp(r'\s+'));
+    final text = joinParts([d.title, ...d.sub, d.value, d.badge?.label]).toLowerCase();
+    return words.every(text.contains);
   }
 
   void _search(String v) {
@@ -195,6 +206,37 @@ class RecordAction<T> {
   final Future<void> Function(Api api, T x)? delete;
 }
 
+/// A pill that jumps to a section: a button for screen readers, 48 high for fingers.
+class JumpChip extends StatelessWidget {
+  const JumpChip({super.key, required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      label: 'Go to $label',
+      excludeSemantics: true,
+      onTap: onTap,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: Gap.tap),
+          alignment: Alignment.center,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(999), border: Border.all(color: c.line)),
+            child: Text(label, style: context.text.labelMedium),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 sealed class SectionDef {
   const SectionDef(this.title);
   final String title;
@@ -204,6 +246,12 @@ sealed class SectionDef {
 class KvSection extends SectionDef {
   const KvSection(super.title, this.pairs);
   final List<(String, String?)> pairs;
+}
+
+/// A section written by hand (lib/custom), e.g. an order's papers. [child] draws its own card.
+class CustomSection extends SectionDef {
+  const CustomSection(super.title, this.child);
+  final Widget child;
 }
 
 /// A list of rows inside a card.
@@ -308,9 +356,11 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
       ),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
+        // Every section is built at once (a record has a handful), so the chips can jump to any of them.
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.xl),
-          children: [
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Semantics(header: true, child: Text(widget.title(v) ?? '', style: context.text.titleLarge)),
             if (sub.isNotEmpty) ...[
               const SizedBox(height: 2),
@@ -329,7 +379,7 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
                 child: KeyedSubtree(key: ValueKey('section:${s.title}'), child: _section(context, s)),
               ),
             ],
-          ],
+          ]),
         ),
       ),
     );
@@ -342,9 +392,9 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
           for (final s in sections)
             Padding(
               padding: const EdgeInsets.only(right: Gap.sm),
-              child: ActionChip(
-                label: Text(s is ListSection && s.rows.isNotEmpty ? '${s.title} ${s.rows.length}' : s.title),
-                onPressed: () {
+              child: JumpChip(
+                label: s is ListSection && s.rows.isNotEmpty ? '${s.title} ${s.rows.length}' : s.title,
+                onTap: () {
                   final ctx = keys[s.title]?.currentContext;
                   if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250), alignment: 0.02);
                 },
@@ -367,6 +417,8 @@ class _RecordFrameState<T> extends State<RecordFrame<T>> {
                 )
               : Column(children: [for (final p in shown) KvRow(p.$1, p.$2!)]),
         );
+      case CustomSection(:final child):
+        return child;
       case ListSection(:final rows, :final empty):
         return SectionCard(
           title: s.title,

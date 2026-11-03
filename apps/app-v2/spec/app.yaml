@@ -20,6 +20,11 @@ enums:
     quoted: { label: Quoted, tone: warn }
     won: { label: Won, tone: ok }
     lost: { label: Lost, tone: neutral }
+  OrderStage:
+    confirmed: { label: Confirmed, tone: info }
+    in_production: { label: In production, tone: info }
+    shipped: { label: Shipped, tone: info }
+    done: { label: Done, tone: ok }
   OrderStatus:
     open: { label: Open, tone: info }
     closed: { label: Done, tone: ok }

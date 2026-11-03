@@ -11,6 +11,8 @@ const defaultServer = String.fromEnvironment('KEBO_SERVER', defaultValue: 'https
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final session = Session(Api(server: defaultServer));
-  runApp(App(session: session));
+  // A link (a notification, a web address) opens its own page, not Home.
+  final link = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+  runApp(App(session: session, initialLocation: link == '/' || link.isEmpty ? '/home' : link));
   await session.start();
 }
