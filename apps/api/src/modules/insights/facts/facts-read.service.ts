@@ -626,8 +626,8 @@ export class FactsReadService {
   async orderMoney(user: SessionUser, q: Required<Span>) {
     const { currency } = await this.open(user, true);
     const rows = await this.prisma.db.$queryRaw<Record<string, unknown>[]>`
-      select f.order_id as "orderId", o.ref_no as "refNo", f.customer_id as "customerId", c.name as customer, f.status::text as status,
-             to_char(f.ordered_on, 'YYYY-MM-DD') as "orderedOn", f.rate_known as "rateKnown", f.currency,
+      select f.order_id as "orderId", f.inquiry_id as "inquiryId", o.ref_no as "refNo", f.customer_id as "customerId", c.name as customer,
+             f.status::text as status, to_char(f.ordered_on, 'YYYY-MM-DD') as "orderedOn", f.rate_known as "rateKnown", f.currency,
              f.total_main::text as sales, f.costed_main::text as costed, f.profit_quote_main::text as "profitQuote",
              f.profit_expected_main::text as "profitExpected", f.costs_over_plan_main::text as "costsOverPlan", f.received_main::text as received,
              coalesce((select sum(x.owed_main) from factory_order_facts x where x.order_id = f.order_id), 0)::text as "factoryOwed",
@@ -639,6 +639,7 @@ export class FactsReadService {
       currency,
       rows: rows.map((r) => ({
         orderId: r.orderId as string,
+        inquiryId: r.inquiryId as string,
         refNo: r.refNo as string,
         customer: { id: r.customerId as string, name: r.customer as string },
         status: r.status as string,
