@@ -46,7 +46,7 @@ import { EditAccount, MoveMoney, NewAccount, PutOnAccount, type AccountRow } fro
 import { ExpenseRecord } from "@/components/money/expense-record";
 import { expenseAction, voidTransferAction } from "./actions";
 
-export const metadata = { title: "Money" };
+export const metadata = { title: "Cash & accounts" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -90,7 +90,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
-        title="Money"
+        title="Cash & accounts"
         description={
           managers
             ? "Where the money is, what was spent, what customers owe us and what we owe the factories. Charts and profit are on Insights."

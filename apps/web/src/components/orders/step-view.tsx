@@ -1,12 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, X } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Alert, Button, Card, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
 import { EditableRows, EditButton, useFocusRow } from "@/components/common/edit-button";
 import type { ActionState } from "@/lib/actions";
 
@@ -19,116 +19,7 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export const dayLabel = (iso: string | null | undefined) =>
   iso ? new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }) : "";
 
-/* ---------------------------------------------------------------- the side panel */
-
-const noop = () => () => {};
-/** True in the browser, false while rendering on the server. */
-const useMounted = () => useSyncExternalStore(noop, () => true, () => false);
-
-const PanelClose = createContext<() => void>(() => {});
-/** Inside an Edit panel: closes it (a form's onDone). */
-export const useClosePanel = () => useContext(PanelClose);
-
-/**
- * The Edit side panel: 600px from the right on a desktop, the whole screen on
- * a phone; Escape or the backdrop closes it. Its body is a form (or the
- * existing forms of the section) in sections with small-caps titles, two
- * columns at most, the label above each field and its hint under it, and
- * Save / Cancel in a footer that stays at the bottom; saving closes it.
- */
-export function EditPanel({
-  title,
-  description,
-  onClose,
-  children,
-}: {
-  title: string;
-  description?: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const id = useId();
-  const head = useRef<HTMLHeadingElement>(null);
-  const mounted = useMounted();
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", esc);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", esc);
-      document.body.style.overflow = overflow;
-    };
-  }, [onClose]);
-  useEffect(() => {
-    if (mounted) head.current?.focus();
-  }, [mounted]);
-  if (!mounted) return null;
-  return createPortal(
-    <div className="fixed inset-0 z-[80] flex justify-end">
-      <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${id}-title`}
-        className="relative flex h-dvh w-full flex-col border-l border-line bg-surface shadow-pop sm:w-[600px] sm:max-w-[calc(100vw-2rem)]"
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-          <div className="min-w-0">
-            <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="text-base font-semibold outline-none">
-              {title}
-            </h2>
-            {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
-          </div>
-          <Button size="icon-sm" variant="ghost" aria-label="Close the panel" onClick={onClose}>
-            <X aria-hidden />
-          </Button>
-        </div>
-        <PanelClose.Provider value={onClose}>{children}</PanelClose.Provider>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-/**
- * A panel's scrolling body. A form inside takes its height (`PANEL_FORM`), so
- * its PanelActions stay at the bottom of the panel however short it is.
- */
-export function PanelBody({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5", className)}>{children}</div>;
-}
-
-/** The class of a form filling a PanelBody, so its PanelActions sit at the bottom. */
-export const PANEL_FORM = "flex flex-1 flex-col gap-5";
-
-/** A section of a panel's form: a small-caps title, then its fields, two columns at most (one on a phone). */
-export function PanelSection({ title, children, className, first }: { title?: string; children: ReactNode; className?: string; first?: boolean }) {
-  return (
-    <fieldset className={cn("flex min-w-0 flex-col gap-3", !first && "border-t border-line pt-5")}>
-      {title && <legend className="float-left mb-1 w-full text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</legend>}
-      <div className={cn("grid grid-cols-1 gap-x-3 gap-y-3.5 sm:grid-cols-2", className)}>{children}</div>
-    </fieldset>
-  );
-}
-
-/**
- * The panel's Save / Cancel, in a footer that stays at the bottom of the panel
- * while the form scrolls; `end`: a quiet action on the right (Remove this offer).
- */
-export function PanelActions({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        "sticky bottom-0 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface-2 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
-        className,
-      )}
-    >
-      {children}
-      {end && <span className="ml-auto">{end}</span>}
-    </div>
-  );
-}
+/* ---------------------------------------------------------------- the side panel (common/panel) */
 
 function PanelFooter({ save = "Save" }: { save?: string }) {
   const close = useClosePanel();
@@ -411,9 +302,9 @@ export function ViewCard({
       </div>
       {children}
       {open && panel && (
-        <EditPanel title={panel.title} description={panel.description} onClose={() => setOpen(false)}>
+        <SidePanel title={panel.title} description={panel.description} onClose={() => setOpen(false)}>
           {panel.body}
-        </EditPanel>
+        </SidePanel>
       )}
     </Card>
   );
@@ -644,9 +535,9 @@ export function PanelButton({
         {icon} {label}
       </Button>
       {open && (
-        <EditPanel title={title} description={description} onClose={() => setOpen(false)}>
+        <SidePanel title={title} description={description} onClose={() => setOpen(false)}>
           {body}
-        </EditPanel>
+        </SidePanel>
       )}
     </>
   );

@@ -12,7 +12,7 @@ import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { FloatingList } from "@/components/common/floating";
-import { PANEL_FORM, PanelActions, PanelSection } from "@/components/orders/step-view";
+import { PANEL_FORM, PanelActions, PanelSection } from "@/components/common/panel";
 
 /** The usual Chinese ports, offered under the Port field (any other can be typed). */
 const PORTS = ["Qingdao", "Shanghai", "Ningbo", "Tianjin", "Shenzhen", "Guangzhou", "Xiamen", "Dalian"];

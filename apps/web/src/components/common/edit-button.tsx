@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ComponentProps, type ReactNode, type RefObject } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 
 /**
@@ -24,6 +24,24 @@ export function EditButton({
       {...props}
     >
       <Pencil aria-hidden /> {label}
+    </Button>
+  );
+}
+
+/**
+ * "+ Add": the header button of a card that holds a list you add to (a
+ * contact, a payment), beside where ✎ Edit sits on a card of details. Quiet
+ * (ghost) so the page's one primary stays the only loud button.
+ */
+export function AddButton({
+  label = "Add",
+  size = "sm",
+  className,
+  ...props
+}: Omit<ComponentProps<"button">, "children"> & { label?: ReactNode; size?: "xs" | "sm" }) {
+  return (
+    <Button size={size} variant="ghost" className={cn(size === "sm" && "h-8 px-2.5 text-[13px] [&_svg]:size-3.5", className)} {...props}>
+      <Plus aria-hidden /> {label}
     </Button>
   );
 }

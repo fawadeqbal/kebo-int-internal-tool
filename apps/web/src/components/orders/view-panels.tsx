@@ -6,7 +6,7 @@ import type { ActionState } from "@/lib/actions";
 import type { BankContract, BankStepView, DeliveryView, FlowDocument, SatCheckView } from "@/lib/types-flow";
 import { BankContractForm, RouteForm, SatEditor, type RouteTermsValue } from "./flow-forms";
 import { BankChainPanel, PaperSetPanel } from "./flow-panels";
-import { PanelBody, useClosePanel } from "./step-view";
+import { PanelBody, useClosePanel } from "@/components/common/panel";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 

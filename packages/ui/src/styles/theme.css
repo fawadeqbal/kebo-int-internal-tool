@@ -166,6 +166,31 @@
 
   --animate-in: fade-in 140ms ease-out;
   --animate-slide-in: slide-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* The side panel coming in from the right. */
+  --animate-panel-in: panel-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* What a save changed, lit for 2 seconds. */
+  --animate-flash: flash 2s ease-out;
+}
+
+@keyframes panel-in {
+  from {
+    transform: translateX(32px);
+    opacity: 0;
+  }
+}
+
+@keyframes flash {
+  0%,
+  60% {
+    background-color: color-mix(in oklab, var(--primary) 14%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-panel-in,
+  .animate-in {
+    animation: none;
+  }
 }
 
 @keyframes fade-in {
