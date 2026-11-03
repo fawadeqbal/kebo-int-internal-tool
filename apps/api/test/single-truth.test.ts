@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decimalToMinor, FIRST_COMPANY_ID } from "@kebo/database";
 import { fromMinor, settle, splitDeposit } from "@kebo/money";
-import { readSettings } from "@kebo/shared";
+import { paperDateText, readSettings } from "@kebo/shared";
 import { todayIn } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
@@ -134,7 +134,10 @@ describe("one money truth", () => {
     });
 
     it("lets the customer pay it, and is then paid in full", async () => {
-      await api(app, manager).post(`/orders/${o.orderId}/payments`, { kind: "balance", amount: 801, currency: "USD", paidOn: today }).expect(400);
+      // The order part is capped at what is due with the charge (the rest of a transfer would be credit).
+      const part = (await api(app, manager).post(`/orders/${o.orderId}/payments`, { kind: "balance", currency: "USD", receivedAmount: 900, receivedCurrency: "USD", amount: 801, paidOn: today }))
+        .status;
+      expect(part).toBe(400);
       await pay(o.orderId, 800);
       expect((await order(o.orderId)).money).toMatchObject({ due: "0.00", status: "paid" });
     });
@@ -249,7 +252,7 @@ describe("one money truth", () => {
       expect(costs.profit.factoryOwed).toEqual([{ currency: "CNY", amount: "11300.00", toPay: "0.00" }]);
       const po = await doc(o.orderId, "purchase-order");
       expect(po.total).toMatchObject({ label: "Total with tax", amount: "11300.00", currency: "CNY" });
-      expect(po.bullets).toContainEqual({ label: `Charged to you on ${today.split("-").reverse().join("/")}:`, value: { money: "7910.00", currency: "CNY" } });
+      expect(po.bullets).toContainEqual({ label: `Charged to you on ${paperDateText(today)}:`, value: { money: "7910.00", currency: "CNY" } });
       expect(po.bullets).toContainEqual({ label: "Still to pay:", value: { money: "0.00", currency: "CNY" } });
     });
   });
@@ -273,7 +276,7 @@ describe("one money truth", () => {
         })
         .expect(200);
       po = await doc(o.orderId, "purchase-order");
-      expect(po.bullets).toContain("Payment: Advance 50%, CNY 5,650.00, when we order; Balance 50%, CNY 5,650.00, by 15/01/2027.");
+      expect(po.bullets).toContain("Payment: Advance 50%, CNY 5,650.00, when we order; Balance 50%, CNY 5,650.00, by 15 Jan 2027.");
     });
   });
 
@@ -281,7 +284,14 @@ describe("one money truth", () => {
     let o: Awaited<ReturnType<typeof makeOrder>>;
     const contract = (amount: number | null) =>
       api(app, sana)
-        .put(`/orders/${o.orderId}/bank-contract`, { number: `LC-${tag}`, status: "opened", customerBank: "Zenith Bank, Lagos", ourBank: "Bank of China", amount })
+        .put(`/orders/${o.orderId}/bank-contract`, {
+          number: `LC-${tag}`,
+          status: "opened",
+          customerBank: "Zenith Bank, Lagos",
+          ourBank: "Bank of China",
+          amount,
+          currency: amount === null ? null : "USD",
+        })
         .expect(200);
 
     beforeAll(async () => {

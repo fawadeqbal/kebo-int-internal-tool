@@ -64,18 +64,27 @@ export interface OrderPosition {
   status: SettlementStatus;
 }
 
+/**
+ * The deposit an order asks for: its plan's deposit row(s), else the accepted %
+ * of the total; and that as a % (the accepted one unless the plan differs).
+ */
+export function planDeposit(totalMinor: Minor, plan: PositionPlanItem[] | null | undefined, depositPercent: number) {
+  const accepted = Math.min(Math.max(Number(depositPercent) || 0, 0), 100);
+  const fromPercent = percentOfMinor(totalMinor, accepted);
+  const rows = (plan ?? []).filter((p) => p.part === "deposit");
+  const fromPlan = rows.length ? rows.reduce((t, p) => t + p.amountMinor, 0) : null;
+  const depositMinor = Math.max(fromPlan ?? fromPercent, 0);
+  const percent =
+    fromPlan === null || fromPlan === fromPercent ? accepted : totalMinor > 0 ? roundHalfAway((depositMinor * 10_000) / totalMinor) / 100 : accepted;
+  return { depositMinor, percent, fromPlan: fromPlan !== null };
+}
+
 export function orderPosition(input: OrderPositionInput): OrderPosition {
   const total = input.totalMinor;
   const charged = Math.max(Math.round(input.chargedMinor ?? 0), 0);
   const owed = total + charged;
   const s = settle(owed, input.payments, 0, input.toleranceMinor ?? 0);
-  const accepted = Math.min(Math.max(Number(input.depositPercent) || 0, 0), 100);
-  const fromPercent = percentOfMinor(total, accepted);
-  const rows = (input.plan ?? []).filter((p) => p.part === "deposit");
-  const planDeposit = rows.length ? rows.reduce((t, p) => t + p.amountMinor, 0) : null;
-  const deposit = Math.max(planDeposit ?? fromPercent, 0);
-  const depositPercent =
-    planDeposit === null || planDeposit === fromPercent ? accepted : total > 0 ? roundHalfAway((deposit * 10_000) / total) / 100 : accepted;
+  const { depositMinor: deposit, percent: depositPercent, fromPlan } = planDeposit(total, input.plan, input.depositPercent);
   let status = s.status;
   // "Deposit paid" while the order itself is not paid yet; with only a charge open it is partly paid.
   if (status === "partly_paid" && deposit > 0 && s.settledMinor >= deposit && s.settledMinor < total) status = "deposit_paid";
@@ -91,7 +100,7 @@ export function orderPosition(input: OrderPositionInput): OrderPosition {
     overpaidMinor: Math.max(s.settledMinor - owed, 0),
     depositMinor: deposit,
     depositPercent,
-    depositFromPlan: planDeposit !== null,
+    depositFromPlan: fromPlan,
     depositOutstandingMinor: Math.max(deposit - s.settledMinor, 0),
     depositReceived: deposit > 0 ? s.settledMinor >= deposit : due === 0,
     status,

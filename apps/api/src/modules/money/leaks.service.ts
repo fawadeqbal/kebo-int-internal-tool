@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
-import { formatMinor, fromMinor, orderProfit, roundHalfAway, type Minor } from "@kebo/money";
-import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
+import { formatMinor, fromMinor, orderMoney, roundHalfAway, type Minor } from "@kebo/money";
+import { BASIS_COST_CATEGORIES, can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
 import { addDays, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
@@ -158,7 +158,7 @@ export class LeaksService {
                  where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "bankChargesMinor",
                coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
                  cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
-                 where e.order_id = o.id and e.voided_at is null and e.borne_by = 'us' and e.category in ('freight', 'inland_transport', 'customs', 'insurance')), 0)::float8 as "basisPaidMinor",
+                 where e.order_id = o.id and e.voided_at is null and e.borne_by = 'us' and e.category = any(${[...BASIS_COST_CATEGORIES]}::text[])), 0)::float8 as "basisPaidMinor",
                coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
                  cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
                  where e.order_id = o.id and e.voided_at is null and e.borne_by = 'us'), 0)::float8 as "orderCostsMinor",
@@ -253,10 +253,9 @@ export class LeaksService {
         const paidFactories = inMain(o.factoryPaidMinor);
         // Rate rounding is not a cost: only more than half a percent (and more than 1.00) counts.
         const factoryExtra = paidFactories - goods > Math.max(100, goods * 0.005) ? paidFactories - goods : 0;
-        // Planned: what the quotation promised on the revenue that has a cost (goods and the costs to reach the basis).
-        const planned = costedRevenue - goods - basis;
-        // After the sale: its expenses (freight paid for the planned costs is already in them), bank charges, costs before it.
-        const p = orderProfit({
+        // Planned: the profit on the quote (what it promised on the revenue that has a cost); after the sale: its
+        // expenses (freight paid for the planned costs is already in them), bank charges, costs before it.
+        const p = orderMoney({
           revenueMinor: revenue,
           costedRevenueMinor: costedRevenue,
           goodsCostMinor: goods,
@@ -267,9 +266,10 @@ export class LeaksService {
           basisPaidMinor: o.basisPaidMinor,
           bankChargesMinor: inMain(o.bankChargesMinor),
         });
+        const planned = p.grossOnQuoteMinor;
         const orderCosts = p.expensesCountedMinor + inMain(o.bankChargesMinor);
         const beforeSale = o.beforeSaleMinor;
-        const actual = p.earnedMinor - beforeSale - factoryExtra;
+        const actual = p.expectedMinor - beforeSale - factoryExtra;
         return {
           id: o.id,
           refNo: o.refNo,

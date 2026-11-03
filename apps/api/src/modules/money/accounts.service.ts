@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, orderProfit, roundHalfAway } from "@kebo/money";
+import { fromMinor, orderMoney, roundHalfAway } from "@kebo/money";
 import { can, type LostReason } from "@kebo/shared";
 import { addDays, dateIn, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -202,20 +202,21 @@ export class AccountsService {
         const bank = inMain(
           order.payments.filter((p) => p.currency === order.currency).reduce((s, p) => s + decimalToMinor(p.bankCharges), 0),
         );
-        const p = orderProfit({
+        // Profit now expected, as on the order's Costs page (freight paid for the planned basis costs counted there once).
+        const p = orderMoney({
           revenueMinor: revenue,
           costedRevenueMinor: costedRevenue,
-          goodsCostMinor: goodsCost,
+          goodsCostMinor: inMain(c.goodsCostMinor),
+          basisCostMinor: inMain(c.basisCostMinor),
           receivedMinor: 0,
           factoryPaidMinor: 0,
           expensesMinor: spent.onOrder,
-          basisCostMinor: 0,
+          basisPaidMinor: spent.basisPaid,
           bankChargesMinor: bank,
+          beforeSaleMinor: spent.beforeSale,
         });
-        // Freight paid for the planned costs to reach the basis is already in the goods cost.
-        const covered = Math.min(inMain(c.basisCostMinor), spent.basisPaid, spent.onOrder);
-        const profit = p.earnedMinor + covered;
-        money = { revenue, goodsCost, uncosted: revenue - costedRevenue, profit, net: profit - spent.beforeSale };
+        const profit = p.expectedMinor;
+        money = { revenue, goodsCost, uncosted: revenue - costedRevenue, profit, net: p.netMinor };
         t.sales += revenue;
         t.goodsCost += goodsCost;
         // What was spent on the order (cash); profit counts freight paid for the planned basis costs once.

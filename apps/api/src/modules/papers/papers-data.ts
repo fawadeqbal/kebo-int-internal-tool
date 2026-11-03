@@ -1,5 +1,5 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { documentTotals, factoryUnitCostMinor, fromMinor, multiplyMinor, settle } from "@kebo/money";
+import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
   LINE_CONDITION_LABEL,
@@ -11,6 +11,9 @@ import {
   paperNumber,
   paperWordsText,
   paymentSentenceOf,
+  defaultFactoryPlan,
+  FACTORY_DUE_RULE_LABEL,
+  type FactoryDueRule,
   documentDone,
   documentsInUse,
   SAT_RESULT_LABEL,
@@ -28,6 +31,8 @@ import {
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import { orderLineNumbers } from "../orders/orders.service";
+import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../money/position";
+import { lcBalanceMinor } from "../money/route-plan";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -49,6 +54,13 @@ export const paperOrderInclude = {
   payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
   planItems: { orderBy: { sortOrder: "asc" } },
   factoryPaid: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
+  factoryPlan: { orderBy: { sortOrder: "asc" } },
+  // Charged to the customer (added to what they owe) or borne by a factory (taken off what we owe it).
+  expenses: {
+    where: { voidedAt: null, borneBy: { in: ["customer", "factory"] } },
+    orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
+    select: { id: true, amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, factoryId: true, description: true, spentOn: true },
+  },
   bankContract: true,
   shipments: { orderBy: { createdAt: "asc" } },
   documents: {
@@ -73,7 +85,7 @@ export type Party = PaperDoc["party"];
 
 /** The customer's orders and payments, for the statement (only the orders the person may see). */
 export interface StatementData {
-  orders: { refNo: string; orderedOn: ISODate; currency: string; total: string; received: string; due: string }[];
+  orders: { refNo: string; orderedOn: ISODate; currency: string; total: string; charged: string; received: string; due: string }[];
   payments: { paidOn: ISODate; refNo: string; amount: string; currency: string }[];
 }
 
@@ -159,18 +171,22 @@ export function linesOf(c: PaperCtx) {
   };
 }
 
-/** Received and due on the order (in its currency). */
+/** Received and due on the order (in its currency), as on every screen: orderPosition, charged expenses included. */
 export function positionOf(c: PaperCtx) {
-  const total = linesOf(c).total;
-  const p = settle(
-    decimalToMinor(total),
-    c.o.payments
-      .filter((x) => x.currency === c.o.currency)
-      .map((x) => ({ amountMinor: decimalToMinor(x.amount), bankChargesMinor: decimalToMinor(x.bankCharges) })),
-    Number(c.o.depositPercent),
-  );
-  return { total, received: fromMinor(p.settledMinor), due: fromMinor(p.outstandingMinor) };
+  const p = orderPositionOf(c.o, fxOf(c.settings));
+  return {
+    total: fromMinor(p.totalMinor),
+    charged: fromMinor(p.chargedMinor),
+    chargedMinor: p.chargedMinor,
+    received: fromMinor(p.settledMinor),
+    due: fromMinor(p.dueMinor),
+    depositPercent: p.depositPercent,
+  };
 }
+
+/** "Includes USD 800.00 of expenses charged to you." when anything was charged. */
+const chargedLine = (chargedMinor: number, currency: string) =>
+  chargedMinor > 0 ? [`Includes ${formatMinor(chargedMinor, currency)} of expenses charged to you.`] : [];
 
 /** The ports: from the shipment, else the Incoterm place (loading for E/F terms, discharge for C/D terms) and the order's port. */
 function portsOf(c: PaperCtx) {
@@ -292,7 +308,8 @@ function salesContract(c: PaperCtx): Built {
       foot: null,
       boxTitle: "Terms",
       bullets: [
-        paymentSentenceOf(Number(c.o.depositPercent), c.o.balanceTerms),
+        // The deposit as the plan asks for it (a plan edited to 50% says 50%).
+        paymentSentenceOf(positionOf(c).depositPercent, c.o.balanceTerms),
         ...(routeLine ? [routeLine] : []),
         ...bullets(rev.paymentTerms),
         `Shipment: by ${mode}${pol ? ` from ${pol}` : ""}${pod ? ` to ${pod}` : ""}, ${c.o.incoterm}${c.o.incotermPlace ? ` ${c.o.incotermPlace}` : ""}${shipBy ? `, latest ${paperDateText(shipBy)}` : ""}.`,
@@ -398,16 +415,45 @@ export function poTax(lines: { factoryUnitPrice: Prisma.Decimal | null; factoryT
   return { pricesMinor, owedMinor, rate, added, sentence };
 }
 
+/**
+ * "Payment: Advance 30%, CNY 3,390.00, when we order; Balance 70%, CNY 7,910.00,
+ * on the ready date." from the factory's payment plan on the order (the
+ * company's default until one is saved), as the plan card shows it.
+ */
+function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMinor: number): string | null {
+  const stored = c.o.factoryPlan.filter((r) => r.factoryId === factoryId && r.currency === currency);
+  const rows = stored.length
+    ? stored.map((r) => ({
+        label: r.label,
+        percent: r.percent === null ? null : Number(r.percent),
+        amountMinor: decimalToMinor(r.amount),
+        dueRule: r.dueRule as FactoryDueRule,
+        dueOn: fromDbDateOrNull(r.dueOn),
+      }))
+    : defaultFactoryPlan(owedMinor, c.settings.sales.factoryAdvancePercent);
+  if (!rows.length || owedMinor <= 0) return null;
+  const when = (r: (typeof rows)[number]) =>
+    r.dueRule === "on_order" ? "when we order" : r.dueRule === "on_ready" ? "on the ready date" : r.dueOn ? `by ${paperDateText(r.dueOn)}` : FACTORY_DUE_RULE_LABEL[r.dueRule];
+  const named = (r: (typeof rows)[number]) =>
+    r.percent !== null && !/%/.test(r.label) ? `${r.label} ${Math.round(r.percent * 100) / 100}%` : r.label;
+  return `Payment: ${rows.map((r) => `${named(r)}, ${formatMinor(r.amountMinor, currency)}, ${when(r)}`).join("; ")}.`;
+}
+
 function purchaseOrder(c: PaperCtx): Built {
   const factories = factoriesOf(c.o);
   const f = factories.find((x) => x.id === c.ref) ?? factories[0] ?? null;
   const { lines } = linesOf(c);
   const mine = lines.filter((l) => f && l.factoryId === f.id);
-  const currency = mine.find((l) => l.factoryCurrency)?.factoryCurrency ?? "CNY";
+  // The factory's currency, frozen on its lines (never guessed).
+  const currency = mine.find((l) => l.factoryCurrency)?.factoryCurrency ?? null;
   const priced = mine.filter((l) => l.factoryUnitPrice !== null);
   const readyOn = fromDbDateOrNull(c.o.readyOn);
   const tax = poTax(priced);
   const paid = c.o.factoryPaid.filter((p) => f && p.factoryId === f.id);
+  // Where we stand with this factory, as on the order's money (factoryPosition): paid, what it bears, still to pay.
+  const position = f && currency ? (factoryPositionOf(c.o, fxOf(c.settings)).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
+  const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.factoryId === f.id);
+  const terms = f && currency ? poPaymentTerms(c, f.id, currency, tax.owedMinor) : null;
   return {
     n: factories.length > 1 && f ? factories.indexOf(f) + 1 : null,
     checks: [
@@ -418,8 +464,8 @@ function purchaseOrder(c: PaperCtx): Built {
       check(
         "prices",
         "Factory prices",
-        priced.length === mine.length ? `in ${currency}` : `${mine.length - priced.length} line(s) without a price`,
-        mine.length > 0 && priced.length === mine.length,
+        !currency ? "no currency on the lines" : priced.length === mine.length ? `in ${currency}` : `${mine.length - priced.length} line(s) without a price`,
+        mine.length > 0 && priced.length === mine.length && !!currency,
         {
           required: true,
           href: "factory",
@@ -440,24 +486,30 @@ function purchaseOrder(c: PaperCtx): Built {
         no: l.no,
         item: { item: l.description, model: l.model },
         qty: qty(l.quantity, l.unit),
-        price: l.factoryUnitPrice !== null ? money(l.factoryUnitPrice.toString(), currency) : "",
-        amount: l.factoryUnitPrice !== null ? money(Number(l.factoryUnitPrice) * Number(l.quantity), currency) : "",
+        price: l.factoryUnitPrice !== null && currency ? money(l.factoryUnitPrice.toString(), currency) : "",
+        // Exact: price × quantity in minor units (as what we owe is worked out), not floating point.
+        amount:
+          l.factoryUnitPrice !== null && currency ? money(fromMinor(multiplyMinor(decimalToMinor(l.factoryUnitPrice), l.quantity.toString())), currency) : "",
       })),
       // Tax added on top: the prices' total, the tax and the total with tax (what we owe the factory).
-      sums: tax.added
-        ? [
-            { label: "Total without tax", value: money(fromMinor(tax.pricesMinor), currency) },
-            { label: tax.rate === null ? "Tax" : `Tax ${tax.rate}%`, value: money(fromMinor(tax.owedMinor - tax.pricesMinor), currency) },
-          ]
-        : [],
-      total: { label: tax.added ? "Total with tax" : "Total", amount: fromMinor(tax.owedMinor), currency },
+      sums:
+        tax.added && currency
+          ? [
+              { label: "Total without tax", value: money(fromMinor(tax.pricesMinor), currency) },
+              { label: tax.rate === null ? "Tax" : `Tax ${tax.rate}%`, value: money(fromMinor(tax.owedMinor - tax.pricesMinor), currency) },
+            ]
+          : [],
+      total: currency ? { label: tax.added ? "Total with tax" : "Total", amount: fromMinor(tax.owedMinor), currency } : null,
       foot: null,
       boxTitle: "Terms",
       bullets: [
         readyOn ? { label: "Ready by:", value: date(readyOn) } : "Ready date: to be confirmed by the factory.",
         ...(tax.sentence ? [tax.sentence] : []),
+        ...(terms ? [terms] : []),
         ...paid.map((p) => ({ label: `Paid on ${paperDateText(fromDbDate(p.paidOn))}:`, value: money(p.amount.toString(), p.currency) })),
-        "Balance before the goods leave the factory, after our inspection.",
+        // Expenses the factory bears come off what we owe it (as on the order's money).
+        ...borne.map((e) => ({ label: `Charged to you on ${paperDateText(fromDbDate(e.spentOn))}:`, value: money(e.amount.toString(), e.currency) })),
+        ...(position && (paid.length || borne.length) ? [{ label: "Still to pay:", value: money(fromMinor(position.toPayMinor), position.currency) }] : []),
         `Please quote our order number ${c.o.refNo} on every paper and on the packing.`,
         ...(c.o.shippingMarks ? [{ label: "Shipping marks:", value: `\n${c.o.shippingMarks}` }] : []),
       ],
@@ -603,6 +655,7 @@ function paymentReceipt(c: PaperCtx): Built {
         ? [
             `Received with thanks by ${PAYMENT_METHOD_LABEL[p.method].toLowerCase()} on ${paperDateText(fromDbDate(p.paidOn))}.`,
             { label: "Order total:", value: money(pos.total, c.o.currency) },
+            ...(pos.chargedMinor > 0 ? [{ label: "Charged to you:", value: money(pos.charged, c.o.currency) }] : []),
             { label: "Received so far:", value: money(pos.received, c.o.currency) },
             { label: "Still due:", value: money(pos.due, c.o.currency) },
           ]
@@ -643,6 +696,7 @@ function paymentRequest(c: PaperCtx): Built {
       ],
       sums: [
         { label: "Order total", value: money(pos.total, c.o.currency) },
+        ...(pos.chargedMinor > 0 ? [{ label: "Charged to you (expenses)", value: money(pos.charged, c.o.currency) }] : []),
         { label: "Received so far", value: money(pos.received, c.o.currency) },
       ],
       total: { label: "Amount due", amount: Number(amount).toFixed(2), currency: c.o.currency },
@@ -650,6 +704,8 @@ function paymentRequest(c: PaperCtx): Built {
       boxTitle: "Payment",
       bullets: [
         `Please pay ${paperMoneyText(amount, c.o.currency)}${due ? ` by ${paperDateText(due)}` : ""} to the account below.`,
+        // The balance asked for includes what was charged to them (an instalment of the plan does not).
+        ...(item ? [] : chargedLine(pos.chargedMinor, c.o.currency)),
         `Please quote ${number} with the payment.`,
         ...bullets(c.o.revision.paymentTerms),
       ],
@@ -856,11 +912,37 @@ function lcChecks(c: PaperCtx, need: ("lcNo" | "customerBank" | "ourBank")[]) {
   return out;
 }
 
+/**
+ * What the bank papers draw: the LC balance (the plan's LC part, else the order
+ * less its deposit), never more; less when the LC is for less. Never the whole
+ * order total. In the LC's currency when it has one (else the order's).
+ */
 function lcAmount(c: PaperCtx) {
   const b = c.o.bankContract;
-  return b?.amount !== null && b?.amount !== undefined
-    ? { amount: b.amount.toFixed(2), currency: b.currency ?? c.o.currency }
-    : { amount: linesOf(c).total, currency: c.o.currency };
+  const balanceMinor = lcBalanceMinor(c.o);
+  const lcMinor = b?.amount !== null && b?.amount !== undefined ? toMinor(b.amount.toString()) : null;
+  return {
+    amount: fromMinor(lcMinor === null ? balanceMinor : Math.min(lcMinor, balanceMinor)),
+    currency: b?.currency ?? c.o.currency,
+    lcMinor,
+    balanceMinor,
+  };
+}
+
+/** The LC's own amount against the LC balance, when both are known: a check on the Make page when they differ. */
+function lcAmountCheck(c: PaperCtx): PaperCheck[] {
+  const a = lcAmount(c);
+  if (a.lcMinor === null) return [];
+  const currency = a.currency;
+  return [
+    check(
+      "lcAmount",
+      `${lcWord(c)} amount against the ${lcWord(c)} balance`,
+      `${lcWord(c)} ${formatMinor(a.lcMinor, currency)} · ${lcWord(c)} balance ${formatMinor(a.balanceMinor, c.o.currency)}`,
+      a.lcMinor === a.balanceMinor && currency === c.o.currency,
+      { href: "payment" },
+    ),
+  ];
 }
 
 function billOfExchange(c: PaperCtx): Built {
@@ -872,6 +954,7 @@ function billOfExchange(c: PaperCtx): Built {
     checks: [
       ...lcChecks(c, ["lcNo", "customerBank"]),
       check("amount", "Amount", paperMoneyText(a.amount, a.currency), Number(a.amount) > 0, { required: true }),
+      ...lcAmountCheck(c),
     ],
     doc: {
       party: { name: b?.customerBank ?? "The issuing bank" },
@@ -980,7 +1063,7 @@ function coverLetter(c: PaperCtx): Built {
   ];
   const a = lcAmount(c);
   return {
-    checks: [...lcChecks(c, ["lcNo", "ourBank"]), check("set", "The paper set", `${papers.length} papers`, papers.length > 0)],
+    checks: [...lcChecks(c, ["lcNo", "ourBank"]), ...lcAmountCheck(c), check("set", "The paper set", `${papers.length} papers`, papers.length > 0)],
     doc: {
       party: { name: b?.ourBank ?? "Our bank" },
       date: c.today,
@@ -1020,7 +1103,10 @@ function coverLetter(c: PaperCtx): Built {
 
 function customerStatement(c: PaperCtx): Built {
   const s = c.statement ?? { orders: [], payments: [] };
-  const due = s.orders.filter((x) => x.currency === c.o.currency).reduce((t, x) => t + Number(x.due), 0);
+  const mine = s.orders.filter((x) => x.currency === c.o.currency);
+  const due = mine.reduce((t, x) => t + toMinor(x.due), 0) / 100;
+  const chargedMinor = mine.reduce((t, x) => t + toMinor(x.charged), 0);
+  const anyCharged = s.orders.some((x) => toMinor(x.charged) > 0);
   return {
     checks: [
       check(
@@ -1040,6 +1126,8 @@ function customerStatement(c: PaperCtx): Built {
         { key: "item", label: "Order" },
         { key: "date", label: "Date", width: 76 },
         { key: "total", label: "Total", width: 84, align: "right" },
+        // Expenses charged to the customer are part of what they owe: shown when there are any.
+        ...(anyCharged ? [{ key: "charged", label: "Charged", width: 76, align: "right" as const }] : []),
         { key: "received", label: "Received", width: 84, align: "right" },
         { key: "due", label: "Due", width: 84, align: "right" },
       ],
@@ -1048,11 +1136,16 @@ function customerStatement(c: PaperCtx): Built {
         item: x.refNo,
         date: date(x.orderedOn),
         total: money(x.total, x.currency),
+        ...(anyCharged ? { charged: money(x.charged, x.currency) } : {}),
         received: money(x.received, x.currency),
         due: money(x.due, x.currency),
       })),
       sums: [],
-      total: { label: `Balance due`, amount: due.toFixed(2), currency: c.o.currency },
+      total: {
+        label: chargedMinor > 0 ? `Balance due (incl. ${formatMinor(chargedMinor, c.o.currency)} charged)` : `Balance due`,
+        amount: due.toFixed(2),
+        currency: c.o.currency,
+      },
       foot: null,
       boxTitle: "Payments received",
       bullets: s.payments.length

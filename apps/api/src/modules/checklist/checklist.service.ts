@@ -40,6 +40,7 @@ import { orderAccess } from "../orders/orders.service";
 import { MoneyService } from "../money/money.service";
 import { SettingsService } from "../settings/settings.service";
 import { checklistFactsOf, checklistOrderInclude } from "./checklist-facts";
+import { fxOf } from "../money/position";
 
 /** The settings row that keeps the company's list choices: { hidden: auto keys, saved: the company made its own list }. */
 export const CHECKLIST_SETTING = "order_checklist";
@@ -222,7 +223,7 @@ export class ChecklistService {
     const today = this.clock.today();
     const settings = await this.settings.get();
     // Settings › Papers we use: switched-off papers leave the Documents step (unless already in).
-    const facts = { ...checklistFactsOf(o, factories, tz, settings.reminders.lcCourierDays), papersOff: settings.papers.off };
+    const facts = { ...checklistFactsOf(o, factories, tz, fxOf(settings), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
     const steps = orderSteps(features);
     const overrides = new Map(rows.filter((r) => r.key).map((r) => [r.key!, r]));
     const late = (done: boolean, skipped: boolean, due: ISODate | null) => !done && !skipped && !!due && due < today;

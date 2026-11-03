@@ -44,7 +44,10 @@ export interface PositionFacts {
 const minor = (d: Decimalish) => decimalToMinor(d as Prisma.Decimal);
 
 /** Each expense charged to the customer in the order's currency (null: no rate to turn it). */
-export function chargedOf<E extends PositionFacts["expenses"][number]>(o: Omit<PositionFacts, "payments" | "planItems" | "total" | "depositPercent"> & { expenses: E[] }, fx: Fx) {
+export function chargedOf<E extends PositionFacts["expenses"][number]>(
+  o: { currency: string; mainCurrency: string | null; mainRate: Decimalish | null; expenses: E[] },
+  fx: Fx,
+) {
   const perMain = orderRate({ currency: o.currency, mainCurrency: o.mainCurrency, mainRate: o.mainRate as never }, fx.main, fx.rates);
   return o.expenses
     .filter((e) => (e.borneBy ?? "customer") === "customer" && !e.voidedAt)

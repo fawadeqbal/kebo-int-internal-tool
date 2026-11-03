@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
-import { documentTotals, fromMinor, settle, splitDeposit } from "@kebo/money";
+import { fromDbDate, fromDbDateOrNull } from "@kebo/database";
+import { documentTotals, fromMinor } from "@kebo/money";
 import { BALANCE_TERMS_LABEL, can, paymentSentenceOf, type BalanceTerms } from "@kebo/shared";
 import { NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -9,6 +9,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { companySnapshot, customerSnapshot } from "../quotations/quotations.service";
 import { orderLineNumbers, OrdersService } from "./orders.service";
+import { chargedExpenses, fxOf, positionOf } from "../money/position";
 
 export const ORDER_DOCUMENTS = ["proforma", "packing-list"] as const;
 export type OrderDocumentKind = (typeof ORDER_DOCUMENTS)[number];
@@ -59,14 +60,17 @@ export class DocumentsService {
         lines: { orderBy: { sortOrder: "asc" }, include: { quoteLine: { select: { requestedItemId: true, requestedItem: { select: { parentId: true } }, factoryQuoteLineId: true, factoryQuoteLine: { select: { parentId: true } } } } } },
         revision: { include: { quotation: { select: { refNo: true } } } },
         payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
+        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        expenses: chargedExpenses,
         inquiry: { select: { contactId: true } },
       },
     });
     const settings = await this.settings.get();
     const rev = o.revision;
     const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), rev.discount.toString());
-    const ins = o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }));
-    const position = settle(t.total, ins, Number(o.depositPercent));
+    // Where the order stands, as on every screen: the plan's deposit (a plan edited to 50% says 50%), what was charged.
+    const position = positionOf(o, fxOf(settings));
+    const depositPercent = position.depositPercent;
     const shippedOn = fromDbDateOrNull(o.shippedOn);
     const goodsOnly = kind === "packing-list";
     const lines = o.lines.filter((l) => !goodsOnly || l.type === "goods");
@@ -102,9 +106,9 @@ export class DocumentsService {
         /** e.g. "90 days after receiving advance payment". */
         leadTime: rev.leadTime,
       },
-      paymentTerms: paymentTermsOf(Number(o.depositPercent), o.balanceTerms),
+      paymentTerms: paymentTermsOf(depositPercent, o.balanceTerms),
       /** The payment terms as Kebo writes them on a proforma, e.g. "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
-      paymentSentence: paymentSentenceOf(Number(o.depositPercent), o.balanceTerms),
+      paymentSentence: paymentSentenceOf(depositPercent, o.balanceTerms),
       currency: o.currency,
       showPrices: !goodsOnly,
       lines: lines.map((l, i) => ({
@@ -141,10 +145,12 @@ export class DocumentsService {
             subtotal: fromMinor(t.subtotal),
             discount: fromMinor(t.discount),
             total: fromMinor(t.total),
-            deposit: fromMinor(splitDeposit(t.total, Number(o.depositPercent)).deposit),
-            depositPercent: Number(o.depositPercent),
+            deposit: fromMinor(position.depositMinor),
+            depositPercent,
+            /** Expenses charged to the customer: part of what is due. */
+            charged: fromMinor(position.chargedMinor),
             received: fromMinor(position.settledMinor),
-            due: fromMinor(position.outstandingMinor),
+            due: fromMinor(position.dueMinor),
           },
       /** The quotation's own payment and delivery terms (free text, printed as bullets). */
       paymentTermsText: kind === "packing-list" ? null : rev.paymentTerms,

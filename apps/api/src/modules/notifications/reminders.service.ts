@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
-import { settle } from "@kebo/money";
 import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -12,6 +11,7 @@ import { links, NotificationsService } from "./notifications.service";
 import { goodsOf } from "../orders/orders.service";
 import { InsightsService } from "../insights/insights.service";
 import { ordersWithMoneyDue } from "../money/due";
+import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../money/position";
 import { LimitsService } from "../../common/company/limits.service";
 
 /**
@@ -102,10 +102,11 @@ export class RemindersService {
     const orders = await this.prisma.db.order.findMany({
       // Closed orders too: one closed with money still owed keeps being chased (orderNeeds decides).
       // Closed ones only while money is still owed on them (found in the database, not by reading every order).
-      where: { inquiry: { onHold: false }, OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma) } }] },
+      where: { inquiry: { onHold: false }, OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, fxOf(s)) } }] },
       include: {
         payments: { where: { voidedAt: null } },
         planItems: { orderBy: { sortOrder: "asc" } },
+        expenses: chargedExpenses,
         inquiry: { select: { id: true, assigneeId: true } },
         lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } },
       },
@@ -115,16 +116,15 @@ export class RemindersService {
     type Late = { orderId: string; refNo: string; title: string; due: string; lateBy: number };
     const lateFor = new Map<string, Late[]>();
     const escalated: Late[] = [];
+    const fx = fxOf(s);
     for (const o of orders) {
-      const received = settle(decimalToMinor(o.total), o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }))).settledMinor;
+      // The same position as the order page: the plan's deposit, what was charged to the customer.
       const need = orderNeeds(
         {
+          ...moneyFacts(positionOf(o, fx)),
           stage: o.stage,
           status: o.status,
           currency: o.currency,
-          totalMinor: decimalToMinor(o.total),
-          receivedMinor: received,
-          depositPercent: Number(o.depositPercent),
           stageSince: dateIn(o.stageSince, this.clock.timeZone),
           readyOn: fromDbDateOrNull(o.readyOn),
           shippedOn: fromDbDateOrNull(o.shippedOn),
@@ -168,7 +168,7 @@ export class RemindersService {
     // 6. The customer's instalments: a heads-up to the handler when one is due soon, and the handler
     //    and managers once when it becomes late (the order reminders above keep chasing after that).
     for (const o of orders) {
-      const received = settle(decimalToMinor(o.total), o.payments.filter((p) => p.currency === o.currency).map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) }))).settledMinor;
+      const received = positionOf(o, fx).settledMinor;
       const plan = planStatus(o.planItems.map((p) => ({ id: p.id, label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })), received, today, s.reminders.dueSoonDays);
       for (const p of plan) {
         if (p.status === "due_soon") await note([o.inquiry.assigneeId ?? managers[0]], { type: "reminder.instalment", title: `${o.refNo}: ${instalmentSentence(p.label, p.openMinor, o.currency, p.dueOn)} — remind the customer`, link: links.orderMoney(o.id), dedupeKey: `plan-soon:${p.id}:${p.dueOn}` });

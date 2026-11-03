@@ -1,8 +1,9 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { factoryUnitCostMinor, fromMinor, multiplyMinor, type Minor } from "@kebo/money";
+import { fromMinor, type Fx } from "@kebo/money";
 import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
+import { factoryBorneExpenses, factoryPositionOf } from "./position";
 
 type Db = PrismaService["db"] | Tx;
 type FactoryRef = { id: string; name: string };
@@ -15,22 +16,16 @@ type FactoryRef = { id: string; name: string };
 export function owedByFactory<F extends FactoryRef>(
   lines: { factory: F | null; factoryUnitPrice: Prisma.Decimal | null; factoryCurrency: string | null; factoryTaxRate: Prisma.Decimal | null; factoryTaxIncluded: boolean; quantity: Prisma.Decimal }[],
 ) {
-  const owed = new Map<string, { factory: F; currency: string; owedMinor: Minor; lines: number }>();
-  for (const l of lines) {
-    if (!l.factory || l.factoryUnitPrice === null || !l.factoryCurrency) continue;
-    const key = `${l.factory.id}:${l.factoryCurrency}`;
-    const unit = factoryUnitCostMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0, l.factoryTaxIncluded);
-    const cur = owed.get(key) ?? { factory: l.factory, currency: l.factoryCurrency, owedMinor: 0, lines: 0 };
-    cur.owedMinor += multiplyMinor(unit, l.quantity.toString());
-    cur.lines += 1;
-    owed.set(key, cur);
-  }
-  return owed;
+  // The one formula (factoryPosition), without payments or expenses: only what the lines owe.
+  const rows = factoryPositionOf({ lines: lines.map((l) => ({ ...l, factoryId: l.factory?.id ?? null })), factoryPaid: [], expenses: [] }, { main: "", rates: {} });
+  const factories = new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+  return new Map(rows.map((r) => [r.key, { factory: factories.get(r.factoryId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
 }
 
 const planLines = {
   where: { factoryId: { not: null } },
   select: {
+    factoryId: true,
     factory: { select: { id: true, name: true } },
     factoryUnitPrice: true,
     factoryCurrency: true,
@@ -42,11 +37,13 @@ const planLines = {
 
 /**
  * Each factory's payment plan on an order, with what is paid on each part and
- * where it stands. A factory without a stored plan shows the company's default
- * (advance on order, balance on the ready date) until one is saved; the
- * balance's date follows the order's ready date.
+ * where it stands. Paid counts what we sent and the expenses the factory bears
+ * (taken off what we owe it, as on the order's money: factoryPosition), so a
+ * balance the factory bore is not shown late. A factory without a stored plan
+ * shows the company's default (advance on order, balance on the ready date)
+ * until one is saved; the balance's date follows the order's ready date.
  */
-export async function factoryPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number) {
+export async function factoryPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number, fx: Fx) {
   const o = await db.order.findUniqueOrThrow({
     where: { id: orderId },
     select: {
@@ -54,13 +51,21 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
       readyOn: true,
       lines: planLines,
       factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true } },
+      expenses: factoryBorneExpenses,
       factoryPlan: { orderBy: { sortOrder: "asc" }, include: { factory: { select: { id: true, name: true } } } },
     },
   });
-  const owed = owedByFactory(o.lines);
+  const names = new Map<string, FactoryRef>();
+  for (const l of o.lines) if (l.factory) names.set(l.factory.id, l.factory);
+  for (const r of o.factoryPlan) names.set(r.factory.id, r.factory);
+  const positions = factoryPositionOf(o, fx).filter((r) => r.lines > 0);
+  const owed = new Map(positions.map((r) => [r.key, { factory: names.get(r.factoryId)!, currency: r.currency, owedMinor: r.owedMinor, settledMinor: r.settledMinor, takenOffMinor: r.takenOffMinor }]));
   for (const r of o.factoryPlan) {
     const key = `${r.factoryId}:${r.currency}`;
-    if (!owed.has(key)) owed.set(key, { factory: r.factory, currency: r.currency, owedMinor: 0, lines: 0 });
+    if (!owed.has(key)) {
+      const paid = o.factoryPaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0);
+      owed.set(key, { factory: r.factory, currency: r.currency, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
+    }
   }
   const orderedOn = fromDbDateOrNull(o.factoryOrderedOn);
   const readyOn = fromDbDateOrNull(o.readyOn);
@@ -75,7 +80,7 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
           dueOn: fromDbDateOrNull(r.dueOn),
         }))
       : defaultFactoryPlan(f.owedMinor, advancePercent);
-    const paidMinor = o.factoryPaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0);
+    const paidMinor = f.settledMinor;
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
     const status = factoryPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays);
     const next = status.find((r) => r.status !== "paid") ?? null;
@@ -87,7 +92,9 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
       saved: stored.length > 0,
       /** The plan adds up to something else than we owe (prices changed since): shown to fix. */
       differs: f.owedMinor > 0 && planMinor !== f.owedMinor ? fromMinor(f.owedMinor - planMinor) : null,
+      /** Paid, with the expenses the factory bears (taken off what we owe it). */
       paid: fromMinor(paidMinor),
+      takenOff: fromMinor(f.takenOffMinor),
       toPay: fromMinor(Math.max(f.owedMinor - paidMinor, 0)),
       rows: status.map((r) => ({
         label: r.label,

@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
-import { settle } from "@kebo/money";
 import {
   bankStepsFor,
   BANK_STEP_LABEL,
@@ -55,6 +54,8 @@ import { orderAccess, OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 import { SettingsService } from "../settings/settings.service";
 import { datePapers, lcChecksOf, rebuildRoutePlan, termsOf } from "../money/route-plan";
+import { chargedExpenses, fxOf, positionOf, type PositionFacts } from "../money/position";
+import type { Fx } from "@kebo/money";
 import { seedFactoryPlans } from "../money/factory-plan";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
@@ -124,21 +125,9 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
   };
 }
 
-/** The deposit (or everything, with no deposit) has come in, in the order's currency. */
-function depositInOf(o: {
-  total: Prisma.Decimal;
-  currency: string;
-  depositPercent: Prisma.Decimal;
-  payments: { currency: string; amount: Prisma.Decimal; bankCharges: Prisma.Decimal }[];
-}) {
-  const money = settle(
-    decimalToMinor(o.total),
-    o.payments
-      .filter((p) => p.currency === o.currency)
-      .map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-    Number(o.depositPercent),
-  );
-  return money.depositOutstandingMinor === 0 && (Number(o.depositPercent) > 0 || money.outstandingMinor === 0);
+/** The deposit (the plan's deposit row, else the accepted %; with no deposit: everything) has come in, as orderPosition says. */
+function depositInOf(o: PositionFacts, fx: Fx) {
+  return positionOf(o, fx).depositReceived;
 }
 
 interface DocumentView {
@@ -232,7 +221,8 @@ export class FlowService {
       include: {
         payments: { where: { voidedAt: null } },
         bankContract: true,
-        planItems: { select: { amount: true, dueRule: true } },
+        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
+        expenses: chargedExpenses,
         checklist: {
           where: productionWhere,
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -254,11 +244,11 @@ export class FlowService {
     const features = await this.limits.features();
     const has = (f: PlanFeature) => !features || features.includes(f);
 
-    const depositIn = depositInOf(o);
+    const settings = await this.settings.get();
+    const depositIn = depositInOf(o, fxOf(settings));
 
     const route = o.paymentRoute;
     const mode = o.shipments[0]?.mode ?? "sea";
-    const settings = await this.settings.get();
     const required = documentsInUse(route, mode, settings.papers.off, (k) => documentIn(o, k));
     const documents = this.documentSet(o, required);
     const bankKinds = bankStepsFor(route);
@@ -487,7 +477,11 @@ export class FlowService {
         total: true,
         currency: true,
         depositPercent: true,
+        mainCurrency: true,
+        mainRate: true,
         payments: { where: { voidedAt: null }, select: { currency: true, amount: true, bankCharges: true } },
+        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        expenses: chargedExpenses,
         checklist: { where: productionWhere, select: { doneAt: true, skippedAt: true } },
         shipments: { orderBy: { createdAt: "asc" }, select: { mode: true, status: true } },
         documents: { select: { kind: true, status: true } },
@@ -501,7 +495,7 @@ export class FlowService {
     const [features, settings] = await Promise.all([this.limits.features(), this.settings.get()]);
     return {
       items: rows.map((o) => {
-        const steps = flowSteps(factsOf(o, depositInOf(o), settings.papers.off), features);
+        const steps = flowSteps(factsOf(o, depositInOf(o, fxOf(settings)), settings.papers.off), features);
         const current = steps.find((s) => s.state === "current") ?? null;
         return { id: o.id, current: current && { key: current.key, label: current.label, sub: current.sub } };
       }),
