@@ -164,7 +164,8 @@ export default async function OrderDocuments({
 
   // The checklist: only the company's own items for this step (papers and bank steps are the cards below).
   const own = d.items.filter((i) => !i.key?.startsWith("doc:") && !i.key?.startsWith("bank:"));
-  const shipNumber = flow?.shipping?.shipments.find((s) => s.blNo)?.blNo ?? o.blNo ?? null;
+  // The B/L is the shipment's (Shipment 1's).
+  const shipNumber = o.blNo;
   const routeLine = route
     ? `${route === "letter_of_credit" ? "The LC" : route === "bank_contract" ? "The bank contract" : "The route"}${contract?.number ? ` ${contract.number}` : ""} asks for these. Made by the app, uploaded or kept elsewhere all count as ready.`
     : "Choose how the customer pays on Payment: it decides the papers for the bank. Made by the app, uploaded or kept elsewhere all count as ready.";

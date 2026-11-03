@@ -176,7 +176,8 @@ export default async function OrderDocumentPrint({
         ]
       : [];
 
-  const ports = portBullets(o.incoterm, o.incotermPlace, o.portOfDischarge);
+  // The packing list prints its shipment's ports (versions made before that print what they printed: from the terms).
+  const ports = portBullets(o.incoterm, o.incotermPlace, o.portOfDischarge, packing ? d.shipment : null);
   const pk = d.packing;
   const bullets = packing
     ? [

@@ -382,7 +382,8 @@ export function DocumentForm({
   /** For a new paper the shipment needs: its kind is fixed. */
   kind?: OrderDocumentKind;
   files: { id: string; name: string }[];
-  shipments: { id: string; label: string }[];
+  /** The order's shipments; a B/L or AWB row shows its shipment's number (Shipment 1's when it names none). */
+  shipments: { id: string; label: string; blNo?: string | null }[];
   onDone: () => void;
 }) {
   const [k, setK] = useState<OrderDocumentKind>(doc?.kind ?? kind ?? "other");
@@ -421,9 +422,20 @@ export function DocumentForm({
                   ))}
                 </Select>
               </Field>
-              <Field label="Number" htmlFor="doc-number" optional error={s.errors?.number}>
-                <Input id="doc-number" name="number" maxLength={60} defaultValue={v("number")} />
-              </Field>
+              {k === "bill_of_lading" || k === "airway_bill" ? (
+                // The B/L or AWB number is the shipment's: shown here, changed on Shipping (never typed twice).
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium">Number</span>
+                  <span className="flex min-h-9 items-center rounded-md border border-line bg-surface-2/60 px-3 text-sm" aria-readonly="true">
+                    {(shipments.find((x) => x.id === doc?.shipmentId) ?? shipments[0])?.blNo ?? <span className="text-muted">—</span>}
+                  </span>
+                  <span className="text-xs text-text-2">The shipment&apos;s · change it on Shipping</span>
+                </div>
+              ) : (
+                <Field label="Number" htmlFor="doc-number" optional error={s.errors?.number}>
+                  <Input id="doc-number" name="number" maxLength={60} defaultValue={v("number")} />
+                </Field>
+              )}
               <Field label="Issued on" htmlFor="doc-issued" optional error={s.errors?.issuedOn}>
                 <Input id="doc-issued" name="issuedOn" type="date" defaultValue={v("issuedOn")} />
               </Field>

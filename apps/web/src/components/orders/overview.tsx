@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { PROFIT_LABEL } from "@kebo/money";
-import { CHANNEL_LABEL, FLOW_STEP_LABEL, STEP_PATH, type FlowStep } from "@kebo/shared";
+import { CHANNEL_LABEL, FLOW_STEP_LABEL, shipByVsLc, STEP_PATH, type FlowStep } from "@kebo/shared";
 import { Badge, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
 import { date, money, qty, whole } from "@/lib/format";
 import { countryName, isUnknownCountry } from "@/lib/countries";
@@ -67,10 +67,14 @@ export function overviewFacts({ o, steps, flow, m, costs, deal, now }: OverviewI
   /** "14 Jan" this year, "14 Jan 2027" another. */
   const short = (d: string | null | undefined) => (d ? (d.slice(0, 4) === year ? date(d).replace(/ \d{4}$/, "") : date(d)) : null);
   const base = `/orders/${o.id}`;
-  const ship = flow?.shipping?.shipments.find((s) => s.departedOn || s.etd || s.eta || s.arrivedOn) ?? flow?.shipping?.shipments[0] ?? null;
+  // Shipment 1 (the primary: the first made; the API lists it first), as the papers and the checklist read it.
+  const ship = flow?.shipping?.shipments[0] ?? null;
   const pod = ship?.portOfDischarge ?? o.portOfDischarge ?? null;
   const contract = flow?.payment.bankContract ?? null;
   const lc = flow?.payment.route === "letter_of_credit";
+  // Our ship-by beside the LC's latest shipment date (we keep ours; warned about when it is later).
+  const lcLatest = lc ? (contract?.latestShipOn ?? null) : null;
+  const shipByLc = shipByVsLc(o.shipBy, lcLatest);
   const docs = flow?.documents ?? null;
   const required = docs?.set.filter((d) => d.required) ?? [];
   const missing = required.filter((d) => d.status !== "ready");
@@ -155,7 +159,7 @@ export function overviewFacts({ o, steps, flow, m, costs, deal, now }: OverviewI
 
   // Deadlines still ahead (or missed), earliest first.
   const open = o.status !== "cancelled" && o.status !== "closed";
-  const shipped = !!(o.shippedOn || ship?.departedOn || ship?.arrivedOn);
+  const shipped = !!o.shippedOn || !!flow?.shipping?.shipments.some((s) => s.departedOn || s.arrivedOn);
   const raw: Deadline[] = [];
   if (open) {
     for (const i of steps.items) if (!i.done && !i.skipped && i.dueOn) raw.push({ on: i.dueOn, what: i.title, step: i.step });
@@ -202,6 +206,12 @@ export function overviewFacts({ o, steps, flow, m, costs, deal, now }: OverviewI
 
   // Keep an eye on: deadlines within 30 days (and missed ones), papers missing, profit against the quote.
   const watch: { tone: Tone; strong: string; rest: string }[] = [];
+  if (open && !shipped && shipByLc?.late)
+    watch.push({
+      tone: "bad",
+      strong: "Ship-by is later than the LC allows",
+      rest: `ours ${short(o.shipBy)} · LC latest ${short(lcLatest)}: ship by the LC's date, or ask for an amendment · Shipping`,
+    });
   for (const d of deadlines.filter((x) => daysFrom(now, x.on) <= 30).slice(0, 3)) {
     const n = daysFrom(now, d.on);
     watch.push({
@@ -238,6 +248,8 @@ export function overviewFacts({ o, steps, flow, m, costs, deal, now }: OverviewI
   return {
     c,
     now,
+    lcLatest,
+    shipByLc,
     short,
     ship,
     pod,
@@ -841,6 +853,7 @@ export function KeyDates({ o, f, deal }: { o: OverviewInput["o"]; f: OverviewFac
     ["Order", o.orderedOn],
     ["Ready at factory", o.readyOn],
     ["Ship by", o.shipBy],
+    ["LC latest shipment", f.lcLatest],
     [f.ship?.departedOn ? "Sailed" : "ETD", f.ship?.departedOn ?? f.ship?.etd],
     [f.ship?.arrivedOn ? `Arrived${f.pod ? ` ${f.pod}` : ""}` : `ETA${f.pod ? ` ${f.pod}` : ""}`, f.ship?.arrivedOn ?? f.ship?.eta],
     [f.lc ? "LC expires" : "Contract expires", f.contract?.expiresOn],

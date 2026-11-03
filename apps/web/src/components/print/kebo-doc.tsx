@@ -1,4 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { portsOf } from "@kebo/shared";
 import { numberToWords } from "@kebo/utils";
 import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
@@ -117,11 +118,20 @@ export function textBullets(text: string | null | undefined) {
     .filter(Boolean);
 }
 
-/** "Port of loading" / "Port of discharge": the Incoterm place is where goods are loaded for E and F terms, where they go for C and D terms. */
-export function portBullets(incoterm: string, place: string | null, portOfDischarge?: string | null): ReactNode[] {
-  const loadingTerm = ["EXW", "FCA", "FAS", "FOB"].includes(incoterm);
-  const loading = loadingTerm ? place : null;
-  const discharge = portOfDischarge ?? (loadingTerm ? null : place);
+/**
+ * "Port of loading" / "Port of discharge": the shipment's when given (the packing list since the shipment is the
+ * one place), else from the terms (portsOf: the Incoterm place is where goods are loaded for E and F terms,
+ * where they go for C and D terms, unless the order names its destination).
+ */
+export function portBullets(
+  incoterm: string,
+  place: string | null,
+  portOfDischarge?: string | null,
+  shipment?: { portOfLoading: string | null; portOfDischarge: string | null } | null,
+): ReactNode[] {
+  const p = shipment ?? portsOf({ incoterm, incotermPlace: place, portOfDischarge: portOfDischarge ?? null });
+  const loading = p.portOfLoading;
+  const discharge = p.portOfDischarge;
   return [
     loading ? <Labelled key="pol" label="Port of loading:" value={loading} /> : null,
     discharge ? <Labelled key="pod" label="Port of discharge:" value={discharge} /> : null,

@@ -147,6 +147,11 @@ function Warnings({ text }: { text: string }) {
  * The order's Details card (the overview's right column): terms, dates and
  * shipping in two columns, values wrapping; ✎ Edit in the header opens the
  * form in place; an empty value offers "+ Add" to people who may edit.
+ * Shipped on, the B/L and the container are Shipment 1's: with the shipping
+ * module they are shown read-only, "from Shipment 1 · edit in Shipping" (a link
+ * that lands on the shipment lit up); without it they are typed here (and saved
+ * on the shipment). With an LC, ship-by shows the LC's latest shipment date
+ * beside ours, warned about when ours is later.
  */
 export function DetailsCard({
   action,
@@ -155,23 +160,64 @@ export function DetailsCard({
   fixed,
   values,
   shown,
+  shipment,
+  lc,
+  suggestShipBy,
 }: {
   action: Action;
   canEdit: boolean;
   today: string;
   /** Read-only rows (incoterm, payment terms, ordered on). */
   fixed: { label: string; value: ReactNode }[];
-  values: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null; documentTitle: string | null; portOfDischarge: string | null };
+  values: {
+    shipBy: string | null;
+    readyOn: string | null;
+    shippedOn: string | null;
+    blNo: string | null;
+    containerNo: string | null;
+    documentTitle: string | null;
+    portOfDischarge: string | null;
+  };
   /** The same values, formatted for reading. */
   shown: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null };
+  /** Where shipped on / B/L / container are edited: on Shipping (read-only here, `href` lands there), or here (no shipping module). */
+  shipment: { onShipping: boolean; href: string; label: string };
+  /** An LC order: its latest shipment date (as read) and whether our ship-by is later. */
+  lc?: { latest: string | null; late: boolean } | null;
+  /** While ship-by is empty: the deal's "wanted by" (YYYY-MM-DD and as read). */
+  suggestShipBy?: { on: string; shown: string } | null;
 }) {
   const [editing, setEditing] = useState(false);
-  const rows: { label: string; value: ReactNode }[] = [
+  const fromShipment = (filled: boolean) =>
+    shipment.onShipping ? (
+      <a href={shipment.href} className="text-xs font-normal text-primary hover:underline">
+        {filled ? `from ${shipment.label} · edit in Shipping` : "add it in Shipping"}
+      </a>
+    ) : null;
+  const shipBy =
+    shown.shipBy && lc?.latest ? (
+      <span className="flex flex-col gap-0.5">
+        <span>
+          {shown.shipBy} <span className="font-normal text-text-2">· LC latest {lc.latest}</span>
+        </span>
+        {lc.late && (
+          <span className="flex items-center gap-1 text-xs font-medium text-bad">
+            <AlertTriangle className="size-3.5 shrink-0" aria-hidden /> Later than the LC allows
+          </span>
+        )}
+      </span>
+    ) : !shown.shipBy && lc?.latest ? (
+      <span className="font-normal text-text-2">LC latest {lc.latest}</span>
+    ) : (
+      shown.shipBy
+    );
+  const rows: { label: string; value: ReactNode; note?: ReactNode }[] = [
     ...fixed,
-    { label: "Ship by", value: shown.shipBy },
+    { label: "Ship by", value: shipBy },
     { label: "Ready at factory", value: shown.readyOn },
-    { label: "Shipped on", value: shown.shippedOn },
-    { label: "B/L no.", value: shown.blNo },
+    { label: "Shipped on", value: shown.shippedOn, note: fromShipment(!!shown.shippedOn) },
+    { label: "B/L no.", value: shown.blNo, note: fromShipment(!!shown.blNo) },
+    { label: "Container", value: values.containerNo, note: fromShipment(!!values.containerNo) },
     { label: "Port of discharge", value: values.portOfDischarge },
     { label: "Heading on documents", value: values.documentTitle },
   ];
@@ -192,6 +238,8 @@ export function DetailsCard({
                 <dd className="text-sm font-medium [overflow-wrap:anywhere]">
                   {r.value !== null && r.value !== undefined && r.value !== "" ? (
                     r.value
+                  ) : r.note ? (
+                    <span className="font-normal text-muted">—</span>
                   ) : canEdit ? (
                     <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setEditing(true)}>
                       + Add
@@ -200,6 +248,7 @@ export function DetailsCard({
                     <span className="font-normal text-muted">—</span>
                   )}
                 </dd>
+                {r.note && <dd>{r.note}</dd>}
               </div>
             ))}
           </dl>
@@ -208,19 +257,46 @@ export function DetailsCard({
             {(s) => (
               <>
                 <DetailList columns={2} items={fixed} />
-                <Field label="Ship by" htmlFor="d-shipBy" optional hint="Promised to the customer" error={s.errors?.shipBy}>
-                  <Input id="d-shipBy" name="shipBy" type="date" defaultValue={s.values?.shipBy ?? values.shipBy ?? ""} />
+                <Field
+                  label="Ship by"
+                  htmlFor="d-shipBy"
+                  optional
+                  hint={
+                    lc?.latest
+                      ? `Promised to the customer · the LC's latest shipment is ${lc.latest}`
+                      : !values.shipBy && suggestShipBy
+                        ? `Promised to the customer · suggested: the customer wanted it by ${suggestShipBy.shown}`
+                        : "Promised to the customer"
+                  }
+                  error={s.errors?.shipBy}
+                >
+                  <Input id="d-shipBy" name="shipBy" type="date" defaultValue={s.values?.shipBy ?? values.shipBy ?? suggestShipBy?.on ?? ""} />
                 </Field>
                 <Field label="Ready on" htmlFor="d-readyOn" optional hint="When the factory expects the goods ready" error={s.errors?.readyOn}>
                   <Input id="d-readyOn" name="readyOn" type="date" defaultValue={s.values?.readyOn ?? values.readyOn ?? ""} />
                 </Field>
-                <Field label="Shipped on" htmlFor="d-shippedOn" optional error={s.errors?.shippedOn}>
-                  <Input id="d-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? values.shippedOn ?? ""} />
-                </Field>
-                <Field label="B/L number" htmlFor="d-blNo" optional error={s.errors?.blNo}>
-                  <Input id="d-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? values.blNo ?? ""} />
-                </Field>
-                <Field label="Port of discharge" htmlFor="d-pod" optional hint="Printed on the proforma, e.g. Hairatan, Afghanistan" error={s.errors?.portOfDischarge}>
+                {shipment.onShipping ? (
+                  <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2 text-xs text-text-2">
+                    Shipped on, the B/L and the container are {shipment.label}&apos;s:{" "}
+                    <a href={shipment.href} className="font-medium text-primary hover:underline">
+                      edit them in Shipping
+                    </a>
+                    .
+                  </p>
+                ) : (
+                  <>
+                    <Field label="Shipped on" htmlFor="d-shippedOn" optional error={s.errors?.shippedOn}>
+                      <Input id="d-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? values.shippedOn ?? ""} />
+                    </Field>
+                    <Field label="B/L number" htmlFor="d-blNo" optional error={s.errors?.blNo}>
+                      <Input id="d-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? values.blNo ?? ""} />
+                    </Field>
+                    <Field label="Container no." htmlFor="d-containerNo" optional error={s.errors?.containerNo}>
+                      <Input id="d-containerNo" name="containerNo" maxLength={120} defaultValue={s.values?.containerNo ?? values.containerNo ?? ""} />
+                    </Field>
+                  </>
+                )}
+                <Field label="Port of discharge" htmlFor="d-pod" optional hint="The contract destination: printed on the proforma, the default for a new shipment" error={s.errors?.portOfDischarge}>
                   <Input id="d-pod" name="portOfDischarge" maxLength={120} defaultValue={s.values?.portOfDischarge ?? values.portOfDischarge ?? ""} />
                 </Field>
                 <Field label="Heading on documents" htmlFor="d-title" optional hint="Over the items, e.g. Complete automatic liquid syrup filling line" error={s.errors?.documentTitle}>

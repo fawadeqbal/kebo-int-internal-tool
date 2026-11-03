@@ -59,7 +59,7 @@ SELECT gen_random_uuid(), x."company_id", NULL, 'flow.shipment', 'order', x."ord
            CASE WHEN x."container_no" IS NOT NULL THEN 'container ' || x."container_no" END)
          || ' moved from the order to Shipment 1 (one place for the shipment)',
        jsonb_strip_nulls(jsonb_build_object('shippedOn', to_char(x."shipped_on", 'YYYY-MM-DD'), 'blNo', coalesce(x."bl_no", x."doc_bl_no"), 'containerNo', x."container_no")),
-       jsonb_strip_nulls(jsonb_build_object('step', 'shipping', 'shipmentId', s."id", 'departedOn', to_char(s."departed_on", 'YYYY-MM-DD'), 'blNo', s."bl_no", 'containerNo', s."container_no"))
+       jsonb_strip_nulls(jsonb_build_object('step', 'shipping', 'shippedOn', to_char(s."departed_on", 'YYYY-MM-DD'), 'blNo', s."bl_no", 'containerNo', s."container_no"))
   FROM "sot3_orders" x
   JOIN "shipments" s ON s."order_id" = x."order_id"
  WHERE x."primary_id" IS NULL;
@@ -96,7 +96,6 @@ SELECT gen_random_uuid(), d."company_id", NULL, 'flow.shipment', 'order', d."ord
          'containerNo', CASE WHEN d."container_differs" THEN d."container_no" END)),
        jsonb_strip_nulls(jsonb_build_object(
          'step', 'shipping',
-         'shipmentId', d."primary_id",
          'blNo', CASE WHEN d."bl_differs" THEN d."s_bl_no" END,
          'shippedOn', CASE WHEN d."date_differs" THEN to_char(d."s_shipped_on", 'YYYY-MM-DD') END,
          'containerNo', CASE WHEN d."container_differs" THEN d."s_container_no" END))
@@ -134,8 +133,8 @@ SELECT d."id" AS doc_id, d."company_id", d."order_id", o."ref_no", nullif(btrim(
 INSERT INTO "audit_logs" ("id", "company_id", "user_id", "action", "entity_type", "entity_id", "summary", "old_values", "new_values")
 SELECT gen_random_uuid(), x."company_id", NULL, 'flow.shipment', 'order', x."order_id",
        x."ref_no" || ': the document set''s B/L ' || x."number" || ' differed from the shipment''s (' || s."bl_no" || '): the shipment''s is kept (one place for the shipment)',
-       jsonb_build_object('documentId', x."doc_id", 'blNo', x."number"),
-       jsonb_build_object('step', 'shipping', 'shipmentId', s."id", 'blNo', s."bl_no")
+       jsonb_build_object('blNo', x."number"),
+       jsonb_build_object('step', 'shipping', 'blNo', s."bl_no")
   FROM "sot3_docs" x
   JOIN "shipments" s ON s."id" = x."shipment_id"
  WHERE s."bl_no" IS NOT NULL AND s."bl_no" <> x."number";

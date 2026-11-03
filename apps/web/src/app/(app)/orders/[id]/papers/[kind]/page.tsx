@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { isPaperKind, paperDateText, PAPER_LABEL, PAPER_STEP, STEP_PATH } from "@kebo/shared";
+import { isPaperKind, paperDateText, PAPER_LABEL, PAPER_STEP, portsOf, STEP_PATH } from "@kebo/shared";
 import { buttonClass, Card } from "@kebo/ui";
 import { api, ApiError } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
@@ -23,18 +23,18 @@ async function adviceText(id: string, number: string, sender: string) {
     optional(() => orderFlowOf(id)),
     optional(() => api.get<CustomerNow>(`/customers/${o.customer.id}`)),
   ]);
+  // Shipment 1 (the primary: listed first), as the shipping advice prints it.
   const s = flow?.shipping?.shipments[0];
+  const ports = portsOf(o, s);
   const contact = customer?.contacts.find((c) => c.isPrimary) ?? customer?.contacts[0] ?? null;
   const lines = [
     `Dear ${contact?.name ?? o.customer.name},`,
     "",
     `Your order ${o.refNo} has been shipped.`,
     s?.vessel ? `Vessel: ${s.vessel}` : null,
-    (s?.blNo ?? o.blNo) ? `${s?.mode === "air" ? "AWB" : "B/L"} No.: ${s?.blNo ?? o.blNo}` : null,
+    o.blNo ? `${s?.mode === "air" ? "AWB" : "B/L"} No.: ${o.blNo}` : null,
     s?.containerNo ? `Container: ${s.containerNo}${s.containerType ? ` (${s.containerType})` : ""}` : null,
-    s?.portOfLoading || s?.portOfDischarge
-      ? `From ${s?.portOfLoading ?? "China"} to ${s?.portOfDischarge ?? o.portOfDischarge ?? ""}`
-      : null,
+    ports.portOfLoading || ports.portOfDischarge ? `From ${ports.portOfLoading ?? "China"} to ${ports.portOfDischarge ?? ""}` : null,
     s?.etd || s?.eta
       ? [s?.etd ? `ETD ${paperDateText(s.etd)}` : null, s?.eta ? `ETA ${paperDateText(s.eta)}` : null].filter(Boolean).join(" · ")
       : null,

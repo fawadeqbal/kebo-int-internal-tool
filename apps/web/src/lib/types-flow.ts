@@ -70,6 +70,8 @@ export interface ProductionStepView {
 
 export interface ShipmentView {
   id: string;
+  /** 1 for Shipment 1 (the primary: the first made, what the papers print), 2… */
+  n?: number;
   mode: ShipMode;
   status: ShipmentStatus;
   forwarder: string | null;
@@ -180,4 +182,8 @@ export interface OrderDefaults {
   banks: { customerBank: string | null; ourBank: string | null; refNo: string } | null;
   leadTime: { text: string; days: number | null; from: string; readyOn: string | null } | null;
   priceBasis: { basis: string; place: string | null } | null;
+  /** A new shipment's ports, from the order's terms. */
+  ports?: { portOfLoading: string | null; portOfDischarge: string | null };
+  /** Ship-by while empty: when the customer wanted it. */
+  shipBy?: { on: string; from: string } | null;
 }
