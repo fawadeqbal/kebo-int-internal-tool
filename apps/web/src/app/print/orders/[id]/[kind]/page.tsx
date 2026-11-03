@@ -220,8 +220,9 @@ export default async function OrderDocumentPrint({
           rows={[
             ["Order total", docMoney(t.total, c)],
             [`Deposit (${t.depositPercent}%)`, docMoney(t.deposit, c)],
+            ...(Number(t.charged ?? 0) > 0 ? [["Charged to the customer (expenses)", docMoney(t.charged, c)] as [string, string]] : []),
             ["Received so far", docMoney(t.received, c)],
-            ["Still due", docMoney(t.due, c)],
+            [Number(t.charged ?? 0) > 0 ? `Still due (incl. ${docMoney(t.charged, c)} charged)` : "Still due", docMoney(t.due, c)],
             ...(costs
               ? [
                   [

@@ -235,7 +235,8 @@ export interface OrderCosts {
     sale: string;
     uncosted: string;
     factory: string;
-    factoryOwed: { currency: string; amount: string }[];
+    /** What the factories charge (with tax) and what is still to pay them after payments and what they bear. */
+    factoryOwed: { currency: string; amount: string; toPay?: string }[];
     planned: string;
     notPlanned: string;
     bankCharges: string;
@@ -540,7 +541,9 @@ export interface FactoryPlanView {
   saved: boolean;
   /** The plan does not add up to what we owe (prices changed since). */
   differs: string | null;
+  /** Paid, with the expenses the factory bears (taken off what we owe it). */
   paid: string;
+  takenOff?: string;
   toPay: string;
   rows: {
     label: string;

@@ -35,6 +35,8 @@ export interface OrderRow {
   currency: string;
   total: string;
   received: string;
+  /** Expenses charged to the customer (part of due). */
+  charged: string;
   due: string;
   next: OrderNext | null;
   needs: OrderNeed | null;
@@ -64,7 +66,21 @@ export interface OrderView {
   balanceTerms: BalanceTerms;
   incoterm: Incoterm;
   incotermPlace: string | null;
-  money: { total: string; deposit: string; received: string; bankCharges: string; due: string; depositDue: string; status: PaymentStatus };
+  /** Where the order stands with the customer (one position for every screen and paper). */
+  money: {
+    total: string;
+    /** Expenses charged to the customer: part of what is due. */
+    charged: string;
+    /** The deposit asked for: the plan's deposit row (else the accepted %), and that as a %. */
+    deposit: string;
+    depositPercent: number;
+    received: string;
+    bankCharges: string;
+    /** Still due: total + charged − received. */
+    due: string;
+    depositDue: string;
+    status: PaymentStatus;
+  };
   next: OrderNext | null;
   back: { to: OrderStage; label: string } | null;
   needs: OrderNeed | null;
@@ -147,6 +163,8 @@ export type PaymentStatus = "unpaid" | "partly_paid" | "deposit_paid" | "paid" |
 export interface PaymentsView {
   currency: string;
   total: string;
+  /** Expenses charged to the customer (part of due). */
+  charged: string;
   received: string;
   due: string;
   depositDue: string;
@@ -274,6 +292,8 @@ export interface OrderDocument {
     total: string;
     deposit: string;
     depositPercent: number;
+    /** Expenses charged to the customer (part of due). */
+    charged: string;
     received: string;
     due: string;
   } | null;

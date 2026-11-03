@@ -2,6 +2,7 @@ import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
 import { apiFetch } from "@/lib/api";
 import { excelRefusal } from "@/app/sheets/guard";
 import type { ReportView } from "@/lib/types-deals";
+import { PROFIT_LABEL } from "@kebo/money";
 
 /** The report's tables as one CSV file (the API checks the person may see reports). */
 const cell = (v: string | number | null | undefined) => {
@@ -47,7 +48,7 @@ function toCsv(r: ReportView) {
     ...r.people.map((x) => row(x.person, x.won, x.lost, x.winRatePercent)),
     "",
     row("Estimated profit (lines without a cost are left out of profit and margin)"),
-    row("Group", "Name", "Orders", "Sales", "Not costed", "Cost", "Profit", "Margin %", "Costed %"),
+    row("Group", "Name", "Orders", "Sales", "Not costed", "Cost", PROFIT_LABEL.grossOnQuote, "Margin %", "Costed %"),
     row(
       "Total",
       "",

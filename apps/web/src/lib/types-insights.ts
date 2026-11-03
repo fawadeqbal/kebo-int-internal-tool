@@ -121,6 +121,8 @@ export interface Receivables {
     currency: string;
     total: string;
     received: string;
+    /** Expenses charged to the customer (part of due). */
+    charged?: string;
     due: string;
     overdue: string;
     daysLate: number;

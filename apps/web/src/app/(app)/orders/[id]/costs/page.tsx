@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FLOW_STEP_LABEL, type FlowStep } from "@kebo/shared";
+import { PROFIT_LABEL } from "@kebo/money";
 import { Alert, buttonClass, Card, CardHeader, cn, Segmented } from "@kebo/ui";
 import { orderHistoryOf, orderOf } from "@/lib/order-data";
 import { money } from "@/lib/format";
@@ -190,15 +191,23 @@ export default async function OrderCostsPage({
                 {Number(p.bankCharges) > 0 && <Line label="Bank charges on payments" value={`− ${money(p.bankCharges, c)}`} />}
                 <Line
                   strong
-                  label="Profit now expected"
+                  label={PROFIT_LABEL.expected}
                   value={`${money(p.expected, c)}${p.margin !== null ? ` · ${p.margin.toFixed(1)}%` : ""}`}
                   tone={Number(p.expected) < 0 ? "text-bad" : undefined}
                 />
               </dl>
               <p className="px-4 pb-3.5 text-xs text-muted">
-                On the quote: {money(p.onQuote, c)}
+                {PROFIT_LABEL.grossOnQuote}: {money(p.onQuote, c)}
                 {p.onQuoteMargin !== null ? ` · ${p.onQuoteMargin.toFixed(1)}%` : ""}
                 {Number(p.uncosted) > 0 ? ` · ${money(p.uncosted, c)} of the sale has no cost and is left out` : ""}
+                {/* Still to pay the factories after our payments and what they bear (as on the order's money). */}
+                {p.factoryOwed
+                  .filter((f) => f.toPay !== undefined)
+                  .map((f) => (
+                    <span key={f.currency} className="block">
+                      Still to pay the factory: {money(f.toPay!, f.currency)} of {money(f.amount, f.currency)}
+                    </span>
+                  ))}
               </p>
             </Card>
           )}
