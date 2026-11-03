@@ -52,6 +52,12 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     expect(own.items.some((x: { link: string; type: string }) => x.type === "inquiry.created" && x.link === `/inquiries/${created.id}`)).toBe(false);
     await api(app, manager).post("/notifications/read", { ids: "all" }).expect(200);
     expect((await api(app, manager).get("/notifications").expect(200)).body.unread).toBe(0);
+    // A page at a time, with how many there are: the second page carries on from the first.
+    const first = (await api(app, manager).get("/notifications?take=2").expect(200)).body;
+    const second = (await api(app, manager).get("/notifications?take=2&page=2").expect(200)).body;
+    expect(first.total).toBeGreaterThanOrEqual(first.items.length);
+    if (first.total > 2) expect(second.items[0].id).not.toBe(first.items[0].id);
+    expect((await api(app, manager).get("/notifications?unread=true").expect(200)).body.total).toBe(0);
   });
 
   it("runs reminders once a day: orders waiting too long reach the handler", async () => {

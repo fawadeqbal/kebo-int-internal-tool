@@ -240,16 +240,16 @@ export class NotificationsService implements OnModuleInit {
 
   /* ---------------------------------------------------------------- reading */
 
-  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number }) {
-    const [items, unread] = await Promise.all([
-      this.prisma.db.notification.findMany({
-        where: { userId: user.id, ...(opts.unreadOnly ? { readAt: null } : {}) },
-        orderBy: { createdAt: "desc" },
-        take: Math.min(opts.take ?? 50, 200),
-      }),
+  /** Mine, newest first, `take` at a time (page 1 by default); `total`: how many there are with the same filter. */
+  async mine(user: SessionUser, opts: { unreadOnly?: boolean; take?: number; page?: number }) {
+    const where = { userId: user.id, ...(opts.unreadOnly ? { readAt: null } : {}) };
+    const take = Math.min(opts.take ?? 50, 200);
+    const [items, unread, total] = await Promise.all([
+      this.prisma.db.notification.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: ((opts.page ?? 1) - 1) * take, take }),
       this.prisma.db.notification.count({ where: { userId: user.id, readAt: null } }),
+      this.prisma.db.notification.count({ where }),
     ]);
-    return { unread, items };
+    return { unread, total, items };
   }
 
   async markRead(user: SessionUser, ids: string[] | "all") {

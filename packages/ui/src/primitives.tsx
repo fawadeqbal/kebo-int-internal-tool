@@ -382,8 +382,11 @@ export function PhoneRow({
   figure,
   flash,
   muted,
+  prefetch,
 }: {
   href: string;
+  /** false: never fetched ahead (a link that does something when opened). */
+  prefetch?: boolean;
   title: ReactNode;
   line?: ReactNode;
   status?: ReactNode;
@@ -393,7 +396,7 @@ export function PhoneRow({
 }) {
   return (
     <li className={flash ? "animate-flash" : undefined}>
-      <Link href={href} className="flex items-start justify-between gap-3 px-4 py-3 active:bg-surface-2">
+      <Link href={href} prefetch={prefetch} className="flex items-start justify-between gap-3 px-4 py-3 active:bg-surface-2">
         <span className="min-w-0">
           <span className={cn("block truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
           {line && <span className="block truncate text-xs text-text-2">{line}</span>}

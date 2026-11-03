@@ -19,8 +19,12 @@ class NotificationsController {
   ) {}
 
   @Get("notifications")
-  mine(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ unread: z.enum(["true", "false"]).optional(), take: z.coerce.number().int().min(1).max(200).optional() }))) q: { unread?: string; take?: number }) {
-    return this.notifications.mine(user, { unreadOnly: q.unread === "true", take: q.take });
+  mine(
+    @CurrentUser() user: SessionUser,
+    @Query(Validate(z.object({ unread: z.enum(["true", "false"]).optional(), take: z.coerce.number().int().min(1).max(200).optional(), page: z.coerce.number().int().min(1).optional() })))
+    q: { unread?: string; take?: number; page?: number },
+  ) {
+    return this.notifications.mine(user, { unreadOnly: q.unread === "true", take: q.take, page: q.page });
   }
 
   /** { ids: [...] | "all" } */
