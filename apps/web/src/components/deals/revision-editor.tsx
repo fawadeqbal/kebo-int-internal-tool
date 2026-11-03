@@ -30,7 +30,7 @@ import { PANEL_FORM, PanelActions, PanelSection } from "@/components/orders/step
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-interface ChargeState {
+export interface ChargeState {
   key: string;
   /** Charges have no parts (the line table's rows always say so). */
   parentKey: null;
@@ -42,7 +42,7 @@ interface ChargeState {
   unitCost: string;
 }
 
-interface OptionState {
+export interface OptionState {
   key: string;
   /** null: the customer's items, priced by hand. */
   factoryQuoteId: string | null;
@@ -55,13 +55,13 @@ interface OptionState {
   costs: Partial<Record<BasisStep, CostState>>;
 }
 
-interface CostState {
+export interface CostState {
   amount: string;
   currency: string;
   note: string;
 }
 
-interface EditorState {
+export interface EditorState {
   currency: string;
   incoterm: Incoterm;
   incotermPlace: string;
@@ -76,9 +76,9 @@ interface EditorState {
 
 const str = (v: number | string | null | undefined) => (v === null || v === undefined ? "" : String(v));
 const money2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : "");
-const valid = (v: string) => v.trim() !== "" && Number.isFinite(Number(numberText(v)));
+export const valid = (v: string) => v.trim() !== "" && Number.isFinite(Number(numberText(v)));
 
-function fromDraft(d: RevisionDraft): EditorState {
+export function fromDraft(d: RevisionDraft): EditorState {
   return {
     currency: d.currency,
     incoterm: d.incoterm,
@@ -111,23 +111,23 @@ function fromDraft(d: RevisionDraft): EditorState {
 }
 
 /** What the option's factory offer pays for vs the basis we sell on (null: no factory offer, or its basis is not said). */
-function gapOf(o: OptionState, offers: QuoteOffers, selling: Incoterm) {
+export function gapOf(o: OptionState, offers: QuoteOffers, selling: Incoterm) {
   if (!o.factoryQuoteId) return null;
   return basisGap(offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.basis ?? null, selling);
 }
 
 /** The words a step gets when it is shown to the customer as its own line. */
-const STEP_LINE: Record<BasisStep, (place: string) => string> = {
+export const STEP_LINE: Record<BasisStep, (place: string) => string> = {
   to_port: () => "Transport to the port",
   freight: (place) => `Sea freight${place ? ` to ${place}` : ""}`,
   insurance: () => "Cargo insurance",
   delivery: (place) => `Delivery${place ? ` to ${place}` : ""}`,
   duties: () => "Import duties and taxes",
 };
-const asLineOf = (o: OptionState, step: BasisStep) => o.charges.some((c) => c.description.startsWith(STEP_LINE[step]("")));
+export const asLineOf = (o: OptionState, step: BasisStep) => o.charges.some((c) => c.description.startsWith(STEP_LINE[step]("")));
 
 /** The costs to reach our basis in the quotation's currency; which are still empty; a currency without a rate. */
-function extraOf(o: OptionState, offers: QuoteOffers, selling: Incoterm, currency: string) {
+export function extraOf(o: OptionState, offers: QuoteOffers, selling: Incoterm, currency: string) {
   const gap = gapOf(o, offers, selling);
   const out = { minor: 0, empty: [] as BasisStep[], noRate: null as string | null, needed: gap?.needed ?? [] };
   for (const step of out.needed) {
@@ -145,12 +145,12 @@ function extraOf(o: OptionState, offers: QuoteOffers, selling: Incoterm, currenc
 }
 
 /** The lines an option offers: the factory's (locked), or the customer's items when there are no factory prices. */
-function linesOf(o: OptionState, offers: QuoteOffers): OfferLine[] | null {
+export function linesOf(o: OptionState, offers: QuoteOffers): OfferLine[] | null {
   if (!o.factoryQuoteId) return offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
   return offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.lines ?? null;
 }
 
-function payload(s: EditorState, offers: QuoteOffers) {
+export function payload(s: EditorState, offers: QuoteOffers) {
   const costsOf = (o: OptionState) =>
     (gapOf(o, offers, s.incoterm)?.needed ?? [])
       .filter((step) => valid(o.costs[step]?.amount ?? "") && Number(numberText(o.costs[step]!.amount)) > 0)
@@ -181,7 +181,7 @@ function payload(s: EditorState, offers: QuoteOffers) {
  * line's cost plus its share of the costs to reach our basis (freight…), so the
  * prices cover them. Lines without a cost keep what they have.
  */
-function priced(lines: OfferLine[], prices: Record<string, string>, margin: number, extraMinor = 0) {
+export function priced(lines: OfferLine[], prices: Record<string, string>, margin: number, extraMinor = 0) {
   const next = { ...prices };
   const landed = landedUnitCosts(
     lines.map((l) => ({ unitCostMinor: l.unitCost === null ? null : toMinor(l.unitCost), quantity: numberText(l.quantity) || 0 })),
@@ -934,7 +934,7 @@ export function RevisionEditor({
   );
 }
 
-function swap<T>(list: T[], a: number, b: number): T[] {
+export function swap<T>(list: T[], a: number, b: number): T[] {
   if (b < 0 || b >= list.length) return list;
   const next = [...list];
   [next[a], next[b]] = [next[b]!, next[a]!];
@@ -1022,7 +1022,7 @@ export function CostingBox({
  * customer sees. Warns when the basis is not said, when a cost is still empty,
  * and when the factory's price pays for something we do not sell.
  */
-function BasisCosts({
+export function BasisCosts({
   letter,
   factoryBasis,
   factoryPlace,
@@ -1037,7 +1037,10 @@ function BasisCosts({
   fmt,
   onChange,
   onAsLine,
+  bare = false,
 }: {
+  /** Without its own frame and title (inside the price editor's card). */
+  bare?: boolean;
   letter: string;
   factoryBasis: Incoterm | null;
   factoryPlace: string | null;
@@ -1056,13 +1059,15 @@ function BasisCosts({
   const ours = basisText(selling, sellingPlace.trim() || null);
   const gap = basisGap(factoryBasis, selling);
   return (
-    <section aria-label={`Getting it to ${ours}`} className="flex flex-col gap-2 rounded-lg border border-line p-3">
-      <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
-        Getting it to {ours}
-        <span className="text-xs font-normal text-muted">
-          the factory&apos;s price is {factoryBasis ? basisText(factoryBasis, factoryPlace) : "on a basis not said"} · internal
-        </span>
-      </h4>
+    <section aria-label={`Getting it to ${ours}`} className={cn("flex flex-col gap-2", !bare && "rounded-lg border border-line p-3")}>
+      {!bare && (
+        <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
+          Getting it to {ours}
+          <span className="text-xs font-normal text-muted">
+            the factory&apos;s price is {factoryBasis ? basisText(factoryBasis, factoryPlace) : "on a basis not said"} · internal
+          </span>
+        </h4>
+      )}
       {!gap ? (
         <p className="flex items-start gap-1.5 rounded-md bg-warn-soft px-3 py-2 text-xs text-text">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />

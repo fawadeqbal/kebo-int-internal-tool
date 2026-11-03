@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, ChevronRight, Lock, Plus, Send } from "lucide-react";
 import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS } from "@kebo/shared";
-import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelActions, PanelBody, PanelButton, useClosePanel, ViewCard } from "@/components/orders/step-view";
@@ -73,47 +73,18 @@ export function OptionsCard({
   edit,
 }: {
   r: RevisionView;
-  /** The draft's editor (people who may change it), null otherwise. */
+  /** The draft's price editor (people who may change it), null otherwise: "Edit prices" turns the page into it. */
   edit: {
-    initial: RevisionDraft;
-    offers: QuoteOffers;
-    loadOffers: (currency: string) => Promise<QuoteOffers | null>;
     showCosts: boolean;
-    action: Action;
+    /** Another offer (or the customer's items) can still become an option. */
+    canAdd: boolean;
+    /** The page in price-editing mode (then "&option=1", "&add=1"). */
+    pricesHref: string;
   } | null;
 }) {
   const [at, setAt] = useState(() => Math.max(0, r.options.findIndex((o) => o.status === "accepted")));
-  const [editing, setEditing] = useState<null | "prices" | "add">(null);
   const o = r.options[Math.min(at, r.options.length - 1)];
-  const canAdd = !!edit && (edit.offers.offers.length + 1 > r.options.length);
-
-  if (editing && edit)
-    return (
-      <ViewCard
-        id="options"
-        title={`R${r.number} · options and prices`}
-        description="Prices, discounts, charges and costs to reach our basis. Saving keeps the draft; the terms are saved as they are."
-        canEdit={false}
-      >
-        <div className="p-4">
-          <RevisionEditor
-            part="options"
-            action={edit.action}
-            number={r.number}
-            initial={edit.initial}
-            offers={edit.offers}
-            loadOffers={edit.loadOffers}
-            showCosts={edit.showCosts}
-            submitLabel={`Save R${r.number}`}
-            requireChanges
-            initialOption={editing === "add" ? 0 : at}
-            startAdding={editing === "add"}
-            onDone={() => setEditing(null)}
-            onCancel={() => setEditing(null)}
-          />
-        </div>
-      </ViewCard>
-    );
+  const canAdd = !!edit && edit.canAdd;
 
   return (
     <ViewCard
@@ -124,13 +95,13 @@ export function OptionsCard({
         edit ? (
           <>
             {edit.showCosts && (
-              <Button size="xs" variant="ghost" onClick={() => setEditing("prices")}>
+              <Link href={`${edit.pricesHref}&option=${at}`} className={buttonClass("ghost", "xs")}>
                 Price at a margin
-              </Button>
+              </Link>
             )}
-            <Button size="xs" variant="ghost" onClick={() => setEditing("prices")}>
+            <Link href={`${edit.pricesHref}&option=${at}`} className={buttonClass("ghost", "xs")}>
               Edit prices
-            </Button>
+            </Link>
           </>
         ) : undefined
       }
@@ -173,13 +144,12 @@ export function OptionsCard({
             );
           })}
           {edit && canAdd && (
-            <button
-              type="button"
-              onClick={() => setEditing("add")}
+            <Link
+              href={`${edit.pricesHref}&add=1`}
               className="flex min-h-16 items-center justify-center gap-1 rounded-xl border border-dashed border-line-strong px-3 py-3 text-sm font-medium text-primary hover:border-primary"
             >
               <Plus className="size-4" aria-hidden /> Add an option
-            </button>
+            </Link>
           )}
         </div>
         {o && <OptionLines o={o} currency={r.currency} incoterm={r.incoterm} single={r.options.length === 1} />}

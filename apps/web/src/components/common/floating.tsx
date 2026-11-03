@@ -140,7 +140,7 @@ export function FloatingMenu({
   if (!mounted) return null;
   if (phone)
     return createPortal(
-      <div className="fixed inset-0 z-[70] flex flex-col justify-end">
+      <div className="fixed inset-0 z-[90] flex flex-col justify-end">
         <button type="button" aria-label="Close the menu" className="absolute inset-0 bg-black/40 animate-in fade-in" onClick={onClose} tabIndex={-1} />
         <div
           ref={panel}
@@ -168,7 +168,7 @@ export function FloatingMenu({
       onKeyDown={keys}
       style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width }}
       className={cn(
-        "fixed z-[70] flex max-h-[min(70vh,28rem)] flex-col overflow-y-auto rounded-lg border border-line bg-surface p-1 text-left shadow-pop",
+        "fixed z-[90] flex max-h-[min(70vh,28rem)] flex-col overflow-y-auto rounded-lg border border-line bg-surface p-1 text-left shadow-pop",
         HIDE_EMPTY,
         !pos && "invisible",
       )}
@@ -192,7 +192,7 @@ export function FloatingList({ anchor, onClose, children, className }: { anchor:
     <div
       ref={panel}
       style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: pos?.width }}
-      className={cn("fixed z-[70] overflow-hidden rounded-xl border border-line bg-surface shadow-pop", !pos && "invisible", className)}
+      className={cn("fixed z-[90] overflow-hidden rounded-xl border border-line bg-surface shadow-pop", !pos && "invisible", className)}
     >
       {children}
     </div>,
