@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, Clock, FilePlus2, Pencil, Send, Trash2, XCircle } from "lucide-react";
-import { Button, cn, Field, Input } from "@kebo/ui";
+import { Button, ButtonLink, Card, CardBody, CardHeader, cn, Field, Input } from "@kebo/ui";
 import { money } from "@/lib/format";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { FileActions } from "@/components/common/file-actions";
@@ -14,7 +15,11 @@ import { RevisionEditor } from "./revision-editor";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/** "Start a new revision": opens the editor with the API's starting values (a copy of the latest, or R1 from factory costs). */
+/**
+ * "Start a new revision": opens the editor with the API's starting values (a
+ * copy of the latest, or R1 from factory costs). With `empty` it is the whole
+ * "No quotation yet" card, which the editor replaces when it opens.
+ */
 export function StartRevision({
   action,
   draft,
@@ -26,6 +31,9 @@ export function StartRevision({
   first,
   defaultOpen = false,
   label: labelAs,
+  note,
+  empty,
+  openHref,
 }: {
   action: Action;
   draft: RevisionDraft | null;
@@ -39,36 +47,80 @@ export function StartRevision({
   defaultOpen?: boolean;
   /** The button's words, when not "Make the quotation (R1)" / "Start a new revision (Rn)". */
   label?: string;
+  /** What the new revision starts with (the factory, its cost, the margin): under the title. */
+  note?: ReactNode;
+  /** The card shown while the editor is closed ("No quotation yet"). */
+  empty?: { title: string; description: string };
+  /** Open by going to this address (the page then gives the editor its full width); Cancel comes back. */
+  openHref?: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(defaultOpen && allowed);
   const label = labelAs ?? (first ? "Make the quotation (R1)" : `Start a new revision${draft ? ` (R${draft.number})` : ""}`);
+  const startNote =
+    note ??
+    (first
+      ? "Starts with the factory offer that covers the most at the lowest cost, priced at the default margin. Add more offers as Options B, C… for the customer to choose from."
+      : "Starts as a copy of the latest revision. Change what is different, then save the draft.");
+  const frame = (body: ReactNode) =>
+    empty ? (
+      <Card>
+        <CardHeader title={empty.title} description={empty.description} />
+        <CardBody className="flex flex-col gap-3">{body}</CardBody>
+      </Card>
+    ) : (
+      body
+    );
   // Nothing to offer yet: no factory offer with lines, and no list from the customer to price by hand.
   const nothing = !!offers && offers.offers.length === 0 && offers.items.length === 0;
   if (nothing)
-    return (
+    return frame(
       <p className="text-sm text-muted">
         Add a factory offer with its lines on the Factory prices tab first; each offer becomes an option the customer can choose.
-      </p>
+      </p>,
     );
-  if (!open || !draft || !offers)
-    return (
+  if (!open || !draft || !offers) {
+    const can = allowed && !!draft && !!offers;
+    return frame(
       <div className="flex flex-col items-start gap-1.5">
-        <Button variant={first ? "primary" : "secondary"} onClick={() => setOpen(true)} disabled={!allowed || !draft || !offers} aria-describedby={!allowed && whyNot ? "why-not-start" : undefined}>
-          <FilePlus2 aria-hidden /> {label}
-        </Button>
+        {empty && note && can && <p className="mb-1.5 text-sm text-text-2">{note}</p>}
+        {openHref && can ? (
+          <ButtonLink href={openHref} variant={first ? "primary" : "secondary"}>
+            <FilePlus2 aria-hidden /> {label}
+          </ButtonLink>
+        ) : (
+          <Button variant={first ? "primary" : "secondary"} onClick={() => setOpen(true)} disabled={!can} aria-describedby={!allowed && whyNot ? "why-not-start" : undefined}>
+            <FilePlus2 aria-hidden /> {label}
+          </Button>
+        )}
         {!allowed && whyNot && (
           <p id="why-not-start" className="text-xs text-muted">
             {whyNot}
           </p>
         )}
-      </div>
+      </div>,
     );
+  }
+  const close = () => {
+    setOpen(false);
+    if (openHref) router.replace(pathname, { scroll: false });
+  };
   return (
-    <div className="w-full rounded-xl border border-primary/30 bg-primary-soft/20 p-3 sm:p-4">
-      <h3 className="mb-1 text-sm font-semibold">New revision R{draft.number}</h3>
-      <p className="mb-4 text-xs text-muted">{first ? "Starts with the factory offer that covers the most at the lowest cost, priced at the default margin. Add more offers as Options B, C… for the customer to choose from." : "Starts as a copy of the latest revision. Change what is different, then save the draft."}</p>
-      <RevisionEditor action={action} number={draft.number} initial={draft} offers={offers} loadOffers={loadOffers} showCosts={showCosts} submitLabel={`Save R${draft.number} as a draft`} onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />
-    </div>
+    <RevisionEditor
+      action={action}
+      number={draft.number}
+      initial={draft}
+      offers={offers}
+      loadOffers={loadOffers}
+      showCosts={showCosts}
+      title={`New revision R${draft.number}`}
+      note={startNote}
+      submitLabel={`Save R${draft.number} as a draft`}
+      submitShort="Save draft"
+      onDone={close}
+      onCancel={close}
+    />
   );
 }
 

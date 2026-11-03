@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Lock, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Lock } from "lucide-react";
 import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import {
   BALANCE_TERMS,
@@ -16,7 +16,7 @@ import {
   type BasisStep,
   type Incoterm,
 } from "@kebo/shared";
-import { Badge, Button, ChecksBox, cn, Field, Input, Select, SelectCard, SelectCardList, StickyBar, Textarea } from "@kebo/ui";
+import { AddCard, Badge, Button, ChecksBox, cn, Field, Input, Select, SelectCard, SelectCardList, StickyBar, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -221,6 +221,9 @@ export function RevisionEditor({
   part,
   initialOption = 0,
   startAdding = false,
+  title,
+  note,
+  submitShort,
 }: {
   action: Action;
   number: number;
@@ -246,6 +249,11 @@ export function RevisionEditor({
   /** The option open first (0 = A), and the "Add an option" list open at once. */
   initialOption?: number;
   startAdding?: boolean;
+  /** The title over the whole form ("New revision R2"; default "R2"), and what it starts with under it. */
+  title?: ReactNode;
+  note?: ReactNode;
+  /** The save button's words on a phone, when submitLabel is long ("Save draft"). */
+  submitShort?: string;
 }) {
   const [s, setS] = useState<EditorState>(() => fromDraft(initial));
   const [saved, setSaved] = useState(() => JSON.stringify(fromDraft(initial)));
@@ -403,7 +411,48 @@ export function RevisionEditor({
     if (showCosts && t.costing.marginPercent !== null && t.costing.marginPercent < 0) out.push({ key: "loss", text: <>it sells below cost.</> });
     return out.map((c) => ({ key: `${o.key}-${c.key}`, text: <><b>Option {L}</b>{c.key === "price" || c.key === "gone" ? ": " : " "}{c.text}</> }));
   };
-  const checks = s.options.flatMap((o, i) => checksOf(o, i));
+  const optChecks = checksOf(opt, at);
+  const letter = optionLetter(at);
+  /** Section numbers when the form has both parts ("1 · Terms", "2 · Options for the customer"). */
+  const both = terms && options;
+  const nOffers = addable.filter(Boolean).length;
+  const margined = (m: number | null) => (m === null ? "text-muted" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : "text-ok");
+
+  /** The price box of a line: Enter and the arrows move like a spreadsheet; a column pasted from Excel fills down. */
+  const priceBox = (l: OfferLine, i: number, attr: "data-price" | "data-price-m", className: string) => (
+    <input
+      aria-label={`Unit price for ${l.no}`}
+      {...{ [attr]: `${at}:${i}` }}
+      inputMode="decimal"
+      className={className}
+      value={opt.prices[l.id] ?? ""}
+      placeholder="0.00"
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setOption(at, (o) => ({ prices: { ...o.prices, [l.id]: e.target.value } }))}
+      onKeyDown={(e) => {
+        // Like a spreadsheet: Enter and the arrows go to the price above or below.
+        const to = e.key === "ArrowDown" || (e.key === "Enter" && !e.shiftKey) ? i + 1 : e.key === "ArrowUp" || (e.key === "Enter" && e.shiftKey) ? i - 1 : null;
+        if (to === null) return;
+        const next = document.querySelector<HTMLInputElement>(`[${attr}="${at}:${to}"]`);
+        e.preventDefault();
+        next?.focus();
+      }}
+      onPaste={(e) => {
+        // A column of prices copied from Excel fills this line and the ones below.
+        const values = e.clipboardData.getData("text/plain").replace(/\r?\n$/, "").split(/\r?\n/).map((v) => v.split("\t")[0]!.trim());
+        if (values.length < 2) return;
+        e.preventDefault();
+        setOption(at, (o) => {
+          const prices = { ...o.prices };
+          values.forEach((v, n) => {
+            const target = lines[i + n];
+            if (target) prices[target.id] = v.replace(/[^\d.,-]/g, "");
+          });
+          return { prices };
+        });
+      }}
+    />
+  );
 
   return (
     <>
@@ -413,51 +462,11 @@ export function RevisionEditor({
           setSaved(JSON.stringify(s));
           onDone?.();
         }}
-        className={inPanel ? PANEL_FORM : "flex flex-col gap-5"}
+        className={inPanel ? PANEL_FORM : "flex flex-col gap-4"}
       >
         {(st) => (
           <>
             <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
-
-            {terms && !inPanel && (
-            <section aria-label="Terms" className={cn("grid gap-4 sm:grid-cols-2", !part && "lg:grid-cols-4")}>
-              <Field
-                label="Currency"
-                htmlFor={`cur-${number}`}
-                error={st.errors?.currency}
-                hint={converted ? <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span> : "Changing it converts the prices at the Settings rates"}
-              >
-                <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
-              </Field>
-              <Field label="Incoterm" htmlFor={`inco-${number}`} error={st.errors?.incoterm}>
-                <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
-                  {INCOTERMS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Place" htmlFor={`place-${number}`} optional error={st.errors?.incotermPlace} hint="Port or place for the Incoterm">
-                <Input id={`place-${number}`} value={s.incotermPlace} maxLength={80} placeholder="e.g. Qingdao" onChange={(e) => set("incotermPlace", e.target.value)} />
-              </Field>
-              <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil}>
-                <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
-              </Field>
-              <Field label="Deposit %" htmlFor={`dep-${number}`} error={st.errors?.depositPercent}>
-                <Input id={`dep-${number}`} inputMode="decimal" className="tabular" value={s.depositPercent} onChange={(e) => set("depositPercent", e.target.value)} />
-              </Field>
-              <Field label="Balance" htmlFor={`bal-${number}`} error={st.errors?.balanceTerms}>
-                <Select id={`bal-${number}`} value={s.balanceTerms} onChange={(e) => set("balanceTerms", e.target.value as BalanceTerms)}>
-                  {BALANCE_TERMS.map((b) => (
-                    <option key={b} value={b}>
-                      {BALANCE_TERMS_LABEL[b]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </section>
-            )}
 
             {terms && inPanel && (
               <>
@@ -517,387 +526,456 @@ export function RevisionEditor({
               </>
             )}
 
-            {options && (
-            <section aria-label="Options" className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold">Options for the customer</h3>
-                  <p className="text-xs text-muted">Each option is one factory&apos;s offer, lines as the factory gave them. The customer accepts one.</p>
-                </div>
-                {showCosts && (
-                  <div className="flex items-end gap-2">
-                    <div>
-                      <label htmlFor={`margin-${number}`} className="mb-1 block text-xs text-muted">
-                        Margin
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        <Input id={`margin-${number}`} inputMode="decimal" className="h-8 w-20 tabular" value={margin} onChange={(e) => setMargin(e.target.value)} />
-                        <span className="text-sm text-muted">%</span>
-                      </div>
+            {!inPanel && (
+              <div className={cn(both && "rounded-xl border border-line bg-surface shadow-card")}>
+                {/* The title, what it starts with, and the date the whole quotation is valid until. */}
+                {terms && (
+                  <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-line px-4 py-3.5 sm:px-5">
+                    <div className="min-w-0 flex-1 basis-80">
+                      <h3 className="text-lg font-semibold">{title ?? `R${number}`}</h3>
+                      {note && <p className="mt-0.5 text-xs text-text-2">{note}</p>}
                     </div>
-                    <Button size="sm" onClick={() => marginOk && setOption(at, (o) => ({ prices: priced(lines, o.prices, marginNumber, extraOf(o, offers, s.incoterm, currency).minor) }))} disabled={!marginOk || costed === 0}>
-                      Price Option {optionLetter(at)} at {marginOk ? marginNumber : "…"}%
-                    </Button>
+                    <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil} hint="the whole quotation" className="w-44 max-sm:w-full">
+                      <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
+                    </Field>
                   </div>
                 )}
-              </div>
 
-              <ChecksBox
-                title={`Before you send R${number}`}
-                items={checks}
-                ready={
-                  <>
-                    <b className="text-ok">Ready to send.</b> Every line has a price{showCosts ? " and the costs to reach your basis are in" : ""}.
-                  </>
-                }
-              />
-
-              <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start">
-                <div className="flex flex-col gap-2 2xl:sticky 2xl:top-20 2xl:w-64 2xl:shrink-0">
-                  <SelectCardList label="Options" column className="lg:px-0.5">
-                    {s.options.map((o, i) => {
-                      const t = totalsOf(o);
-                      const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
-                      const n = checksOf(o, i).length;
-                      return (
-                        <SelectCard
-                          key={o.key}
-                          wide
-                          title={`Option ${optionLetter(i)}`}
-                          figure={fmt(t.totals.total)}
-                          meta={`${o.factoryQuoteId ? (off?.factory.name ?? "A removed offer") : "The customer's items"}${o.leadTime ? ` · ${o.leadTime}` : ""}`}
-                          badges={
-                            <>
-                              {showCosts && t.costing.marginPercent !== null && <Badge tone={t.costing.marginPercent < 0 ? "bad" : "neutral"}>margin {t.costing.marginPercent.toFixed(1)}%</Badge>}
-                              {n ? <Badge tone="warn">{n} to check</Badge> : <Badge tone="ok">Ready</Badge>}
-                            </>
-                          }
-                          selected={i === at}
-                          onSelect={() => setActive(i)}
-                        />
-                      );
-                    })}
-                  </SelectCardList>
-                  {addable.length > 0 && (
-                    <Button size="sm" variant="secondary" className="self-start border-dashed text-primary 2xl:self-stretch" onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
-                      <Plus aria-hidden /> Add an option
-                    </Button>
+                <div className={cn("flex flex-col gap-6", both && "p-4 sm:p-5")}>
+                  {terms && (
+                    <section aria-labelledby={`terms-${number}`} className="flex flex-col gap-3">
+                      <SectionTitle id={`terms-${number}`} n={1} sub="for every option in this revision">
+                        Terms
+                      </SectionTitle>
+                      {/* Two kinds of terms: side by side on a wide screen, one under the other on a phone. */}
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <TermsGroup id={`pay-${number}`} title="Payment terms">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            <Field
+                              label="Currency"
+                              htmlFor={`cur-${number}`}
+                              error={st.errors?.currency}
+                              hint={converted ? <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span> : "Changing it converts the prices at the Settings rates"}
+                              className="col-span-2 sm:col-span-1"
+                            >
+                              <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
+                            </Field>
+                            <Field label="Deposit %" htmlFor={`dep-${number}`} error={st.errors?.depositPercent}>
+                              <Input id={`dep-${number}`} inputMode="decimal" className="tabular" value={s.depositPercent} onChange={(e) => set("depositPercent", e.target.value)} />
+                            </Field>
+                            <Field label="Balance" htmlFor={`bal-${number}`} error={st.errors?.balanceTerms}>
+                              <Select id={`bal-${number}`} value={s.balanceTerms} onChange={(e) => set("balanceTerms", e.target.value as BalanceTerms)}>
+                                {BALANCE_TERMS.map((b) => (
+                                  <option key={b} value={b}>
+                                    {BALANCE_TERMS_LABEL[b]}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
+                          </div>
+                          <Field label="Printed payment terms" htmlFor={`pay-terms-${number}`} optional error={st.errors?.paymentTerms} hint="Printed after the deposit and balance">
+                            <Textarea id={`pay-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. By T/T; L/C at sight accepted" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} />
+                          </Field>
+                        </TermsGroup>
+                        <TermsGroup id={`del-${number}`} title="Delivery terms">
+                          <div className="grid grid-cols-2 gap-3">
+                            <Field label="Incoterm" htmlFor={`inco-${number}`} error={st.errors?.incoterm}>
+                              <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
+                                {INCOTERMS.map((t) => (
+                                  <option key={t} value={t}>
+                                    {t}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Field label="Place" htmlFor={`place-${number}`} optional error={st.errors?.incotermPlace} hint="Port or place for the Incoterm">
+                              <Input id={`place-${number}`} value={s.incotermPlace} maxLength={80} placeholder="e.g. Qingdao" onChange={(e) => set("incotermPlace", e.target.value)} />
+                            </Field>
+                          </div>
+                          <Field label="Printed delivery terms" htmlFor={`del-terms-${number}`} optional error={st.errors?.deliveryTerms} hint="Printed under the delivery time">
+                            <Textarea id={`del-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. packing, inspection, warranty" value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
+                          </Field>
+                        </TermsGroup>
+                      </div>
+                      <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last, on the whole quotation">
+                        <Textarea id={`notes-${number}`} rows={2} className="min-h-0" placeholder="e.g. Warranty 12 months from SAT; prices include export wooden cases" value={s.notes} onChange={(e) => set("notes", e.target.value)} />
+                      </Field>
+                    </section>
                   )}
-                </div>
 
-                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  {both && <hr className="border-line" />}
 
-              {adding && (
-                <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Offers to add">
-                  {addable.map((o) => (
-                    <li key={o?.factoryQuoteId ?? "items"} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-                      <span className="min-w-0">
-                        <span className="font-medium">{o ? o.factory.name : "The customer's items, priced by hand"}</span>
-                        <span className="block text-xs text-muted">
-                          {o
-                            ? `${o.lines.length} line${o.lines.length === 1 ? "" : "s"}${o.leadTime ? ` · ${o.leadTime}` : ""}${o.totalCost ? ` · cost ${formatMinor(toMinor(o.totalCost), currency)}` : ""}`
-                            : "No factory prices: the items as the customer asked for them"}
-                        </span>
-                      </span>
-                      <span className="flex items-center gap-2">
-                        {o && <CoverageBadge missing={o.coverage.missing} />}
-                        <Button size="xs" variant="secondary" onClick={() => addOption(o?.factoryQuoteId ?? null)}>
-                          Add as Option {optionLetter(s.options.length)}
-                        </Button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                  {options && (
+                    <section aria-labelledby={`options-${number}`} className="flex flex-col gap-3">
+                      <SectionTitle id={`options-${number}`} n={both ? 2 : null} sub="each option is one factory's offer · the customer accepts one · click an option to work on it">
+                        Options for the customer
+                      </SectionTitle>
 
-              <div role="tabpanel" aria-label={`Option ${optionLetter(at)}`} className="flex flex-col gap-4 rounded-xl border border-line p-3 sm:p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">
-                      Option {optionLetter(at)} — {opt.factoryQuoteId ? (offer?.factory.name ?? "an offer that was removed") : "the customer's items"}
-                    </p>
-                    {coverage && (
-                      <p className="mt-0.5 text-xs">
-                        {coverage.missing.length ? (
-                          <span className="flex items-start gap-1 text-warn">
-                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                            Does not cover {coverage.missing.map((n) => `${n} (${itemName(n)})`).join(", ")}
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-ok">
-                            <CheckCircle2 className="size-3.5" aria-hidden /> Covers everything the customer asked for
-                          </span>
+                      {/* The options as a row of cards on top; on a phone the row scrolls sideways. */}
+                      <SelectCardList label="Options" className="sm:-mx-5 sm:scroll-px-5 sm:px-5 lg:mx-0 lg:scroll-px-0 lg:px-0.5">
+                        {s.options.map((o, i) => {
+                          const t = totalsOf(o);
+                          const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
+                          const n = checksOf(o, i).length;
+                          return (
+                            <SelectCard
+                              key={o.key}
+                              title={`Option ${optionLetter(i)}`}
+                              figure={fmt(t.totals.total)}
+                              meta={`${o.factoryQuoteId ? (off?.factory.name ?? "A removed offer") : "The customer's items"}${o.leadTime ? ` · ${o.leadTime}` : ""}`}
+                              badges={
+                                <>
+                                  {showCosts && t.costing.marginPercent !== null && <Badge tone={t.costing.marginPercent < 0 ? "bad" : "neutral"}>margin {t.costing.marginPercent.toFixed(1)}%</Badge>}
+                                  {n ? <Badge tone="warn">{n} to check</Badge> : <Badge tone="ok">Ready</Badge>}
+                                </>
+                              }
+                              selected={i === at}
+                              onSelect={() => setActive(i)}
+                            />
+                          );
+                        })}
+                        {addable.length > 0 && (
+                          <AddCard
+                            expanded={adding}
+                            onClick={() => setAdding((v) => !v)}
+                            hint={nOffers ? `${nOffers} more offer${nOffers === 1 ? "" : "s"} to add` : "the customer's items, by hand"}
+                          >
+                            Add an option
+                          </AddCard>
                         )}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button size="icon-xs" variant="ghost" disabled={at === 0} aria-label="Move this option left" onClick={() => {
-                        setS((x) => ({ ...x, options: swap(x.options, at, at - 1) }));
-                        setActive(at - 1);
-                      }}>
-                      <ArrowLeft aria-hidden />
-                    </Button>
-                    <Button size="icon-xs" variant="ghost" disabled={at === s.options.length - 1} aria-label="Move this option right" onClick={() => {
-                        setS((x) => ({ ...x, options: swap(x.options, at, at + 1) }));
-                        setActive(at + 1);
-                      }}>
-                      <ArrowRight aria-hidden />
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="danger-ghost"
-                      disabled={s.options.length === 1}
-                      onClick={() => {
-                        setS((x) => ({ ...x, options: x.options.filter((_, n) => n !== at) }));
-                        setActive(Math.max(0, at - 1));
-                      }}
-                    >
-                      <Trash2 aria-hidden /> Remove option
-                    </Button>
-                  </div>
-                </div>
+                      </SelectCardList>
 
-                {lines.length === 0 && opt.factoryQuoteId && !offer && (
-                  <p className="rounded-md bg-warn-soft px-3 py-2 text-sm">This factory offer was removed from the inquiry. Remove this option or choose another offer.</p>
-                )}
-
-                <div className="relative overflow-x-auto rounded-lg border border-line bg-surface">
-                  <table className={cn(SHEET, "min-w-[640px]")} aria-label={`Option ${optionLetter(at)} prices`}>
-                    <thead>
-                      <tr>
-                        <th className={cn(HEAD, "w-12 text-center")}>No.</th>
-                        <th className={HEAD}>Description</th>
-                        <th className={cn(HEAD, "w-28 text-right")}>Qty</th>
-                        {showCosts && <th className={cn(HEAD, "w-32 text-right")}>{extra.minor > 0 ? "Landed cost" : "Cost"}</th>}
-                        <th className={cn(HEAD, "w-36 text-right")}>Unit price ({currency})</th>
-                        {showCosts && <th className={cn(HEAD, "w-24 text-right")}>Margin</th>}
-                        <th className={cn(HEAD, "w-36 text-right")}>Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lines.map((l, i) => {
-                        const price = opt.prices[l.id] ?? "";
-                        // On the landed cost: the factory's cost plus this line's share of the costs to reach our basis.
-                        const cost = landed[i] ?? null;
-                        const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
-                        return (
-                          <tr key={l.id}>
-                            <th scope="row" className={cn(CELL, "bg-surface-2 text-center text-xs font-normal text-muted tabular")}>
-                              {l.no}
-                            </th>
-                            <td className={cn(CELL, "py-1.5")}>
-                              <span className="block whitespace-pre-line">{l.description}</span>
-                              <span className="block text-xs text-muted">
-                                {[l.model, opt.factoryQuoteId && l.answersNo ? `for item ${l.answersNo}` : null].filter(Boolean).join(" · ")}
+                      {adding && (
+                        <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Offers to add">
+                          {addable.map((o) => (
+                            <li key={o?.factoryQuoteId ?? "items"} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                              <span className="min-w-0">
+                                <span className="font-medium">{o ? o.factory.name : "The customer's items, priced by hand"}</span>
+                                <span className="block text-xs text-muted">
+                                  {o
+                                    ? `${o.lines.length} line${o.lines.length === 1 ? "" : "s"}${o.leadTime ? ` · ${o.leadTime}` : ""}${o.totalCost ? ` · cost ${formatMinor(toMinor(o.totalCost), currency)}` : ""}`
+                                    : "No factory prices: the items as the customer asked for them"}
+                                </span>
                               </span>
-                            </td>
-                            <td className={cn(CELL, "bg-surface-2/40 text-right whitespace-nowrap text-text-2 tabular")}>
-                              {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
-                            </td>
-                            {showCosts && (
-                              <td className={cn(CELL, "bg-surface-2/40 text-right whitespace-nowrap text-text-2 tabular")}>
-                                {cost === null ? "—" : fmt(cost)}
-                                {cost !== null && extra.minor > 0 && l.unitCost !== null && (
-                                  <span className="block text-xs text-muted" title={`Factory ${fmt(toMinor(l.unitCost))} + its share of the costs to reach ${s.incoterm}`}>
-                                    factory {fmt(toMinor(l.unitCost))}
+                              <span className="flex items-center gap-2">
+                                {o && <CoverageBadge missing={o.coverage.missing} />}
+                                <Button size="xs" variant="secondary" onClick={() => addOption(o?.factoryQuoteId ?? null)}>
+                                  Add as Option {optionLetter(s.options.length)}
+                                </Button>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {/* The chosen option, full width. */}
+                      <div role="tabpanel" aria-label={`Option ${letter}`} className="flex min-w-0 flex-col rounded-xl border border-primary/60 bg-surface">
+                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-3 py-3 sm:px-4">
+                          <div className="min-w-0">
+                            <p className="text-base font-semibold">
+                              Option {letter} · {opt.factoryQuoteId ? (offer?.factory.name ?? "an offer that was removed") : "the customer's items"}
+                            </p>
+                            {coverage && (
+                              <p className="mt-0.5 text-xs">
+                                {coverage.missing.length ? (
+                                  <span className="flex items-start gap-1 text-warn">
+                                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                                    Does not cover {coverage.missing.map((n) => `${n} (${itemName(n)})`).join(", ")}
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1 text-ok">
+                                    <CheckCircle2 className="size-3.5" aria-hidden /> Covers everything the customer asked for
                                   </span>
                                 )}
-                              </td>
+                              </p>
                             )}
-                            <td className={cn(CELL, "p-0")}>
-                              <input
-                                aria-label={`Unit price for ${l.no}`}
-                                data-price={`${at}:${i}`}
-                                inputMode="decimal"
-                                className="block h-9 w-full min-w-0 border-0 bg-transparent px-2 text-right text-sm tabular outline-none placeholder:text-muted/70 focus:bg-surface focus:ring-2 focus:ring-primary focus:ring-inset"
-                                value={price}
-                                placeholder="0.00"
-                                onFocus={(e) => e.currentTarget.select()}
-                                onChange={(e) => setOption(at, (o) => ({ prices: { ...o.prices, [l.id]: e.target.value } }))}
-                                onKeyDown={(e) => {
-                                  // Like a spreadsheet: Enter and the arrows go to the price above or below.
-                                  const to = e.key === "ArrowDown" || (e.key === "Enter" && !e.shiftKey) ? i + 1 : e.key === "ArrowUp" || (e.key === "Enter" && e.shiftKey) ? i - 1 : null;
-                                  if (to === null) return;
-                                  const next = document.querySelector<HTMLInputElement>(`[data-price="${at}:${to}"]`);
-                                  e.preventDefault();
-                                  next?.focus();
-                                }}
-                                onPaste={(e) => {
-                                  // A column of prices copied from Excel fills this line and the ones below.
-                                  const values = e.clipboardData.getData("text/plain").replace(/\r?\n$/, "").split(/\r?\n/).map((v) => v.split("\t")[0]!.trim());
-                                  if (values.length < 2) return;
-                                  e.preventDefault();
-                                  setOption(at, (o) => {
-                                    const prices = { ...o.prices };
-                                    values.forEach((v, n) => {
-                                      const target = lines[i + n];
-                                      if (target) prices[target.id] = v.replace(/[^\d.,-]/g, "");
-                                    });
-                                    return { prices };
-                                  });
-                                }}
-                              />
-                            </td>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
                             {showCosts && (
-                              <td className={cn(CELL, "text-right font-medium tabular", m === null ? "text-muted" : m < 0 ? "text-bad" : m < 5 ? "text-warn" : "text-ok")}>
-                                {m === null ? "—" : `${m.toFixed(1)}%`}
-                              </td>
+                              <>
+                                <label htmlFor={`margin-${number}`} className="text-xs text-text-2">
+                                  Price all at
+                                </label>
+                                <Input id={`margin-${number}`} inputMode="decimal" className="h-8 w-16 text-right tabular" value={margin} onChange={(e) => setMargin(e.target.value)} />
+                                <span className="text-sm text-muted">%</span>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  aria-label={`Price every line of Option ${letter} at ${marginOk ? marginNumber : "…"}%`}
+                                  onClick={() => marginOk && setOption(at, (o) => ({ prices: priced(lines, o.prices, marginNumber, extraOf(o, offers, s.incoterm, currency).minor) }))}
+                                  disabled={!marginOk || costed === 0}
+                                >
+                                  Apply
+                                </Button>
+                                <span className="mx-1 h-6 w-px bg-line" aria-hidden />
+                              </>
                             )}
-                            <td className={cn(CELL, "bg-surface-2/40 text-right font-semibold whitespace-nowrap tabular")}>{fmt(totals.lines[i]?.lineTotal ?? 0)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-xs text-muted">
-                  Type a price and press Enter for the next line; a column of prices copied from Excel fills the lines below. The factory&apos;s lines
-                  themselves change on Factory prices.
-                </p>
-                {showCosts && opt.factoryQuoteId && (
-                  <BasisCosts
-                    letter={optionLetter(at)}
-                    factoryBasis={offer?.basis ?? null}
-                    factoryPlace={offer?.basisPlace ?? null}
-                    selling={s.incoterm}
-                    sellingPlace={s.incotermPlace}
-                    currency={currency}
-                    fx={fx}
-                    costs={opt.costs}
-                    extra={extra}
-                    asLine={(step) => asLineOf(opt, step)}
-                    convert={(c) => {
-                      const rate = /^[A-Z]{3}$/.test(currency) && valid(c.amount) ? fxRate(c.currency.trim().toUpperCase(), currency, offers.mainCurrency, offers.rates) : null;
-                      return rate === null ? null : convertMinor(toMinor(numberText(c.amount)), rate);
-                    }}
-                    fmt={fmt}
-                    onChange={(step, patch) =>
-                      setOption(at, (o) => ({
-                        costs: { ...o.costs, [step]: { ...(o.costs[step] ?? { amount: "", currency: currency === "—" ? "USD" : currency, note: "" }), ...patch } },
-                      }))
-                    }
-                    onAsLine={(step, costMinor) =>
-                      setOption(at, (o) => ({
-                        costs: { ...o.costs, [step]: { amount: "", currency: o.costs[step]?.currency ?? currency, note: "" } },
-                        charges: [
-                          ...o.charges,
-                          {
-                            key: rowKey(),
-                            parentKey: null,
-                            type: "charge",
-                            description: STEP_LINE[step](s.incotermPlace.trim()),
-                            quantity: "1",
-                            unit: "lot",
-                            unitCost: fromMinor(costMinor),
-                            unitPrice: fromMinor(priceForMargin(costMinor, marginOk ? marginNumber : offers.defaultMargin)),
-                          },
-                        ],
-                      }))
-                    }
-                  />
-                )}
-                <section aria-label="Charges" className="flex flex-col gap-1.5">
-                  <h4 className="text-sm font-medium">
-                    Charges <span className="text-xs font-normal text-muted">freight, inspection, insurance… our own price{showCosts ? ", and cost if known" : ""}</span>
-                  </h4>
-                  <LineTable
-                    flat
-                    noun="charge"
-                    rows={opt.charges.map((c) => ({
-                      key: c.key,
-                      parentKey: null,
-                      values: { description: c.description, quantity: c.quantity, unit: c.unit, unitCost: c.unitCost, unitPrice: c.unitPrice },
-                    }))}
-                    columns={chargeColumns}
-                    {...localLineHandlers(
-                      opt.charges,
-                      (fn) => setOption(at, (o) => ({ charges: fn(o.charges) })),
-                      (values) => ({
-                        key: rowKey(),
-                        parentKey: null,
-                        type: "charge" as const,
-                        description: values.description ?? "",
-                        quantity: values.quantity || "1",
-                        unit: values.unit || "lot",
-                        unitPrice: values.unitPrice ?? "",
-                        unitCost: values.unitCost ?? "",
-                      }),
-                      (row, values) => ({ ...row, ...values }),
-                    )}
-                  />
-                </section>
-                <ErrorText error={st.errors?.options} />
+                            <Button
+                              size="icon-xs"
+                              variant="ghost"
+                              disabled={at === 0}
+                              aria-label={`Move option ${letter} left`}
+                              onClick={() => {
+                                setS((x) => ({ ...x, options: swap(x.options, at, at - 1) }));
+                                setActive(at - 1);
+                              }}
+                            >
+                              <ArrowLeft aria-hidden />
+                            </Button>
+                            <Button
+                              size="icon-xs"
+                              variant="ghost"
+                              disabled={at === s.options.length - 1}
+                              aria-label={`Move option ${letter} right`}
+                              onClick={() => {
+                                setS((x) => ({ ...x, options: swap(x.options, at, at + 1) }));
+                                setActive(at + 1);
+                              }}
+                            >
+                              <ArrowRight aria-hidden />
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant="danger-ghost"
+                              disabled={s.options.length === 1}
+                              title={s.options.length === 1 ? "A quotation keeps at least one option" : undefined}
+                              aria-label={`Remove option ${letter}`}
+                              onClick={() => {
+                                setS((x) => ({ ...x, options: x.options.filter((_, n) => n !== at) }));
+                                setActive(Math.max(0, at - 1));
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
 
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-                  <Field label="Lead time" htmlFor={`lead-${opt.key}`} optional hint="For this option, e.g. 45 days after deposit">
-                    <Input id={`lead-${opt.key}`} value={opt.leadTime} maxLength={120} onChange={(e) => setOption(at, { leadTime: e.target.value })} />
-                  </Field>
-                  <div className="flex flex-col gap-3">
-                    <dl className="rounded-lg border border-line p-3 text-sm">
-                      <div className="flex justify-between py-1">
-                        <dt className="text-muted">Subtotal</dt>
-                        <dd className="tabular">{fmt(totals.subtotal)}</dd>
+                        <div className="flex flex-col gap-4 p-3 sm:p-4">
+                          <ChecksBox
+                            title={`Option ${letter}: before you send R${number}`}
+                            items={optChecks}
+                            ready={
+                              <>
+                                <b className="text-ok">Ready to send.</b> Every line has a price{showCosts && opt.factoryQuoteId ? ` and the costs to reach ${s.incoterm} are in` : ""}.
+                              </>
+                            }
+                          />
+
+                          {lines.length === 0 && opt.factoryQuoteId && !offer && (
+                            <p className="rounded-md bg-warn-soft px-3 py-2 text-sm">This factory offer was removed from the inquiry. Remove this option or choose another offer.</p>
+                          )}
+
+                          {/* Wide: every column in view (no sideways scroll from 1024px). */}
+                          <div className="relative overflow-x-auto rounded-lg border border-line bg-surface max-sm:hidden">
+                            <table className={cn(SHEET, "min-w-[640px] lg:min-w-0")} aria-label={`Option ${letter} prices`}>
+                              <thead>
+                                <tr>
+                                  <th className={cn(HEAD, "w-12 text-center")}>No.</th>
+                                  <th className={HEAD}>Description</th>
+                                  <th className={cn(HEAD, "w-24 text-right")}>Qty</th>
+                                  {showCosts && <th className={cn(HEAD, "w-28 text-right")}>{extra.minor > 0 ? "Landed cost" : "Cost"}</th>}
+                                  <th className={cn(HEAD, "w-36 text-right")}>Unit price ({currency})</th>
+                                  {showCosts && <th className={cn(HEAD, "w-20 text-right")}>Margin</th>}
+                                  <th className={cn(HEAD, "w-32 text-right")}>Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {lines.map((l, i) => {
+                                  const price = opt.prices[l.id] ?? "";
+                                  // On the landed cost: the factory's cost plus this line's share of the costs to reach our basis.
+                                  const cost = landed[i] ?? null;
+                                  const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
+                                  return (
+                                    <tr key={l.id}>
+                                      <th scope="row" className={cn(CELL, "bg-surface-2 text-center text-xs font-normal text-muted tabular")}>
+                                        {l.no}
+                                      </th>
+                                      <td className={cn(CELL, "py-1.5")}>
+                                        <span className="block whitespace-pre-line">{l.description}</span>
+                                        <span className="block text-xs text-muted">
+                                          {[l.model, opt.factoryQuoteId && l.answersNo ? `for item ${l.answersNo}` : null].filter(Boolean).join(" · ")}
+                                        </span>
+                                      </td>
+                                      <td className={cn(CELL, "bg-surface-2/40 text-right whitespace-nowrap text-text-2 tabular")}>
+                                        {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
+                                      </td>
+                                      {showCosts && (
+                                        <td className={cn(CELL, "bg-surface-2/40 text-right whitespace-nowrap text-text-2 tabular")}>
+                                          {cost === null ? "—" : fmt(cost)}
+                                          {cost !== null && extra.minor > 0 && l.unitCost !== null && (
+                                            <span className="block text-xs text-muted" title={`Factory ${fmt(toMinor(l.unitCost))} + its share of the costs to reach ${s.incoterm}`}>
+                                              factory {fmt(toMinor(l.unitCost))}
+                                            </span>
+                                          )}
+                                        </td>
+                                      )}
+                                      <td className={cn(CELL, "p-0")}>
+                                        {priceBox(
+                                          l,
+                                          i,
+                                          "data-price",
+                                          "block h-9 w-full min-w-0 border-0 bg-transparent px-2 text-right text-sm tabular outline-none placeholder:text-muted/70 focus:bg-surface focus:ring-2 focus:ring-primary focus:ring-inset",
+                                        )}
+                                      </td>
+                                      {showCosts && <td className={cn(CELL, "text-right font-medium tabular", margined(m))}>{m === null ? "—" : `${m.toFixed(1)}%`}</td>}
+                                      <td className={cn(CELL, "bg-surface-2/40 text-right font-semibold whitespace-nowrap tabular")}>{fmt(totals.lines[i]?.lineTotal ?? 0)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                          {/* Phone: one row per line, its price box on the right (as on Edit prices). */}
+                          <ul className="flex flex-col divide-y divide-line sm:hidden" aria-label={`Option ${letter} prices`}>
+                            {lines.map((l, i) => {
+                              const price = opt.prices[l.id] ?? "";
+                              const cost = landed[i] ?? null;
+                              const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
+                              return (
+                                <li key={l.id} className={cn("flex items-center gap-3 py-2.5", l.no.includes(".") && "pl-3")}>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm">
+                                      <span className="text-xs text-muted tabular">{l.no}</span> {l.description.split("\n")[0]}
+                                    </span>
+                                    <span className="block text-xs text-text-2 tabular">
+                                      {Number(l.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {l.unit}
+                                      {showCosts && cost !== null ? ` · cost ${fmt(cost)}` : ""}
+                                      {showCosts && m !== null && <span className={margined(m)}> · {m.toFixed(1)}%</span>}
+                                    </span>
+                                  </span>
+                                  {priceBox(
+                                    l,
+                                    i,
+                                    "data-price-m",
+                                    "h-9 w-28 shrink-0 rounded-lg border border-line bg-surface px-3 text-right text-sm tabular outline-none placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary/30",
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          <p className="text-xs text-muted">
+                            Type a price and press Enter for the next line; a column of prices copied from Excel fills the lines below. The factory&apos;s lines
+                            themselves change on Factory prices.
+                          </p>
+                          {showCosts && opt.factoryQuoteId && (
+                            <BasisCosts
+                              letter={letter}
+                              factoryBasis={offer?.basis ?? null}
+                              factoryPlace={offer?.basisPlace ?? null}
+                              selling={s.incoterm}
+                              sellingPlace={s.incotermPlace}
+                              currency={currency}
+                              fx={fx}
+                              costs={opt.costs}
+                              extra={extra}
+                              asLine={(step) => asLineOf(opt, step)}
+                              convert={(c) => {
+                                const rate = /^[A-Z]{3}$/.test(currency) && valid(c.amount) ? fxRate(c.currency.trim().toUpperCase(), currency, offers.mainCurrency, offers.rates) : null;
+                                return rate === null ? null : convertMinor(toMinor(numberText(c.amount)), rate);
+                              }}
+                              fmt={fmt}
+                              onChange={(step, patch) =>
+                                setOption(at, (o) => ({
+                                  costs: { ...o.costs, [step]: { ...(o.costs[step] ?? { amount: "", currency: currency === "—" ? "USD" : currency, note: "" }), ...patch } },
+                                }))
+                              }
+                              onAsLine={(step, costMinor) =>
+                                setOption(at, (o) => ({
+                                  costs: { ...o.costs, [step]: { amount: "", currency: o.costs[step]?.currency ?? currency, note: "" } },
+                                  charges: [
+                                    ...o.charges,
+                                    {
+                                      key: rowKey(),
+                                      parentKey: null,
+                                      type: "charge",
+                                      description: STEP_LINE[step](s.incotermPlace.trim()),
+                                      quantity: "1",
+                                      unit: "lot",
+                                      unitCost: fromMinor(costMinor),
+                                      unitPrice: fromMinor(priceForMargin(costMinor, marginOk ? marginNumber : offers.defaultMargin)),
+                                    },
+                                  ],
+                                }))
+                              }
+                            />
+                          )}
+                          <section aria-label="Charges" className="flex flex-col gap-1.5">
+                            <h4 className="text-sm font-medium">
+                              Charges <span className="text-xs font-normal text-muted">freight, inspection, insurance… our own price{showCosts ? ", and cost if known" : ""}</span>
+                            </h4>
+                            <LineTable
+                              flat
+                              noun="charge"
+                              rows={opt.charges.map((c) => ({
+                                key: c.key,
+                                parentKey: null,
+                                values: { description: c.description, quantity: c.quantity, unit: c.unit, unitCost: c.unitCost, unitPrice: c.unitPrice },
+                              }))}
+                              columns={chargeColumns}
+                              {...localLineHandlers(
+                                opt.charges,
+                                (fn) => setOption(at, (o) => ({ charges: fn(o.charges) })),
+                                (values) => ({
+                                  key: rowKey(),
+                                  parentKey: null,
+                                  type: "charge" as const,
+                                  description: values.description ?? "",
+                                  quantity: values.quantity || "1",
+                                  unit: values.unit || "lot",
+                                  unitPrice: values.unitPrice ?? "",
+                                  unitCost: values.unitCost ?? "",
+                                }),
+                                (row, values) => ({ ...row, ...values }),
+                              )}
+                            />
+                          </section>
+                          <ErrorText error={st.errors?.options} />
+
+                          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+                            <Field label="Lead time" htmlFor={`lead-${opt.key}`} optional hint="For this option, e.g. 45 days after deposit">
+                              <Input id={`lead-${opt.key}`} value={opt.leadTime} maxLength={120} onChange={(e) => setOption(at, { leadTime: e.target.value })} />
+                            </Field>
+                            <div className="flex flex-col gap-3">
+                              <dl className="rounded-lg border border-line p-3 text-sm">
+                                <div className="flex justify-between py-1">
+                                  <dt className="text-muted">Subtotal</dt>
+                                  <dd className="tabular">{fmt(totals.subtotal)}</dd>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 py-1">
+                                  <dt>
+                                    <label htmlFor={`disc-${opt.key}`} className="text-muted">
+                                      Discount
+                                    </label>
+                                  </dt>
+                                  <dd>
+                                    <Input id={`disc-${opt.key}`} inputMode="decimal" className="h-8 w-32 text-right tabular" value={opt.discount} placeholder="0.00" onChange={(e) => setOption(at, { discount: e.target.value })} />
+                                  </dd>
+                                </div>
+                                <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">
+                                  <dt>Option {letter} total</dt>
+                                  <dd className="tabular">{fmt(totals.total)}</dd>
+                                </div>
+                              </dl>
+                              {showCosts && (
+                                <CostingBox
+                                  currency={currency}
+                                  cost={costing.costMinor}
+                                  sales={costing.salesMinor}
+                                  profit={costing.profitMinor}
+                                  margin={costing.marginPercent}
+                                  uncosted={costing.uncostedLines}
+                                  extra={costing.extraCostMinor}
+                                  extraLabel={`incl. costs to reach ${s.incoterm}`}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between gap-3 py-1">
-                        <dt>
-                          <label htmlFor={`disc-${opt.key}`} className="text-muted">
-                            Discount
-                          </label>
-                        </dt>
-                        <dd>
-                          <Input id={`disc-${opt.key}`} inputMode="decimal" className="h-8 w-32 text-right tabular" value={opt.discount} placeholder="0.00" onChange={(e) => setOption(at, { discount: e.target.value })} />
-                        </dd>
-                      </div>
-                      <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">
-                        <dt>Option {optionLetter(at)} total</dt>
-                        <dd className="tabular">{fmt(totals.total)}</dd>
-                      </div>
-                    </dl>
-                    {showCosts && (
-                      <CostingBox
-                        currency={currency}
-                        cost={costing.costMinor}
-                        sales={costing.salesMinor}
-                        profit={costing.profitMinor}
-                        margin={costing.marginPercent}
-                        uncosted={costing.uncostedLines}
-                        extra={costing.extraCostMinor}
-                        extraLabel={`incl. costs to reach ${s.incoterm}`}
-                      />
-                    )}
-                  </div>
+                    </section>
+                  )}
                 </div>
               </div>
-                </div>
-              </div>
-            </section>
-            )}
-
-            {terms && !inPanel && (
-            <section aria-label="Terms and notes" className={cn("grid gap-4", !part && "lg:grid-cols-2")}>
-              <Field
-                label="Payment terms"
-                htmlFor={`pay-terms-${number}`}
-                optional
-                error={st.errors?.paymentTerms}
-                hint="Printed after the deposit and balance, e.g. By T/T; L/C at sight accepted"
-              >
-                <Textarea id={`pay-terms-${number}`} rows={3} value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} />
-              </Field>
-              <Field
-                label="Delivery terms"
-                htmlFor={`del-terms-${number}`}
-                optional
-                error={st.errors?.deliveryTerms}
-                hint="Printed under the delivery time, e.g. packing, inspection, warranty"
-              >
-                <Textarea id={`del-terms-${number}`} rows={3} value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
-              </Field>
-              <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last" className={cn(!part && "lg:col-span-2")}>
-                <Textarea id={`notes-${number}`} rows={3} value={s.notes} onChange={(e) => set("notes", e.target.value)} />
-              </Field>
-            </section>
             )}
             {part === "options" && <ErrorText error={st.errors?.currency ?? st.errors?.validUntil} />}
 
@@ -914,16 +992,56 @@ export function RevisionEditor({
                 {dirty && requireChanges && <span className="text-xs text-warn">Unsaved changes</span>}
               </PanelActions>
             ) : (
-              <StickyBar>
-                <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
-                  {submitLabel}
-                </SubmitButton>
-                {onCancel && (
-                  <Button variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
-                    Cancel
-                  </Button>
+              <StickyBar className="gap-x-6 px-4 py-2.5 sm:px-5">
+                {options && (
+                  <>
+                    {/* The chosen option's money: wide, every figure; phone, the total and the margin. */}
+                    <dl className="flex flex-wrap items-end gap-x-6 gap-y-1 max-sm:hidden">
+                      <Fig label={s.options.length > 1 ? `Option ${letter} total` : "Total"} strong>
+                        {fmt(totals.total)}
+                      </Fig>
+                      {showCosts && (
+                        <>
+                          <Fig label="Cost">{fmt(costing.costMinor)}</Fig>
+                          <Fig label="Profit" className={costing.profitMinor < 0 ? "text-bad" : undefined}>
+                            {fmt(costing.profitMinor)}
+                          </Fig>
+                          <Fig label="Margin" strong className={costing.marginPercent !== null && costing.marginPercent < 0 ? "text-bad" : undefined}>
+                            {costing.marginPercent === null ? "—" : `${costing.marginPercent.toFixed(1)}%`}
+                          </Fig>
+                        </>
+                      )}
+                    </dl>
+                    <div className="min-w-0 sm:hidden">
+                      <p className="text-xs text-text-2">
+                        {s.options.length > 1 ? `Option ${letter}` : "Total"}
+                        {showCosts ? " · margin" : ""}
+                      </p>
+                      <p className="text-sm font-semibold tabular">
+                        {fmt(totals.total)}
+                        {showCosts && costing.marginPercent !== null ? ` · ${costing.marginPercent.toFixed(1)}%` : ""}
+                      </p>
+                    </div>
+                  </>
                 )}
-                {dirty && requireChanges && <span className="text-xs text-warn">Unsaved changes</span>}
+                <div className="ml-auto flex items-center gap-2">
+                  {dirty && requireChanges && <span className="text-xs text-warn max-lg:hidden">Unsaved changes</span>}
+                  {onCancel && (
+                    <Button variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
+                      Cancel
+                    </Button>
+                  )}
+                  <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
+                    {submitShort ? (
+                      <>
+                        <span className="max-sm:hidden">{submitLabel}</span>
+                        <span className="sm:hidden">{submitShort}</span>
+                      </>
+                    ) : (
+                      submitLabel
+                    )}
+                  </SubmitButton>
+                </div>
               </StickyBar>
             )}
           </>
@@ -931,6 +1049,41 @@ export function RevisionEditor({
       </ActionForm>
       {footer?.(dirty)}
     </>
+  );
+}
+
+/** "1 · Terms" with its short line under it. */
+function SectionTitle({ id, n, sub, children }: { id: string; n: number | null; sub: ReactNode; children: ReactNode }) {
+  return (
+    <div>
+      <h4 id={id} className="text-[0.9375rem] font-semibold">
+        {n !== null && <span className="font-medium text-muted">{n} · </span>}
+        {children}
+      </h4>
+      <p className="text-xs text-text-2">{sub}</p>
+    </div>
+  );
+}
+
+/** One kind of terms (payment, delivery): titled, its fields under the title. */
+function TermsGroup({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-labelledby={id} className="flex min-w-0 flex-col gap-3 rounded-lg border border-line p-3 sm:p-4">
+      <h5 id={id} className="text-sm font-semibold">
+        {title}
+      </h5>
+      {children}
+    </div>
+  );
+}
+
+/** A figure in a totals bar: small label over the amount. */
+export function Fig({ label, children, strong, className }: { label: string; children: ReactNode; strong?: boolean; className?: string }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-xs text-text-2">{label}</dt>
+      <dd className={cn("text-sm font-semibold whitespace-nowrap tabular", strong && "text-base", className)}>{children}</dd>
+    </div>
   );
 }
 
@@ -1155,7 +1308,7 @@ export function BasisCosts({
             <p className="text-xs text-muted">
               {extra.minor > 0 ? (
                 <>
-                  <span className="font-medium text-text">{fmt(extra.minor)}</span> added to Option {letter}&apos;s cost. &ldquo;Price Option {letter}&rdquo; spreads it
+                  <span className="font-medium text-text">{fmt(extra.minor)}</span> added to Option {letter}&apos;s cost. &ldquo;Price all at … %&rdquo; spreads it
                   over the lines, so the prices cover it.
                 </>
               ) : (
@@ -1164,7 +1317,7 @@ export function BasisCosts({
               {extra.noRate && <span className="ml-1 text-warn">There is no exchange rate for {extra.noRate} in Settings.</span>}
               {gap.needed.some((x) => asLine(x)) && (
                 <span className="mt-1 block text-warn">
-                  A cost shown as its own line is no longer spread into the prices: press &ldquo;Price Option {letter}&rdquo; again if you priced before moving it.
+                  A cost shown as its own line is no longer spread into the prices: price Option {letter} again (&ldquo;Price all at … %&rdquo;) if you priced before moving it.
                 </span>
               )}
             </p>

@@ -11,10 +11,14 @@ Code: apps/web/src/components/deals/revision-editor.tsx (the "New revision" / re
 1. Title block: "New revision Rn" with the start note as its subtitle ("Starts with <factory>: covers
    everything asked for, cost …, priced at your default n%. Add more offers as Options B, C…"). The separate
    grey "Rn WILL START WITH" box goes away.
-2. "1 · Terms — for every option in this revision": Currency, Incoterm, Place (optional), Valid until,
-   Deposit %, Balance in one row of 6 on wide screens (3 / 2 / 1 columns as it narrows). Printed terms and
-   notes behind a "More: printed terms and notes" toggle (keep all fields; open automatically if any has a
-   value or an error).
+2. "1 · Terms — for every option in this revision" (changed by the owner on 3 Nov, replacing the one-row/"More"
+   idea): the terms are two kinds, as before, shown as TWO titled groups side by side on wide screens (stacked on
+   phones):
+   - "Payment terms": Currency, Deposit %, Balance, and the printed payment terms (textarea, always visible).
+   - "Delivery terms": Incoterm, Place (optional), and the printed delivery terms (textarea, always visible).
+   "Valid until" sits at the top right of the "New revision Rn" title block (it belongs to the quotation as a
+   whole). "Notes" (printed last) is a full-width optional field under the two groups, always visible. Same
+   fields and data as today, only grouped this way; nothing hidden behind a toggle.
 3. "2 · Options for the customer": the option cards become a horizontal row ABOVE the option, at every
    width (no left column, remove the 2xl side layout). Each card: Option X + total, factory · lead time,
    margin badge + Ready / n to check; selected = primary border + soft fill; "+ Add an option" as a dashed

@@ -157,20 +157,43 @@ export function SelectCard({
   );
 }
 
-/** The dashed "Add …" card that ends a SelectCard list. */
-export function AddCard({ children, onClick, pressed, wide }: { children: ReactNode; onClick?: () => void; pressed?: boolean; wide?: boolean }) {
+/**
+ * The dashed "Add …" card that ends a SelectCard list, with an optional small
+ * line under it ("2 more offers to add"). `expanded`: it opens a list (a
+ * disclosure, announced as such) rather than toggling a state.
+ */
+export function AddCard({
+  children,
+  hint,
+  onClick,
+  pressed,
+  expanded,
+  wide,
+}: {
+  children: ReactNode;
+  hint?: ReactNode;
+  onClick?: () => void;
+  pressed?: boolean;
+  expanded?: boolean;
+  wide?: boolean;
+}) {
+  const on = pressed ?? expanded;
   return (
     <li className={cn("w-48 shrink-0 snap-start", wide && "2xl:w-auto")}>
       <button
         type="button"
         onClick={onClick}
-        aria-pressed={pressed}
+        aria-pressed={expanded === undefined ? pressed : undefined}
+        aria-expanded={expanded}
         className={cn(
-          "flex h-full min-h-12 w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed px-3 py-3 text-sm font-semibold text-primary",
-          pressed ? "border-primary bg-primary-soft" : "border-primary/40 bg-surface hover:border-primary",
+          "flex h-full min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl border-[1.5px] border-dashed px-3 py-3 text-sm font-semibold text-primary",
+          on ? "border-primary bg-primary-soft" : "border-primary/40 bg-surface hover:border-primary",
         )}
       >
-        <Plus className="size-4" aria-hidden /> {children}
+        <span className="flex items-center gap-2">
+          <Plus className="size-4" aria-hidden /> {children}
+        </span>
+        {hint && <span className="text-xs font-normal text-text-2">{hint}</span>}
       </button>
     </li>
   );
