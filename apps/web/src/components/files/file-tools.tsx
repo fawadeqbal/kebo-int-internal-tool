@@ -289,10 +289,13 @@ export function FileChip({
   file,
   set,
   className,
+  compact,
 }: {
   file: OrderFile | { id: string; name: string; href: string; viewHref?: string | null };
   set?: OrderFile[];
   className?: string;
+  /** Only the name (it opens the file; the row around it has the menu): for narrow cells. */
+  compact?: boolean;
 }) {
   const tools = useFileTools();
   const phone = useIsPhone();
@@ -312,6 +315,18 @@ export function FileChip({
         <FileText className="size-3.5 shrink-0 text-muted" aria-hidden />
         <span className="truncate">{file.name}</span>
       </a>
+    );
+  if (compact)
+    return (
+      <button
+        type="button"
+        className={cn(pill, "max-w-full pr-2.5 hover:border-primary/50", className)}
+        onClick={() => tools.view(full, set)}
+        title={`${full.name} · open it here`}
+      >
+        <FileIcon file={full} className="size-3.5" />
+        <span className="truncate">{full.name}</span>
+      </button>
     );
   return (
     <span className={cn(pill, "hover:border-primary/50", menu && "border-primary", className)} data-file-chip>

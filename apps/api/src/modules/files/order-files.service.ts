@@ -237,7 +237,7 @@ export class OrderFilesService {
               : link === "step"
                 ? {
                     link,
-                    label: step ? `${FLOW_STEP_LABEL[step]} · files` : "This order",
+                    label: step ? `Step · ${FLOW_STEP_LABEL[step]}` : "This order",
                     href: step ? stepHref(step) : `${base}/documents`,
                   }
                 : {

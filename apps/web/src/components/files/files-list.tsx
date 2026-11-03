@@ -273,7 +273,7 @@ export function StepFilesCard({
 
 function StepFileItem({ file, set }: { file: OrderFile; set: OrderFile[] }) {
   const tools = useFileTools();
-  const where = file.attachedTo.label.replace(/^(Checklist|Paper|Inquiry) · /, "");
+  const where = file.attachedTo.label.replace(/^(Checklist|Paper|Inquiry|Step) · /, "");
   return (
     <li className="flex items-center gap-2 py-2">
       <FileIcon file={file} />

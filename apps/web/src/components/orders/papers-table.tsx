@@ -164,7 +164,7 @@ export function PapersTable({
         <div role="table" aria-label="Papers" className="text-sm">
           <div
             role="row"
-            className="hidden grid-cols-[28px_minmax(0,1.5fr)_minmax(0,1.1fr)_128px_minmax(0,1fr)_auto] gap-x-3 border-b border-line px-2 py-2 text-xs font-medium text-text-2 md:grid"
+            className="hidden grid-cols-[28px_minmax(0,1.5fr)_minmax(0,1.1fr)_128px_minmax(0,1fr)_200px] gap-x-3 border-b border-line px-2 py-2 text-xs font-medium text-text-2 md:grid"
           >
             <span role="columnheader" />
             <span role="columnheader">Paper</span>
@@ -467,10 +467,10 @@ function PaperLine({
     r.source === "app" && (r.version !== null || r.live) ? (
       <span className="inline-flex items-center gap-1 text-xs">
         <FileText className="size-3.5 text-muted" aria-hidden /> {r.live ? "live" : `version ${r.version}`}
-        {file && <FileChip file={file} className="ml-1" />}
+        {file && <FileChip file={file} compact className="ml-1" />}
       </span>
     ) : file ? (
-      <FileChip file={file} />
+      <FileChip file={file} compact />
     ) : r.state === "else" ? (
       <span className="text-xs text-text-2">{r.doc?.keptWhere ?? ""}</span>
     ) : (
@@ -484,7 +484,7 @@ function PaperLine({
       data-drop-label={r.label}
       className={cn("border-b border-line px-2 last:border-b-0", open && "-mx-2 rounded-lg bg-primary-soft px-4")}
     >
-      <div className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2.5 md:grid-cols-[28px_minmax(0,1.5fr)_minmax(0,1.1fr)_128px_minmax(0,1fr)_auto]">
+      <div className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2.5 md:grid-cols-[28px_minmax(0,1.5fr)_minmax(0,1.1fr)_128px_minmax(0,1fr)_200px]">
         <span role="cell" className="row-span-2 self-start pt-0.5 md:row-span-1 md:self-center md:pt-0">
           <StateMark state={r.state} />
         </span>

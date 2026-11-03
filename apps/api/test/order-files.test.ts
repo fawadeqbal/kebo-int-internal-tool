@@ -147,7 +147,7 @@ describe("order files", () => {
     ).body;
     expect(added.id).toMatch(/^attachment:/);
     const step = (await byName("Loading photos.pdf"))!;
-    expect(step).toMatchObject({ step: "shipping", group: "shipping", attachedTo: { link: "step", label: "Shipping · files" } });
+    expect(step).toMatchObject({ step: "shipping", group: "shipping", attachedTo: { link: "step", label: "Step · Shipping" } });
     await upload(sana, `/orders/${orderId}/files`)
       .field("step", "shipping")
       .field("attachTo", "paper:bill_of_lading")
