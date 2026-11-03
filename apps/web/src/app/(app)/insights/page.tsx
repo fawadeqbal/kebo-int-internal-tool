@@ -7,6 +7,7 @@ import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
+import { FileActions } from "@/components/common/file-actions";
 import {
   PERIOD_KINDS,
   PERIOD_LABEL,
@@ -135,6 +136,8 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
     people: people?.people.length,
   };
   const navItems = sections.map((s) => ({ href: sectionHref(s), label: SECTION_LABEL[s], active: s === section, count: count[s] }));
+  // The printable report (unchanged), for the period up to today.
+  const reportTo = p.to < today ? p.to : today;
   const excel = buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
   const subView =
     (section === "money" && (sp.view === "pnl" || sp.view === "leaks")) || (section === "people" && sp.view === "targets" && seeMoney);
@@ -168,11 +171,11 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
             <span className="text-xs text-text-2">
               {p.label} · vs {p.vsLabel}
             </span>
-            {!subView && (
-              <a href={excel} className={buttonClass("ghost", "sm")} download>
-                Excel
-              </a>
-            )}
+            <FileActions
+              excelHref={subView ? undefined : excel}
+              viewHref={buildHref("/print/report", {}, { from: p.from, to: reportTo })}
+              pdfHref={buildHref("/pdf/report/summary", {}, { from: p.from, to: reportTo })}
+            />
           </div>
         }
       />
