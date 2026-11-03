@@ -17,6 +17,8 @@ This is the outcome of the single-source-of-truth refactor (audit:
    cash fact at its own rate. Say on screen that it is one ("as accepted", "final", "bought at").
 4. The database holds what it can (triggers, unique keys) so a second truth cannot appear by accident.
 5. Numbers given to the outside (receipts, requests, papers) are stored once and never worked out again.
+6. Insights' calculated tables are not copies to keep in step: a new figure there is worked out in `compute.ts`
+   with the helper named below (never a formula of its own), and the nightly check holds them to it.
 
 ## Where each fact lives
 
@@ -41,6 +43,9 @@ This is the outcome of the single-source-of-truth refactor (audit:
 | FAT and inspection results | the checklist item bound by `paper` = `fat-report` / `inspection-report` | `reportItem` (`apps/api/src/modules/papers/papers-data.ts`), `checklistPaperOf` / `REPORT_PAPERS` (`packages/shared/src/workflows/checklist.ts`) | Renaming the item keeps its report. Settings › Order checklist: "The report it fills". |
 | Production timeline | the checklist's Production items | the checklist service | The old `production_steps` table is gone. |
 | Packing (packages, weights, CBM) | `OrderLine` packing fields; `Order.packedAt` | the packing list paper | |
+| Shipped on time | `Order.shipBy` and the shipments | `shippedOnTime` (`packages/shared/src/workflows/shipment.ts`) | Shipped by the ship-by date; unknown before shipping or without one. |
+| A factory's goods actually ready, and late or not | the factory's goods lines (`receivedQty`, `receivedOn`) and the shipments | `factoryReadyActual` / `readyDelay` (`packages/shared/src/workflows/ready.ts`) | The day its last line came in full, or the day the order first shipped, whichever is earlier; against that factory's ready date. |
+| Insights' figures per order, inquiry and order × factory | **calculated tables** `order_facts`, `inquiry_facts`, `factory_order_facts` (never typed, never kept in step by hand) | written only by `FactsService` (`apps/api/src/modules/insights/facts/compute.ts`) through the helpers above; read by `FactsReadService` (`GET /insights/facts/...`) | Triggers on the source tables queue what changed (`facts_queue`); the API works it off after each change and before each read; the worker rebuilds everything every night, compares, logs and fixes. Money in the main currency at the order's rate (factory money and quotations at today's Settings rates). They can always be thrown away and made again. |
 
 ## Frozen snapshots (copies on purpose) and their labels
 

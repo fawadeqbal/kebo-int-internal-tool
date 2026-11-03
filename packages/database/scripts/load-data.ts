@@ -735,6 +735,8 @@ async function main() {
     targets++;
   }
 
+  // Insights' calculated tables: worked out again in one go by the API or the worker (rather than row by row).
+  await db.$executeRaw`select facts_enqueue(app_company(), 'all', app_company())`;
   await db.$executeRawUnsafe("analyze");
   console.log(
     `[load] done in ${Math.round((Date.now() - t0) / 1000)}s: ${made} deals, ${orders} orders, ${monthly.length + onCustomers.length} expenses, ${targets} monthly targets, ${notes.length} notifications, ${audit.length} audit entries.`,
