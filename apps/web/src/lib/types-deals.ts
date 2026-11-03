@@ -37,6 +37,9 @@ export interface SalesSettings {
   exchangeRates: Record<string, number>;
   defaultMarginPercent: number;
   categories: string[];
+  /** New factory offers start with these: prices with tax included or not, and the tax %. */
+  factoryTaxIncluded: boolean;
+  factoryTaxRate: number;
 }
 
 /* ---------------------------------------------------------------- inquiry form */
@@ -85,11 +88,11 @@ export interface FactoryQuoteLineView {
   model: string | null;
   quantity: string;
   unit: string;
-  /** Without tax. */
+  /** Without tax, or with tax included, as the offer says. */
   unitPrice: string;
-  /** Tax % added on top of the price (13 unless changed). */
+  /** This line's tax % (the offer's unless changed): added on top of the price, or included in it. */
   taxRate: number;
-  /** e.g. "CNY 100.00 + 13% tax = CNY 113.00" (factory currency). */
+  /** e.g. "CNY 100.00 + 13% tax = CNY 113.00", "CNY 113.00, tax 13% included (CNY 13.00)" (factory currency). */
   costNote: string;
   /** One unit's landed cost in the selling currency; null when the exchange rate is missing. */
   unitCost: string | null;
@@ -117,6 +120,10 @@ export interface FactoryQuoteView {
   receivedOn: string;
   validUntil: string | null;
   currency: string;
+  /** The factory's prices have the tax in them (shown, never added again), or the tax is added on top. */
+  taxIncluded: boolean;
+  /** The offer's tax % (its lines take it unless they have their own). */
+  taxRate: number;
   /** What the factory's prices already pay for (EXW, FOB…), and where. */
   basis: Incoterm | null;
   basisPlace: string | null;
@@ -126,6 +133,10 @@ export interface FactoryQuoteView {
   notes: string | null;
   fxRate: number | null;
   lines: FactoryQuoteLineView[];
+  /** The lines at the factory's prices, in its currency. */
+  factoryTotal: string;
+  /** The tax in that: on top (without tax) or inside (tax included), in its currency. */
+  taxTotal: string;
   /** What the whole offer costs us in the selling currency (null when a rate is missing). */
   totalCost: string | null;
   /** Lines still without a price (a line priced in its parts does not count). */

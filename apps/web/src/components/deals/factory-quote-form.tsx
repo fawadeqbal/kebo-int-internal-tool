@@ -117,6 +117,96 @@ export function PortPicker({ id, value, onChange, exw }: { id: string; value: st
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
+/**
+ * The offer's tax (board Fix27Tax): "Their prices are" without tax (added on
+ * top) or tax included, and the tax % its lines take. `note` says what a
+ * change does to the lines already there.
+ */
+export function TaxBox({
+  idPrefix,
+  included,
+  rate,
+  onIncluded,
+  onRate,
+  error,
+  note,
+  className,
+}: {
+  idPrefix: string;
+  included: boolean;
+  rate: string;
+  onIncluded: (v: boolean) => void;
+  onRate: (v: string) => void;
+  error?: string[];
+  note?: ReactNode;
+  className?: string;
+}) {
+  const choice = (value: boolean, title: string, sub: string) => (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-2.5 rounded-lg border bg-surface px-3 py-2.5 text-sm transition-colors",
+        included === value ? "border-primary bg-primary-soft/50 ring-1 ring-primary/30" : "border-line hover:border-line-strong",
+      )}
+    >
+      <input
+        type="radio"
+        name={`${idPrefix}-tax-included`}
+        className="mt-0.5 accent-[var(--color-primary)]"
+        checked={included === value}
+        onChange={() => onIncluded(value)}
+      />
+      <span>
+        <span className="block font-medium">{title}</span>
+        <span className="block text-xs text-text-2">{sub}</span>
+      </span>
+    </label>
+  );
+  return (
+    <fieldset className={cn("flex flex-col gap-3 rounded-xl border border-line bg-surface-2/60 p-3 sm:p-4", className)}>
+      <legend className="sr-only">Tax</legend>
+      <p className="text-sm font-semibold" aria-hidden>
+        Tax
+      </p>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs text-text-2">Their prices are</span>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {choice(false, "Without tax", "tax is added on top")}
+          {choice(true, "Tax included", "the price already has the tax in it")}
+        </div>
+      </div>
+      <Field
+        label="Tax %"
+        htmlFor={`${idPrefix}-tax-rate`}
+        error={error}
+        hint="0 unless the factory charges tax, e.g. 13% VAT in China"
+      >
+        <span className="flex items-center gap-2">
+          <Input
+            id={`${idPrefix}-tax-rate`}
+            inputMode="decimal"
+            className="h-9 w-24 text-right tabular"
+            value={rate}
+            onChange={(e) => onRate(e.target.value.replace(/[^\d.]/g, ""))}
+            placeholder="0"
+          />
+          <span className="text-sm text-muted">%</span>
+        </span>
+      </Field>
+      <p className="text-xs text-text-2">{note ?? "Applies to every line; a line can still have its own %."}</p>
+    </fieldset>
+  );
+}
+
+/** What changing the offer's % does to its lines: those at the old % follow, the others keep theirs. */
+export function taxRateNote(lines: { taxRate: number }[], oldRate: number, newRate: string): ReactNode {
+  const next = Number(newRate || 0);
+  if (!lines.length || !Number.isFinite(next) || next === oldRate) return null;
+  const follow = lines.filter((l) => Number(l.taxRate) === oldRate).length;
+  const own = lines.length - follow;
+  if (!follow) return `No line is at ${oldRate}%, so no line changes: each keeps its own %.`;
+  return `${follow === lines.length ? `All ${follow}` : follow} line${follow === 1 ? "" : "s"} at ${oldRate}% change to ${next}%${own ? `; ${own} with ${own === 1 ? "its" : "their"} own % stay${own === 1 ? "s" : ""} as ${own === 1 ? "it is" : "they are"}` : ""}.`;
+}
+
 /** What each basis means for us, in a few words. */
 export const BASIS_HINT: Partial<Record<Incoterm, string>> = {
   EXW: "At their factory: we pay transport to the port and everything after",
@@ -153,6 +243,10 @@ export interface QuoteState {
   moq: string;
   paymentTerms: string;
   notes: string;
+  /** Their prices have the tax in them (null: a new offer, the company's default). */
+  taxIncluded: boolean | null;
+  /** The offer's tax % as typed ("": a new offer, the company's default). */
+  taxRate: string;
 }
 
 function initialState(quote: FactoryQuoteView | null, today: string): QuoteState {
@@ -169,6 +263,8 @@ function initialState(quote: FactoryQuoteView | null, today: string): QuoteState
     moq: quote?.moq ?? "",
     paymentTerms: quote?.paymentTerms ?? "",
     notes: quote?.notes ?? "",
+    taxIncluded: quote ? quote.taxIncluded : null,
+    taxRate: quote ? String(quote.taxRate) : "",
   };
 }
 
@@ -188,6 +284,9 @@ function payload(s: QuoteState, convertible?: boolean) {
     moq: s.moq,
     paymentTerms: s.paymentTerms,
     notes: s.notes,
+    // Not set (a new offer): the company's default.
+    ...(s.taxIncluded === null ? {} : { taxIncluded: s.taxIncluded }),
+    ...(s.taxRate.trim() === "" ? {} : { taxRate: s.taxRate.trim() }),
   };
 }
 
@@ -452,6 +551,16 @@ export function OfferHeaderForm({
               <Field label="Minimum order (MOQ)" htmlFor="moq" optional error={st.errors?.moq}>
                 <Input id="moq" value={s.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
               </Field>
+              <TaxBox
+                idPrefix="fq"
+                className="sm:col-span-2"
+                included={s.taxIncluded ?? false}
+                rate={s.taxRate}
+                onIncluded={(v) => set("taxIncluded", v)}
+                onRate={(v) => set("taxRate", v)}
+                error={st.errors?.taxRate ?? st.errors?.taxIncluded}
+                note={quote ? taxRateNote(quote.lines, quote.taxRate, s.taxRate) : undefined}
+              />
             </PanelSection>
             <PanelSection title="Terms">
               <Field label="Lead time" htmlFor="leadTime" optional error={st.errors?.leadTime}>

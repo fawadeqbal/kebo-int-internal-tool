@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Factory } from "lucide-react";
-import { basisText } from "@kebo/shared";
+import { basisText, offerTaxTag } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -102,6 +102,7 @@ export default async function SourcingPage({
         searchFactories={searchFactoriesAction}
         createAction={saveFactoryQuoteAction.bind(null, d.id, null)}
         addLines={lines.add}
+        taxDefault={{ included: settings.sales.factoryTaxIncluded ?? false, rate: settings.sales.factoryTaxRate ?? 0 }}
         variant={props.variant}
         size={props.size}
         label={props.label}
@@ -159,7 +160,7 @@ export default async function SourcingPage({
           <ViewCard title={`Offers · ${s.quotes.length}`} canEdit={false}>
             <OffersTable quotes={s.quotes} view={s} selected={selected?.id ?? null} base={base} letterOf={letterOf} />
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3 text-xs text-muted">
-              <span>Click a factory to see its offer below. Our cost = their price to our basis, with tax, in {s.currency}.</span>
+              <span>Click a factory to see its offer below. Our cost = their price to our basis, plus tax unless it is included, in {s.currency}.</span>
               <Link href={`${base}?view=compare`} className={buttonClass("ghost", "xs")}>
                 Compare side by side
               </Link>
@@ -240,6 +241,9 @@ function OffersTable({
                   <span className="block text-xs text-muted">
                     {[x.basis ? basisText(x.basis, x.basisPlace) : "Basis not said", x.leadTime].filter(Boolean).join(" · ")}
                   </span>
+                  {offerTaxTag(x.taxRate, x.taxIncluded) && (
+                    <span className="block text-xs text-muted">{offerTaxTag(x.taxRate, x.taxIncluded)}</span>
+                  )}
                   <span className="mt-1 block sm:hidden">
                     <CoverBadge cover={coverOf(x, view.items)} />
                   </span>
@@ -349,7 +353,7 @@ function CompareView({ view, dealId }: { view: SourcingView; dealId: string }) {
       <Card className="overflow-hidden">
         <div className="border-b border-line px-4 py-3">
           <h2 className="text-sm font-semibold">Compare side by side</h2>
-          <p className="text-xs text-muted">Our cost per unit in {view.currency}, with tax. The cheapest in each row is marked.</p>
+          <p className="text-xs text-muted">Our cost per unit in {view.currency}, after tax. The cheapest in each row is marked.</p>
         </div>
         <div className="overflow-x-auto">
           <Table className="min-w-[640px]">
