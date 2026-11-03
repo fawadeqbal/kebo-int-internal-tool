@@ -28,7 +28,8 @@ import {
   paperNumber,
   paperOptionsOf,
   parsePaperOptions,
-  requiredDocuments,
+  documentsInUse,
+  paperUsed,
   shipmentInput,
   shipmentUpdateInput,
   type FlowStep,
@@ -385,7 +386,13 @@ export class PapersService {
     const c = await this.ctx(user, o, null, {}, "");
     const out: PaperListRow[] = [];
     const mode = o.shipments[0]?.mode ?? "sea";
-    const set = has("bank_documents") ? requiredDocuments(o.paymentRoute, mode) : [];
+    // Settings › Papers we use: a switched-off paper is left out, unless it is already made or recorded.
+    const off = c.settings.papers.off;
+    const used = (key: string) => paperUsed(off, key);
+    const recordedDone = (kind: OrderDocumentKind) =>
+      o.documents.some((d) => d.kind === kind && documentDone(d.status)) ||
+      (kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false);
+    const set = has("bank_documents") ? documentsInUse(o.paymentRoute, mode, off, recordedDone) : [];
     const docFile = (d: PaperOrder["documents"][number]) =>
       d.attachment && !d.attachment.deletedAt ? { id: d.attachment.id, name: d.attachment.fileName } : null;
     const docView = (d: PaperOrder["documents"][number] | undefined) =>
@@ -406,7 +413,8 @@ export class PapersService {
     const row = (r: Omit<PaperListRow, "stateLabel">): PaperListRow => ({ ...r, stateLabel: PAPER_STATE_LABEL[r.state] });
 
     // The order's own papers, as before.
-    out.push(
+    if (used("proforma") || o.proformaNo)
+      out.push(
       row({
         key: "proforma",
         kind: "proforma",
@@ -429,7 +437,7 @@ export class PapersService {
       }),
     );
     const goods = o.lines.filter((l) => l.type === "goods");
-    if (goods.length)
+    if (goods.length && (used("packing-list") || o.packedAt))
       out.push(
         row({
           key: "packing-list",
@@ -454,6 +462,8 @@ export class PapersService {
     for (const kind of PAPER_KINDS) {
       if (!this.applies(kind, o, features)) continue;
       if (FACTORY_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) continue;
+      // Switched off: printed-from-the-data papers go; made ones stay (below).
+      if (!used(kind) && LIVE_PAPERS.includes(kind)) continue;
       const base = { kind, source: "app" as const, step: PAPER_STEP[kind], printable: true, live: LIVE_PAPERS.includes(kind) };
       if (kind === "payment-receipt") {
         o.payments.forEach((p, i) =>
@@ -554,6 +564,7 @@ export class PapersService {
         const ready = built.checks.every((x) => x.ok || !x.required);
         const needs = built.checks.filter((x) => x.required && !x.ok).map((x) => inSentence(x.label));
         const recorded = docKind ? o.documents.find((d) => d.kind === docKind && !d.paperId && documentDone(d.status)) : undefined;
+        if (!used(kind) && !latest && !recorded) continue;
         const state: PaperState = latest ? this.stateOf(latest, ready) : recorded ? docState(recorded) : this.stateOf(null, ready);
         out.push(
           row({

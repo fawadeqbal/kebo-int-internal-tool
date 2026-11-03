@@ -220,7 +220,9 @@ export class ChecklistService {
     ]);
     const tz = this.clock.timeZone;
     const today = this.clock.today();
-    const facts = checklistFactsOf(o, factories, tz, (await this.settings.get()).reminders.lcCourierDays);
+    const settings = await this.settings.get();
+    // Settings › Papers we use: switched-off papers leave the Documents step (unless already in).
+    const facts = { ...checklistFactsOf(o, factories, tz, settings.reminders.lcCourierDays), papersOff: settings.papers.off };
     const steps = orderSteps(features);
     const overrides = new Map(rows.filter((r) => r.key).map((r) => [r.key!, r]));
     const late = (done: boolean, skipped: boolean, due: ISODate | null) => !done && !skipped && !!due && due < today;

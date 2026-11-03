@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind } from "@kebo/shared";
 import { Alert, Button, cn, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
@@ -11,7 +10,7 @@ import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
 import type { OrderNext } from "@/lib/types-orders";
 import { AccountSelect } from "@/components/money/accounts";
-import { FilePicker, uploadFile } from "@/components/money/attachment";
+import { FilePicker, useSaveThenSend } from "@/components/money/attachment";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -247,18 +246,10 @@ export function PaymentForm({
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<PaymentKind>(first);
   const [file, setFile] = useState<File | null>(null);
-  const [sending, setSending] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  const router = useRouter();
-  const done = async (s: ActionState) => {
-    const id = (s.data as { createdId?: string } | undefined)?.createdId;
-    if (file && id) {
-      setSending(true);
-      const error = await uploadFile(`/files/payments/${id}`, file);
-      setSending(false);
-      router.refresh();
-      if (error) setFileError(`The payment is recorded, but its file was not: ${error} Open the payment below to add it again.`);
-    }
+  // The slip goes with the save itself, so it is kept even when the page re-draws without this form.
+  const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", setFileError);
+  const done = () => {
     setFile(null);
     setOpen(false);
   };
@@ -283,7 +274,7 @@ export function PaymentForm({
     );
   const amount = kind === "deposit" && Number(depositDue) > 0 ? depositDue : kind === "other" ? "" : due;
   return (
-    <ActionForm action={action} onDone={done} className={framed}>
+    <ActionForm action={save} onDone={done} className={framed}>
       {(s) => (
         <>
           <p className="text-sm font-medium">Payment from the customer</p>
@@ -329,8 +320,8 @@ export function PaymentForm({
             <Textarea id="p-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
           <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Recording…" disabled={sending}>
-              {sending ? "Sending the file…" : "Record the payment"}
+            <SubmitButton size="sm" pendingText={file ? "Recording, sending the file…" : "Recording…"}>
+              Record the payment
             </SubmitButton>
             <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
               Cancel

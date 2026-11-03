@@ -11,7 +11,8 @@ import {
   paperNumber,
   paperWordsText,
   paymentSentenceOf,
-  requiredDocuments,
+  documentDone,
+  documentsInUse,
   SAT_RESULT_LABEL,
   SHIP_MODE_LABEL,
   type OrderDocumentKind,
@@ -926,7 +927,10 @@ const SETS: Partial<Record<OrderDocumentKind | PaperKind, [number, number]>> = {
 function coverLetter(c: PaperCtx): Built {
   const b = c.o.bankContract;
   const mode = c.o.shipments[0]?.mode ?? "sea";
-  const set = requiredDocuments(c.o.paymentRoute, mode);
+  // The papers enclosed: the set the shipment needs that the company uses (Settings › Papers we use), and any already in.
+  const set = documentsInUse(c.o.paymentRoute, mode, c.settings.papers.off, (k) =>
+    k === "proforma_invoice" ? !!c.o.proformaNo : k === "packing_list" ? !!c.o.packedAt : c.o.documents.some((d) => d.kind === k && documentDone(d.status)),
+  );
   const numberOf = (kind: OrderDocumentKind) => {
     const row = c.o.documents.find((d) => d.kind === kind && d.number);
     if (row) return row.number;

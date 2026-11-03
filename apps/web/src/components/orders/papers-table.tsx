@@ -599,9 +599,6 @@ export function PaperMenu({
               )}
             </>
           )}
-          {!leading && !print && !file && !recordable && !(canMake && r.draft) && (
-            <p className="px-2.5 py-1.5 text-xs text-muted">Nothing to do here yet.</p>
-          )}
         </FloatingMenu>
       )}
       <input id={scanId} type="file" hidden accept="application/pdf,image/*" onChange={(e) => (sendScan(e.target.files?.[0]), (e.target.value = ""))} />

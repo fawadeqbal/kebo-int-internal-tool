@@ -78,6 +78,43 @@ describe("payment files", () => {
     expect(audit.some((a) => /added the proof of a payment from the customer \(slip\.png\)/.test(a.summary))).toBe(true);
   });
 
+  it("a slip sent after the deposit that ticks the checklist is kept, and shows in Files with the file tools", async () => {
+    // The fix (3 Nov 2026): the web sends the slip in the same call as the payment, by the id the payment answers with.
+    const orders = (await api(app, manager).get("/orders?status=open").expect(200)).body as OrderRow[];
+    let order: OrderRow | null = null;
+    let deposit = 0;
+    for (const o of orders) {
+      const p = (await api(app, manager).get(`/orders/${o.id}/payments`).expect(200)).body;
+      if (Number(p.depositDue) >= 1 && Number(p.received) === 0) {
+        order = o;
+        deposit = Number(p.depositDue);
+        break;
+      }
+    }
+    expect(order).not.toBeNull();
+    const made = (
+      await api(app, manager)
+        .post(`/orders/${order!.id}/payments`, { kind: "deposit", amount: deposit.toFixed(2), currency: order!.currency, paidOn: today })
+        .expect(201)
+    ).body;
+    const id = made.createdId as string;
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    // The deposit is in: the checklist row the form was opened from is ticked (the form leaves the page).
+    const steps = (await api(app, manager).get(`/orders/${order!.id}/steps`).expect(200)).body as { items: { key: string | null; done: boolean }[] };
+    expect(steps.items.find((i) => i.key === "deposit_in")).toMatchObject({ done: true });
+    await upload(manager, `/payments/${id}/file`).attach("file", png, { filename: "bank slip.png", contentType: "image/png" }).expect(201);
+    const files = (await api(app, manager).get(`/orders/${order!.id}/files`).expect(200)).body as {
+      files: { id: string; name: string; kindLabel: string; href: string; viewHref: string | null; can: Record<string, boolean> }[];
+    };
+    expect(files.files.find((f) => f.id === `payment:${id}`)).toMatchObject({
+      name: "bank slip.png",
+      kindLabel: "Proof of payment",
+      href: `/files/payments/${id}`,
+      viewHref: `/files/payments/${id}?view=1`,
+      can: { rename: true, replace: true, remove: true },
+    });
+  });
+
   it("keeps the proof with a payment to a factory", async () => {
     const orders = (await api(app, manager).get("/orders?status=open").expect(200)).body as OrderRow[];
     let found: { orderId: string; pay: Pay } | null = null;

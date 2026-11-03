@@ -15,7 +15,7 @@ import {
   balanceTermsOf,
   balanceWhenOf,
   lcChecksLine,
-  requiredDocuments,
+  documentsInUse,
   routeSummary,
   type BankContractInput,
   type BankStepInput,
@@ -85,14 +85,18 @@ interface FlowRows {
   claims: { status: ClaimStatus }[];
 }
 
-export function factsOf(o: FlowRows, depositIn: boolean): FlowFacts {
+/** A paper of the shipment's set is in: recorded as done, or the order's own proforma / packing list made. */
+function documentIn(o: Pick<FlowRows, "documents" | "proformaNo" | "packedAt">, kind: OrderDocumentKind) {
+  const rows = o.documents.filter((d) => d.kind === kind);
+  if (rows.length) return rows.some((d) => documentDone(d.status));
+  return kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false;
+}
+
+/** `papersOff`: Settings › Papers we use (switched-off papers are not counted unless already in). */
+export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly string[] = []): FlowFacts {
   const route = o.paymentRoute;
-  const required = requiredDocuments(route, o.shipments[0]?.mode ?? "sea");
-  const ready = required.filter((kind) => {
-    const rows = o.documents.filter((d) => d.kind === kind);
-    if (rows.length) return rows.some((d) => documentDone(d.status));
-    return kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false;
-  }).length;
+  const required = documentsInUse(route, o.shipments[0]?.mode ?? "sea", papersOff, (k) => documentIn(o, k));
+  const ready = required.filter((kind) => documentIn(o, kind)).length;
   const bankKinds = bankStepsFor(route);
   return {
     stage: o.stage,
@@ -254,7 +258,8 @@ export class FlowService {
 
     const route = o.paymentRoute;
     const mode = o.shipments[0]?.mode ?? "sea";
-    const required = requiredDocuments(route, mode);
+    const settings = await this.settings.get();
+    const required = documentsInUse(route, mode, settings.papers.off, (k) => documentIn(o, k));
     const documents = this.documentSet(o, required);
     const bankKinds = bankStepsFor(route);
     const bankSteps = bankKinds.map((step) => {
@@ -303,12 +308,12 @@ export class FlowService {
       resolvedOn: fromDbDateOrNull(c.resolvedOn),
       resolution: c.resolution,
     }));
-    const steps = flowSteps(factsOf(o, depositIn), features);
+    const steps = flowSteps(factsOf(o, depositIn, settings.papers.off), features);
 
     const factories = [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
     const b = o.bankContract;
     const terms = termsOf(o);
-    const checks = has("bank_contracts") ? lcChecksOf(o, (await this.settings.get()).reminders.lcCourierDays) : null;
+    const checks = has("bank_contracts") ? lcChecksOf(o, settings.reminders.lcCourierDays) : null;
     return {
       orderId: o.id,
       refNo: o.refNo,
@@ -493,10 +498,10 @@ export class FlowService {
       orderBy: { stageSince: "asc" },
       take: 300,
     });
-    const features = await this.limits.features();
+    const [features, settings] = await Promise.all([this.limits.features(), this.settings.get()]);
     return {
       items: rows.map((o) => {
-        const steps = flowSteps(factsOf(o, depositInOf(o)), features);
+        const steps = flowSteps(factsOf(o, depositInOf(o), settings.papers.off), features);
         const current = steps.find((s) => s.state === "current") ?? null;
         return { id: o.id, current: current && { key: current.key, label: current.label, sub: current.sub } };
       }),

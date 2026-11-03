@@ -355,6 +355,57 @@ describe("order papers", () => {
     });
   });
 
+  it("Settings › Papers we use: every paper starts on; one switched off leaves the lists, counts, checklist and warnings, unless already made", async () => {
+    // Nothing is hidden by default.
+    expect((await api(app, sana).get("/settings").expect(200)).body.papers).toEqual({ off: [] });
+    const kinds = async () => (await list()).papers.map((p) => p.kind);
+    const before = await kinds();
+    expect(before).toEqual(
+      expect.arrayContaining(["bill-of-exchange", "beneficiary-certificate", "bank-cover-letter", "insurance", "customer-statement", "commercial-invoice", "certificate_of_origin"]),
+    );
+    const docItems = async () => (await steps()).items.filter((i) => i.key?.startsWith("doc:")).map((i) => i.key);
+    expect(await docItems()).toEqual(expect.arrayContaining(["doc:insurance", "doc:commercial_invoice", "doc:certificate_of_origin"]));
+    const flow = async () =>
+      (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body as {
+        steps: { key: string; sub: string }[];
+        documents: { set: { kind: string; required: boolean }[] } | null;
+      };
+    const papersLine = async () => (await flow()).steps.find((x) => x.key === "documents")!.sub;
+    const requiredBefore = Number(/of (\d+) papers/.exec(await papersLine())![1]);
+
+    // Only people with settings.manage switch papers.
+    await api(app, sana).put("/settings/papers", { off: ["insurance"] }).expect(403);
+    try {
+      const saved = (
+        await api(app, admin)
+          .put("/settings/papers", {
+            off: ["bill-of-exchange", "insurance", "customer-statement", "commercial-invoice", "certificate_of_origin", "not-a-paper", "insurance"],
+          })
+          .expect(200)
+      ).body;
+      expect(saved).toEqual({ off: ["bill-of-exchange", "insurance", "customer-statement", "commercial-invoice", "certificate_of_origin"] });
+      const after = await kinds();
+      // Switched off and never made: gone from the list.
+      for (const k of ["bill-of-exchange", "insurance", "customer-statement"]) expect(after).not.toContain(k);
+      // The other LC papers are ordinary switches, still on.
+      expect(after).toEqual(expect.arrayContaining(["beneficiary-certificate", "bank-cover-letter"]));
+      // Made (final commercial invoice) or recorded (certificate of origin kept elsewhere): still shown.
+      expect(after).toEqual(expect.arrayContaining(["commercial-invoice", "certificate_of_origin"]));
+      // The checklist: the switched-off paper that is not in leaves the Documents step; the ones in stay.
+      const items = await docItems();
+      expect(items).not.toContain("doc:insurance");
+      expect(items).toEqual(expect.arrayContaining(["doc:commercial_invoice", "doc:certificate_of_origin"]));
+      // The step's numbers: one paper fewer to wait for.
+      expect(Number(/of (\d+) papers/.exec(await papersLine())![1])).toBe(requiredBefore - 1);
+      expect((await flow()).documents!.set.find((d) => d.kind === "insurance")?.required ?? false).toBe(false);
+      // The papers stay reachable for whoever opens one directly (and for older apps).
+      await api(app, sana).get(`/orders/${orderId}/papers/bill-of-exchange/doc`).expect(200);
+    } finally {
+      await api(app, admin).put("/settings/papers", { off: [] }).expect(200);
+    }
+    expect(await kinds()).toEqual(expect.arrayContaining(["bill-of-exchange", "insurance", "customer-statement"]));
+  });
+
   it("order_papers is a company table", async () => {
     const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean; policies: bigint }[]>(
       `select c.relrowsecurity as rls, (select count(*) from pg_policies p where p.tablename = c.relname) as policies from pg_class c where c.relname = 'order_papers'`,

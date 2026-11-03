@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { BALANCE_TERMS, CURRENCIES, INCOTERMS } from "../enums";
 import { DEFAULT_ORDER_REMINDER_DAYS } from "../workflows/order";
+import { isPaperSwitch } from "../workflows/papers";
 
 /**
  * Everything an admin can change, grouped. Each group is stored as one JSON
@@ -112,11 +113,24 @@ export const notificationSettings = z.object({
   dailySummary: z.boolean().default(true),
 });
 
+/**
+ * Settings › Papers we use: the papers the company switched off. Empty (the
+ * default): every paper is used. Unknown keys are dropped.
+ */
+export const papersSettings = z.object({
+  off: z
+    .array(z.string().trim().max(40))
+    .max(100)
+    .default([])
+    .transform((list) => [...new Set(list.filter(isPaperSwitch))]),
+});
+
 export const SETTINGS = {
   company: companySettings,
   sales: salesSettings,
   reminders: reminderSettings,
   notifications: notificationSettings,
+  papers: papersSettings,
 } as const;
 
 export type SettingsKey = keyof typeof SETTINGS;

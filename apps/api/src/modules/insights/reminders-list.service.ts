@@ -9,7 +9,7 @@ import {
   OPEN_STAGES,
   ORDER_DOCUMENT_LABEL,
   documentDone,
-  requiredDocuments,
+  documentsInUse,
   STEP_PATH,
 } from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
@@ -434,6 +434,7 @@ export class RemindersListService {
 
     // After sailing: papers not ready, and the bank chain not started.
     if ((await on("bank_documents")) && (await on("shipping"))) {
+      const papersOff = (await this.settings.get()).papers.off;
       const sailed = await this.prisma.db.order.findMany({
         where: { ...orders, shipments: { some: { status: { in: ["departed", "arrived", "cleared"] } } } },
         select: {
@@ -451,7 +452,8 @@ export class RemindersListService {
         take: 200,
       });
       for (const o of sailed) {
-        const missing = requiredDocuments(o.paymentRoute, o.shipments[0]?.mode ?? "sea").filter((k) => {
+        // Settings › Papers we use: a switched-off paper is never "missing".
+        const missing = documentsInUse(o.paymentRoute, o.shipments[0]?.mode ?? "sea", papersOff).filter((k) => {
           const rows = o.documents.filter((d) => d.kind === k);
           if (rows.length) return !rows.some((d) => documentDone(d.status));
           return k === "proforma_invoice" ? !o.proformaNo : k === "packing_list" ? !o.packedAt : true;

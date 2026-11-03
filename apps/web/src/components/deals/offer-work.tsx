@@ -18,14 +18,14 @@ import {
   type LineValues,
   type NewLine,
 } from "@/components/lines/line-table";
-import { DetailsCard, EditPanel, LinesCard, PanelBody, useClosePanel, type DetailField } from "@/components/orders/step-view";
+import { DetailsCard, EditPanel, LinesCard, PanelActions, PanelBody, useClosePanel, type DetailField } from "@/components/orders/step-view";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, money as amount } from "@/lib/format";
 import { rateSentence } from "@/lib/fx";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { FileDrop, send, type Staged } from "./documents-panel";
-import { BASIS_HINT, FactoryPicker, OfferHeaderForm, type QuoteState } from "./factory-quote-form";
+import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, type QuoteState } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -231,8 +231,13 @@ function OfferForm({
   removeAction: Action;
 }) {
   const close = useClosePanel();
+  const removeId = `remove-offer-${q.id}`;
   return (
-    <PanelBody className="flex flex-col gap-6">
+    <PanelBody>
+      {/* Remove this offer (its button sits in the footer): only its error shows here. */}
+      <ActionForm id={removeId} action={removeAction} showSuccess={false} onDone={close}>
+        {null}
+      </ActionForm>
       <OfferHeaderForm
         action={saveAction}
         quote={q}
@@ -242,19 +247,21 @@ function OfferForm({
         searchFactories={searchFactories}
         onDone={close}
         onCancel={close}
+        panel={{
+          // Its own form (below): a form inside a form is not allowed, so the button points at it.
+          end: (
+            <ConfirmSubmit
+              form={removeId}
+              size="sm"
+              variant="danger-ghost"
+              pendingText="Removing…"
+              message={`Remove the offer from ${q.factory.name} with its ${q.lines.length} lines?`}
+            >
+              <Trash2 aria-hidden /> Remove this offer
+            </ConfirmSubmit>
+          ),
+        }}
       />
-      <div className="border-t border-line pt-4">
-        <ActionForm action={removeAction} showSuccess={false} onDone={close}>
-          <ConfirmSubmit
-            size="sm"
-            variant="danger-ghost"
-            pendingText="Removing…"
-            message={`Remove the offer from ${q.factory.name} with its ${q.lines.length} lines?`}
-          >
-            <Trash2 aria-hidden /> Remove this offer
-          </ConfirmSubmit>
-        </ActionForm>
-      </div>
     </PanelBody>
   );
 }
@@ -866,35 +873,18 @@ function AddOfferForm({
                 <Field label="Factory" htmlFor="factory" error={s.errors?.factoryId ?? s.errors?.newFactoryName}>
                   <FactoryPicker value={factory} search={searchFactories} error={s.errors?.factoryId} onChange={(f) => setFactory(f)} />
                 </Field>
-                <Field
-                  label="Price basis"
-                  htmlFor="add-basis"
-                  error={s.errors?.basis ?? s.errors?.basisPlace}
-                  hint={basis ? BASIS_HINT[basis] : undefined}
-                >
-                  <div className="flex gap-2">
-                    <Select
-                      id="add-basis"
-                      value={basis}
-                      onChange={(e) => setBasis(e.target.value as Incoterm | "")}
-                      className="w-[6.5rem] shrink-0"
-                    >
-                      <option value="">Not said</option>
-                      {INCOTERMS.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </Select>
-                    <Input
-                      aria-label="Basis place"
-                      value={basisPlace}
-                      onChange={(e) => setBasisPlace(e.target.value)}
-                      maxLength={60}
-                      placeholder={basis === "EXW" ? "Town" : "Port"}
-                      className="min-w-0"
-                    />
-                  </div>
+                <Field label="Price basis" htmlFor="add-basis" error={s.errors?.basis} hint={basis ? BASIS_HINT[basis] : undefined}>
+                  <Select id="add-basis" value={basis} onChange={(e) => setBasis(e.target.value as Incoterm | "")}>
+                    <option value="">Not said</option>
+                    {INCOTERMS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label={basis === "EXW" ? "Town" : "Port"} htmlFor="add-port" optional error={s.errors?.basisPlace}>
+                  <PortPicker id="add-port" value={basisPlace} onChange={setBasisPlace} exw={basis === "EXW"} />
                 </Field>
                 <Field
                   label="Currency"
@@ -1056,7 +1046,7 @@ function AddOfferForm({
             </section>
             {error && <p className="text-sm text-bad">{error}</p>}
           </PanelBody>
-          <div className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-3">
+          <PanelActions className="static mx-0 mb-0">
             <SubmitButton size="sm" pendingText="Adding…">
               Add the offer
             </SubmitButton>
@@ -1064,7 +1054,7 @@ function AddOfferForm({
               Cancel
             </Button>
             <span className="text-xs text-muted">Our cost works out by itself.</span>
-          </div>
+          </PanelActions>
         </>
       )}
     </ActionForm>

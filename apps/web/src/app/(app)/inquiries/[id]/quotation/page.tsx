@@ -15,6 +15,7 @@ import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/ste
 import { StartRevision } from "@/components/deals/quotation-panels";
 import { AnswerCard, MarkSentButton, OptionsCard, TermsPanel } from "@/components/deals/quotation-step";
 import { changesIn, FilesCard } from "@/components/deals/inquiry-side";
+import { PriceEditor } from "@/components/deals/price-editor";
 import { inquirySteps } from "../steps";
 import { createRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
 
@@ -41,7 +42,7 @@ export default async function QuotationPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ start?: string }>;
+  searchParams: Promise<{ start?: string; edit?: string; option?: string; add?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -103,6 +104,22 @@ export default async function QuotationPage({
     : "No quotation yet: each factory offer becomes an option the customer can choose.";
 
   const editTerms = !!(draft && manage && draftValues && offers);
+
+  // "Edit prices": the page itself becomes the price editor, full width (no side column, nothing else on it).
+  if (sp.edit === "prices" && editTerms)
+    return (
+      <PriceEditor
+        key={draft!.id}
+        action={updateRevisionAction.bind(null, d.id, draft!.id)}
+        number={draft!.number}
+        initial={draftValues!}
+        offers={offers!}
+        showCosts={showCosts}
+        initialOption={Number(sp.option) || 0}
+        startAdding={sp.add === "1"}
+        backHref={`${base}/quotation`}
+      />
+    );
   const terms = current && (
     <DetailsCard
       title={`R${current.number} · terms`}
@@ -117,7 +134,7 @@ export default async function QuotationPage({
       action={editTerms ? revisionFieldsAction.bind(null, d.id, draft!.id) : undefined}
       canEdit={editTerms}
       panelTitle={`R${current.number} · terms`}
-      panelDescription="Currency, delivery, validity, payment and the printed terms. Changing the currency converts the prices."
+      panelDescription="Printed on the quotation. Changing the currency converts the prices."
       panelBody={
         editTerms ? (
           <TermsPanel number={draft!.number} initial={draftValues!} offers={offers!} loadOffers={loadOffers} showCosts={showCosts} action={updateRevisionAction.bind(null, d.id, draft!.id)} />
@@ -229,7 +246,7 @@ export default async function QuotationPage({
         <OptionsCard
           key={current.id}
           r={current}
-          edit={draft && manage && draftValues && offers ? { initial: draftValues, offers, loadOffers, showCosts, action: updateRevisionAction.bind(null, d.id, draft.id) } : null}
+          edit={editTerms ? { showCosts, canAdd: offers!.offers.length + 1 > current.options.length, pricesHref: `${base}/quotation?edit=prices` } : null}
         />
       )}
 

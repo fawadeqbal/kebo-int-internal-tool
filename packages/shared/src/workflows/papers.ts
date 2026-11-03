@@ -1,8 +1,8 @@
 import { numberToWords } from "@kebo/utils";
-import type { OrderDocumentKind, PaymentRoute } from "../enums";
+import type { OrderDocumentKind, PaymentRoute, ShipMode } from "../enums";
 import type { Tone } from "../labels";
 import type { PlanFeature } from "../platform";
-import type { FlowStep } from "./flow";
+import { requiredDocuments, type FlowStep } from "./flow";
 
 /**
  * Order flow v3, papers: every paper the app makes from the order, in the one
@@ -189,6 +189,118 @@ export const PER_FACTORY_PAPERS: readonly PaperKind[] = ["purchase-order"];
 
 /** Papers that show factory prices: only for people who see them (sourcing.manage). */
 export const FACTORY_PRICE_PAPERS: readonly PaperKind[] = ["purchase-order"];
+
+/* ---------------------------------------------------------------- papers we use */
+
+/**
+ * Settings › Papers we use: every paper the app makes or tracks, each with an
+ * on/off switch for the company. Every paper starts switched on; a company
+ * turns off the ones it never uses. A switched-off paper leaves the Papers
+ * lists, their counts, the step's numbers, the checklist's paper items and
+ * the "missing" warnings; a paper already made (or recorded) stays visible.
+ * The keys are the Papers list's kinds: the app's papers, the order's own
+ * proforma and packing list, and the document-set kinds others issue.
+ */
+export const PAPER_SWITCHES = [
+  "proforma",
+  "sales-contract",
+  "payment-request",
+  "payment-receipt",
+  "customer-statement",
+  "purchase-order",
+  "fat-report",
+  "inspection-report",
+  "packing-list",
+  "commercial-invoice",
+  "shipping-advice",
+  "bill-of-exchange",
+  "beneficiary-certificate",
+  "bank-cover-letter",
+  "delivery-note",
+  "sat-certificate",
+  "bill_of_lading",
+  "airway_bill",
+  "certificate_of_origin",
+  "insurance",
+] as const;
+export type PaperSwitch = (typeof PAPER_SWITCHES)[number];
+
+export const isPaperSwitch = (k: string): k is PaperSwitch => (PAPER_SWITCHES as readonly string[]).includes(k);
+
+export const PAPER_SWITCH_LABEL: Record<PaperSwitch, string> = {
+  proforma: "Proforma invoice",
+  "packing-list": "Packing list",
+  ...PAPER_LABEL,
+  bill_of_lading: "Bill of lading",
+  airway_bill: "Airway bill",
+  certificate_of_origin: "Certificate of origin",
+  insurance: "Insurance certificate",
+};
+
+/** Settings' groups: made by the app, or issued by others and kept track of. */
+export const PAPER_SWITCH_GROUPS: { title: string; hint: string; keys: readonly PaperSwitch[] }[] = [
+  {
+    title: "Made by the app",
+    hint: "From the order's data, in the company's template.",
+    keys: PAPER_SWITCHES.filter((k) => !["bill_of_lading", "airway_bill", "certificate_of_origin", "insurance"].includes(k)),
+  },
+  {
+    title: "From others",
+    hint: "Issued by the forwarder, the chamber or the insurer: uploaded, or marked kept elsewhere.",
+    keys: ["bill_of_lading", "airway_bill", "certificate_of_origin", "insurance"],
+  },
+];
+
+/** A short note beside a switch: where the paper shows up at all. */
+export const PAPER_SWITCH_NOTE: Partial<Record<PaperSwitch, string>> = {
+  "bill-of-exchange": "LC orders only",
+  "beneficiary-certificate": "LC orders only",
+  "bank-cover-letter": "LC and bank-contract orders only",
+  "purchase-order": "seen by people who see factory prices",
+  "fat-report": "when the order has a FAT",
+  "inspection-report": "when the order has an inspection",
+  airway_bill: "orders going by air",
+  insurance: "LC orders",
+};
+
+/** The switch of a document-set kind (the papers the shipment needs); null: always used ("other"). */
+export function documentSwitch(kind: OrderDocumentKind): PaperSwitch | null {
+  switch (kind) {
+    case "proforma_invoice":
+      return "proforma";
+    case "packing_list":
+      return "packing-list";
+    case "commercial_invoice":
+      return "commercial-invoice";
+    case "sales_contract":
+      return "sales-contract";
+    case "inspection":
+      return "inspection-report";
+    case "other":
+      return null;
+    default:
+      return kind;
+  }
+}
+
+/** Is this paper used by the company? (`off`: Settings › Papers we use; a key not switched off is on.) */
+export const paperUsed = (off: readonly string[] | null | undefined, key: string | null) => !key || !off?.includes(key);
+
+/** Is this document-set kind used by the company? */
+export const documentUsed = (off: readonly string[] | null | undefined, kind: OrderDocumentKind) => paperUsed(off, documentSwitch(kind));
+
+/**
+ * The papers the shipment needs (requiredDocuments) that the company uses: a
+ * switched-off one is left out, unless it is already made or recorded (`made`).
+ */
+export function documentsInUse(
+  route: PaymentRoute | null,
+  mode: ShipMode | null,
+  off: readonly string[] | null | undefined,
+  made: (kind: OrderDocumentKind) => boolean = () => false,
+): OrderDocumentKind[] {
+  return requiredDocuments(route, mode).filter((k) => documentUsed(off, k) || made(k));
+}
 
 /* ---------------------------------------------------------------- options */
 

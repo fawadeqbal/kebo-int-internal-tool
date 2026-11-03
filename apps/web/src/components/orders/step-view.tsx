@@ -29,9 +29,11 @@ const PanelClose = createContext<() => void>(() => {});
 export const useClosePanel = () => useContext(PanelClose);
 
 /**
- * The Edit side panel: 480px from the right on a desktop, the whole screen on
+ * The Edit side panel: 600px from the right on a desktop, the whole screen on
  * a phone; Escape or the backdrop closes it. Its body is a form (or the
- * existing forms of the section); saving closes it.
+ * existing forms of the section) in sections with small-caps titles, two
+ * columns at most, the label above each field and its hint under it, and
+ * Save / Cancel in a footer that stays at the bottom; saving closes it.
  */
 export function EditPanel({
   title,
@@ -68,7 +70,7 @@ export function EditPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
-        className="relative flex h-dvh w-full flex-col border-l border-line bg-surface shadow-pop sm:w-[480px]"
+        className="relative flex h-dvh w-full flex-col border-l border-line bg-surface shadow-pop sm:w-[600px] sm:max-w-[calc(100vw-2rem)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0">
@@ -88,15 +90,49 @@ export function EditPanel({
   );
 }
 
-/** A panel's scrolling body and its Save / Cancel footer (for forms that bring their own buttons, use PanelBody alone). */
+/**
+ * A panel's scrolling body. A form inside takes its height (`PANEL_FORM`), so
+ * its PanelActions stay at the bottom of the panel however short it is.
+ */
 export function PanelBody({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", className)}>{children}</div>;
+  return <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5", className)}>{children}</div>;
+}
+
+/** The class of a form filling a PanelBody, so its PanelActions sit at the bottom. */
+export const PANEL_FORM = "flex flex-1 flex-col gap-5";
+
+/** A section of a panel's form: a small-caps title, then its fields, two columns at most (one on a phone). */
+export function PanelSection({ title, children, className, first }: { title?: string; children: ReactNode; className?: string; first?: boolean }) {
+  return (
+    <fieldset className={cn("flex min-w-0 flex-col gap-3", !first && "border-t border-line pt-5")}>
+      {title && <legend className="float-left mb-1 w-full text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</legend>}
+      <div className={cn("grid grid-cols-1 gap-x-3 gap-y-3.5 sm:grid-cols-2", className)}>{children}</div>
+    </fieldset>
+  );
+}
+
+/**
+ * The panel's Save / Cancel, in a footer that stays at the bottom of the panel
+ * while the form scrolls; `end`: a quiet action on the right (Remove this offer).
+ */
+export function PanelActions({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "sticky bottom-0 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface-2 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        className,
+      )}
+    >
+      {children}
+      {end && <span className="ml-auto">{end}</span>}
+    </div>
+  );
 }
 
 function PanelFooter({ save = "Save" }: { save?: string }) {
   const close = useClosePanel();
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-line px-5 py-3">
+    <PanelActions>
       <SubmitButton size="sm" pendingText="Saving…">
         {save}
       </SubmitButton>
@@ -104,7 +140,7 @@ function PanelFooter({ save = "Save" }: { save?: string }) {
         Cancel
       </Button>
       <span className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</span>
-    </div>
+    </PanelActions>
   );
 }
 
@@ -185,32 +221,27 @@ export function FieldsForm({ action, fields, save }: { action: Action; fields: D
   return (
     <ActionForm action={action} onDone={close} showSuccess={false} className="flex min-h-0 flex-1 flex-col">
       {(s) => (
-        <>
-          <PanelBody className="flex flex-col gap-5">
-            {groups.map((g) => (
-              <fieldset key={g} className="flex flex-col gap-2.5">
-                {g && <legend className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">{g}</legend>}
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                  {editable
-                    .filter((f) => (f.group ?? "") === g)
-                    .map((f) => (
-                      <Field
-                        key={f.name}
-                        label={f.panelLabel ?? f.label}
-                        htmlFor={`${id}-${f.name}`}
-                        hint={f.hint}
-                        error={s.errors?.[f.name!]}
-                        className={cn(f.wide && "col-span-2")}
-                      >
-                        <Control f={{ ...f, value: s.values?.[f.name!] ?? f.value }} id={`${id}-${f.name}`} />
-                      </Field>
-                    ))}
-                </div>
-              </fieldset>
-            ))}
-          </PanelBody>
+        <PanelBody className="gap-5">
+          {groups.map((g, i) => (
+            <PanelSection key={g} title={g || undefined} first={i === 0}>
+              {editable
+                .filter((f) => (f.group ?? "") === g)
+                .map((f) => (
+                  <Field
+                    key={f.name}
+                    label={f.panelLabel ?? f.label}
+                    htmlFor={`${id}-${f.name}`}
+                    hint={f.hint}
+                    error={s.errors?.[f.name!]}
+                    className={cn(f.wide && "sm:col-span-2")}
+                  >
+                    <Control f={{ ...f, value: s.values?.[f.name!] ?? f.value }} id={`${id}-${f.name}`} />
+                  </Field>
+                ))}
+            </PanelSection>
+          ))}
           <PanelFooter save={save} />
-        </>
+        </PanelBody>
       )}
     </ActionForm>
   );
