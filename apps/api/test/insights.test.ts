@@ -77,6 +77,9 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     const a = (await api(app, manager).get("/audit?entityType=order&pageSize=5").expect(200)).body;
     expect(a.rows.length).toBeGreaterThan(0);
     expect(a.rows[0]).toHaveProperty("userName");
+    // Counts by kind of record for the list's chips, whatever kind is picked.
+    expect(a.counts.order).toBe(a.total);
+    expect(Object.keys(a.counts).length).toBeGreaterThan(1);
   });
 
   it("keeps the company stamp image in the settings (a data URL of a few hundred KB)", async () => {

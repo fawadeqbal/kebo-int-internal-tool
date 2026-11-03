@@ -383,8 +383,10 @@ export function PhoneRow({
   flash,
   muted,
   prefetch,
+  extra,
 }: {
-  href: string;
+  /** Where the row goes; without it the row is plain (a record with no page). */
+  href?: string;
   /** false: never fetched ahead (a link that does something when opened). */
   prefetch?: boolean;
   title: ReactNode;
@@ -393,21 +395,35 @@ export function PhoneRow({
   figure?: ReactNode;
   flash?: boolean;
   muted?: boolean;
+  /** Under the row, outside its link (e.g. a "Show changes" disclosure). */
+  extra?: ReactNode;
 }) {
+  const hasFigure = figure !== undefined && figure !== null && figure !== "";
+  const inner = (
+    <>
+      <span className="min-w-0">
+        <span className={cn("block truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
+        {line && <span className="block truncate text-xs text-text-2">{line}</span>}
+      </span>
+      {(status || hasFigure) && (
+        <span className="flex shrink-0 flex-col items-end gap-1 text-right text-xs text-text-2 tabular">
+          {status}
+          {hasFigure && <span className="block">{figure}</span>}
+        </span>
+      )}
+    </>
+  );
+  const cls = "flex items-start justify-between gap-3 px-4 py-3";
   return (
     <li className={flash ? "animate-flash" : undefined}>
-      <Link href={href} prefetch={prefetch} className="flex items-start justify-between gap-3 px-4 py-3 active:bg-surface-2">
-        <span className="min-w-0">
-          <span className={cn("block truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
-          {line && <span className="block truncate text-xs text-text-2">{line}</span>}
-        </span>
-        {(status || (figure !== undefined && figure !== null && figure !== "")) && (
-          <span className="flex shrink-0 flex-col items-end gap-1 text-right text-xs text-text-2 tabular">
-            {status}
-            {figure !== undefined && figure !== null && figure !== "" && <span className="block">{figure}</span>}
-          </span>
-        )}
-      </Link>
+      {href ? (
+        <Link href={href} prefetch={prefetch} className={cn(cls, "active:bg-surface-2")}>
+          {inner}
+        </Link>
+      ) : (
+        <div className={cls}>{inner}</div>
+      )}
+      {extra && <div className="-mt-1.5 px-4 pb-3">{extra}</div>}
     </li>
   );
 }
