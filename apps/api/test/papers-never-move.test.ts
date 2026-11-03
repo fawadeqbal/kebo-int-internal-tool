@@ -257,7 +257,8 @@ describe("papers that never move", () => {
       .expect(200);
     const pl = async (q = "") => (await api(app, sana).get(`/orders/${o.id}/documents/packing-list${q}`).expect(200)).body;
     expect(await pl()).toMatchObject({ final: false, paper: null, watermark: null });
-    await move({ to: "shipped", confirm: true, shippedOn: today, blNo: "MEDU123" }).expect(200);
+    // Shipped last month (the month's reports elsewhere are left as they are).
+    await move({ to: "shipped", confirm: true, shippedOn: day(-40), blNo: "MEDU123" }).expect(200);
     const shipped = await pl();
     expect(shipped).toMatchObject({ final: true, paper: { version: 1, status: "final", rebuiltOn: null }, order: { blNo: "MEDU123" } });
     // The B/L corrected afterwards: the packing list printed stays as it was; version 2 takes the correction.

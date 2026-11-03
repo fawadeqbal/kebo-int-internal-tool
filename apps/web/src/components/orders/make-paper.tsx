@@ -254,23 +254,21 @@ function BuyerBox({
   const numbers = [b.taxNo ? `Tax no. ${b.taxNo}` : null, b.regNo ? `Reg. no. ${b.regNo}` : null].filter(Boolean).join(" · ");
   return (
     <section aria-labelledby="buyer" className="rounded-lg border border-line p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 id="buyer" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
-            Buyer as on the order
-          </h3>
-          <p className="mt-1 text-sm font-medium">{b.name}</p>
-          {(b.address || b.country) && (
-            <p className="text-xs whitespace-pre-line text-text-2">{[b.address, b.country].filter(Boolean).join(", ")}</p>
-          )}
-          {numbers && <p className="text-xs text-muted">{numbers}</p>}
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h3 id="buyer" className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+          Buyer as on the order
+        </h3>
         {editing && p.canRefreshBuyer && (
-          <Button size="xs" variant="secondary" className="shrink-0" onClick={() => setOpen(true)}>
+          <Button size="xs" variant="ghost" className="-my-1 shrink-0" onClick={() => setOpen(true)}>
             <RefreshCw aria-hidden /> Refresh from customer
           </Button>
         )}
       </div>
+      <p className="mt-1 text-sm font-medium">{b.name}</p>
+      {(b.address || b.country) && (
+        <p className="text-xs whitespace-pre-line text-text-2">{[b.address, b.country].filter(Boolean).join(", ")}</p>
+      )}
+      {numbers && <p className="text-xs text-muted">{numbers}</p>}
       {changes.length > 0 ? (
         <p className="mt-2 text-xs text-[#9a3412]">
           The customer&apos;s {changes.join(", ")} changed since. This paper prints the buyer as on the order until it is refreshed.
@@ -297,6 +295,9 @@ function BuyerBox({
 /** The quotation's payment text against the route, when they differ: print it too, or not (the default). */
 function TermsBox({ p, editing, pending, onChange }: { p: PaperChecks; editing: boolean; pending: boolean; onChange: (print: boolean) => void }) {
   const t = p.terms;
+  // Ticked at once while it is saved; then as saved.
+  const [mine, setMine] = useState<boolean | null>(null);
+  const on = pending && mine !== null ? mine : !!t?.printed;
   if (!t) return null;
   return (
     <section aria-labelledby="terms" className="rounded-lg border border-warn/40 bg-warn-soft p-3">
@@ -304,11 +305,19 @@ function TermsBox({ p, editing, pending, onChange }: { p: PaperChecks; editing: 
         Payment terms
       </h3>
       <p className="mt-1 text-sm">
-        The quotation said <q className="font-medium">{t.quoted.split(/\r?\n/)[0]}</q>; the route is now <strong>{t.route}</strong>.
+        The quotation said <q className="font-medium">{t.quoted.split(/\r?\n/)[0]!.replace(/[\s.;,]+$/, "")}</q>; the route is now{" "}
+        <strong>{t.route}</strong>.
       </p>
       <p className="mt-0.5 text-xs text-text-2">The paper words the payment terms from the route.</p>
       <label className="mt-2 flex items-center gap-2.5 text-sm">
-        <Checkbox checked={t.printed} disabled={!editing || pending} onChange={(e) => onChange(e.target.checked)} />
+        <Checkbox
+          checked={on}
+          disabled={!editing || pending}
+          onChange={(e) => {
+            setMine(e.target.checked);
+            onChange(e.target.checked);
+          }}
+        />
         Print the quotation&apos;s text too
       </label>
     </section>
