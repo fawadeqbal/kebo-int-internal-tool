@@ -317,6 +317,15 @@ export function routeFromTerms(terms: BalanceTerms): RouteTerms {
   return { route: null, balanceWhen: null, lcTerms: null, lcDays: null };
 }
 
+/** The order is still on the route its quotation's terms implied (shown "from the quotation"). */
+export function routeFromQuotation(t: RouteTerms, accepted: BalanceTerms): boolean {
+  const q = routeFromTerms(accepted);
+  if (!t.route || t.route !== q.route) return false;
+  if (t.route === "informal") return (t.balanceWhen ?? "before_shipment") === q.balanceWhen;
+  if (t.route === "letter_of_credit") return (t.lcTerms ?? "at_sight") === "at_sight";
+  return true;
+}
+
 /**
  * The balance terms the route now means, from the terms as accepted (Order.balanceTerms stays as the
  * quotation said: nothing writes it after the order is made). No route yet: the accepted terms.

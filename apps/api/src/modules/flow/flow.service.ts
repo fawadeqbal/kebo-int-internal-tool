@@ -16,6 +16,7 @@ import {
   balanceWhenOf,
   lcChecksLine,
   documentsInUse,
+  routeFromQuotation,
   routeSummary,
   type BankContractInput,
   type BankStepInput,
@@ -339,6 +340,8 @@ export class FlowService {
       payment: {
         route,
         routeLabel: route ? PAYMENT_ROUTE_SHORT[route] : null,
+        /** Still the route the quotation's terms implied (the order started on it; changing it is fine). */
+        fromQuotation: routeFromQuotation(terms, o.balanceTerms),
         /** The route's terms: informal balance before shipment or against the B/L copy; LC at sight or deferred N days. */
         balanceWhen: terms.balanceWhen,
         lcTerms: terms.lcTerms,

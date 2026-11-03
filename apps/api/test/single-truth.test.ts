@@ -214,7 +214,7 @@ describe("one money truth", () => {
       // CNY 1,000 + 13% × 10 = CNY 11,300: the default plan is 30% (3,390) on order and 7,910 on the ready date.
       o = await makeOrder({ taxRate: 13 });
       await api(app, manager).patch(`/orders/${o.orderId}/factory-order`, { factoryOrderedOn: day(-20) }).expect(200);
-      await db().order.update({ where: { id: o.orderId }, data: { readyOn: new Date(`${day(-3)}T00:00:00Z`) } });
+      await api(app, manager).patch(`/orders/${o.orderId}/details`, { readyOn: day(-3) }).expect(200);
       await api(app, manager)
         .post(`/orders/${o.orderId}/factory-payments`, { factoryId: o.factoryId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: day(-15) })
         .expect(201);

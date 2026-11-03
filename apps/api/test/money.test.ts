@@ -73,9 +73,11 @@ describe("money", () => {
     expect(m).toMatchObject({ currency: "USD", total: "2000.00" });
     expect(m.plan.items.map((i: { label: string; amount: string; status: string }) => [i.label, i.amount, i.status])).toEqual([
       ["Deposit 30%", "600.00", "open"],
-      ["Balance", "1400.00", "open"],
+      // The quotation said "before shipment": the order starts on that route, the balance named after it.
+      ["Balance before shipment", "1400.00", "open"],
     ]);
     expect(m.plan.items[0].dueOn).not.toBeNull();
+    expect(m.plan.items[1]).toMatchObject({ dueRule: "on_ready", dueOn: null, rule: "on the ready date" });
     expect(m.plan).toMatchObject({ matchesTotal: true, next: { label: "Deposit 30%", open: "600.00" } });
     // 10 × (1,000 + 13%) = CNY 11,300, looked after by Sana who added the factory.
     expect(m.factories.rows).toEqual([
@@ -278,15 +280,17 @@ describe("money", () => {
 
   it("dates the balance when the order ships", async () => {
     await api(app, sana).post(`/orders/${orderId}/stage`, { to: "in_production", confirm: true }).expect(200);
-    // Clear the date set above, so shipping fills it in.
+    // The last row due "on the ready date" instead of its own date: with no ready date, by the ship date.
     const m = await money();
     const items = m.plan.items.map((i: { id: string; label: string; amount: string; dueOn: string | null }, n: number) => ({
       id: i.id,
       label: i.label,
       amount: Number(i.amount),
       dueOn: n === 2 ? null : i.dueOn,
+      ...(n === 2 ? { dueRule: "on_ready" } : {}),
     }));
     await api(app, sana).put(`/orders/${orderId}/payment-plan`, { items, reason: "Order changed" }).expect(200);
+    expect((await money()).plan.items[2]).toMatchObject({ dueRule: "on_ready", dueOn: null });
     await api(app, sana).post(`/orders/${orderId}/stage`, { to: "shipped", shippedOn: today, confirm: true }).expect(200);
     expect((await money()).plan.items[2].dueOn).toBe(today); // balance before shipment: due by the ship date
   });

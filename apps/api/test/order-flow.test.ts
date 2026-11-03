@@ -97,12 +97,13 @@ describe("order flow: from asking factories to SAT", () => {
     const f = await flow();
     expect(f.modules).toEqual({ bankContracts: true, production: true, shipping: true, bankDocuments: true, deliverySat: true });
     expect(stepState(f)).toEqual({ payment: "current", factory: "todo", production: "todo", shipping: "todo", documents: "todo", delivery: "todo" });
-    expect(f.payment).toMatchObject({ route: null, depositIn: false, bankContract: null });
+    // The route the quotation's terms imply (before shipment: informal), shown "from the quotation".
+    expect(f.payment).toMatchObject({ route: "informal", fromQuotation: true, depositIn: false, bankContract: null });
     expect(f.factory.factories).toEqual([{ id: henan, name: `Henan Pack ${tag}` }]);
     expect(f.production.suggested.length).toBeGreaterThan(0);
     expect(f.delivery.suggestedSat.length).toBeGreaterThan(0);
-    // No route yet: the informal set of papers, the proforma counted from the order itself.
-    expect(f.documents.set.map((d: { kind: string }) => d.kind)).toEqual(requiredDocuments(null));
+    // The informal set of papers, the proforma counted from the order itself.
+    expect(f.documents.set.map((d: { kind: string }) => d.kind)).toEqual(requiredDocuments("informal"));
     expect(f.documents.bankSteps.map((b: { step: string }) => b.step)).toEqual(["copies_to_customer"]);
     await api(app, bilal).get(`/orders/${orderId}/flow`).expect(404);
   });

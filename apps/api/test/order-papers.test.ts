@@ -136,7 +136,8 @@ describe("order papers", () => {
     expect(l.canMake).toBe(true);
     const ci = l.papers.find((p) => p.kind === "commercial-invoice")!;
     expect(ci).toMatchObject({ step: "shipping", state: "wait", number: refNo.replace(/^SO-/, "CI-"), makeable: true });
-    expect(l.papers.find((p) => p.kind === "sales-contract")).toMatchObject({ step: "payment", state: "wait" });
+    // The route comes from the quotation's terms: the contract can be made at once.
+    expect(l.papers.find((p) => p.kind === "sales-contract")).toMatchObject({ step: "payment", state: "can" });
     expect(l.papers.find((p) => p.kind === "purchase-order")).toMatchObject({ step: "factory", number: refNo.replace(/^SO-/, "PO-") });
     expect(l.papers.find((p) => p.kind === "proforma")).toMatchObject({ step: "payment" });
     // LC papers only on an LC order; receipts only for payments made.
