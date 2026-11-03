@@ -82,14 +82,23 @@ export function PortPicker({ id, value, onChange, exw }: { id: string; value: st
                 onKeyDown={(e) => {
                   const items = [...(e.currentTarget.parentElement?.querySelectorAll<HTMLElement>("[role=option]") ?? [])];
                   const at = items.indexOf(e.currentTarget);
-                  if (e.key === "ArrowDown") (e.preventDefault(), items[at + 1]?.focus());
-                  else if (e.key === "ArrowUp") (e.preventDefault(), at === 0 ? document.getElementById(id)?.focus() : items[at - 1]?.focus());
-                  else if (e.key === "Enter" || e.key === " ") {
+                  const input = () => document.getElementById(id)?.focus();
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    items[at + 1]?.focus();
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    if (at === 0) input();
+                    else items[at - 1]?.focus();
+                  } else if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     onChange(p);
                     setOpen(false);
-                    document.getElementById(id)?.focus();
-                  } else if (e.key === "Escape") (setOpen(false), document.getElementById(id)?.focus());
+                    input();
+                  } else if (e.key === "Escape") {
+                    setOpen(false);
+                    input();
+                  }
                 }}
                 className={cn(
                   "cursor-pointer rounded-md px-2.5 py-2 text-sm outline-none hover:bg-surface-2 focus:bg-surface-2",

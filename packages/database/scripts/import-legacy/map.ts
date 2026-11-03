@@ -396,6 +396,8 @@ export function mapSettings(old: Record<string, unknown> | null | undefined): Se
       paymentReceived: o.notifyPayment,
       dailySummary: o.notifyDailySummary,
     }),
+    // The old app had no such list: every paper is used.
+    papers: {},
   };
   const problems: string[] = [];
   const values = {} as Record<SettingsKey, unknown>;
