@@ -335,7 +335,9 @@ export function THead({ className, ...props }: ComponentProps<"thead">) {
   return <thead className={cn("bg-surface-2/60", className)} {...props} />;
 }
 export function Th({ className, ...props }: ComponentProps<"th">) {
-  return <th scope="col" className={cn("h-9 border-b border-line px-3 text-left text-xs font-medium whitespace-nowrap text-muted first:pl-4 last:pr-4", className)} {...props} />;
+  // relative: a hidden (sr-only) name inside is placed in its cell, so a table that scrolls
+  // sideways keeps it in its box instead of widening the page.
+  return <th scope="col" className={cn("relative h-9 border-b border-line px-3 text-left text-xs font-medium whitespace-nowrap text-muted first:pl-4 last:pr-4", className)} {...props} />;
 }
 export function Td({ className, ...props }: ComponentProps<"td">) {
   return <td className={cn("h-12 border-b border-line px-3 align-middle text-text first:pl-4 last:pr-4", className)} {...props} />;

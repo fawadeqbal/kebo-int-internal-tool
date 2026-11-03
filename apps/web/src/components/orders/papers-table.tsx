@@ -448,10 +448,15 @@ function PaperLine({
           {busy && <span className="text-xs text-muted">…</span>}
           <PaperMenu r={r} orderId={orderId} canMake={canMake} canRecord={canRecord} issuing={!!issue} onRecord={setOpen} />
         </span>
-        {action && <span className="col-start-2 flex flex-wrap gap-1.5 sm:hidden">{action}</span>}
+        {/* A row holds only cells: the phone's own place for the action is one too. */}
+        {action && (
+          <span role="cell" className="col-start-2 flex flex-wrap gap-1.5 sm:hidden">
+            {action}
+          </span>
+        )}
       </div>
       {open && (
-        <div className="pb-3 md:pl-[40px]">
+        <div role="cell" className="pb-3 md:pl-[40px]">
           <RecordForm
             r={{
               ...r,

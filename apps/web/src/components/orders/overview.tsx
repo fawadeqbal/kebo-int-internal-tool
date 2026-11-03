@@ -751,7 +751,13 @@ export function WhatTheyBought({ o, f }: { o: OverviewInput["o"]; f: OverviewFac
       />
       <div className="p-4">
         {o.lines.length ? (
-          <div className="overflow-x-auto rounded-lg border border-line">
+          // It can scroll sideways on a phone, so Tab stops on it.
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="The order's lines"
+            className="overflow-x-auto rounded-lg border border-line focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+          >
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-surface-2 text-xs text-text-2">

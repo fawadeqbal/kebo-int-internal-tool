@@ -101,7 +101,7 @@ export function RecordTable({ label, columns, rows, foot }: { label: string; col
                 {c.label}
               </th>
             ))}
-            <th scope="col" className="w-10 py-2">
+            <th scope="col" className="relative w-10 py-2">
               <span className="sr-only">Details</span>
             </th>
           </tr>

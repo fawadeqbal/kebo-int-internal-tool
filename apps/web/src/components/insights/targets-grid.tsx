@@ -43,7 +43,7 @@ export function TargetsGrid({ rows, people, actions, currency }: { rows: TargetR
             ))}
             <th className="px-3 py-2 text-right font-medium">Sold</th>
             <th className="px-3 py-2 text-right font-medium">Progress</th>
-            <th className="w-24 px-3 py-2">
+            <th className="relative w-24 px-3 py-2">
               <span className="sr-only">Change</span>
             </th>
           </tr>

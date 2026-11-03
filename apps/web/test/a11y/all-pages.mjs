@@ -47,6 +47,7 @@ const NOT_VISITED = {
   "/login/set-up-two-step": "needs a role that requires two-step (the platform's set-up page is checked on the way in)",
   "/platform/two-step": "needs a pending two-step sign-in; when the platform admin signs in again it is checked",
   "/notifications/open": "a redirect to the notification's record",
+  "/security/roles/new": "opens the New role panel on /security (checked there); without custom roles in the plan it shows the plan's note",
 };
 
 let failures = 0;
@@ -475,6 +476,9 @@ function appRoutes(dir = APP_DIR) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) out.push(...appRoutes(p));
     else if (name === "page.tsx") {
+      // An old address that only sends on (redirect, nothing rendered): the page it opens is checked.
+      const src = readFileSync(p, "utf8");
+      if (/\bredirect\(/.test(src) && !/\breturn\b/.test(src)) continue;
       const r = "/" + relative(APP_DIR, dirname(p)).split("/").filter((s) => s && !/^\(.*\)$/.test(s)).map((s) => s.replace(/^\[(.+)\]$/, ":$1")).join("/");
       out.push(r === "/" ? "/" : r.replace(/\/$/, ""));
     }
