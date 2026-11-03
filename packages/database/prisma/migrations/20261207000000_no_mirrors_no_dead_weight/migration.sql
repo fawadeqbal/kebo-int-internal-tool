@@ -92,3 +92,18 @@ SELECT gen_random_uuid(), w."company_id", NULL, 'flow.delivery', 'order', w."id"
 
 ALTER TABLE "orders" DROP COLUMN "delivery_condition";
 DROP TYPE "DeliveryCondition";
+
+-- 3. The old production timeline table: unused since the timeline became the checklist's Production items
+--    (20261122000000_order_checklist copied every row into order_checklist_items, with the same id).
+--    It goes. Refused if it holds a row that is not in the checklist (nothing that is anywhere else is lost).
+DO $$
+DECLARE n bigint;
+BEGIN
+  SELECT count(*) INTO n FROM "production_steps" p
+   WHERE NOT EXISTS (SELECT 1 FROM "order_checklist_items" c WHERE c."id" = p."id");
+  IF n > 0 THEN
+    RAISE EXCEPTION 'production_steps has % row(s) that are not in the order checklist: move them into order_checklist_items (step production) before this migration', n;
+  END IF;
+END $$;
+
+DROP TABLE "production_steps";

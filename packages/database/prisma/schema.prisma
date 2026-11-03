@@ -595,7 +595,6 @@ model Factory {
   orderLines OrderLine[]
 
   requests        FactoryRequest[]
-  productionSteps ProductionStep[]
   checklistItems  OrderChecklistItem[]
   paymentPlans    FactoryPaymentPlan[]
   orderParts      OrderFactory[]
@@ -1134,7 +1133,6 @@ model Order {
   expenses     Expense[]
   costs        OrderCost[]
   bankContract OrderBankContract?
-  production   ProductionStep[]
   shipments    Shipment[]
   documents    OrderDocument[]
   bankSteps    OrderBankStep[]
@@ -1318,27 +1316,6 @@ model OrderBankContract {
 
   @@index([companyId])
   @@map("order_bank_contracts")
-}
-
-/// A step of the factory's production timeline (drawings approved, parts in, assembly, test run, ready).
-model ProductionStep {
-  id        String    @id @default(uuid()) @db.Uuid
-  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company   Company   @relation(fields: [companyId], references: [id])
-  orderId   String    @map("order_id") @db.Uuid
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  factoryId String?   @map("factory_id") @db.Uuid
-  factory   Factory?  @relation(fields: [factoryId], references: [id], onDelete: SetNull)
-  title     String    @db.VarChar(120)
-  plannedOn DateTime? @map("planned_on") @db.Date
-  doneOn    DateTime? @map("done_on") @db.Date
-  note      String?   @db.VarChar(500)
-  sortOrder Int       @default(0) @map("sort_order")
-
-  @@index([orderId])
-  @@index([companyId])
-  @@map("production_steps")
 }
 
 /// One item of an order's checklist (see @kebo/shared workflows/checklist). Items with a `key` are the
@@ -2184,7 +2161,6 @@ model Company {
   personTargets       PersonTarget[]
   factoryRequests     FactoryRequest[]
   orderBankContracts  OrderBankContract[]
-  productionSteps     ProductionStep[]
   shipments           Shipment[]
   orderDocuments      OrderDocument[]
   orderBankSteps      OrderBankStep[]
