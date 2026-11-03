@@ -148,3 +148,19 @@ END $$;
 
 CREATE TRIGGER "orders_currency_keeps_payments" BEFORE UPDATE OF "currency" ON "orders"
   FOR EACH ROW WHEN (NEW."currency" IS DISTINCT FROM OLD."currency") EXECUTE FUNCTION order_currency_keeps_payments();
+
+-- 5. The FAT and inspection reports read the checklist item bound to them by its `paper` key, no longer
+--    one found by its title. Bound here: the Production items (not Make / Send) the title rule found,
+--    on orders and in the company's list. Renaming an item no longer loses its report.
+UPDATE "order_checklist_items" SET "paper" = 'fat-report'
+ WHERE "step" = 'production' AND "paper" IS NULL AND "tool" NOT IN ('make', 'send')
+   AND "title" ~* '\yFAT\y|factory (acceptance |test)';
+UPDATE "order_checklist_items" SET "paper" = 'inspection-report'
+ WHERE "step" = 'production' AND "paper" IS NULL AND "tool" NOT IN ('make', 'send')
+   AND "title" ~* 'inspection';
+UPDATE "checklist_templates" SET "paper" = 'fat-report'
+ WHERE "step" = 'production' AND "paper" IS NULL AND "tool" NOT IN ('make', 'send')
+   AND "title" ~* '\yFAT\y|factory (acceptance |test)';
+UPDATE "checklist_templates" SET "paper" = 'inspection-report'
+ WHERE "step" = 'production' AND "paper" IS NULL AND "tool" NOT IN ('make', 'send')
+   AND "title" ~* 'inspection';

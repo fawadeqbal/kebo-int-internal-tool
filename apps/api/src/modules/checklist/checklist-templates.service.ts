@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
-import { AUTO_ITEMS, can, FLOW_STEPS, HIDEABLE_AUTO_KEYS, type ChecklistTemplateInput } from "@kebo/shared";
+import { AUTO_ITEMS, can, checklistPaperOf, FLOW_STEPS, HIDEABLE_AUTO_KEYS, type ChecklistTemplateInput } from "@kebo/shared";
 import { ForbiddenError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -64,7 +64,7 @@ export class ChecklistTemplatesService {
             title: i.title,
             tool: i.tool,
             fields: i.fields as unknown as Prisma.InputJsonValue,
-            paper: i.tool === "make" || i.tool === "send" ? i.paper : null,
+            paper: checklistPaperOf(i.tool, i.paper),
             route: i.route,
             dueDays: i.dueDays,
             sortOrder: n * 10 + 5,

@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { ArrowDown, ArrowUp, Lock, Plus, Trash2, X } from "lucide-react";
 import {
+  checklistPaperOf,
   CHECKLIST_FIELD_TYPES,
   CHECKLIST_TOOLS,
   FLOW_STEP_LABEL,
@@ -11,6 +12,7 @@ import {
   PAPER_LABEL,
   PAYMENT_ROUTE_SHORT,
   PAYMENT_ROUTES,
+  REPORT_PAPERS,
   TOOL_HINT,
   TOOL_LABEL,
   type ChecklistField,
@@ -149,7 +151,7 @@ export function ChecklistEditor({ initial, action }: { initial: ChecklistSetting
     items: FLOW_STEPS.flatMap((s) => items.filter((i) => i.step === s)).map(({ uid: _uid, ...i }) => ({
       ...i,
       fields: i.tool === "fill" ? i.fields.filter((f) => f.label.trim()) : [],
-      paper: i.tool === "make" || i.tool === "send" ? i.paper : null,
+      paper: checklistPaperOf(i.tool, i.paper),
     })),
     hidden,
   });
@@ -303,7 +305,22 @@ export function ChecklistEditor({ initial, action }: { initial: ChecklistSetting
                     </label>
                   )}
                   {i.tool === "fill" && (
-                    <div className="pl-6">
+                    <div className="flex flex-col gap-2 pl-6">
+                      <label className="flex flex-col gap-1 text-xs text-muted sm:max-w-xs">
+                        The report it fills
+                        <Select
+                          value={checklistPaperOf(i.tool, i.paper) ?? ""}
+                          onChange={(e) => patch(i.uid, { paper: (e.target.value || null) as PaperKind | null })}
+                          className="h-8 text-sm"
+                        >
+                          <option value="">None</option>
+                          {REPORT_PAPERS.map((k) => (
+                            <option key={k} value={k}>
+                              {PAPER_LABEL[k]}
+                            </option>
+                          ))}
+                        </Select>
+                      </label>
                       <FieldsEditor fields={i.fields} onChange={(f) => patch(i.uid, { fields: f })} />
                     </div>
                   )}

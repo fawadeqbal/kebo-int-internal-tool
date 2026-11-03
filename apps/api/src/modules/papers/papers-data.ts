@@ -762,14 +762,12 @@ function paymentRequest(c: PaperCtx): Built {
   };
 }
 
-/** The production checklist's own item a report is made from: the FAT or the inspection. */
+/**
+ * The checklist's own item a report is made from: the Fill in item bound to it by its `paper` (the FAT or
+ * the inspection), whatever its title; one for another payment route does not count.
+ */
 export function reportItem(c: { o: PaperOrder }, kind: "fat-report" | "inspection-report") {
-  const re = kind === "fat-report" ? /\bFAT\b|factory (acceptance |test)/i : /inspection/i;
-  return (
-    c.o.checklist.find((i) => i.paper === kind) ??
-    c.o.checklist.find((i) => i.step === "production" && re.test(i.title ?? "") && (!i.route || i.route === c.o.paymentRoute)) ??
-    null
-  );
+  return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === c.o.paymentRoute)) ?? null;
 }
 
 function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {

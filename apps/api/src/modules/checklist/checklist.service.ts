@@ -17,6 +17,7 @@ import {
   stepStates,
   STEP_STATE_LABEL,
   type AutoItem,
+  checklistPaperOf,
   type ChecklistAutoInput,
   type ChecklistFacts,
   type ChecklistField,
@@ -460,7 +461,7 @@ export class ChecklistService {
           title: input.title,
           tool: input.tool,
           fields: input.fields as unknown as Prisma.InputJsonValue,
-          paper: input.tool === "make" || input.tool === "send" ? input.paper : null,
+          paper: checklistPaperOf(input.tool, input.paper),
           route: input.route,
           dueOn: toDbDateOrNull(input.dueOn),
           assigneeId: input.assigneeId,
@@ -501,7 +502,8 @@ export class ChecklistService {
       if (input.title !== undefined) data.title = input.title;
       if (input.tool !== undefined) data.tool = input.tool;
       if (input.fields !== undefined) data.fields = input.fields as unknown as Prisma.InputJsonValue;
-      if (input.paper !== undefined) data.paper = input.paper;
+      if (input.paper !== undefined || input.tool !== undefined)
+        data.paper = checklistPaperOf((input.tool ?? r.tool) as ChecklistTool, input.paper !== undefined ? input.paper : (r.paper as PaperKind | null));
       if (input.route !== undefined) data.route = input.route;
       if (input.dueOn !== undefined) data.dueOn = toDbDateOrNull(input.dueOn);
       if (input.assigneeId !== undefined) data.assigneeId = input.assigneeId;

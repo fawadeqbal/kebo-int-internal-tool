@@ -168,6 +168,22 @@ describe("order checklist", () => {
     expect(fat.id).toBeTruthy();
   });
 
+  it("the FAT report reads the item bound to it, whatever the item is called", async () => {
+    const s = await steps();
+    const fat = find(s, "Factory test run (FAT) with video")! as Item & { paper: string | null };
+    expect(fat.paper).toBe("fat-report");
+    await api(app, sana).patch(`/checklist/${fat.id}`, { title: "Test run at the works, with video" }).expect(200);
+    await api(app, sana).post(`/checklist/${fat.id}/tick`, { data: { date: day(0), result: "Passed, 4 h at full load" } }).expect(200);
+    const checks = (await api(app, sana).get(`/orders/${orderId}/papers/fat-report/checks`).expect(200)).body.checks as { key: string; ok: boolean; value: string }[];
+    expect(checks.find((c) => c.key === "item")).toMatchObject({ ok: true, value: "Test run at the works, with video" });
+    // Still bound after the rename.
+    const after = (await api(app, sana).get(`/orders/${orderId}/steps`).expect(200)).body as Steps;
+    expect((find(after, "Test run at the works, with video") as Item & { paper: string | null }).paper).toBe("fat-report");
+    // Put back as it was for the tests below.
+    await api(app, sana).post(`/checklist/${fat.id}/untick`).expect(200);
+    await api(app, sana).patch(`/checklist/${fat.id}`, { title: "Factory test run (FAT) with video" }).expect(200);
+  });
+
   it("own items: add, tick with data, untick, skip, delete", async () => {
     const added = (
       await api(app, sana)
