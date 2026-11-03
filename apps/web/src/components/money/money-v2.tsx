@@ -26,6 +26,7 @@ import { LineTable, type LineColumn, type LineResult, type LineRow } from "@/com
 import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
 import type { CustomerCreditView, FactoryPlanView, OrderMoney } from "@/lib/types-money";
+import { useBankBand } from "@/components/orders/bank-tracker";
 import { AccountSelect } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
 
@@ -75,9 +76,8 @@ function useArrival(fx: Fx, currency: string, initialAmount = "") {
  * "Money received from {customer}" (MoneyV2Record): what was paid (any
  * currency), into an account of that currency, when, how, who paid, the rate
  * (from Settings, editable); "Counts as" and what it pays on this order; what
- * is left over becomes the customer's credit. With `reached` it is "Money
- * reached us" (MoneyV2Bank): the credited amount and the bank charges, and
- * recording it ticks the bank step.
+ * is left over becomes the customer's credit. ("Money reached us", the bank
+ * step's own, is ReachedForm below.)
  */
 export function ReceivedForm({
   action,
@@ -91,7 +91,6 @@ export function ReceivedForm({
   today,
   label = "Record a payment",
   quiet,
-  reached,
 }: {
   action: Action;
   currency: string;
@@ -105,12 +104,10 @@ export function ReceivedForm({
   today: string;
   label?: string;
   quiet?: boolean;
-  /** "Money reached us · LC …": records the payment and ticks the bank step. */
-  reached?: { title: string };
 }) {
   const [open, setOpen] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  if (Number(due) <= 0 && !reached) return <p className="text-sm text-muted">Paid in full: nothing more to record.</p>;
+  if (Number(due) <= 0) return <p className="text-sm text-muted">Paid in full: nothing more to record.</p>;
   if (!open)
     return (
       <div className="flex flex-col gap-2">
@@ -139,7 +136,6 @@ export function ReceivedForm({
       forWhat={forWhat}
       fx={fx}
       today={today}
-      reached={reached}
       onClose={() => setOpen(false)}
       onFileError={setFileError}
     />
@@ -156,15 +152,14 @@ function ReceivedFields({
   forWhat,
   fx,
   today,
-  reached,
   onClose,
   onFileError,
 }: Omit<Parameters<typeof ReceivedForm>[0], "label" | "quiet"> & { onClose: () => void; onFileError: (m: string) => void }) {
   const dueMinor = toMinor(due);
-  const a = useArrival(fx, currency, reached ? due : "");
+  const a = useArrival(fx, currency);
   const [charges, setCharges] = useState("");
   const [part, setPart] = useState<string | null>(null);
-  const [method, setMethod] = useState<PaymentMethod>(reached ? "bank_transfer" : "bank_transfer");
+  const [method, setMethod] = useState<PaymentMethod>("bank_transfer");
   const [file, setFile] = useState<File | null>(null);
   const chargesMinor = toMinor(charges);
   const auto = Math.max(Math.min(a.countsMinor, dueMinor - chargesMinor), 0);
@@ -180,59 +175,38 @@ function ReceivedFields({
       {(s) => (
         <>
           <div className="-mx-3 -mt-3 border-b border-line px-3 py-2.5 sm:-mx-4 sm:-mt-4 sm:px-4">
-            <p className="font-semibold">{reached ? reached.title : `Money received from ${customer}`}</p>
+            <p className="font-semibold">Money received from {customer}</p>
             <p className="text-xs text-text-2">
-              {reached
-                ? "Ticks the bank step and records the payment together."
-                : "Record what really happened: the currency and account it arrived in, who paid, and the rate. The system works out what it covers on the order."}
+              Record what really happened: the currency and account it arrived in, who paid, and the rate. The system works out what it covers on the order.
             </p>
           </div>
           <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="receivedCurrency" value={a.received} />
           <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
           <input type="hidden" name="method" value={method} />
-          {reached && <input type="hidden" name="bankStep" value="bank_paid_us" />}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-3">
-            <Field label={reached ? "Credited to us" : "What was paid"} htmlFor="r-amount" hint={reached ? "what the bank put in our account" : "the amount as it arrived"} error={s.errors?.receivedAmount ?? s.errors?.amount}>
+            <Field label="What was paid" htmlFor="r-amount" hint="the amount as it arrived" error={s.errors?.receivedAmount ?? s.errors?.amount}>
               <div className="flex flex-col gap-2">
                 <CurrencySelect short aria-label="Currency it arrived in" value={a.received} onChange={(e) => a.setReceived(e.target.value)} className="w-28" />
                 <MoneyInput id="r-amount" name="receivedAmount" currency={a.received} value={a.amount} onChange={(e) => a.setAmount(e.target.value)} placeholder="0.00" />
               </div>
             </Field>
-            {reached ? (
-              <Field label="On" htmlFor="r-paidOn" error={s.errors?.paidOn}>
-                <Input id="r-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
-              </Field>
-            ) : (
-              <AccountSelect id="r-account" label="Into" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
-            )}
-            {reached ? (
-              <Field label="Bank charges taken" htmlFor="r-charges" optional hint="advising + negotiation; a cost of this order" error={s.errors?.bankCharges}>
-                <MoneyInput id="r-charges" name="bankCharges" currency={currency} value={charges} onChange={(e) => setCharges(e.target.value)} placeholder="0.00" />
-              </Field>
-            ) : (
-              <Field label="Paid on" htmlFor="r-paidOn" error={s.errors?.paidOn}>
-                <Input id="r-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
-              </Field>
-            )}
-            {reached ? (
-              <AccountSelect id="r-account" label="Into" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
-            ) : (
-              <Field label="How" htmlFor="r-method" error={s.errors?.method}>
-                <Select id="r-method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
-                  {METHODS.map((m) => (
-                    <option key={m} value={m}>
-                      {PAYMENT_METHOD_LABEL[m]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            )}
-            {!reached && (
-              <Field label="Paid by" htmlFor="r-paidBy" optional hint="when someone pays for the customer" error={s.errors?.paidByName}>
-                <Input id="r-paidBy" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} placeholder={customer} />
-              </Field>
-            )}
+            <AccountSelect id="r-account" label="Into" currency={a.received} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
+            <Field label="Paid on" htmlFor="r-paidOn" error={s.errors?.paidOn}>
+              <Input id="r-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
+            </Field>
+            <Field label="How" htmlFor="r-method" error={s.errors?.method}>
+              <Select id="r-method" value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)}>
+                {METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {PAYMENT_METHOD_LABEL[m]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Paid by" htmlFor="r-paidBy" optional hint="when someone pays for the customer" error={s.errors?.paidByName}>
+              <Input id="r-paidBy" name="paidByName" maxLength={120} defaultValue={s.values?.paidByName ?? ""} placeholder={customer} />
+            </Field>
             {!a.same && (
               <Field label="Rate" htmlFor="r-rate" hint={a.settingsRate ? "from Settings · change it to the rate you agreed" : "no rate in Settings: type the rate you agreed"} error={s.errors?.rate}>
                 <div className="flex items-center gap-2 text-sm text-text-2">
@@ -242,96 +216,272 @@ function ReceivedFields({
                 </div>
               </Field>
             )}
-            <Field label="Reference" htmlFor="r-reference" optional hint={reached ? "MT103 / credit advice" : "T/T or SWIFT reference, receipt no."} error={s.errors?.reference}>
+            <Field label="Reference" htmlFor="r-reference" optional hint="T/T or SWIFT reference, receipt no." error={s.errors?.reference}>
               <Input id="r-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
             </Field>
-            {!reached && method === "bank_transfer" && (
+            {method === "bank_transfer" && (
               <Field label="Bank charges" htmlFor="r-charges" optional hint="kept by the banks; counts as paid" error={s.errors?.bankCharges}>
                 <MoneyInput id="r-charges" name="bankCharges" currency={currency} value={charges} onChange={(e) => setCharges(e.target.value)} placeholder="0.00" />
               </Field>
             )}
           </div>
 
-          {reached ? (
-            <dl className="flex flex-col gap-1.5 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-text-2">Balance due</dt>
-                <dd className="font-semibold tabular">{fmt(dueMinor, currency)}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-text-2">Credited + charges</dt>
-                <dd className="font-semibold tabular">{fmt(a.countsMinor + chargesMinor, currency)}</dd>
-              </div>
-              <div className="flex justify-between gap-3 border-t border-line pt-1.5">
-                <dt className="font-medium">Left due</dt>
-                <dd className="font-semibold tabular">{fmt(Math.max(dueMinor - a.countsMinor - chargesMinor, 0), currency)}</dd>
-              </div>
-              {leftMinor > 0 && <dd className="text-xs text-text-2">{fmt(leftMinor, currency)} more than is due: kept as {customer}&apos;s credit.</dd>}
-            </dl>
-          ) : (
-            <div className={box}>
-              <p className="text-sm font-semibold">
-                Counts as {fmt(a.countsMinor, currency)} · goes to
-              </p>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[22rem] border-collapse text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-text-2">
-                      <th scope="col" className="py-1.5 pr-2 font-medium">Order</th>
-                      <th scope="col" className="py-1.5 pr-2 font-medium">What for</th>
-                      <th scope="col" className="py-1.5 pr-2 text-right font-medium">Still due</th>
-                      <th scope="col" className="py-1.5 text-right font-medium">This payment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-t border-line">
-                      <td className="py-2 pr-2 font-mono text-xs">{refNo}</td>
-                      <td className="py-2 pr-2">{forWhat ?? "Balance"}</td>
-                      <td className="py-2 pr-2 text-right tabular">{fmt(dueMinor, currency)}</td>
-                      <td className="py-2 text-right">
-                        <div className="ml-auto w-40">
-                          <MoneyInput aria-label={`This payment on ${refNo}`} currency={currency} className="text-right" value={part ?? fromMinor(auto)} onChange={(e) => setPart(e.target.value)} />
-                        </div>
-                      </td>
-                    </tr>
-                    <tr className="border-t border-line">
-                      <td colSpan={3} className="py-2 pr-2 text-right font-semibold">
-                        Left over
-                      </td>
-                      <td className={cn("py-2 text-right font-semibold tabular", leftMinor < 0 && "text-bad")}>{fmt(leftMinor, currency)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              {tooMuch && <p className="text-xs text-bad">That is more than is still due on {refNo}.</p>}
-              {leftMinor > 0 && (
-                <p className="flex items-start gap-2 rounded-md border border-info/30 bg-info-soft px-2.5 py-2 text-xs">
-                  <Info className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden />
-                  {fmt(leftMinor, currency)} more than is due: kept as {customer}&apos;s credit, to use on the next order or refund.
-                </p>
-              )}
-              {a.receivedMinor > 0 && (
-                <p className="text-xs text-text-2">
-                  {a.same
-                    ? `Kept as ${fmt(a.receivedMinor, a.received)} in the account, ${fmt(partMinor, currency)} off the order.`
-                    : `Kept as both: ${fmt(a.receivedMinor, a.received)} in the account, ${fmt(partMinor, currency)} off the order. The rate is kept with the payment, so later rate changes never move it.`}
-                </p>
-              )}
+          <div className={box}>
+            <p className="text-sm font-semibold">
+              Counts as {fmt(a.countsMinor, currency)} · goes to
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[22rem] border-collapse text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-text-2">
+                    <th scope="col" className="py-1.5 pr-2 font-medium">Order</th>
+                    <th scope="col" className="py-1.5 pr-2 font-medium">What for</th>
+                    <th scope="col" className="py-1.5 pr-2 text-right font-medium">Still due</th>
+                    <th scope="col" className="py-1.5 text-right font-medium">This payment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-line">
+                    <td className="py-2 pr-2 font-mono text-xs">{refNo}</td>
+                    <td className="py-2 pr-2">{forWhat ?? "Balance"}</td>
+                    <td className="py-2 pr-2 text-right tabular">{fmt(dueMinor, currency)}</td>
+                    <td className="py-2 text-right">
+                      <div className="ml-auto w-40">
+                        <MoneyInput aria-label={`This payment on ${refNo}`} currency={currency} className="text-right" value={part ?? fromMinor(auto)} onChange={(e) => setPart(e.target.value)} />
+                      </div>
+                    </td>
+                  </tr>
+                  <tr className="border-t border-line">
+                    <td colSpan={3} className="py-2 pr-2 text-right font-semibold">
+                      Left over
+                    </td>
+                    <td className={cn("py-2 text-right font-semibold tabular", leftMinor < 0 && "text-bad")}>{fmt(leftMinor, currency)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          )}
+            {tooMuch && <p className="text-xs text-bad">That is more than is still due on {refNo}.</p>}
+            {leftMinor > 0 && (
+              <p className="flex items-start gap-2 rounded-md border border-info/30 bg-info-soft px-2.5 py-2 text-xs">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden />
+                {fmt(leftMinor, currency)} more than is due: kept as {customer}&apos;s credit, to use on the next order or refund.
+              </p>
+            )}
+            {a.receivedMinor > 0 && (
+              <p className="text-xs text-text-2">
+                {a.same
+                  ? `Kept as ${fmt(a.receivedMinor, a.received)} in the account, ${fmt(partMinor, currency)} off the order.`
+                  : `Kept as both: ${fmt(a.receivedMinor, a.received)} in the account, ${fmt(partMinor, currency)} off the order. The rate is kept with the payment, so later rate changes never move it.`}
+              </p>
+            )}
+          </div>
           <Field label="Note" htmlFor="r-note" optional error={s.errors?.note}>
             <Textarea id="r-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
           </Field>
           <div className="flex flex-wrap items-end justify-between gap-2">
-            <FilePicker id="r-file" label={reached ? "MT103 / credit advice" : "Receipt or bank slip"} hint="Photo or PDF" file={file} onChange={setFile} className="min-w-0 flex-1 basis-56" />
+            <FilePicker id="r-file" label="Receipt or bank slip" hint="Photo or PDF" file={file} onChange={setFile} className="min-w-0 flex-1 basis-56" />
             <div className="flex gap-2">
               <Button type="button" size="sm" variant="ghost" onClick={onClose}>
                 Cancel
               </Button>
               <SubmitButton size="sm" pendingText={file ? "Recording, sending the file…" : "Recording…"} disabled={a.countsMinor <= 0 || tooMuch || leftMinor < 0}>
-                {reached ? "Record and tick" : "Record the payment"}
+                Record the payment
               </SubmitButton>
             </div>
+          </div>
+        </>
+      )}
+    </ActionForm>
+  );
+}
+
+/* ---------------------------------------------------------------- money reached us (the bank step) */
+
+/** A line of the money check: label and value side by side; three across under the fields when the band is mid-wide. */
+const CHECK_ROW = "flex justify-between gap-3 @2xl:flex-col @2xl:gap-0.5 @5xl:flex-row @5xl:gap-3";
+
+/**
+ * "Money reached us" in the bank step's band (Documents › Through the banks):
+ * credited to us (currency + amount), on, bank charges; into, reference, the
+ * MT103 or bank slip; the money check on the right. Recording it records the
+ * payment and ticks the bank step, as before. On a phone the band is the
+ * whole screen and "Record and tick" stays at the bottom.
+ */
+export function ReachedForm({
+  action,
+  currency,
+  customer,
+  due,
+  depositDue,
+  fx,
+  today,
+}: {
+  action: Action;
+  currency: string;
+  customer: string;
+  due: string;
+  depositDue: string;
+  fx: Fx;
+  today: string;
+}) {
+  const band = useBankBand();
+  const dueMinor = toMinor(due);
+  const a = useArrival(fx, currency, Number(due) > 0 ? due : "");
+  const [charges, setCharges] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const chargesMinor = toMinor(charges);
+  const partMinor = Math.max(Math.min(a.countsMinor, dueMinor - chargesMinor), 0);
+  const leftMinor = a.countsMinor - partMinor;
+  const kind = Number(depositDue) > 0 ? "deposit" : "balance";
+  const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", band.error);
+  const leftDue = Math.max(dueMinor - a.countsMinor - chargesMinor, 0);
+  return (
+    <ActionForm action={save} onDone={band.close} keepFields className="@container flex min-h-0 flex-1 flex-col">
+      {(s) => (
+        <>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="receivedCurrency" value={a.received} />
+          <input type="hidden" name="amount" value={fromMinor(Math.max(partMinor, 0))} />
+          <input type="hidden" name="method" value="bank_transfer" />
+          <input type="hidden" name="bankStep" value="bank_paid_us" />
+          <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto p-4 sm:flex-none sm:overflow-visible @5xl:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="grid content-start gap-x-3 gap-y-3.5 @lg:grid-cols-2 @2xl:grid-cols-3">
+              <Field
+                label="Credited to us"
+                htmlFor="rb-amount"
+                hint="what the bank put in our account"
+                error={s.errors?.receivedAmount ?? s.errors?.amount}
+              >
+                <div className="flex gap-2">
+                  <CurrencySelect
+                    short
+                    aria-label="Currency it arrived in"
+                    value={a.received}
+                    onChange={(e) => a.setReceived(e.target.value)}
+                    className="w-24 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <MoneyInput
+                      id="rb-amount"
+                      name="receivedAmount"
+                      currency={a.received}
+                      value={a.amount}
+                      onChange={(e) => a.setAmount(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </Field>
+              <Field label="On" htmlFor="rb-paidOn" error={s.errors?.paidOn}>
+                <Input id="rb-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
+              </Field>
+              <Field
+                label="Bank charges taken"
+                htmlFor="rb-charges"
+                optional
+                hint="advising + negotiation · a cost of this order"
+                error={s.errors?.bankCharges}
+              >
+                <MoneyInput
+                  id="rb-charges"
+                  name="bankCharges"
+                  currency={currency}
+                  value={charges}
+                  onChange={(e) => setCharges(e.target.value)}
+                  placeholder="0.00"
+                />
+              </Field>
+              <AccountSelect
+                id="rb-account"
+                label="Into"
+                currency={a.received}
+                defaultValue={s.values?.accountId}
+                error={s.errors?.accountId}
+              />
+              <Field label="Reference" htmlFor="rb-reference" optional error={s.errors?.reference}>
+                <Input
+                  id="rb-reference"
+                  name="reference"
+                  maxLength={120}
+                  defaultValue={s.values?.reference ?? ""}
+                  placeholder="MT103 / credit advice no."
+                />
+              </Field>
+              <FilePicker id="rb-file" label="Credit advice" hint="MT103 / bank slip · photo or PDF" file={file} onChange={setFile} />
+              {!a.same && (
+                <Field
+                  label="Rate"
+                  htmlFor="rb-rate"
+                  hint={
+                    a.settingsRate ? "from Settings · change it to the rate you agreed" : "no rate in Settings: type the rate you agreed"
+                  }
+                  error={s.errors?.rate}
+                >
+                  <div className="flex items-center gap-2 text-sm text-text-2">
+                    <span className="shrink-0">1 {currency} =</span>
+                    <Input
+                      id="rb-rate"
+                      name="rate"
+                      inputMode="decimal"
+                      className="w-28 tabular"
+                      value={a.rate}
+                      onChange={(e) => a.setRate(e.target.value)}
+                    />
+                    <span>{a.received}</span>
+                  </div>
+                </Field>
+              )}
+              <Field
+                label="Note"
+                htmlFor="rb-note"
+                optional
+                error={s.errors?.note}
+                className={cn(a.same ? "@lg:col-span-2 @2xl:col-span-3" : "@2xl:col-span-2")}
+              >
+                <Input id="rb-note" name="note" maxLength={1000} defaultValue={s.values?.note ?? ""} />
+              </Field>
+            </div>
+            <dl
+              className="grid gap-2 self-start rounded-lg border border-line bg-surface-2 p-3.5 text-sm @2xl:grid-cols-3 @2xl:gap-4 @5xl:grid-cols-1 @5xl:gap-2"
+              aria-label="The money check"
+            >
+              <div className={CHECK_ROW}>
+                <dt className="text-text-2">Balance due</dt>
+                <dd className="font-semibold tabular">{fmt(dueMinor, currency)}</dd>
+              </div>
+              <div className={CHECK_ROW}>
+                <dt className="text-text-2">Credited + charges</dt>
+                <dd className="font-semibold tabular">{fmt(a.countsMinor + chargesMinor, currency)}</dd>
+              </div>
+              <div
+                className={cn(
+                  CHECK_ROW,
+                  "border-t border-line pt-2 @2xl:border-t-0 @2xl:border-l @2xl:pt-0 @2xl:pl-4 @5xl:border-t @5xl:border-l-0 @5xl:pt-2 @5xl:pl-0",
+                )}
+              >
+                <dt className="font-semibold">Left due</dt>
+                <dd className={cn("font-bold tabular", leftDue === 0 ? "text-ok" : "text-text")}>{fmt(leftDue, currency)}</dd>
+              </div>
+              {leftMinor > 0 && (
+                <dd className="text-xs text-text-2 @2xl:col-span-3 @5xl:col-span-1">
+                  {fmt(leftMinor, currency)} more than is due: kept as {customer}&apos;s credit.
+                </dd>
+              )}
+            </dl>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-surface-2 px-4 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <SubmitButton
+              size="sm"
+              className="max-sm:h-11 max-sm:flex-1"
+              pendingText={file ? "Recording, sending the file…" : "Recording…"}
+              disabled={a.countsMinor <= 0 || chargesMinor > dueMinor}
+            >
+              Record and tick
+            </SubmitButton>
+            <Button type="button" size="sm" variant="ghost" className="max-sm:hidden" onClick={band.close}>
+              Cancel
+            </Button>
+            <span className="text-xs text-muted max-sm:hidden">Records the payment and ticks the bank step together.</span>
           </div>
         </>
       )}

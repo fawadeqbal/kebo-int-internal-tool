@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind } from "@kebo/shared";
 import { Alert, Button, cn, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
@@ -177,9 +178,7 @@ export function DetailsForm({
         />
         {canEdit && (
           <div>
-            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
-              <Pencil aria-hidden /> Edit details
-            </Button>
+            <EditButton label="Edit details" onClick={() => setEditing(true)} />
           </div>
         )}
       </div>

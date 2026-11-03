@@ -100,7 +100,10 @@ export function LightForm({
   hint,
   onSubmit,
   onDone,
+  band,
 }: {
+  /** In a bank step's band: no box of its own, the buttons in a footer (pinned at the bottom on a phone). */
+  band?: boolean;
   fields: LightField[];
   chips?: LightChip[];
   dealId: string;
@@ -147,61 +150,68 @@ export function LightForm({
 
   return (
     <form
-      className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-3"
+      className={cn("flex flex-col", band ? "@container min-h-0 flex-1" : "gap-3 rounded-lg border border-line bg-surface p-3")}
       onSubmit={(e) => {
         e.preventDefault();
         submit();
       }}
       noValidate
     >
-      {error && <Alert tone="error">{error}</Alert>}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {shown.map((f) => (
-          <Field
-            key={f.name}
-            label={f.label}
-            htmlFor={`${id}-${f.name}`}
-            optional={!f.required}
-            hint={f.hint}
-            className={cn(f.type === "textarea" && "sm:col-span-3")}
-          >
-            <Control
-              f={f}
-              id={`${id}-${f.name}`}
-              value={values[f.name] ?? ""}
-              onChange={(v) => setValues((x) => ({ ...x, [f.name]: v }))}
-              onFile={(file) => setFiles((x) => ({ ...x, [f.name]: file }))}
-            />
-          </Field>
-        ))}
-      </div>
-      {left.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-muted">Add if you have it:</span>
-          {left.map((c) => (
-            <button
-              key={c.field.name}
-              type="button"
-              onClick={() => {
-                setShown((s) => [...s, c.field]);
-                setValues((x) => ({ ...x, [c.field.name]: c.field.value ?? "" }));
-                setLeft((l) => l.filter((x) => x !== c));
-              }}
-              className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 px-2.5 py-1 font-medium text-primary hover:bg-primary-soft"
+      <div className={cn("contents", band && "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 sm:flex-none sm:overflow-visible")}>
+        {error && <Alert tone="error">{error}</Alert>}
+        <div className={cn("grid gap-3", band ? "@lg:grid-cols-3" : "sm:grid-cols-3")}>
+          {shown.map((f) => (
+            <Field
+              key={f.name}
+              label={f.label}
+              htmlFor={`${id}-${f.name}`}
+              optional={!f.required}
+              hint={f.hint}
+              className={cn(f.type === "textarea" && (band ? "@lg:col-span-3" : "sm:col-span-3"))}
             >
-              <Plus className="size-3" aria-hidden /> {c.label}
-            </button>
+              <Control
+                f={f}
+                id={`${id}-${f.name}`}
+                value={values[f.name] ?? ""}
+                onChange={(v) => setValues((x) => ({ ...x, [f.name]: v }))}
+                onFile={(file) => setFiles((x) => ({ ...x, [f.name]: file }))}
+              />
+            </Field>
           ))}
         </div>
-      )}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {left.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-muted">Add if you have it:</span>
+            {left.map((c) => (
+              <button
+                key={c.field.name}
+                type="button"
+                onClick={() => {
+                  setShown((s) => [...s, c.field]);
+                  setValues((x) => ({ ...x, [c.field.name]: c.field.value ?? "" }));
+                  setLeft((l) => l.filter((x) => x !== c));
+                }}
+                className="inline-flex items-center gap-0.5 rounded-full border border-primary/30 px-2.5 py-1 font-medium text-primary hover:bg-primary-soft"
+              >
+                <Plus className="size-3" aria-hidden /> {c.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-x-3 gap-y-2",
+          band && "border-t border-line bg-surface-2 px-4 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:[&>button:first-child]:h-11 max-sm:[&>button:first-child]:flex-1",
+        )}
+      >
         <Button type="submit" size="sm" variant="primary" disabled={pending || busy}>
           {busy ? "Sending the file…" : pending ? "Saving…" : save}
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+        <Button type="button" size="sm" variant="ghost" onClick={onDone} className={cn(band && "max-sm:hidden")}>
           Cancel
         </Button>
-        <span className="text-xs text-muted">
+        <span className={cn("text-xs text-muted", band && "max-sm:hidden")}>
           {hint ?? (required.length && required.length < shown.length ? `Only the first ${required.length === 1 ? "one is" : `${required.length} are`} needed to tick it.` : null)}
         </span>
       </div>

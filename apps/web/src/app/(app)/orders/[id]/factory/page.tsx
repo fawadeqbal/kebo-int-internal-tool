@@ -130,6 +130,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       />
       <StepViewDivider />
       <DetailsCard
+        target="factory"
         title="Factory"
         fields={fields.map((f) => (f.type === "date" && f.value ? { ...f, show: date(f.value) } : f))}
         action={fieldsAction.bind(null, o.id, "factory")}
@@ -139,6 +140,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       />
       {priced.length > 0 && (
         <LinesCard
+          target="lines.factory"
           title="Lines · to the factory"
           description="What we bought from the factory for each line, at its price (internal)."
           canEdit={false}
@@ -152,7 +154,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           .filter((x) => !x.voided && x.factory.id === plan.factory.id && x.currency === plan.currency)
           .reduce((t, x) => t + Number(x.inOrderCurrency), 0);
         return (
-          <Card key={`${plan.factory.id}:${plan.currency}`} id={`plan-${plan.factory.id}`}>
+          <Card key={`${plan.factory.id}:${plan.currency}`} id={`plan-${plan.factory.id}`} data-target="factory.plan" data-target-card="">
             <CardHeader
               title={`What we pay ${plan.factory.name} · ${o.refNo}`}
               description="Agreed once per factory on the order: an advance when we order, the balance when they say ready (or on a fixed day)."
@@ -181,6 +183,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       {m.factories && (
         <MoneySection
           id="factory-money"
+          target="factory.payments"
           icon={<ArrowUpRight aria-hidden />}
           title="To the factory"
           tag="Internal"

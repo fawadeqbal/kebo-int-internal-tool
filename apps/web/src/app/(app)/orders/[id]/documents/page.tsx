@@ -11,7 +11,7 @@ import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { PapersTable, type PaperLineRow, type PapersTab } from "@/components/orders/papers-table";
 import { BankTracker, type BankStepLine, type BankStepTool } from "@/components/orders/bank-tracker";
 import { FilesOfOrder, UploadButton } from "@/components/files/files-list";
-import { ReceivedForm } from "@/components/money/money-v2";
+import { ReachedForm } from "@/components/money/money-v2";
 import { date } from "@/lib/format";
 import { lightAction } from "../../light-actions";
 import { addDocumentAction, updateDocumentAction } from "../../flow-actions";
@@ -118,6 +118,7 @@ export default async function OrderDocuments({
         ? {
             kind: "light",
             label: "Add the tracking no.",
+            note: "The courier's tracking no. and the day it went: ticks the step.",
             action,
             fields: [
               { name: "reference", label: "Tracking no.", value: current.reference, required: true },
@@ -135,23 +136,18 @@ export default async function OrderDocuments({
       api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
     ]);
     tool = {
-      kind: "node",
-      node: (
-        <ReceivedForm
-          quiet
-          label="Record it"
+      kind: "form",
+      label: "Record it",
+      note: "Ticks the bank step and records the payment together.",
+      form: (
+        <ReachedForm
           action={paymentAction.bind(null, o.id, o.currency)}
           currency={o.currency}
           customer={o.customer.name}
-          refNo={o.refNo}
           due={pays.due}
           depositDue={pays.depositDue}
-          forWhat="Balance"
           fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
           today={now}
-          reached={{
-            title: `Money reached us${contract?.number ? ` · ${route === "letter_of_credit" ? "LC" : "contract"} ${contract.number}` : ""}`,
-          }}
         />
       ),
     };
@@ -235,6 +231,7 @@ export default async function OrderDocuments({
           steps={lines}
           tool={tool}
           dealId={o.inquiry.id}
+          reference={contract?.number ?? null}
         />
       )}
       {files && <FilesOfOrder data={files} step="documents" />}

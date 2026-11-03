@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  AUTO_ITEMS,
   autoChecklist,
+  itemLink,
   checklistAutoInput,
   checklistItemInput,
   checklistTemplateInput,
@@ -244,5 +246,48 @@ describe("checklist inputs", () => {
     expect(DEFAULT_CHECKLIST.every((i) => checklistTemplateInput.shape.items.element.safeParse({ ...i, dueDays: null }).success)).toBe(
       true,
     );
+  });
+});
+
+describe("itemLink: where a checklist item's data lives", () => {
+  it("points every automatic item (but closed) at a step and its places", () => {
+    for (const step of Object.keys(AUTO_ITEMS) as (keyof typeof AUTO_ITEMS)[])
+      for (const d of AUTO_ITEMS[step]) {
+        const link = itemLink({ key: d.key, tool: null, title: d.title });
+        if (d.key === "closed") expect(link).toBeNull();
+        else {
+          expect(link, d.key).not.toBeNull();
+          expect(link!.step).not.toBeNull();
+          expect(link!.targets.length).toBeGreaterThan(0);
+        }
+      }
+  });
+
+  it("sends the shipment items to the matching fields", () => {
+    expect(itemLink({ key: "loaded", tool: null, title: "Loaded" })).toEqual({
+      step: "shipping",
+      targets: ["shipment.containerNo", "shipment.sealNo", "shipment.loadedOn"],
+      label: "Shipment · container",
+    });
+    expect(itemLink({ key: "balance_in", tool: null, title: "Balance received" })?.step).toBe("payment");
+  });
+
+  it("sends papers and bank steps to their row on Documents", () => {
+    expect(itemLink({ key: "doc:commercial_invoice", tool: null, title: "x" })).toEqual({
+      step: "documents",
+      targets: ["paper.commercial_invoice", "papers"],
+      label: "Papers · Commercial invoice",
+    });
+    expect(itemLink({ key: "bank:bank_paid_us", tool: null, title: "x" })?.targets).toEqual(["bank.bank_paid_us"]);
+  });
+
+  it("sends a cost to its line in Costs and a file to Files; other own items have none", () => {
+    expect(itemLink({ key: null, tool: "pay", title: "Freight paid to Sino Trans" })).toEqual({
+      step: null,
+      targets: ["costs.freight", "costs"],
+      label: "Costs · Sea / air freight",
+    });
+    expect(itemLink({ key: null, tool: "upload", title: "Signed contract", file: { id: "a1", name: "c.pdf" } })?.targets).toEqual(["file.a1", "files"]);
+    expect(itemLink({ key: null, tool: "done", title: "Call the customer" })).toBeNull();
   });
 });

@@ -116,6 +116,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       />
       <StepViewDivider />
       <DetailsCard
+        target="delivery"
         title="Delivery"
         description={canEdit ? undefined : o.customer.name}
         fields={shownFields}
@@ -125,6 +126,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       />
       {goodsLines.length > 0 && (
         <LinesCard
+          target="lines.delivered"
           title="Lines · delivered"
           description={delivered === goodsLines.length ? "Everything reached the customer." : "How many of each line reached the customer, and in what condition."}
           canEdit={canEdit}
@@ -137,6 +139,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       )}
       <ViewCard
         id="sat"
+        target="sat"
         title="SAT results"
         description={dv.satDoneOn ? `Signed off ${date(dv.satDoneOn)}${dv.satSignedBy ? ` by ${dv.satSignedBy}` : ""}.` : "What our engineer checks on site, from the customer's URS."}
         meter={dv.sat.length ? { n: dv.sat.filter((c) => c.result === "pass" || c.result === "not_applicable").length, of: dv.sat.length, word: "passed" } : undefined}
@@ -165,7 +168,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
           </p>
         )}
       </ViewCard>
-      <ViewCard id="claims" title="Claims" description="Damage, missing parts or faults after delivery, and how each was settled." canEdit={false}>
+      <ViewCard id="claims" target="claims" title="Claims" description="Damage, missing parts or faults after delivery, and how each was settled." canEdit={false}>
         <CardBody>
           <ClaimsPanel
             addAction={addClaimAction.bind(null, o.id)}

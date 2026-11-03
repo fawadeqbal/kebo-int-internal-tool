@@ -31,7 +31,7 @@ export async function StepCosts({ id, step }: { id: string; step: FlowStep }) {
       ? "Nothing was planned for this step, so these cut the profit."
       : null;
   return (
-    <Card aria-label="Costs in this step">
+    <Card aria-label="Costs in this step" data-target="costs" data-target-card="">
       <CardHeader
         title="Costs in this step"
         actions={<AddOrderExpense setup={setup} step={step} variant="ghost" size="xs" />}
@@ -39,7 +39,7 @@ export async function StepCosts({ id, step }: { id: string; step: FlowStep }) {
       {here.length ? (
         <ul className="flex flex-col divide-y divide-line px-4">
           {here.map((e) => (
-            <li key={e.id} className="flex items-start justify-between gap-3 py-2.5 text-xs">
+            <li key={e.id} data-target={`costs.${e.category}`} className="flex items-start justify-between gap-3 py-2.5 text-xs">
               <span className="min-w-0">
                 <span className="block text-sm font-medium text-text">{e.description}</span>
                 <span className="block text-muted">

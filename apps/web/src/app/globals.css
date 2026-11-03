@@ -2,3 +2,64 @@
 @import "@kebo/ui/theme.css";
 /* Tailwind scans the design system's source for class names too. */
 @source "../../../../packages/ui/src";
+
+/*
+ * A read-only table of lines that can be edited (EditableRows): a hovered row
+ * lights up and shows a pencil at its end; a click opens it for editing.
+ */
+@media (hover: hover) {
+  .edit-rows tbody tr[aria-rowindex],
+  .edit-rows tbody tr[aria-rowindex] > * {
+    cursor: pointer;
+  }
+  .edit-rows tbody tr[aria-rowindex]:hover > td,
+  .edit-rows tbody tr[aria-rowindex]:hover > th {
+    background-color: color-mix(in oklab, var(--primary-soft) 80%, transparent);
+  }
+  .edit-rows tbody tr[aria-rowindex] > td:last-child {
+    position: relative;
+    padding-right: 1.75rem;
+  }
+  .edit-rows tbody tr[aria-rowindex]:hover > td:last-child::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    width: 0.875rem;
+    height: 0.875rem;
+    transform: translateY(-50%);
+    background-color: var(--primary);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+}
+
+/*
+ * goTo(): where a checklist item's data lives, lit up for two seconds — the
+ * card outlined, the fields with a soft background.
+ */
+.goto-card {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 18%, transparent);
+  transition:
+    outline-color 0.4s,
+    box-shadow 0.4s;
+}
+.goto-hit {
+  background-color: var(--warn-soft) !important;
+  box-shadow: 0 0 0 4px var(--warn-soft);
+  border-radius: 0.375rem;
+  transition:
+    background-color 0.4s,
+    box-shadow 0.4s;
+}
+tr.goto-hit > * {
+  background-color: var(--warn-soft) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .goto-card,
+  .goto-hit {
+    transition: none;
+  }
+}

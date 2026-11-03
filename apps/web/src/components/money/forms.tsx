@@ -20,6 +20,7 @@ import {
 } from "@kebo/shared";
 import { Alert, Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
+import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { AccountSelect } from "./accounts";
@@ -80,16 +81,13 @@ export function PaymentPlan({
 
   if (!editing && buttonOnly)
     return plan.canEdit ? (
-      <Button
-        size="xs"
-        variant="ghost"
+      <EditButton
+        label="Edit the plan"
         onClick={() => {
           setRows(start());
           setEditing(true);
         }}
-      >
-        <Pencil aria-hidden /> Change the plan
-      </Button>
+      />
     ) : null;
   if (!editing)
     return (
@@ -99,16 +97,13 @@ export function PaymentPlan({
             Schedule <span className="font-normal text-muted">· {terms}</span>
           </h3>
           {plan.canEdit && (
-            <Button
-              size="xs"
-              variant="ghost"
+            <EditButton
+              label="Edit the schedule"
               onClick={() => {
                 setRows(start());
                 setEditing(true);
               }}
-            >
-              <Pencil aria-hidden /> Change the schedule
-            </Button>
+            />
           )}
         </div>
         {!plan.matchesTotal && (

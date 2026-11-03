@@ -180,6 +180,7 @@ export async function StepSidePanel({
         : null;
     costsSection = (
       <SideSection
+        target="costs"
         title="Costs"
         count={here.length}
         action={<AddOrderExpense setup={costs.setup} step={step} variant="ghost" size="xs" />}
@@ -208,7 +209,7 @@ export async function StepSidePanel({
             .filter(Boolean)
             .join(" · ");
           return (
-            <li key={e.id} title={detail} className="flex h-[34px] items-center gap-2 border-b border-line last:border-b-0">
+            <li key={e.id} data-target={`costs.${e.category}`} title={detail} className="flex h-[34px] items-center gap-2 border-b border-line last:border-b-0">
               <span className="min-w-0 flex-1 truncate text-[13px]">{e.description}</span>
               <span className="flex max-w-[35%] shrink-0 items-center gap-1 text-xs text-muted">
                 <span className="truncate">{meta}</span>
@@ -253,6 +254,7 @@ export async function StepSidePanel({
       {costsSection}
       {files && (
         <SideSection
+          target="files"
           title="Files"
           count={stepFiles.length}
           action={

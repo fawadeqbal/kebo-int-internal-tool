@@ -163,6 +163,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       <StepViewDivider />
       <DetailsCard
         id="route"
+        target="payment"
         title="How they pay"
         description={bankRoute && canRoute ? undefined : route ? undefined : "The route is chosen in the checklist above."}
         fields={shown}
@@ -194,6 +195,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       />
       <ViewCard
         id="plan"
+        target="plan"
         title="The plan"
         description={m.route.summary ? `Built from the route: ${m.route.summary}.` : "Deposit and balance; choose the route to build the balance part."}
         canEdit={false}
@@ -210,6 +212,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       </ViewCard>
       <MoneySection
         id="customer"
+        target="payments.received"
         icon={<ArrowDownLeft aria-hidden />}
         title="Payments received"
         sub={`${o.customer.name} pays us · ${termsOf(o)}`}

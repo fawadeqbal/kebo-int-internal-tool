@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { FileText, Pencil, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import {
   BANK_CONTRACT_STATUS_LABEL,
   BANK_CONTRACT_STATUS_TONE,
@@ -19,6 +19,7 @@ import {
 } from "@kebo/shared";
 import { Badge, Button, DetailGrid, EmptyState, Tracker, type StepState } from "@kebo/ui";
 import { ConfirmSubmit } from "@kebo/ui/client";
+import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { BankContract, BankStepView, ClaimView, DeliveryView, FlowDocument, SatCheckView, ShipmentView } from "@/lib/types-flow";
@@ -113,9 +114,7 @@ export function RoutePanel({
         <span className="text-sm font-semibold">{PAYMENT_ROUTE_LABEL[route]}</span>
         {summary && <span className="text-sm text-text-2">· {summary.replace(/^(Informal|LC|Bank contract),?\s*/, "")}</span>}
         {canEdit && (
-          <Button size="xs" variant="ghost" onClick={() => setEditRoute(true)}>
-            <Pencil aria-hidden /> Change
-          </Button>
+          <EditButton size="xs" label="Change" onClick={() => setEditRoute(true)} />
         )}
       </div>
       {bank &&
@@ -185,9 +184,7 @@ export function FactoryOrderPanel({ action, orderedOn, readyOn, factories, today
           />
         ) : (
           <div>
-            <Button size="xs" variant="ghost" onClick={() => setEdit(true)}>
-              <Pencil aria-hidden /> Change the date
-            </Button>
+            <EditButton size="xs" label="Change the date" onClick={() => setEdit(true)} />
           </div>
         ))}
     </div>
@@ -253,9 +250,7 @@ export function ShipmentsPanel({
               </p>
               {canEdit && (
                 <span className="flex gap-1">
-                  <Button size="xs" variant="ghost" onClick={() => setEditing(s.id)}>
-                    <Pencil aria-hidden /> Edit
-                  </Button>
+                  <EditButton size="xs" onClick={() => setEditing(s.id)} />
                   <RemoveButton action={removeActions[s.id]!} what="this shipment" />
                 </span>
               )}
@@ -352,9 +347,13 @@ export function PaperSetPanel({
                   </a>
                 )}
                 {canEdit && !(d.printable && !d.id) && (
-                  <Button size="xs" variant={d.status === "ready" ? "ghost" : "secondary"} onClick={() => setEditing(key)}>
-                    {d.id ? <Pencil aria-hidden /> : <Plus aria-hidden />} {d.id ? "Edit" : "Record"}
-                  </Button>
+                  d.id ? (
+                    <EditButton size="xs" onClick={() => setEditing(key)} />
+                  ) : (
+                    <Button size="xs" variant="secondary" onClick={() => setEditing(key)}>
+                      <Plus aria-hidden /> Record
+                    </Button>
+                  )
                 )}
                 {canEdit && d.id && <RemoveButton action={removeActions[d.id]!} what={`the ${d.label.toLowerCase()}`} />}
               </span>
@@ -540,9 +539,7 @@ export function ClaimsPanel({ addAction, updateActions, claims, today, canEdit }
                   {day(c.openedOn)}
                   {c.resolvedOn && ` → ${day(c.resolvedOn)}`}
                   {canEdit && editing !== c.id && (
-                    <Button size="xs" variant="ghost" onClick={() => setEditing(c.id)}>
-                      <Pencil aria-hidden /> Update
-                    </Button>
+                    <EditButton size="xs" label="Update" onClick={() => setEditing(c.id)} />
                   )}
                 </span>
               </span>

@@ -40,7 +40,7 @@ export function LinesView({ rows, columns, numbers, footer }: { rows: LineRow[];
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={r.key} className="border-b border-line last:border-b-0">
+            <tr key={r.key} aria-rowindex={i + 1} className="border-b border-line last:border-b-0">
               <td className="px-2 pt-[0.6rem] pb-2 align-top text-xs text-muted tabular">{numbers[i]}</td>
               {columns.map((c, k) => (
                 <td

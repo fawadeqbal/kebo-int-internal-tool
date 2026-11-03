@@ -86,7 +86,7 @@ export function FilesOfOrder({ data, step }: { data: OrderFiles; step: FlowStep 
   // A phone: one line of counts; Open shows the list.
   if (phone && !unfolded)
     return (
-      <Card id="files" className="scroll-mt-24">
+      <Card id="files" data-target="files" data-target-card="" className="scroll-mt-24">
         <CardHeader
           title={`Files · ${data.files.length}`}
           actions={
@@ -115,7 +115,7 @@ export function FilesOfOrder({ data, step }: { data: OrderFiles; step: FlowStep 
     </button>
   );
   return (
-    <Card id="files" className="scroll-mt-24">
+    <Card id="files" data-target="files" data-target-card="" className="scroll-mt-24">
       <CardHeader title={`Files of this order · ${data.files.length}`} />
       <div className="flex flex-col gap-3 px-4 py-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
