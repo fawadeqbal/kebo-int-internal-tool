@@ -48,7 +48,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
       error = null;
     });
     try {
-      final j = await context.api.get('/api/notifications', query: {'take': 40, 'page': page + 1, if (onlyUnread) 'unread': 'true'});
+      final j = await context.api.get(
+        '/api/notifications',
+        query: {'take': 40, 'page': page + 1, if (onlyUnread) 'unread': 'true'},
+      );
       if (!mounted) return;
       setState(() {
         items.addAll(j.list('items', (m) => m));
@@ -96,32 +99,45 @@ class _AlertsScreenState extends State<AlertsScreen> {
       final heading = at == null ? 'Earlier' : fmtDayHeading(at);
       if (heading != day) {
         day = heading;
-        rows.add(Padding(
-          padding: const EdgeInsets.fromLTRB(Gap.xs, Gap.lg, 0, Gap.xs),
-          child: Semantics(header: true, child: Text(heading.toUpperCase(), style: context.text.labelSmall?.copyWith(color: c.muted, letterSpacing: 0.6))),
-        ));
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.xs, Gap.lg, 0, Gap.xs),
+            child: Semantics(
+              header: true,
+              child: Text(
+                heading.toUpperCase(),
+                style: context.text.labelSmall?.copyWith(color: c.muted, letterSpacing: 0.6),
+              ),
+            ),
+          ),
+        );
       }
       final isNew = n['readAt'] == null;
-      rows.add(Container(
-        margin: const EdgeInsets.only(bottom: Gap.sm),
-        padding: const EdgeInsets.symmetric(horizontal: Gap.md),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(Gap.radius),
-          border: Border.all(color: isNew ? c.primary : c.line),
-        ),
-        child: PhoneRow(
-          RowData(
-            title: n.str('title'),
-            sub: [n.strOrNull('body'), if (isNew) 'new'],
-            tone: toneOf(n.str('type')),
-            strong: isNew,
-            value: fmtWhen(at),
-            onTap: () => _open(n),
+      rows.add(
+        Semantics(
+          hint: isNew ? 'Unread' : null,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: Gap.sm),
+            padding: const EdgeInsets.symmetric(horizontal: Gap.md),
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(Gap.radius),
+              border: Border.all(color: isNew ? c.primary : c.line),
+            ),
+            child: PhoneRow(
+              RowData(
+                title: n.str('title'),
+                sub: [n.strOrNull('body')],
+                tone: toneOf(n.str('type')),
+                strong: isNew,
+                value: fmtWhen(at),
+                onTap: () => _open(n),
+              ),
+              divider: false,
+            ),
           ),
-          divider: false,
         ),
-      ));
+      );
     }
     return Scaffold(
       appBar: AppBar(
@@ -131,45 +147,65 @@ class _AlertsScreenState extends State<AlertsScreen> {
           const SizedBox(width: Gap.xs),
         ],
       ),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, 0),
-          child: Row(children: [
-            ChoiceChip(label: const Text('All'), selected: !onlyUnread, onSelected: (_) {
-              setState(() => onlyUnread = false);
-              _reload();
-            }),
-            const SizedBox(width: Gap.sm),
-            ChoiceChip(label: Text('Unread $unread'), selected: onlyUnread, onSelected: (_) {
-              setState(() => onlyUnread = true);
-              _reload();
-            }),
-          ]),
-        ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _reload,
-            child: error != null && items.isEmpty
-                ? ErrorView(error!, retry: _reload)
-                : items.isEmpty && loading
-                    ? const LoadingView()
-                    : items.isEmpty
-                        ? ListView(children: [
-                            EmptyState(title: onlyUnread ? 'All read' : 'No alerts yet', text: 'Late money, dates, papers and new inquiries come here.'),
-                          ])
-                        : NotificationListener<ScrollNotification>(
-                            onNotification: (s) {
-                              if (s.metrics.extentAfter < 400) _more();
-                              return false;
-                            },
-                            child: ListView(
-                              padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.xl),
-                              children: [...rows, if (loading) const Padding(padding: EdgeInsets.all(Gap.lg), child: LoadingView())],
-                            ),
-                          ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, 0),
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: const Text('All'),
+                  selected: !onlyUnread,
+                  onSelected: (_) {
+                    setState(() => onlyUnread = false);
+                    _reload();
+                  },
+                ),
+                const SizedBox(width: Gap.sm),
+                ChoiceChip(
+                  label: Text('Unread $unread'),
+                  selected: onlyUnread,
+                  onSelected: (_) {
+                    setState(() => onlyUnread = true);
+                    _reload();
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-      ]),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _reload,
+              child: error != null && items.isEmpty
+                  ? ErrorView(error!, retry: _reload)
+                  : items.isEmpty && loading
+                  ? const LoadingView()
+                  : items.isEmpty
+                  ? ListView(
+                      children: [
+                        EmptyState(
+                          title: onlyUnread ? 'All read' : 'No alerts yet',
+                          text: 'Late money, dates, papers and new inquiries come here.',
+                        ),
+                      ],
+                    )
+                  : NotificationListener<ScrollNotification>(
+                      onNotification: (s) {
+                        if (s.metrics.extentAfter < 400) _more();
+                        return false;
+                      },
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(Gap.lg, 0, Gap.lg, Gap.xl),
+                        children: [
+                          ...rows,
+                          if (loading) const Padding(padding: EdgeInsets.all(Gap.lg), child: LoadingView()),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
