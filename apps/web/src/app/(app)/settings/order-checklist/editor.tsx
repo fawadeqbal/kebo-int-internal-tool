@@ -23,8 +23,9 @@ import {
   type PaymentRoute,
 } from "@kebo/shared";
 import { Button, cn, Input, Select } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { PANEL_FORM, PanelActions, PanelKeys, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { ChecklistSettings } from "@/lib/types-checklist";
 
@@ -128,9 +129,14 @@ function FieldsEditor({ fields, onChange }: { fields: ChecklistField[]; onChange
  * days; reorder, rename, remove, add. The automatic items of the step are
  * listed with a switch to hide them. Saved as a whole.
  */
-export function ChecklistEditor({ initial, action }: { initial: ChecklistSettings; action: Action }) {
+/**
+ * The whole checklist, in the side panel opened from a step's card (`step`:
+ * the one it opens on; the others are a click away). Saves all steps at once.
+ */
+export function ChecklistEditor({ initial, action, step: first = "production", onSaved }: { initial: ChecklistSettings; action: Action; step?: FlowStep; onSaved?: () => void }) {
   const id = useId();
-  const [step, setStep] = useState<FlowStep>("production");
+  const close = useClosePanel();
+  const [step, setStep] = useState<FlowStep>(first);
   const [items, setItems] = useState<Item[]>(() => initial.items.map((i) => ({ ...i, uid: uid() })));
   const [hidden, setHidden] = useState<string[]>(initial.hidden);
   const mine = items.filter((i) => i.step === step);
@@ -157,7 +163,16 @@ export function ChecklistEditor({ initial, action }: { initial: ChecklistSetting
   });
 
   return (
-    <ActionForm action={action} keepFields className="flex flex-col gap-4">
+    <ActionForm
+      action={action}
+      keepFields
+      showSuccess={false}
+      className={cn(PANEL_FORM, "gap-4")}
+      onDone={(r) => {
+        toast(r.message ?? "Saved · Order checklist");
+        onSaved?.();
+      }}
+    >
       {(s) => (
         <>
           <input type="hidden" name="payload" value={payload} />
@@ -370,14 +385,18 @@ export function ChecklistEditor({ initial, action }: { initial: ChecklistSetting
             </section>
           )}
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-            <SubmitButton size="sm" pendingText="Saving…" disabled={items.some((i) => !i.title.trim())}>
+          <p className="text-xs text-muted">
+            {initial.saved ? "New orders start with this list." : "This is the usual list; save it to make it your own."}
+          </p>
+          <PanelActions>
+            <SubmitButton pendingText="Saving…" disabled={items.some((i) => !i.title.trim())}>
               Save the checklist
             </SubmitButton>
-            <span className="text-xs text-muted">
-              {initial.saved ? "New orders start with this list." : "This is the usual list; save it to make it your own."}
-            </span>
-          </div>
+            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
+              Cancel
+            </button>
+            <PanelKeys />
+          </PanelActions>
         </>
       )}
     </ActionForm>

@@ -19,6 +19,7 @@ import { HistoryPanel, RecordLanding, RecordNav } from "@/components/common/reco
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { changeRows, compactChanges } from "@/components/orders/side-panel";
 import { CustomerMoney } from "@/components/money/customer-money";
+import { PerformanceCard } from "@/components/insights/performance";
 import { removeCustomerAction, saveCustomerAction } from "../actions";
 import { CustomerPanel } from "../customer-panel";
 import { currenciesFrom, type SalesCurrencies } from "../currencies";
@@ -43,7 +44,7 @@ type PayOrder = CustomerPayments["orders"][number];
  * status worked out from their orders' payments (Overdue · Owes money · Paid
  * up · No order yet), one summary line and the one primary — New inquiry —
  * with ⋯ for the rest (remove last, red). Main column: Performance (from
- * Insights, PR #98), Details with ✎ Edit (the side panel), their orders and
+ * Insights), Details with ✎ Edit (the side panel), their orders and
  * inquiries, then their money; right panel: contacts and changes. No tabs:
  * old ?tab= links land on the section, ?tab=history opens All history.
  */
@@ -192,7 +193,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         main={
           <>
             <RecordSection id="overview" className="flex flex-col gap-5">
-              {/* Performance (Insights' figures for this customer) sits here: PerformanceCard from PR #98. */}
+              <PerformanceCard kind="customer" id={c.id} me={me} />
               <DetailsCard
                 flash={sp.saved === c.id}
                 edit={canEdit ? { panel: "edit-customer", id: c.id, label: `Edit ${c.name}` } : null}

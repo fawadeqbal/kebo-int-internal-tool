@@ -24,7 +24,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
         description="A session ends after 30 days unused, and after 90 days whatever happens. Signing out takes effect at their next click."
         actions={
           who && sessions.length ? (
-            <ConfirmAction action={signOutEverywhereAction.bind(null, who.id)} confirm={`Sign ${who.name} out on every device?`} label="Sign out everywhere" pendingText="Signing out…" variant="danger" size="xs" />
+            <ConfirmAction action={signOutEverywhereAction.bind(null, who.id)} confirm={`Sign ${who.name} out on every device?`} label="Sign out everywhere" pendingText="Signing out…" variant="secondary" size="xs" />
           ) : undefined
         }
       />

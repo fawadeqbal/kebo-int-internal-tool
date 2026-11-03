@@ -4,18 +4,48 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, ShieldCheck, Smartphone } from "lucide-react";
 import { Alert, Button, Field, Input } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { EditButton } from "@/components/common/edit-button";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { TwoStepStatus } from "@/lib/types-people";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-export function PasswordForm({ action }: { action: Action }) {
+/** ✎ Change in the Password card's header, and the side panel it opens (?panel=password). */
+export function PasswordEdit({ action }: { action: Action }) {
+  const panel = useSidePanel("password");
   return (
-    <ActionForm action={action} resetOnSuccess className="flex flex-col gap-4">
+    <>
+      <EditButton label="Change" aria-label="Change my password" onClick={() => panel.openPanel()} />
+      {panel.open && (
+        <SidePanel title="Change my password" description="Changing it signs you out on your other devices." onClose={() => panel.close()}>
+          <PanelBody>
+            <PasswordForm action={action} onSaved={() => panel.close()} />
+          </PanelBody>
+        </SidePanel>
+      )}
+    </>
+  );
+}
+
+export function PasswordForm({ action, onSaved }: { action: Action; onSaved?: () => void }) {
+  const close = useClosePanel();
+  return (
+    <ActionForm
+      action={action}
+      resetOnSuccess
+      showSuccess={false}
+      className={PANEL_FORM}
+      onDone={(r) => {
+        toast(r.message ?? "Password changed");
+        onSaved?.();
+      }}
+    >
       {(s) => (
         <>
+          <PanelSection first className="sm:grid-cols-1">
           <Field label="Current password" htmlFor="current" error={s.errors?.current}>
             <Input id="current" name="current" type="password" autoComplete="current-password" aria-invalid={!!s.errors?.current} />
           </Field>
@@ -25,9 +55,14 @@ export function PasswordForm({ action }: { action: Action }) {
           <Field label="New password again" htmlFor="confirm" error={s.errors?.confirm}>
             <Input id="confirm" name="confirm" type="password" autoComplete="new-password" aria-invalid={!!s.errors?.confirm} />
           </Field>
-          <div>
+          </PanelSection>
+          <PanelActions>
             <SubmitButton pendingText="Changing…">Change my password</SubmitButton>
-          </div>
+            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
+              Cancel
+            </button>
+            <PanelKeys />
+          </PanelActions>
         </>
       )}
     </ActionForm>
@@ -133,11 +168,11 @@ export function TwoStepPanel({
           <Alert tone="warning">You are running out of recovery codes. Make new ones so you can still get in if you lose your phone.</Alert>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant={manage === "codes" ? "primary" : "secondary"} onClick={() => setManage(manage === "codes" ? null : "codes")} aria-pressed={manage === "codes"}>
+          <Button size="sm" variant="secondary" className="aria-pressed:bg-surface-2" onClick={() => setManage(manage === "codes" ? null : "codes")} aria-pressed={manage === "codes"}>
             <KeyRound aria-hidden /> Make new recovery codes
           </Button>
           {!status.required && (
-            <Button size="sm" variant={manage === "off" ? "danger" : "danger-ghost"} onClick={() => setManage(manage === "off" ? null : "off")} aria-pressed={manage === "off"}>
+            <Button size="sm" variant="danger-ghost" className="aria-pressed:bg-bad-soft" onClick={() => setManage(manage === "off" ? null : "off")} aria-pressed={manage === "off"}>
               Turn off
             </Button>
           )}

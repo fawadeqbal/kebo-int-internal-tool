@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { CURRENCIES, type SettingsKey } from "@kebo/shared";
+import { CURRENCIES, type Settings, type SettingsKey } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { attempt, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import { SETTING_GROUPS } from "./groups";
@@ -21,14 +21,29 @@ const plain = (m: string) =>
     .replace(/^Invalid email address$/, "One of these is not a valid email address")
     .replace(/^Invalid input: expected int, received number$/, "Use a whole number");
 
-/** Turn one group's form into its settings object and save it (PUT /settings/:key). */
+/**
+ * Turn a settings form into its group's object and save it (PUT /settings/:key).
+ * A card's panel (or one switch) sends only its own fields, named in `_fields`:
+ * the rest of the group goes as it is stored, since the API takes the whole group.
+ */
 export async function saveSettingsAction(key: SettingsKey, _prev: ActionState, form: FormData): Promise<ActionState> {
   const group = SETTING_GROUPS.find((g) => g.key === key);
   if (!group) return { ok: false, message: "Unknown settings group." };
   const v = formValues(form);
+  const only = v._fields ? new Set(v._fields.split(",")) : null;
   const body: Record<string, unknown> = {};
   const errors: Record<string, string[]> = {};
-  for (const f of group.fields) {
+  if (only) {
+    const stored = (await api.get<Settings>("/settings"))[key] as Record<string, unknown>;
+    for (const f of group.fields) {
+      if (only.has(f.name)) continue;
+      if (f.kind === "currencies") {
+        body.currency = stored.currency;
+        body.exchangeRates = stored.exchangeRates;
+      } else body[f.name] = stored[f.name];
+    }
+  }
+  for (const f of group.fields.filter((x) => !only || only.has(x.name))) {
     const raw = v[f.name];
     switch (f.kind) {
       case "bool":
@@ -62,7 +77,8 @@ export async function saveSettingsAction(key: SettingsKey, _prev: ActionState, f
   }
   if (Object.keys(errors).length) return { ok: false, message: "Some values need fixing.", errors, values: v };
   body.reason = reasonOf(form);
-  const r = await attempt(form, () => api.put(`/settings/${key}`, body), `${group.title} saved.`);
+  const card = only ? group.cards.find((c) => c.fields.every((n) => only.has(n)) && c.fields.length === only.size) : null;
+  const r = await attempt(form, () => api.put(`/settings/${key}`, body), `${card?.title ?? group.title} saved.`);
   if (!r.ok && r.errors) r.errors = Object.fromEntries(Object.entries(r.errors).map(([k, ms]) => [k, ms?.map(plain)]));
   if (!r.ok && r.message) r.message = plain(r.message);
   if (r.ok) revalidatePath("/", "layout");

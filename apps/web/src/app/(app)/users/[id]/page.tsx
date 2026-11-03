@@ -14,6 +14,7 @@ import { RecordLanding, RecordNav } from "@/components/common/record-nav";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { changeRows, compactChanges } from "@/components/orders/side-panel";
 import { RoleBadge } from "@/components/people/role-badge";
+import { PerformanceCard } from "@/components/insights/performance";
 import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserAction } from "../actions";
 import { EditUserPanel, PasswordPanel } from "../forms";
 
@@ -38,7 +39,7 @@ const asHistory = (r: AuditRow): HistoryEntry => ({
  * One person (design system: Record frame). Header: ← Users, the name, Active
  * or Switched off, role · email · last sign-in; no primary (nothing is
  * "next" for a person) — Set a new password is the secondary, ⋯ has the rest
- * (switch off last, red). Main column: Performance (Insights, PR #98),
+ * (switch off last, red). Main column: Performance (Insights),
  * Details with ✎ Edit (side panel: name, email, role), the open inquiries
  * they handle; right panel: changes to their account (with the audit log).
  */
@@ -164,7 +165,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
         main={
           <>
             <RecordSection id="overview" className="flex flex-col gap-5">
-              {/* Performance (Insights' figures for this person) sits here: PerformanceCard from PR #98. */}
+              <PerformanceCard kind="user" id={u.id} me={me} />
               <DetailsCard
                 flash={sp.saved === u.id}
                 edit={{ panel: "edit-user", id: u.id, label: `Edit ${u.name}` }}

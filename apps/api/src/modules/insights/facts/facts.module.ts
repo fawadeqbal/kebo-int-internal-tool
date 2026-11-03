@@ -82,6 +82,13 @@ class FactsController {
     return this.read.cash(user, q);
   }
 
+  /** What stands today and needs attention: open quotations, expiring ones, overdue customers, late factories, low margins. */
+  @RequireFeature("insights")
+  @Get("now")
+  now(@CurrentUser() user: SessionUser, @Query(Validate(z.object(span))) q: z.infer<z.ZodObject<typeof span>>) {
+    return this.read.now(user, q);
+  }
+
   /** The order rows themselves, newest first (drill-down and Excel). */
   @RequireFeature("insights")
   @Get("orders")

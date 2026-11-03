@@ -29,6 +29,7 @@ export function NewKeyButton() {
     <ActionForm action={newFormKeyAction}>
       <ConfirmSubmit
         variant="secondary"
+        size="sm"
         pendingText="Making…"
         message="Make a new key? The form on your website stops working until you paste the new snippet."
       >

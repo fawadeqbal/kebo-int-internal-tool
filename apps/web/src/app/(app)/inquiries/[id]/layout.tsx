@@ -1,17 +1,19 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { can, CHANNEL_LABEL } from "@kebo/shared";
-import { buttonClass, PriorityBadge, StageBadge } from "@kebo/ui";
+import { Banner, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
+import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { StepNav } from "@/components/orders/step-nav";
 import { inquirySteps } from "./steps";
 
 /**
- * Every page of an inquiry shares one top: its number and stage, what it is,
- * the customer, how it came and who handles it, Edit details, and the
+ * Every page of an inquiry shares one top (design system: page header): its
+ * number and stage, one summary line (what it is, the customer, how it came,
+ * who handles it), ⋯ more (Edit details, the order once won), and the
  * inquiry's navigation: Overview · 1 Needs · 2 Factory prices · 3 Quotation ·
- * Costs (managers) · History, then "Order →" once won.
+ * Costs (managers) · History, then "Order →" once won. Each step's own header
+ * has that page's one primary.
  */
 export default async function DealLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,6 +24,12 @@ export default async function DealLayout({ children, params }: { children: React
   const order = d.orders.find((o) => o.status !== "cancelled");
   const base = `/inquiries/${d.id}`;
   const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
+  const moreItems: MenuEntry[] = [
+    ...(d.allowed.edit ? [{ label: "Edit details", href: `${base}/edit` }] : []),
+    ...(order ? [{ label: `Open the order ${order.refNo}`, href: `/orders/${order.id}` }] : []),
+    { label: `Open the customer ${d.customer.name}`, href: `/customers/${d.customer.id}` },
+    { label: "Copy link to this inquiry", copy: base },
+  ];
   const meta = [
     d.title && <span key="t">{d.title}</span>,
     <Link key="c" href={`/customers/${d.customer.id}`} className="hover:underline">
@@ -33,43 +41,40 @@ export default async function DealLayout({ children, params }: { children: React
 
   return (
     <div>
-      <header className="flex flex-col gap-1">
-        <Link href="/inquiries" className="inline-flex w-fit items-center gap-1 text-xs text-muted hover:text-text">
-          <ArrowLeft className="size-3.5" aria-hidden /> Inquiries
-        </Link>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-xl font-semibold tracking-tight tabular sm:text-2xl">{d.refNo}</h1>
+      <PageHeader
+        backHref="/inquiries"
+        backLabel="Inquiries"
+        title={<span className="tabular">{d.refNo}</span>}
+        badge={
+          <>
             <StageBadge stage={d.stage} onHold={d.onHold} />
             <PriorityBadge priority={d.priority} />
-            <p className="min-w-0 basis-full text-sm text-text-2 sm:basis-auto">
-              {meta.map((m, i) => (
-                <span key={i}>
-                  {i > 0 && (
-                    <span aria-hidden className="px-1.5 text-muted">
-                      ·
-                    </span>
-                  )}
-                  {m}
-                </span>
-              ))}
-            </p>
-          </div>
-          {d.allowed.edit && (
-            <Link href={`${base}/edit`} className={buttonClass("secondary", "sm", "shrink-0 self-start max-sm:hidden")}>
-              Edit details
-            </Link>
-          )}
-        </div>
-      </header>
+          </>
+        }
+        summary={
+          <p className="min-w-0">
+            {meta.map((m, i) => (
+              <span key={i}>
+                {i > 0 && (
+                  <span aria-hidden className="px-1.5 text-muted">
+                    ·
+                  </span>
+                )}
+                {m}
+              </span>
+            ))}
+          </p>
+        }
+        more={<MoreMenu label={`More for ${d.refNo}`} items={moreItems} />}
+      />
       {d.customer.country === "ZZ" && (
-        <p className="mt-3 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-sm">
+        <Banner meaning="warn" className="mb-3">
           This customer&apos;s country is not set.{" "}
           <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
             Add it
           </Link>{" "}
           — it decides shipping.
-        </p>
+        </Banner>
       )}
       <StepNav
         base={base}

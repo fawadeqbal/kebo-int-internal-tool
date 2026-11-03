@@ -30,6 +30,7 @@ export async function WebsiteFormCard() {
       <CardHeader
         title="Website form"
         description="Inquiries sent from a form on your own website arrive here as new inquiries. The form sends this key, which says they are for your company."
+        actions={view ? <NewKeyButton /> : undefined}
       />
       <CardBody className="flex flex-col gap-5">
         {!view ? (
@@ -48,7 +49,6 @@ export async function WebsiteFormCard() {
               <p className="text-xs font-medium tracking-wide text-muted uppercase">Snippet to paste before &lt;/body&gt;</p>
               <CopyBlock text={snippet(view)} label="Website form snippet" multiline />
             </div>
-            <NewKeyButton />
           </>
         )}
       </CardBody>

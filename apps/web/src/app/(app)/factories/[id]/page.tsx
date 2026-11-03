@@ -15,6 +15,7 @@ import { AllLink, DetailsCard, FigureTiles, RecordEmpty, RecordFrame, RecordList
 import { HistoryPanel, RecordLanding, RecordNav } from "@/components/common/record-nav";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { changeRows, compactChanges } from "@/components/orders/side-panel";
+import { PerformanceCard } from "@/components/insights/performance";
 import { removeFactoryAction, saveFactoryAction } from "../actions";
 import { FactoryPanel } from "../factory-form";
 
@@ -32,7 +33,7 @@ const SECTION_OF: Record<string, string> = { prices: "offers", costs: "costs", d
  * status from what it makes for us (Late · Making for us · No open order),
  * one summary line and the one primary — Ask for prices (the inquiries
  * waiting for factory prices) — with ⋯ for the rest (remove last, red). Main
- * column: Performance (Insights, PR #98), how it answers and delivers,
+ * column: Performance (Insights), how it answers and delivers,
  * Details with ✎ Edit (side panel), the orders it is making, its price
  * offers and (managers) visits and costs; right panel: changes. No tabs: old
  * ?tab= links land on the section, ?tab=history opens All history.
@@ -121,7 +122,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
         main={
           <>
             <RecordSection id="overview" className="flex flex-col gap-5">
-              {/* Performance (Insights' figures for this factory) sits here: PerformanceCard from PR #98. */}
+              <PerformanceCard kind="factory" id={f.id} me={me} />
               {(r.asked > 0 || r.openOrders.length > 0) && (
                 <Card>
                   <div className="border-b border-line px-4 py-3">
