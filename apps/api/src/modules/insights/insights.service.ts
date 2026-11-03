@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate } from "@kebo/database";
 import { fromMinor, toMinor } from "@kebo/money";
 import { can, PAYMENT_ROUTE_SHORT, planStatus, planWhen, type BalanceWhen, type LcTerms } from "@kebo/shared";
-import { addDays, daysBetween, DomainError, ForbiddenError, type ISODate } from "@kebo/utils";
+import { daysBetween, DomainError, ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";

@@ -4,7 +4,6 @@ import {
   CUSTOMER_TYPE_LABEL,
   EXPENSE_CATEGORY_LABEL,
   INQUIRY_STAGE_LABEL,
-  LOST_REASON_LABEL,
   ORDER_STAGE_LABEL,
   PRIORITY_LABEL,
   REVISION_STATUS_LABEL,
@@ -452,7 +451,7 @@ async function report(q: Q): Promise<SheetSpec[]> {
       name,
       title: "Lost reasons",
       columns: [text("Reason", 28), count("Inquiries")],
-      rows: r.lostReasons.map((x) => [LOST_REASON_LABEL[x.reason], x.count]),
+      rows: r.lostReasons.map((x) => [x.label, x.count]),
     },
     {
       name,

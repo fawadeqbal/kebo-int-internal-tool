@@ -1,4 +1,4 @@
-import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
+import { CHANNEL_LABEL } from "@kebo/shared";
 import { apiFetch } from "@/lib/api";
 import { excelRefusal } from "@/app/sheets/guard";
 import type { ReportView } from "@/lib/types-deals";
@@ -33,7 +33,7 @@ function toCsv(r: ReportView) {
     "",
     row("Lost reasons"),
     row("Reason", "Inquiries"),
-    ...r.lostReasons.map((x) => row(LOST_REASON_LABEL[x.reason], x.count)),
+    ...r.lostReasons.map((x) => row(x.label, x.count)),
     "",
     row("By channel"),
     row("Channel", "Inquiries"),

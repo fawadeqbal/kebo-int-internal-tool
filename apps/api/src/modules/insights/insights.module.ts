@@ -1,7 +1,6 @@
 import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { isISODate, type ISODate } from "@kebo/utils";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -12,7 +11,6 @@ import { InsightsService } from "./insights.service";
 import { RemindersListService } from "./reminders-list.service";
 import { FactsModule } from "./facts/facts.module";
 
-const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026-10");
 const key = z.object({ key: z.string().min(1).max(120) });
 

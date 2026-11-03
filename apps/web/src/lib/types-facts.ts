@@ -38,6 +38,8 @@ export interface OrderGroups {
   seeExpenses: boolean;
   period: string;
   by: string;
+  /** Currencies of these orders with no rate to the main currency (their money counts 0). */
+  missingRates: string[];
   rows: OrderGroupRow[];
 }
 
@@ -57,6 +59,7 @@ export interface InquiryGroupRow {
   daysToFirstQuote: number | null;
   medianDaysToFirstQuote: number | null;
   daysToWin: number | null;
+  daysToLose: number | null;
   medianDaysToClose: number | null;
 }
 

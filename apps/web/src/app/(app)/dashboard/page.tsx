@@ -1,16 +1,19 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
-import { Banknote, Coins, TrendingUp, Users } from "lucide-react";
 import { can, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
 import { Alert, Badge, Card, CardBody, CardHeader, Meter, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
-import type { Insights, Reminders } from "@/lib/types-insights";
-import { Headline, KpiCard, TargetRing } from "@/components/insights/kpi";
-import { RevenueChart } from "@/components/insights/charts";
+import type { Reminders } from "@/lib/types-insights";
+import { loadHome } from "@/lib/insights-data";
+import { amountCell, bigMoney, change, monthYearOf, percent } from "@/lib/insights-period";
+import { TargetRing } from "@/components/insights/kpi";
 import { TargetEditor } from "@/components/insights/targets";
+import { Delta, Tile, Tiles } from "@/components/insights/frame";
+import { ChartCard } from "@/components/insights/chart-card";
+import { SalesProfitChart } from "@/components/insights/facts-charts";
 import { ReminderList } from "@/components/insights/reminder-list";
 import { readableDates } from "@/components/insights/readable-dates";
 
@@ -91,7 +94,7 @@ export default async function DashboardPage() {
 
       {insights && (
         <Suspense fallback={<MonthSkeleton />}>
-          <MonthStrip />
+          <MonthStrip today={d.today} />
         </Suspense>
       )}
 
@@ -103,7 +106,7 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-5">
           {insights && (
             <Suspense fallback={<div className="h-[300px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
-              <SalesChart />
+              <SalesChart today={d.today} />
             </Suspense>
           )}
           <Suspense>
@@ -173,7 +176,7 @@ export default async function DashboardPage() {
 }
 
 // One request each per page view, however many sections use them.
-const getInsights = cache(() => api.get<Insights>("/insights").catch(() => null));
+const getHome = cache((today: string) => loadHome(today).catch(() => null));
 const getReminders = cache(() => api.get<Reminders>("/reminders"));
 
 /** " · 3 things need you, 1 urgent" after the date, once the list is in. */
@@ -190,92 +193,73 @@ async function HowMany() {
   );
 }
 
-async function MonthStrip() {
-  const i = await getInsights();
-  if (!i) return null;
+const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
+
+/**
+ * This month, as Insights › Overview shows it for "Month" (the same tiles, labels and endpoints): Sales,
+ * Gross profit, To receive with what is overdue, Open quotes; and the month's target.
+ */
+async function MonthStrip({ today }: { today: string }) {
+  const h = await getHome(today);
+  if (!h) return null;
+  const c = h.currency;
+  const vs = h.p.vsLabel;
+  const overdue = h.now.overdue;
+  const owed = Number(h.receivable.total);
   return (
     <>
-      {i.missingRates.length > 0 && (
+      {h.missingRates.length > 0 && (
         <Alert tone="warning" className="mb-4">
-          There is no exchange rate for {i.missingRates.join(", ")} in Settings, so amounts in{" "}
-          {i.missingRates.length === 1 ? "it are" : "them are"} left out of these figures.
+          There is no exchange rate for {h.missingRates.join(", ")} in Settings, so amounts in {h.missingRates.length === 1 ? "it are" : "them are"} left
+          out of these figures.
         </Alert>
       )}
       <section aria-label="This month" className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <KpiCard
-            label="Sales this month"
-            icon={<TrendingUp className="size-3.5" />}
-            value={<Headline amount={i.kpis.revenue.value ?? 0} currency={i.currency} />}
-            kpi={i.kpis.revenue}
-            note={`${i.kpis.orders.value} order${i.kpis.orders.value === 1 ? "" : "s"}`}
-            href="/insights"
+        <Tiles>
+          <Tile
+            label="Sales"
+            value={bigMoney(h.sales.now, c)}
+            delta={<Delta value={change(h.sales.now, h.sales.before)} vs={vs} />}
+            sub={`this month · ${plural(h.sales.orders, "order")}`}
+            href="/insights?period=month"
           />
-          {i.kpis.netProfit ? (
-            <KpiCard
-              label="Profit after expenses"
-              icon={<Coins className="size-3.5" />}
-              value={<Headline amount={i.kpis.netProfit.value ?? 0} currency={i.currency} />}
-              kpi={i.kpis.netProfit}
-              tone={Number(i.kpis.netProfit.value) < 0 ? "bad" : undefined}
-              note={
-                Number(i.kpis.uncostedRevenue.value) > 0 ? `${money(i.kpis.uncostedRevenue.value ?? 0, i.currency)} not costed` : undefined
-              }
-              href="/insights?tab=profit"
-            />
-          ) : (
-            <KpiCard
-              label="Gross profit"
-              icon={<Coins className="size-3.5" />}
-              value={<Headline amount={i.kpis.grossProfit.value ?? 0} currency={i.currency} />}
-              kpi={i.kpis.grossProfit}
-              note={
-                Number(i.kpis.uncostedRevenue.value) > 0 ? `${money(i.kpis.uncostedRevenue.value ?? 0, i.currency)} not costed` : undefined
-              }
-              href="/insights?tab=profit"
-            />
-          )}
-          <KpiCard
-            label="Customers owe us"
-            icon={<Users className="size-3.5" />}
-            value={<Headline amount={i.now.toReceive} currency={i.currency} />}
-            note={
-              Number(i.now.overdue) > 0 ? (
-                <span className="font-medium text-bad">{money(i.now.overdue, i.currency)} overdue</span>
+          <Tile
+            label="Gross profit"
+            value={bigMoney(h.profit.now, c)}
+            delta={<Delta value={change(h.profit.now, h.profit.before)} vs={vs} />}
+            sub={`margin ${percent(h.profit.margin)}${h.profit.marginBefore !== null ? ` · was ${percent(h.profit.marginBefore)}` : ""}`}
+            href="/insights?period=month"
+          />
+          <Tile
+            label="To receive"
+            value={bigMoney(owed, c)}
+            meter={owed > 0 ? { percent: (Number(overdue.amount) / owed) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` } : undefined}
+            sub={
+              Number(overdue.amount) > 0 ? (
+                <span className="font-medium text-bad">
+                  {bigMoney(Number(overdue.amount), c)} overdue · {plural(overdue.customers, "customer")}
+                </span>
               ) : (
-                "Nothing overdue"
+                "nothing overdue"
               )
             }
-            tone={Number(i.now.overdue) > 0 ? "warn" : undefined}
             href="/money?tab=receive"
           />
-          {i.now.cashInHand !== null ? (
-            <KpiCard
-              label="In our accounts"
-              icon={<Banknote className="size-3.5" />}
-              value={<Headline amount={i.now.cashInHand} currency={i.currency} />}
-              note="Cash, banks and wallets"
-              href="/money?tab=cash"
-            />
-          ) : (
-            <KpiCard
-              label="Win rate"
-              icon={<Banknote className="size-3.5" />}
-              value={i.kpis.winRate.value === null ? "—" : `${i.kpis.winRate.value}%`}
-              kpi={i.kpis.winRate}
-              points
-              href="/insights?tab=sales"
-            />
-          )}
-        </div>
+          <Tile
+            label="Open quotes"
+            value={bigMoney(Number(h.now.openQuotes.value), c)}
+            sub={`${plural(h.now.openQuotes.count, "quote")}${h.now.openQuotes.likely ? ` · likely ${bigMoney(Number(h.now.openQuotes.likely), c)}` : ""}`}
+            href="/inquiries?stage=quoted"
+          />
+        </Tiles>
         <Card className="rounded-2xl">
           <CardHeader
             title="This month's target"
-            actions={i.target.canSet ? <TargetEditor month={i.target.month} current={i.target.amount} currency={i.currency} /> : undefined}
+            actions={h.target.canSet ? <TargetEditor month={h.target.month} current={h.target.amount} currency={c} /> : undefined}
           />
           <CardBody>
-            {i.target.amount && i.target.percent !== null ? (
-              <TargetRing percent={i.target.percent} reached={i.target.reached} amount={i.target.amount} currency={i.currency} size={112} />
+            {h.target.amount && h.target.percent !== null ? (
+              <TargetRing percent={h.target.percent} reached={h.target.reached} amount={h.target.amount} currency={c} size={112} />
             ) : (
               <p className="text-sm text-muted">No target yet. Set one to see at a glance how the month is going.</p>
             )}
@@ -286,23 +270,26 @@ async function MonthStrip() {
   );
 }
 
-async function SalesChart() {
-  const i = await getInsights();
-  if (!i) return null;
+async function SalesChart({ today }: { today: string }) {
+  const h = await getHome(today);
+  if (!h) return null;
+  const c = h.currency;
   return (
-    <Card className="rounded-2xl">
-      <CardHeader
-        title="Sales, last 6 months"
-        actions={
-          <Link href="/insights" className="text-sm text-primary hover:underline">
-            Open Insights
-          </Link>
-        }
-      />
-      <CardBody>
-        <RevenueChart data={i.series.slice(-6)} currency={i.currency} showNet={false} height={220} />
-      </CardBody>
-    </Card>
+    <ChartCard
+      title="Sales and gross profit, last 6 months"
+      description={c}
+      actions={
+        <Link href="/insights" className="text-sm text-primary hover:underline">
+          Open Insights
+        </Link>
+      }
+      table={{
+        columns: ["Month", "Orders", `Sales ${c}`, `Gross profit ${c}`, "Margin"],
+        rows: h.months.map((m) => [monthYearOf(m.month), m.orders, amountCell(m.sales), amountCell(m.profit), percent(m.margin)]),
+      }}
+    >
+      <SalesProfitChart rows={h.months} currency={c} />
+    </ChartCard>
   );
 }
 
