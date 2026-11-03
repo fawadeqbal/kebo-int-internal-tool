@@ -1269,6 +1269,8 @@ async function main() {
       await prisma.$transaction(
         async (tx) => {
           await importAll(tx, old, report);
+          // Insights' calculated tables: worked out in one go by the API or the worker on its next start or tick.
+          await tx.$executeRaw`select facts_enqueue(app_company(), 'all', app_company())`;
           const bad = report.totals.filter((t) => !t.ok && !t.what.startsWith("old invoices'"));
           if (bad.length) throw new Error(`Totals do not match (${bad.map((b) => b.what).join(", ")}): nothing was written.`);
           if (dryRun) throw new DryRunRollback();

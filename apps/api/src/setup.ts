@@ -6,6 +6,7 @@ import { ErrorFilter } from "./common/http/error.filter";
 import { ReadCache } from "./common/cache/read-cache";
 import { CompanyResolver } from "./common/company/company-resolver";
 import { CompanyContext } from "./common/company/company-context";
+import { FactsService } from "./modules/insights/facts/facts.service";
 import type { Env } from "./config/env";
 
 /** Everything main.ts and the tests share: prefix, security headers, CORS, errors, API docs. */
@@ -22,10 +23,17 @@ export function configureApp(app: INestApplication, env: Env) {
   // Which company the request works in; everything after runs inside it (see CompanyResolver).
   app.use(app.get(CompanyResolver).middleware());
   // A change that went through drops that company's remembered heavy reads (see ReadCache).
+  // It also has Insights' calculated tables catch up on what it queued (FactsService), a moment later.
   const cache = app.get(ReadCache);
+  const facts = app.get(FactsService);
   app.use((req: { method: string }, res: { statusCode: number; on(event: "finish", fn: () => void): void }, next: () => void) => {
-    const company = CompanyContext.current()?.id;
-    if (company && req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") res.on("finish", () => res.statusCode < 400 && cache.bump(company));
+    const company = CompanyContext.current();
+    if (company && req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS")
+      res.on("finish", () => {
+        if (res.statusCode >= 400) return;
+        cache.bump(company.id);
+        facts.schedule(company);
+      });
     next();
   });
   app.enableShutdownHooks();

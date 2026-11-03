@@ -10,6 +10,7 @@ import { MoneyModule } from "../money/money.module";
 import { ChecklistModule } from "../checklist/checklist.module";
 import { InsightsService } from "./insights.service";
 import { RemindersListService } from "./reminders-list.service";
+import { FactsModule } from "./facts/facts.module";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026-10");
@@ -100,5 +101,5 @@ class InsightsController {
   }
 }
 
-@Module({ imports: [OrdersModule, MoneyModule, ChecklistModule], controllers: [InsightsController], providers: [InsightsService, RemindersListService], exports: [InsightsService] })
+@Module({ imports: [OrdersModule, MoneyModule, ChecklistModule, FactsModule], controllers: [InsightsController], providers: [InsightsService, RemindersListService], exports: [InsightsService, FactsModule] })
 export class InsightsModule {}

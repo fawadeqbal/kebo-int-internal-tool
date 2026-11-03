@@ -64,6 +64,11 @@ export function shippedOnOf(list: readonly { departedOn: ISODate | null }[]): IS
   return days.length ? days.sort()[0]! : null;
 }
 
+/** Shipped by our ship-by date (Insights' "on time"): null until it has shipped, or without a ship-by. */
+export function shippedOnTime(shipBy: ISODate | null, shippedOn: ISODate | null): boolean | null {
+  return shipBy && shippedOn ? shippedOn <= shipBy : null;
+}
+
 /**
  * Our ship-by against the LC's latest shipment date (owner, 3 Nov 2026: keep our own, show both, warn when
  * ours is later). `late`: ours is after the LC's; null when one of them is not known.
