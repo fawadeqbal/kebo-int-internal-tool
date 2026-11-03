@@ -21,6 +21,7 @@ import {
 } from "../enums";
 import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, optionalPercent, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
+import { PLAN_DUE_RULES } from "../workflows/money-route";
 import { CANCEL_CUSTOMER_MONEY, CANCEL_FACTORY_MONEY, FACTORY_DUE_RULES } from "../workflows/money-route";
 import { FLOW_STEPS } from "../workflows/flow";
 
@@ -233,6 +234,11 @@ export const factoryQuoteInput = z
     leadTime: optionalText(120),
     moq: optionalText(60),
     paymentTerms: optionalText(2000),
+    /**
+     * The advance the factory asks when we order, in % (seeds its payment plan on the order and is printed on
+     * the purchase order; the payment terms text stays as a note). Empty: the company's default (Settings).
+     */
+    advancePercent: optionalPercent,
     notes: optionalText(5000),
     /** Left out: the lines are not touched (they are added one by one, see factoryLinesInput). */
     lines: z.array(factoryQuoteLineInput).max(1000).optional(),
@@ -377,7 +383,13 @@ export type MoveStageInput = z.infer<typeof moveStageInput>;
  */
 export const orderDetailsInput = z.object({
   shipBy: optionalDate.optional(),
+  /** One date for every factory of the order (each factory's own: readyBy). */
   readyOn: optionalDate.optional(),
+  /** Each factory's ready date (one per factory; the order's is the latest of them). Only the factories sent change. */
+  readyBy: z
+    .array(z.object({ factoryId: optionalId, readyOn: optionalDate }))
+    .max(50)
+    .optional(),
   shippedOn: optionalDate.optional(),
   blNo: optionalText(60).optional(),
   /** Heading over the lines on the proforma / invoice / packing list. */
@@ -500,7 +512,11 @@ export const paymentPartInput = z.object({
  * pays `parts` (other orders) and the rest becomes the customer's credit.
  */
 export const paymentInput = z.object({
-  kind: z.enum(PAYMENT_KINDS),
+  /**
+   * Worked out from what the money pays (the deposit while it is open, else the balance); only "other"
+   * (money that is not for the plan's instalments) is taken as sent.
+   */
+  kind: z.preprocess((v) => (v === "" ? undefined : v), z.enum(PAYMENT_KINDS).optional()),
   amount: optionalAmount.optional().transform((v) => v ?? null),
   bankCharges: amountOr(0),
   currency,
@@ -605,7 +621,15 @@ export const paymentPlanInput = z.object({
         id: optionalId,
         label: text(80, "Name each instalment, e.g. Deposit"),
         amount: amount().refine((v) => (v as number) > 0, "Each instalment must be more than 0"),
+        /** The date of a fixed row; a date typed without a rule makes the row fixed. */
         dueOn: optionalDate,
+        /**
+         * When it falls due (fixed | on_ready | on_ship_plus_days | after_papers; empty: no date yet). Left out:
+         * a row with a date becomes fixed, one without keeps its rule.
+         */
+        dueRule: z.preprocess((v) => (v === "" ? null : v), z.enum(PLAN_DUE_RULES).nullable().optional()),
+        /** on_ship_plus_days / after_papers: how many days after. */
+        dueDays: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().int().min(0).max(3650).optional()),
       }),
     )
     .min(1, "Add at least one instalment")
