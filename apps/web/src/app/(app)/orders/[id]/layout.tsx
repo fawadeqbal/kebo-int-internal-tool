@@ -111,7 +111,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
               ))}
             </p>
           }
-          papers={pdf ? <FileActions viewHref={pdf.view} pdfHref={pdf.pdf} of="proforma invoice" /> : undefined}
+          papers={pdf ? <FileActions viewHref={pdf.view} pdfHref={pdf.pdf} /> : undefined}
           more={<MoreMenu label={`More for ${o.refNo}`} phoneItems={paperItems} items={moreItems} />}
         />
 

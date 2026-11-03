@@ -107,7 +107,8 @@ export function BrandPreview({ initial, label = "The top of your documents" }: {
   return (
     <div ref={box} className="sm:col-span-2">
       {label && <p className="mb-1.5 text-sm font-medium">{label}</p>}
-      <div className="overflow-x-auto rounded-lg border border-line bg-white p-5 text-[#1a1a1a]">
+      {/* Wider than a phone: it scrolls sideways, so the keyboard can reach it too. */}
+      <div tabIndex={0} role="region" aria-label="Preview of the top of your documents" className="overflow-x-auto rounded-lg border border-line bg-white p-5 text-[#1a1a1a]">
         <div className="flex min-w-[26rem] items-center gap-3.5">
           {b.logo ? (
             // eslint-disable-next-line @next/next/no-img-element -- a data URL kept in the settings
