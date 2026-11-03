@@ -1071,19 +1071,19 @@ model Order {
   /// The last receipt and payment-request numbers given (RC-…-n, PR-…-n): numbers are given once and never reused.
   lastReceiptNo       Int                @default(0) @map("last_receipt_no")
   lastRequestNo       Int                @default(0) @map("last_request_no")
-  /// Ship date promised to the customer.
+  /// Ship date promised to the customer (ours: with an LC its latest shipment date is shown beside it, and a
+  /// ship-by later than that is warned about).
   shipBy              DateTime?          @map("ship_by") @db.Date
   /// Ready date the factory confirmed.
   readyOn             DateTime?          @map("ready_on") @db.Date
-  shippedOn           DateTime?          @map("shipped_on") @db.Date
-  blNo                String?            @map("bl_no") @db.VarChar(60)
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
   documentTitle       String?            @map("document_title") @db.VarChar(200)
-  /// Where the goods are unloaded, e.g. "Hairatan, Afghanistan" (the port of loading is the Incoterm place).
+  /// The contract destination, e.g. "Hairatan, Afghanistan": printed on the proforma and the contract, and the
+  /// default port of discharge of a new shipment. Shipped on, the B/L and the container are the shipments'
+  /// (Shipment 1 for the papers; shipped on = the earliest day one left), never the order's.
   portOfDischarge     String?            @map("port_of_discharge") @db.VarChar(120)
   /// When the packing list was filled in (null: not yet).
   packedAt            DateTime?          @map("packed_at") @db.Timestamptz
-  containerNo         String?            @map("container_no") @db.VarChar(120)
   shippingMarks       String?            @map("shipping_marks")
   currency            String             @db.Char(3)
   total               Decimal            @db.Decimal(14, 2)
@@ -1420,7 +1420,9 @@ model ChecklistTemplate {
   @@map("checklist_templates")
 }
 
-/// One shipment of an order (an order can go in more than one).
+/// One shipment of an order (an order can go in more than one). The only place for its B/L, the day it left,
+/// the container, seal, vessel, ports and ETD/ETA; Shipment 1 (the first made) is the one the papers print.
+/// An order without the shipping module still has one, typed from the order's Details card.
 model Shipment {
   id              String         @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).

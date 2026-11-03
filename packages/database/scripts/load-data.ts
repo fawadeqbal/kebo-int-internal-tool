@@ -424,8 +424,6 @@ async function main() {
         orderedOn: toDbDate(orderedOn),
         readyOn: oStage === "confirmed" ? null : toDbDate(addDays(orderedOn, int(15, 40))),
         shipBy: toDbDate(addDays(orderedOn, int(30, 45))),
-        shippedOn: shippedOn ? toDbDate(shippedOn) : null,
-        blNo: shippedOn ? `QDLOS${300_000 + n}` : null,
         currency: "USD",
         total: fromMinor(accepted.total),
         depositPercent: 30,
@@ -449,6 +447,20 @@ async function main() {
               : {}),
           })),
         },
+        // The shipment that left (FOB Qingdao): its B/L and the day it sailed.
+        ...(shippedOn
+          ? {
+              shipments: {
+                create: {
+                  mode: "sea",
+                  status: oStage === "done" ? "arrived" : "departed",
+                  blNo: `QDLOS${300_000 + n}`,
+                  departedOn: toDbDate(shippedOn),
+                  portOfLoading: "Qingdao",
+                },
+              },
+            }
+          : {}),
       },
     });
     orders++;
