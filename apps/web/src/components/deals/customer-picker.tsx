@@ -157,7 +157,7 @@ export function CustomerPicker({
           </ul>
           <div className="border-t border-line px-3 py-2 text-xs text-muted">
             Not in the list?{" "}
-            <Link href="/customers/new" target="_blank" className="font-medium text-primary hover:underline">
+            <Link href="/customers?panel=new-customer" target="_blank" className="font-medium text-primary hover:underline">
               Add a new customer
             </Link>{" "}
             (opens in a new tab), then search for it here.

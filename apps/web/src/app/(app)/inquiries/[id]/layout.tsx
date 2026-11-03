@@ -70,7 +70,7 @@ export default async function DealLayout({ children, params }: { children: React
       {d.customer.country === "ZZ" && (
         <Banner meaning="warn" className="mb-3">
           This customer&apos;s country is not set.{" "}
-          <Link href={`/customers/${d.customer.id}/edit`} className="font-medium underline">
+          <Link href={`/customers/${d.customer.id}?panel=edit-customer&id=${d.customer.id}`} className="font-medium underline">
             Add it
           </Link>{" "}
           — it decides shipping.

@@ -73,6 +73,18 @@ export function SideSection({
 }) {
   const [all, setAll] = useState(false);
   const rows = Children.toArray(children);
+  // A list that scrolls inside can be reached and scrolled from the keyboard.
+  const list = useRef<HTMLUListElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const check = () => setScrolls(el.scrollHeight > el.clientHeight + 1);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    check();
+    return () => ro.disconnect();
+  }, [rows.length]);
   return (
     <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className="border-b border-line px-[18px] pt-3.5 pb-3 last:border-b-0">
       <div className="mb-1 flex min-h-8 items-center justify-between gap-2">
@@ -84,6 +96,9 @@ export function SideSection({
       </div>
       {rows.length ? (
         <ul
+          ref={list}
+          tabIndex={scrolls ? 0 : undefined}
+          aria-label={scrolls ? title : undefined}
           className={cn(
             "[scrollbar-width:thin] lg:-mr-2.5 lg:overflow-y-auto lg:pr-2.5",
             dense ? "lg:max-h-[300px]" : "lg:max-h-[330px]",
