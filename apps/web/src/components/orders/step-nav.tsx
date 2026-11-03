@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { isPaperKind, PAPER_STEP, STEP_PATH, type StepState } from "@kebo/shared";
-import { cn } from "@kebo/ui";
+import { cn, SectionNav } from "@kebo/ui";
 
 export interface StepNavStep {
   key: string;
@@ -108,38 +108,30 @@ export function StepNav({
 
   return (
     <>
-      <nav aria-label={label} className="no-print mt-4 hidden border-b border-line md:block">
-        <ul className="relative -mb-px flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {links.map((l) => {
-            const s = "number" in l ? l : null;
-            const on = active(l.href);
-            return (
-              <li key={l.href} className="shrink-0">
-                <Link
-                  href={l.href}
-                  aria-current={on ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-1.5 border-b-2 px-2 py-2.5 text-sm whitespace-nowrap transition-colors xl:px-2.5",
-                    on ? "border-primary font-semibold text-text" : "border-transparent text-text-2 hover:text-text",
-                  )}
-                >
-                  {s && <StepMark state={s.state} number={s.number} />}
-                  <span>{l.label}</span>
-                  {"tag" in l && l.tag && <span className="text-[11px] text-muted tabular">{l.tag}</span>}
-                  {s && (
-                    <span className={cn("text-[11px] tabular", s.state === "late" ? "text-bad" : "text-muted")}>
-                      {tagOf(s)}
-                      <span className="sr-only">
-                        {s.status === undefined && s.total !== undefined ? " done" : ""}, {SR[s.state]}
-                      </span>
-                    </span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      {/* From a tablet up: the design system's section navigation (its phone chips are replaced by the picker below). */}
+      <SectionNav
+        label={label}
+        phone="none"
+        className="mt-4"
+        items={links.map((l) => {
+          const s = "number" in l ? l : null;
+          return {
+            href: l.href,
+            label: l.label,
+            active: active(l.href),
+            mark: s ? <StepMark state={s.state} number={s.number} /> : undefined,
+            alert: s?.state === "late",
+            count: s ? (
+              <>
+                {tagOf(s)}
+                <span className="sr-only">
+                  {s.status === undefined && s.total !== undefined ? " done" : ""}, {SR[s.state]}
+                </span>
+              </>
+            ) : "tag" in l ? l.tag : undefined,
+          };
+        })}
+      />
 
       <div ref={box} className="no-print relative mt-3 md:hidden">
         <button

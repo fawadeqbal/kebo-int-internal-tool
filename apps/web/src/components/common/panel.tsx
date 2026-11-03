@@ -210,19 +210,11 @@ export function PanelKeys() {
 /** The page (without its panel) a panel was opened from in this tab, so closing it can go Back. */
 let openedFrom: string | null = null;
 
-/**
- * A side panel kept in the URL (?panel=new-customer, ?panel=edit-customer&id=…),
- * so a link opens it, Back closes it and a reload keeps it. The page reads the
- * same parameters on the server to draw the panel with its data.
- */
-export function useSidePanel(name: string) {
+/** The current URL with some parameters changed (null: removed). */
+function usePanelUrl() {
   const params = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
-  const open = params.get("panel") === name;
-  const id = open ? params.get("id") : null;
-
-  const url = useCallback(
+  return useCallback(
     (patch: Record<string, string | null>) => {
       const p = new URLSearchParams(params.toString());
       for (const [k, v] of Object.entries(patch)) if (v === null) p.delete(k);
@@ -232,18 +224,38 @@ export function useSidePanel(name: string) {
     },
     [params, pathname],
   );
+}
+
+/** Opens any URL side panel of this page (a menu's "Edit"): (name, record id). */
+export function useOpenPanel() {
+  const router = useRouter();
+  const url = usePanelUrl();
+  return useCallback(
+    (name: string, recordId?: string) => {
+      openedFrom = url({ panel: null, id: null });
+      router.push(url({ panel: name, id: recordId ?? null }), { scroll: false });
+    },
+    [router, url],
+  );
+}
+
+/**
+ * A side panel kept in the URL (?panel=new-customer, ?panel=edit-customer&id=…),
+ * so a link opens it, Back closes it and a reload keeps it. The page reads the
+ * same parameters on the server to draw the panel with its data.
+ */
+export function useSidePanel(name: string) {
+  const params = useSearchParams();
+  const router = useRouter();
+  const url = usePanelUrl();
+  const opener = useOpenPanel();
+  const open = params.get("panel") === name;
+  const id = open ? params.get("id") : null;
   const without = useCallback((extra: Record<string, string> = {}) => url({ panel: null, id: null, ...extra }), [url]);
 
   /** The link that opens it (for a <Link> or an href). */
   const href = useCallback((recordId?: string) => url({ panel: name, id: recordId ?? null }), [url, name]);
-
-  const openPanel = useCallback(
-    (recordId?: string) => {
-      openedFrom = without();
-      router.push(href(recordId), { scroll: false });
-    },
-    [router, href, without],
-  );
+  const openPanel = useCallback((recordId?: string) => opener(name, recordId), [opener, name]);
 
   /** Closes it: Back when it was opened from this page, else the page without it. `then`: parameters to add (e.g. what was saved). */
   const close = useCallback(

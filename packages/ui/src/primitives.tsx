@@ -337,6 +337,23 @@ export function Tr({ className, ...props }: ComponentProps<"tr">) {
   return <tr className={cn("transition-colors last:[&>td]:border-b-0", className)} {...props} />;
 }
 
+/**
+ * A list row that opens its record (inside the app's DataTable): a click
+ * anywhere on it goes to `href` (Ctrl/⌘-click: a new tab), the row lights on
+ * hover, and its first cell should hold a real link to the same place for the
+ * keyboard (Enter) and screen readers. `flash`: just saved, lit for 2 seconds.
+ */
+export function DataRow({ href, flash, className, ...props }: ComponentProps<"tr"> & { href: string; flash?: boolean }) {
+  return (
+    <tr
+      data-href={href}
+      data-flash={flash ? "" : undefined}
+      className={cn("group cursor-pointer transition-colors last:[&>td]:border-b-0 hover:bg-primary-soft/50", flash && "animate-flash", className)}
+      {...props}
+    />
+  );
+}
+
 /* ---------------------------------------------------------------- Detail list */
 
 /** Label/value grid for detail panels. */
