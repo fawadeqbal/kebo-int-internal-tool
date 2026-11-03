@@ -623,7 +623,7 @@ export class FactsReadService {
    * Each order's money as the tables hold it, for Leaks (callers check the permission): the orders ordered in
    * the span (not cancelled) and every open one, with what we owe and paid their factories (main currency).
    */
-  async orderMoney(user: SessionUser, q: Required<Span>) {
+  async moneyByOrder(user: SessionUser, q: Required<Span>) {
     const { currency } = await this.open(user, true);
     const rows = await this.prisma.db.$queryRaw<Record<string, unknown>[]>`
       select f.order_id as "orderId", f.inquiry_id as "inquiryId", o.ref_no as "refNo", f.customer_id as "customerId", c.name as customer,

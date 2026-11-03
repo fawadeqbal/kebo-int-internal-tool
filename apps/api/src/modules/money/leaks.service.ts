@@ -76,7 +76,7 @@ export class LeaksService {
       new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
 
     // The tables first (each read works the queue off), then what only the records hold.
-    const money = await this.facts.orderMoney(user, { from, to });
+    const money = await this.facts.moneyByOrder(user, { from, to });
     const [decided, monthly, cash] = await Promise.all([
       this.facts.inquiryGroups(user, { from, to, period: "all", by: "company", on: "closed" }, true),
       this.facts.orderGroups(user, { ...twelve, period: "month", by: "company" }, true),

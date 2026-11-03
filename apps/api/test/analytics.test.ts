@@ -1,25 +1,6 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addMonths, previousPeriod } from "../src/modules/insights/insights.service";
 import { api, signIn, startApp } from "./app";
-
-describe("comparing a period with the one before", () => {
-  it("compares a month (or months) with the same days before", () => {
-    expect(previousPeriod("2026-10-01", "2026-10-28")).toEqual({ from: "2026-09-01", to: "2026-09-28" });
-    expect(previousPeriod("2026-10-01", "2026-10-31")).toEqual({ from: "2026-09-01", to: "2026-09-30" });
-    expect(previousPeriod("2026-03-01", "2026-03-31")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
-    expect(previousPeriod("2026-07-01", "2026-09-30")).toEqual({ from: "2026-04-01", to: "2026-06-30" });
-    expect(previousPeriod("2026-01-01", "2026-10-28")).toEqual({ from: "2025-03-01", to: "2025-12-28" });
-  });
-  it("compares other days with as many days just before", () => {
-    expect(previousPeriod("2026-10-11", "2026-10-20")).toEqual({ from: "2026-10-01", to: "2026-10-10" });
-  });
-  it("keeps the day inside the month", () => {
-    expect(addMonths("2026-03-31", -1)).toBe("2026-02-28");
-    expect(addMonths("2024-03-31", -1)).toBe("2024-02-29");
-    expect(addMonths("2026-01-15", -12)).toBe("2025-01-15");
-  });
-});
 
 /** Insights (managers), targets, the reminders on Home and what customers owe. */
 describe("insights", () => {
@@ -39,38 +20,20 @@ describe("insights", () => {
     await app?.close();
   });
 
-  it("gives managers the period against the one before, month by month", async () => {
-    await api(app, staff).get("/insights").expect(403);
-    const i = (await api(app, manager).get(`/insights?from=${today.slice(0, 4)}-01-01&to=${today}`).expect(200)).body;
-    expect(i.range).toEqual({ from: `${today.slice(0, 4)}-01-01`, to: today });
-    expect(i.series.length).toBeGreaterThanOrEqual(12);
-    // The year's sales are the months' sales added up.
-    const fromSeries = i.series.filter((s: { month: string }) => s.month.startsWith(today.slice(0, 4))).reduce((t: number, s: { revenue: string }) => t + Number(s.revenue), 0);
-    expect(Number(i.kpis.revenue.value)).toBeCloseTo(fromSeries, 1);
-    expect(Number(i.kpis.revenue.value)).toBeGreaterThan(0);
-    expect(i.kpis.grossProfit.value).not.toBeNull();
-    expect(i.funnel.received).toBeGreaterThanOrEqual(i.funnel.quoted);
-    expect(i.funnel.quoted).toBeGreaterThanOrEqual(i.funnel.won);
-    expect(i.topCustomers.length).toBeGreaterThan(0);
-    expect(i.countries.length).toBeGreaterThan(0);
-    expect(Object.keys(i.aging)).toEqual(["notDue", "d30", "d60", "d90", "older"]);
-    const aged = Object.values(i.aging as Record<string, string>).reduce((t, v) => t + Number(v), 0);
-    expect(aged).toBeCloseTo(Number(i.now.toReceive), 0);
-    expect(i.now.cashInHand).not.toBeNull();
-    expect(i.people.some((p: { name: string }) => p.name === "Sana" || p.name === "Bilal")).toBe(true);
-  });
-
-  it("keeps a monthly target and shows how far along it is", async () => {
+  it("keeps a monthly target and shows how far along it is, on Insights' sales", async () => {
+    await api(app, staff).get("/insights/target").expect(403);
     await api(app, staff).put(`/insights/targets/${month}`, { amount: 50000 }).expect(403);
     await api(app, manager).put(`/insights/targets/2026-13`, { amount: 1 }).expect(422);
     await api(app, manager).put(`/insights/targets/${month}`, { amount: 50000 }).expect(200);
-    const i = (await api(app, manager).get("/insights").expect(200)).body;
-    expect(i.target).toMatchObject({ month, amount: "50000.00" });
-    expect(i.target.percent).toBe(Math.round((Number(i.target.reached) / 50000) * 100));
-    expect(i.series.find((s: { month: string }) => s.month === month).target).toBe("50000.00");
+    const t = (await api(app, manager).get("/insights/target").expect(200)).body;
+    expect(t).toMatchObject({ month, amount: "50000.00", currency: "USD", canSet: true });
+    const end = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
+    const sales = (await api(app, manager).get(`/insights/facts/orders/groups?from=${month}-01&to=${end}&period=all`).expect(200)).body.rows[0]?.sales ?? "0.00";
+    expect(t.reached).toBe(sales);
+    expect(t.percent).toBe(Math.round((Number(t.reached) / 50000) * 100));
     expect((await api(app, manager).get(`/insights/targets?year=${today.slice(0, 4)}`).expect(200)).body).toEqual([{ month, amount: "50000.00", currency: "USD" }]);
     await api(app, manager).put(`/insights/targets/${month}`, { amount: 0 }).expect(200);
-    expect((await api(app, manager).get("/insights").expect(200)).body.target.amount).toBeNull();
+    expect((await api(app, manager).get("/insights/target").expect(200)).body.amount).toBeNull();
   });
 
   it("lists what needs each person, and puts one off or marks it done", async () => {

@@ -149,12 +149,12 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect((await db().orderFact.findMany({ where: { dueMain: { gt: 0 } }, select: { orderId: true } })).map((x) => x.orderId).filter((id) => !listed.has(id))).toEqual([]);
     });
 
-    it("this month's sales are Insights' (one formula)", async () => {
+    it("this month's sales are the report's (one formula)", async () => {
       const from = `${today.slice(0, 7)}-01`;
-      const insights = (await api(app, manager).get(`/insights?from=${from}&to=${today}`).expect(200)).body;
+      const report = (await api(app, manager).get(`/reports?from=${from}&to=${today}`).expect(200)).body;
       const groups = (await api(app, manager).get(`/insights/facts/orders/groups?from=${from}&to=${today}&period=all`).expect(200)).body;
-      expect(groups.rows[0]?.sales ?? "0.00").toBe(insights.kpis.revenue.value);
-      expect(groups.rows[0]?.orders ?? 0).toBe(insights.kpis.orders.value);
+      expect(groups.rows[0]?.sales ?? "0.00").toBe(report.wonValue);
+      expect(groups.rows[0]?.orders ?? 0).toBe(report.profit.total.orders);
     });
 
     it("what we owe each factory is factoryPosition's (the SQL twin)", async () => {
