@@ -467,6 +467,7 @@ export function PaperMenu({
   issuing,
   onRecord,
   lead,
+  size = "icon-xs",
 }: {
   r: PaperLineRow;
   orderId: string;
@@ -477,6 +478,8 @@ export function PaperMenu({
   onRecord?: (mode: "upload" | "elsewhere") => void;
   /** Items before the paper's own (the side panel: Make, Open in Papers). */
   lead?: (item: (label: string, on: () => void, hint?: string) => ReactNode) => ReactNode;
+  /** The ⋯ button's size (the side panel: icon-sm). */
+  size?: "icon-xs" | "icon-sm";
 }) {
   const tools = useFileTools();
   const router = useRouter();
@@ -533,7 +536,7 @@ export function PaperMenu({
         aria-label={`More for ${r.label}`}
         aria-haspopup="menu"
         aria-expanded={menu}
-        className={buttonClass("ghost", "icon-xs")}
+        className={buttonClass("ghost", size)}
         onClick={() => setMenu((m) => !m)}
       >
         <MoreHorizontal aria-hidden />

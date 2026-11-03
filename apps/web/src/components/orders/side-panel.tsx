@@ -52,13 +52,15 @@ export interface ChangeLine {
   when: string;
   /** The whole change (all of a paper's folded versions), on hover. */
   title: string;
+  /** The order step it belongs to (the overview's Recent changes). */
+  step: string | null;
 }
 
 /**
  * A step's changes, one line each: who, what (short), when. A paper's drafts,
  * finals and remakes fold into one line (the newest); History keeps every one.
  */
-export function compactChanges(entries: HistoryEntry[]): ChangeLine[] {
+export function compactChanges(entries: (HistoryEntry & { step?: string | null })[]): ChangeLine[] {
   const now = today();
   const out: (ChangeLine & { paper?: string; all: string[] })[] = [];
   for (const e of entries) {
@@ -82,33 +84,32 @@ export function compactChanges(entries: HistoryEntry[]): ChangeLine[] {
       text,
       when: when(e.at, now),
       title: full,
+      step: e.step ?? null,
       paper,
       all: [full],
     });
   }
-  return out.map(({ id, initial, who, text, when, title }) => ({ id, initial, who, text, when, title }));
+  return out.map(({ id, initial, who, text, when, title, step }) => ({ id, initial, who, text, when, title, step }));
 }
 
-/** The compact change lines (the side panel's Changes, the Documents page's side card), as list items. */
+/** The change lines (the side panel's Changes, the Documents page's side card), as list items: avatar, the whole sentence, the time under it. */
 export function changeRows(lines: ChangeLine[]) {
   return lines.map((c) => (
-    <li
-      key={c.id}
-      title={c.title}
-      className="grid h-[30px] grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 border-b border-line text-xs last:border-b-0"
-    >
-      <span aria-hidden className="grid size-5 place-items-center rounded-full bg-primary-soft text-[10px] font-bold text-primary">
+    <li key={c.id} title={c.title} className="grid grid-cols-[24px_minmax(0,1fr)] items-start gap-2.5 border-b border-line py-2 last:border-b-0">
+      <span aria-hidden className="grid size-6 place-items-center rounded-full bg-primary-soft text-[11px] font-bold text-primary">
         {c.initial}
       </span>
-      <span className="truncate text-text-2">
-        <b className="font-semibold text-text">{c.who}</b> {c.text}
+      <span className="min-w-0">
+        <span className="block text-sm [overflow-wrap:anywhere]">
+          <b className="font-semibold">{c.who}</b> {c.text}
+        </span>
+        <span className="block text-xs text-muted tabular">{c.when}</span>
       </span>
-      <span className="text-muted whitespace-nowrap tabular">{c.when}</span>
     </li>
   ));
 }
 
-/** The Documents page's side card: the step's changes, one line each. */
+/** The Documents page's side card: the step's changes. */
 export function StepChangesCompact({ entries, historyHref }: { entries: HistoryEntry[]; historyHref: string }) {
   const lines = compactChanges(entries);
   return (
@@ -118,7 +119,7 @@ export function StepChangesCompact({ entries, historyHref }: { entries: HistoryE
         count={lines.length}
         dense
         action={
-          <Link href={historyHref} className={buttonClass("ghost", "xs")}>
+          <Link href={historyHref} className={buttonClass("ghost", "sm")}>
             All history
           </Link>
         }
@@ -133,7 +134,7 @@ export function StepChangesCompact({ entries, historyHref }: { entries: HistoryE
 /**
  * Every step page's right side (but Documents): one card, no tabs, four
  * sections — Papers · Costs · Files · Changes — each with its count and button,
- * one line per entry, five then it scrolls. Papers come from GET
+ * two lines per entry (names in full), about six then it scrolls. Papers come from GET
  * /orders/:id/papers (this step's), Costs from the order's costs (managers with
  * the expenses feature only), Files from GET /orders/:id/files (this step's),
  * Changes from the step's history.
@@ -183,16 +184,16 @@ export async function StepSidePanel({
         target="costs"
         title="Costs"
         count={here.length}
-        action={<AddOrderExpense setup={costs.setup} step={step} variant="ghost" size="xs" />}
+        action={<AddOrderExpense setup={costs.setup} step={step} variant="ghost" size="sm" />}
         empty={`No expense on this step yet · ${money("0", c)}`}
         footer={
           <>
             {here.length > 0 && (
-              <p className="mt-1 flex items-baseline justify-between gap-3 text-xs text-text-2">
-                Spent in this step <b className="text-sm font-semibold text-text tabular">{money(total, c)}</b>
+              <p className="mt-1 flex items-baseline justify-between gap-3 text-sm text-text-2">
+                Spent in this step <b className="font-semibold text-text tabular">{money(total, c)}</b>
               </p>
             )}
-            {note && <p className="mt-1 text-xs text-muted">{note}</p>}
+            {note && <p className="mt-1 text-[13px] text-muted">{note}</p>}
           </>
         }
       >
@@ -209,13 +210,20 @@ export async function StepSidePanel({
             .filter(Boolean)
             .join(" · ");
           return (
-            <li key={e.id} data-target={`costs.${e.category}`} title={detail} className="flex h-[34px] items-center gap-2 border-b border-line last:border-b-0">
-              <span className="min-w-0 flex-1 truncate text-[13px]">{e.description}</span>
-              <span className="flex max-w-[35%] shrink-0 items-center gap-1 text-xs text-muted">
-                <span className="truncate">{meta}</span>
-                {!e.receipt && <span role="img" aria-label="No receipt" title="No receipt" className="size-1.5 shrink-0 rounded-full bg-warn" />}
+            <li
+              key={e.id}
+              data-target={`costs.${e.category}`}
+              title={detail}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 border-b border-line py-2 last:border-b-0"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-medium [overflow-wrap:anywhere]">{e.description}</span>
+                <span className="flex items-center gap-1 text-xs text-text-2">
+                  {meta}
+                  {!e.receipt && <span role="img" aria-label="No receipt" title="No receipt" className="size-1.5 shrink-0 rounded-full bg-warn" />}
+                </span>
               </span>
-              <span className="shrink-0 text-[13px] tabular">{money(e.amount, e.currency)}</span>
+              <span className="text-sm tabular">{money(e.amount, e.currency)}</span>
             </li>
           );
         })}
@@ -224,6 +232,12 @@ export async function StepSidePanel({
   }
 
   const stepFiles = files?.files.filter((f) => f.step === step) ?? [];
+  const now = today();
+  /** "Sales contract signed · Fawad · today": what the file belongs to, who added it, when. */
+  const fileMeta = (f: (typeof stepFiles)[number]) =>
+    [f.attachedTo.label.replace(/^(Checklist|Paper|Inquiry|Step) · /, ""), f.by?.name.split(" ")[0], when(f.at, now).replace(/^today .*/, "today")]
+      .filter(Boolean)
+      .join(" · ");
   const lines = compactChanges(changes);
 
   return (
@@ -233,7 +247,7 @@ export async function StepSidePanel({
           title="Papers"
           count={paperRows.length}
           action={
-            <Link href={`/orders/${id}/documents?tab=all#papers`} className={buttonClass("ghost", "xs")}>
+            <Link href={`/orders/${id}/documents?tab=all#papers`} className={buttonClass("ghost", "sm")}>
               All papers
             </Link>
           }
@@ -259,9 +273,9 @@ export async function StepSidePanel({
           count={stepFiles.length}
           action={
             files.canUpload ? (
-              <UploadButton orderId={id} step={step} label="Upload" variant="ghost" />
+              <UploadButton orderId={id} step={step} label="Upload" variant="ghost" size="sm" />
             ) : (
-              <Link href={`/orders/${id}/documents#files`} className={buttonClass("ghost", "xs")}>
+              <Link href={`/orders/${id}/documents#files`} className={buttonClass("ghost", "sm")}>
                 All files
               </Link>
             )
@@ -269,7 +283,7 @@ export async function StepSidePanel({
           empty="No files on this step yet. Drop them on the page, or upload."
         >
           {stepFiles.map((f) => (
-            <SideFileRow key={f.id} file={f} set={stepFiles} />
+            <SideFileRow key={f.id} file={f} set={stepFiles} meta={fileMeta(f)} />
           ))}
         </SideSection>
       )}
@@ -278,7 +292,7 @@ export async function StepSidePanel({
         count={lines.length}
         dense
         action={
-          <Link href={historyHref} className={buttonClass("ghost", "xs")}>
+          <Link href={historyHref} className={buttonClass("ghost", "sm")}>
             All history
           </Link>
         }

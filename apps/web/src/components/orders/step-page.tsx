@@ -106,6 +106,9 @@ export function StepPrevNext({ prev, next }: { prev: { href: string; label: stri
   );
 }
 
+/** The work area beside the side panel: 380px from 1024, 420px from 1280; under the page below that. */
+export const SIDE_COLUMNS = "lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]";
+
 /** A step page's frame: the header, then its work area beside the side cards, then the way to the step before and after. */
 export function StepFrame({
   header,
@@ -122,7 +125,7 @@ export function StepFrame({
     <div className="flex flex-col gap-5">
       {header}
       {side ? (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className={cn("grid gap-5", SIDE_COLUMNS)}>
           <div className="flex min-w-0 flex-col gap-5">{children}</div>
           <aside className="flex min-w-0 flex-col gap-5">{side}</aside>
         </div>
@@ -220,43 +223,43 @@ export function StepChanges({
       <CardHeader
         title={title ?? (showStep ? "Recent changes" : "Changes in this step")}
         actions={
-          <Link href={historyHref} className={buttonClass("ghost", "xs")}>
+          <Link href={historyHref} className={buttonClass("ghost", "sm")}>
             {showStep ? "History" : "All history"}
           </Link>
         }
       />
       {entries.length ? (
-        <ol className="flex flex-col divide-y divide-line px-4">
+        <ol className="flex max-h-[300px] flex-col divide-y divide-line overflow-y-auto px-4 [scrollbar-width:thin]">
           {entries.map((e) => {
             // A summary that already says "a → b" needs no "was".
             const change = /→/.test(e.summary ?? "") ? null : e.changes.find((c) => c.from && c.to);
             return (
-              <li key={e.id} className="flex gap-2.5 py-3">
+              <li key={e.id} className="grid grid-cols-[24px_minmax(0,1fr)] items-start gap-2.5 py-2">
                 <span
                   aria-hidden
-                  className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-[11px] font-semibold text-primary"
+                  className="grid size-6 place-items-center rounded-full bg-primary-soft text-[11px] font-bold text-primary"
                 >
                   {(e.by?.name ?? "S").charAt(0).toUpperCase()}
                 </span>
-                <span className="min-w-0 text-xs leading-relaxed">
-                  <span className="block text-text-2">
-                    <span className="font-semibold text-text">{e.by?.name ?? "System"}</span>{" "}
+                <span className="min-w-0 text-sm [overflow-wrap:anywhere]">
+                  <span className="block">
+                    <span className="font-semibold">{e.by?.name ?? "System"}</span>{" "}
                     {readable((e.summary ?? e.action).replace(/^[A-Z]{2,4}-\d{4}-\d+: /, ""))}
                     {showStep && e.step && <span className="text-muted"> · {FLOW_STEP_LABEL[e.step as FlowStep] ?? e.step}</span>}
                   </span>
                   {change && (
-                    <span className="block text-muted">
+                    <span className="block text-xs text-muted">
                       was {change.from && /^\d{4}-\d{2}-\d{2}$/.test(change.from) ? date(change.from) : change.from}
                     </span>
                   )}
-                  <span className="block text-muted">{dateTime(e.at)}</span>
+                  <span className="block text-xs text-muted">{dateTime(e.at)}</span>
                 </span>
               </li>
             );
           })}
         </ol>
       ) : (
-        <p className="px-4 py-3.5 text-xs text-muted">Nothing changed here yet.</p>
+        <p className="px-4 py-3.5 text-sm text-muted">Nothing changed here yet.</p>
       )}
     </Card>
   );

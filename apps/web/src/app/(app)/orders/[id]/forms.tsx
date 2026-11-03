@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, Plus } from "lucide-react";
 import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind } from "@kebo/shared";
-import { Alert, Button, cn, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Alert, Button, Card, CardBody, CardHeader, cn, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
@@ -143,7 +143,12 @@ function Warnings({ text }: { text: string }) {
 
 /* ---------------------------------------------------------------- details */
 
-export function DetailsForm({
+/**
+ * The order's Details card (the overview's right column): terms, dates and
+ * shipping in two columns, values wrapping; ✎ Edit in the header opens the
+ * form in place; an empty value offers "+ Add" to people who may edit.
+ */
+export function DetailsCard({
   action,
   canEdit,
   today,
@@ -158,65 +163,83 @@ export function DetailsForm({
   fixed: { label: string; value: ReactNode }[];
   values: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null; documentTitle: string | null; portOfDischarge: string | null };
   /** The same values, formatted for reading. */
-  shown: { shipBy: string; readyOn: string; shippedOn: string; blNo: string };
+  shown: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null };
 }) {
   const [editing, setEditing] = useState(false);
-  if (!editing)
-    return (
-      <div className="flex flex-col gap-3">
-        <DetailList
-          columns={1}
-          items={[
-            ...fixed,
-            { label: "Ship by", value: shown.shipBy },
-            { label: "Ready on", value: shown.readyOn },
-            { label: "Shipped on", value: shown.shippedOn },
-            { label: "B/L number", value: shown.blNo },
-            { label: "Port of discharge", value: values.portOfDischarge ?? "—" },
-            { label: "Heading on documents", value: values.documentTitle ?? "—" },
-          ]}
-        />
-        {canEdit && (
-          <div>
-            <EditButton label="Edit details" onClick={() => setEditing(true)} />
-          </div>
-        )}
-      </div>
-    );
+  const rows: { label: string; value: ReactNode }[] = [
+    ...fixed,
+    { label: "Ship by", value: shown.shipBy },
+    { label: "Ready at factory", value: shown.readyOn },
+    { label: "Shipped on", value: shown.shippedOn },
+    { label: "B/L no.", value: shown.blNo },
+    { label: "Port of discharge", value: values.portOfDischarge },
+    { label: "Heading on documents", value: values.documentTitle },
+  ];
+  const filled = rows.filter((r) => r.value !== null && r.value !== undefined && r.value !== "").length;
   return (
-    <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
-      {(s) => (
-        <>
-          <DetailList columns={1} items={fixed} />
-          <Field label="Ship by" htmlFor="d-shipBy" optional hint="Promised to the customer" error={s.errors?.shipBy}>
-            <Input id="d-shipBy" name="shipBy" type="date" defaultValue={s.values?.shipBy ?? values.shipBy ?? ""} />
-          </Field>
-          <Field label="Ready on" htmlFor="d-readyOn" optional hint="When the factory expects the goods ready" error={s.errors?.readyOn}>
-            <Input id="d-readyOn" name="readyOn" type="date" defaultValue={s.values?.readyOn ?? values.readyOn ?? ""} />
-          </Field>
-          <Field label="Shipped on" htmlFor="d-shippedOn" optional error={s.errors?.shippedOn}>
-            <Input id="d-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? values.shippedOn ?? ""} />
-          </Field>
-          <Field label="B/L number" htmlFor="d-blNo" optional error={s.errors?.blNo}>
-            <Input id="d-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? values.blNo ?? ""} />
-          </Field>
-          <Field label="Port of discharge" htmlFor="d-pod" optional hint="Printed on the proforma, e.g. Hairatan, Afghanistan" error={s.errors?.portOfDischarge}>
-            <Input id="d-pod" name="portOfDischarge" maxLength={120} defaultValue={s.values?.portOfDischarge ?? values.portOfDischarge ?? ""} />
-          </Field>
-          <Field label="Heading on documents" htmlFor="d-title" optional hint="Over the items, e.g. Complete automatic liquid syrup filling line" error={s.errors?.documentTitle}>
-            <Input id="d-title" name="documentTitle" maxLength={200} defaultValue={s.values?.documentTitle ?? values.documentTitle ?? ""} />
-          </Field>
-          <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText="Saving…">
-              Save details
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
-              Cancel
-            </Button>
-          </div>
-        </>
-      )}
-    </ActionForm>
+    <Card id="details" className="scroll-mt-24">
+      <CardHeader
+        title="Details"
+        description={`terms, dates and shipping · ${filled} of ${rows.length} filled`}
+        actions={canEdit && !editing ? <EditButton onClick={() => setEditing(true)} /> : undefined}
+      />
+      <CardBody>
+        {!editing ? (
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-3.5">
+            {rows.map((r) => (
+              <div key={r.label} className="flex min-w-0 flex-col gap-0.5">
+                <dt className="text-xs text-text-2">{r.label}</dt>
+                <dd className="text-sm font-medium [overflow-wrap:anywhere]">
+                  {r.value !== null && r.value !== undefined && r.value !== "" ? (
+                    r.value
+                  ) : canEdit ? (
+                    <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setEditing(true)}>
+                      + Add
+                    </button>
+                  ) : (
+                    <span className="font-normal text-muted">—</span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
+            {(s) => (
+              <>
+                <DetailList columns={2} items={fixed} />
+                <Field label="Ship by" htmlFor="d-shipBy" optional hint="Promised to the customer" error={s.errors?.shipBy}>
+                  <Input id="d-shipBy" name="shipBy" type="date" defaultValue={s.values?.shipBy ?? values.shipBy ?? ""} />
+                </Field>
+                <Field label="Ready on" htmlFor="d-readyOn" optional hint="When the factory expects the goods ready" error={s.errors?.readyOn}>
+                  <Input id="d-readyOn" name="readyOn" type="date" defaultValue={s.values?.readyOn ?? values.readyOn ?? ""} />
+                </Field>
+                <Field label="Shipped on" htmlFor="d-shippedOn" optional error={s.errors?.shippedOn}>
+                  <Input id="d-shippedOn" name="shippedOn" type="date" max={today} defaultValue={s.values?.shippedOn ?? values.shippedOn ?? ""} />
+                </Field>
+                <Field label="B/L number" htmlFor="d-blNo" optional error={s.errors?.blNo}>
+                  <Input id="d-blNo" name="blNo" maxLength={60} defaultValue={s.values?.blNo ?? values.blNo ?? ""} />
+                </Field>
+                <Field label="Port of discharge" htmlFor="d-pod" optional hint="Printed on the proforma, e.g. Hairatan, Afghanistan" error={s.errors?.portOfDischarge}>
+                  <Input id="d-pod" name="portOfDischarge" maxLength={120} defaultValue={s.values?.portOfDischarge ?? values.portOfDischarge ?? ""} />
+                </Field>
+                <Field label="Heading on documents" htmlFor="d-title" optional hint="Over the items, e.g. Complete automatic liquid syrup filling line" error={s.errors?.documentTitle}>
+                  <Input id="d-title" name="documentTitle" maxLength={200} defaultValue={s.values?.documentTitle ?? values.documentTitle ?? ""} />
+                </Field>
+                <div className="flex gap-2">
+                  <SubmitButton size="sm" pendingText="Saving…">
+                    Save details
+                  </SubmitButton>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            )}
+          </ActionForm>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
