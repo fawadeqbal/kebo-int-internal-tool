@@ -1,17 +1,27 @@
 import Link from "next/link";
-import { getCompany, hasFeature } from "@/lib/session";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { getCompany, hasFeature, requireUser } from "@/lib/session";
+import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Alert, Badge, ButtonLink, Card, CardHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Banner, Badge, Card, CardHeader, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
 import { Stat } from "@/components/common/stat";
+import { OpenPanelButton } from "@/components/common/panel";
+import { createRoleAction } from "./actions";
+import { RolePanel } from "./role-form";
 
 export const metadata = { title: "Security · Roles" };
 
 /** How people stand (signed in, two-step sign-in, failed attempts) and the roles: what each allows and whether it needs two-step sign-in. */
 export default async function SecurityPage() {
-  const [o, roles, company] = await Promise.all([api.get<SecurityOverview>("/security/overview"), api.get<RoleRow[]>("/roles"), getCompany()]);
+  const [o, roles, company, me, custom] = await Promise.all([
+    api.get<SecurityOverview>("/security/overview"),
+    api.get<RoleRow[]>("/roles"),
+    getCompany(),
+    requireUser(),
+    hasFeature("custom_roles"),
+  ]);
+  const superAdmin = !!roles.find((x) => x.key === me.role)?.superAdmin;
   // Permissions follow the company's plan: what it leaves out nobody has, and it is not counted.
   const available = PERMISSIONS.filter((p) => permissionInPlan(p, company?.features ?? null)).length;
   const frozen = roles.filter((r) => r.frozen);
@@ -30,7 +40,7 @@ export default async function SecurityPage() {
       </div>
 
       {o.mustSetUp.length > 0 && (
-        <Alert tone="warning">
+        <Banner meaning="warn">
           <p className="font-medium">
             {o.mustSetUp.length === 1 ? "1 person has" : `${o.mustSetUp.length} people have`} not set up two-step sign-in yet, though their role needs it.
           </p>
@@ -47,11 +57,11 @@ export default async function SecurityPage() {
             ))}
             .
           </p>
-        </Alert>
+        </Banner>
       )}
 
       {frozen.length > 0 && (
-        <Alert tone="info">
+        <Banner meaning="info">
           <p className="font-medium">
             {frozen.length === 1 ? `The role ${frozen[0]!.name} is` : `${frozen.length} roles your company made are`} frozen: your plan
             {company?.plan ? ` (${company.plan.name})` : ""} does not include custom roles.
@@ -60,7 +70,7 @@ export default async function SecurityPage() {
             Their people keep working with what the plan includes. They cannot be changed or given to anyone else; move people to Super Admin, Manager or Staff, or ask for a
             plan with custom roles.
           </p>
-        </Alert>
+        </Banner>
       )}
 
       <Card className="overflow-hidden p-0">
@@ -69,10 +79,10 @@ export default async function SecurityPage() {
           description="Each person has one role. A change to a role applies to its people from their next click. The Super Admin always has everything."
           actions={
             // Roles beyond the three built in are a plan feature.
-            (await hasFeature("custom_roles")) && (
-              <ButtonLink href="/security/roles/new" variant="primary" size="sm">
-                New role
-              </ButtonLink>
+            custom && (
+              <OpenPanelButton panel="new-role" variant="ghost" size="sm" className="h-8 px-2.5 text-[13px] [&_svg]:size-3.5">
+                <Plus aria-hidden /> New role
+              </OpenPanelButton>
             )
           }
         />
@@ -93,7 +103,7 @@ export default async function SecurityPage() {
                     <span className="flex items-center gap-2 font-medium group-hover:text-primary">
                       {r.name}
                       {r.superAdmin ? <Badge tone="primary">Everything</Badge> : r.preset ? <Badge tone="outline">Built in</Badge> : null}
-                      {r.frozen && <Badge tone="warn">Frozen: not in your plan</Badge>}
+                      {r.frozen && <StatusBadge meaning="warn">Frozen: not in your plan</StatusBadge>}
                     </span>
                     {r.description && <span className="block text-xs text-muted">{r.description}</span>}
                   </Link>
@@ -105,15 +115,14 @@ export default async function SecurityPage() {
                 </Td>
                 <Td>
                   {r.requireTwoStep ? (
-                    <span className="inline-flex flex-col">
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-ok">
-                        <ShieldCheck className="size-3.5" aria-hidden /> Required
-                      </span>
+                    <span className="inline-flex flex-col items-start gap-0.5">
+                      <StatusBadge meaning={r.withoutTwoStep > 0 ? "warn" : "ok"}>Required</StatusBadge>
                       {r.withoutTwoStep > 0 && <span className="text-xs text-warn">{r.withoutTwoStep} still to set it up</span>}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-xs text-muted">
-                      <ShieldAlert className="size-3.5" aria-hidden /> Their choice{r.people ? ` (${r.people - r.withoutTwoStep} of ${r.people} use it)` : ""}
+                    <span className="inline-flex flex-col items-start gap-0.5">
+                      <StatusBadge meaning="neutral">Their choice</StatusBadge>
+                      {r.people > 0 && <span className="text-xs text-muted">{`${r.people - r.withoutTwoStep} of ${r.people} use it`}</span>}
                     </span>
                   )}
                 </Td>
@@ -122,6 +131,16 @@ export default async function SecurityPage() {
           </tbody>
         </Table>
       </Card>
+      {custom && (
+        <RolePanel
+          name="new-role"
+          title="New role"
+          description="Choose only what the job needs. You can change it later; people in the role get the change at once."
+          action={createRoleAction}
+          mine={superAdmin ? null : me.permissions}
+          submitLabel="Make the role"
+        />
+      )}
     </div>
   );
 }

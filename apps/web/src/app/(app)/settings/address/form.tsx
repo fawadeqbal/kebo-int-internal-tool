@@ -3,13 +3,33 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Alert, Field, Input } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { EditButton } from "@/components/common/edit-button";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
 import { changeAddressAction, checkAddressAction } from "./actions";
 import type { AddressView } from "./types";
 
+/** ✎ Change in the card's header, and the side panel it opens (?panel=company-address). */
+export function AddressEdit({ view }: { view: AddressView }) {
+  const panel = useSidePanel("company-address");
+  return (
+    <>
+      <EditButton label="Change" aria-label="Change the company address" onClick={() => panel.openPanel()} />
+      {panel.open && (
+        <SidePanel title="Change the company address" description="Where your team signs in and works. Links in emails go here too." onClose={() => panel.close()}>
+          <PanelBody>
+            <AddressForm view={view} disabled={false} onSaved={() => panel.close()} />
+          </PanelBody>
+        </SidePanel>
+      )}
+    </>
+  );
+}
+
 /** A new short name, checked as it is typed: free, taken or not allowed. */
-export function AddressForm({ view, disabled }: { view: AddressView; disabled: boolean }) {
+export function AddressForm({ view, disabled, onSaved }: { view: AddressView; disabled: boolean; onSaved?: () => void }) {
+  const close = useClosePanel();
   const [slug, setSlug] = useState("");
   const [check, setCheck] = useState<AddressView["check"]>(null);
   const [busy, setBusy] = useState(false);
@@ -35,7 +55,15 @@ export function AddressForm({ view, disabled }: { view: AddressView; disabled: b
   const shown = wanted && check?.slug === wanted ? check : null;
   const free = !!shown && !shown.problem;
   return (
-    <ActionForm action={changeAddressAction} className="flex flex-col gap-4">
+    <ActionForm
+      action={changeAddressAction}
+      className={PANEL_FORM}
+      showSuccess={false}
+      onDone={(r) => {
+        toast(r.message ?? "Address changed");
+        onSaved?.();
+      }}
+    >
       <Field label="New address" htmlFor="slug" hint="3 to 30 characters: small letters, numbers and dashes.">
         <div className="flex items-center gap-2">
           <Input
@@ -79,11 +107,15 @@ export function AddressForm({ view, disabled }: { view: AddressView; disabled: b
           keep working), and only then becomes free for others. The address can change again after 30 days.
         </Alert>
       )}
-      <div>
+      <PanelActions>
         <SubmitButton pendingText="Changing…" disabled={disabled || !free}>
           Change the address
         </SubmitButton>
-      </div>
+        <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
+          Cancel
+        </button>
+        <PanelKeys />
+      </PanelActions>
     </ActionForm>
   );
 }
