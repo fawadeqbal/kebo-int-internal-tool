@@ -30,7 +30,9 @@ export function SectionList({ label, items }: { label: string; items: SectionIte
               )}
             >
               <span>{i.label}</span>
-              {i.count !== undefined && i.count !== null && <span className={cn("text-xs tabular", i.active ? "text-primary" : "text-muted")}>{i.count}</span>}
+              {i.count !== undefined && i.count !== null && (
+                <span className={cn("text-xs tabular", i.active ? "text-primary" : "text-muted")}>{i.count}</span>
+              )}
             </Link>
           </li>
         ))}
@@ -43,7 +45,17 @@ export function SectionList({ label, items }: { label: string; items: SectionIte
  * The change against the period before: an arrow and the size, coloured by whether it went the good way
  * (never by sign alone), with the words for screen readers.
  */
-export function Delta({ value, goodWhenUp = true, points, vs }: { value: number | null; goodWhenUp?: boolean; points?: boolean; vs: string }) {
+export function Delta({
+  value,
+  goodWhenUp = true,
+  points,
+  vs,
+}: {
+  value: number | null;
+  goodWhenUp?: boolean;
+  points?: boolean;
+  vs: string;
+}) {
   if (value === null || !Number.isFinite(value)) return null;
   const flat = Math.abs(value) < 0.5;
   const up = value > 0;
@@ -51,10 +63,17 @@ export function Delta({ value, goodWhenUp = true, points, vs }: { value: number 
   const size = Math.abs(value) >= 1000 ? ">999" : Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 1 });
   const unit = points ? " pts" : "%";
   return (
-    <span className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-semibold tabular", good === null ? "text-muted" : good ? "text-ok" : "text-bad")}>
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 text-xs font-semibold tabular",
+        good === null ? "text-muted" : good ? "text-ok" : "text-bad",
+      )}
+    >
       <span aria-hidden>{flat ? "=" : up ? "▲" : "▼"}</span>
       <span aria-hidden>{flat ? "same" : `${size}${unit}`}</span>
-      <span className="sr-only">{flat ? `the same as ${vs}` : `${up ? "up" : "down"} ${size}${points ? " points" : " percent"} on ${vs}`}</span>
+      <span className="sr-only">
+        {flat ? `the same as ${vs}` : `${up ? "up" : "down"} ${size}${points ? " points" : " percent"} on ${vs}`}
+      </span>
     </span>
   );
 }
@@ -120,7 +139,14 @@ export function Spark({ values, label }: { values: number[]; label: string }) {
   const last = pts[pts.length - 1]!;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label} className="overflow-visible">
-      <polyline points={pts.map((p) => p.join(",")).join(" ")} fill="none" stroke="var(--chart-1)" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      <polyline
+        points={pts.map((p) => p.join(",")).join(" ")}
+        fill="none"
+        stroke="var(--chart-1)"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
       <circle cx={last[0]} cy={last[1]} r={2.5} fill="var(--chart-1)" />
     </svg>
   );
@@ -138,7 +164,15 @@ export const RAMP = [
  * One whole split into ordered parts (owed by age): a thin segmented bar, then each part's name and amount
  * under its swatch. A part can link to its list.
  */
-export function SegmentBar({ label, total, parts }: { label: string; total: ReactNode; parts: { key: string; label: string; value: number; text: string; href?: string; active?: boolean }[] }) {
+export function SegmentBar({
+  label,
+  total,
+  parts,
+}: {
+  label: string;
+  total: ReactNode;
+  parts: { key: string; label: string; value: number; text: string; href?: string; active?: boolean }[];
+}) {
   const sum = parts.reduce((t, p) => t + Math.max(0, p.value), 0);
   return (
     <div className="flex flex-col gap-3">
@@ -146,11 +180,21 @@ export function SegmentBar({ label, total, parts }: { label: string; total: Reac
         <span className="text-text-2">Total</span>
         <span className="font-semibold tabular">{total}</span>
       </div>
-      <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-surface-3" role="img" aria-label={`${label}: ${parts.map((p) => `${p.label} ${p.text}`).join(", ")}`}>
+      <div
+        className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-surface-3"
+        role="img"
+        aria-label={`${label}: ${parts.map((p) => `${p.label} ${p.text}`).join(", ")}`}
+      >
         {sum > 0 &&
           parts
             .filter((p) => p.value > 0)
-            .map((p) => <span key={p.key} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${(p.value / sum) * 100}%`, background: RAMP[parts.indexOf(p)] }} />)}
+            .map((p) => (
+              <span
+                key={p.key}
+                className="h-full first:rounded-l-full last:rounded-r-full"
+                style={{ width: `${(p.value / sum) * 100}%`, background: RAMP[parts.indexOf(p)] }}
+              />
+            ))}
       </div>
       <ul className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
         {parts.map((p, i) => {
@@ -170,7 +214,10 @@ export function SegmentBar({ label, total, parts }: { label: string; total: Reac
                   href={p.href}
                   scroll={false}
                   aria-current={p.active ? "true" : undefined}
-                  className={cn("-m-1 flex flex-col gap-0.5 rounded-md p-1 hover:bg-surface-2", p.active && "bg-primary-soft ring-1 ring-primary/40")}
+                  className={cn(
+                    "-m-1 flex flex-col gap-0.5 rounded-md p-1 hover:bg-surface-2",
+                    p.active && "bg-primary-soft ring-1 ring-primary/40",
+                  )}
                 >
                   {body}
                 </Link>
@@ -186,13 +233,24 @@ export function SegmentBar({ label, total, parts }: { label: string; total: Reac
 }
 
 /** Ranked horizontal bars, one hue, the value at the end and an optional second line under the name. */
-export function BarList({ label, rows, tone = "chart-1" }: { label: string; rows: { key: string; label: string; sub?: string; value: number; text: string }[]; tone?: "chart-1" | "chart-3" | "chart-4" }) {
+export function BarList({
+  label,
+  rows,
+  tone = "chart-1",
+}: {
+  label: string;
+  rows: { key: string; label: string; sub?: string; value: number; text: string }[];
+  tone?: "chart-1" | "chart-3" | "chart-4";
+}) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   const fill = tone === "chart-3" ? "bg-chart-3" : tone === "chart-4" ? "bg-chart-4" : "bg-chart-1";
   return (
     <ul aria-label={label} className="flex flex-col gap-3">
       {rows.map((r) => (
-        <li key={r.key} className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto]">
+        <li
+          key={r.key}
+          className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto]"
+        >
           <span className="min-w-0">
             <span className="block truncate">{r.label}</span>
             {r.sub && <span className="block truncate text-xs text-muted">{r.sub}</span>}

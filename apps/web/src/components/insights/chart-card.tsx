@@ -62,7 +62,14 @@ function FiguresTable({ table }: { table: ChartTable }) {
         <thead>
           <tr>
             {table.columns.map((c, i) => (
-              <th key={c} scope="col" className={cn("h-9 border-b border-line px-3 text-xs font-medium whitespace-nowrap text-muted first:pl-0 last:pr-0", text.has(i) ? "text-left" : "text-right")}>
+              <th
+                key={c}
+                scope="col"
+                className={cn(
+                  "h-9 border-b border-line px-3 text-xs font-medium whitespace-nowrap text-muted first:pl-0 last:pr-0",
+                  text.has(i) ? "text-left" : "text-right",
+                )}
+              >
                 {c}
               </th>
             ))}
@@ -72,7 +79,13 @@ function FiguresTable({ table }: { table: ChartTable }) {
           {table.rows.map((r, n) => (
             <tr key={n} className="last:[&>td]:border-b-0">
               {r.map((v, i) => (
-                <td key={i} className={cn("h-10 border-b border-line px-3 whitespace-nowrap first:pl-0 last:pr-0", text.has(i) ? "text-left" : "text-right tabular")}>
+                <td
+                  key={i}
+                  className={cn(
+                    "h-10 border-b border-line px-3 whitespace-nowrap first:pl-0 last:pr-0",
+                    text.has(i) ? "text-left" : "text-right tabular",
+                  )}
+                >
                   {v}
                 </td>
               ))}

@@ -12,8 +12,10 @@ import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, Resp
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const monthShort = (m: string) => MONTHS[Number(m.slice(5, 7)) - 1] ?? m;
-const monthLong = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-export const compact = (v: number) => Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v).replace("K", "k");
+const monthLong = (m: string) =>
+  new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
+export const compact = (v: number) =>
+  Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v).replace("K", "k");
 const full = (v: number, c: string) => `${c} ${Math.round(v).toLocaleString("en-US")}`;
 const signed = (v: number) => (v > 0 ? `+${compact(v)}` : compact(v));
 
@@ -28,7 +30,11 @@ export function Legend({ keys }: { keys: Key[] }) {
     <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-2">
       {keys.map((k) => (
         <li key={k.name} className="flex items-center gap-1.5">
-          {k.kind === "bar" ? <span aria-hidden className="size-2.5 rounded-sm" style={{ background: k.color }} /> : <span aria-hidden className="h-0.5 w-3.5 rounded-full" style={{ background: k.color }} />}
+          {k.kind === "bar" ? (
+            <span aria-hidden className="size-2.5 rounded-sm" style={{ background: k.color }} />
+          ) : (
+            <span aria-hidden className="h-0.5 w-3.5 rounded-full" style={{ background: k.color }} />
+          )}
           {k.name}
         </li>
       ))}
@@ -55,7 +61,9 @@ function tip(currency: string, opts: { abs?: boolean; extra?: (row: Record<strin
           {payload.map((p) => (
             <li key={String(p.dataKey)} className="flex items-center gap-2">
               <span aria-hidden className="h-0.5 w-3 shrink-0 rounded-full" style={{ background: p.color }} />
-              <span className="font-semibold text-text tabular">{full(opts.abs ? Math.abs(Number(p.value)) : Number(p.value), currency)}</span>
+              <span className="font-semibold text-text tabular">
+                {full(opts.abs ? Math.abs(Number(p.value)) : Number(p.value), currency)}
+              </span>
               <span className="text-muted">{p.name}</span>
             </li>
           ))}
@@ -103,9 +111,21 @@ export function SalesProfitChart({
             style={monthHref ? { cursor: "pointer" } : undefined}
           >
             {grid}
-            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: "var(--line-strong)" }} interval={0} minTickGap={0} />
+            <XAxis
+              dataKey="label"
+              tick={axisTick}
+              tickLine={false}
+              axisLine={{ stroke: "var(--line-strong)" }}
+              interval={0}
+              minTickGap={0}
+            />
             <YAxis tick={axisTick} tickLine={false} axisLine={false} width={44} tickFormatter={compact} />
-            <Tooltip cursor={{ fill: "var(--surface-2)" }} content={tip(currency, { extra: (r) => `${r.orders} order${r.orders === 1 ? "" : "s"}${monthHref ? " · click for them" : ""}` })} />
+            <Tooltip
+              cursor={{ fill: "var(--surface-2)" }}
+              content={tip(currency, {
+                extra: (r) => `${r.orders} order${r.orders === 1 ? "" : "s"}${monthHref ? " · click for them" : ""}`,
+              })}
+            />
             <Bar dataKey="sales" name="Sales" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
               <LabelList
                 dataKey="sales"
@@ -113,14 +133,29 @@ export function SalesProfitChart({
                   const { index, x, y, width, value } = p as { index?: number; x?: number; y?: number; width?: number; value?: number };
                   if (index !== last || !value) return null;
                   return (
-                    <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--text)">
+                    <text
+                      x={Number(x) + Number(width) / 2}
+                      y={Number(y) - 6}
+                      textAnchor="middle"
+                      fontSize={11}
+                      fontWeight={600}
+                      fill="var(--text)"
+                    >
                       {compact(Number(value))}
                     </text>
                   );
                 }}
               />
             </Bar>
-            <Line dataKey="profit" name="Gross profit" stroke="var(--chart-2)" strokeWidth={2} dot={dot("var(--chart-2)")} activeDot={{ ...dot("var(--chart-2)"), r: 5 }} isAnimationActive={false} />
+            <Line
+              dataKey="profit"
+              name="Gross profit"
+              stroke="var(--chart-2)"
+              strokeWidth={2}
+              dot={dot("var(--chart-2)")}
+              activeDot={{ ...dot("var(--chart-2)"), r: 5 }}
+              isAnimationActive={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -148,9 +183,33 @@ export function CashChart({ rows, currency }: { rows: { month: string; in: numbe
             <YAxis tick={axisTick} tickLine={false} axisLine={false} width={48} tickFormatter={signed} />
             <ReferenceLine y={0} stroke="var(--line-strong)" />
             <Tooltip cursor={{ fill: "var(--surface-2)" }} content={tip(currency, { abs: false })} />
-            <Bar dataKey="in" name="Cash in" stackId="cash" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-            <Bar dataKey="outNeg" name="Cash out" stackId="cash" fill="var(--chart-3)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-            <Line dataKey="net" name="Net" stroke="var(--text)" strokeWidth={2} dot={dot("var(--text)")} activeDot={{ ...dot("var(--text)"), r: 5 }} isAnimationActive={false} />
+            <Bar
+              dataKey="in"
+              name="Cash in"
+              stackId="cash"
+              fill="var(--chart-1)"
+              radius={[4, 4, 0, 0]}
+              maxBarSize={24}
+              isAnimationActive={false}
+            />
+            <Bar
+              dataKey="outNeg"
+              name="Cash out"
+              stackId="cash"
+              fill="var(--chart-3)"
+              radius={[4, 4, 0, 0]}
+              maxBarSize={24}
+              isAnimationActive={false}
+            />
+            <Line
+              dataKey="net"
+              name="Net"
+              stroke="var(--text)"
+              strokeWidth={2}
+              dot={dot("var(--text)")}
+              activeDot={{ ...dot("var(--text)"), r: 5 }}
+              isAnimationActive={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -159,7 +218,17 @@ export function CashChart({ rows, currency }: { rows: { month: string; in: numbe
 }
 
 /** Two figures per month side by side (profit expected when ordered, and now). */
-export function PairBars({ rows, currency, a, b }: { rows: { month: string; a: number; b: number }[]; currency: string; a: string; b: string }) {
+export function PairBars({
+  rows,
+  currency,
+  a,
+  b,
+}: {
+  rows: { month: string; a: number; b: number }[];
+  currency: string;
+  a: string;
+  b: string;
+}) {
   const data = rows.map((r) => ({ ...r, label: monthShort(r.month) }));
   return (
     <div>

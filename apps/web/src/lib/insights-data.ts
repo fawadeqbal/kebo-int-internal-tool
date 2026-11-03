@@ -5,7 +5,18 @@ import { can, type Permission } from "@kebo/shared";
 import { todayIn } from "@kebo/utils";
 import { lastMonths, monthEnd, monthStart, periodOf, SECTIONS, type Period, type Section } from "./insights-period";
 import type { SheetSpec } from "./sheet-spec";
-import type { Aging, AgeBucket, CashFacts, FactoryGroups, FactOrders, FactsNow, Funnel, InquiryGroups, OrderGroupRow, OrderGroups } from "./types-facts";
+import type {
+  Aging,
+  AgeBucket,
+  CashFacts,
+  FactoryGroups,
+  FactOrders,
+  FactsNow,
+  Funnel,
+  InquiryGroups,
+  OrderGroupRow,
+  OrderGroups,
+} from "./types-facts";
 
 /*
  * What each Insights section shows, read from the Insights tables (GET /insights/facts/*) — never worked
@@ -37,22 +48,23 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const prev = { from: p.prevFrom, to: p.prevTo };
   const twelve = { from: monthStart(p.to, -11), to: p.to };
   const drill = month && /^\d{4}-\d{2}$/.test(month) ? { from: `${month}-01`, to: monthEnd(`${month}-01`) } : null;
-  const [cur, before, cashNow, cashBefore, now, recv, pay, funnelNow, funnelBefore, monthly, customers, factories, owing, monthOrders] = await Promise.all([
-    facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
-    facts<OrderGroups>("orders/groups", { ...prev, period: "all" }),
-    facts<CashFacts>("cash", span),
-    facts<CashFacts>("cash", prev),
-    facts<FactsNow>("now", span),
-    facts<Aging>("aging", { side: "receivable" }),
-    money ? facts<Aging>("aging", { side: "payable" }) : Promise.resolve(null),
-    facts<Funnel>("funnel", span),
-    facts<Funnel>("funnel", prev),
-    facts<OrderGroups>("orders/groups", { ...twelve, period: "month" }),
-    facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "customer" }),
-    facts<FactoryGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
-    money ? facts<FactoryGroups>("factories/groups", { period: "all", by: "factory" }) : Promise.resolve(null),
-    drill ? facts<FactOrders>("orders", { ...drill, limit: 200 }) : Promise.resolve(null),
-  ]);
+  const [cur, before, cashNow, cashBefore, now, recv, pay, funnelNow, funnelBefore, monthly, customers, factories, owing, monthOrders] =
+    await Promise.all([
+      facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
+      facts<OrderGroups>("orders/groups", { ...prev, period: "all" }),
+      facts<CashFacts>("cash", span),
+      facts<CashFacts>("cash", prev),
+      facts<FactsNow>("now", span),
+      facts<Aging>("aging", { side: "receivable" }),
+      money ? facts<Aging>("aging", { side: "payable" }) : Promise.resolve(null),
+      facts<Funnel>("funnel", span),
+      facts<Funnel>("funnel", prev),
+      facts<OrderGroups>("orders/groups", { ...twelve, period: "month" }),
+      facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "customer" }),
+      facts<FactoryGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
+      money ? facts<FactoryGroups>("factories/groups", { period: "all", by: "factory" }) : Promise.resolve(null),
+      drill ? facts<FactOrders>("orders", { ...drill, limit: 200 }) : Promise.resolve(null),
+    ]);
   const c = cur.currency;
   const t = totalOf(cur);
   const b = totalOf(before);
@@ -68,7 +80,9 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const own = new Map<string, number>();
   for (const r of owingFactories) for (const o of r.own ?? []) own.set(o.currency, (own.get(o.currency) ?? 0) + n(o.toPay));
   const topCustomers = [...customers.rows].sort((x, y) => n(y.sales) - n(x.sales)).slice(0, 5);
-  const topFactories = [...factories.rows.filter((r) => r.orders > 0)].sort((x, y) => (money ? n(y.spend) - n(x.spend) : y.orders - x.orders)).slice(0, 5);
+  const topFactories = [...factories.rows.filter((r) => r.orders > 0)]
+    .sort((x, y) => (money ? n(y.spend) - n(x.spend) : y.orders - x.orders))
+    .slice(0, 5);
   const data = {
     currency: c,
     seeMoney: cur.seeMoney,
@@ -95,7 +109,11 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     {
       name: `Insights overview ${p.from} to ${p.to}`,
       title: "Overview",
-      columns: [{ header: "Figure", width: 28 }, { header: `${p.label}`, kind: "number", width: 18 }, { header: `Before (${p.vsLabel})`, kind: "number", width: 18 }],
+      columns: [
+        { header: "Figure", width: 28 },
+        { header: `${p.label}`, kind: "number", width: 18 },
+        { header: `Before (${p.vsLabel})`, kind: "number", width: 18 },
+      ],
       rows: [
         [`Sales (${c})`, xl(data.sales.now), xl(data.sales.before)],
         ["Orders", data.sales.orders, data.sales.ordersBefore],
@@ -112,19 +130,35 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     {
       name: "Sales by month",
       title: "Sales by month",
-      columns: [{ header: "Month", width: 12 }, { header: "Orders", kind: "number" }, { header: `Sales (${c})`, kind: "number", width: 16 }, { header: `Gross profit (${c})`, kind: "number", width: 16 }, { header: "Margin %", kind: "number" }],
+      columns: [
+        { header: "Month", width: 12 },
+        { header: "Orders", kind: "number" },
+        { header: `Sales (${c})`, kind: "number", width: 16 },
+        { header: `Gross profit (${c})`, kind: "number", width: 16 },
+        { header: "Margin %", kind: "number" },
+      ],
       rows: months.map((m) => [m.month, m.orders, xl(m.sales), xl(m.profit), xl(m.margin)]),
     },
     {
       name: "Top customers",
       title: "Top customers",
-      columns: [{ header: "Customer", width: 30 }, { header: "Orders", kind: "number" }, { header: `Sales (${c})`, kind: "number", width: 16 }, { header: "Margin %", kind: "number" }],
+      columns: [
+        { header: "Customer", width: 30 },
+        { header: "Orders", kind: "number" },
+        { header: `Sales (${c})`, kind: "number", width: 16 },
+        { header: "Margin %", kind: "number" },
+      ],
       rows: topCustomers.map((r) => [r.label, r.orders, xl(n(r.sales)), xl(r.marginQuote)]),
     },
     {
       name: "Top factories",
       title: "Top factories",
-      columns: [{ header: "Factory", width: 30 }, { header: "Orders", kind: "number" }, ...(money ? [{ header: `Spend (${c})`, kind: "number" as const, width: 16 }] : []), { header: "Ready on time %", kind: "number" }],
+      columns: [
+        { header: "Factory", width: 30 },
+        { header: "Orders", kind: "number" },
+        ...(money ? [{ header: `Spend (${c})`, kind: "number" as const, width: 16 }] : []),
+        { header: "Ready on time %", kind: "number" },
+      ],
       rows: topFactories.map((r) => [r.label, r.orders, ...(money ? [xl(n(r.spend))] : []), xl(r.ready.percent)]),
     },
   ];
@@ -174,7 +208,8 @@ export async function loadMoney(p: Period, age?: { side: "receivable" | "payable
     return { month: m, a: n(r?.profitQuote), b: n(r?.profitExpected) };
   });
   const inHand = new Map<string, number>();
-  for (const a of accounts) if (!a.archived && a.balance !== undefined) inHand.set(a.currency, (inHand.get(a.currency) ?? 0) + n(a.balance));
+  for (const a of accounts)
+    if (!a.archived && a.balance !== undefined) inHand.set(a.currency, (inHand.get(a.currency) ?? 0) + n(a.balance));
   const currencies = [...new Set([...(now.byCurrency ?? []).map((x) => x.currency), ...inHand.keys()])].map((cur) => {
     const x = now.byCurrency?.find((y) => y.currency === cur);
     return { currency: cur, toReceive: n(x?.toReceive), toPay: n(x?.toPay), inHand: inHand.has(cur) ? inHand.get(cur)! : null };
@@ -183,7 +218,15 @@ export async function loadMoney(p: Period, age?: { side: "receivable" | "payable
     .filter((r) => n(r.costsOverPlan) > 0)
     .sort((x, y) => n(y.costsOverPlan) - n(x.costsOverPlan))
     .slice(0, 5)
-    .map((r) => ({ orderId: r.orderId, refNo: r.refNo, customer: r.customer, planned: n(r.cost), actual: n(r.cost) + n(r.costsOverPlan), over: n(r.costsOverPlan), margin: r.margin }));
+    .map((r) => ({
+      orderId: r.orderId,
+      refNo: r.refNo,
+      customer: r.customer,
+      planned: n(r.cost),
+      actual: n(r.cost) + n(r.costsOverPlan),
+      over: n(r.costsOverPlan),
+      margin: r.margin,
+    }));
   const ageList = age ? lists.flatMap((l) => l.orders ?? []).sort((x, y) => n(y.amount) - n(x.amount)) : null;
   const data = {
     currency: c,
@@ -205,37 +248,66 @@ export async function loadMoney(p: Period, age?: { side: "receivable" | "payable
     {
       name: `Insights money ${p.from} to ${p.to}`,
       title: "Cash by month",
-      columns: [{ header: "Month", width: 12 }, { header: `Cash in (${c})`, kind: "number", width: 16 }, { header: `Cash out (${c})`, kind: "number", width: 16 }, { header: `Net (${c})`, kind: "number", width: 16 }],
+      columns: [
+        { header: "Month", width: 12 },
+        { header: `Cash in (${c})`, kind: "number", width: 16 },
+        { header: `Cash out (${c})`, kind: "number", width: 16 },
+        { header: `Net (${c})`, kind: "number", width: 16 },
+      ],
       rows: cashMonths.map((m) => [m.month, xl(m.in), xl(m.out), xl(m.net)]),
     },
     {
       name: "Owed by age",
       title: "Owed by age",
-      columns: [{ header: "Age", width: 16 }, { header: `Owed to us (${c})`, kind: "number", width: 18 }, { header: `We owe factories (${c})`, kind: "number", width: 20 }],
+      columns: [
+        { header: "Age", width: 16 },
+        { header: `Owed to us (${c})`, kind: "number", width: 18 },
+        { header: `We owe factories (${c})`, kind: "number", width: 20 },
+      ],
       rows: BUCKETS.map((k) => [k.label, xl(bucketValue(recv, k.key)), xl(bucketValue(pay, k.key))]),
     },
     {
       name: "Profit by month",
       title: "Profit by month",
-      columns: [{ header: "Month", width: 12 }, { header: `Expected at order (${c})`, kind: "number", width: 20 }, { header: `Now (${c})`, kind: "number", width: 16 }],
+      columns: [
+        { header: "Month", width: 12 },
+        { header: `Expected at order (${c})`, kind: "number", width: 20 },
+        { header: `Now (${c})`, kind: "number", width: 16 },
+      ],
       rows: profitMonths.map((m) => [m.month, xl(m.a), xl(m.b)]),
     },
     {
       name: "Costs by kind",
       title: "Costs by kind",
-      columns: [{ header: "Kind", width: 22 }, { header: `Amount (${c})`, kind: "number", width: 16 }, { header: "Orders", kind: "number" }],
+      columns: [
+        { header: "Kind", width: 22 },
+        { header: `Amount (${c})`, kind: "number", width: 16 },
+        { header: "Orders", kind: "number" },
+      ],
       rows: data.byKind.map((k) => [k.category, xl(n(k.amount)), k.orders]),
     },
     {
       name: "Money by currency",
       title: "By currency",
-      columns: [{ header: "Currency", width: 10 }, { header: "To receive", kind: "number", width: 16 }, { header: "To pay", kind: "number", width: 16 }, { header: "In hand", kind: "number", width: 16 }],
+      columns: [
+        { header: "Currency", width: 10 },
+        { header: "To receive", kind: "number", width: 16 },
+        { header: "To pay", kind: "number", width: 16 },
+        { header: "In hand", kind: "number", width: 16 },
+      ],
       rows: currencies.map((x) => [x.currency, xl(x.toReceive), xl(x.toPay), xl(x.inHand)]),
     },
     {
       name: "Where money leaks",
       title: "Costs over plan",
-      columns: [{ header: "Order", width: 16 }, { header: "Customer", width: 28 }, { header: `Planned cost (${c})`, kind: "number", width: 16 }, { header: `Cost now (${c})`, kind: "number", width: 16 }, { header: `Over (${c})`, kind: "number" }, { header: "Margin now %", kind: "number" }],
+      columns: [
+        { header: "Order", width: 16 },
+        { header: "Customer", width: 28 },
+        { header: `Planned cost (${c})`, kind: "number", width: 16 },
+        { header: `Cost now (${c})`, kind: "number", width: 16 },
+        { header: `Over (${c})`, kind: "number" },
+        { header: "Margin now %", kind: "number" },
+      ],
       rows: leaks.map((l) => [l.refNo, l.customer, xl(l.planned), xl(l.actual), xl(l.over), xl(l.margin)]),
     },
   ];
@@ -246,7 +318,13 @@ export async function loadMoney(p: Period, age?: { side: "receivable" | "payable
 
 export const CUSTOMER_CHIPS = ["all", "new", "repeat", "sleeping", "owe"] as const;
 export type CustomerChip = (typeof CUSTOMER_CHIPS)[number];
-export const CUSTOMER_CHIP_LABEL: Record<CustomerChip, string> = { all: "All", new: "New", repeat: "Repeat", sleeping: "Sleeping", owe: "Owe money" };
+export const CUSTOMER_CHIP_LABEL: Record<CustomerChip, string> = {
+  all: "All",
+  new: "New",
+  repeat: "Repeat",
+  sleeping: "Sleeping",
+  owe: "Owe money",
+};
 
 export interface CustomerRow {
   id: string;
@@ -277,7 +355,11 @@ export async function loadCustomers(p: Period, today: string) {
   const c = period.currency;
   const firstOf = new Map(ever.rows.map((r) => [r.key, r.firstOrderedOn]));
   const sleepFrom = monthStart(today, -6);
-  const repeatOrders = (rows: OrderGroupRow[], from: string) => sum(rows.filter((r) => (firstOf.get(r.key) ?? from) < from), (r) => r.orders);
+  const repeatOrders = (rows: OrderGroupRow[], from: string) =>
+    sum(
+      rows.filter((r) => (firstOf.get(r.key) ?? from) < from),
+      (r) => r.orders,
+    );
   const orders = sum(period.rows, (r) => r.orders);
   const ordersBefore = sum(before.rows, (r) => r.orders);
   const sales = sum(period.rows, (r) => n(r.sales));
@@ -331,7 +413,16 @@ export async function loadCustomers(p: Period, today: string) {
         { header: `Still owed (${c})`, kind: "number", width: 16 },
         { header: `Overdue (${c})`, kind: "number", width: 16 },
       ],
-      rows: rows.map((r) => [r.name, r.country ? countryName(r.country) : null, r.orders, xl(r.sales), xl(r.margin), xl(r.paidOnTime), xl(r.owed), xl(r.overdue)]),
+      rows: rows.map((r) => [
+        r.name,
+        r.country ? countryName(r.country) : null,
+        r.orders,
+        xl(r.sales),
+        xl(r.margin),
+        xl(r.paidOnTime),
+        xl(r.owed),
+        xl(r.overdue),
+      ]),
     },
   ];
   return { ...data, sheets };
@@ -348,7 +439,10 @@ export async function loadFactories(p: Period) {
     api.get<{ total: number }>("/factories", { pageSize: 1 }).catch(() => ({ total: 0 })),
   ]);
   const c = period.currency;
-  const keys = new Set([...period.rows.filter((r) => r.orders > 0 || r.offersSent > 0).map((r) => r.key), ...ever.rows.filter((r) => n(r.toPay) > 0).map((r) => r.key)]);
+  const keys = new Set([
+    ...period.rows.filter((r) => r.orders > 0 || r.offersSent > 0).map((r) => r.key),
+    ...ever.rows.filter((r) => n(r.toPay) > 0).map((r) => r.key),
+  ]);
   const rows = [...keys]
     .map((k) => {
       const r = period.rows.find((x) => x.key === k);
@@ -421,8 +515,16 @@ export async function loadPeople(p: Period, today: string) {
   ]);
   const c = ord.currency;
   const ym = today.slice(0, 7);
-  const keys = new Set([...inq.rows.map((r) => r.key), ...ord.rows.map((r) => r.key), ...targets.targets.filter((t) => t.month === ym).map((t) => t.userId)]);
-  const nameOf = (k: string) => inq.rows.find((r) => r.key === k)?.label ?? ord.rows.find((r) => r.key === k)?.label ?? targets.people.find((x) => x.id === k)?.name ?? k;
+  const keys = new Set([
+    ...inq.rows.map((r) => r.key),
+    ...ord.rows.map((r) => r.key),
+    ...targets.targets.filter((t) => t.month === ym).map((t) => t.userId),
+  ]);
+  const nameOf = (k: string) =>
+    inq.rows.find((r) => r.key === k)?.label ??
+    ord.rows.find((r) => r.key === k)?.label ??
+    targets.people.find((x) => x.id === k)?.name ??
+    k;
   const rows = [...keys]
     .map((k) => {
       const i = inq.rows.find((r) => r.key === k);
@@ -437,7 +539,9 @@ export async function loadPeople(p: Period, today: string) {
         winRate: i?.winRate ?? null,
         sales: n(o?.sales),
         profit: n(o?.profitQuote),
-        target: target ? { amount: n(target.amount), sold, percent: n(target.amount) > 0 ? Math.round((sold / n(target.amount)) * 100) : null } : null,
+        target: target
+          ? { amount: n(target.amount), sold, percent: n(target.amount) > 0 ? Math.round((sold / n(target.amount)) * 100) : null }
+          : null,
       };
     })
     .sort((x, y) => (x.id === "nobody" ? 1 : y.id === "nobody" ? -1 : y.sales - x.sales || y.inquiries - x.inquiries));
@@ -446,7 +550,13 @@ export async function loadPeople(p: Period, today: string) {
   const data = {
     currency: c,
     rows,
-    company: companyTarget ? { amount: n(companyTarget.amount), sold: companySold, percent: n(companyTarget.amount) > 0 ? Math.round((companySold / n(companyTarget.amount)) * 100) : null } : null,
+    company: companyTarget
+      ? {
+          amount: n(companyTarget.amount),
+          sold: companySold,
+          percent: n(companyTarget.amount) > 0 ? Math.round((companySold / n(companyTarget.amount)) * 100) : null,
+        }
+      : null,
   };
   const sheets: SheetSpec[] = [
     {
@@ -462,7 +572,16 @@ export async function loadPeople(p: Period, today: string) {
         { header: "Target reached %", kind: "number" },
         { header: `Gross profit (${c})`, kind: "number", width: 16 },
       ],
-      rows: rows.map((r) => [r.name, r.inquiries, xl(r.daysToQuote), xl(r.winRate), xl(r.sales), xl(r.target?.amount), xl(r.target?.percent), xl(r.profit)]),
+      rows: rows.map((r) => [
+        r.name,
+        r.inquiries,
+        xl(r.daysToQuote),
+        xl(r.winRate),
+        xl(r.sales),
+        xl(r.target?.amount),
+        xl(r.target?.percent),
+        xl(r.profit),
+      ]),
     },
   ];
   return { ...data, sheets };
@@ -488,17 +607,30 @@ export async function loadFunnel(p: Period) {
     countries: by(countries),
     categories: by(categories).map((r) => ({ ...r, margin: margins.rows.find((m) => m.key === r.key)?.marginQuote ?? null })),
   };
-  const table = (title: string, head: string, rows: { label: string; inquiries: number; winRate: number | null; wonValue: string }[]): SheetSpec => ({
+  const table = (
+    title: string,
+    head: string,
+    rows: { label: string; inquiries: number; winRate: number | null; wonValue: string }[],
+  ): SheetSpec => ({
     name: title,
     title,
-    columns: [{ header: head, width: 24 }, { header: "Inquiries", kind: "number" }, { header: "Win rate %", kind: "number" }, { header: `Won (${c})`, kind: "number", width: 16 }],
+    columns: [
+      { header: head, width: 24 },
+      { header: "Inquiries", kind: "number" },
+      { header: "Win rate %", kind: "number" },
+      { header: `Won (${c})`, kind: "number", width: 16 },
+    ],
     rows: rows.map((r) => [r.label, r.inquiries, xl(r.winRate), xl(n(r.wonValue))]),
   });
   const sheets: SheetSpec[] = [
     {
       name: `Insights funnel ${p.from} to ${p.to}`,
       title: "Funnel",
-      columns: [{ header: "Stage", width: 22 }, { header: "Inquiries", kind: "number" }, { header: `Value (${c})`, kind: "number", width: 16 }],
+      columns: [
+        { header: "Stage", width: 22 },
+        { header: "Inquiries", kind: "number" },
+        { header: `Value (${c})`, kind: "number", width: 16 },
+      ],
       rows: [
         ["Inquiries in", f.inquiries, null],
         ["Got factory prices", f.gotPrices, null],
@@ -508,9 +640,21 @@ export async function loadFunnel(p: Period) {
         ["Still open", f.open, null],
       ],
     },
-    { name: "Why we lose", title: "Why we lose", columns: [{ header: "Reason", width: 28 }, { header: "Inquiries", kind: "number" }], rows: f.lostReasons.map((r) => [r.label, r.count]) },
+    {
+      name: "Why we lose",
+      title: "Why we lose",
+      columns: [
+        { header: "Reason", width: 28 },
+        { header: "Inquiries", kind: "number" },
+      ],
+      rows: f.lostReasons.map((r) => [r.label, r.count]),
+    },
     table("By channel", "Channel", data.channels),
-    table("By country", "Country", data.countries.map((r) => ({ ...r, label: countryName(r.label) }))),
+    table(
+      "By country",
+      "Country",
+      data.countries.map((r) => ({ ...r, label: countryName(r.label) })),
+    ),
     table("By product", "Product", data.categories),
   ];
   return { ...data, sheets };

@@ -12,7 +12,10 @@ import { TargetsGrid, type TargetRow } from "./targets-grid";
 export async function TargetsView({ year, today, back }: { year: number; today: string; back: string }) {
   const [company, people, sold] = await Promise.all([
     api.get<{ month: string; amount: string }[]>("/insights/targets", { year }),
-    api.get<{ people: { id: string; name: string }[]; targets: { month: string; userId: string; amount: string }[] }>("/insights/targets/people", { year }),
+    api.get<{ people: { id: string; name: string }[]; targets: { month: string; userId: string; amount: string }[] }>(
+      "/insights/targets/people",
+      { year },
+    ),
     api.get<OrderGroups>("/insights/facts/orders/groups", { from: `${year}-01-01`, to: `${year}-12-31`, period: "month" }),
   ]);
   const currency = sold.currency;
@@ -41,10 +44,16 @@ export async function TargetsView({ year, today, back }: { year: number; today: 
         description={`Monthly sales targets in ${currency}, for the company and each person. Home and Insights measure against these.`}
         actions={
           <span className="flex items-center gap-1">
-            <Link href={buildHref("/insights", {}, { section: "people", view: "targets", year: String(year - 1) })} className="rounded-md px-2 py-1 text-xs text-text-2 hover:bg-surface-2">
+            <Link
+              href={buildHref("/insights", {}, { section: "people", view: "targets", year: String(year - 1) })}
+              className="rounded-md px-2 py-1 text-xs text-text-2 hover:bg-surface-2"
+            >
               ← {year - 1}
             </Link>
-            <Link href={buildHref("/insights", {}, { section: "people", view: "targets", year: String(year + 1) })} className="rounded-md px-2 py-1 text-xs text-text-2 hover:bg-surface-2">
+            <Link
+              href={buildHref("/insights", {}, { section: "people", view: "targets", year: String(year + 1) })}
+              className="rounded-md px-2 py-1 text-xs text-text-2 hover:bg-surface-2"
+            >
               {year + 1} →
             </Link>
             <Link href={back} className="ml-1 rounded-md px-2 py-1 text-sm font-medium text-text-2 hover:bg-surface-2 hover:text-text">

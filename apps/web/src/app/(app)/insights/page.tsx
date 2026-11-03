@@ -7,8 +7,26 @@ import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
-import { PERIOD_KINDS, PERIOD_LABEL, periodOf, SECTION_LABEL, SECTIONS, sectionOfTab, type Period, type Section } from "@/lib/insights-period";
-import { CUSTOMER_CHIPS, loadCustomers, loadFactories, loadFunnel, loadMoney, loadOverview, loadPeople, type CustomerChip } from "@/lib/insights-data";
+import {
+  PERIOD_KINDS,
+  PERIOD_LABEL,
+  periodOf,
+  SECTION_LABEL,
+  SECTIONS,
+  sectionOfTab,
+  type Period,
+  type Section,
+} from "@/lib/insights-period";
+import {
+  CUSTOMER_CHIPS,
+  loadCustomers,
+  loadFactories,
+  loadFunnel,
+  loadMoney,
+  loadOverview,
+  loadPeople,
+  type CustomerChip,
+} from "@/lib/insights-data";
 import type { LeaksReport } from "@/lib/types-money";
 import type { AgeBucket } from "@/lib/types-facts";
 import { SectionList } from "@/components/insights/frame";
@@ -75,16 +93,20 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
     const custom = sp.from && sp.to;
     const view = old.view ?? (sp.tab === "profit" && sp.sub ? (sp.sub === "pnl" ? "pnl" : "leaks") : undefined);
     redirect(
-      buildHref("/insights", {}, {
-        section: old.section === "overview" ? undefined : old.section,
-        view,
-        leak: view === "leaks" ? sp.sub : undefined,
-        year: sp.year,
-        pl: sp.pl,
-        period: custom ? "custom" : undefined,
-        from: custom ? sp.from : undefined,
-        to: custom ? sp.to : undefined,
-      }),
+      buildHref(
+        "/insights",
+        {},
+        {
+          section: old.section === "overview" ? undefined : old.section,
+          view,
+          leak: view === "leaks" ? sp.sub : undefined,
+          year: sp.year,
+          pl: sp.pl,
+          period: custom ? "custom" : undefined,
+          from: custom ? sp.from : undefined,
+          to: custom ? sp.to : undefined,
+        },
+      ),
     );
   }
 
@@ -107,10 +129,15 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
     api.get<{ total: number }>("/factories", { pageSize: 1 }).catch(() => null),
     api.get<{ people: unknown[] }>("/insights/targets/people", { year: today.slice(0, 4) }).catch(() => null),
   ]);
-  const count: Partial<Record<Section, number | undefined>> = { customers: customers?.total, factories: factories?.total, people: people?.people.length };
+  const count: Partial<Record<Section, number | undefined>> = {
+    customers: customers?.total,
+    factories: factories?.total,
+    people: people?.people.length,
+  };
   const navItems = sections.map((s) => ({ href: sectionHref(s), label: SECTION_LABEL[s], active: s === section, count: count[s] }));
   const excel = buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
-  const subView = (section === "money" && (sp.view === "pnl" || sp.view === "leaks")) || (section === "people" && sp.view === "targets" && seeMoney);
+  const subView =
+    (section === "money" && (sp.view === "pnl" || sp.view === "leaks")) || (section === "people" && sp.view === "targets" && seeMoney);
 
   const periodPicker = (
     <Segmented
@@ -150,7 +177,10 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         }
       />
       <div className="mb-4 flex flex-col gap-3 lg:hidden">
-        <SectionNav label="Insights sections" items={navItems.map((i) => ({ href: i.href, label: i.label, active: i.active, count: i.count ?? undefined }))} />
+        <SectionNav
+          label="Insights sections"
+          items={navItems.map((i) => ({ href: i.href, label: i.label, active: i.active, count: i.count ?? undefined }))}
+        />
         <div className="md:hidden">
           {periodPicker}
           <p className="mt-1.5 text-xs text-text-2">
@@ -159,7 +189,10 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         </div>
       </div>
       {p.kind === "custom" && (
-        <form action="/insights" className="no-print mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
+        <form
+          action="/insights"
+          className="no-print mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card"
+        >
           {keep.section && <input type="hidden" name="section" value={keep.section} />}
           <input type="hidden" name="period" value="custom" />
           <label className="text-xs text-text-2">
@@ -218,7 +251,11 @@ async function SectionBody({
       if (sp.view === "pnl")
         return (
           <SubView title="Profit and loss, month by month" back={href({})}>
-            <ProfitTable year={sp.year} cash={sp.pl === "cash"} href={(change) => buildHref("/insights", { ...keep, view: "pnl", year: sp.year, pl: sp.pl }, change)} />
+            <ProfitTable
+              year={sp.year}
+              cash={sp.pl === "cash"}
+              href={(change) => buildHref("/insights", { ...keep, view: "pnl", year: sp.year, pl: sp.pl }, change)}
+            />
           </SubView>
         );
       if (sp.view === "leaks") {
@@ -230,7 +267,10 @@ async function SectionBody({
           </SubView>
         );
       }
-      const age = sp.age && sp.side && ["notDue", "d30", "d60", "over60"].includes(sp.age) && ["receivable", "payable"].includes(sp.side) ? { side: sp.side as "receivable" | "payable", bucket: sp.age as AgeBucket | "over60" } : undefined;
+      const age =
+        sp.age && sp.side && ["notDue", "d30", "d60", "over60"].includes(sp.age) && ["receivable", "payable"].includes(sp.side)
+          ? { side: sp.side as "receivable" | "payable", bucket: sp.age as AgeBucket | "over60" }
+          : undefined;
       const d = await loadMoney(p, age);
       return (
         <>
@@ -243,10 +283,14 @@ async function SectionBody({
       const chip: CustomerChip = (CUSTOMER_CHIPS as readonly string[]).includes(sp.chip ?? "") ? (sp.chip as CustomerChip) : "all";
       const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
       const d = await loadCustomers(p, today);
-      return <CustomersSection d={d} p={p} href={href} chip={chip} page={page} params={{ ...keep, chip: chip === "all" ? undefined : chip }} />;
+      return (
+        <CustomersSection d={d} p={p} href={href} chip={chip} page={page} params={{ ...keep, chip: chip === "all" ? undefined : chip }} />
+      );
     }
     case "factories":
-      return <FactoriesSection d={await loadFactories(p)} p={p} page={Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1)} params={keep} />;
+      return (
+        <FactoriesSection d={await loadFactories(p)} p={p} page={Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1)} params={keep} />
+      );
     case "people": {
       if (sp.view === "targets" && seeMoney) {
         const year = /^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : Number(today.slice(0, 4));

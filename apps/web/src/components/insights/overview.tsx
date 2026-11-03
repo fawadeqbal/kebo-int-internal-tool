@@ -39,8 +39,13 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
       key: "margin",
       meaning: "warn" as const,
       title: `Margin under 10% on ${plural(d.now.lowMargin.orders, "order")}`,
-      sub: d.now.lowMargin.costsOverPlan && Number(d.now.lowMargin.costsOverPlan) > 0 ? `costs over plan by ${bigMoney(Number(d.now.lowMargin.costsOverPlan), c)}` : `ordered ${p.name}`,
-      link: d.seeMoney ? { href: href({ section: "money" }), label: "Money" } : { href: href({ section: "customers" }), label: "Customers" },
+      sub:
+        d.now.lowMargin.costsOverPlan && Number(d.now.lowMargin.costsOverPlan) > 0
+          ? `costs over plan by ${bigMoney(Number(d.now.lowMargin.costsOverPlan), c)}`
+          : `ordered ${p.name}`,
+      link: d.seeMoney
+        ? { href: href({ section: "money" }), label: "Money" }
+        : { href: href({ section: "customers" }), label: "Customers" },
     },
     d.now.expiring.count > 0 && {
       key: "expiring",
@@ -49,7 +54,13 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
       sub: `${bigMoney(Number(d.now.expiring.value), c)} in total`,
       link: { href: "/inquiries?stage=quoted", label: "Quotations" },
     },
-  ].filter(Boolean) as { key: string; meaning: "bad" | "warn" | "info"; title: string; sub: string | null; link: { href: string; label: string } }[];
+  ].filter(Boolean) as {
+    key: string;
+    meaning: "bad" | "warn" | "info";
+    title: string;
+    sub: string | null;
+    link: { href: string; label: string };
+  }[];
 
   const monthHref = Object.fromEntries(d.months.map((m) => [m.month, `${href({ month: m.month })}#month-orders`]));
 
@@ -68,7 +79,13 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           delta={<Delta value={change(d.profit.now, d.profit.before)} vs={vs} />}
           sub={`margin ${percent(d.profit.margin)}${d.profit.marginBefore !== null ? ` · was ${percent(d.profit.marginBefore)}` : ""}`}
         />
-        <Tile className="max-sm:hidden" label="Cash in" value={bigMoney(d.cashIn.now, c)} delta={<Delta value={change(d.cashIn.now, d.cashIn.before)} vs={vs} />} sub="from customers" />
+        <Tile
+          className="max-sm:hidden"
+          label="Cash in"
+          value={bigMoney(d.cashIn.now, c)}
+          delta={<Delta value={change(d.cashIn.now, d.cashIn.before)} vs={vs} />}
+          sub="from customers"
+        />
         {d.cashOut ? (
           <Tile
             className="max-sm:hidden"
@@ -88,8 +105,16 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         <Tile
           label="To receive"
           value={bigMoney(recvTotal, c)}
-          meter={recvTotal > 0 ? { percent: (Number(overdue.amount) / recvTotal) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` } : undefined}
-          sub={Number(overdue.amount) > 0 ? `${bigMoney(Number(overdue.amount), c)} overdue · ${plural(overdue.customers, "customer")}` : "nothing overdue"}
+          meter={
+            recvTotal > 0
+              ? { percent: (Number(overdue.amount) / recvTotal) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` }
+              : undefined
+          }
+          sub={
+            Number(overdue.amount) > 0
+              ? `${bigMoney(Number(overdue.amount), c)} overdue · ${plural(overdue.customers, "customer")}`
+              : "nothing overdue"
+          }
           href={href({ section: "money" })}
         />
         {d.payable ? (
@@ -97,11 +122,23 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             className="max-sm:hidden"
             label="To pay factories"
             value={bigMoney(Number(d.payable.total), c)}
-            sub={[...d.payOwn.filter(([cur]) => cur !== c).slice(0, 1).map(([cur, v]) => bigMoney(v, cur)), plural(d.payFactories, "factory", "factories")].join(" · ")}
+            sub={[
+              ...d.payOwn
+                .filter(([cur]) => cur !== c)
+                .slice(0, 1)
+                .map(([cur, v]) => bigMoney(v, cur)),
+              plural(d.payFactories, "factory", "factories"),
+            ].join(" · ")}
             href={href({ section: "money" })}
           />
         ) : (
-          <Tile className="max-sm:hidden" label="Orders" value={String(d.sales.orders)} delta={<Delta value={change(d.sales.orders, d.sales.ordersBefore)} vs={vs} />} sub={`was ${d.sales.ordersBefore}`} />
+          <Tile
+            className="max-sm:hidden"
+            label="Orders"
+            value={String(d.sales.orders)}
+            delta={<Delta value={change(d.sales.orders, d.sales.ordersBefore)} vs={vs} />}
+            sub={`was ${d.sales.ordersBefore}`}
+          />
         )}
         <Tile
           className="max-sm:hidden"
@@ -113,7 +150,13 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         <Tile
           label="Win rate"
           value={percent(d.winRate.now)}
-          delta={<Delta value={d.winRate.now !== null && d.winRate.before !== null ? Math.round((d.winRate.now - d.winRate.before) * 10) / 10 : null} points vs={vs} />}
+          delta={
+            <Delta
+              value={d.winRate.now !== null && d.winRate.before !== null ? Math.round((d.winRate.now - d.winRate.before) * 10) / 10 : null}
+              points
+              vs={vs}
+            />
+          }
           sub={`won ${d.winRate.won} · lost ${d.winRate.lost}${d.winRate.before !== null ? ` · was ${percent(d.winRate.before)}` : ""}`}
           href={href({ section: "funnel" })}
         />
@@ -178,12 +221,20 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         <Card>
           <CardHeader title="Needs attention" />
           {attention.length === 0 ? (
-            <p className="p-4 text-sm text-muted">Nothing needs attention: no customer overdue, no factory late, no thin margin, no quotation running out this week.</p>
+            <p className="p-4 text-sm text-muted">
+              Nothing needs attention: no customer overdue, no factory late, no thin margin, no quotation running out this week.
+            </p>
           ) : (
             <ul className="divide-y divide-line px-4">
               {attention.map((a) => (
                 <li key={a.key} className="flex items-start gap-3 py-3">
-                  <span aria-hidden className={cn("mt-1.5 size-2.5 shrink-0 rounded-full", a.meaning === "bad" ? "bg-bad" : a.meaning === "warn" ? "bg-warn" : "bg-info")} />
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "mt-1.5 size-2.5 shrink-0 rounded-full",
+                      a.meaning === "bad" ? "bg-bad" : a.meaning === "warn" ? "bg-warn" : "bg-info",
+                    )}
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">
                       <span className="sr-only">{a.meaning === "bad" ? "Late: " : a.meaning === "warn" ? "Check: " : "Soon: "}</span>

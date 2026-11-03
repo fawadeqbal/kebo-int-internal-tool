@@ -5,7 +5,15 @@ import { DataTable } from "@/components/common/data-table";
 import { countryName } from "@/lib/countries";
 import { money } from "@/lib/format";
 import { amountCell, bigMoney, change, compactMoney, percent, type Period } from "@/lib/insights-period";
-import { CUSTOMER_CHIP_LABEL, CUSTOMER_CHIPS, type CustomerChip, type loadCustomers, type loadFactories, type loadFunnel, type loadPeople } from "@/lib/insights-data";
+import {
+  CUSTOMER_CHIP_LABEL,
+  CUSTOMER_CHIPS,
+  type CustomerChip,
+  type loadCustomers,
+  type loadFactories,
+  type loadFunnel,
+  type loadPeople,
+} from "@/lib/insights-data";
 import { BarList, Delta, Spark, Tile, Tiles } from "./frame";
 
 type Href = (patch: Record<string, string | undefined>) => string;
@@ -46,16 +54,29 @@ export function CustomersSection({
         <Tile
           label="Repeat share"
           value={percent(d.repeat.now)}
-          delta={<Delta value={d.repeat.now !== null && d.repeat.before !== null ? Math.round((d.repeat.now - d.repeat.before) * 10) / 10 : null} points vs={vs} />}
+          delta={
+            <Delta
+              value={d.repeat.now !== null && d.repeat.before !== null ? Math.round((d.repeat.now - d.repeat.before) * 10) / 10 : null}
+              points
+              vs={vs}
+            />
+          }
           sub="of orders from returning customers"
         />
         <Tile
           label="Average order"
           value={bigMoney(d.average.now, c)}
-          delta={<Delta value={d.average.now !== null && d.average.before !== null ? change(d.average.now, d.average.before) : null} vs={vs} />}
+          delta={
+            <Delta value={d.average.now !== null && d.average.before !== null ? change(d.average.now, d.average.before) : null} vs={vs} />
+          }
           sub={plural(d.average.orders, "order")}
         />
-        <Tile label="Sleeping" value={String(d.sleeping.count)} sub={`no order in 6 months · ${compactMoney(d.sleeping.sales, c)} before`} href={href({ chip: "sleeping", page: undefined })} />
+        <Tile
+          label="Sleeping"
+          value={String(d.sleeping.count)}
+          sub={`no order in 6 months · ${compactMoney(d.sleeping.sales, c)} before`}
+          href={href({ chip: "sleeping", page: undefined })}
+        />
       </Tiles>
 
       <Card>
@@ -65,7 +86,13 @@ export function CustomersSection({
           actions={
             <nav aria-label="Which customers" className="flex flex-wrap gap-1.5">
               {CUSTOMER_CHIPS.map((k) => (
-                <FilterChip key={k} pill href={href({ chip: k === "all" ? undefined : k, page: undefined })} active={chip === k} count={d.counts[k]}>
+                <FilterChip
+                  key={k}
+                  pill
+                  href={href({ chip: k === "all" ? undefined : k, page: undefined })}
+                  active={chip === k}
+                  count={d.counts[k]}
+                >
                   {CUSTOMER_CHIP_LABEL[k]}
                 </FilterChip>
               ))}
@@ -73,7 +100,9 @@ export function CustomersSection({
           }
         />
         {shown.length === 0 ? (
-          <p className="p-4 text-sm text-muted">No customer here {chip === "all" ? "yet: customers appear once they order" : `in ${CUSTOMER_CHIP_LABEL[chip].toLowerCase()}`}.</p>
+          <p className="p-4 text-sm text-muted">
+            No customer here {chip === "all" ? "yet: customers appear once they order" : `in ${CUSTOMER_CHIP_LABEL[chip].toLowerCase()}`}.
+          </p>
         ) : (
           <DataTable label="Customers">
             <THead>
@@ -130,7 +159,17 @@ export function CustomersSection({
 
 /* ------------------------------------------------------------------------------------------- Factories */
 
-export function FactoriesSection({ d, p, page, params }: { d: Awaited<ReturnType<typeof loadFactories>>; p: Period; page: number; params: Record<string, string | undefined> }) {
+export function FactoriesSection({
+  d,
+  p,
+  page,
+  params,
+}: {
+  d: Awaited<ReturnType<typeof loadFactories>>;
+  p: Period;
+  page: number;
+  params: Record<string, string | undefined>;
+}) {
   const c = d.currency;
   const size = 25;
   const shown = d.rows.slice((page - 1) * size, page * size);
@@ -193,7 +232,17 @@ export function FactoriesSection({ d, p, page, params }: { d: Awaited<ReturnType
 
 /* ------------------------------------------------------------------------------------------- People */
 
-export function PeopleSection({ d, p, canSet, href }: { d: Awaited<ReturnType<typeof loadPeople>>; p: Period; canSet: boolean; href: Href }) {
+export function PeopleSection({
+  d,
+  p,
+  canSet,
+  href,
+}: {
+  d: Awaited<ReturnType<typeof loadPeople>>;
+  p: Period;
+  canSet: boolean;
+  href: Href;
+}) {
   const c = d.currency;
   return (
     <div className="flex flex-col gap-4">
@@ -257,10 +306,18 @@ export function PeopleSection({ d, p, canSet, href }: { d: Awaited<ReturnType<ty
                     {r.target && r.target.percent !== null ? (
                       <span className="flex items-center gap-2" title={`${money(r.target.sold, c)} of ${money(r.target.amount, c)}`}>
                         <span className="h-2 w-24 shrink-0 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                          <span className={cn("block h-full rounded-full", r.target.percent >= 100 ? "bg-ok" : "bg-chart-1")} style={{ width: `${Math.min(100, r.target.percent)}%` }} />
+                          <span
+                            className={cn("block h-full rounded-full", r.target.percent >= 100 ? "bg-ok" : "bg-chart-1")}
+                            style={{ width: `${Math.min(100, r.target.percent)}%` }}
+                          />
                         </span>
                         <span className="text-sm tabular">
-                          {r.target.percent}%<span className="sr-only"> of {money(r.target.amount, c)}{r.target.percent >= 100 ? ", reached" : ""}</span>
+                          {r.target.percent}%
+                          <span className="sr-only">
+                            {" "}
+                            of {money(r.target.amount, c)}
+                            {r.target.percent >= 100 ? ", reached" : ""}
+                          </span>
                         </span>
                       </span>
                     ) : (
@@ -286,8 +343,18 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
   const max = Math.max(1, f.inquiries);
   const stages = [
     { label: "Inquiries in", count: f.inquiries, value: null, share: f.inquiries ? "100%" : "—" },
-    { label: "Got factory prices", count: f.gotPrices, value: null, share: f.inquiries ? `${percent(Math.round((f.gotPrices / f.inquiries) * 100))} of inquiries` : "—" },
-    { label: "Quoted", count: f.quoted, value: Number(f.quotedValue), share: f.gotPrices ? `${percent(Math.round((f.quoted / f.gotPrices) * 100))} of those` : "—" },
+    {
+      label: "Got factory prices",
+      count: f.gotPrices,
+      value: null,
+      share: f.inquiries ? `${percent(Math.round((f.gotPrices / f.inquiries) * 100))} of inquiries` : "—",
+    },
+    {
+      label: "Quoted",
+      count: f.quoted,
+      value: Number(f.quotedValue),
+      share: f.gotPrices ? `${percent(Math.round((f.quoted / f.gotPrices) * 100))} of those` : "—",
+    },
     { label: "Won", count: f.won, value: Number(f.wonValue), share: `${percent(f.winRate)} of decided` },
   ];
   return (
@@ -297,7 +364,10 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
         <div className="flex flex-col gap-3 p-4">
           <ol aria-label="From inquiry to order" className="flex flex-col gap-2.5">
             {stages.map((s) => (
-              <li key={s.label} className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_8rem]">
+              <li
+                key={s.label}
+                className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_8rem]"
+              >
                 <span className="truncate">{s.label}</span>
                 <span className="h-7">
                   <span
@@ -315,7 +385,8 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
             ))}
           </ol>
           <p className="text-xs text-muted">
-            Lost {f.lost} · open {f.open} · median days: to first quote {f.medianDaysToFirstQuote ?? "—"}, to decision {f.medianDaysToClose ?? "—"}
+            Lost {f.lost} · open {f.open} · median days: to first quote {f.medianDaysToFirstQuote ?? "—"}, to decision{" "}
+            {f.medianDaysToClose ?? "—"}
           </p>
         </div>
       </Card>
@@ -327,19 +398,70 @@ export function FunnelSection({ d, p }: { d: Awaited<ReturnType<typeof loadFunne
             {f.lostReasons.length === 0 ? (
               <p className="text-sm text-muted">No inquiry lost {p.name}.</p>
             ) : (
-              <BarList label="Why we lose" tone="chart-4" rows={f.lostReasons.map((r) => ({ key: r.reason, label: r.label, value: r.count, text: String(r.count) }))} />
+              <BarList
+                label="Why we lose"
+                tone="chart-4"
+                rows={f.lostReasons.map((r) => ({ key: r.reason, label: r.label, value: r.count, text: String(r.count) }))}
+              />
             )}
           </div>
         </Card>
-        <GroupTable title="By channel" head="Channel" c={c} rows={d.channels.map((r) => ({ key: r.key, label: CHANNEL_LABEL[r.key as InquiryChannel] ?? r.label, inquiries: r.inquiries, winRate: r.winRate, last: amountCell(Number(r.wonValue)) }))} lastHead={`Won ${c}`} />
-        <GroupTable title="By country" head="Country" c={c} rows={d.countries.map((r) => ({ key: r.key, label: countryName(r.key), inquiries: r.inquiries, winRate: r.winRate, last: amountCell(Number(r.wonValue)) }))} lastHead={`Won ${c}`} />
-        <GroupTable title="By product" head="Product" c={c} rows={d.categories.map((r) => ({ key: r.key, label: r.label, inquiries: r.inquiries, winRate: r.winRate, last: percent(r.margin) }))} lastHead="Margin" />
+        <GroupTable
+          title="By channel"
+          head="Channel"
+          c={c}
+          rows={d.channels.map((r) => ({
+            key: r.key,
+            label: CHANNEL_LABEL[r.key as InquiryChannel] ?? r.label,
+            inquiries: r.inquiries,
+            winRate: r.winRate,
+            last: amountCell(Number(r.wonValue)),
+          }))}
+          lastHead={`Won ${c}`}
+        />
+        <GroupTable
+          title="By country"
+          head="Country"
+          c={c}
+          rows={d.countries.map((r) => ({
+            key: r.key,
+            label: countryName(r.key),
+            inquiries: r.inquiries,
+            winRate: r.winRate,
+            last: amountCell(Number(r.wonValue)),
+          }))}
+          lastHead={`Won ${c}`}
+        />
+        <GroupTable
+          title="By product"
+          head="Product"
+          c={c}
+          rows={d.categories.map((r) => ({
+            key: r.key,
+            label: r.label,
+            inquiries: r.inquiries,
+            winRate: r.winRate,
+            last: percent(r.margin),
+          }))}
+          lastHead="Margin"
+        />
       </div>
     </div>
   );
 }
 
-function GroupTable({ title, head, rows, lastHead }: { title: string; head: string; c: string; rows: { key: string; label: string; inquiries: number; winRate: number | null; last: string }[]; lastHead: string }) {
+function GroupTable({
+  title,
+  head,
+  rows,
+  lastHead,
+}: {
+  title: string;
+  head: string;
+  c: string;
+  rows: { key: string; label: string; inquiries: number; winRate: number | null; last: string }[];
+  lastHead: string;
+}) {
   return (
     <Card>
       <CardHeader title={title} />

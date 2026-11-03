@@ -16,7 +16,19 @@ export interface PerfFigure {
 }
 
 /** The Performance card's figures, with the Year · All time switch. */
-export function PerformanceView({ title, description, year, all, yearLabel }: { title: string; description: string; year: PerfFigure[]; all: PerfFigure[]; yearLabel: string }) {
+export function PerformanceView({
+  title,
+  description,
+  year,
+  all,
+  yearLabel,
+}: {
+  title: string;
+  description: string;
+  year: PerfFigure[];
+  all: PerfFigure[];
+  yearLabel: string;
+}) {
   const [scope, setScope] = useState<"year" | "all">("all");
   const list = scope === "year" ? year : all;
   return (
@@ -32,7 +44,10 @@ export function PerformanceView({ title, description, year, all, yearLabel }: { 
                 type="button"
                 aria-pressed={scope === s}
                 onClick={() => setScope(s)}
-                className={cn("inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-text-2 hover:text-text", scope === s && "bg-surface text-text shadow-card")}
+                className={cn(
+                  "inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-text-2 hover:text-text",
+                  scope === s && "bg-surface text-text shadow-card",
+                )}
               >
                 {s === "year" ? `Year ${yearLabel}` : "All time"}
               </button>
@@ -40,13 +55,21 @@ export function PerformanceView({ title, description, year, all, yearLabel }: { 
           </div>
         }
       />
-      <ul className={cn("grid grid-cols-2 gap-2 p-4", list.length === 5 ? "sm:grid-cols-3 lg:grid-cols-5" : "sm:grid-cols-4")} aria-live="polite">
+      <ul
+        className={cn("grid grid-cols-2 gap-2 p-4", list.length === 5 ? "sm:grid-cols-3 lg:grid-cols-5" : "sm:grid-cols-4")}
+        aria-live="polite"
+      >
         {list.map((f) => {
           const body = (
             <>
               <span className="block text-xs text-text-2">{f.label}</span>
               <span className="block truncate text-lg leading-6 font-semibold">{f.value}</span>
-              {f.sub && <span className={cn("block truncate text-xs", f.meaning === "bad" ? "font-medium text-bad" : "text-muted")}>{f.sub}{f.now ? " · today" : ""}</span>}
+              {f.sub && (
+                <span className={cn("block truncate text-xs", f.meaning === "bad" ? "font-medium text-bad" : "text-muted")}>
+                  {f.sub}
+                  {f.now ? " · today" : ""}
+                </span>
+              )}
             </>
           );
           return (

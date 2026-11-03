@@ -59,8 +59,22 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
       </ChartCard>
 
       <div id="owed" className="grid scroll-mt-20 gap-4 lg:grid-cols-2">
-        <AgeCard title="Owed to us, by age" description="from customers · click an age to see the orders" a={d.receivable} side="receivable" d={d} href={href} />
-        <AgeCard title="We owe factories, by age" description="after factory-borne costs · click an age to see the orders" a={d.payable} side="payable" d={d} href={href} />
+        <AgeCard
+          title="Owed to us, by age"
+          description="from customers · click an age to see the orders"
+          a={d.receivable}
+          side="receivable"
+          d={d}
+          href={href}
+        />
+        <AgeCard
+          title="We owe factories, by age"
+          description="after factory-borne costs · click an age to see the orders"
+          a={d.payable}
+          side="payable"
+          d={d}
+          href={href}
+        />
       </div>
 
       {d.age && (
@@ -69,7 +83,11 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
             title={`${d.age.side === "receivable" ? "Owed to us" : "We owe factories"} · ${BUCKETS.find((b) => b.key === d.age!.bucket)?.label.toLowerCase()}`}
             description="the orders in this age · click one to open it"
             actions={
-              <Link href={href({ age: undefined, side: undefined })} scroll={false} className="text-sm font-medium text-text-2 hover:text-text">
+              <Link
+                href={href({ age: undefined, side: undefined })}
+                scroll={false}
+                className="text-sm font-medium text-text-2 hover:text-text"
+              >
                 Close
               </Link>
             }
@@ -109,7 +127,10 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
         <ChartCard
           title="Profit by month: expected vs now"
           description={`${c} · a gap means costs or prices moved after the order`}
-          table={{ columns: ["Month", `Expected at order ${c}`, `Now ${c}`], rows: d.profitMonths.map((m) => [monthName(m.month), amountCell(m.a), amountCell(m.b)]) }}
+          table={{
+            columns: ["Month", `Expected at order ${c}`, `Now ${c}`],
+            rows: d.profitMonths.map((m) => [monthName(m.month), amountCell(m.a), amountCell(m.b)]),
+          }}
         >
           <PairBars rows={d.profitMonths} currency={c} a="Expected at order" b="Now" />
         </ChartCard>
@@ -223,7 +244,21 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
 
 const kindLabel = (k: string) => EXPENSE_CATEGORY_LABEL[k as ExpenseCategory] ?? k;
 
-function AgeCard({ title, description, a, side, d, href }: { title: string; description: string; a: Aging; side: "receivable" | "payable"; d: Data; href: Href }) {
+function AgeCard({
+  title,
+  description,
+  a,
+  side,
+  d,
+  href,
+}: {
+  title: string;
+  description: string;
+  a: Aging;
+  side: "receivable" | "payable";
+  d: Data;
+  href: Href;
+}) {
   return (
     <Card>
       <CardHeader title={title} description={description} />

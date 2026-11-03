@@ -53,12 +53,15 @@ export const monthYearOf = (ym: string) => `${monthShortOf(ym)} ${ym.slice(0, 4)
 
 /** A date in parts: { day: true, month: true, year: true } → "1 Sep 2026". */
 const fmt = (iso: string, opts: { day?: unknown; month?: unknown; year?: unknown }) =>
-  [opts.day ? String(Number(iso.slice(8, 10))) : null, opts.month ? monthShortOf(iso) : null, opts.year ? iso.slice(0, 4) : null].filter(Boolean).join(" ");
+  [opts.day ? String(Number(iso.slice(8, 10))) : null, opts.month ? monthShortOf(iso) : null, opts.year ? iso.slice(0, 4) : null]
+    .filter(Boolean)
+    .join(" ");
 
 /** "1 Sep – 30 Nov 2026", "1–30 Nov 2026", "1 Dec 2025 – 30 Nov 2026". */
 export function spanLabel(from: string, to: string): string {
   const sameYear = from.slice(0, 4) === to.slice(0, 4);
-  if (from.slice(0, 7) === to.slice(0, 7)) return `${fmt(from, { day: "numeric" })}–${fmt(to, { day: "numeric", month: "short", year: "numeric" })}`;
+  if (from.slice(0, 7) === to.slice(0, 7))
+    return `${fmt(from, { day: "numeric" })}–${fmt(to, { day: "numeric", month: "short", year: "numeric" })}`;
   return `${fmt(from, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" })} – ${fmt(to, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
@@ -68,7 +71,9 @@ function shortSpan(from: string, to: string): string {
   if (!whole) return spanLabel(from, to);
   if (from.slice(0, 7) === to.slice(0, 7)) return fmt(from, { month: "short" });
   const sameYear = from.slice(0, 4) === to.slice(0, 4);
-  return sameYear ? `${fmt(from, { month: "short" })} – ${fmt(to, { month: "short" })}` : `${fmt(from, { month: "short", year: "numeric" })} – ${fmt(to, { month: "short", year: "numeric" })}`;
+  return sameYear
+    ? `${fmt(from, { month: "short" })} – ${fmt(to, { month: "short" })}`
+    : `${fmt(from, { month: "short", year: "numeric" })} – ${fmt(to, { month: "short", year: "numeric" })}`;
 }
 
 /**
@@ -84,7 +89,16 @@ export function periodOf(q: { period?: string; from?: string; to?: string }, tod
     const days = daysBetween(from, to) + 1;
     const prevTo = addDays(from, -1);
     const prevFrom = addDays(prevTo, -(days - 1));
-    return { kind, from, to, prevFrom, prevTo, label: spanLabel(from, to), vsLabel: shortSpan(prevFrom, prevTo), name: spanLabel(from, to) };
+    return {
+      kind,
+      from,
+      to,
+      prevFrom,
+      prevTo,
+      label: spanLabel(from, to),
+      vsLabel: shortSpan(prevFrom, prevTo),
+      name: spanLabel(from, to),
+    };
   }
   const n = MONTHS[kind];
   const from = monthStart(today, -(n - 1));
@@ -127,7 +141,8 @@ export function sectionOfTab(tab?: string): { section: Section; view?: string } 
 }
 
 /** "63k", "1.2M": an amount in a list or on an axis (the exact one is in the table and Excel). */
-export const compact = (v: number) => Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v).replace("K", "k");
+export const compact = (v: number) =>
+  Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v).replace("K", "k");
 /** "USD 63k" */
 export const compactMoney = (v: number | null | undefined, c: string) => (v === null || v === undefined ? "—" : `${c} ${compact(v)}`);
 /** "USD 288,000" (whole units); from a million "USD 1.21M". */
@@ -139,4 +154,5 @@ export function bigMoney(v: number | null | undefined, c: string) {
 /** "1,234" (whole units) for table cells in the main currency named in the header. */
 export const amountCell = (v: number | null | undefined) => (v === null || v === undefined ? "—" : Math.round(v).toLocaleString("en-US"));
 /** "13.6%" */
-export const percent = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`);
+export const percent = (v: number | null | undefined) =>
+  v === null || v === undefined ? "—" : `${v.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
