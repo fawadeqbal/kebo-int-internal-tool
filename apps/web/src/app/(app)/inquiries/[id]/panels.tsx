@@ -4,7 +4,7 @@ import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from
 import { Button, Field, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PanelBody, PanelButton, useClosePanel } from "@/components/orders/step-view";
+import { PANEL_FORM, PanelActions, PanelBody, PanelButton, useClosePanel } from "@/components/orders/step-view";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -13,14 +13,14 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 function Buttons({ save, danger }: { save: string; danger?: boolean }) {
   const close = useClosePanel();
   return (
-    <div className="flex gap-2">
+    <PanelActions>
       <SubmitButton size="sm" variant={danger ? "danger" : "primary"} pendingText="Saving…">
         {save}
       </SubmitButton>
       <Button type="button" size="sm" variant="ghost" onClick={close}>
         Cancel
       </Button>
-    </div>
+    </PanelActions>
   );
 }
 
@@ -30,7 +30,7 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
   const lost = to === "lost";
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
+      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         {(s) => (
           <>
             <input type="hidden" name="to" value={to} />
@@ -63,7 +63,7 @@ function HoldForm({ onHold, action }: { onHold: boolean; action: Action }) {
   const close = useClosePanel();
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
+      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         <input type="hidden" name="onHold" value={onHold ? "false" : "true"} />
         <Field label={onHold ? "Note" : "What are we waiting for?"} optional={onHold} htmlFor="hold-note">
           <Textarea id="hold-note" name="note" rows={3} className="min-h-0" placeholder={onHold ? "" : "e.g. new drawings from the customer"} />
@@ -136,7 +136,7 @@ export function AssignForm({
   const close = useClosePanel();
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className="flex flex-col gap-3">
+      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         {(s) =>
           canAssignOthers ? (
             <>

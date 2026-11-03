@@ -7,7 +7,7 @@ import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS } fr
 import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PanelBody, PanelButton, useClosePanel, ViewCard } from "@/components/orders/step-view";
+import { PANEL_FORM, PanelActions, PanelBody, PanelButton, useClosePanel, ViewCard } from "@/components/orders/step-view";
 import type { ActionState } from "@/lib/actions";
 import { money, qty } from "@/lib/format";
 import type { OptionView, QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
@@ -48,7 +48,7 @@ export function TermsPanel({
         offers={offers}
         loadOffers={loadOffers}
         showCosts={showCosts}
-        submitLabel={`Save R${number}`}
+        submitLabel="Save terms"
         requireChanges
         onDone={close}
         onCancel={close}
@@ -318,7 +318,7 @@ function SentForm({ number, action, today }: { number: number; action: Action; t
   const [how, setHow] = useState(HOW[0]!);
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className="flex flex-col gap-4">
+      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         {(s) => (
           <>
             <input type="hidden" name="to" value="sent" />
@@ -340,14 +340,14 @@ function SentForm({ number, action, today }: { number: number; action: Action; t
                 <Input id="sent-on" name="on" type="date" max={today} defaultValue={s.values?.on} />
               </Field>
             </div>
-            <div className="flex gap-2">
+            <PanelActions>
               <SubmitButton size="sm" pendingText="Saving…">
                 <Send aria-hidden /> Mark R{number} as sent
               </SubmitButton>
               <Button size="sm" variant="ghost" onClick={close}>
                 Cancel
               </Button>
-            </div>
+            </PanelActions>
           </>
         )}
       </ActionForm>
@@ -398,7 +398,7 @@ function AcceptForm({ number, options, currency, action, today, onOrder }: { num
           if (data?.orderId && data.orderRefNo) onOrder({ orderId: data.orderId, orderRefNo: data.orderRefNo });
           close();
         }}
-        className="flex flex-col gap-4"
+        className={PANEL_FORM}
       >
         {(s) => (
           <>
@@ -426,14 +426,14 @@ function AcceptForm({ number, options, currency, action, today, onOrder }: { num
             <Field label="Answered on" htmlFor="accept-on" optional hint="Today when empty" error={s.errors?.on}>
               <Input id="accept-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
             </Field>
-            <div className="flex gap-2">
+            <PanelActions>
               <SubmitButton size="sm" pendingText="Saving…" disabled={!optionId}>
                 {options.length > 1 ? (optionId ? `Option ${options.find((o) => o.id === optionId)!.letter} accepted: make the order` : "Choose an option") : `R${number} accepted: make the order`}
               </SubmitButton>
               <Button size="sm" variant="ghost" onClick={close}>
                 Cancel
               </Button>
-            </div>
+            </PanelActions>
           </>
         )}
       </ActionForm>
@@ -446,7 +446,7 @@ function LostForm({ action, today }: { action: Action; today: string }) {
   const close = useClosePanel();
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className="flex flex-col gap-4">
+      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         {(s) => (
           <>
             <Field label="Why was it lost?" htmlFor="lost-reason" error={s.errors?.lostReason}>
@@ -467,14 +467,14 @@ function LostForm({ action, today }: { action: Action; today: string }) {
             <Field label="Answered on" htmlFor="lost-on" optional hint="Today when empty" error={s.errors?.on}>
               <Input id="lost-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
             </Field>
-            <div className="flex gap-2">
+            <PanelActions>
               <SubmitButton size="sm" variant="danger" pendingText="Saving…">
                 Mark as lost
               </SubmitButton>
               <Button size="sm" variant="ghost" onClick={close}>
                 Cancel
               </Button>
-            </div>
+            </PanelActions>
           </>
         )}
       </ActionForm>
@@ -487,7 +487,7 @@ function ExpiredForm({ action, today }: { action: Action; today: string }) {
   const close = useClosePanel();
   return (
     <PanelBody>
-      <ActionForm action={action} onDone={close} className="flex flex-col gap-4">
+      <ActionForm action={action} onDone={close} className={PANEL_FORM}>
         {(s) => (
           <>
             <input type="hidden" name="to" value="expired" />
@@ -497,14 +497,14 @@ function ExpiredForm({ action, today }: { action: Action; today: string }) {
             <Field label="Expired on" htmlFor="exp-on" optional hint="Today when empty" error={s.errors?.on}>
               <Input id="exp-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
             </Field>
-            <div className="flex gap-2">
+            <PanelActions>
               <SubmitButton size="sm" pendingText="Saving…">
                 Mark expired
               </SubmitButton>
               <Button size="sm" variant="ghost" onClick={close}>
                 Cancel
               </Button>
-            </div>
+            </PanelActions>
           </>
         )}
       </ActionForm>

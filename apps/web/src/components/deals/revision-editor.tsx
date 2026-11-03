@@ -26,6 +26,7 @@ import { localLineHandlers } from "@/components/lines/local-lines";
 import { ErrorText, numberText, rowKey } from "./form-bits";
 import { convertText, rateSentence, type Fx } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
+import { PANEL_FORM, PanelActions, PanelSection } from "@/components/orders/step-view";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -252,6 +253,8 @@ export function RevisionEditor({
   const [active, setActive] = useState(initialOption);
   const [adding, setAdding] = useState(startAdding);
   const terms = part !== "options";
+  /** The terms alone, in the Quotation step's side panel: sections and the panel's footer. */
+  const inPanel = part === "terms";
   const options = part !== "terms";
   const [margin, setMargin] = useState(String(initialOffers.defaultMargin));
   const dirty = JSON.stringify(s) !== saved;
@@ -410,13 +413,13 @@ export function RevisionEditor({
           setSaved(JSON.stringify(s));
           onDone?.();
         }}
-        className="flex flex-col gap-5"
+        className={inPanel ? PANEL_FORM : "flex flex-col gap-5"}
       >
         {(st) => (
           <>
             <input type="hidden" name="payload" value={JSON.stringify(payload(s, offers))} />
 
-            {terms && (
+            {terms && !inPanel && (
             <section aria-label="Terms" className={cn("grid gap-4 sm:grid-cols-2", !part && "lg:grid-cols-4")}>
               <Field
                 label="Currency"
@@ -454,6 +457,64 @@ export function RevisionEditor({
                 </Select>
               </Field>
             </section>
+            )}
+
+            {terms && inPanel && (
+              <>
+                <PanelSection title="The deal" first>
+                  <Field
+                    label="Currency"
+                    htmlFor={`cur-${number}`}
+                    error={st.errors?.currency}
+                    hint={converted ? <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span> : "Changing it converts the prices"}
+                  >
+                    <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
+                  </Field>
+                  <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil}>
+                    <Input id={`valid-${number}`} type="date" value={s.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
+                  </Field>
+                  <Field label="Delivery (incoterm)" htmlFor={`inco-${number}`} error={st.errors?.incoterm}>
+                    <Select id={`inco-${number}`} value={s.incoterm} onChange={(e) => set("incoterm", e.target.value as Incoterm)}>
+                      {INCOTERMS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Place" htmlFor={`place-${number}`} optional error={st.errors?.incotermPlace} hint="The port or place for the incoterm">
+                    <Input id={`place-${number}`} value={s.incotermPlace} maxLength={80} placeholder="e.g. Karachi" onChange={(e) => set("incotermPlace", e.target.value)} />
+                  </Field>
+                </PanelSection>
+                <PanelSection title="Payment">
+                  <Field label="Deposit" htmlFor={`dep-${number}`} error={st.errors?.depositPercent} hint="% of the total, before production">
+                    <div className="relative">
+                      <Input id={`dep-${number}`} inputMode="decimal" className="pr-8 tabular" value={s.depositPercent} onChange={(e) => set("depositPercent", e.target.value)} />
+                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted">%</span>
+                    </div>
+                  </Field>
+                  <Field label="Balance" htmlFor={`bal-${number}`} error={st.errors?.balanceTerms} hint="or against the B/L copy, or by LC">
+                    <Select id={`bal-${number}`} value={s.balanceTerms} onChange={(e) => set("balanceTerms", e.target.value as BalanceTerms)}>
+                      {BALANCE_TERMS.map((b) => (
+                        <option key={b} value={b}>
+                          {BALANCE_TERMS_LABEL[b]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                </PanelSection>
+                <PanelSection title="Printed on the quotation" className="sm:grid-cols-1">
+                  <Field label="Payment terms" htmlFor={`pay-terms-${number}`} optional error={st.errors?.paymentTerms} hint="Printed after the deposit and balance">
+                    <Textarea id={`pay-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. By T/T; L/C at sight accepted" value={s.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} />
+                  </Field>
+                  <Field label="Delivery terms" htmlFor={`del-terms-${number}`} optional error={st.errors?.deliveryTerms} hint="Printed under the delivery time">
+                    <Textarea id={`del-terms-${number}`} rows={2} className="min-h-0" placeholder="e.g. packing, inspection, warranty" value={s.deliveryTerms} onChange={(e) => set("deliveryTerms", e.target.value)} />
+                  </Field>
+                  <Field label="Notes" htmlFor={`notes-${number}`} optional error={st.errors?.notes} hint="Printed last">
+                    <Textarea id={`notes-${number}`} rows={3} className="min-h-0" placeholder="Warranty 12 months from SAT; prices include export wooden cases…" value={s.notes} onChange={(e) => set("notes", e.target.value)} />
+                  </Field>
+                </PanelSection>
+              </>
             )}
 
             {options && (
@@ -813,7 +874,7 @@ export function RevisionEditor({
             </section>
             )}
 
-            {terms && (
+            {terms && !inPanel && (
             <section aria-label="Terms and notes" className={cn("grid gap-4", !part && "lg:grid-cols-2")}>
               <Field
                 label="Payment terms"
@@ -840,17 +901,31 @@ export function RevisionEditor({
             )}
             {part === "options" && <ErrorText error={st.errors?.currency ?? st.errors?.validUntil} />}
 
-            <StickyBar>
-              <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
-                {submitLabel}
-              </SubmitButton>
-              {onCancel && (
-                <Button variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
-                  Cancel
-                </Button>
-              )}
-              {dirty && requireChanges && <span className="text-xs text-warn">Unsaved changes</span>}
-            </StickyBar>
+            {inPanel ? (
+              <PanelActions>
+                <SubmitButton size="sm" pendingText="Saving…" disabled={requireChanges && !dirty}>
+                  {submitLabel}
+                </SubmitButton>
+                {onCancel && (
+                  <Button size="sm" variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
+                    Cancel
+                  </Button>
+                )}
+                {dirty && requireChanges && <span className="text-xs text-warn">Unsaved changes</span>}
+              </PanelActions>
+            ) : (
+              <StickyBar>
+                <SubmitButton pendingText="Saving…" disabled={requireChanges && !dirty}>
+                  {submitLabel}
+                </SubmitButton>
+                {onCancel && (
+                  <Button variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
+                    Cancel
+                  </Button>
+                )}
+                {dirty && requireChanges && <span className="text-xs text-warn">Unsaved changes</span>}
+              </StickyBar>
+            )}
           </>
         )}
       </ActionForm>

@@ -23,7 +23,10 @@ export function ActionForm({
   showSuccess = true,
   quietCodes,
   keepFields,
+  id,
 }: {
+  /** The form's id, for a submit button placed outside it (form="…"). */
+  id?: string;
   action: Action;
   children: ReactNode | ((state: ActionState) => ReactNode);
   className?: string;
@@ -52,7 +55,7 @@ export function ActionForm({
     }
   }, [state, router, onDone, resetOnSuccess]);
   return (
-    <form ref={formRef} action={formAction} className={className} noValidate onReset={keepFields ? (e) => e.preventDefault() : undefined}>
+    <form ref={formRef} id={id} action={formAction} className={className} noValidate onReset={keepFields ? (e) => e.preventDefault() : undefined}>
       {state.code === "reason_needed" && <ReasonPrompt key={state.message} state={state} />}
       {state.message &&
         (state.ok === false || showSuccess) &&
