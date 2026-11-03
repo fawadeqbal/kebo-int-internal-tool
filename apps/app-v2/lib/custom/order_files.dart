@@ -23,6 +23,15 @@ const _uploadFields = [
   FieldDef('note', 'Note', FieldKind.text, max: 300),
 ];
 
+/// A photo or file added to an order: which step, what it is, a note.
+Future<bool> uploadToOrder(BuildContext context, String orderId, String? refNo) => pickAndUpload(
+      context,
+      endpoint: '/api/orders/$orderId/files',
+      title: 'Add to ${refNo ?? 'the order'}',
+      fields: _uploadFields,
+      initial: {'kind': 'photo'},
+    );
+
 /// Every file of an order (uploads, payment proofs, receipts, factory files), grouped
 /// like on the web. Tap opens it inside the app; Add takes a photo or picks a file.
 class OrderFiles extends StatefulWidget {
@@ -55,13 +64,7 @@ class _OrderFilesState extends State<OrderFiles> {
   }
 
   Future<void> _add() async {
-    final ok = await pickAndUpload(
-      context,
-      endpoint: '/api/orders/${widget.order.id}/files',
-      title: 'Add to ${widget.order.refNo ?? 'the order'}',
-      fields: _uploadFields,
-      initial: {'kind': 'photo'},
-    );
+    final ok = await uploadToOrder(context, widget.order.id, widget.order.refNo);
     if (ok && mounted) {
       toast(context, 'Uploaded');
       _load();

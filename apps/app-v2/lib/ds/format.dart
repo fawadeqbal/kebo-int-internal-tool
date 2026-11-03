@@ -22,3 +22,38 @@ String? fill(String template, String? value) => value == null || value.isEmpty ?
 
 /// The parts that have a value, joined with " · ".
 String joinParts(Iterable<String?> parts) => parts.whereType<String>().where((s) => s.trim().isNotEmpty).join(' · ');
+
+final _time = DateFormat('H:mm');
+final _weekday = DateFormat('EEE');
+final _dayMonth = DateFormat('d MMM');
+
+/// When something happened, as people say it: "9:02", "yesterday", "Mon", "28 Oct".
+String fmtWhen(DateTime? d, {DateTime? now}) {
+  if (d == null) return '';
+  final t = d.toLocal();
+  final n = now ?? DateTime.now();
+  final days = DateTime(n.year, n.month, n.day).difference(DateTime(t.year, t.month, t.day)).inDays;
+  if (days == 0) return _time.format(t);
+  if (days == 1) return 'yesterday';
+  if (days < 7) return _weekday.format(t);
+  return _dayMonth.format(t);
+}
+
+/// The day heading of a list grouped by day: "Today", "Yesterday", "Mon 2 Nov".
+String fmtDayHeading(DateTime d, {DateTime? now}) {
+  final n = now ?? DateTime.now();
+  final t = d.toLocal();
+  final days = DateTime(n.year, n.month, n.day).difference(DateTime(t.year, t.month, t.day)).inDays;
+  if (days == 0) return 'Today';
+  if (days == 1) return 'Yesterday';
+  return DateFormat('EEE d MMM').format(t);
+}
+
+/// "USD 1.2M", "USD 44.1k": big amounts on cards.
+String? fmtShort(String? amount, String? currency) {
+  final n = amount == null ? null : num.tryParse(amount);
+  if (n == null) return null;
+  final a = n.abs();
+  final text = a >= 1e6 ? '${(n / 1e6).toStringAsFixed(1)}M' : a >= 1e4 ? '${(n / 1e3).toStringAsFixed(1)}k' : NumberFormat('#,##0', 'en_US').format(n);
+  return currency == null ? text : '$currency $text';
+}

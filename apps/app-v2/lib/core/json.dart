@@ -12,6 +12,15 @@ extension JsonRead on Json {
 
   bool boolean(String k) => this[k] == true;
 
+  /// A text deeper in: `o.at('customer.name')`; null when any step is missing.
+  String? at(String path) {
+    Object? v = this;
+    for (final p in path.split('.')) {
+      v = v is Map<String, dynamic> ? v[p] : null;
+    }
+    return switch (v) { String s when s.isNotEmpty => s, num n => '$n', _ => null };
+  }
+
   DateTime? date(String k) => switch (this[k]) { String s => DateTime.tryParse(s), _ => null };
 
   T? obj<T>(String k, T Function(Json) read) => switch (this[k]) { Map<String, dynamic> m => read(m), _ => null };

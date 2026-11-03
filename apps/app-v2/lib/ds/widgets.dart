@@ -114,8 +114,17 @@ class ContactAction {
 
 /// What a row shows. Built by the generated screens from the spec.
 class RowData {
-  const RowData({required this.title, this.sub = const [], this.badge, this.value, this.actions = const [], this.onTap});
+  const RowData({required this.title, this.sub = const [], this.badge, this.value, this.actions = const [], this.onTap, this.tone, this.trailing, this.strong = false});
   final String? title;
+
+  /// A coloured mark at the start: how urgent it is (late, due soon…).
+  final Tone? tone;
+
+  /// A small button at the end, e.g. "Open".
+  final Widget? trailing;
+
+  /// Unread or new: the title in bold.
+  final bool strong;
   final List<String?> sub;
   final Badge? badge;
   final String? value;
@@ -137,9 +146,18 @@ class PhoneRow extends StatelessWidget {
     final body = Padding(
       padding: const EdgeInsets.symmetric(vertical: Gap.md),
       child: Row(children: [
+        if (data.tone != null) ...[
+          ExcludeSemantics(
+            child: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.fg(data.tone!), shape: BoxShape.circle)),
+          ),
+          const SizedBox(width: Gap.md),
+        ],
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(data.title ?? '', style: context.text.titleSmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(data.title ?? '',
+                style: data.strong ? context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700) : context.text.titleSmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
             if (sub.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(sub, style: context.text.bodySmall?.copyWith(color: c.text2), maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -156,7 +174,8 @@ class PhoneRow extends StatelessWidget {
             ],
           ]),
         ],
-        if (data.onTap != null) ...[
+        if (data.trailing != null) ...[const SizedBox(width: Gap.sm), data.trailing!]
+        else if (data.onTap != null) ...[
           const SizedBox(width: Gap.xs),
           Icon(Icons.chevron_right, color: c.muted, size: 20),
         ],
