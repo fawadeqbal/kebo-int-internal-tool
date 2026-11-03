@@ -86,9 +86,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="Customers"
         summary={
-          can(me, "inquiries.viewAll")
-            ? `${plural(total, "customer")} · every buyer, their contacts and what is open with them`
-            : `${plural(total, "customer")} · the customers of the inquiries you handle or created`
+          <>
+            {plural(total, "customer")}
+            <span className="max-sm:hidden">
+              {can(me, "inquiries.viewAll") ? " · every buyer, their contacts and what is open with them" : " · the customers of the inquiries you handle or created"}
+            </span>
+          </>
         }
         primary={
           canAdd && (
@@ -102,15 +105,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       />
 
       <ListToolbar
-        search={{ placeholder: "Search name, contact, email, phone…", value: sp.q, clearHref: href({ q: undefined }) }}
+        search={{ placeholder: "Search name, contact, phone…", value: sp.q, clearHref: href({ q: undefined }) }}
         keep={keep}
         chips={chips}
         label="Filter customers"
-        end={
-          <>
-            <form className="max-sm:hidden">
+        filters={
+          !country && (
+            <form>
               {sp.q && <input type="hidden" name="q" value={sp.q} />}
-              <AutoSelect name="country" defaultValue={country && country !== UNKNOWN_COUNTRY ? country : ""} aria-label="Country" className="w-44">
+              <AutoSelect name="country" defaultValue="" aria-label="Filter by country" className="w-32">
                 <option value="">+ Country</option>
                 {COUNTRIES.map(([code, name]) => (
                   <option key={code} value={code}>
@@ -119,9 +122,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 ))}
               </AutoSelect>
             </form>
-            <PartyExcel kind="customers" importAction={canAdd ? importCustomersAction : undefined} exportHref={buildHref("/sheets/export/customers", {}, keep)} />
-          </>
+          )
         }
+        end={<PartyExcel kind="customers" importAction={canAdd ? importCustomersAction : undefined} exportHref={buildHref("/sheets/export/customers", {}, keep)} />}
       />
 
       <Card className="overflow-clip p-0">

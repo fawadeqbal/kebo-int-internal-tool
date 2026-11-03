@@ -11,9 +11,12 @@ export const useMounted = () => useSyncExternalStore(noop, () => true, () => fal
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
 
+/** A test DOM (jsdom) lays nothing out, so there everything counts as shown. */
+const noLayout = () => typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom");
+
 /** What Tab can reach inside a box, in order (hidden ones left out). */
 export function focusables(box: HTMLElement): HTMLElement[] {
-  return [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest("[hidden],[inert]") && el.getClientRects().length > 0);
+  return [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest("[hidden],[inert]") && (el.getClientRects().length > 0 || noLayout()));
 }
 
 /**
@@ -104,7 +107,8 @@ export function ConfirmDialog({
   if (!mounted) return null;
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center p-4" data-layer>
-      <button type="button" aria-label={cancelLabel} tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={() => !busy && onCancel()} />
+      {/* The dim backdrop: a click on it is the way back (the keyboard has Escape and the button). */}
+      <div aria-hidden className="absolute inset-0 bg-black/40" onClick={() => !busy && onCancel()} />
       <div
         ref={box}
         role="alertdialog"

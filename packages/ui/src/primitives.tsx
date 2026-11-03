@@ -348,7 +348,7 @@ export function DataRow({ href, flash, className, ...props }: ComponentProps<"tr
     <tr
       data-href={href}
       data-flash={flash ? "" : undefined}
-      className={cn("group cursor-pointer transition-colors last:[&>td]:border-b-0 hover:bg-primary-soft/50", flash && "animate-flash", className)}
+      className={cn("group cursor-pointer transition-colors last:[&>td]:border-b-0 hover:bg-primary-soft/70", flash && "animate-flash", className)}
       {...props}
     />
   );
@@ -479,6 +479,7 @@ export function ListToolbar({
   search,
   keep = {},
   chips = [],
+  filters,
   end,
   label = "Filters",
   className,
@@ -487,6 +488,8 @@ export function ListToolbar({
   /** The list's other filters, carried by the search form (page is dropped: a new search starts at page 1). */
   keep?: Record<string, string | undefined>;
   chips?: ListChip[];
+  /** After the chips: a filter you add ("+ Country", a select), drawn as a chip. */
+  filters?: ReactNode;
   /** The list's Excel (export what the filters show). */
   end?: ReactNode;
   label?: string;
@@ -498,13 +501,13 @@ export function ListToolbar({
       {search && (
         <form role="search" className="w-full sm:w-auto">
           {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
-          <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="h-9 sm:w-64 [&_input]:h-9" />
+          <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="h-9 sm:w-72 [&_input]:h-9" />
           <button className="sr-only">Search</button>
         </form>
       )}
-      {(chips.length > 0 || end) && (
+      {(chips.length > 0 || filters || end) && (
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {chips.length > 0 && (
+          {(chips.length > 0 || filters) && (
             <ScrollFade
               as="nav"
               aria-label={label}
@@ -515,6 +518,11 @@ export function ListToolbar({
                   {c.label}
                 </FilterChip>
               ))}
+              {filters && (
+                <div className="flex shrink-0 items-center gap-1.5 [&_select]:h-8 [&_select]:rounded-full [&_select]:border-line-strong [&_select]:text-xs [&_select]:font-medium [&_select]:shadow-none">
+                  {filters}
+                </div>
+              )}
             </ScrollFade>
           )}
           {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}

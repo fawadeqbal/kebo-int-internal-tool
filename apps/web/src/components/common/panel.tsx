@@ -92,7 +92,8 @@ export function SidePanel({
   if (!mounted) return null;
   return createPortal(
     <div className="fixed inset-0 z-[80] flex justify-end">
-      <button type="button" aria-label="Close the panel" tabIndex={-1} className="absolute inset-0 bg-black/40 animate-in" onClick={() => request()} />
+      {/* The dim page beside it: a click closes (the keyboard has Escape and ✕). */}
+      <div aria-hidden className="absolute inset-0 animate-in bg-black/40" onClick={() => request()} />
       <div
         ref={box}
         role="dialog"
@@ -184,13 +185,15 @@ export function PanelSection({ title, children, className, first }: { title?: st
 
 /**
  * The panel's Save / Cancel, in a footer that stays at the bottom of the panel
- * while the form scrolls; `end`: a quiet action on the right (Remove this offer).
+ * while the form scrolls (pinned to the very bottom: -bottom-5 makes up for the
+ * body's padding, so nothing shows under it); `end`: a quiet action on the
+ * right (Remove this offer).
  */
 export function PanelActions({ children, end, className }: { children: ReactNode; end?: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        "sticky bottom-0 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface-2 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface-2 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         className,
       )}
     >
