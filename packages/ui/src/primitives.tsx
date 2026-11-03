@@ -165,9 +165,25 @@ export function CardFooter({ className, ...props }: ComponentProps<"div">) {
 
 /* ---------------------------------------------------------------- Page structure */
 
-/** Title row of every screen: back link, title, one-line description, actions. */
+/**
+ * Title row of every screen (design system: page header). Left: ← back link,
+ * the title (22px) and its status badge, then one summary line (who · what ·
+ * how much · how paid · who handles it). Right: the paper buttons (View /
+ * Print, Download PDF), the page's ONE primary button — the next step — and
+ * ⋯ more. There is a single `primary` slot on purpose: a page has at most one.
+ * On a phone the paper buttons hide and the page passes them to ⋯ instead
+ * (MoreMenu's `phoneItems`), so the row is the primary and ⋯.
+ *
+ * `actions` and `description` are the older form (a free row of buttons, a
+ * line of text), kept for the pages not yet moved to the frame.
+ */
 export function PageHeader({
   title,
+  badge,
+  summary,
+  papers,
+  primary,
+  more,
   description,
   actions,
   backHref,
@@ -175,12 +191,24 @@ export function PageHeader({
   children,
 }: {
   title: ReactNode;
+  /** The record's status (StatusBadge). */
+  badge?: ReactNode;
+  /** One line: who · what · how much · how paid · who handles it. */
+  summary?: ReactNode;
+  /** View / Print and Download PDF, where the page is a paper; hidden on a phone (put them in ⋯). */
+  papers?: ReactNode;
+  /** The one primary button: the next step. Leave it out when nothing is next. */
+  primary?: ReactNode;
+  /** The ⋯ menu (MoreMenu): everything else; delete last, in red. */
+  more?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   backHref?: string;
   backLabel?: string;
   children?: ReactNode;
 }) {
+  const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined;
+  const right = actions || papers || primary || more;
   return (
     <header className="mb-5">
       {backHref && (
@@ -188,32 +216,62 @@ export function PageHeader({
           ← {backLabel ?? "Back"}
         </Link>
       )}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-[1_1_18rem]">
-          <h1 className="text-xl font-semibold tracking-tight text-text">{title}</h1>
+      <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap")}>
+        <div className={cn("min-w-0", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]")}>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <h1 className={cn("font-semibold tracking-tight text-text", framed ? "text-[22px] leading-7" : "text-xl")}>{title}</h1>
+            {badge}
+          </div>
+          {summary && <div className="mt-1 text-sm text-text-2">{summary}</div>}
           {description && <div className="mt-1 max-w-2xl text-sm text-muted">{description}</div>}
         </div>
-        {/* Excel, print and download first, then the main button: always top right. */}
-        {actions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
+        {/* Papers first, then the one primary, then ⋯: always top right. */}
+        {right && (
+          <div className={cn("flex items-center gap-2", framed ? "shrink-0 sm:flex-wrap sm:justify-end" : "flex-wrap sm:justify-end")}>
+            {actions}
+            {papers && (
+              <div data-slot="papers" className="flex items-center gap-2 max-sm:hidden">
+                {papers}
+              </div>
+            )}
+            {primary && <div data-slot="primary" className="contents">{primary}</div>}
+            {more}
+          </div>
+        )}
       </div>
       {children}
     </header>
   );
 }
 
+/**
+ * Empty is a starting point: what goes here and the ONE way to add it (a single
+ * `action`). `framed`: the dashed box of the design system, without the icon,
+ * for an empty list inside a card.
+ */
 export function EmptyState({
   icon: Icon = Inbox,
   title,
   description,
   action,
+  framed,
   className,
 }: {
   icon?: LucideIcon;
   title: string;
   description?: ReactNode;
   action?: ReactNode;
+  framed?: boolean;
   className?: string;
 }) {
+  if (framed)
+    return (
+      <div className={cn("m-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-line-strong px-6 py-8 text-center", className)}>
+        <p className="text-sm font-semibold text-text">{title}</p>
+        {description && <p className="mt-1 max-w-sm text-sm text-text-2">{description}</p>}
+        {action && <div className="mt-3">{action}</div>}
+      </div>
+    );
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-14 text-center", className)}>
       <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary-soft text-primary">
@@ -241,6 +299,19 @@ export function Alert({ tone = "info", children, className }: { tone?: keyof typ
       <Icon className={cn("mt-0.5 size-4 shrink-0", t.iconClass)} aria-hidden />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
+  );
+}
+
+/**
+ * A problem or a note on the page, shown in the card it concerns (not at the
+ * top of the page): the Alert in the design system's meanings.
+ */
+export function Banner({ meaning = "info", children, className }: { meaning?: "info" | "ok" | "warn" | "bad"; children: ReactNode; className?: string }) {
+  const tone = meaning === "ok" ? "success" : meaning === "warn" ? "warning" : meaning === "bad" ? "error" : "info";
+  return (
+    <Alert tone={tone} className={className}>
+      {children}
+    </Alert>
   );
 }
 
@@ -347,20 +418,92 @@ export function FilterBar({ children, end, className }: { children: ReactNode; e
   );
 }
 
-/** A filter chip that is a link: dashed when off, tinted when on. */
-export function FilterChip({ href, active, children }: { href: string; active: boolean; children: ReactNode }) {
+/**
+ * A filter chip that is a link: dashed when off, tinted when on. `pill`: the
+ * list toolbar's round chip with its count ("Overdue 2"), ringed when on.
+ */
+export function FilterChip({ href, active, count, pill, children }: { href: string; active: boolean; count?: number; pill?: boolean; children: ReactNode }) {
   return (
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        buttonClass("secondary", "sm"),
-        "h-8 gap-1 border-dashed px-2.5 text-xs",
-        active && "border-solid border-primary/40 bg-primary-soft text-primary hover:bg-primary-soft",
+        pill
+          ? "inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-line-strong bg-surface px-3 text-xs font-medium whitespace-nowrap text-text transition-colors hover:bg-surface-2"
+          : buttonClass("secondary", "sm"),
+        !pill && "h-8 gap-1 border-dashed px-2.5 text-xs",
+        active &&
+          (pill
+            ? "border-primary bg-primary-soft text-primary ring-1 ring-primary hover:bg-primary-soft"
+            : "border-solid border-primary/40 bg-primary-soft text-primary hover:bg-primary-soft"),
       )}
     >
       {children}
+      {count !== undefined && <span className={cn("tabular", active ? "font-semibold" : "text-text-2")}>{count}</span>}
     </Link>
+  );
+}
+
+export interface ListChip {
+  key: string;
+  label: ReactNode;
+  count?: number;
+  href: string;
+  active: boolean;
+}
+
+/**
+ * The row above every list (design system: List frame): search, the filter
+ * chips with their counts, and on the right the list's Excel — in one row; on
+ * a phone the search takes the width and the chips scroll sideways. The search
+ * is a GET form that keeps the other filters (`keep`), so the URL holds them all.
+ */
+export function ListToolbar({
+  search,
+  keep = {},
+  chips = [],
+  end,
+  label = "Filters",
+  className,
+}: {
+  search?: { placeholder: string; value?: string; clearHref?: string; label?: string; name?: string };
+  /** The list's other filters, carried by the search form (page is dropped: a new search starts at page 1). */
+  keep?: Record<string, string | undefined>;
+  chips?: ListChip[];
+  /** The list's Excel (export what the filters show). */
+  end?: ReactNode;
+  label?: string;
+  className?: string;
+}) {
+  const name = search?.name ?? "q";
+  return (
+    <div className={cn("mb-3 flex flex-wrap items-center gap-2", className)}>
+      {search && (
+        <form role="search" className="w-full sm:w-auto">
+          {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
+          <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="h-9 sm:w-64 [&_input]:h-9" />
+          <button className="sr-only">Search</button>
+        </form>
+      )}
+      {(chips.length > 0 || end) && (
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {chips.length > 0 && (
+            <ScrollFade
+              as="nav"
+              aria-label={label}
+              className="-mx-4 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-4 py-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0.5 [&::-webkit-scrollbar]:hidden"
+            >
+              {chips.map((c) => (
+                <FilterChip key={c.key} href={c.href} active={c.active} count={c.count} pill>
+                  {c.label}
+                </FilterChip>
+              ))}
+            </ScrollFade>
+          )}
+          {end && <div className="ml-auto flex shrink-0 items-center gap-2">{end}</div>}
+        </div>
+      )}
+    </div>
   );
 }
 

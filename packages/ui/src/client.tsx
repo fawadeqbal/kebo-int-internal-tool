@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ComponentProps } from "react";
+import { useEffect, useState, useSyncExternalStore, type ComponentProps } from "react";
 import { useFormStatus } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Check, Loader2 } from "lucide-react";
 import { buttonClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
 
 /** Submit button that shows progress and blocks double submits. */
@@ -42,46 +43,105 @@ export function ConfirmSubmit({
   );
 }
 
-/** Shows a short confirmation after a redirect (?toast=…), then cleans the URL. */
+/* ---------------------------------------------------------------- Toast */
+
+export interface ToastInput {
+  /** Short: "Saved", "Customer added · Lahore Pharma". */
+  message: string;
+  /** Undo where possible: called once, then the toast says what happened. */
+  undo?: () => void | Promise<void>;
+  /** A link instead (e.g. "Open"). */
+  action?: { label: string; href: string };
+}
+interface ToastItem extends ToastInput {
+  id: number;
+}
+
+let toastSeq = 0;
+let toastNow: ToastItem | null = null;
+const toastListeners = new Set<() => void>();
+const emitToast = () => toastListeners.forEach((l) => l());
+
+/** Shows the short note after a save ("Saved", with Undo where possible). One at a time; the newest wins. */
+export function toast(input: ToastInput | string) {
+  toastNow = { ...(typeof input === "string" ? { message: input } : input), id: ++toastSeq };
+  emitToast();
+}
+function dismissToast(id: number) {
+  if (toastNow?.id !== id) return;
+  toastNow = null;
+  emitToast();
+}
+const subscribeToast = (l: () => void) => {
+  toastListeners.add(l);
+  return () => toastListeners.delete(l);
+};
+
+/** The toast on screen (bottom right; above the phone's bottom bar): ✓ message, Undo or a link, ✕. Hover keeps it. */
+export function Toaster() {
+  const t = useSyncExternalStore(subscribeToast, () => toastNow, () => null);
+  const [held, setHeld] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!t || held || busy) return;
+    const timer = setTimeout(() => dismissToast(t.id), t.undo ? 7000 : 4000);
+    return () => clearTimeout(timer);
+  }, [t, held, busy]);
+  if (!t) return null;
+  const undo = async () => {
+    if (!t.undo) return;
+    setBusy(true);
+    try {
+      await t.undo();
+      toast("Undone");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={() => setHeld(false)}
+      className="no-print fixed inset-x-4 bottom-24 z-[95] flex animate-in items-center gap-3 rounded-xl bg-[#18181b] px-4 py-3 text-sm text-white shadow-pop sm:inset-x-auto sm:right-5 sm:min-w-72 lg:bottom-5 dark:bg-surface-3 dark:text-text"
+    >
+      <Check className="size-4 shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1">{t.message}</span>
+      {t.undo && (
+        <button type="button" onClick={() => void undo()} disabled={busy} className="font-medium text-[#c4b5fd] underline underline-offset-2 hover:text-white disabled:opacity-60">
+          {busy ? "Undoing…" : "Undo"}
+        </button>
+      )}
+      {t.action && (
+        <Link href={t.action.href} className="font-medium text-[#c4b5fd] underline underline-offset-2 hover:text-white" onClick={() => dismissToast(t.id)}>
+          {t.action.label}
+        </Link>
+      )}
+      <button onClick={() => dismissToast(t.id)} className="ml-1 rounded p-0.5 text-white/60 hover:text-white" aria-label="Dismiss">
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/** The toasts, and the one a redirect asks for (?toast=…, then the URL is cleaned). In the app's layout. */
 export function Toast() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const message = params.get("toast");
-  const [visible, setVisible] = useState<string | null>(null);
-  const [lastMessage, setLastMessage] = useState<string | null>(null);
-  // Show a newly arrived message (state adjusted during render, not in an effect).
-  if (message && message !== lastMessage) {
-    setLastMessage(message);
-    setVisible(message);
-  }
-
   useEffect(() => {
     if (!message) return;
+    toast(message);
     const next = new URLSearchParams(params.toString());
     next.delete("toast");
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    const timer = setTimeout(() => setVisible(null), 4000);
-    return () => clearTimeout(timer);
   }, [message, params, pathname, router]);
-
-  if (!visible) return null;
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="no-print fixed inset-x-4 bottom-24 z-50 flex animate-in items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-text shadow-pop sm:inset-x-auto sm:right-5 sm:min-w-72 lg:bottom-5"
-    >
-      <span className="flex size-5 items-center justify-center rounded-full bg-ok-soft text-ok" aria-hidden>
-        <svg viewBox="0 0 16 16" className="size-3" fill="none"><path d="m4 8.5 2.5 2.5L12 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </span>
-      <span className="flex-1">{visible}</span>
-      <button onClick={() => setVisible(null)} className="ml-2 rounded p-0.5 text-muted hover:text-text" aria-label="Dismiss">
-        ✕
-      </button>
-    </div>
-  );
+  return <Toaster />;
 }
 
 /** A filter select that applies itself as soon as it changes. */

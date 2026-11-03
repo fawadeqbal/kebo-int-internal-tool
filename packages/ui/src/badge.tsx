@@ -37,6 +37,27 @@ export function Badge({ tone = "neutral", dot, children, className }: { tone?: k
   );
 }
 
+/** The five things a status can mean, and nothing else (design system, principle 6). */
+export type StatusMeaning = Tone;
+
+/** Any tone used in the app, as one of the five meanings ("primary": moving → info; "outline": neutral). */
+export function meaningOf(tone: keyof typeof TONES): StatusMeaning {
+  return tone === "primary" ? "info" : tone === "outline" ? "neutral" : tone;
+}
+
+/**
+ * A status: its word and a dot, in the colour of what it means — neutral (Draft,
+ * not started), info (Sent, In progress), ok (Done, Paid), warn (Due soon,
+ * Check), bad (Late, Failed). The word is always there; the colour only repeats it.
+ */
+export function StatusBadge({ meaning, children, className }: { meaning: StatusMeaning; children: ReactNode; className?: string }) {
+  return (
+    <Badge tone={meaning} dot className={className}>
+      {children}
+    </Badge>
+  );
+}
+
 export const StageBadge = ({ stage, onHold }: { stage: InquiryStage; onHold?: boolean }) => (
   <span className="inline-flex items-center gap-1">
     <Badge tone={INQUIRY_STAGE_TONE[stage]} dot>
