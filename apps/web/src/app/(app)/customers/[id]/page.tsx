@@ -28,6 +28,7 @@ import { HistoryList } from "@/components/common/history-list";
 import { CustomerMoney } from "@/components/money/customer-money";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeCustomerAction } from "../actions";
+import { PerformanceCard } from "@/components/insights/performance";
 
 export const metadata = { title: "Customer" };
 
@@ -103,6 +104,8 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           — it decides shipping.
         </p>
       )}
+
+      {tab === "overview" && <PerformanceCard kind="customer" id={c.id} me={me} />}
 
       <LinkTabs
         label="Customer sections"

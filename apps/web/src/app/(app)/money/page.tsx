@@ -82,7 +82,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   const expensesOn = await hasFeature("expenses");
   const allowed: Tab[] = [...(managers && cashBook ? (["cash"] as const) : []), ...(managers && expensesOn ? (["expenses"] as const) : []), ...(recorders ? (["receive"] as const) : []), "owe"];
   // Old links to profit & loss now open on Insights.
-  if (sp.tab === "pnl") redirect("/insights?tab=profit&sub=pnl");
+  if (sp.tab === "pnl") redirect("/insights?section=money&view=pnl");
   const tab: Tab = allowed.includes(sp.tab as Tab) ? (sp.tab as Tab) : allowed[0]!;
   const today = todayIn(TZ);
   const label: Record<Tab, string> = { cash: "Cash book", expenses: "Expenses", receive: "To receive", owe: "What we owe factories" };
@@ -98,7 +98,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
         }
         actions={
           can(me, "reports.view") && (await hasFeature("insights")) ? (
-            <Link href="/insights?tab=profit" className={buttonClass("secondary", "sm")}>
+            <Link href="/insights?section=money" className={buttonClass("secondary", "sm")}>
               <ChartNoAxesCombined aria-hidden /> Profit on Insights
             </Link>
           ) : undefined

@@ -11,6 +11,7 @@ import { ConfirmAction } from "@/components/people/confirm-action";
 import { RoleBadge } from "@/components/people/role-badge";
 import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserAction } from "../actions";
 import { EditUserForm, SetPasswordForm } from "../forms";
+import { PerformanceCard } from "@/components/insights/performance";
 
 export const metadata = { title: "Person" };
 
@@ -39,6 +40,7 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
         }
         description={isMe ? "This is you. Change your own password and two-step sign-in under My account." : u.email}
       />
+      <PerformanceCard kind="user" id={u.id} me={me} />
       <div className="grid items-start gap-5 md:grid-cols-2">
         <Card>
           <CardHeader title="Details" description="Name, sign-in email and what they may do" />

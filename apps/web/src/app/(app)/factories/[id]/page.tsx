@@ -11,6 +11,8 @@ import { HistoryList } from "@/components/common/history-list";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { removeFactoryAction } from "../actions";
 
+import { PerformanceCard } from "@/components/insights/performance";
+
 export const metadata = { title: "Factory" };
 
 type Tab = "prices" | "costs" | "details" | "history";
@@ -41,6 +43,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
           </ButtonLink>
         }
       />
+      {tab === "prices" && <PerformanceCard kind="factory" id={f.id} me={me} />}
       {(f.record.asked > 0 || f.record.openOrders.length > 0) && (
         <StatRow className="mb-5">
           <StatTile
