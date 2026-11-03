@@ -352,6 +352,8 @@ model User {
   relReceiptRecorder        CustomerReceipt[]    @relation("ReceiptRecorder")
   relCreditRecorder         CustomerCredit[]     @relation("CreditRecorder")
   relPapersMade             OrderPaper[]         @relation("PaperMadeBy")
+  relOrderFacts             OrderFact[]          @relation("OrderFactHandledBy")
+  relInquiryFacts           InquiryFact[]        @relation("InquiryFactHandledBy")
 
   @@unique([companyId, email])
   @@map("users")
@@ -532,6 +534,8 @@ model Customer {
   expenses  Expense[]
   receipts  CustomerReceipt[]
   credits   CustomerCredit[]
+  orderFacts   OrderFact[]
+  inquiryFacts InquiryFact[]
 
   @@index([name])
   @@index([country])
@@ -598,6 +602,7 @@ model Factory {
   checklistItems  OrderChecklistItem[]
   paymentPlans    FactoryPaymentPlan[]
   orderParts      OrderFactory[]
+  orderFacts      FactoryOrderFact[]
 
   @@index([name])
   @@index([ownerId])
@@ -648,6 +653,8 @@ model Inquiry {
   attachments   Attachment[]
   factoryQuotes FactoryQuote[]
   quotation     Quotation?
+  fact          InquiryFact?
+  orderFacts    OrderFact[]
   /// At most one order that is not cancelled (partial unique index in the integrity migration).
   orders        Order[]
   expenses      Expense[]
@@ -1145,6 +1152,8 @@ model Order {
   factories    OrderFactory[]
   credits      CustomerCredit[]
   papers       OrderPaper[]
+  fact         OrderFact?
+  factoryFacts FactoryOrderFact[]
 
   @@unique([companyId, refNo])
   @@unique([companyId, proformaNo])
@@ -2173,6 +2182,10 @@ model Company {
   factoryPaymentPlans FactoryPaymentPlan[]
   orderFactories      OrderFactory[]
   orderPapers         OrderPaper[]
+  orderFacts          OrderFact[]
+  inquiryFacts        InquiryFact[]
+  factoryOrderFacts   FactoryOrderFact[]
+  factsQueue          FactsQueue[]
 
   @@map("companies")
 }
@@ -2383,4 +2396,171 @@ model DatabaseMarker {
   at   DateTime @default(now()) @db.Timestamptz
 
   @@map("database_markers")
+}
+
+// ============================================================================
+// Insights data: three calculated tables (never typed by people)
+// ============================================================================
+
+/// One ready-made row per order for Insights, worked out only by the shared rules (orderPosition, orderMoney,
+/// the live plan, shippedOnOf, the ready dates) in FactsService. Refreshed when anything of the order changes
+/// (facts_queue, filled by database triggers) and rebuilt every night; it can always be thrown away and made
+/// again. Money in the main currency (`main_currency`) at the order's own rate.
+model OrderFact {
+  orderId            String         @id @map("order_id") @db.Uuid
+  order              Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId          String         @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company            Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inquiryId          String         @map("inquiry_id") @db.Uuid
+  inquiry            Inquiry        @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  customerId         String         @map("customer_id") @db.Uuid
+  customer           Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  handledBy          String?        @map("handled_by") @db.Uuid
+  handler            User?          @relation("OrderFactHandledBy", fields: [handledBy], references: [id], onDelete: SetNull)
+  country            String         @db.Char(2)
+  channel            InquiryChannel
+  category           String         @db.VarChar(120)
+  status             OrderStatus
+  stage              OrderStage
+  orderedOn          DateTime       @map("ordered_on") @db.Date
+  shipBy             DateTime?      @map("ship_by") @db.Date
+  readyOn            DateTime?      @map("ready_on") @db.Date
+  shippedOn          DateTime?      @map("shipped_on") @db.Date
+  deliveredOn        DateTime?      @map("delivered_on") @db.Date
+  closedOn           DateTime?      @map("closed_on") @db.Date
+  /// The order's own currency, and the main currency the figures below are in.
+  currency           String         @db.Char(3)
+  mainCurrency       String         @map("main_currency") @db.Char(3)
+  /// False: no rate to the main currency (the money figures are 0 and the order is listed as missing a rate).
+  rateKnown          Boolean        @map("rate_known")
+  totalMain          Decimal        @map("total_main") @db.Decimal(16, 2)
+  /// The part of the total whose lines have a cost (profit and margin are on it alone).
+  costedMain         Decimal        @map("costed_main") @db.Decimal(16, 2)
+  /// Goods and the planned costs to reach the basis sold on.
+  costMain           Decimal        @map("cost_main") @db.Decimal(16, 2)
+  profitQuoteMain    Decimal        @map("profit_quote_main") @db.Decimal(16, 2)
+  profitExpectedMain Decimal        @map("profit_expected_main") @db.Decimal(16, 2)
+  marginQuote        Decimal?       @map("margin_quote") @db.Decimal(8, 1)
+  margin             Decimal?       @db.Decimal(8, 1)
+  /// Every live expense we bear on the order.
+  expensesMain       Decimal        @map("expenses_main") @db.Decimal(16, 2)
+  /// What went beyond the plan: profit on the quote less profit now expected.
+  costsOverPlanMain  Decimal        @map("costs_over_plan_main") @db.Decimal(16, 2)
+  receivedMain       Decimal        @map("received_main") @db.Decimal(16, 2)
+  dueMain            Decimal        @map("due_main") @db.Decimal(16, 2)
+  /// Late on the plan on the day it was worked out (readers age `open_parts` against today).
+  overdueMain        Decimal        @map("overdue_main") @db.Decimal(16, 2)
+  /// What is still open, part by part: [{ "dueOn": "2026-11-30" | null, "open": "1200.00" }] (main currency).
+  openParts          Json           @default("[]") @map("open_parts")
+  paidInFullOn       DateTime?      @map("paid_in_full_on") @db.Date
+  /// Paid in full with every dated part settled by its due date (null until paid in full).
+  paidOnTime         Boolean?       @map("paid_on_time")
+  /// Shipped by the ship-by date (null: not shipped or no ship-by).
+  onTime             Boolean?       @map("on_time")
+  daysQuoteToOrder   Int?           @map("days_quote_to_order")
+  daysToShip         Int?           @map("days_to_ship")
+  computedAt         DateTime       @default(now()) @map("computed_at") @db.Timestamptz
+
+  @@index([companyId, orderedOn])
+  @@index([customerId])
+  @@index([inquiryId])
+  @@index([handledBy])
+  @@map("order_facts")
+}
+
+/// One ready-made row per inquiry (not deleted) for the funnel and the people, worked out by the shared rules.
+model InquiryFact {
+  inquiryId        String         @id @map("inquiry_id") @db.Uuid
+  inquiry          Inquiry        @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId        String         @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId       String         @map("customer_id") @db.Uuid
+  customer         Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  handledBy        String?        @map("handled_by") @db.Uuid
+  handler          User?          @relation("InquiryFactHandledBy", fields: [handledBy], references: [id], onDelete: SetNull)
+  channel          InquiryChannel
+  country          String         @db.Char(2)
+  category         String         @db.VarChar(120)
+  stage            InquiryStage
+  /// The company's day it came in (APP_TIME_ZONE).
+  receivedOn       DateTime       @map("received_on") @db.Date
+  firstQuoteOn     DateTime?      @map("first_quote_on") @db.Date
+  /// At least one factory offer came in.
+  gotPrices        Boolean        @map("got_prices")
+  /// The latest sent quotation at its accepted option, else its lowest, at today's Settings rate (null: none sent).
+  quotedValueMain  Decimal?       @map("quoted_value_main") @db.Decimal(16, 2)
+  mainCurrency     String         @map("main_currency") @db.Char(3)
+  /// open | won | lost
+  outcome          String         @db.VarChar(4)
+  lostReason       LostReason?    @map("lost_reason")
+  closedOn         DateTime?      @map("closed_on") @db.Date
+  daysToFirstQuote Int?           @map("days_to_first_quote")
+  daysToClose      Int?           @map("days_to_close")
+  computedAt       DateTime       @default(now()) @map("computed_at") @db.Timestamptz
+
+  @@index([companyId, receivedOn])
+  @@index([companyId, closedOn])
+  @@index([customerId])
+  @@index([handledBy])
+  @@map("inquiry_facts")
+}
+
+/// One ready-made row per order × factory (the factories its lines are bought from): what we owe it
+/// (factoryPosition), its plan's open parts, its ready date against the promise, its offers on the deal.
+model FactoryOrderFact {
+  orderId          String    @map("order_id") @db.Uuid
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  factoryId        String    @map("factory_id") @db.Uuid
+  factory          Factory   @relation(fields: [factoryId], references: [id], onDelete: Cascade)
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId        String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status           OrderStatus
+  orderedOn        DateTime  @map("ordered_on") @db.Date
+  /// The factory's currency; null when the order owes it in more than one (then only the main figures).
+  currency         String?   @db.Char(3)
+  owed             Decimal?  @db.Decimal(16, 2)
+  paid             Decimal?  @db.Decimal(16, 2)
+  toPay            Decimal?  @map("to_pay") @db.Decimal(16, 2)
+  mainCurrency     String    @map("main_currency") @db.Char(3)
+  owedMain         Decimal   @map("owed_main") @db.Decimal(16, 2)
+  paidMain         Decimal   @map("paid_main") @db.Decimal(16, 2)
+  toPayMain        Decimal   @map("to_pay_main") @db.Decimal(16, 2)
+  /// Its plan's open parts: [{ "dueOn": "2026-11-30" | null, "open": "1200.00" }] (main currency).
+  openParts        Json      @default("[]") @map("open_parts")
+  readyPromised    DateTime? @map("ready_promised") @db.Date
+  readyActual      DateTime? @map("ready_actual") @db.Date
+  daysLate         Int?      @map("days_late")
+  onTime           Boolean?  @map("on_time")
+  /// Offers this factory sent on the order's deal, and whether the order was bought on one of them.
+  offersSent       Int       @map("offers_sent")
+  offerWon         Boolean   @map("offer_won")
+  /// Claims on the order (claims name no factory yet: each of the order's factories carries them).
+  claims           Int
+  computedAt       DateTime  @default(now()) @map("computed_at") @db.Timestamptz
+
+  @@id([orderId, factoryId])
+  @@index([companyId, orderedOn])
+  @@index([factoryId])
+  @@map("factory_order_facts")
+}
+
+/// What the calculated tables still have to catch up on: database triggers on the tables they are worked out
+/// from add the order or inquiry here (kind "all": the whole company, e.g. after the rates changed), and
+/// FactsService works them off (after each change through the API, before every read, and in the worker).
+model FactsQueue {
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the row changed).
+  companyId String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// order | inquiry | all
+  kind      String   @db.VarChar(10)
+  entityId  String   @map("entity_id") @db.Uuid
+  /// Moves on each time the row is queued again, so a row queued while it was being worked off stays.
+  seq       BigInt   @default(autoincrement())
+  queuedAt  DateTime @default(now()) @map("queued_at") @db.Timestamptz
+
+  @@id([companyId, kind, entityId])
+  @@map("facts_queue")
 }
