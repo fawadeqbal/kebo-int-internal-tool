@@ -21,7 +21,7 @@ import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
 import type { BalanceTerms, Incoterm, InquiryStage } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
-import { freezeOrderMoney, nextReference, openCompany, toDbDate, type Prisma } from "../src";
+import { freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, toDbDate, type Prisma } from "../src";
 import * as map from "./import-legacy/map";
 
 /* ---------------------------------------------------------------- arguments */
@@ -966,6 +966,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     });
     await tx.orderLine.createMany({ data: lineRows });
     await freezeOrderMoney(tx, [id]);
+    await freezeOrderBuyer(tx, [id], new Date().toISOString().slice(0, 10));
     await tx.orderStageChange.createMany({
       data: staged.history.map((h, i) => ({
         id: randomUUID(),

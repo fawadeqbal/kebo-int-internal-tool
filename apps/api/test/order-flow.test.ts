@@ -210,9 +210,25 @@ describe("order flow: from asking factories to SAT", () => {
     await api(app, sana).post(`/orders/${orderId}/document-set`, { kind: "other", status: "ready" }).expect(400);
     await api(app, sana).post(`/orders/${orderId}/document-set`, { kind: "insurance", status: "ready", attachmentId: "6b65626f-0000-4000-8000-00000000abcd" }).expect(400);
 
-    for (const kind of ["packing_list", "commercial_invoice", "certificate_of_origin", "proforma_invoice", "sales_contract", "insurance"]) {
-      f = (await api(app, sana).post(`/orders/${orderId}/document-set`, { kind, status: "ready" }).expect(201)).body;
+    // The papers the app makes are never recorded by hand: the app makes them (issued, packed, made final).
+    for (const kind of ["packing_list", "commercial_invoice", "proforma_invoice", "sales_contract"]) {
+      const refused = await api(app, sana).post(`/orders/${orderId}/document-set`, { kind, status: "ready" }).expect(400);
+      expect(refused.body.error).toMatch(/made by the app/);
     }
+    for (const kind of ["certificate_of_origin", "insurance"]) {
+      await api(app, sana).post(`/orders/${orderId}/document-set`, { kind, status: "ready" }).expect(201);
+    }
+    await api(app, sana).post(`/orders/${orderId}/proforma`).expect(200);
+    const goods = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body.lines.filter((l: { type: string }) => l.type === "goods");
+    await api(app, sana)
+      .put(`/orders/${orderId}/packing`, { lines: goods.map((l: { id: string }) => ({ lineId: l.id, packages: 1, packageType: "Wooden case" })) })
+      .expect(200);
+    await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice/fix`, { field: "vessel", value: "MSC Aurora" }).expect(200);
+    for (const kind of ["sales-contract", "commercial-invoice"]) {
+      const made = (await api(app, sana).post(`/orders/${orderId}/papers/${kind}`, {}).expect(201)).body;
+      await api(app, sana).post(`/papers/${made.paper.id}/final`, {}).expect(200);
+    }
+    f = await flow();
     expect(f.documents.set.filter((d: { required: boolean; status: string }) => d.required && d.status !== "ready")).toEqual([]);
 
     await api(app, sana).put(`/orders/${orderId}/bank-steps/teleported`, { doneOn: "2026-11-01" }).expect(422);

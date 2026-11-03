@@ -39,11 +39,17 @@ async function ask<T>(token: string, path: string, query?: Record<string, string
 type Target = { name: string; path: string };
 type Kind = (id: string, token: string, url: URL) => Promise<Target>;
 
+/** The proforma or the packing list: a version (?v=), else the latest. */
 const orderDocument =
   (kind: "proforma" | "packing-list"): Kind =>
-  async (id, token) => {
-    const d = await ask<OrderDocument>(token, `/orders/${id}/documents/${kind}`);
-    return { name: `${d.title} ${d.number}${d.order.status === "cancelled" ? " (cancelled)" : ""}`, path: `/print/orders/${id}/${kind}` };
+  async (id, token, url) => {
+    const v = url.searchParams.get("v");
+    const q = v && /^\d{1,3}$/.test(v) ? { v } : undefined;
+    const d = await ask<OrderDocument>(token, `/orders/${id}/documents/${kind}`, q);
+    return {
+      name: `${d.title} ${d.number}${d.paper && d.versions.length > 1 ? ` v${d.paper.version}` : ""}${d.order.status === "cancelled" ? " (cancelled)" : ""}`,
+      path: `/print/orders/${id}/${kind}${q ? `?v=${q.v}` : ""}`,
+    };
   };
 
 /** A paper the app makes: a version (?v=), which payment, plan item or factory (?ref=). */
@@ -105,7 +111,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     target = await KINDS[kind].target(id, session, new URL(req.url));
     // Priced documents: the internal copy (every price, cost and payment) when asked for.
     if ((kind === "revisions" || kind === "proforma") && new URL(req.url).searchParams.get("copy") === "internal") {
-      target = { name: `${target.name} (internal)`, path: `${target.path}?copy=internal` };
+      target = { name: `${target.name} (internal)`, path: `${target.path}${target.path.includes("?") ? "&" : "?"}copy=internal` };
     }
   } catch (e) {
     if (e instanceof ApiError)

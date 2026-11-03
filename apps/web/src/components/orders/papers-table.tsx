@@ -10,13 +10,16 @@ import { FloatingMenu } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
 import { downloadHref, FileChip, uploadToOrder, useFileTools } from "@/components/files/file-tools";
-import { paperAgainAction, paperDeleteDraftAction } from "@/app/(app)/orders/files-actions";
+import { ownDocumentAction, paperAgainAction, paperDeleteDraftAction } from "@/app/(app)/orders/files-actions";
 import { RecordForm, StateMark } from "./papers-card";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 export type PapersTab = "bank" | "all" | "missing";
 /** A row of the table: a paper of GET /orders/:id/papers, or the quotation (its own print page); `links` overrides where it prints. */
 export type PaperLineRow = PaperRow & { links?: { view: string; pdf: string; internal?: string } };
+
+/** The order's own proforma and packing list: final when issued / shipped, Make again for the next version. */
+const ownDoc = (r: PaperRow): r is PaperRow & { kind: "proforma" | "packing-list" } => r.kind === "proforma" || r.kind === "packing-list";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const day = (iso: string) => `${iso.slice(8, 10)} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
@@ -307,15 +310,37 @@ function PaperLine({
   const recordable = r.docKind && canRecord;
   const drop = attachKey(r);
 
-  const issue =
-    issueProforma && r.state === "can" ? (
+  // The next version of the proforma / packing list (Make again): issued or made final from the row.
+  const ownDraft =
+    canMake && ownDoc(r) && r.draft ? (
+      <Button
+        size="xs"
+        variant="primary"
+        disabled={busy}
+        onClick={() =>
+          window.confirm(
+            `Make version ${r.version} of the ${r.label.toLowerCase()} final? It keeps exactly what it prints now; version ${(r.version ?? 2) - 1} stays as it was.`,
+          ) &&
+          start(async () => {
+            const res = await ownDocumentAction(orderId, r.kind as "proforma" | "packing-list", "final");
+            if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+            router.refresh();
+          })
+        }
+      >
+        {r.kind === "proforma" ? `Issue version ${r.version}` : `Make version ${r.version} final`}
+      </Button>
+    ) : null;
+  const issue = ownDraft ? (
+    ownDraft
+  ) : issueProforma && r.state === "can" ? (
       <Button
         size="xs"
         variant="secondary"
         disabled={busy}
         onClick={() =>
           window.confirm(
-            "Issue the proforma now? It gets its number dated today (your letters, the date, the customer's letters, the handler's count) and the number does not change afterwards.",
+            "Issue the proforma now? It gets its number dated today (your letters, the date, the customer's letters, the handler's count) and is final: re-printing it shows exactly what it prints now. A correction later is Make again (version 2, same number).",
           ) &&
           start(async () => {
             const res = await issueProforma({}, new FormData());
@@ -578,6 +603,46 @@ export function PaperMenu({
                 }),
               `version ${(r.version ?? 1) + 1}, keeps ${r.version ?? 1}`,
             )}
+          {canMake && ownDoc(r) && r.version !== null && !r.draft && paperDone(r.state) && (
+            <>
+              {sep}
+              {item(
+                "Make again",
+                () =>
+                  window.confirm(
+                    `Start version ${r.version! + 1} of the ${r.label.toLowerCase()} from the order as it is now? Version ${r.version} stays exactly as it was printed; the number stays ${r.number}.`,
+                  ) &&
+                  start(async () => {
+                    const res = await ownDocumentAction(orderId, r.kind as "proforma" | "packing-list", "again");
+                    if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+                    router.refresh();
+                  }),
+                `version ${r.version + 1}, keeps ${r.version}`,
+              )}
+            </>
+          )}
+          {ownDoc(r) &&
+            print &&
+            r.version !== null &&
+            r.version > 1 &&
+            Array.from({ length: r.version - 1 }, (_, i) => i + 1).map((v) => (
+              <span key={v}>{item(`View version ${v}`, () => window.open(`${print.view}&v=${v}`, "_blank"), "as printed")}</span>
+            ))}
+          {canMake &&
+            ownDoc(r) &&
+            r.draft &&
+            item(
+              "Delete the draft",
+              () =>
+                window.confirm(`Delete the draft of the ${r.label.toLowerCase()} (version ${r.version})? Version ${(r.version ?? 2) - 1} stays.`) &&
+                start(async () => {
+                  const res = await ownDocumentAction(orderId, r.kind as "proforma" | "packing-list", "delete");
+                  if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+                  router.refresh();
+                }),
+              "drafts only",
+              true,
+            )}
           {canRecord &&
             r.source === "app" &&
             paperDone(r.state) &&
@@ -586,7 +651,7 @@ export function PaperMenu({
           {!onRecord && recordable && r.source === "upload" && (r.state === "miss" || r.state === "draft") && item("Upload…", () => record("upload"), "in Papers")}
           {recordable && r.state !== "else" && r.source === "upload" && item(onRecord ? "Kept elsewhere instead" : "Kept elsewhere…", () => record("elsewhere"))}
           {recordable && r.state === "else" && item("Upload it instead", () => record("upload"))}
-          {canMake && r.draft && r.paperId && (
+          {canMake && r.draft && r.paperId && !ownDoc(r) && (
             <>
               {sep}
               {item(

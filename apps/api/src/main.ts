@@ -5,6 +5,7 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ENV, type Env } from "./config/env";
 import { configureApp } from "./setup";
+import { DocumentsService } from "./modules/orders/documents.service";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
@@ -12,6 +13,11 @@ async function bootstrap() {
   configureApp(app, env);
   await app.listen(env.API_PORT);
   Logger.log(`API on http://localhost:${env.API_PORT}/api (docs at /api/docs)`, "Bootstrap");
+  // Proformas issued (and packing lists shipped) before their snapshots were kept: snapshot them once, from the data.
+  void app
+    .get(DocumentsService)
+    .rebuildAll()
+    .catch((e) => Logger.error(`snapshots from the data: ${(e as Error).stack ?? e}`, "Bootstrap"));
 }
 
 void bootstrap();

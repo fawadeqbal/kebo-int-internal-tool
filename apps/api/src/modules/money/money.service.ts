@@ -4,6 +4,7 @@ import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
+  balanceTermsOf,
   BALANCE_TERMS_LABEL,
   can,
   planHow,
@@ -264,7 +265,8 @@ export class MoneyService {
       refNo: o.refNo,
       currency: o.currency,
       total: fromMinor(totalMinor),
-      terms: BALANCE_TERMS_LABEL[o.balanceTerms],
+      // The terms the route now means (as accepted until a route is chosen).
+      terms: BALANCE_TERMS_LABEL[balanceTermsOf(terms, o.balanceTerms)],
       /** How the customer pays, from the route ("LC, deferred 90 days"); null until chosen. */
       route: { route: terms.route, summary: routeSummary(terms) },
       received: fromMinor(position.settledMinor),

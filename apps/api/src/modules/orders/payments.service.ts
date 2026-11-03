@@ -118,6 +118,8 @@ export class PaymentsService {
       },
       payments: all.map((p) => ({
         id: p.id,
+        /** Its receipt's number (RC-…-n), given when it was recorded and never moved. */
+        receiptNo: p.receiptNo,
         kind: p.kind,
         amount: p.amount.toFixed(2),
         bankCharges: p.bankCharges.toFixed(2),

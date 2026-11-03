@@ -229,8 +229,12 @@ describe("money v2", () => {
     expect(m.plan.items[0]).toMatchObject({ id: deposit.id, status: "paid" });
     expect(m.plan.items[1]).toMatchObject({ label: "Balance through the LC", part: "balance", how: "LC, deferred 90 days", when: "90 days after the papers", dueOn: null });
     expect(m.plan.matchesTotal).toBe(true);
-    // The papers' terms follow the route.
-    expect((await api(app, sana).get(`/orders/${id}`).expect(200)).body.balanceTerms).toBe("letter_of_credit");
+    // The order's terms stay as accepted; the papers word theirs from the route, and the Money tab shows the route's.
+    expect((await api(app, sana).get(`/orders/${id}`).expect(200)).body.balanceTerms).toBe("before_shipment");
+    expect(m.terms).toBe("Letter of credit");
+    expect((await api(app, sana).get(`/orders/${id}/papers/sales-contract/doc`).expect(200)).body.doc.bullets).toContain(
+      "Our usual payment is made by 30% Advance deposit and 70% by irrevocable letter of credit, payable 90 days after the documents reach the buyer's bank.",
+    );
 
     // Deferred: the balance is due 90 days after "Papers reached their bank".
     const on = day(-2);

@@ -519,6 +519,14 @@ export type PaymentInput = z.infer<typeof paymentInput>;
 
 export const voidPaymentInput = z.object({ reason: text(2000, "Say why this payment is being removed") });
 
+/** "Refresh from customer": the buyer on the order's papers taken again from the customer, and why (kept in the history). */
+export const buyerRefreshInput = z.object({ reason: text(300, "Say why the buyer is taken again from the customer") });
+export type BuyerRefreshInput = z.infer<typeof buyerRefreshInput>;
+
+/** The quotation's own payment text printed on the papers although the route now differs (or not, the default). */
+export const quotedTermsInput = z.object({ print: z.boolean() });
+export type QuotedTermsInput = z.infer<typeof quotedTermsInput>;
+
 /** Changing a recorded payment says why (asked with code "reason_needed"; kept in the order's history). */
 export const editPaymentInput = paymentInput.extend({ reason: optionalText(500).optional() });
 export type EditPaymentInput = z.infer<typeof editPaymentInput>;

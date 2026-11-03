@@ -10,8 +10,8 @@ import {
   DEFAULT_SAT_CHECKS,
   flowSteps,
   ORDER_DOCUMENT_LABEL,
+  appMakesDocument,
   PAYMENT_ROUTE_SHORT,
-  balanceTermsOf,
   balanceWhenOf,
   lcChecksLine,
   documentsInUse,
@@ -83,6 +83,18 @@ interface FlowRows {
   bankSteps: { step: BankStepKind }[];
   satChecks: { result: SatResult }[];
   claims: { status: ClaimStatus }[];
+}
+
+/** Why a kind the app makes is not recorded by hand. */
+function madeByTheApp(kind: OrderDocumentKind) {
+  const label = ORDER_DOCUMENT_LABEL[kind];
+  return `The ${label.charAt(0).toLowerCase()}${label.slice(1)} is made by the app, so it is not recorded by hand: ${
+    kind === "proforma_invoice"
+      ? "issue it on the order"
+      : kind === "packing_list"
+        ? "fill in the packing on Shipping; it is final once the order ships"
+        : "make it final on its page"
+  }. A signed or stamped copy goes to its paper or the order's files.`;
 }
 
 /** A paper of the shipment's set is in: recorded as done, or the order's own proforma / packing list made. */
@@ -506,7 +518,8 @@ export class FlowService {
 
   /**
    * The route and its terms build the plan: changing them rebuilds the
-   * instalments not paid yet (payments stay) and the balance terms on the papers.
+   * instalments not paid yet (payments stay). The papers word their payment
+   * terms from the route; the order's balance terms stay as accepted.
    */
   async setRoute(user: SessionUser, id: string, input: PaymentRouteInput) {
     await this.must(user, "orders.update", null, "change orders");
@@ -526,7 +539,8 @@ export class FlowService {
       if (was.route === t.route && was.balanceWhen === t.balanceWhen && was.lcTerms === t.lcTerms && was.lcDays === t.lcDays) return;
       await tx.order.update({
         where: { id },
-        data: { paymentRoute: t.route, balanceWhen: t.balanceWhen, lcTerms: t.lcTerms, lcDays: t.lcDays, balanceTerms: balanceTermsOf(t, o.balanceTerms) },
+        // The balance terms stay as accepted: the papers word the terms from the route itself.
+        data: { paymentRoute: t.route, balanceWhen: t.balanceWhen, lcTerms: t.lcTerms, lcDays: t.lcDays },
       });
       const plan = await rebuildRoutePlan(tx, o, t, reminders);
       await this.log(
@@ -835,6 +849,7 @@ export class FlowService {
 
   async addDocument(user: SessionUser, id: string, input: OrderDocumentInput) {
     await this.must(user, "documents.manage", "bank_documents", "manage the documents");
+    if (appMakesDocument(input.kind)) throw new DomainError(madeByTheApp(input.kind));
     if (input.kind === "other" && !input.title) throw new DomainError("Say what the document is.");
     if (input.status === "elsewhere" && !input.keptWhere) throw new DomainError("Say where it is kept, so anyone can find it.");
     await this.prisma.tx(async (tx) => {
@@ -874,6 +889,16 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, orderId);
       await this.checkDocumentLinks(tx, o, input.shipmentId, input.attachmentId);
       const before = await tx.orderDocument.findUniqueOrThrow({ where: { id: docId } });
+      // The app's own papers: their number and state are the paper's; only a file (a signed copy) or a note is added.
+      if (
+        appMakesDocument(before.kind) &&
+        ((input.number !== undefined && input.number !== before.number) ||
+          (input.status !== undefined && input.status !== before.status) ||
+          (input.title !== undefined && input.title !== before.title) ||
+          (input.issuedOn !== undefined && input.issuedOn !== fromDbDateOrNull(before.issuedOn)) ||
+          (input.keptWhere !== undefined && input.keptWhere !== before.keptWhere))
+      )
+        throw new DomainError(madeByTheApp(before.kind));
       const status = input.status ?? before.status;
       if (status === "elsewhere" && !(input.keptWhere !== undefined ? input.keptWhere : before.keptWhere))
         throw new DomainError("Say where it is kept, so anyone can find it.");

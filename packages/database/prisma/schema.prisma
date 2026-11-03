@@ -1060,8 +1060,17 @@ model Order {
   stageSince          DateTime           @default(now()) @map("stage_since") @db.Timestamptz
   orderedOn           DateTime           @map("ordered_on") @db.Date
   /// The proforma invoice's number once issued, e.g. KEB260916TN07 (prefix, issue date, customer letters, the handler's count this year).
+  /// An index only: the proforma itself is its OrderPaper rows (kind "proforma"), final with a snapshot; only issuing writes these.
   proformaNo          String?            @map("proforma_no") @db.VarChar(40)
   proformaIssuedOn    DateTime?          @map("proforma_issued_on") @db.Date
+  /// The buyer as on the order (@kebo/shared BuyerSnapshot): taken when the order is made, printed on every paper of the
+  /// order; "Refresh from customer" (with a reason) takes it again. Final papers keep the buyer they were printed with.
+  buyerSnapshot       Json?              @map("buyer_snapshot")
+  /// The quotation's own payment text is printed on the papers even though the route now differs from what it said.
+  printQuotedTerms    Boolean            @default(false) @map("print_quoted_terms")
+  /// The last receipt and payment-request numbers given (RC-…-n, PR-…-n): numbers are given once and never reused.
+  lastReceiptNo       Int                @default(0) @map("last_receipt_no")
+  lastRequestNo       Int                @default(0) @map("last_request_no")
   /// Ship date promised to the customer.
   shipBy              DateTime?          @map("ship_by") @db.Date
   /// Ready date the factory confirmed.
@@ -1482,7 +1491,8 @@ model OrderDocument {
   @@map("order_documents")
 }
 
-/// A paper the app makes from the order (sales contract, commercial invoice, …; see @kebo/shared workflows/papers):
+/// A paper the app makes from the order (sales contract, commercial invoice, …; see @kebo/shared workflows/papers),
+/// and the order's own proforma ("proforma": final when issued) and packing list ("packing-list": final once shipped):
 /// a draft until made final; final keeps the snapshot of exactly what was printed and locks the number.
 /// "Make again" adds the next version as a draft and keeps the earlier ones.
 model OrderPaper {
@@ -1602,7 +1612,11 @@ model PaymentPlanItem {
   /// after_papers: due `dueDays` after the papers reached the customer's bank (LC).
   dueRule   String?   @map("due_rule") @db.VarChar(20)
   dueDays   Int?      @map("due_days")
+  /// Its payment request's number (PR-2026-0031-n), given when the row is made and never changed or reused
+  /// (a rebuilt plan keeps the numbers of the rows it keeps; new rows get the next one). Set by the database.
+  requestNo Int?      @map("request_no")
 
+  @@unique([orderId, requestNo])
   @@index([orderId])
   @@index([dueOn])
   @@index([companyId])
@@ -1764,10 +1778,14 @@ model Payment {
   voidedAt         DateTime?        @map("voided_at") @db.Timestamptz
   voidReason       String?          @map("void_reason")
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  /// Its receipt's number (RC-2026-0031-n), given when the payment is recorded and never changed or reused
+  /// (voiding or back-dating a payment moves no other receipt's number). Set by the database.
+  receiptNo        Int?             @map("receipt_no")
 
   bankSteps OrderBankStep[]
   credits   CustomerCredit[]
 
+  @@unique([orderId, receiptNo])
   @@index([orderId])
   @@index([paidOn])
   @@index([accountId])

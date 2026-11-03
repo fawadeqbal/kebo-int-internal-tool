@@ -31,6 +31,8 @@ import {
   parsePaperOptions,
   documentsInUse,
   paperUsed,
+  routeAsAccepted,
+  routeWords,
   shipmentInput,
   shipmentUpdateInput,
   type FlowStep,
@@ -52,7 +54,10 @@ import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
-import { companySnapshot, customerSnapshot } from "../quotations/quotations.service";
+import { companySnapshot } from "../quotations/quotations.service";
+import { buyerOf, partyOf } from "../orders/buyer";
+import { quotedTermsPrinted } from "../orders/order-docs";
+import { termsOf } from "../money/route-plan";
 import { orderAccess, OrdersService } from "../orders/orders.service";
 import { FlowService } from "../flow/flow.service";
 import {
@@ -181,13 +186,9 @@ export class PapersService {
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
   }
 
-  /** The customer as on the quotation; details missing there come from the customer now (as the proforma does). */
+  /** The buyer as on the order (frozen when the order was made; "Refresh from customer" takes it again, with a reason). */
   private async customerOf(o: PaperOrder) {
-    const now = await customerSnapshot(this.prisma.db, o.customerId, o.inquiry.contactId);
-    const sent = o.revision.customerSnapshot as Record<string, unknown> | null;
-    const filled = sent ? Object.fromEntries(Object.entries(sent).filter(([, v]) => v !== null && v !== undefined && v !== "")) : {};
-    const c = { ...now, ...filled } as typeof now;
-    return { name: c.name, country: c.country, address: c.address, taxNo: c.taxNo, regNo: c.regNo };
+    return partyOf(await buyerOf(this.prisma.db, o, this.clock.today()));
   }
 
   /** The customer's orders (that the person may see) and payments, for the statement. */
@@ -371,7 +372,21 @@ export class PapersService {
       options: paperOptionsOf(kind).map((k) => ({ key: k, label: PAPER_OPTION_LABEL[k], on: options[k] !== false })),
       paper: this.paperView(latest),
       versions: rows.map((p) => this.paperView(p)!),
+      /** The buyer the paper prints (as on the order) and what differs from the customer now: "Refresh from customer". */
+      buyer: kind === "purchase-order" ? null : await this.orders.buyerView(user, o.id),
+      canRefreshBuyer: (can(user, "documents.manage") || can(user, "orders.update")) && o.status !== "cancelled",
+      /** The quotation's own payment text against the route, when they differ (the papers with payment terms). */
+      terms: this.termsOf(o, kind),
     };
+  }
+
+  /** "The quotation said 'By T/T'; the route is now LC at sight": print it or not (default not), for the papers with payment terms. */
+  private termsOf(o: PaperOrder, kind: PaperKind) {
+    if (kind !== "sales-contract" && kind !== "payment-request") return null;
+    const text = o.revision.paymentTerms?.trim();
+    const t = termsOf(o);
+    if (!text || routeAsAccepted(t, o.balanceTerms)) return null;
+    return { quoted: text, route: routeWords(t, o.balanceTerms), printed: quotedTermsPrinted(o) };
   }
 
   private stateOf(latest: PaperRow | null, ready: boolean): PaperState {
@@ -414,7 +429,14 @@ export class PapersService {
                 : "miss";
     const row = (r: Omit<PaperListRow, "stateLabel">): PaperListRow => ({ ...r, stateLabel: PAPER_STATE_LABEL[r.state] });
 
-    // The order's own papers, as before.
+    // The order's own papers: final when issued (the proforma) or shipped (the packing list), Make again for the next version.
+    const own = (kind: "proforma" | "packing-list") => {
+      const rows = o.papers.filter((p) => p.kind === kind).sort((a, b) => a.version - b.version);
+      const latest = rows.at(-1) ?? null;
+      const rebuiltOn = (latest?.snapshot as { rebuiltOn?: string | null } | null)?.rebuiltOn ?? null;
+      return { latest, draft: latest?.status === "draft", rebuilt: rebuiltOn ? ` · rebuilt from the data on ${rebuiltOn}` : "" };
+    };
+    const pi = own("proforma");
     if (used("proforma") || o.proformaNo)
       out.push(
       row({
@@ -423,12 +445,16 @@ export class PapersService {
         source: "app",
         label: "Proforma invoice",
         step: "payment",
-        state: o.proformaNo ? "ready" : "can",
+        state: !o.proformaNo ? "can" : pi.draft ? "draft" : "ready",
         number: o.proformaNo,
-        version: null,
-        sub: o.proformaNo
-          ? `issued ${fromDbDateOrNull(o.proformaIssuedOn) ?? ""}`.trim()
-          : "order lines, buyer, payment terms, bank details",
+        version: pi.latest?.version ?? null,
+        paperId: pi.latest?.id ?? null,
+        draft: pi.draft,
+        sub: !o.proformaNo
+          ? "order lines, buyer, payment terms, bank details"
+          : pi.draft
+            ? `version ${pi.latest!.version} · draft: issue it to make it final`
+            : `issued ${fromDbDateOrNull(o.proformaIssuedOn) ?? ""}${(pi.latest?.version ?? 1) > 1 ? ` · version ${pi.latest!.version}` : ""}${pi.rebuilt}`.trim(),
         ref: null,
         printable: true,
         makeable: false,
@@ -439,6 +465,7 @@ export class PapersService {
       }),
     );
     const goods = o.lines.filter((l) => l.type === "goods");
+    const pl = own("packing-list");
     if (goods.length && (used("packing-list") || o.packedAt))
       out.push(
         row({
@@ -447,10 +474,14 @@ export class PapersService {
           source: "app",
           label: "Packing list",
           step: "shipping",
-          state: o.packedAt ? "ready" : "wait",
+          state: !o.packedAt ? "wait" : pl.draft ? "draft" : "ready",
           number: o.refNo.replace(/^[A-Z]+-/, "PL-"),
-          version: null,
-          sub: o.packedAt ? `${goods.reduce((t, l) => t + (l.packages ?? 0), 0)} packages` : "packages, weights and volume per line",
+          version: pl.latest?.version ?? null,
+          paperId: pl.latest?.id ?? null,
+          draft: pl.draft,
+          sub: o.packedAt
+            ? `${goods.reduce((t, l) => t + (l.packages ?? 0), 0)} packages${pl.latest ? (pl.draft ? ` · version ${pl.latest.version} draft` : ` · final${pl.latest.version > 1 ? `, version ${pl.latest.version}` : ""}${pl.rebuilt}`) : ""}`
+            : "packages, weights and volume per line",
           ref: null,
           printable: true,
           makeable: false,
@@ -473,9 +504,10 @@ export class PapersService {
             row({
               ...base,
               key: `${kind}:${p.id}`,
-              label: `${PAPER_LABEL[kind]} ${i + 1}`,
+              label: `${PAPER_LABEL[kind]} ${p.receiptNo ?? i + 1}`,
               state: "ready",
-              number: paperNumber(o.refNo, kind, i + 1),
+              // Given when the payment was recorded: never moved by a void or a back-dated payment.
+              number: paperNumber(o.refNo, kind, p.receiptNo ?? i + 1),
               version: null,
               sub: `${p.currency} ${p.amount.toFixed(2)} · ${fromDbDate(p.paidOn)}`,
               ref: p.id,
@@ -497,7 +529,8 @@ export class PapersService {
               key: `${kind}:${p.id}`,
               label: `${PAPER_LABEL[kind]} · ${p.label}`,
               state: "can",
-              number: paperNumber(o.refNo, kind, i + 1),
+              // Given when the plan row was made: a rebuilt plan keeps the numbers of the rows it keeps.
+              number: paperNumber(o.refNo, kind, p.requestNo ?? i + 1),
               version: null,
               sub: `${o.currency} ${p.amount.toFixed(2)}${p.dueOn ? ` · due ${fromDbDate(p.dueOn)}` : ""}`,
               ref: p.id,
@@ -515,7 +548,7 @@ export class PapersService {
               key: `${kind}:balance`,
               label: PAPER_LABEL[kind],
               state: "can",
-              number: paperNumber(o.refNo, kind, 1),
+              number: paperNumber(o.refNo, kind),
               version: null,
               sub: `${o.currency} ${pos.due} still due`,
               ref: "balance",

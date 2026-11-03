@@ -5,7 +5,10 @@ import { localPath } from "@/lib/paths";
 
 /**
  * Sent and issued documents carry the letterhead and customer as they were
- * then (snapshots). Drafts have none yet: they print with today's.
+ * then (snapshots). Drafts have none yet: they print with today's. The
+ * customer has the shape of the order's buyer (BuyerSnapshot: name, country,
+ * address, tax and registration numbers, contact); order papers get theirs
+ * from the API (the buyer as on the order), so only quotations use this.
  */
 export async function companyOr(snapshot: CompanySnapshot | null): Promise<CompanySnapshot> {
   if (snapshot?.name) return snapshot;
@@ -25,6 +28,7 @@ export async function customerOr(
     country: c.country,
     address: c.address,
     taxNo: c.taxNo,
+    regNo: c.regNo ?? null,
     contact: contact && { name: contact.name, email: contact.email, phone: contact.phone ?? contact.whatsapp },
   };
 }

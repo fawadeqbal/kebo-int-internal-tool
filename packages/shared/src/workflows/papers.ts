@@ -161,6 +161,15 @@ export const DOCUMENT_PAPER: Partial<Record<OrderDocumentKind, PaperKind>> = {
   inspection: "inspection-report",
 };
 
+/**
+ * Document-set kinds the app makes itself (the proforma, the packing list, the sales contract, the
+ * commercial invoice): their row in the set is written only by the app (making the paper final), never
+ * recorded by hand, so the paper and the set can never disagree. The API refuses them; the form hides them.
+ * (An inspection certificate can come from an outside inspector: it may still be recorded.)
+ */
+export const APP_DOCUMENT_KINDS: readonly OrderDocumentKind[] = ["proforma_invoice", "packing_list", "sales_contract", "commercial_invoice"];
+export const appMakesDocument = (kind: OrderDocumentKind) => APP_DOCUMENT_KINDS.includes(kind);
+
 /** Papers that exist only with a module of the company's plan. */
 export const PAPER_FEATURE: Partial<Record<PaperKind, PlanFeature>> = {
   "shipping-advice": "shipping",
@@ -300,6 +309,43 @@ export function documentsInUse(
   made: (kind: OrderDocumentKind) => boolean = () => false,
 ): OrderDocumentKind[] {
   return requiredDocuments(route, mode).filter((k) => documentUsed(off, k) || made(k));
+}
+
+/* ---------------------------------------------------------------- the buyer */
+
+/**
+ * The buyer as on the order (Order.buyerSnapshot): taken when the order is made (the quotation's
+ * customer, details missing there from the customer as it was then), printed on every paper of the
+ * order. "Refresh from customer" takes it again from the customer, with a reason; final papers keep
+ * the buyer they were printed with.
+ */
+export interface BuyerSnapshot {
+  name: string;
+  country: string | null;
+  address: string | null;
+  taxNo: string | null;
+  regNo: string | null;
+  contact: { name: string | null; email: string | null; phone: string | null } | null;
+  /** YYYY-MM-DD: when it was taken. */
+  takenOn?: string | null;
+  /** order: when the order was made · customer: refreshed from the customer · data: filled in from the data (migration). */
+  from?: "order" | "customer" | "data";
+}
+
+/** The buyer's details that are printed, compared (name, country, address, tax and registration numbers). */
+export const BUYER_FIELDS = ["name", "country", "address", "taxNo", "regNo"] as const;
+
+/** What differs between the buyer on the order and the customer now ("address, tax no."); empty: the same. */
+export function buyerChanges(onOrder: Partial<BuyerSnapshot> | null, now: Partial<BuyerSnapshot>): string[] {
+  const label: Record<(typeof BUYER_FIELDS)[number], string> = {
+    name: "name",
+    country: "country",
+    address: "address",
+    taxNo: "tax no.",
+    regNo: "registration no.",
+  };
+  const norm = (v: unknown) => (typeof v === "string" ? v.trim() : "") || "";
+  return BUYER_FIELDS.filter((k) => norm(onOrder?.[k]) !== norm(now[k])).map((k) => label[k]);
 }
 
 /* ---------------------------------------------------------------- options */

@@ -10,7 +10,7 @@ import {
   paperMoneyText,
   paperNumber,
   paperWordsText,
-  paymentSentenceOf,
+  routePaymentSentence,
   defaultFactoryPlan,
   FACTORY_DUE_RULE_LABEL,
   type FactoryDueRule,
@@ -32,7 +32,8 @@ import {
 import type { ISODate } from "@kebo/utils";
 import { orderLineNumbers } from "../orders/orders.service";
 import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../money/position";
-import { lcBalanceMinor } from "../money/route-plan";
+import { lcBalanceMinor, termsOf } from "../money/route-plan";
+import { quotedTermsPrinted } from "../orders/order-docs";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -51,7 +52,8 @@ export const paperOrderInclude = {
     },
   },
   revision: { include: { quotation: { select: { refNo: true } } } },
-  payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
+  // Receipts are numbered when the payment is recorded (Payment.receiptNo); listed in date order.
+  payments: { where: { voidedAt: null }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] },
   planItems: { orderBy: { sortOrder: "asc" } },
   factoryPaid: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
   factoryPlan: { orderBy: { sortOrder: "asc" } },
@@ -188,6 +190,12 @@ export function positionOf(c: PaperCtx) {
 const chargedLine = (chargedMinor: number, currency: string) =>
   chargedMinor > 0 ? [`Includes ${formatMinor(chargedMinor, currency)} of expenses charged to you.`] : [];
 
+/** The payment sentence from the route (route, balance when, LC terms and days) and the plan's deposit. */
+export const termsSentence = (c: PaperCtx) => routePaymentSentence(positionOf(c).depositPercent, termsOf(c.o), c.o.balanceTerms);
+
+/** The quotation's own payment text: while the route is still the accepted one, or when chosen on the Make page. */
+const quotedTerms = (c: PaperCtx) => (quotedTermsPrinted(c.o) ? bullets(c.o.revision.paymentTerms) : []);
+
 /** The ports: from the shipment, else the Incoterm place (loading for E/F terms, discharge for C/D terms) and the order's port. */
 function portsOf(c: PaperCtx) {
   const s = c.o.shipments[0];
@@ -263,11 +271,12 @@ function salesContract(c: PaperCtx): Built {
   const shipBy = fromDbDateOrNull(c.o.shipBy);
   const prices = c.options.prices !== false;
   const columns = [COL.no, COL.item, ...(hs.show ? [COL.hs] : []), COL.qty, ...(prices ? [COL.amount] : [])];
+  // The LC / bank contract itself, once known (the sentence above already says how the balance is paid).
   const routeLine =
-    route === "letter_of_credit"
-      ? `Balance by irrevocable letter of credit${b?.customerBank ? ` through ${b.customerBank}` : ""}${b?.number ? `, LC No. ${b.number}` : ""}.`
-      : route === "bank_contract"
-        ? `Payment through the bank contract${b?.customerBank ? ` with ${b.customerBank}` : ""}${b?.number ? `, No. ${b.number}` : ""}.`
+    route === "letter_of_credit" && (b?.customerBank || b?.number)
+      ? `Letter of credit${b?.customerBank ? ` through ${b.customerBank}` : ""}${b?.number ? `, LC No. ${b.number}` : ""}.`
+      : route === "bank_contract" && (b?.customerBank || b?.number)
+        ? `Bank contract${b?.customerBank ? ` with ${b.customerBank}` : ""}${b?.number ? `, No. ${b.number}` : ""}.`
         : null;
   const mode = SHIP_MODE_LABEL[c.o.shipments[0]?.mode ?? "sea"].toLowerCase();
   return {
@@ -308,10 +317,10 @@ function salesContract(c: PaperCtx): Built {
       foot: null,
       boxTitle: "Terms",
       bullets: [
-        // The deposit as the plan asks for it (a plan edited to 50% says 50%).
-        paymentSentenceOf(positionOf(c).depositPercent, c.o.balanceTerms),
+        // From the route, with the deposit as the plan asks for it (a plan edited to 50% says 50%).
+        termsSentence(c),
         ...(routeLine ? [routeLine] : []),
-        ...bullets(rev.paymentTerms),
+        ...quotedTerms(c),
         `Shipment: by ${mode}${pol ? ` from ${pol}` : ""}${pod ? ` to ${pod}` : ""}, ${c.o.incoterm}${c.o.incotermPlace ? ` ${c.o.incotermPlace}` : ""}${shipBy ? `, latest ${paperDateText(shipBy)}` : ""}.`,
         ...(rev.leadTime ? [`Delivery: ${rev.leadTime}.`.replace(/\.\.$/, ".")] : []),
         has(c, "delivery_sat")
@@ -607,7 +616,8 @@ function paymentReceipt(c: PaperCtx): Built {
   const p = c.ref ? list.find((x) => x.id === c.ref) : list.at(-1);
   const pos = positionOf(c);
   return {
-    n: p ? list.indexOf(p) + 1 : null,
+    // Given when the payment was recorded: voiding or back-dating another payment never moves it.
+    n: p ? (p.receiptNo ?? list.indexOf(p) + 1) : null,
     checks: [
       check(
         "payment",
@@ -673,9 +683,12 @@ function paymentRequest(c: PaperCtx): Built {
   const amount = item ? item.amount.toFixed(2) : pos.due;
   const label = item ? item.label : "Balance due on the order";
   const due = item ? fromDbDateOrNull(item.dueOn) : null;
-  const number = paperNumber(c.o.refNo, "payment-request", item ? items.indexOf(item) + 1 : items.length + 1);
+  // Its number was given when the plan row was made (never moved by a void, a back-date or a rebuilt plan);
+  // the balance asked for without a plan has the order's own (PR-2026-0031).
+  const n = item ? (item.requestNo ?? items.indexOf(item) + 1) : null;
+  const number = paperNumber(c.o.refNo, "payment-request", n);
   return {
-    n: item ? items.indexOf(item) + 1 : items.length + 1,
+    n,
     checks: [
       check("amount", "Amount", paperMoneyText(amount, c.o.currency), Number(amount) > 0, { required: true }),
       check("bank", "Our bank details", c.settings.company.bankDetails ? "from Settings" : "not set", !!c.settings.company.bankDetails, {
@@ -707,7 +720,8 @@ function paymentRequest(c: PaperCtx): Built {
         // The balance asked for includes what was charged to them (an instalment of the plan does not).
         ...(item ? [] : chargedLine(pos.chargedMinor, c.o.currency)),
         `Please quote ${number} with the payment.`,
-        ...bullets(c.o.revision.paymentTerms),
+        termsSentence(c),
+        ...quotedTerms(c),
       ],
       bank: c.settings.company.bankDetails || null,
       signatures: null,

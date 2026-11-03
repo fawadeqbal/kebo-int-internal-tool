@@ -58,3 +58,19 @@ export async function paperAgainAction(orderId: string, kind: PaperKind, ref: st
 export async function paperDeleteDraftAction(orderId: string, paperId: string): Promise<ActionState> {
   return done(orderId, await attempt(null, () => api.delete(`/papers/${paperId}`), "Draft deleted."));
 }
+
+/**
+ * The order's own proforma and packing list: "again" starts the next version as a draft (same number),
+ * "final" makes it final as it prints now (the proforma's draft is issued), "delete" drops the draft.
+ */
+export async function ownDocumentAction(orderId: string, kind: "proforma" | "packing-list", op: "again" | "final" | "delete"): Promise<ActionState> {
+  const label = kind === "proforma" ? "Proforma" : "Packing list";
+  return done(
+    orderId,
+    await attempt(
+      null,
+      () => (op === "delete" ? api.delete(`/orders/${orderId}/documents/${kind}/draft`) : api.post(`/orders/${orderId}/documents/${kind}/${op}`)),
+      op === "again" ? `${label}: next version started as a draft.` : op === "final" ? `${label} made final.` : "Draft deleted.",
+    ),
+  );
+}

@@ -1,7 +1,11 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
+  buyerRefreshInput,
+  quotedTermsInput,
+  type BuyerRefreshInput,
+  type QuotedTermsInput,
   cancelOrderInput,
   creditRefundInput,
   customerReceiptInput,
@@ -34,6 +38,7 @@ import { OrdersService } from "./orders.service";
 import { DocumentsService, ORDER_DOCUMENTS, type OrderDocumentKind } from "./documents.service";
 import { PaymentsService } from "./payments.service";
 
+const docQuery = z.object({ v: z.coerce.number().int().min(1).max(999).optional() });
 const flag = z.enum(["true", "false"]).optional().transform((v) => v === "true");
 const listQuery = z.object({
   mine: flag,
@@ -100,11 +105,29 @@ export class OrdersController {
     return this.orders.savePacking(user, id, body);
   }
 
-  /** Gives the proforma its number (KEB260916TN07), dated today. Once issued it does not change. */
+  /**
+   * Issues the proforma: gives it its number (KEB260916TN07), dated today, and makes it final as it prints
+   * now (the number never changes). Issued already with a next version open (Make again): that version is
+   * made final.
+   */
   @Post(":id/proforma")
   @HttpCode(200)
   issueProforma(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.orders.issueProforma(user, id);
+  }
+
+  /** { reason } — the buyer on the order's papers taken again from the customer (papers made from now on; final ones keep theirs). */
+  @Post(":id/buyer")
+  @HttpCode(200)
+  refreshBuyer(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(buyerRefreshInput)) body: BuyerRefreshInput) {
+    return this.orders.refreshBuyer(user, id, body.reason);
+  }
+
+  /** { print } — the quotation's own payment text on the papers although the route now differs (default: not printed). */
+  @Post(":id/quoted-terms")
+  @HttpCode(200)
+  quotedTerms(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(quotedTermsInput)) body: QuotedTermsInput) {
+    return this.orders.setQuotedTerms(user, id, body.print);
   }
 
   /**
@@ -143,10 +166,35 @@ export class OrdersController {
     return this.payments.useCredit(user, id, body);
   }
 
-  /** proforma | invoice | packing-list — the data to print (the web turns it into a page and a PDF). */
+  /** proforma | packing-list — the data to print (the web turns it into a page and a PDF): a final version as it was made (?v=), else from the order now. */
   @Get(":id/documents/:kind")
-  document(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
-    return this.documents.get(user, id, kind);
+  document(
+    @CurrentUser() user: SessionUser,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind,
+    @Query(Validate(docQuery)) q: z.infer<typeof docQuery>,
+  ) {
+    return this.documents.get(user, id, kind, q.v);
+  }
+
+  /** Make again: the next version as a draft (same number); the final one stays as it was printed. */
+  @Post(":id/documents/:kind/again")
+  @HttpCode(200)
+  documentAgain(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
+    return this.documents.again(user, id, kind);
+  }
+
+  /** The open version made final, as it prints now. */
+  @Post(":id/documents/:kind/final")
+  @HttpCode(200)
+  documentFinal(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
+    return this.documents.final(user, id, kind);
+  }
+
+  /** The next version's draft deleted. */
+  @Delete(":id/documents/:kind/draft")
+  documentDraftDelete(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind) {
+    return this.documents.removeDraft(user, id, kind);
   }
 }
 

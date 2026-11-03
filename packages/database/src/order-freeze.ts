@@ -39,3 +39,28 @@ export async function freezeOrderMoney(db: Db, orderIds: string[]): Promise<void
                                from settings where key = 'sales'), '{"CNY": 7.1}'::jsonb) as rates) s
      where o.main_currency is null and o.id = any(${orderIds}::uuid[])`;
 }
+
+/**
+ * For orders made outside the API: the buyer their papers print (orders.buyer_snapshot), as the API takes it
+ * when an order is made — the quotation's customer, details missing there from the customer and the deal's
+ * contact (else the primary one) now. Only fills orders without one; the same as the papers migration does.
+ */
+export async function freezeOrderBuyer(db: Db, orderIds: string[], takenOn: string): Promise<void> {
+  if (!orderIds.length) return;
+  await db.$executeRaw`
+    update orders o
+       set buyer_snapshot = jsonb_build_object(
+             'name', c.name, 'country', c.country, 'address', c.address, 'taxNo', c.tax_no, 'regNo', c.reg_no,
+             'contact', (select jsonb_build_object('name', ct.name, 'email', ct.email, 'phone', coalesce(ct.phone, ct.whatsapp))
+                           from contacts ct
+                          where ct.customer_id = c.id and ct.deleted_at is null
+                          order by (ct.id = i.contact_id) desc nulls last, ct.is_primary desc, ct.created_at, ct.id
+                          limit 1))
+           || coalesce((select jsonb_object_agg(e.key, e.value)
+                          from jsonb_each(case when jsonb_typeof(r.customer_snapshot) = 'object' then r.customer_snapshot else '{}'::jsonb end) e
+                         where e.value not in ('null'::jsonb, '""'::jsonb)), '{}'::jsonb)
+           || jsonb_build_object('takenOn', ${takenOn}::text, 'from', 'order')
+      from customers c, inquiries i, quotation_revisions r
+     where c.id = o.customer_id and i.id = o.inquiry_id and r.id = o.revision_id
+       and o.buyer_snapshot is null and o.id = any(${orderIds}::uuid[])`;
+}
