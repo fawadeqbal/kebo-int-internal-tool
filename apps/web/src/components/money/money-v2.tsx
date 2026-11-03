@@ -149,7 +149,6 @@ function ReceivedFields({
   customer,
   refNo,
   due,
-  depositDue,
   forWhat,
   fx,
   today,
@@ -311,7 +310,6 @@ export function ReachedForm({
   currency,
   customer,
   due,
-  depositDue,
   fx,
   today,
 }: {

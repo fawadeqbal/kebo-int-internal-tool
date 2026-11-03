@@ -29,7 +29,7 @@ import { FilePicker, uploadFile, useSaveThenSend } from "./attachment";
 import { MoneyInput } from "@/components/common/money-input";
 import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
-import { date, dueText, money } from "@/lib/format";
+import { dueText, money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { ExpenseView, FactoryOwed, FactoryPaymentView, OrderMoney } from "@/lib/types-money";
 
