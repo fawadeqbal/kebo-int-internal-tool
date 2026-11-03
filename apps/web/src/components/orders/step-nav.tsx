@@ -12,10 +12,15 @@ export interface StepNavStep {
   number: number;
   label: string;
   state: StepState;
-  done: number;
-  total: number;
+  /** "n/m done" beside the step (the order); or `status` instead ("3 offers", "R2 draft": the inquiry). */
+  done?: number;
+  total?: number;
+  status?: string;
   href: string;
 }
+
+/** What the bar shows beside a step: its short status, or n/m done. */
+const tagOf = (s: StepNavStep) => s.status ?? (s.total !== undefined ? `${s.done ?? 0}/${s.total}` : "");
 
 /** The step's round mark: a tick when done, its number (filled when it is the one now). */
 export function StepMark({ state, number, size = "sm" }: { state: StepState; number: number; size?: "sm" | "md" }) {
@@ -47,11 +52,29 @@ export function StepMark({ state, number, size = "sm" }: { state: StepState; num
 const SR: Record<StepState, string> = { done: "done", now: "now", late: "late", todo: "later" };
 
 /**
- * The order's navigation: Overview, the steps (tick or number, and n/m done),
- * Costs (with what was spent, for managers) and History. A row of links from a
+ * The order's (and the inquiry's) navigation: Overview, the steps (tick or
+ * number, and n/m done or a short status), Costs (with what was spent, for
+ * managers), History and any extra link ("Order →"). A row of links from a
  * tablet up; on a phone, "Step 3 of 6 ▾" opens the same links.
  */
-export function StepNav({ base, steps, costs }: { base: string; steps: StepNavStep[]; costs?: { spent: string } | null }) {
+export function StepNav({
+  base,
+  steps,
+  costs,
+  label = "Order steps",
+  glance = "The order at a glance",
+  extra = [],
+}: {
+  base: string;
+  steps: StepNavStep[];
+  costs?: { spent?: string } | null;
+  /** The nav's name for screen readers. */
+  label?: string;
+  /** The phone picker's line for the overview. */
+  glance?: string;
+  /** Links after History (e.g. the inquiry's "Order →"). */
+  extra?: { href: string; label: string }[];
+}) {
   const at = usePathname();
   // A paper's Make page (/orders/:id/papers/:kind) belongs to the paper's step.
   const paper = at.slice(base.length).match(/^\/papers\/([a-z-]+)/)?.[1];
@@ -63,9 +86,11 @@ export function StepNav({ base, steps, costs }: { base: string; steps: StepNavSt
     ...steps,
     ...(costs ? [{ href: `${base}/costs`, label: "Costs", tag: costs.spent }] : []),
     { href: `${base}/history`, label: "History" },
+    ...extra,
   ];
   const active = (href: string) => (href === base ? path === base : path === href || path.startsWith(`${href}/`));
   const here = steps.find((s) => active(s.href));
+  const of = Math.max(steps.length, ...steps.map((s) => s.number));
   const current = steps.find((s) => s.state === "now" || s.state === "late");
 
   // A new page closes the picker (adjusted while rendering, not in an effect).
@@ -83,7 +108,7 @@ export function StepNav({ base, steps, costs }: { base: string; steps: StepNavSt
 
   return (
     <>
-      <nav aria-label="Order steps" className="no-print mt-4 hidden border-b border-line md:block">
+      <nav aria-label={label} className="no-print mt-4 hidden border-b border-line md:block">
         <ul className="-mb-px flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {links.map((l) => {
             const s = "number" in l ? l : null;
@@ -103,8 +128,10 @@ export function StepNav({ base, steps, costs }: { base: string; steps: StepNavSt
                   {"tag" in l && l.tag && <span className="text-[11px] text-muted tabular">{l.tag}</span>}
                   {s && (
                     <span className={cn("text-[11px] tabular", s.state === "late" ? "text-bad" : "text-muted")}>
-                      {s.done}/{s.total}
-                      <span className="sr-only"> done, {SR[s.state]}</span>
+                      {tagOf(s)}
+                      <span className="sr-only">
+                        {s.status === undefined && s.total !== undefined ? " done" : ""}, {SR[s.state]}
+                      </span>
                     </span>
                   )}
                 </Link>
@@ -124,16 +151,18 @@ export function StepNav({ base, steps, costs }: { base: string; steps: StepNavSt
         >
           <span className="min-w-0">
             <span className="block text-xs text-muted">
-              {here ? `Step ${here.number} of ${steps.length}` : active(base) ? "Overview" : active(`${base}/costs`) ? "Costs" : "History"}
+              {here ? `Step ${here.number} of ${of}` : active(base) ? "Overview" : active(`${base}/costs`) ? "Costs" : "History"}
               {!here && current ? ` · now step ${current.number}` : ""}
             </span>
             <span className="block truncate text-sm font-semibold">
               {here
-                ? `${here.label} · ${here.done} of ${here.total}`
+                ? `${here.label}${here.status !== undefined ? (here.status ? ` · ${here.status}` : "") : here.total !== undefined ? ` · ${here.done ?? 0} of ${here.total}` : ""}`
                 : active(base)
-                  ? "The order at a glance"
+                  ? glance
                   : active(`${base}/costs`)
-                    ? `Spent ${costs?.spent ?? ""}`
+                    ? costs?.spent
+                      ? `Spent ${costs.spent}`
+                      : "What was spent"
                     : "Every change"}
             </span>
           </span>
@@ -172,11 +201,7 @@ export function StepNav({ base, steps, costs }: { base: string; steps: StepNavSt
                     {s ? <StepMark state={s.state} number={s.number} /> : <span className="size-[18px]" aria-hidden />}
                     <span className="flex-1">{l.label}</span>
                     {"tag" in l && l.tag && <span className="text-xs text-muted tabular">{l.tag}</span>}
-                    {s && (
-                      <span className={cn("text-xs tabular", s.state === "late" ? "text-bad" : "text-muted")}>
-                        {s.done}/{s.total}
-                      </span>
-                    )}
+                    {s && <span className={cn("text-xs tabular", s.state === "late" ? "text-bad" : "text-muted")}>{tagOf(s)}</span>}
                   </Link>
                 </li>
               );

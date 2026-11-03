@@ -44,8 +44,12 @@ export function ProgressBar({ done, total, state, className }: { done: number; t
   );
 }
 
-/** The step's top: its number, name, state, n of m, one line on where it stands, progress, and its main button. */
-function StepHeader({ step, action }: { step: StepView; action?: ReactNode }) {
+/** What a step's header shows: the order's StepView, or any step with a number, name, state and one line (no n/m: the inquiry). */
+export type StepHeaderData = Pick<StepView, "number" | "label" | "state" | "stateLabel" | "line"> & { done?: number; total?: number };
+
+/** The step's top: its number, name, state, n of m (when counted), one line on where it stands, progress, and its main buttons. */
+export function StepHeader({ step, action }: { step: StepHeaderData; action?: ReactNode }) {
+  const counted = step.total !== undefined;
   return (
     <section
       aria-labelledby="step-title"
@@ -73,15 +77,59 @@ function StepHeader({ step, action }: { step: StepView; action?: ReactNode }) {
             {step.label}
           </span>
           <StateBadge state={step.state} label={step.stateLabel} />
-          <span className="text-xs font-normal text-muted tabular">
-            {step.done} of {step.total} done
-          </span>
+          {counted && (
+            <span className="text-xs font-normal text-muted tabular">
+              {step.done ?? 0} of {step.total} done
+            </span>
+          )}
         </h2>
         {step.line && <p className="mt-0.5 text-sm text-text-2">{readable(step.line)}</p>}
-        <ProgressBar done={step.done} total={step.total} state={step.state} className="mt-2.5 max-w-md" />
+        {counted && <ProgressBar done={step.done ?? 0} total={step.total!} state={step.state} className="mt-2.5 max-w-md" />}
       </div>
       {action && <div className="flex shrink-0 flex-wrap gap-2 has-[form]:basis-full sm:has-[form]:basis-auto">{action}</div>}
     </section>
+  );
+}
+
+/** ← previous · next →, as links. */
+export function StepPrevNext({ prev, next }: { prev: { href: string; label: string }; next: { href: string; label: string } }) {
+  return (
+    <nav aria-label="Steps" className="no-print flex items-center justify-between gap-3 border-t border-line pt-4">
+      <Link href={prev.href} className={buttonClass("ghost", "md", "px-2")}>
+        <ArrowLeft aria-hidden /> {prev.label}
+      </Link>
+      <Link href={next.href} className={buttonClass("secondary", "md")}>
+        {next.label} <ArrowRight aria-hidden />
+      </Link>
+    </nav>
+  );
+}
+
+/** A step page's frame: the header, then its work area beside the side cards, then the way to the step before and after. */
+export function StepFrame({
+  header,
+  side,
+  prevNext,
+  children,
+}: {
+  header: ReactNode;
+  side?: ReactNode;
+  prevNext?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-5">
+      {header}
+      {side ? (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="flex min-w-0 flex-col gap-5">{children}</div>
+          <aside className="flex min-w-0 flex-col gap-5">{side}</aside>
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-5">{children}</div>
+      )}
+      {prevNext}
+    </div>
   );
 }
 
@@ -94,16 +142,7 @@ function PrevNext({ base, steps, here }: { base: string; steps: StepView[]; here
     at < steps.length - 1
       ? { href: `${base}/${STEP_PATH[steps[at + 1]!.key]}`, label: steps[at + 1]!.label }
       : { href: `${base}/history`, label: "History" };
-  return (
-    <nav aria-label="Steps" className="no-print flex items-center justify-between gap-3 border-t border-line pt-4">
-      <Link href={prev.href} className={buttonClass("ghost", "md", "px-2")}>
-        <ArrowLeft aria-hidden /> {prev.label}
-      </Link>
-      <Link href={next.href} className={buttonClass("secondary", "md")}>
-        {next.label} <ArrowRight aria-hidden />
-      </Link>
-    </nav>
-  );
+  return <StepPrevNext prev={prev} next={next} />;
 }
 
 /**
@@ -129,20 +168,21 @@ export function StepPage({
 }) {
   const view = steps.steps.find((s) => s.key === step);
   return (
-    <div className="flex flex-col gap-5">
-      {view ? (
-        <StepHeader step={view} action={action} />
-      ) : (
-        <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
-          {FLOW_STEP_LABEL[step]} is switched off for your company.
-        </p>
-      )}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-5">{children}</div>
-        <aside className="flex min-w-0 flex-col gap-5">{side}</aside>
-      </div>
-      <PrevNext base={base} steps={steps.steps} here={step} />
-    </div>
+    <StepFrame
+      header={
+        view ? (
+          <StepHeader step={view} action={action} />
+        ) : (
+          <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+            {FLOW_STEP_LABEL[step]} is switched off for your company.
+          </p>
+        )
+      }
+      side={side}
+      prevNext={<PrevNext base={base} steps={steps.steps} here={step} />}
+    >
+      {children}
+    </StepFrame>
   );
 }
 

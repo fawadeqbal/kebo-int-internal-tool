@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
-import type { Paged } from "@/lib/types";
+import type { DealDetail, Paged } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
@@ -137,4 +137,62 @@ export async function saveDealAction(id: string | null, _prev: ActionState, form
   const newId = id ?? (r.data as { id: string }).id;
   refresh(newId);
   redirect(`/inquiries/${newId}`);
+}
+
+/** The fields the inquiry's own cards change one at a time (Needs: "+ Add" in place, Edit, Edit lines). */
+const DEAL_FIELDS = ["contactId", "channel", "category", "title", "requirements", "priority", "requiredBy"] as const;
+
+/**
+ * Save some of the inquiry's fields, or its items, without the whole form: the
+ * inquiry as it is now (GET), with what was sent put in, saved with the same
+ * PUT /inquiries/:id as the edit form. Items keep their ids, so factory prices
+ * stay linked; a priced item asks why, as on the form. Items come as JSON in
+ * `items` ({ id, key, parentKey, description, model, quantity, unit, targetPrice }).
+ */
+export async function dealFieldsAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(
+    form,
+    async () => {
+      const d = await api.get<DealDetail>(`/inquiries/${id}`);
+      const at = new Map(d.items.map((it, n) => [it.id, n]));
+      let items: object[] = d.items.map((it) => ({
+        id: it.id,
+        partOf: it.parentId ? (at.get(it.parentId) ?? null) : null,
+        description: it.description,
+        model: it.model,
+        quantity: it.quantity,
+        unit: it.unit,
+        targetPrice: it.targetPrice,
+      }));
+      if (v.items) {
+        type Row = { id: string | null; key: string; parentKey: string | null; description: string; model: string; quantity: string; unit: string; targetPrice: string };
+        const rows = JSON.parse(v.items) as Row[];
+        const pos = new Map(rows.map((it, n) => [it.key, n]));
+        items = rows.map((it) => ({
+          id: it.id,
+          partOf: it.parentKey ? (pos.get(it.parentKey) ?? null) : null,
+          description: it.description,
+          model: it.model.trim() || null,
+          quantity: it.quantity.replace(/,/g, "").trim(),
+          unit: it.unit.trim() || "pcs",
+          targetPrice: it.targetPrice.replace(/,/g, "").trim() || null,
+        }));
+      }
+      const now: Record<string, unknown> = {
+        contactId: d.contactId,
+        channel: d.channel,
+        category: d.category,
+        title: d.title || null,
+        requirements: d.requirements,
+        priority: d.priority,
+        requiredBy: d.requiredBy,
+      };
+      for (const k of DEAL_FIELDS) if (k in v) now[k] = v[k]!.trim() === "" ? null : v[k];
+      return api.put(`/inquiries/${id}`, { customerId: d.customer.id, ...now, items, reason: reasonOf(form) });
+    },
+    "Saved.",
+  );
+  if (r.ok) refresh(id);
+  return r;
 }

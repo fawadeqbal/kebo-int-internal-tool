@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
-import type { QuoteOffers } from "@/lib/types-deals";
+import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
+import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
@@ -65,4 +66,44 @@ export async function offersAction(dealId: string, currency: string): Promise<Qu
   } catch {
     return null;
   }
+}
+
+/**
+ * Lost: the sent revision recorded as rejected (with the reason) and the
+ * inquiry marked lost — the same two calls as "Customer rejected" and "Mark
+ * as lost" on their own.
+ */
+export async function lostAction(dealId: string, revisionId: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  if (!v.lostReason) return { ok: false, message: "Choose why it was lost.", errors: { lostReason: ["Choose why it was lost"] }, values: v };
+  const why = `Lost: ${LOST_REASON_LABEL[v.lostReason as LostReason] ?? v.lostReason}${v.note?.trim() ? ` — ${v.note.trim()}` : ""}`;
+  const r = await attempt(
+    form,
+    async () => {
+      if (revisionId) await api.post(`/revisions/${revisionId}/status`, { to: "rejected", on: v.on || null, reason: why.slice(0, 500) });
+      return api.post(`/inquiries/${dealId}/stage`, { to: "lost", lostReason: v.lostReason, note: v.note?.trim() || null, reason: why.slice(0, 500) });
+    },
+    "Marked as lost.",
+  );
+  if (r.ok) refresh(dealId);
+  return r;
+}
+
+const TERM_FIELDS = ["validUntil", "incotermPlace", "paymentTerms", "deliveryTerms", "notes"] as const;
+
+/** One of a draft's terms ("+ Add" on the terms card): the draft's values with it put in, saved with the same PUT as the editor. */
+export async function revisionFieldsAction(dealId: string, revisionId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(
+    form,
+    async () => {
+      const values = await api.get<RevisionDraft>(`/revisions/${revisionId}/values`);
+      const body: Record<string, unknown> = { ...values };
+      for (const k of TERM_FIELDS) if (k in v) body[k] = v[k]!.trim() === "" ? null : v[k]!.trim();
+      return api.put(`/revisions/${revisionId}`, { ...body, reason: reasonOf(form) });
+    },
+    "Draft saved.",
+  );
+  if (r.ok) refresh(dealId);
+  return r;
 }

@@ -1,80 +1,69 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { can, CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
-import { buttonClass, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
-import { api } from "@/lib/api";
-import { load, requireUser, hasFeature } from "@/lib/session";
-import { date } from "@/lib/format";
-import type { DealDetail } from "@/lib/types";
-import { DealTabs } from "./tabs";
+import { ArrowLeft } from "lucide-react";
+import { can, CHANNEL_LABEL } from "@kebo/shared";
+import { buttonClass, PriorityBadge, StageBadge } from "@kebo/ui";
+import { requireUser, hasFeature } from "@/lib/session";
+import { dealOf, sourcingOf } from "@/lib/deal-data";
+import { StepNav } from "@/components/orders/step-nav";
+import { inquirySteps } from "./steps";
 
-/** What the deal needs now, worked out from its stage (the same rules the API enforces). */
-function guidance(d: DealDetail): { text: string; href?: string; label?: string } {
-  const latest = d.quotation?.revisions[0];
-  const order = d.orders.find((o) => o.status !== "cancelled");
-  switch (d.stage) {
-    case "new":
-      return d.assignee ? { text: `${d.assignee.name} should start by getting factory prices.`, href: `/inquiries/${d.id}/sourcing`, label: "Add factory prices" } : { text: "Nobody handles this yet. Assign someone (or take it) so sourcing can start." };
-    case "sourcing":
-      return latest?.status === "draft"
-        ? { text: `R${latest.number} is drafted. Check it and send it to the customer.`, href: `/inquiries/${d.id}/quotation`, label: "Open the quotation" }
-        : { text: "Get prices from 2–3 factories, then make the quotation.", href: `/inquiries/${d.id}/sourcing`, label: "Factory prices" };
-    case "quoted":
-      return { text: latest?.validUntil ? `Waiting for the customer. R${latest.number} is valid until ${date(latest.validUntil)}: follow up, then record their answer.` : "Waiting for the customer: follow up and record their answer.", href: `/inquiries/${d.id}/quotation`, label: "Record the answer" };
-    case "won":
-      return order ? { text: `Won. The work continues on order ${order.refNo}.`, href: `/orders/${order.id}`, label: "Go to the order" } : { text: "Won." };
-    case "lost":
-      return { text: `Lost${d.lostReason ? `: ${LOST_REASON_LABEL[d.lostReason].toLowerCase()}` : ""}.${d.allowed.reopen ? " A manager can reopen it." : ""}` };
-  }
-}
-
+/**
+ * Every page of an inquiry shares one top: its number and stage, what it is,
+ * the customer, how it came and who handles it, Edit details, and the
+ * inquiry's navigation: Overview · 1 Needs · 2 Factory prices · 3 Quotation ·
+ * Costs (managers) · History, then "Order →" once won.
+ */
 export default async function DealLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
-  const d = await load(() => api.get<DealDetail>(`/inquiries/${id}`));
-  const g = guidance(d);
+  const d = await dealOf(id);
+  const sourcing = can(me, "sourcing.manage");
+  const offers = sourcing ? ((await sourcingOf(id).catch(() => null))?.quotes.length ?? 0) : null;
   const order = d.orders.find((o) => o.status !== "cancelled");
+  const base = `/inquiries/${d.id}`;
+  const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
+  const meta = [
+    d.title && <span key="t">{d.title}</span>,
+    <Link key="c" href={`/customers/${d.customer.id}`} className="hover:underline">
+      {d.customer.name}
+    </Link>,
+    <span key="ch">{CHANNEL_LABEL[d.channel]}</span>,
+    d.assignee && <span key="a">{d.assignee.name}</span>,
+  ].filter(Boolean);
+
   return (
     <div>
-      <PageHeader
-        backHref="/inquiries"
-        backLabel="Inquiries"
-        title={
-          <span className="flex flex-wrap items-center gap-2">
-            {d.refNo} <StageBadge stage={d.stage} onHold={d.onHold} /> <PriorityBadge priority={d.priority} />
-          </span>
-        }
-        description={
-          <>
-            <span className="font-medium text-text">{d.title}</span> ·{" "}
-            <Link href={`/customers/${d.customer.id}`} className="hover:underline">
-              {d.customer.name}
-            </Link>{" "}
-            · {CHANNEL_LABEL[d.channel]} · {d.category}
-            {d.requiredBy && <> · needed by {date(d.requiredBy)}</>}
-          </>
-        }
-        actions={
-          d.allowed.edit ? (
-            <Link href={`/inquiries/${d.id}/edit`} className={buttonClass("secondary", "sm")}>
+      <header className="flex flex-col gap-1">
+        <Link href="/inquiries" className="inline-flex w-fit items-center gap-1 text-xs text-muted hover:text-text">
+          <ArrowLeft className="size-3.5" aria-hidden /> Inquiries
+        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-xl font-semibold tracking-tight tabular sm:text-2xl">{d.refNo}</h1>
+            <StageBadge stage={d.stage} onHold={d.onHold} />
+            <PriorityBadge priority={d.priority} />
+            <p className="min-w-0 basis-full text-sm text-text-2 sm:basis-auto">
+              {meta.map((m, i) => (
+                <span key={i}>
+                  {i > 0 && (
+                    <span aria-hidden className="px-1.5 text-muted">
+                      ·
+                    </span>
+                  )}
+                  {m}
+                </span>
+              ))}
+            </p>
+          </div>
+          {d.allowed.edit && (
+            <Link href={`${base}/edit`} className={buttonClass("secondary", "sm", "shrink-0 self-start max-sm:hidden")}>
               Edit details
             </Link>
-          ) : undefined
-        }
-      />
-      <section aria-label="What next" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary-soft/50 p-4">
-        <p className="flex items-center gap-2 text-sm">
-          <ArrowRight className="size-4 shrink-0 text-primary" aria-hidden />
-          {g.text}
-        </p>
-        {g.href && (
-          <Link href={g.href} className={buttonClass("primary", "sm")}>
-            {g.label}
-          </Link>
-        )}
-      </section>
+          )}
+        </div>
+      </header>
       {d.customer.country === "ZZ" && (
-        <p className="mb-4 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-sm">
+        <p className="mt-3 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-sm">
           This customer&apos;s country is not set.{" "}
           <Link href={`/customers/${d.customer.id}/edit`} className="font-medium underline">
             Add it
@@ -82,11 +71,13 @@ export default async function DealLayout({ children, params }: { children: React
           — it decides shipping.
         </p>
       )}
-      <DealTabs
-        id={d.id}
-        source={can(me, "sourcing.manage")}
-        orderId={order?.id ?? null}
-        managers={can(me, "expenses.manage") && (await hasFeature("expenses"))}
+      <StepNav
+        base={base}
+        label="Inquiry steps"
+        glance="The inquiry at a glance"
+        steps={inquirySteps(d, offers).map((s) => ({ key: s.key, number: s.number, label: s.label, state: s.state, status: s.status, href: `${base}/${s.path}` }))}
+        costs={managers ? {} : null}
+        extra={order ? [{ href: `/orders/${order.id}`, label: "Order →" }] : []}
       />
       <div className="mt-5">{children}</div>
     </div>
