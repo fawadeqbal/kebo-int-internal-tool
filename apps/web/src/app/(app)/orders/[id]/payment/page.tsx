@@ -5,10 +5,11 @@ import { api } from "@/lib/api";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { PaymentEdit } from "@/components/orders/view-panels";
-import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
+import { expensePayTools } from "@/components/orders/costs-card";
 import { PaymentPlan } from "@/components/money/forms";
 import { LcChecks, PlanLines, ReceivedForm, UseCredit } from "@/components/money/money-v2";
 import { savePlanAction } from "../../../money/actions";
@@ -17,7 +18,6 @@ import { fieldsAction, lightAction } from "../../light-actions";
 import { paymentAction, useCreditAction } from "../../actions";
 import { CustomerSummary, MoneySection, PaymentsReceived } from "../money-sections";
 import { stepData } from "../step-data";
-import { StepFilesSide, StepPapers } from "../papers";
 import { termsOf } from "../shared";
 
 export const metadata = { title: "Order · payment" };
@@ -142,12 +142,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       step="payment"
       base={d.base}
       action={pay("Record a payment", false)}
-      side={
-        <>
-          <StepFilesSide id={o.id} step="payment" />
-          <StepChanges entries={d.changes} historyHref={d.historyHref} />
-        </>
-      }
+      side={<StepSidePanel id={o.id} step="payment" changes={d.changes} historyHref={d.historyHref} />}
     >
       <Checklist
         payFor={await expensePayTools(o.id, d.items)}
@@ -239,8 +234,6 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         )}
         <PaymentsReceived o={o} p={p} me={me} now={now} />
       </MoneySection>
-      <StepPapers id={o.id} step="payment" />
-      <StepCosts id={o.id} step="payment" />
     </StepPage>
   );
 }

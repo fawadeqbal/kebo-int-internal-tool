@@ -4,9 +4,10 @@ import { Badge, Card, CardHeader } from "@kebo/ui";
 import { date } from "@/lib/format";
 import type { ShipmentView } from "@/lib/types-flow";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, FieldsForm, PanelButton, type DetailField } from "@/components/orders/step-view";
-import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
+import { expensePayTools } from "@/components/orders/costs-card";
 import { packingAction, packingMarksAction, paymentAction } from "../../actions";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { PaymentForm } from "../forms";
@@ -14,7 +15,6 @@ import { PackingCard } from "../goods";
 import { docHref, goodsOf } from "../shared";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
-import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · shipping" };
 
@@ -211,12 +211,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       step="shipping"
       base={d.base}
       action={shipments.length ? addShipment : undefined}
-      side={
-        <>
-          <StepFilesSide id={o.id} step="shipping" />
-          <StepChanges entries={d.changes} historyHref={d.historyHref} />
-        </>
-      }
+      side={<StepSidePanel id={o.id} step="shipping" changes={d.changes} historyHref={d.historyHref} />}
     >
       <Checklist
         payFor={await expensePayTools(o.id, d.items)}
@@ -304,8 +299,6 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             />
           </Card>
         ))}
-      <StepPapers id={o.id} step="shipping" />
-      <StepCosts id={o.id} step="shipping" />
     </StepPage>
   );
 }

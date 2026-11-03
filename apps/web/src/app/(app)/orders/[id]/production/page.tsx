@@ -7,9 +7,10 @@ import type { Person } from "@/lib/types";
 import type { ChecklistItem } from "@/lib/types-checklist";
 import { optional } from "@/components/print/data";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
-import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
+import { expensePayTools } from "@/components/orders/costs-card";
 import { NewFactoryPayment } from "@/components/money/forms";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { factoryPaymentAction } from "../../../money/actions";
@@ -17,7 +18,6 @@ import { fieldsAction, lightAction } from "../../light-actions";
 import { GoodsExcel } from "../goods";
 import { goodsOf } from "../shared";
 import { stepData } from "../step-data";
-import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · production" };
 
@@ -128,12 +128,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       steps={d.steps}
       step="production"
       base={d.base}
-      side={
-        <>
-          <StepFilesSide id={o.id} step="production" />
-          <StepChanges entries={d.changes} historyHref={d.historyHref} />
-        </>
-      }
+      side={<StepSidePanel id={o.id} step="production" changes={d.changes} historyHref={d.historyHref} />}
     >
       <Checklist
         payFor={await expensePayTools(o.id, d.items)}
@@ -177,8 +172,6 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
           editActions={<GoodsExcel lines={goods} />}
         />
       )}
-      <StepPapers id={o.id} step="production" />
-      <StepCosts id={o.id} step="production" />
     </StepPage>
   );
 }

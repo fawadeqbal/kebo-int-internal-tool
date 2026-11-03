@@ -16,7 +16,7 @@ export async function stepData(id: string, step: FlowStep) {
     orderStepsOf(id),
     optional(() => orderFlowOf(id)),
     optional(() => api.get<Person[]>("/users/people")),
-    optional(() => orderHistoryOf(id, step, 4)),
+    optional(() => orderHistoryOf(id, step, 200)),
     optional(() => orderDefaultsOf(id)),
   ]);
   const base = `/orders/${o.id}`;

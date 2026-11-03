@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, FileText, MoreHorizontal, Plus, Share2 } from "lucide-react";
@@ -52,7 +52,7 @@ const GROUPS: { label: string; steps: FlowStep[] }[] = [
 ];
 
 /** The paper's print page (View / Print) and its PDF. */
-function printOf(orderId: string, r: PaperLineRow) {
+export function printOf(orderId: string, r: PaperLineRow) {
   if (r.links) return r.links;
   if (r.source !== "app" || !r.printable) return null;
   const q = new URLSearchParams({ ...(r.ref ? { ref: r.ref } : {}), back: `/orders/${orderId}/documents` });
@@ -297,10 +297,7 @@ function PaperLine({
 }) {
   const tools = useFileTools();
   const router = useRouter();
-  const [menu, setMenu] = useState(false);
   const [busy, start] = useTransition();
-  const more = useRef<HTMLButtonElement>(null);
-  const scanId = useId();
   const from = fromOf(r);
   const print = printOf(orderId, r);
   const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
@@ -370,99 +367,6 @@ function PaperLine({
     </Link>
   ) : null;
 
-  const item = (label: string, on: () => void, hint?: string, danger?: boolean) => (
-    <button
-      type="button"
-      role="menuitem"
-      className={cn(
-        "flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none",
-        danger && "text-bad",
-      )}
-      onClick={() => {
-        setMenu(false);
-        on();
-      }}
-    >
-      <span>{label}</span>
-      {hint && <span className="text-xs text-muted">{hint}</span>}
-    </button>
-  );
-  const sep = <span role="separator" className="my-1 block h-px bg-line" />;
-  const finalApp = r.source === "app" && r.state === "ready" && r.makeable && !r.draft && r.version !== null;
-  const sendScan = (f: File | undefined) =>
-    f &&
-    start(async () => {
-      const res = await uploadToOrder(
-        orderId,
-        f,
-        drop ? { step: r.step, attachTo: drop, note: `${r.label}, signed` } : { step: r.step, note: `${r.label}, signed` },
-      );
-      if (res.error) window.alert(res.error);
-      router.refresh();
-    });
-
-  const menuItems = (
-    <>
-      {print && (paperDone(r.state) || r.live || r.state === "draft" || !!issue) && (
-        <>
-          {item("View / Print", () => window.open(print.view, "_blank"))}
-          {item("Download PDF", () => downloadHref(print.pdf))}
-          {print.internal && item("Internal copy (PDF)", () => downloadHref(print.internal!), "all prices, costs")}
-        </>
-      )}
-      {file && item("View the file", () => tools?.view(file))}
-      {tools &&
-        (paperDone(r.state) || r.live) &&
-        (print || file) &&
-        item(
-          "Share…",
-          () =>
-            tools.open({
-              kind: "share",
-              files: print ? [] : file ? [file] : [],
-              papers: print ? [{ key: r.key, label: [r.label, r.number].filter(Boolean).join(" ") }] : [],
-            }),
-          "WhatsApp, email",
-        )}
-      {canMake && finalApp && sep}
-      {canMake &&
-        finalApp &&
-        item(
-          "Make again",
-          () =>
-            start(async () => {
-              const res = await paperAgainAction(orderId, r.kind as PaperKind, r.ref);
-              if (!res.ok) return window.alert(res.message ?? "Something went wrong.");
-              router.push(make!);
-            }),
-          `version ${(r.version ?? 1) + 1}, keeps ${r.version ?? 1}`,
-        )}
-      {canRecord &&
-        r.source === "app" &&
-        paperDone(r.state) &&
-        item(r.doc?.file ? "Replace the signed scan" : "Attach the signed scan", () => document.getElementById(scanId)?.click())}
-      {make && r.version !== null && item("Versions", () => router.push(make), String(r.version))}
-      {recordable && r.state !== "else" && r.source === "upload" && item("Kept elsewhere instead", () => setOpen("elsewhere"))}
-      {recordable && r.state === "else" && item("Upload it instead", () => setOpen("upload"))}
-      {canMake && r.draft && r.paperId && (
-        <>
-          {sep}
-          {item(
-            "Delete the draft",
-            () =>
-              window.confirm(`Delete the draft of the ${r.label.toLowerCase()} (version ${r.version})?`) &&
-              start(async () => {
-                const res = await paperDeleteDraftAction(orderId, r.paperId!);
-                if (!res.ok) window.alert(res.message ?? "Something went wrong.");
-                router.refresh();
-              }),
-            "drafts only",
-            true,
-          )}
-        </>
-      )}
-    </>
-  );
   const fileCell =
     r.source === "app" && (r.version !== null || r.live) ? (
       <span className="inline-flex items-center gap-1 text-xs">
@@ -514,35 +418,10 @@ function PaperLine({
         <span role="cell" className="col-start-3 row-start-1 flex items-center justify-end gap-1 md:col-start-6">
           <span className="hidden items-center gap-1 sm:flex">{action}</span>
           {busy && <span className="text-xs text-muted">…</span>}
-          <button
-            ref={more}
-            type="button"
-            aria-label={`More for ${r.label}`}
-            aria-haspopup="menu"
-            aria-expanded={menu}
-            className={buttonClass("ghost", "icon-xs")}
-            onClick={() => setMenu((m) => !m)}
-          >
-            <MoreHorizontal aria-hidden />
-          </button>
-          {menu && (
-            <FloatingMenu anchor={() => more.current} onClose={() => setMenu(false)} label={r.label} width={260}>
-              {menuItems}
-              {!print && !file && !recordable && !(canMake && r.draft) && (
-                <p className="px-2.5 py-1.5 text-xs text-muted">Nothing to do here yet.</p>
-              )}
-            </FloatingMenu>
-          )}
+          <PaperMenu r={r} orderId={orderId} canMake={canMake} canRecord={canRecord} issuing={!!issue} onRecord={setOpen} />
         </span>
         {action && <span className="col-start-2 flex flex-wrap gap-1.5 sm:hidden">{action}</span>}
       </div>
-      <input
-        id={scanId}
-        type="file"
-        hidden
-        accept="application/pdf,image/*"
-        onChange={(e) => (sendScan(e.target.files?.[0]), (e.target.value = ""))}
-      />
       {open && (
         <div className="pb-3 md:pl-[40px]">
           <RecordForm
@@ -569,5 +448,163 @@ function PaperLine({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * A paper's ⋯ menu (Documents › Papers and the step pages' side panel): View /
+ * Print, Download PDF, the internal copy, the file, Share…, Make again, the
+ * signed scan, Versions, Upload / Kept elsewhere and Delete the draft — each
+ * only when it applies and the person may. Without `onRecord` (the side panel)
+ * Upload and Kept elsewhere open the paper in Documents › Papers.
+ */
+export function PaperMenu({
+  r,
+  orderId,
+  canMake,
+  canRecord,
+  issuing,
+  onRecord,
+  lead,
+}: {
+  r: PaperLineRow;
+  orderId: string;
+  canMake: boolean;
+  canRecord: boolean;
+  /** The proforma can be issued from the row: its print page is already there. */
+  issuing?: boolean;
+  onRecord?: (mode: "upload" | "elsewhere") => void;
+  /** Items before the paper's own (the side panel: Make, Open in Papers). */
+  lead?: (item: (label: string, on: () => void, hint?: string) => ReactNode) => ReactNode;
+}) {
+  const tools = useFileTools();
+  const router = useRouter();
+  const [menu, setMenu] = useState(false);
+  const [busy, start] = useTransition();
+  const more = useRef<HTMLButtonElement>(null);
+  const scanId = useId();
+  const print = printOf(orderId, r);
+  const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
+  const file = r.doc?.file ? (tools?.files.find((f) => f.sourceId === r.doc!.file!.id) ?? null) : null;
+  const recordable = r.docKind && canRecord;
+  const drop = attachKey(r);
+  const papersHref = `/orders/${orderId}/documents?tab=all#papers`;
+  const record = (mode: "upload" | "elsewhere") => (onRecord ? onRecord(mode) : router.push(papersHref));
+
+  const item = (label: string, on: () => void, hint?: string, danger?: boolean) => (
+    <button
+      type="button"
+      role="menuitem"
+      className={cn(
+        "flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-left text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none",
+        danger && "text-bad",
+      )}
+      onClick={() => {
+        setMenu(false);
+        on();
+      }}
+    >
+      <span>{label}</span>
+      {hint && <span className="text-xs text-muted">{hint}</span>}
+    </button>
+  );
+  const sep = <span role="separator" className="my-1 block h-px bg-line" />;
+  const finalApp = r.source === "app" && r.state === "ready" && r.makeable && !r.draft && r.version !== null;
+  const sendScan = (f: File | undefined) =>
+    f &&
+    start(async () => {
+      const res = await uploadToOrder(
+        orderId,
+        f,
+        drop ? { step: r.step, attachTo: drop, note: `${r.label}, signed` } : { step: r.step, note: `${r.label}, signed` },
+      );
+      if (res.error) window.alert(res.error);
+      router.refresh();
+    });
+  const leading = lead?.((label, on, hint) => item(label, on, hint));
+
+  return (
+    <>
+      {busy && <span className="text-xs text-muted">…</span>}
+      <button
+        ref={more}
+        type="button"
+        aria-label={`More for ${r.label}`}
+        aria-haspopup="menu"
+        aria-expanded={menu}
+        className={buttonClass("ghost", "icon-xs")}
+        onClick={() => setMenu((m) => !m)}
+      >
+        <MoreHorizontal aria-hidden />
+      </button>
+      {menu && (
+        <FloatingMenu anchor={() => more.current} onClose={() => setMenu(false)} label={r.label} width={260}>
+          {leading}
+          {print && (paperDone(r.state) || r.live || r.state === "draft" || !!issuing) && (
+            <>
+              {item("View / Print", () => window.open(print.view, "_blank"))}
+              {item("Download PDF", () => downloadHref(print.pdf))}
+              {print.internal && item("Internal copy (PDF)", () => downloadHref(print.internal!), "all prices, costs")}
+            </>
+          )}
+          {file && item("View the file", () => tools?.view(file))}
+          {tools &&
+            (paperDone(r.state) || r.live) &&
+            (print || file) &&
+            item(
+              "Share…",
+              () =>
+                tools.open({
+                  kind: "share",
+                  files: print ? [] : file ? [file] : [],
+                  papers: print ? [{ key: r.key, label: [r.label, r.number].filter(Boolean).join(" ") }] : [],
+                }),
+              "WhatsApp, email",
+            )}
+          {canMake && finalApp && sep}
+          {canMake &&
+            finalApp &&
+            item(
+              "Make again",
+              () =>
+                start(async () => {
+                  const res = await paperAgainAction(orderId, r.kind as PaperKind, r.ref);
+                  if (!res.ok) return window.alert(res.message ?? "Something went wrong.");
+                  router.push(make!);
+                }),
+              `version ${(r.version ?? 1) + 1}, keeps ${r.version ?? 1}`,
+            )}
+          {canRecord &&
+            r.source === "app" &&
+            paperDone(r.state) &&
+            item(r.doc?.file ? "Replace the signed scan" : "Attach the signed scan", () => document.getElementById(scanId)?.click())}
+          {make && r.version !== null && item("Versions", () => router.push(make), String(r.version))}
+          {!onRecord && recordable && r.source === "upload" && (r.state === "miss" || r.state === "draft") && item("Upload…", () => record("upload"), "in Papers")}
+          {recordable && r.state !== "else" && r.source === "upload" && item(onRecord ? "Kept elsewhere instead" : "Kept elsewhere…", () => record("elsewhere"))}
+          {recordable && r.state === "else" && item("Upload it instead", () => record("upload"))}
+          {canMake && r.draft && r.paperId && (
+            <>
+              {sep}
+              {item(
+                "Delete the draft",
+                () =>
+                  window.confirm(`Delete the draft of the ${r.label.toLowerCase()} (version ${r.version})?`) &&
+                  start(async () => {
+                    const res = await paperDeleteDraftAction(orderId, r.paperId!);
+                    if (!res.ok) window.alert(res.message ?? "Something went wrong.");
+                    router.refresh();
+                  }),
+                "drafts only",
+                true,
+              )}
+            </>
+          )}
+          {!leading && !print && !file && !recordable && !(canMake && r.draft) && (
+            <p className="px-2.5 py-1.5 text-xs text-muted">Nothing to do here yet.</p>
+          )}
+        </FloatingMenu>
+      )}
+      <input id={scanId} type="file" hidden accept="application/pdf,image/*" onChange={(e) => (sendScan(e.target.files?.[0]), (e.target.value = ""))} />
+    </>
   );
 }
