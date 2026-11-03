@@ -18,6 +18,7 @@ import { buyerOf } from "./buyer";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
 import { readyOnOf, readySelect } from "./ready";
+import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /**
  * The order's own documents, the proforma invoice and the packing list (single source of truth, PR 2:
@@ -55,7 +56,8 @@ export const orderDocInclude = {
       },
     },
   },
-  revision: { include: { quotation: { select: { refNo: true } } } },
+  // The accepted option's discount and lead time (the revision keeps no figures of its own).
+  revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   payments: { where: { voidedAt: null }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] },
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
@@ -91,7 +93,7 @@ export const quotedTermsPrinted = (o: Parameters<typeof termsOf>[0] & { balanceT
 /** The document made from the order as it is now (a draft, or what a final version keeps). */
 export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
   const rev = o.revision;
-  const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), rev.discount.toString());
+  const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), figuresOf(rev).discount);
   // Where the order stands, as on every screen: the plan's deposit (a plan edited to 50% says 50%), what was charged.
   const position = positionOf(o, c.fx);
   const depositPercent = position.depositPercent;
@@ -134,7 +136,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       documentTitle: o.documentTitle,
       portOfDischarge: o.portOfDischarge,
       /** e.g. "90 days after receiving advance payment". */
-      leadTime: rev.leadTime,
+      leadTime: figuresOf(rev).leadTime,
     },
     /**
      * The packing list: the shipment it goes with (Shipment 1), its ports as the papers print them (its own,

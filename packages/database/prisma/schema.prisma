@@ -908,6 +908,8 @@ model Quotation {
   @@map("quotations")
 }
 
+/// A revision keeps no figures of its own: its total, discount and lead time are its options' (the accepted
+/// one, else Option A: see @kebo/shared revisionOption / revisionWorth).
 model QuotationRevision {
   id               String         @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
@@ -922,11 +924,7 @@ model QuotationRevision {
   incotermPlace    String?        @map("incoterm_place") @db.VarChar(80)
   depositPercent   Decimal        @default(30) @map("deposit_percent") @db.Decimal(5, 2)
   balanceTerms     BalanceTerms   @default(before_shipment) @map("balance_terms")
-  leadTime         String?        @map("lead_time") @db.VarChar(120)
   validUntil       DateTime       @map("valid_until") @db.Date
-  subtotal         Decimal        @default(0) @db.Decimal(14, 2)
-  discount         Decimal        @default(0) @db.Decimal(14, 2)
-  total            Decimal        @default(0) @db.Decimal(14, 2)
   /// Payment terms printed on the quotation (beyond the deposit and balance above), e.g. "By T/T; L/C at sight accepted".
   paymentTerms     String?        @map("payment_terms")
   /// Delivery terms printed on the quotation, e.g. "Packing: export wooden cases. Inspection before shipment."

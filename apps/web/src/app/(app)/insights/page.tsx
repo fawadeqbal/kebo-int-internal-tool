@@ -234,7 +234,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
               label="Pipeline"
               icon={<ChartLine className="size-3.5" />}
               value={<Headline amount={i.now.pipeline} currency={c} />}
-              note={`${i.now.pipelineDeals} quoted ${i.now.pipelineDeals === 1 ? "inquiry" : "inquiries"}${i.now.weightedPipeline ? ` · likely ${money(i.now.weightedPipeline, c)}` : ""}`}
+              note={`${i.now.pipelineDeals} quoted ${i.now.pipelineDeals === 1 ? "inquiry" : "inquiries"}${i.now.pipelineUpTo ? ` · up to ${money(i.now.pipelineUpTo, c)} at their highest options` : ""}${i.now.weightedPipeline ? ` · likely ${money(i.now.weightedPipeline, c)}` : ""}`}
               href="/inquiries?stage=quoted"
             />
           </div>

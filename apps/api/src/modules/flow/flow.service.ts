@@ -1301,7 +1301,6 @@ export class FlowService {
     const rev = await this.prisma.db.quotationRevision.findUnique({
       where: { id: o.revisionId },
       select: {
-        leadTime: true,
         options: {
           where: { status: "accepted" },
           take: 1,
@@ -1310,7 +1309,7 @@ export class FlowService {
       },
     });
     const option = rev?.options[0] ?? null;
-    const text = option?.leadTime ?? rev?.leadTime ?? null;
+    const text = option?.leadTime ?? null;
     const days = leadDays(text);
     const from = fromDbDateOrNull(o.factoryOrderedOn) ?? this.clock.today();
     return {

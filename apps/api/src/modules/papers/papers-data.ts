@@ -40,6 +40,7 @@ import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 import { factoryReadyOf, readySelect } from "../orders/ready";
 import { livePlanOfOrder } from "../money/plan-live";
 import { advanceOf } from "../money/factory-plan";
+import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -58,7 +59,8 @@ export const paperOrderInclude = {
       factory: { select: { id: true, name: true, address: true } },
     },
   },
-  revision: { include: { quotation: { select: { refNo: true } } } },
+  // The accepted option's discount and lead time (the revision keeps no figures of its own).
+  revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   // Receipts are numbered when the payment is recorded (Payment.receiptNo); listed in date order.
   payments: { where: { voidedAt: null }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] },
   planItems: { orderBy: { sortOrder: "asc" } },
@@ -176,7 +178,7 @@ export function linesOf(c: PaperCtx) {
   const numbers = orderLineNumbers(c.o.lines);
   const t = documentTotals(
     c.o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })),
-    c.o.revision.discount.toString(),
+    figuresOf(c.o.revision).discount,
   );
   return {
     lines: c.o.lines.map((l, i) => ({ ...l, no: numbers[i] ?? String(i + 1) })),
@@ -280,6 +282,8 @@ function salesContract(c: PaperCtx): Built {
   const route = c.o.paymentRoute;
   const b = c.o.bankContract;
   const rev = c.o.revision;
+  // The accepted option's lead time (the revision keeps none of its own).
+  const leadTime = figuresOf(rev).leadTime;
   const shipBy = fromDbDateOrNull(c.o.shipBy);
   // With an LC: its latest shipment date beside ours, and a warning when ours is later (we keep our own).
   const lcLatest = LC(c) ? fromDbDateOrNull(b?.latestShipOn) : null;
@@ -344,7 +348,7 @@ function salesContract(c: PaperCtx): Built {
         ...(routeLine ? [routeLine] : []),
         ...quotedTerms(c),
         `Shipment: by ${mode}${pol ? ` from ${pol}` : ""}${pod ? ` to ${pod}` : ""}, ${c.o.incoterm}${c.o.incotermPlace ? ` ${c.o.incotermPlace}` : ""}${shipBy ? `, latest ${paperDateText(shipBy)}` : ""}.`,
-        ...(rev.leadTime ? [`Delivery: ${rev.leadTime}.`.replace(/\.\.$/, ".")] : []),
+        ...(leadTime ? [`Delivery: ${leadTime}.`.replace(/\.\.$/, ".")] : []),
         has(c, "delivery_sat")
           ? "Inspection: FAT at the factory before shipment; SAT at the buyer's site."
           : "Inspection: FAT at the factory before shipment.",

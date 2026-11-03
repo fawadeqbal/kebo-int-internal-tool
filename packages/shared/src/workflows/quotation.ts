@@ -139,3 +139,45 @@ export function coverage(items: { id: string; parentId: string | null; no: strin
   const isCovered = (t: { id: string }) => set.has(t.id) || items.some((p) => p.parentId === t.id && set.has(p.id));
   return { covered: top.filter(isCovered).map((t) => t.no), missing: top.filter((t) => !isCovered(t)).map((t) => t.no) };
 }
+
+/** What the option figures below need: its letter, its place in the list, and whether the customer chose it. */
+export interface OptionRef {
+  letter: string;
+  sortOrder?: number;
+  status: string;
+}
+
+/**
+ * The option that speaks for a revision: the one the customer accepted; before that, Option A (the first
+ * offered), which is what a draft or a sent revision shows in lists. The revision keeps no figures of its
+ * own: its total, discount and lead time are always read from here. `label` says which option it is, for
+ * screens that show one figure for a revision with several options ("Option B, accepted", "Option A of 3").
+ */
+export function revisionOption<O extends OptionRef>(options: readonly O[]): { option: O; accepted: boolean; label: string } | null {
+  const accepted = options.find((o) => o.status === "accepted");
+  if (accepted) return { option: accepted, accepted: true, label: options.length > 1 ? `Option ${accepted.letter}, accepted` : "accepted" };
+  const first = [...options].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.letter.localeCompare(b.letter))[0];
+  if (!first) return null;
+  return { option: first, accepted: false, label: options.length > 1 ? `Option ${first.letter} of ${options.length}` : "" };
+}
+
+/**
+ * What a revision is worth, for reports and the pipeline: the accepted option's total; before the customer
+ * chooses, the lowest and the highest of its options (the same number when there is one option). `label`
+ * names the basis when it is a range ("lowest–highest of 3 options").
+ */
+export function revisionWorth<O extends OptionRef>(
+  options: readonly O[],
+  minorOf: (o: O) => number,
+): { lowMinor: number; highMinor: number; accepted: boolean; label: string } | null {
+  const accepted = options.find((o) => o.status === "accepted");
+  if (accepted) {
+    const v = minorOf(accepted);
+    return { lowMinor: v, highMinor: v, accepted: true, label: options.length > 1 ? `Option ${accepted.letter}, accepted` : "" };
+  }
+  if (!options.length) return null;
+  const all = options.map(minorOf);
+  const lowMinor = Math.min(...all);
+  const highMinor = Math.max(...all);
+  return { lowMinor, highMinor, accepted: false, label: lowMinor === highMinor ? "" : `lowest–highest of ${options.length} options` };
+}

@@ -224,11 +224,18 @@ describe("quotation options from factory offers", () => {
       "2 charge Sea freight to Mombasa",
     ]);
     expect(b).toMatchObject({ total: "45500.00", leadTime: "60 days", coverage: { covered: ["2"], missing: ["1"] } });
-    expect(r.total).toBe(a.total); // the revision's own figures follow Option A until one is accepted
+    // The revision keeps no figures of its own: they are Option A's until one is accepted, and say so.
+    expect(r).toMatchObject({ total: a.total, leadTime: a.leadTime, figuresOf: "Option A of 2" });
   });
 
   it("records the customer's choice of exactly one option; the order is that option", async () => {
     await api(app, sana).post(`/revisions/${revisionId}/status`, { to: "sent" }).expect(200);
+    // Sent, not chosen yet: the deal shows it at the lowest–highest of its options, labelled.
+    const sent = (await api(app, sana).get(`/revisions/${revisionId}`).expect(200)).body;
+    const totals = sent.options.map((o: { total: string }) => Number(o.total)).sort((x: number, y: number) => x - y);
+    const shown = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body.quotation.revisions[0];
+    expect(shown).toMatchObject({ total: totals[0].toFixed(2), totalUpTo: totals[1].toFixed(2), totalOf: "lowest–highest of 2 options" });
+    expect(shown).not.toHaveProperty("options");
     expect((await api(app, sana).post(`/revisions/${revisionId}/status`, { to: "accepted" }).expect(400)).body.error).toBe(
       "Choose the option the customer accepted.",
     );
@@ -239,7 +246,9 @@ describe("quotation options from factory offers", () => {
       "A:not_chosen",
       "B:accepted",
     ]);
-    expect(accepted).toMatchObject({ status: "accepted", total: "45500.00", leadTime: "60 days" });
+    expect(accepted).toMatchObject({ status: "accepted", total: "45500.00", leadTime: "60 days", figuresOf: "Option B, accepted" });
+    const listed = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body.quotation.revisions[0];
+    expect(listed).toMatchObject({ total: "45500.00", totalUpTo: null, totalOf: "Option B, accepted" });
 
     const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
     const order = (await api(app, sana).get(`/orders/${deal.orders[0].id}`).expect(200)).body;

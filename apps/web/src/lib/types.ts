@@ -23,7 +23,11 @@ export interface DealRow {
   customer: { id: string; name: string; country: string };
   assignee: Person | null;
   items: number;
-  quotation: { refNo: string; latest: { number: number; status: RevisionStatus; total: string; currency: string } | null } | null;
+  quotation: {
+    refNo: string;
+    /** `total` is the accepted option's, else the lowest option's; `totalUpTo` the highest when the options differ. */
+    latest: { number: number; status: RevisionStatus; total: string; totalUpTo: string | null; totalOf: string; currency: string } | null;
+  } | null;
   order: { id: string; refNo: string; status: OrderStatus } | null;
   createdAt: string;
 }
@@ -122,7 +126,10 @@ export interface DealDetail {
       id: string;
       number: number;
       status: RevisionStatus;
+      /** The accepted option's total, else the lowest option's; `totalUpTo` the highest when the options differ. */
       total: string;
+      totalUpTo: string | null;
+      totalOf: string;
       currency: string;
       validUntil: string;
       sentOn: string | null;

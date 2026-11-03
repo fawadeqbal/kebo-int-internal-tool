@@ -119,7 +119,10 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
                     ) : d.quotation?.latest ? (
                       <span className="text-sm">
                         R{d.quotation.latest.number} {REVISION_STATUS_LABEL[d.quotation.latest.status].toLowerCase()}
-                        <span className="block text-xs text-muted tabular">{money(d.quotation.latest.total, d.quotation.latest.currency)}</span>
+                        <span className="block text-xs text-muted tabular" title={d.quotation.latest.totalOf || undefined}>
+                          {money(d.quotation.latest.total, d.quotation.latest.currency)}
+                          {d.quotation.latest.totalUpTo ? `–${money(d.quotation.latest.totalUpTo, d.quotation.latest.currency)}` : ""}
+                        </span>
                       </span>
                     ) : (
                       <span className="text-xs text-muted">Not quoted</span>

@@ -13,6 +13,7 @@ import { ordersWithMoneyDue } from "../money/due";
 import { fxOf, positionOf, positionRelations } from "../money/position";
 import { LimitsService } from "../../common/company/limits.service";
 import { MainMoney } from "../money/order-money";
+import { optionFigures, worthOf, worthView } from "../quotations/revision-figures";
 
 export interface Range {
   from: ISODate;
@@ -80,8 +81,8 @@ export class ReportsService {
           id: true,
           number: true,
           validUntil: true,
-          total: true,
           currency: true,
+          ...optionFigures,
           quotation: { select: { refNo: true, inquiry: { select: { id: true, title: true, customer: { select: { name: true } } } } } },
         },
         orderBy: { validUntil: "asc" },
@@ -99,7 +100,8 @@ export class ReportsService {
         id: r.id,
         label: `${r.quotation.refNo} R${r.number}`,
         validUntil: fromDbDate(r.validUntil),
-        total: r.total.toFixed(2),
+        // What it is worth: one option's total, or the lowest–highest of its options (labelled).
+        ...worthView(r),
         currency: r.currency,
         inquiry: r.quotation.inquiry,
       })),
@@ -123,7 +125,7 @@ export class ReportsService {
     const [quoted, won, paidIn, openOrders] = await Promise.all([
       this.prisma.db.quotationRevision.findMany({
         where: { deletedAt: null, status: { in: LIVE_QUOTED }, sentOn: { gte: day(monthStart) } },
-        select: { total: true, currency: true },
+        select: { currency: true, ...optionFigures },
       }),
       this.prisma.db.order.findMany({
         where: { status: { not: "cancelled" }, orderedOn: { gte: day(monthStart) } },
@@ -146,6 +148,9 @@ export class ReportsService {
         },
       }),
     ]);
+    const worths = quoted.map((r) => ({ w: worthOf(r), currency: r.currency }));
+    const quotedLow = worths.reduce((t, x) => t + fx.live(x.w.lowMinor, x.currency), 0);
+    const quotedHigh = worths.reduce((t, x) => t + fx.live(x.w.highMinor, x.currency), 0);
     let receivable = 0;
     const byStage = { confirmed: 0, in_production: 0, shipped: 0 };
     for (const o of openOrders) {
@@ -156,7 +161,10 @@ export class ReportsService {
     return {
       currency: main,
       thisMonth: {
-        quoted: fromMinor(quoted.reduce((t, r) => t + fx.live(decimalToMinor(r.total), r.currency), 0)),
+        // The accepted option of each revision; before the customer chooses, its lowest option (and, in
+        // quotedUpTo, its highest: a revision with options at 10,000 and 14,000 is quoted 10,000–14,000).
+        quoted: fromMinor(quotedLow),
+        quotedUpTo: quotedHigh !== quotedLow ? fromMinor(quotedHigh) : null,
         won: fromMinor(won.reduce((t, o) => t + fx.order(decimalToMinor(o.total), o), 0)),
         // What arrived (the bank charges never reached us), as in profit & loss and Insights.
         received: fromMinor(

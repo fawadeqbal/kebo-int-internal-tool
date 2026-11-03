@@ -349,7 +349,6 @@ async function main() {
           validUntil: toDbDate(addDays(sentOn, 15)),
           sentOn: toDbDate(sentOn),
           answeredOn: status === "accepted" || status === "rejected" ? toDbDate(closedOn < sentOn ? sentOn : closedOn) : null,
-          ...header,
           balanceTerms: "before_shipment",
           createdById: assignee ?? lead.id,
         },
