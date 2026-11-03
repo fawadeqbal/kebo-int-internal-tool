@@ -19,6 +19,7 @@ import type { OrderRow, RevisionDoc } from "./types-orders";
 import type { AuditRow, CustomerRow, FactoryRow } from "./types-people";
 import type { CashBook, ExpenseList, Payable } from "./types-money";
 import type { Receivables } from "./types-insights";
+import { insightsSheets } from "./insights-data";
 
 /**
  * The lists as Excel files: every row the person may see with the filters on
@@ -609,6 +610,7 @@ export const EXPORTS = {
   expenses,
   audit,
   report,
+  insights: insightsSheets,
   quotation,
   "factory-list": factoryList,
 } satisfies Record<string, (q: Q) => Promise<SheetSpec | SheetSpec[]>>;

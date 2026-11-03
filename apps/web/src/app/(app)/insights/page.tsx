@@ -1,759 +1,284 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Banknote, ChartLine, Coins, HandCoins, Percent, Target, TrendingUp, Trophy, Users } from "lucide-react";
-import { CHANNEL_LABEL } from "@kebo/shared";
-import {
-  Alert,
-  Badge,
-  buildHref,
-  Card,
-  CardBody,
-  CardHeader,
-  cn,
-  LinkTabs,
-  PageHeader,
-  Segmented,
-  Table,
-  Td,
-  Th,
-  THead,
-  Tr,
-} from "@kebo/ui";
+import { redirect } from "next/navigation";
+import { can } from "@kebo/shared";
+import { Alert, buildHref, buttonClass, Input, PageHeader, SectionNav, Segmented } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
-import { money } from "@/lib/format";
-import { countryName } from "@/lib/countries";
-import type { Insights } from "@/lib/types-insights";
+import { PERIOD_KINDS, PERIOD_LABEL, periodOf, SECTION_LABEL, SECTIONS, sectionOfTab, type Period, type Section } from "@/lib/insights-period";
+import { CUSTOMER_CHIPS, loadCustomers, loadFactories, loadFunnel, loadMoney, loadOverview, loadPeople, type CustomerChip } from "@/lib/insights-data";
 import type { LeaksReport } from "@/lib/types-money";
-import { CashFlowChart, Donut, RevenueChart } from "@/components/insights/charts";
-import { Change, flag, Funnel, Headline, KpiCard, ShareBars, TargetRing } from "@/components/insights/kpi";
-import { PeriodPicker } from "@/components/insights/period";
-import { TargetEditor } from "@/components/insights/targets";
-import { TargetsGrid, type TargetRow } from "@/components/insights/targets-grid";
-import { saveTargetRowAction } from "../money/actions";
-import { FileActions } from "@/components/common/file-actions";
+import type { AgeBucket } from "@/lib/types-facts";
+import { SectionList } from "@/components/insights/frame";
+import { Overview } from "@/components/insights/overview";
+import { MoneySection } from "@/components/insights/money-section";
+import { CustomersSection, FactoriesSection, FunnelSection, PeopleSection } from "@/components/insights/parties-sections";
+import { TargetsView } from "@/components/insights/targets-view";
 import { LEAK_VIEWS, LeaksBody, type LeakView } from "@/components/insights/leaks";
 import { ProfitTable } from "@/components/insights/pnl";
-import { ReportTrendChart } from "@/components/deals/report-trend-chart";
 
 export const metadata = { title: "Insights" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
-const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
-const TABS = ["overview", "sales", "customers", "factories", "profit", "targets"] as const;
-type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = {
-  overview: "Overview",
-  sales: "Sales",
+
+type Search = {
+  section?: string;
+  period?: string;
+  from?: string;
+  to?: string;
+  view?: string;
+  leak?: string;
+  year?: string;
+  pl?: string;
+  chip?: string;
+  page?: string;
+  month?: string;
+  age?: string;
+  side?: string;
+  /** Old links. */
+  tab?: string;
+  sub?: string;
+};
+
+const TITLE: Record<Section, string> = {
+  overview: "Insights",
+  money: "Money",
   customers: "Customers",
   factories: "Factories",
-  profit: "Profit",
-  targets: "Targets",
+  people: "People",
+  funnel: "Funnel",
 };
-const n = (v: number | null | undefined, suffix = "") =>
-  v === null || v === undefined ? "—" : `${v.toLocaleString("en-US", { maximumFractionDigits: 1 })}${suffix}`;
-const nums = (xs: (string | number | null)[]) => xs.map((x) => Number(x ?? 0));
-
-type Search = { tab?: string; from?: string; to?: string; sub?: string; year?: string; pl?: string };
+const DESCRIPTION: Record<Section, string> = {
+  overview: "How the business is doing · every figure is from the orders and money themselves",
+  money: "Cash, what we're owed, what we owe, costs and profit · for people who may see money",
+  customers: "Who buys, how much, how well they pay",
+  factories: "Who supplies on time and wins our orders",
+  people: "Who sells, how fast, and against their targets",
+  funnel: "Where inquiries go, and why we lose them",
+};
 
 /**
- * How the business is doing, for any period against the one before: the
- * executive overview, then sales, customers, factories and profit. One period
- * for every number on the page.
+ * Insights (Dashboard frame): the sections on the left, one period for every figure in the header with the
+ * period before to compare, tiles, one chart per question, short lists. All figures come from the Insights
+ * tables (GET /insights/facts/*).
  */
 export default async function InsightsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  await requirePermission("reports.view");
+  const me = await requirePermission("reports.view");
   if (!(await hasFeature("insights"))) return <PlanOff title="Insights" what="Insights (sales, profit and team reports)" />;
   const sp = await searchParams;
+
+  // Old links (?tab=sales, ?tab=profit&sub=pnl, ?tab=targets…) land on the section that has it now.
+  const old = sectionOfTab(sp.tab);
+  if (old) {
+    const custom = sp.from && sp.to;
+    const view = old.view ?? (sp.tab === "profit" && sp.sub ? (sp.sub === "pnl" ? "pnl" : "leaks") : undefined);
+    redirect(
+      buildHref("/insights", {}, {
+        section: old.section === "overview" ? undefined : old.section,
+        view,
+        leak: view === "leaks" ? sp.sub : undefined,
+        year: sp.year,
+        pl: sp.pl,
+        period: custom ? "custom" : undefined,
+        from: custom ? sp.from : undefined,
+        to: custom ? sp.to : undefined,
+      }),
+    );
+  }
+
+  const seeMoney = can(me, "expenses.manage");
+  const sections = SECTIONS.filter((s) => s !== "money" || seeMoney);
+  const section: Section = (sections as readonly string[]).includes(sp.section ?? "") ? (sp.section as Section) : "overview";
   const today = todayIn(TZ);
-  const tab: Tab = (TABS as readonly string[]).includes(sp.tab ?? "") ? (sp.tab as Tab) : "overview";
-  const from = isDay(sp.from) ? sp.from : undefined;
-  const to = isDay(sp.to) ? sp.to : undefined;
-  const i = await api.get<Insights>("/insights", { from, to });
-  const c = i.currency;
-  const k = i.kpis;
-  const keep = { tab: tab === "overview" ? undefined : tab, from, to };
-  const href = (change: Record<string, string | undefined>) =>
-    buildHref("/insights", { ...keep, sub: sp.sub, year: sp.year, pl: sp.pl }, change);
-  const spark = (key: keyof Insights["series"][number]) => nums(i.series.slice(-12).map((s) => s[key] as string | number | null));
+  const p = periodOf(sp, today);
+  const keep = {
+    section: section === "overview" ? undefined : section,
+    period: p.kind === "quarter" ? undefined : p.kind,
+    from: p.kind === "custom" ? p.from : undefined,
+    to: p.kind === "custom" ? p.to : undefined,
+  };
+  const href = (patch: Record<string, string | undefined>) => buildHref("/insights", keep, patch);
+  const sectionHref = (s: Section) => buildHref("/insights", { ...keep, section: s === "overview" ? undefined : s }, {});
+
+  const [customers, factories, people] = await Promise.all([
+    api.get<{ total: number }>("/customers", { pageSize: 1 }).catch(() => null),
+    api.get<{ total: number }>("/factories", { pageSize: 1 }).catch(() => null),
+    api.get<{ people: unknown[] }>("/insights/targets/people", { year: today.slice(0, 4) }).catch(() => null),
+  ]);
+  const count: Partial<Record<Section, number | undefined>> = { customers: customers?.total, factories: factories?.total, people: people?.people.length };
+  const navItems = sections.map((s) => ({ href: sectionHref(s), label: SECTION_LABEL[s], active: s === section, count: count[s] }));
+  const excel = buildHref("/sheets/export/insights", {}, { section, period: p.kind, from: p.from, to: p.to });
+  const subView = (section === "money" && (sp.view === "pnl" || sp.view === "leaks")) || (section === "people" && sp.view === "targets" && seeMoney);
+
+  const periodPicker = (
+    <Segmented
+      label="Period"
+      className="bg-surface-2"
+      options={PERIOD_KINDS.map((k) => ({
+        href: buildHref("/insights", keep, {
+          period: k === "quarter" ? undefined : k,
+          from: k === "custom" ? p.from : undefined,
+          to: k === "custom" ? p.to : undefined,
+          page: undefined,
+          month: undefined,
+        }),
+        label: PERIOD_LABEL[k],
+        active: p.kind === k,
+      }))}
+    />
+  );
 
   return (
     <div>
       <PageHeader
-        title="Insights"
-        description={`How the business is doing. Amounts in ${c}: orders and payments at today's rates, costs at the rates used when paid.`}
+        title={TITLE[section]}
+        description={<span className="max-md:hidden">{DESCRIPTION[section]}</span>}
         actions={
-          <FileActions
-            excelHref={buildHref("/sheets/export/report", {}, { from: i.range.from, to: i.range.to })}
-            viewHref={buildHref("/print/report", {}, { from: i.range.from, to: i.range.to })}
-            pdfHref={buildHref("/pdf/report/summary", {}, { from: i.range.from, to: i.range.to })}
-          />
+          <div className="no-print flex flex-wrap items-center gap-x-3 gap-y-2 max-md:hidden">
+            {periodPicker}
+            <span className="text-xs text-text-2">
+              {p.label} · vs {p.vsLabel}
+            </span>
+            {!subView && (
+              <a href={excel} className={buttonClass("ghost", "sm")} download>
+                Excel
+              </a>
+            )}
+          </div>
         }
       />
-      <LinkTabs
-        label="Insights sections"
-        className="no-print mb-4"
-        tabs={TABS.filter((t) => t !== "targets" || i.target.canSet).map((t) => ({
-          href: buildHref("/insights", { from, to }, { tab: t === "overview" ? undefined : t }),
-          label: TAB_LABEL[t],
-          active: tab === t,
-        }))}
-      />
-      <div className="mb-5">
-        <PeriodPicker path="/insights" keep={{ tab: keep.tab }} range={i.range} previous={i.previous} today={today} />
-      </div>
-      {i.missingRates.length > 0 && (
-        <Alert tone="warning" className="mb-5">
-          There is no exchange rate for {i.missingRates.join(", ")} in Settings, so amounts in{" "}
-          {i.missingRates.length === 1 ? "it are" : "them are"} left out.
-        </Alert>
-      )}
-
-      {tab === "overview" && (
-        <div className="flex flex-col gap-5">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <KpiCard
-                label="Sales"
-                icon={<TrendingUp className="size-3.5" />}
-                value={<Headline amount={k.revenue.value ?? 0} currency={c} />}
-                kpi={k.revenue}
-                note={`${k.orders.value} order${k.orders.value === 1 ? "" : "s"}`}
-                spark={spark("revenue")}
-                href={href({ tab: "sales" })}
-              />
-              <KpiCard
-                label="Gross profit"
-                icon={<Coins className="size-3.5" />}
-                value={<Headline amount={k.grossProfit.value ?? 0} currency={c} />}
-                kpi={k.grossProfit}
-                note={
-                  Number(k.uncostedRevenue.value) > 0
-                    ? `${money(k.uncostedRevenue.value ?? 0, c)} not costed`
-                    : k.margin.value !== null
-                      ? `${n(k.margin.value, "%")} margin`
-                      : undefined
-                }
-                spark={spark("grossProfit")}
-                href={href({ tab: "profit" })}
-              />
-              {k.netProfit ? (
-                <KpiCard
-                  label="Profit after expenses"
-                  icon={<Banknote className="size-3.5" />}
-                  value={<Headline amount={k.netProfit.value ?? 0} currency={c} />}
-                  kpi={k.netProfit}
-                  tone={Number(k.netProfit.value) < 0 ? "bad" : undefined}
-                  spark={spark("netProfit")}
-                  href={href({ tab: "profit" })}
-                />
-              ) : (
-                <KpiCard
-                  label="Average order"
-                  icon={<Banknote className="size-3.5" />}
-                  value={<Headline amount={k.avgOrder.value ?? 0} currency={c} />}
-                  kpi={k.avgOrder}
-                />
-              )}
-              <KpiCard
-                label="Win rate"
-                icon={<Trophy className="size-3.5" />}
-                value={n(k.winRate.value, "%")}
-                kpi={k.winRate}
-                points
-                note={`${k.won.value} won`}
-                spark={nums(i.series.slice(-12).map((s) => s.won))}
-                href={href({ tab: "sales" })}
-              />
-            </div>
-            <Card className="rounded-2xl">
-              <CardHeader
-                title="This month's target"
-                description={new Date(`${i.target.month}-01T00:00:00Z`).toLocaleDateString("en-GB", {
-                  month: "long",
-                  year: "numeric",
-                  timeZone: "UTC",
-                })}
-                actions={i.target.canSet ? <TargetEditor month={i.target.month} current={i.target.amount} currency={c} /> : undefined}
-              />
-              <CardBody>
-                {i.target.amount && i.target.percent !== null ? (
-                  <TargetRing percent={i.target.percent} reached={i.target.reached} amount={i.target.amount} currency={c} />
-                ) : (
-                  <p className="flex items-start gap-2 text-sm text-muted">
-                    <Target className="mt-0.5 size-4 shrink-0" aria-hidden />
-                    No target for this month yet. A target shows how sales are going at a glance{i.target.canSet ? ": set one above." : "."}
-                  </p>
-                )}
-              </CardBody>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiCard
-              label="Money in"
-              icon={<HandCoins className="size-3.5" />}
-              value={<Headline amount={k.cashIn.value ?? 0} currency={c} />}
-              kpi={k.cashIn}
-              note="From customers"
-              spark={spark("cashIn")}
-            />
-            <KpiCard
-              label="Customers owe us"
-              icon={<Users className="size-3.5" />}
-              value={<Headline amount={i.now.toReceive} currency={c} />}
-              note={
-                Number(i.now.overdue) > 0 ? (
-                  <span className="font-medium text-bad">{money(i.now.overdue, c)} overdue</span>
-                ) : (
-                  "Nothing overdue"
-                )
-              }
-              tone={Number(i.now.overdue) > 0 ? "warn" : undefined}
-              href="/money?tab=receive"
-            />
-            {i.now.cashInHand !== null ? (
-              <KpiCard
-                label="In our accounts"
-                icon={<Banknote className="size-3.5" />}
-                value={<Headline amount={i.now.cashInHand} currency={c} />}
-                note={i.now.toPay !== null ? `We owe factories ${money(i.now.toPay, c)}` : undefined}
-                href="/money?tab=cash"
-              />
-            ) : (
-              <KpiCard
-                label="Quotations sent"
-                value={String(k.quotesSent.value ?? 0)}
-                kpi={k.quotesSent}
-                note={money(k.quotesValue.value ?? 0, c)}
-              />
-            )}
-            <KpiCard
-              label="Pipeline"
-              icon={<ChartLine className="size-3.5" />}
-              value={<Headline amount={i.now.pipeline} currency={c} />}
-              note={`${i.now.pipelineDeals} quoted ${i.now.pipelineDeals === 1 ? "inquiry" : "inquiries"}${i.now.pipelineUpTo ? ` · up to ${money(i.now.pipelineUpTo, c)} at their highest options` : ""}${i.now.weightedPipeline ? ` · likely ${money(i.now.weightedPipeline, c)}` : ""}`}
-              href="/inquiries?stage=quoted"
-            />
-          </div>
-
-          <Card className="rounded-2xl">
-            <CardHeader
-              title="Sales and profit, month by month"
-              description="Bars: sales (orders won). Lines: profit. Grey: the same month a year before. Dashed: the target."
-            />
-            <CardBody>
-              <RevenueChart data={i.series} currency={c} showNet={i.seeExpenses} />
-            </CardBody>
-          </Card>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            {i.seeMoney && (
-              <Card className="rounded-2xl">
-                <CardHeader title="Cash flow" description="Money in from customers, and out to factories and expenses, each month" />
-                <CardBody>
-                  <CashFlowChart data={i.series.slice(-12)} currency={c} />
-                </CardBody>
-              </Card>
-            )}
-            <Card className="rounded-2xl">
-              <CardHeader
-                title="From inquiry to order"
-                description="Inquiries received in the period, how many got a quotation, how many were won"
-              />
-              <CardBody className="flex flex-col gap-5">
-                <Funnel
-                  steps={[
-                    { label: "Inquiries received", value: i.funnel.received },
-                    { label: "Quotation sent", value: i.funnel.quoted },
-                    { label: "Won", value: i.funnel.won },
-                  ]}
-                />
-                <div className="grid grid-cols-2 gap-3 border-t border-line pt-4 text-sm">
-                  <div>
-                    <p className="text-xs text-muted">Days to send a quotation</p>
-                    <p className="flex items-center gap-2 text-lg font-semibold tabular">
-                      {n(k.quoteDays.value)} <Change value={k.quoteDays.change} goodWhenUp={false} />
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted">Days from inquiry to order</p>
-                    <p className="flex items-center gap-2 text-lg font-semibold tabular">
-                      {n(k.closeDays.value)} <Change value={k.closeDays.change} goodWhenUp={false} />
-                    </p>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card className="rounded-2xl">
-              <CardHeader
-                title="Best customers"
-                description="Sales in the period"
-                actions={
-                  <Link href={href({ tab: "customers" })} className="text-sm text-primary hover:underline">
-                    All customers
-                  </Link>
-                }
-              />
-              <CardBody>
-                {i.topCustomers.length ? (
-                  <ShareBars
-                    currency={c}
-                    rows={i.topCustomers.slice(0, 6).map((x) => ({
-                      key: x.customer.id,
-                      label: (
-                        <>
-                          {flag(x.customer.country)} {x.customer.name} {x.isNew && <Badge tone="ok">New</Badge>}
-                        </>
-                      ),
-                      sub: `${x.orders} order${x.orders === 1 ? "" : "s"}`,
-                      value: Number(x.revenue),
-                      href: `/customers/${x.customer.id}?tab=money&view=profit`,
-                    }))}
-                  />
-                ) : (
-                  <p className="text-sm text-muted">No order in this period.</p>
-                )}
-              </CardBody>
-            </Card>
-            <Card className="rounded-2xl">
-              <CardHeader
-                title="What customers owe, by age"
-                description="Right now, by how long it is overdue"
-                actions={
-                  <Link href="/money?tab=receive" className="text-sm text-primary hover:underline">
-                    To receive
-                  </Link>
-                }
-              />
-              <CardBody>
-                <ShareBars
-                  currency={c}
-                  rows={[
-                    { key: "notDue", label: "Not due yet", value: Number(i.aging.notDue) },
-                    { key: "d30", label: "1–30 days late", value: Number(i.aging.d30) },
-                    { key: "d60", label: "31–60 days late", value: Number(i.aging.d60) },
-                    { key: "d90", label: "61–90 days late", value: Number(i.aging.d90) },
-                    { key: "older", label: "Over 90 days late", value: Number(i.aging.older) },
-                  ]}
-                  tone="warn"
-                />
-              </CardBody>
-            </Card>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card className="rounded-2xl">
-              <CardHeader title="Why we lose inquiries" description="Inquiries lost in the period" />
-              <CardBody>
-                {i.lostReasons.length ? (
-                  <Donut
-                    data={i.lostReasons.map((r) => ({ label: r.label, value: r.count }))}
-                    centre={String(i.lostReasons.reduce((t, r) => t + r.count, 0))}
-                    centreLabel="lost"
-                  />
-                ) : (
-                  <p className="text-sm text-muted">No inquiry lost in this period.</p>
-                )}
-              </CardBody>
-            </Card>
-            <Card className="rounded-2xl">
-              <CardHeader title="Where the goods go" description="Sales by the customer's country" />
-              <CardBody>
-                {i.countries.length ? (
-                  <ShareBars
-                    currency={c}
-                    rows={i.countries.slice(0, 8).map((x) => ({
-                      key: x.country,
-                      label: `${flag(x.country)} ${countryName(x.country)}`,
-                      sub: `${x.customers} customer${x.customers === 1 ? "" : "s"}`,
-                      value: Number(x.revenue),
-                    }))}
-                  />
-                ) : (
-                  <p className="text-sm text-muted">No order in this period.</p>
-                )}
-              </CardBody>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {tab === "sales" && (
-        <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiCard
-              label="Inquiries received"
-              value={String(k.received.value)}
-              kpi={k.received}
-              spark={nums(i.series.slice(-12).map((s) => s.received))}
-            />
-            <KpiCard
-              label="Quotations sent"
-              value={String(k.quotesSent.value)}
-              kpi={k.quotesSent}
-              note={money(k.quotesValue.value ?? 0, c)}
-            />
-            <KpiCard
-              label="Orders won"
-              value={String(k.won.value)}
-              kpi={k.won}
-              note={money(k.revenue.value ?? 0, c)}
-              spark={nums(i.series.slice(-12).map((s) => s.won))}
-            />
-            <KpiCard label="Average order" value={<Headline amount={k.avgOrder.value ?? 0} currency={c} />} kpi={k.avgOrder} />
-            <KpiCard
-              label="Win rate"
-              icon={<Percent className="size-3.5" />}
-              value={n(k.winRate.value, "%")}
-              kpi={k.winRate}
-              points
-              note="Won ÷ (won + lost)"
-            />
-            <KpiCard
-              label="Days to send a quotation"
-              value={n(k.quoteDays.value)}
-              kpi={k.quoteDays}
-              goodWhenUp={false}
-              note="From the inquiry"
-            />
-            <KpiCard label="Days to win" value={n(k.closeDays.value)} kpi={k.closeDays} goodWhenUp={false} note="Inquiry to order" />
-            <KpiCard label="Shipped on time" value={n(k.onTime.value, "%")} kpi={k.onTime} points note="By the date promised" />
-          </div>
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card className="rounded-2xl">
-              <CardHeader title="Inquiries received and won" description="Month by month" />
-              <CardBody>
-                <ReportTrendChart data={i.series.slice(-12).map((s) => ({ month: s.month, received: s.received, won: s.won }))} />
-              </CardBody>
-            </Card>
-            <Card className="rounded-2xl">
-              <CardHeader title="From inquiry to order" description="Inquiries received in the period" />
-              <CardBody>
-                <Funnel
-                  steps={[
-                    { label: "Inquiries received", value: i.funnel.received },
-                    { label: "Quotation sent", value: i.funnel.quoted },
-                    { label: "Won", value: i.funnel.won },
-                  ]}
-                />
-              </CardBody>
-            </Card>
-          </div>
-          <Card className="overflow-hidden rounded-2xl">
-            <CardHeader
-              title="The team"
-              description="Inquiries each person received in the period, won and lost, their sales and how fast they quote"
-            />
-            <div className="overflow-x-auto">
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Person</Th>
-                    <Th className="text-right">Received</Th>
-                    <Th className="text-right">Won</Th>
-                    <Th className="text-right">Lost</Th>
-                    <Th className="text-right">Win rate</Th>
-                    <Th className="text-right">Days to quote</Th>
-                    <Th className="text-right">Sales</Th>
-                    <Th className="text-right">Target this month</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {i.people.map((p) => (
-                    <Tr key={p.id ?? "nobody"}>
-                      <Td className="font-medium">
-                        {p.id ? (
-                          <Link href={`/inquiries?assignee=${p.id}`} className="hover:text-primary">
-                            {p.name}
-                          </Link>
-                        ) : (
-                          <span className="text-muted">{p.name}</span>
-                        )}
-                      </Td>
-                      <Td className="text-right tabular">{p.received}</Td>
-                      <Td className="text-right tabular">{p.won}</Td>
-                      <Td className="text-right tabular">{p.lost}</Td>
-                      <Td className={cn("text-right tabular", p.winRate !== null && p.winRate < 30 && "text-bad")}>{n(p.winRate, "%")}</Td>
-                      <Td className="text-right tabular">{n(p.quoteDays)}</Td>
-                      <Td className="text-right font-semibold whitespace-nowrap tabular">{money(p.revenue, c)}</Td>
-                      <Td className={cn("text-right whitespace-nowrap tabular", p.month.percent !== null && p.month.percent >= 100 && "text-ok")}>
-                        {p.month.percent === null ? <span className="text-muted">—</span> : `${p.month.percent}% of ${money(p.month.target, c)}`}
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </Card>
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card className="rounded-2xl">
-              <CardHeader title="Where inquiries come from" description="And how many of them we win" />
-              <CardBody>
-                <ShareBars
-                  rows={i.channels.map((ch) => ({
-                    key: ch.channel,
-                    label: CHANNEL_LABEL[ch.channel],
-                    sub: `${ch.won} won · ${n(ch.winRate, "%")}`,
-                    value: ch.received,
-                  }))}
-                />
-              </CardBody>
-            </Card>
-            <Card className="rounded-2xl">
-              <CardHeader title="What sells" description="Sales by product category" />
-              <CardBody>
-                <ShareBars
-                  currency={c}
-                  rows={i.categories.map((x) => ({
-                    key: x.category,
-                    label: x.category,
-                    sub: `${x.orders} order${x.orders === 1 ? "" : "s"}`,
-                    value: Number(x.revenue),
-                  }))}
-                />
-              </CardBody>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {tab === "customers" && (
-        <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiCard label="New customers" value={String(k.newCustomers.value)} kpi={k.newCustomers} note="First order in the period" />
-            <KpiCard
-              label="Orders from returning customers"
-              value={n(k.repeatShare.value, "%")}
-              kpi={k.repeatShare}
-              points
-              note="They came back"
-            />
-            <KpiCard label="Orders" value={String(k.orders.value)} kpi={k.orders} />
-            <KpiCard label="Average order" value={<Headline amount={k.avgOrder.value ?? 0} currency={c} />} kpi={k.avgOrder} />
-          </div>
-          <Card className="overflow-hidden rounded-2xl">
-            <CardHeader
-              title="Customers by sales"
-              description="Click one for their account: what they earned us and what was spent on them"
-            />
-            {i.topCustomers.length === 0 ? (
-              <CardBody>
-                <p className="text-sm text-muted">No order in this period.</p>
-              </CardBody>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <THead>
-                    <tr>
-                      <Th>Customer</Th>
-                      <Th className="text-right">Orders</Th>
-                      <Th className="text-right">Sales</Th>
-                      <Th className="text-right">Gross profit</Th>
-                      <Th className="text-right">Margin</Th>
-                    </tr>
-                  </THead>
-                  <tbody>
-                    {i.topCustomers.map((x) => (
-                      <Tr key={x.customer.id} className="hover:bg-surface-2/50">
-                        <Td>
-                          <Link href={`/customers/${x.customer.id}?tab=money&view=profit`} className="font-medium hover:text-primary">
-                            {flag(x.customer.country)} {x.customer.name}
-                          </Link>{" "}
-                          {x.isNew && <Badge tone="ok">New</Badge>}
-                        </Td>
-                        <Td className="text-right tabular">{x.orders}</Td>
-                        <Td className="text-right whitespace-nowrap tabular">{money(x.revenue, c)}</Td>
-                        <Td className="text-right whitespace-nowrap tabular">{money(x.grossProfit, c)}</Td>
-                        <Td className="text-right tabular">
-                          {Number(x.revenue) ? n(Math.round((Number(x.grossProfit) / Number(x.revenue)) * 1000) / 10, "%") : "—"}
-                        </Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
-            )}
-          </Card>
-          <Card className="rounded-2xl">
-            <CardHeader title="Where the goods go" description="Sales by the customer's country" />
-            <CardBody>
-              <ShareBars
-                currency={c}
-                rows={i.countries.map((x) => ({
-                  key: x.country,
-                  label: `${flag(x.country)} ${countryName(x.country)}`,
-                  sub: `${x.orders} order${x.orders === 1 ? "" : "s"} · ${x.customers} customer${x.customers === 1 ? "" : "s"}`,
-                  value: Number(x.revenue),
-                }))}
-              />
-            </CardBody>
-          </Card>
-        </div>
-      )}
-
-      {tab === "factories" && <FactoriesTab i={i} from={i.range.from} to={i.range.to} />}
-
-      {tab === "targets" && i.target.canSet && <TargetsTab year={/^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : Number(today.slice(0, 4))} today={today} currency={c} series={i.series} />}
-
-      {tab === "profit" && (
-        <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiCard
-              label="Gross profit"
-              value={<Headline amount={k.grossProfit.value ?? 0} currency={c} />}
-              kpi={k.grossProfit}
-              spark={spark("grossProfit")}
-            />
-            <KpiCard label="Margin" value={n(k.margin.value, "%")} kpi={k.margin} points note="Gross profit ÷ sales with a cost" />
-            {k.expenses && (
-              <KpiCard
-                label="Expenses"
-                value={<Headline amount={k.expenses.value ?? 0} currency={c} />}
-                kpi={k.expenses}
-                goodWhenUp={false}
-                spark={spark("expenses")}
-                href="/money?tab=expenses"
-              />
-            )}
-            {k.netProfit && (
-              <KpiCard
-                label="Profit after expenses"
-                value={<Headline amount={k.netProfit.value ?? 0} currency={c} />}
-                kpi={k.netProfit}
-                tone={Number(k.netProfit.value) < 0 ? "bad" : undefined}
-                spark={spark("netProfit")}
-              />
-            )}
-          </div>
-          <p className="-mt-2 px-1 text-xs text-muted">
-            The cards count each order in the month it was won. The table below counts it in the month it shipped, so the two can differ.
-            {Number(k.uncostedRevenue.value) > 0 &&
-              ` Not costed: ${money(k.uncostedRevenue.value ?? 0, c)} of sales has no cost recorded and is left out of profit.`}
+      <div className="mb-4 flex flex-col gap-3 lg:hidden">
+        <SectionNav label="Insights sections" items={navItems.map((i) => ({ href: i.href, label: i.label, active: i.active, count: i.count ?? undefined }))} />
+        <div className="md:hidden">
+          {periodPicker}
+          <p className="mt-1.5 text-xs text-text-2">
+            {p.label} · vs {p.vsLabel}
           </p>
-          {i.seeExpenses ? (
-            <>
-              <Segmented
-                label="Profit views"
-                className="no-print w-fit"
-                options={[
-                  { href: href({ sub: undefined }), label: "Month by month", active: !sp.sub || sp.sub === "pnl" },
-                  { href: href({ sub: "attention" }), label: "Where we lose money", active: !!sp.sub && sp.sub !== "pnl" },
-                ]}
-              />
-              {!sp.sub || sp.sub === "pnl" ? (
-                <Suspense fallback={<SectionSkeleton />}>
-                  <ProfitTable year={sp.year} cash={sp.pl === "cash"} href={(change) => href(change)} />
-                </Suspense>
-              ) : (
-                <Suspense fallback={<SectionSkeleton />}>
-                  <LeaksTab
-                    from={i.range.from}
-                    to={i.range.to}
-                    view={(LEAK_VIEWS as readonly string[]).includes(sp.sub) ? (sp.sub as LeakView) : "attention"}
-                    href={(v) => href({ sub: v })}
-                  />
-                </Suspense>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-muted">
-              {i.seeMoney
-                ? "Profit after expenses comes with Expenses, which is not in your company's plan."
-                : "Profit after expenses is for managers."}
-            </p>
-          )}
         </div>
+      </div>
+      {p.kind === "custom" && (
+        <form action="/insights" className="no-print mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
+          {keep.section && <input type="hidden" name="section" value={keep.section} />}
+          <input type="hidden" name="period" value="custom" />
+          <label className="text-xs text-text-2">
+            From
+            <Input name="from" type="date" defaultValue={p.from} className="mt-1 h-9 w-40" />
+          </label>
+          <label className="text-xs text-text-2">
+            To
+            <Input name="to" type="date" defaultValue={p.to} className="mt-1 h-9 w-40" />
+          </label>
+          <button className={buttonClass("secondary", "sm")}>Show</button>
+          <span className="pb-1.5 text-xs text-muted">compared with the same number of days just before</span>
+        </form>
       )}
+
+      <div className="lg:grid lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start lg:gap-5">
+        <SectionList label="Insights sections" items={navItems} />
+        <div className="min-w-0">
+          <Suspense key={`${section}-${p.from}-${p.to}-${sp.view ?? ""}`} fallback={<SectionSkeleton />}>
+            <SectionBody section={section} p={p} sp={sp} today={today} seeMoney={seeMoney} href={href} keep={keep} />
+          </Suspense>
+        </div>
+      </div>
     </div>
   );
 }
 
-async function LeaksTab({ from, to, view, href }: { from: string; to: string; view: LeakView; href: (v: LeakView) => string }) {
-  const r = await api.get<LeaksReport>("/reports/leaks", { from, to });
-  return <LeaksBody r={r} view={view} href={href} />;
+async function SectionBody({
+  section,
+  p,
+  sp,
+  today,
+  seeMoney,
+  href,
+  keep,
+}: {
+  section: Section;
+  p: Period;
+  sp: Search;
+  today: string;
+  seeMoney: boolean;
+  href: (patch: Record<string, string | undefined>) => string;
+  keep: Record<string, string | undefined>;
+}) {
+  switch (section) {
+    case "overview": {
+      const d = await loadOverview(p, seeMoney, sp.month);
+      return (
+        <>
+          <Missing rates={d.missingRates} />
+          <Overview d={d} p={p} href={href} />
+        </>
+      );
+    }
+    case "money": {
+      if (sp.view === "pnl")
+        return (
+          <SubView title="Profit and loss, month by month" back={href({})}>
+            <ProfitTable year={sp.year} cash={sp.pl === "cash"} href={(change) => buildHref("/insights", { ...keep, view: "pnl", year: sp.year, pl: sp.pl }, change)} />
+          </SubView>
+        );
+      if (sp.view === "leaks") {
+        const r = await api.get<LeaksReport>("/reports/leaks", { from: p.from, to: p.to < today ? p.to : today });
+        const view: LeakView = (LEAK_VIEWS as readonly string[]).includes(sp.leak ?? "") ? (sp.leak as LeakView) : "attention";
+        return (
+          <SubView title="Where we lose money" back={href({})}>
+            <LeaksBody r={r} view={view} href={(v) => buildHref("/insights", { ...keep, view: "leaks" }, { leak: v })} />
+          </SubView>
+        );
+      }
+      const age = sp.age && sp.side && ["notDue", "d30", "d60", "over60"].includes(sp.age) && ["receivable", "payable"].includes(sp.side) ? { side: sp.side as "receivable" | "payable", bucket: sp.age as AgeBucket | "over60" } : undefined;
+      const d = await loadMoney(p, age);
+      return (
+        <>
+          <Missing rates={d.missingRates} />
+          <MoneySection d={d} p={p} href={href} />
+        </>
+      );
+    }
+    case "customers": {
+      const chip: CustomerChip = (CUSTOMER_CHIPS as readonly string[]).includes(sp.chip ?? "") ? (sp.chip as CustomerChip) : "all";
+      const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+      const d = await loadCustomers(p, today);
+      return <CustomersSection d={d} p={p} href={href} chip={chip} page={page} params={{ ...keep, chip: chip === "all" ? undefined : chip }} />;
+    }
+    case "factories":
+      return <FactoriesSection d={await loadFactories(p)} p={p} page={Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1)} params={keep} />;
+    case "people": {
+      if (sp.view === "targets" && seeMoney) {
+        const year = /^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : Number(today.slice(0, 4));
+        return <TargetsView year={year} today={today} back={href({})} />;
+      }
+      return <PeopleSection d={await loadPeople(p, today)} p={p} canSet={seeMoney} href={href} />;
+    }
+    case "funnel":
+      return <FunnelSection d={await loadFunnel(p)} p={p} />;
+  }
 }
 
-/** Who we buy from, money stuck with factories, and what visiting them cost. */
-async function FactoriesTab({ i, from, to }: { i: Insights; from: string; to: string }) {
-  const c = i.currency;
-  const leaks = i.seeExpenses ? await api.get<LeaksReport>("/reports/leaks", { from, to }) : null;
+function SubView({ title, back, children }: { title: string; back: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-5">
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="rounded-2xl">
-          <CardHeader title="Who we buy from" description="The factory cost of the goods on orders won in the period" />
-          <CardBody>
-            {i.factories.length ? (
-              <ShareBars
-                currency={c}
-                rows={i.factories.map((f) => ({
-                  key: f.factory.id,
-                  label: f.factory.name,
-                  sub: `${f.orders} order${f.orders === 1 ? "" : "s"}`,
-                  value: Number(f.spend),
-                  href: `/factories/${f.factory.id}`,
-                }))}
-              />
-            ) : (
-              <p className="text-sm text-muted">No order with factory costs in this period.</p>
-            )}
-          </CardBody>
-        </Card>
-        {leaks && (
-          <Card className="rounded-2xl">
-            <CardHeader title="Visits and costs at factories" description="Trips to check products, inspections there" />
-            <CardBody>
-              {leaks.factories.length ? (
-                <ShareBars
-                  currency={c}
-                  tone="warn"
-                  rows={leaks.factories.map((f) => ({
-                    key: f.factory.id,
-                    label: f.factory.name,
-                    sub: `${f.count} expense${f.count === 1 ? "" : "s"}`,
-                    value: Number(f.spent),
-                    href: `/factories/${f.factory.id}?tab=costs`,
-                  }))}
-                />
-              ) : (
-                <p className="text-sm text-muted">No expense names a factory in this period.</p>
-              )}
-            </CardBody>
-          </Card>
-        )}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">{title}</h2>
+        <Link href={back} className={buttonClass("ghost", "sm")}>
+          ← Back
+        </Link>
       </div>
-      {leaks && (
-        <Card className="rounded-2xl">
-          <CardHeader
-            title="Money stuck with factories"
-            description="Open orders where we paid the factory more than the customer has paid us"
-          />
-          <CardBody>
-            {leaks.stuck.length ? (
-              <ShareBars
-                tone="warn"
-                rows={leaks.stuck.map((x) => ({
-                  key: x.id,
-                  label: `${x.refNo} · ${x.customer.name}`,
-                  sub: `paid ${x.days} days ago`,
-                  value: Number(x.amount),
-                  display: money(x.amount, x.currency),
-                  href: `/orders/${x.id}/payment`,
-                }))}
-              />
-            ) : (
-              <p className="text-sm text-muted">None: customers have paid ahead of the factories.</p>
-            )}
-          </CardBody>
-        </Card>
-      )}
+      {children}
     </div>
+  );
+}
+
+function Missing({ rates }: { rates: string[] }) {
+  if (!rates.length) return null;
+  return (
+    <Alert tone="warning" className="mb-4">
+      There is no exchange rate for {rates.join(", ")} in Settings, so amounts in {rates.length === 1 ? "it are" : "them are"} left out.
+    </Alert>
   );
 }
 
@@ -761,58 +286,12 @@ async function FactoriesTab({ i, from, to }: { i: Insights; from: string; to: st
 function SectionSkeleton() {
   return (
     <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading">
-      <div className="h-24 animate-pulse rounded-2xl bg-surface-2" />
-      <div className="h-64 animate-pulse rounded-2xl bg-surface-2" />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-2" />
+        ))}
+      </div>
+      <div className="h-72 animate-pulse rounded-xl bg-surface-2" />
     </div>
-  );
-}
-
-/** Company › Targets: the company's and each person's monthly targets for a year, and how each month went. */
-async function TargetsTab({ year, today, currency, series }: { year: number; today: string; currency: string; series: Insights["series"] }) {
-  const [company, people] = await Promise.all([
-    api.get<{ month: string; amount: string }[]>("/insights/targets", { year }),
-    api.get<{ people: { id: string; name: string }[]; targets: { month: string; userId: string; amount: string }[] }>("/insights/targets/people", { year }),
-  ]);
-  const thisMonth = today.slice(0, 7);
-  const rows: TargetRow[] = Array.from({ length: 12 }, (_, m) => {
-    const month = `${year}-${String(m + 1).padStart(2, "0")}`;
-    const values: Record<string, string> = { company: company.find((t) => t.month === month)?.amount ?? "" };
-    for (const p of people.people) values[`p:${p.id}`] = people.targets.find((t) => t.month === month && t.userId === p.id)?.amount ?? "";
-    const s = series.find((x) => x.month === month);
-    const sold = month <= thisMonth && s ? String(s.revenue) : null;
-    const target = Number(values.company || 0);
-    return {
-      month,
-      label: new Date(Date.UTC(year, m, 1)).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" }),
-      values,
-      sold,
-      percent: sold !== null && target > 0 ? Math.round((Number(sold) / target) * 100) : null,
-      current: month === thisMonth,
-      past: month < thisMonth,
-    };
-  });
-  return (
-    <Card className="rounded-2xl">
-      <CardHeader
-        title={`Targets ${year}`}
-        description={`Monthly sales targets in ${currency}, for the company and each person. Home and Insights measure against these.`}
-        actions={
-          <span className="flex gap-1">
-            <Link href={buildHref("/insights", {}, { tab: "targets", year: String(year - 1) })} className="rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-2">
-              ← {year - 1}
-            </Link>
-            <Link href={buildHref("/insights", {}, { tab: "targets", year: String(year + 1) })} className="rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-2">
-              {year + 1} →
-            </Link>
-          </span>
-        }
-      />
-      <TargetsGrid
-        rows={rows}
-        people={people.people}
-        currency={currency}
-        actions={Object.fromEntries(rows.map((r) => [r.month, saveTargetRowAction.bind(null, r.month, r.values)]))}
-      />
-    </Card>
   );
 }
