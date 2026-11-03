@@ -336,7 +336,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           </>
         }
         side={
-          <SidePanelCard label="Contacts and changes">
+          <SidePanelCard>
             <div id="contacts" className="scroll-mt-32">
               <SideSection
                 title="Contacts"

@@ -461,12 +461,13 @@ export function Avatar({ name, size = 32, className }: { name: string; size?: nu
     .toUpperCase();
   return (
     <span
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-primary-soft font-medium text-primary", className)}
+      className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-primary-soft font-medium text-primary before:content-[attr(data-initials)]", className)}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}
+      // Drawn by CSS, not as text: inside a named button ("Account") the letters would be words
+      // in its name that are not part of the name.
+      data-initials={initials || "?"}
       aria-hidden
-    >
-      {initials || "?"}
-    </span>
+    />
   );
 }
 
@@ -576,7 +577,7 @@ export function ListToolbar({
   return (
     <div className={cn("mb-3 flex flex-wrap items-center gap-2", className)}>
       {search && (
-        <form role="search" className="w-full sm:w-auto">
+        <form role="search" aria-label={search.label ?? "Search this list"} className="w-full sm:w-auto">
           {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
           <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="h-9 sm:w-72 [&_input]:h-9" />
           <button className="sr-only">Search</button>

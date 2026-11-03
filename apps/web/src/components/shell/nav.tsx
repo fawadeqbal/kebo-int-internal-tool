@@ -370,7 +370,7 @@ export function AppShell({
         >
           <MenuIcon aria-hidden />
         </button>
-        <form action="/inquiries" role="search" className="relative w-full max-w-sm">
+        <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative w-full max-w-sm">
           <label htmlFor="global-search" className="sr-only">
             Search inquiries
           </label>

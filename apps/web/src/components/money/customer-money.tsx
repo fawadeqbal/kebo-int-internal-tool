@@ -87,6 +87,7 @@ export async function CustomerMoney({
                 today={profit.today}
                 choices={profit.choices}
                 label="Add an expense for them"
+                quiet
               />
             </div>
           )

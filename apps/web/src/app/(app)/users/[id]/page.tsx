@@ -220,7 +220,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
         }
         side={
           changes && (
-            <SidePanelCard label="Changes">
+            <SidePanelCard>
               <div id="changes" className="scroll-mt-32">
                 <SideSection
                   title="Changes"
