@@ -9,7 +9,6 @@ import {
   CLAIM_STATUSES,
   CURRENCIES,
   DELIVERY_CONDITION_LABEL,
-  DELIVERY_CONDITIONS,
   ORDER_DOCUMENT_KINDS,
   appMakesDocument,
   ORDER_DOCUMENT_LABEL,
@@ -509,7 +508,10 @@ export function BankStepForm({ action, step, today, onDone }: { action: Action; 
 
 /* ---------------------------------------------------------------- delivery and SAT */
 
-/** Delivery date and condition, and the SAT plan: engineer and date. Signing off is its own button. */
+/**
+ * Delivery date, and the SAT plan: engineer and date. Signing off is its own button. The condition is the
+ * goods lines' (the worst of them): shown here, set per line, or all at once with "every line arrived good".
+ */
 export function DeliveryForm({ action, d, people, today, onDone }: { action: Action; d: DeliveryView; people: { id: string; name: string }[]; today: string; onDone: () => void }) {
   return (
     <ActionForm action={action} onDone={onDone} className={framed}>
@@ -519,16 +521,11 @@ export function DeliveryForm({ action, d, people, today, onDone }: { action: Act
             <Field label="Delivered on" htmlFor="dv-on" optional error={s.errors?.deliveredOn}>
               <Input id="dv-on" name="deliveredOn" type="date" max={today} defaultValue={s.values?.deliveredOn ?? d.deliveredOn ?? ""} />
             </Field>
-            <Field label="Condition" htmlFor="dv-cond" optional error={s.errors?.deliveryCondition}>
-              <Select id="dv-cond" name="deliveryCondition" defaultValue={s.values?.deliveryCondition ?? d.condition ?? ""}>
-                <option value="">Not checked</option>
-                {DELIVERY_CONDITIONS.map((x) => (
-                  <option key={x} value={x}>
-                    {DELIVERY_CONDITION_LABEL[x]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Condition</span>
+              <span className="text-sm">{d.condition ? DELIVERY_CONDITION_LABEL[d.condition] : <span className="text-muted">Not checked</span>}</span>
+              <span className="text-xs text-muted">From the goods lines (the worst of them).</span>
+            </div>
             <Field label="Our engineer" htmlFor="dv-eng" optional error={s.errors?.satEngineerId}>
               <Select id="dv-eng" name="satEngineerId" defaultValue={s.values?.satEngineerId ?? d.satEngineer?.id ?? ""}>
                 <option value="">—</option>
@@ -543,6 +540,10 @@ export function DeliveryForm({ action, d, people, today, onDone }: { action: Act
               <Input id="dv-sat" name="satPlannedOn" type="date" defaultValue={s.values?.satPlannedOn ?? d.satPlannedOn ?? ""} />
             </Field>
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="allLinesGood" defaultChecked={s.values?.allLinesGood === "on"} className="size-4 accent-primary" /> Every line arrived in
+            full and in good condition
+          </label>
           <Field label="Note on the delivery" htmlFor="dv-note" optional error={s.errors?.deliveryNote}>
             <Textarea id="dv-note" name="deliveryNote" rows={2} className="min-h-0" defaultValue={s.values?.deliveryNote ?? d.note ?? ""} placeholder="e.g. all cases dry and intact, 12 photos in the deal's files" />
           </Field>

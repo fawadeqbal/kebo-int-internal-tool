@@ -257,8 +257,13 @@ describe("order flow: from asking factories to SAT", () => {
   it("delivery, SAT by our engineer, and a claim", async () => {
     const engineer = (await api(app, sana).get("/auth/me")).body.id;
     await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: "2026-11-01" }).expect(400); // not delivered yet
-    let f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { deliveredOn: "2026-11-01", deliveryCondition: "minor_damage", satEngineerId: engineer, satPlannedOn: "2026-11-03" }).expect(200)).body;
-    expect(f.delivery).toMatchObject({ deliveredOn: "2026-11-01", condition: "minor_damage", satEngineer: { id: engineer } });
+    // The order keeps no condition of its own (an old client's is ignored): it is the goods lines', the worst of them.
+    let f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { deliveredOn: "2026-11-01", deliveryCondition: "good", satEngineerId: engineer, satPlannedOn: "2026-11-03" }).expect(200)).body;
+    expect(f.delivery).toMatchObject({ deliveredOn: "2026-11-01", condition: null, satEngineer: { id: engineer } });
+    const goods = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body.lines.filter((l: { type: string }) => l.type === "goods");
+    await api(app, sana).patch(`/order-lines/${goods[0].id}`, { set: "delivered", deliveredQty: goods[0].quantity, condition: "minor_damage" }).expect(200);
+    f = (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
+    expect(f.delivery.condition).toBe("minor_damage");
 
     f = (await api(app, sana).put(`/orders/${orderId}/sat`, { checks: f.delivery.suggestedSat.map((item: string) => ({ item })) }).expect(200)).body;
     expect(f.delivery.sat.every((c: { result: string }) => c.result === "pending")).toBe(true);

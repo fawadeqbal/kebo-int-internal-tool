@@ -2,6 +2,7 @@ import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo
 import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
+  deliveryConditionOf,
   LINE_CONDITION_LABEL,
   ORDER_DOCUMENT_LABEL,
   PAYMENT_KIND_LABEL,
@@ -844,11 +845,13 @@ function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
 
 function deliveryNote(c: PaperCtx): Built {
   const on = fromDbDateOrNull(c.o.deliveredOn);
-  const condition = c.o.deliveryCondition ? DELIVERY_CONDITION_LABEL[c.o.deliveryCondition] : null;
+  // Worked out from the goods lines (the worst of them): the only place a condition is recorded.
+  const worked = deliveryConditionOf(c.o.lines.filter((l) => l.type === "goods"));
+  const condition = worked ? DELIVERY_CONDITION_LABEL[worked] : null;
   return {
     checks: [
       check("delivered", "Delivered on", on ? paperDateText(on) : "not recorded", !!on, { required: true, href: "delivery" }),
-      check("condition", "Condition", condition ?? "not recorded", !!condition, { href: "delivery" }),
+      check("condition", "Condition", condition ? `${condition} (from the lines)` : "not recorded on the lines", !!condition, { href: "delivery" }),
       linesCheck(c, c.o.lines.filter((l) => l.type === "goods").length),
     ],
     doc: {
@@ -862,10 +865,10 @@ function deliveryNote(c: PaperCtx): Built {
         { key: "delivered", label: "Delivered", width: 62 },
         { key: "condition", label: "Condition", width: 82, wrap: true },
       ],
-      // What reached the customer line by line (the line table's Delivered columns); the order's condition otherwise.
+      // What reached the customer line by line (the line table's Delivered columns).
       rows: itemRows(c, true).map(({ line: l, cells }) => {
         const got = Number(l.deliveredQty);
-        const cond = l.deliveredCondition ? LINE_CONDITION_LABEL[l.deliveredCondition as LineCondition] : condition;
+        const cond = l.deliveredCondition ? LINE_CONDITION_LABEL[l.deliveredCondition as LineCondition] : null;
         return {
           no: cells.no!,
           item: cells.item!,

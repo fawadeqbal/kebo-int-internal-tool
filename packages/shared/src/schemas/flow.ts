@@ -3,7 +3,6 @@ import {
   BANK_CONTRACT_STATUSES,
   CLAIM_STATUSES,
   CURRENCIES,
-  DELIVERY_CONDITIONS,
   FACTORY_REQUEST_STATUSES,
   ORDER_DOCUMENT_KINDS,
   ORDER_DOCUMENT_STATUSES,
@@ -184,7 +183,8 @@ export type BankStepInput = z.infer<typeof bankStepInput>;
 
 export const deliveryInput = z.object({
   deliveredOn: maybe(optionalDate),
-  deliveryCondition: maybe(optionalEnum(DELIVERY_CONDITIONS)),
+  // No condition here: it is worked out from the goods lines (deliveryConditionOf); "All delivered OK"
+  // (POST …/delivery/all-good) marks every line good.
   deliveryNote: maybe(optionalText(2000)),
   /** Who received the goods at the customer's. */
   deliveryReceivedBy: maybe(optionalText(120)),

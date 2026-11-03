@@ -97,10 +97,20 @@ export async function clearBankStepAction(orderId: string, step: BankStepKind, _
 
 /* ---------------------------------------------------------------- delivery, SAT, claims */
 
-const DELIVERY = ["deliveredOn", "deliveryCondition", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy"];
+const DELIVERY = ["deliveredOn", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy"];
 
+/** The condition is the lines': "every line arrived good" marks them all (and dates the delivery), then the rest is saved. */
 export async function deliveryAction(orderId: string, _prev: ActionState, form: FormData) {
-  return run(orderId, form, () => api.patch(`/orders/${orderId}/delivery`, pick(form, DELIVERY)), "Saved.");
+  const body = pick(form, DELIVERY);
+  return run(
+    orderId,
+    form,
+    async () => {
+      if (form.get("allLinesGood") === "on") await api.post(`/orders/${orderId}/delivery/all-good`, { deliveredOn: body.deliveredOn || null });
+      return api.patch(`/orders/${orderId}/delivery`, body);
+    },
+    "Saved.",
+  );
 }
 
 /** payload: { checks: [{ id?, item, result, note? }] } */

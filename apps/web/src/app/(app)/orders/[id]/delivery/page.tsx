@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { can, DELIVERY_CONDITION_LABEL, DELIVERY_CONDITIONS, SAT_RESULT_LABEL } from "@kebo/shared";
+import { can, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL } from "@kebo/shared";
 import { Badge, CardBody } from "@kebo/ui";
 import { date } from "@/lib/format";
 import { ClaimsPanel } from "@/components/orders/flow-panels";
@@ -64,13 +64,12 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   const day = (v: string | null) => (v ? date(v) : null);
   const fields: DetailField[] = [
     { name: "deliveredOn", label: "Delivered on", value: dv.deliveredOn, type: "date", max: now, show: day(dv.deliveredOn), group: "Delivery" },
+    // Worked out from the goods lines (the worst of them): set on the lines below, or "All delivered OK".
     {
-      name: "deliveryCondition",
       label: "Condition",
       value: dv.condition,
-      type: "select",
-      options: DELIVERY_CONDITIONS.map((c) => ({ value: c, label: DELIVERY_CONDITION_LABEL[c] })),
-      show: dv.condition ? DELIVERY_CONDITION_LABEL[dv.condition] : null,
+      show: dv.condition ? `${DELIVERY_CONDITION_LABEL[dv.condition]} · from the lines` : null,
+      hint: "From the goods lines (the worst of them): set it on the lines, or with All delivered OK.",
       group: "Delivery",
     },
     { name: "deliveryReceivedBy", label: "Received by", value: dv.receivedBy, group: "Delivery", placeholder: "e.g. Mr. Imran, stores" },

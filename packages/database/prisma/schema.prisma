@@ -243,13 +243,6 @@ enum BankStepKind {
   bank_paid_us
 }
 
-enum DeliveryCondition {
-  good
-  minor_damage
-  damaged
-  partial
-}
-
 enum SatResult {
   pending
   pass
@@ -1108,9 +1101,9 @@ model Order {
   factoryOrderedOn    DateTime?          @map("factory_ordered_on") @db.Date
   /// The factory's own number for our order ("their order no.").
   factoryOrderNo      String?            @map("factory_order_no") @db.VarChar(60)
-  /// Delivery at the customer's and the condition the goods arrived in.
+  /// Delivery at the customer's. The condition the goods arrived in is the goods lines' (worked out: the worst
+  /// of them, @kebo/shared deliveryConditionOf); the order keeps only a note.
   deliveredOn         DateTime?          @map("delivered_on") @db.Date
-  deliveryCondition   DeliveryCondition? @map("delivery_condition")
   deliveryNote        String?            @map("delivery_note")
   /// Who received the goods at the customer's.
   deliveryReceivedBy  String?            @map("delivery_received_by") @db.VarChar(120)

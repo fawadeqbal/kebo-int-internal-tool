@@ -8,6 +8,7 @@ import {
   documentDone,
   DEFAULT_PRODUCTION_STEPS,
   DEFAULT_SAT_CHECKS,
+  deliveryConditionOf,
   flowSteps,
   ORDER_DOCUMENT_LABEL,
   portsOf,
@@ -256,7 +257,17 @@ export class FlowService {
         satChecks: { orderBy: { sortOrder: "asc" } },
         claims: { orderBy: { openedOn: "desc" } },
         satEngineer: { select: { id: true, name: true } },
-        lines: { where: { factoryId: { not: null } }, select: { factoryId: true, factory: { select: { id: true, name: true } } } },
+        // Their factories (ready dates) and, for the goods, what arrived (the delivery's condition is theirs).
+        lines: {
+          select: {
+            factoryId: true,
+            factory: { select: { id: true, name: true } },
+            type: true,
+            quantity: true,
+            deliveredQty: true,
+            deliveredCondition: true,
+          },
+        },
         ...readySelect,
       },
     });
@@ -395,7 +406,8 @@ export class FlowService {
       delivery: has("delivery_sat")
         ? {
             deliveredOn: fromDbDateOrNull(o.deliveredOn),
-            condition: o.deliveryCondition,
+            /** Worked out from the goods lines: the worst of them (null until a line is checked). */
+            condition: deliveryConditionOf(o.lines.filter((l) => l.type === "goods")),
             note: o.deliveryNote,
             receivedBy: o.deliveryReceivedBy,
             satEngineer: o.satEngineer,
@@ -1053,7 +1065,6 @@ export class FlowService {
       }
       const data: Prisma.OrderUncheckedUpdateInput = {};
       if (input.deliveredOn !== undefined) data.deliveredOn = toDbDateOrNull(input.deliveredOn);
-      if (input.deliveryCondition !== undefined) data.deliveryCondition = input.deliveryCondition;
       if (input.deliveryNote !== undefined) data.deliveryNote = input.deliveryNote;
       if (input.deliveryReceivedBy !== undefined) data.deliveryReceivedBy = input.deliveryReceivedBy;
       if (input.satEngineerId !== undefined) data.satEngineerId = input.satEngineerId;
@@ -1072,7 +1083,7 @@ export class FlowService {
         id,
         "delivery",
         `${o.refNo}: ${what}`,
-        { deliveredOn: fromDbDateOrNull(o.deliveredOn), deliveryCondition: o.deliveryCondition, satDoneOn: fromDbDateOrNull(o.satDoneOn) },
+        { deliveredOn: fromDbDateOrNull(o.deliveredOn), satDoneOn: fromDbDateOrNull(o.satDoneOn) },
         input,
       );
     });
@@ -1175,15 +1186,15 @@ export class FlowService {
       for (const l of lines)
         await tx.orderLine.update({ where: { id: l.id }, data: { deliveredQty: l.quantity, deliveredCondition: "good" } });
       const deliveredOn = fromDbDateOrNull(o.deliveredOn) ?? on;
-      await tx.order.update({ where: { id }, data: { deliveredOn: toDbDate(deliveredOn), deliveryCondition: "good" } });
+      await tx.order.update({ where: { id }, data: { deliveredOn: toDbDate(deliveredOn) } });
       await this.log(
         tx,
         user,
         id,
         "delivery",
         `${o.refNo}: all delivered in good condition on ${deliveredOn} (${lines.length} line${lines.length === 1 ? "" : "s"})`,
-        { deliveredOn: fromDbDateOrNull(o.deliveredOn), deliveryCondition: o.deliveryCondition },
-        { deliveredOn, deliveryCondition: "good", lines: lines.length, allGood: true },
+        { deliveredOn: fromDbDateOrNull(o.deliveredOn) },
+        { deliveredOn, condition: "good", lines: lines.length, allGood: true },
       );
     });
     return this.get(user, id);

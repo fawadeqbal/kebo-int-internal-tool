@@ -101,6 +101,23 @@ export const DELIVERY_CONDITION_TONE: Record<DeliveryCondition, Tone> = { good: 
 export const LINE_CONDITION_LABEL: Record<LineCondition, string> = { good: "Good", minor_damage: "Minor damage", damaged: "Damaged", missing: "Missing" };
 export const LINE_CONDITION_TONE: Record<LineCondition, Tone> = { good: "ok", minor_damage: "warn", damaged: "bad", missing: "bad" };
 
+/**
+ * The condition the goods arrived in, worked out from the goods lines (the only place it is recorded):
+ * the worst of them. Damaged beats partly delivered (a line missing, or fewer than ordered) beats minor
+ * damage beats good. Lines not checked do not count; null until one has been.
+ */
+export function deliveryConditionOf(
+  lines: readonly { quantity: { toString(): string }; deliveredQty: { toString(): string }; deliveredCondition: string | null }[],
+): DeliveryCondition | null {
+  const checked = lines.filter((l) => l.deliveredCondition);
+  if (!checked.length) return null;
+  const short = (l: (typeof checked)[number]) => l.deliveredCondition === "missing" || Number(String(l.deliveredQty)) < Number(String(l.quantity));
+  if (checked.some((l) => l.deliveredCondition === "damaged")) return "damaged";
+  if (checked.some(short)) return "partial";
+  if (checked.some((l) => l.deliveredCondition === "minor_damage")) return "minor_damage";
+  return "good";
+}
+
 export const SAT_RESULT_LABEL: Record<SatResult, string> = { pending: "Not checked", pass: "Pass", fail: "Fail", not_applicable: "N/A" };
 export const SAT_RESULT_TONE: Record<SatResult, Tone> = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" };
 
