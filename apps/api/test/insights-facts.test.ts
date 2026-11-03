@@ -409,6 +409,9 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect(cash.months.every((m) => m.out === null && m.expenses === null && m.net === null)).toBe(true);
       const rows = (await inKebo(() => read.orders(reader, { limit: 5 }))).rows;
       expect(rows.every((r) => r.cost === null && r.profitExpected === null && r.expenses === null)).toBe(true);
+      expect(g.profitDone).toBeNull();
+      const now = await inKebo(() => read.now(reader, {}));
+      expect([now.byCurrency, now.lowMargin.costsOverPlan]).toEqual([null, null]);
 
       const boss = person(["reports.view", "expenses.manage"]);
       const b = (await inKebo(() => read.orderGroups(boss, { period: "all", by: "company" }))).rows[0]!;
@@ -437,6 +440,30 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect(cash.months.length).toBeGreaterThan(0);
       expect((await api(app, manager).get("/insights/facts/status").expect(200)).body).toMatchObject({ pending: 0, orders: await db().order.count() });
       await api(app, manager).get("/insights/facts/orders/groups?by=planet").expect(422);
+    });
+
+    it("names each customer's country when grouped by customer", async () => {
+      const r = (await api(app, manager).get("/insights/facts/orders/groups?period=all&by=customer").expect(200)).body;
+      const c = r.rows[0];
+      expect(c.country).toBe((await db().customer.findUniqueOrThrow({ where: { id: c.key } })).country);
+      expect((await api(app, manager).get("/insights/facts/orders/groups?period=all").expect(200)).body.rows[0].country).toBeUndefined();
+    });
+
+    it("says what stands today and needs attention, from the same tables", async () => {
+      const now = (await api(app, manager).get(`/insights/facts/now?from=${day(-90)}&to=${today}`).expect(200)).body;
+      // Overdue customers add up to the receivable aging's late buckets.
+      const aging = (await api(app, manager).get("/insights/facts/aging?side=receivable").expect(200)).body;
+      expect(toMinor(now.overdue.amount)).toBe(toMinor(aging.d30) + toMinor(aging.d60) + toMinor(aging.d90) + toMinor(aging.older));
+      expect(now.overdue.list.length).toBe(Math.min(5, now.overdue.customers));
+      // Open quotations: the open inquiries with a quotation sent.
+      expect(now.openQuotes.count).toBe(await db().inquiryFact.count({ where: { outcome: "open", firstQuoteOn: { not: null } } }));
+      // What we owe factories in their own currencies matches the factory facts.
+      const own = await db().factoryOrderFact.groupBy({ by: ["currency"], where: { status: { not: "cancelled" }, currency: { not: null } }, _sum: { toPay: true } });
+      for (const o of own.filter((x) => Number(x._sum.toPay) !== 0))
+        expect(now.byCurrency.find((x: { currency: string }) => x.currency === o.currency)?.toPay).toBe(Number(o._sum.toPay).toFixed(2));
+      // A late factory is one whose goods are past the promised ready date and not ready.
+      for (const f of now.lateFactories) expect(f.days).toBeGreaterThan(0);
+      await api(app, sana).get("/insights/facts/now").expect(403);
     });
   });
 });
