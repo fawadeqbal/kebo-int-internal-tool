@@ -12,13 +12,15 @@ import type { PaperChecks } from "@/lib/types-papers";
  * as draft), final (Make final), again (Make again) and fix (missing data typed
  * there, saved where it belongs). Forms send a JSON `payload`.
  */
-export type PaperOp = "draft" | "final" | "again" | "fix";
+export type PaperOp = "draft" | "final" | "again" | "fix" | "buyer" | "quotedTerms";
 
 const DONE: Record<PaperOp, string> = {
   draft: "Saved as a draft.",
   final: "Made final.",
   again: "Version started as a draft.",
   fix: "Saved.",
+  buyer: "Buyer refreshed from the customer: papers made from now on print it.",
+  quotedTerms: "Saved.",
 };
 
 export async function paperAction(
@@ -42,6 +44,10 @@ export async function paperAction(
         return api.post<PaperChecks>(`/orders/${orderId}/papers/${kind}/again`, ref ? { ref } : {});
       case "fix":
         return api.post<PaperChecks>(`/orders/${orderId}/papers/${kind}/fix${q}`, body);
+      case "buyer":
+        return api.post(`/orders/${orderId}/buyer`, body);
+      case "quotedTerms":
+        return api.post(`/orders/${orderId}/quoted-terms`, body);
     }
   };
   const r = await attempt(form, call, DONE[op]);

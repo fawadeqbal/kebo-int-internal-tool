@@ -1,4 +1,4 @@
-import type { FlowStep, OrderDocumentKind, PaperCheck, PaperDoc, PaperFixField, PaperKind, PaperOption, PaperState } from "@kebo/shared";
+import type { BuyerSnapshot, FlowStep, OrderDocumentKind, PaperCheck, PaperDoc, PaperFixField, PaperKind, PaperOption, PaperState } from "@kebo/shared";
 
 /** One paper of GET /orders/:id/papers (keep in step with apps/api/src/modules/papers). */
 export interface PaperRow {
@@ -66,6 +66,12 @@ export interface PaperChecks {
   options: { key: PaperOption; label: string; on: boolean }[];
   paper: PaperVersion | null;
   versions: PaperVersion[];
+  /** The buyer the paper prints (as on the order) and what differs from the customer now; null: a paper to a factory. */
+  buyer: { buyer: BuyerSnapshot; changes: string[] } | null;
+  /** "Refresh from customer" (with a reason). */
+  canRefreshBuyer: boolean;
+  /** The quotation's payment text against the route, when they differ: printed too, or not (the default). */
+  terms: { quoted: string; route: string; printed: boolean } | null;
 }
 
 /** GET /orders/:id/papers/:kind/doc */

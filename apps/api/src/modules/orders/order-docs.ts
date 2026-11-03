@@ -103,8 +103,8 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
     title: TITLE[kind],
     // The proforma has its own number once issued (KEB260916TN07); before that it is a draft without one.
     number: docNumber(o, kind),
-    /** Not final: the proforma not issued yet (printed without a number), or a version not made final yet. */
-    draft: kind === "proforma" ? !o.proformaNo : !packingFinalNow(o),
+    /** The proforma not issued yet: printed as a draft, without a number (a next version's draft: see DocumentsService.get). */
+    draft: kind === "proforma" && !o.proformaNo,
     date: kind === "proforma" ? (fromDbDateOrNull(o.proformaIssuedOn) ?? c.today) : (shippedOn ?? c.today),
     company: { ...c.settings.company, stamp: c.settings.company.stamp || null },
     /** The buyer as on the order (frozen when the order was made; refreshed from the customer only with a reason). */

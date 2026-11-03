@@ -232,13 +232,35 @@ export interface CustomerSnapshot {
   contact?: { name?: string | null; email?: string | null; phone?: string | null } | null;
 }
 
-/** GET /orders/:id/documents/:kind — made from the order whenever it is opened. */
+/** One version of the proforma or the packing list (final: printed exactly as it was made). */
+export interface OrderDocumentVersion {
+  id: string;
+  version: number;
+  status: "draft" | "final";
+  number: string;
+  madeAt: string;
+  finalAt: string | null;
+  /** Snapshotted afterwards from the data (issued before snapshots were kept). */
+  rebuiltOn: string | null;
+}
+
+/**
+ * GET /orders/:id/documents/:kind?v= — a final version as it was made (the proforma once issued, the
+ * packing list once shipped), else made from the order now.
+ */
 export interface OrderDocument {
   kind: OrderDocumentKind;
   title: string;
   /** null: a proforma not issued yet (a draft). */
   number: string | null;
   draft: boolean;
+  /** Printed exactly as it was made final. */
+  final: boolean;
+  /** "DRAFT" (a next version, or a packing list not filled in), "CANCELLED", or none. */
+  watermark: string | null;
+  paper: OrderDocumentVersion | null;
+  versions: OrderDocumentVersion[];
+  rebuiltOn: string | null;
   date: string;
   company: CompanySnapshot;
   customer: CustomerSnapshot;
@@ -382,5 +404,6 @@ export interface CustomerNow {
   country: string;
   address: string | null;
   taxNo: string | null;
+  regNo?: string | null;
   contacts: { id: string; name: string; email: string | null; phone: string | null; whatsapp: string | null; isPrimary: boolean }[];
 }

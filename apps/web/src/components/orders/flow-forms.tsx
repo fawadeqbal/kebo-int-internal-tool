@@ -11,6 +11,7 @@ import {
   DELIVERY_CONDITION_LABEL,
   DELIVERY_CONDITIONS,
   ORDER_DOCUMENT_KINDS,
+  appMakesDocument,
   ORDER_DOCUMENT_LABEL,
   ORDER_DOCUMENT_STATUS_LABEL,
   ORDER_DOCUMENT_STATUSES,
@@ -397,7 +398,8 @@ export function DocumentForm({
               {!fixed && (
                 <Field label="Document" htmlFor="doc-kind" error={s.errors?.kind}>
                   <Select id="doc-kind" value={k} onChange={(e) => setK(e.target.value as OrderDocumentKind)}>
-                    {ORDER_DOCUMENT_KINDS.map((x) => (
+                    {/* The papers the app makes (proforma, packing list, sales contract, commercial invoice) are never recorded by hand. */}
+                    {ORDER_DOCUMENT_KINDS.filter((x) => !appMakesDocument(x)).map((x) => (
                       <option key={x} value={x}>
                         {ORDER_DOCUMENT_LABEL[x]}
                       </option>

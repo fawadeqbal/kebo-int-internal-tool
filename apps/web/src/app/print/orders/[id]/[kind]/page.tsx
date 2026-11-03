@@ -7,7 +7,7 @@ import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
 import type { PaperDocView } from "@/lib/types-papers";
 import { PaperSheet } from "@/components/print/paper";
 import { PrintToolbar } from "@/components/print/toolbar";
-import { backTo, customerOr } from "@/components/print/data";
+import { backTo } from "@/components/print/data";
 import {
   docDate,
   docFootCell,
@@ -25,8 +25,8 @@ import {
 } from "@/components/print/kebo-doc";
 
 /** The print page for the customer's or the internal copy, keeping where Back goes. */
-const copyHref = (path: string, back: string | undefined, internal: boolean) =>
-  `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
+const copyHref = (path: string, back: string | undefined, internal: boolean, v?: string | null) =>
+  `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}), ...(v ? { v } : {}) })}`;
 
 const KINDS: readonly OrderDocumentKind[] = ["proforma", "packing-list"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -52,9 +52,17 @@ async function getPaper(id: string, kind: PaperKind, sp: PaperQuery) {
   return load(() => api.get<PaperDocView>(`/orders/${id}/papers/${kind}/doc`, paperQuery(sp)));
 }
 
-async function getDoc(id: string, kind: string) {
+async function getDoc(id: string, kind: string, v?: string) {
   if (!KINDS.includes(kind as OrderDocumentKind) || !UUID.test(id)) notFound();
-  return load(() => api.get<OrderDocument>(`/orders/${id}/documents/${kind}`));
+  return load(() => api.get<OrderDocument>(`/orders/${id}/documents/${kind}`, v && /^\d{1,3}$/.test(v) ? { v } : undefined));
+}
+
+/** "Proforma invoice KEB… · version 2", "(draft)", and a snapshot rebuilt from the data says so (the toolbar only, never the paper). */
+function docTitle(d: OrderDocument) {
+  const version = d.paper && d.versions.length > 1 ? ` · version ${d.paper.version}` : "";
+  const state = !d.number ? " (draft, not issued)" : d.paper?.status === "draft" ? " (draft)" : "";
+  const rebuilt = d.final && d.paper?.rebuiltOn ? ` · rebuilt from the data on ${d.paper.rebuiltOn}` : "";
+  return `${d.title} ${d.number ?? ""}${version}${state}${rebuilt}`.replace(/\s+/g, " ").trim();
 }
 
 export async function generateMetadata({
@@ -69,8 +77,8 @@ export async function generateMetadata({
     const p = await getPaper(id, kind, sp);
     return { title: `${p.label} ${p.doc.number}${p.final ? "" : " (draft)"}` };
   }
-  const d = await getDoc(id, kind);
-  return { title: `${d.title} ${d.number ?? "(draft)"}${sp.copy === "internal" && d.kind !== "packing-list" ? " (internal)" : ""}` };
+  const d = await getDoc(id, kind, sp.v);
+  return { title: `${d.title} ${d.number ?? "(draft)"}${d.paper && d.versions.length > 1 ? ` v${d.paper.version}` : ""}${sp.copy === "internal" && d.kind !== "packing-list" ? " (internal)" : ""}` };
 }
 
 type Line = OrderDocument["lines"][number];
@@ -93,12 +101,11 @@ export default async function OrderDocumentPrint({
 }) {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   if (isPaperKind(kind)) return <PaperPrint id={id} kind={kind} sp={sp} />;
-  const d = await getDoc(id, kind);
-  // Customer snapshots imported from the old system may be empty: then the customer as it is now.
-  const customer = await customerOr(d.customer, async () => ({
-    customerId: (await api.get<{ customer: { id: string } }>(`/orders/${id}`)).customer.id,
-  })).catch(() => d.customer);
+  const d = await getDoc(id, kind, sp.v);
+  // The buyer as on the order (frozen when it was made; a final version keeps the one it was printed with).
+  const customer = d.customer;
   const o = d.order;
+  const v = d.paper && d.versions.length > 1 ? String(d.paper.version) : null;
   const c = d.currency;
   const t = d.totals;
   const packing = d.kind === "packing-list";
@@ -107,16 +114,16 @@ export default async function OrderDocumentPrint({
 
   const toolbar = (
     <PrintToolbar
-      title={`${d.title} ${d.number ?? "(draft, not issued)"}`}
+      title={docTitle(d)}
       backHref={backTo(sp.back, `/orders/${o.id}`)}
-      pdfHref={`/pdf/${d.kind}/${o.id}${internal ? "?copy=internal" : ""}`}
+      pdfHref={`/pdf/${d.kind}/${o.id}${internal || v ? `?${new URLSearchParams({ ...(internal ? { copy: "internal" } : {}), ...(v ? { v } : {}) })}` : ""}`}
       copies={
         packing
           ? undefined
           : {
               current: internal ? "internal" : "customer",
-              customer: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, false),
-              internal: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, true),
+              customer: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, false, v),
+              internal: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, true, v),
             }
       }
     />
@@ -283,7 +290,7 @@ export default async function OrderDocumentPrint({
         bullets={bullets.filter(Boolean)}
         bank={packing ? null : d.bankDetails}
         internal={internalPart}
-        watermark={o.status === "cancelled" ? "CANCELLED" : packing && !pk?.done ? "DRAFT" : null}
+        watermark={d.watermark}
       />
     </>
   );
