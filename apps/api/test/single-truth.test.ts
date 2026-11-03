@@ -62,6 +62,9 @@ describe("one money truth", () => {
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "sent" }).expect(200);
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "accepted" }).expect(200);
     const o = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0];
+    // Won and ordered months ago: this month's reports elsewhere (top customers) are left as they are.
+    await prisma.platform.$executeRaw`update orders set ordered_on = ordered_on - 75 where id = ${o.id}::uuid`;
+    await prisma.platform.$executeRaw`update inquiries set closed_at = closed_at - interval '75 days' where id = ${inquiry.id}::uuid`;
     return { orderId: o.id as string, refNo: o.refNo as string, customerId: customer.id as string, factoryId };
   }
   const order = async (id: string) => (await api(app, manager).get(`/orders/${id}`).expect(200)).body;
