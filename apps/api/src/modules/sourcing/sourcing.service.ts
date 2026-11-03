@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
-import { convertAmount, convertMinor, fxRate, withTaxMinor, fromMinor } from "@kebo/money";
+import { convertAmount, convertMinor, factoryTaxMinor, factoryUnitCostMinor, fxRate, fromMinor, multiplyMinor } from "@kebo/money";
 import {
   can,
   coverage,
   lineNumbers,
+  offerTaxText,
   taxSentence,
   type CopyLinesInput,
   type FactoryLinePatch,
@@ -35,9 +36,10 @@ const quoteInclude = {
  * Factory offers for a deal (internal: never shown to customers). Each offer is
  * one factory's lines as it gave them — its models, quantities and breakdown
  * into parts — each saying which of the customer's items it answers. Each
- * line's cost is worked out in the selling currency: the factory price
- * (without tax) plus its tax %, converted at today's rate. A quotation offers
- * one or more whole offers as options A, B…
+ * line's cost is worked out in the selling currency: the factory price plus
+ * its tax % (or the price as it is, when the offer's prices include tax),
+ * converted at today's rate. A quotation offers one or more whole offers as
+ * options A, B…
  */
 @Injectable()
 export class SourcingService {
@@ -75,8 +77,13 @@ export class SourcingService {
       const lines = q.lines.map((l, n) => {
         const taxRate = Number(l.taxRate);
         const unitPriceMinor = decimalToMinor(l.unitPrice);
-        const costInFactoryCurrency = withTaxMinor(unitPriceMinor, taxRate);
+        const costInFactoryCurrency = factoryUnitCostMinor(unitPriceMinor, taxRate, q.taxIncluded);
         const cost = rate ? convertMinor(costInFactoryCurrency, rate) : null;
+        // The line's total at the factory's prices, and the tax on top of it (or inside it), in the factory's currency.
+        const totalMinor = multiplyMinor(unitPriceMinor, l.quantity.toString());
+        const taxMinor = q.taxIncluded
+          ? factoryTaxMinor(totalMinor, taxRate, true)
+          : multiplyMinor(costInFactoryCurrency, l.quantity.toString()) - totalMinor;
         return {
           id: l.id,
           /** "1", "2", "2.1" within this offer. */
@@ -90,10 +97,10 @@ export class SourcingService {
           quantity: l.quantity.toString(),
           unit: l.unit,
           unitPrice: l.unitPrice.toFixed(2),
-          /** Tax % added on top of the price. */
+          /** This line's tax %: added on top of the price, or included in it (the offer's taxIncluded). */
           taxRate,
-          /** e.g. "CNY 100.00 + 13% tax = CNY 113.00" (in the factory's currency). */
-          costNote: taxSentence(unitPriceMinor, taxRate, q.currency),
+          /** e.g. "CNY 100.00 + 13% tax = CNY 113.00" or "CNY 113.00, tax 13% included (CNY 13.00)" (factory currency). */
+          costNote: taxSentence(unitPriceMinor, taxRate, q.currency, q.taxIncluded),
           /** One unit's landed cost in the selling currency. */
           unitCost: cost === null ? null : fromMinor(cost),
           costMinor: cost === null ? null : Math.round(cost * Number(l.quantity)),
@@ -101,6 +108,8 @@ export class SourcingService {
           productKey: l.productKey ?? l.id,
           /** A quotation is priced from it: changing its price, quantity or place asks why. */
           used: l._count.quoteLines > 0,
+          totalMinor,
+          taxMinor,
         };
       });
       return {
@@ -110,6 +119,10 @@ export class SourcingService {
         receivedOn: fromDbDate(q.receivedOn),
         validUntil: fromDbDateOrNull(q.validUntil),
         currency: q.currency,
+        /** The factory's prices have the tax in them (the tax inside is only shown), or the tax is added on top. */
+        taxIncluded: q.taxIncluded,
+        /** The offer's tax % (its lines take it unless they have their own). */
+        taxRate: Number(q.taxRate),
         basis: q.basis,
         basisPlace: q.basisPlace,
         leadTime: q.leadTime,
@@ -118,7 +131,11 @@ export class SourcingService {
         notes: q.notes,
         /** null when the exchange rate for this currency is missing in Settings. */
         fxRate: rate,
-        lines: lines.map(({ costMinor: _c, ...l }) => l),
+        lines: lines.map(({ costMinor: _c, totalMinor: _t, taxMinor: _x, ...l }) => l),
+        /** The lines at the factory's prices, in its currency (without tax, or tax included, as the offer says). */
+        factoryTotal: fromMinor(lines.reduce((t, l) => t + l.totalMinor, 0)),
+        /** The tax in that: added on top (without tax) or the part already inside (tax included), in the factory's currency. */
+        taxTotal: fromMinor(lines.reduce((t, l) => t + l.taxMinor, 0)),
         /** What the whole offer costs us in the selling currency (null when a rate is missing). */
         totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + (l.costMinor ?? 0), 0)),
         /** Lines still without a price (a line priced in its parts does not count). */
@@ -215,7 +232,7 @@ export class SourcingService {
    * Lines keep their ids (quotation lines point at them). Item links must be this
    * deal's items. A part (partOf) points at an earlier line that is not a part itself.
    */
-  private async writeLines(tx: Tx, quoteId: string, inquiryId: string, lines: NonNullable<FactoryQuoteInput["lines"]>) {
+  private async writeLines(tx: Tx, quoteId: string, inquiryId: string, lines: NonNullable<FactoryQuoteInput["lines"]>, offerTaxRate: number) {
     for (const [n, l] of lines.entries()) {
       if (l.partOf === null) continue;
       if (l.partOf >= n || lines[l.partOf]!.partOf !== null)
@@ -242,7 +259,8 @@ export class SourcingService {
         quantity: l.quantity,
         unit: l.unit,
         unitPrice: l.unitPrice,
-        taxRate: l.taxRate,
+        // Left out: the offer's tax %.
+        taxRate: l.taxRate ?? offerTaxRate,
         sortOrder: n,
         parentId: l.partOf === null ? null : ids[l.partOf]!,
       };
@@ -273,14 +291,17 @@ export class SourcingService {
       await tx.$queryRaw`select id from inquiries where id = ${inquiryId}::uuid for update`;
       const inquiry = await this.inquiries.findWorkable(user, inquiryId, tx);
       const factory = await this.factoryFor(tx, user, input);
-      const q = await tx.factoryQuote.create({ data: { ...this.header(input), inquiryId, factoryId: factory.id, createdById: user.id } });
-      if (input.lines) await this.writeLines(tx, q.id, inquiryId, input.lines);
+      // Tax not said: the company's default for new offers (Without tax · 0% unless changed in Settings).
+      const { sales } = await this.settings.get();
+      const tax = { taxIncluded: input.taxIncluded ?? sales.factoryTaxIncluded, taxRate: input.taxRate ?? sales.factoryTaxRate };
+      const q = await tx.factoryQuote.create({ data: { ...this.header(input), ...tax, inquiryId, factoryId: factory.id, createdById: user.id } });
+      if (input.lines) await this.writeLines(tx, q.id, inquiryId, input.lines, tax.taxRate);
       await this.audit.record(tx, {
         userId: user.id,
         action: "create",
         entityType: "factory_quote",
         entityId: q.id,
-        summary: `${inquiry.refNo}: offer from ${factory.name} (${input.currency}${input.lines ? `, ${input.lines.length} lines` : ""})`,
+        summary: `${inquiry.refNo}: offer from ${factory.name} (${input.currency}, tax ${offerTaxText(tax.taxRate, tax.taxIncluded)}${input.lines ? `, ${input.lines.length} lines` : ""})`,
       });
       const moved = await this.stages.after(tx, inquiry, "factory_price_added", user.id);
       if (moved) events.push(moved);
@@ -341,13 +362,35 @@ export class SourcingService {
         });
       }
       if (used.size && recurrency) changes.push(`currency ${q.currency} → ${input.currency}${converted.length ? " (prices converted)" : " (prices kept)"}`);
+      // Tax: included or not, and the offer's %. Lines that had the offer's old % take the new one; a line
+      // set to its own % keeps it. Left out: as it is.
+      const oldRate = Number(q.taxRate);
+      const tax = { taxIncluded: input.taxIncluded ?? q.taxIncluded, taxRate: input.taxRate ?? oldRate };
+      const taxChanged = tax.taxIncluded !== q.taxIncluded || tax.taxRate !== oldRate;
+      const followers =
+        tax.taxRate !== oldRate && !input.lines
+          ? await tx.factoryQuoteLine.findMany({ where: { factoryQuoteId: quoteId, taxRate: q.taxRate }, select: { id: true } })
+          : [];
+      const taxChange = taxChanged
+        ? `tax ${offerTaxText(oldRate, q.taxIncluded)} → ${offerTaxText(tax.taxRate, tax.taxIncluded)}${followers.length ? ` (${followers.length} line${followers.length === 1 ? "" : "s"} to ${tax.taxRate}%)` : ""}`
+        : null;
+      // When it changes what a line a quotation is priced from costs us, it asks why.
+      const moved = new Set(followers.map((f) => f.id));
+      const added = (included: boolean, rate: number) => (included ? 0 : rate);
+      const costMoves = [...used.values()].some(
+        (l) => added(q.taxIncluded, Number(l.taxRate)) !== added(tax.taxIncluded, moved.has(l.id) ? tax.taxRate : Number(l.taxRate)),
+      );
+      if (taxChange && costMoves) changes.push(taxChange);
       const reason = changes.length
         ? requireReason(input.reason, "factoryPrice", "you are changing prices a quotation uses")
         : input.reason;
-      const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input), factoryId: factory.id } });
-      if (input.lines) await this.writeLines(tx, quoteId, q.inquiryId, input.lines);
+      const updated = await tx.factoryQuote.update({ where: { id: quoteId }, data: { ...this.header(input), ...tax, factoryId: factory.id } });
+      if (input.lines) await this.writeLines(tx, quoteId, q.inquiryId, input.lines, tax.taxRate);
+      if (followers.length)
+        await tx.factoryQuoteLine.updateMany({ where: { id: { in: followers.map((f) => f.id) } }, data: { taxRate: tax.taxRate } });
       for (const l of converted) await tx.factoryQuoteLine.update({ where: { id: l.id }, data: { unitPrice: l.unitPrice } });
       if (recurrency && !used.size) changes.push(`currency ${q.currency} → ${input.currency}${converted.length ? `, ${converted.length} prices converted` : ""}`);
+      if (taxChange && !changes.includes(taxChange)) changes.push(taxChange);
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",
@@ -457,7 +500,8 @@ export class SourcingService {
             quantity: l.quantity,
             unit: l.unit,
             unitPrice: l.unitPrice,
-            taxRate: l.taxRate,
+            // Left out: the offer's tax %.
+            taxRate: l.taxRate ?? q.taxRate,
             parentId,
             sortOrder: 100000 + created.length,
           },
@@ -632,7 +676,8 @@ export class SourcingService {
             quantity: l.quantity,
             unit: l.unit,
             unitPrice: input.withPrices ? l.unitPrice : 0,
-            taxRate: l.taxRate,
+            // The other offer's own % becomes this offer's; a line with a % of its own keeps it.
+            taxRate: Number(l.taxRate) === Number(from.taxRate) ? q.taxRate : l.taxRate,
             parentId: l.parentId ? ids.get(l.parentId)! : null,
             productKey: l.productKey ?? l.id,
             sortOrder: existing + n,

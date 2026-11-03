@@ -1,5 +1,5 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, multiplyMinor, withTaxMinor, type Minor } from "@kebo/money";
+import { factoryUnitCostMinor, fromMinor, multiplyMinor, type Minor } from "@kebo/money";
 import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
@@ -9,17 +9,17 @@ type FactoryRef = { id: string; name: string };
 
 /**
  * What we owe each factory for the order's goods (the price frozen on each
- * line when the order was made, plus tax, × the quantity), in the factory's
+ * line when the order was made, plus tax unless it was included, × the quantity), in the factory's
  * currency, keyed "factoryId:currency".
  */
 export function owedByFactory<F extends FactoryRef>(
-  lines: { factory: F | null; factoryUnitPrice: Prisma.Decimal | null; factoryCurrency: string | null; factoryTaxRate: Prisma.Decimal | null; quantity: Prisma.Decimal }[],
+  lines: { factory: F | null; factoryUnitPrice: Prisma.Decimal | null; factoryCurrency: string | null; factoryTaxRate: Prisma.Decimal | null; factoryTaxIncluded: boolean; quantity: Prisma.Decimal }[],
 ) {
   const owed = new Map<string, { factory: F; currency: string; owedMinor: Minor; lines: number }>();
   for (const l of lines) {
     if (!l.factory || l.factoryUnitPrice === null || !l.factoryCurrency) continue;
     const key = `${l.factory.id}:${l.factoryCurrency}`;
-    const unit = withTaxMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0);
+    const unit = factoryUnitCostMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0, l.factoryTaxIncluded);
     const cur = owed.get(key) ?? { factory: l.factory, currency: l.factoryCurrency, owedMinor: 0, lines: 0 };
     cur.owedMinor += multiplyMinor(unit, l.quantity.toString());
     cur.lines += 1;
@@ -35,6 +35,7 @@ const planLines = {
     factoryUnitPrice: true,
     factoryCurrency: true,
     factoryTaxRate: true,
+    factoryTaxIncluded: true,
     quantity: true,
   },
 } as const;

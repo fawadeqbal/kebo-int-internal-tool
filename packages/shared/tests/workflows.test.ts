@@ -188,6 +188,9 @@ describe("settings", () => {
     const s = readSettings({ sales: { defaultDepositPercent: 50 }, plan: "garbage" });
     expect(s.sales.defaultDepositPercent).toBe(50);
     expect(s.sales.currency).toBe("USD");
+    // New factory offers: without tax, 0%, unless the company says otherwise.
+    expect([s.sales.factoryTaxIncluded, s.sales.factoryTaxRate]).toEqual([false, 0]);
+    expect(readSettings({ sales: { factoryTaxIncluded: "on", factoryTaxRate: "13" } }).sales).toMatchObject({ factoryTaxIncluded: true, factoryTaxRate: 13 });
     expect(s.reminders.depositDays).toBe(7);
     // No company's details are built in: a company's own come from its settings.
     expect(s.company.website).toBe("");
@@ -260,16 +263,34 @@ describe("tax", () => {
     const { taxSentence } = await import("../src");
     expect(taxSentence(100_00, 13, "CNY")).toBe("CNY 100.00 + 13% tax = CNY 113.00");
     expect(taxSentence(100_00, 0, "CNY")).toBe("CNY 100.00, no tax");
+    expect(taxSentence(113_00, 13, "CNY", true)).toBe("CNY 113.00, tax 13% included (CNY 13.00)");
   });
 
-  it("takes 13% unless an item says otherwise, and nothing else about tax", async () => {
+  it("says an offer's tax in a few words", async () => {
+    const { offerTaxText, offerTaxTag, DEFAULT_TAX_RATE } = await import("../src");
+    expect(DEFAULT_TAX_RATE).toBe(0);
+    expect(offerTaxText(0, false)).toBe("0% · added on top");
+    expect(offerTaxText("13.00", true)).toBe("13% · included in the prices");
+    expect(offerTaxTag(0, true)).toBeNull();
+    expect(offerTaxTag(13, false)).toBe("+13% tax");
+    expect(offerTaxTag(13, true)).toBe("tax incl. 13%");
+  });
+
+  it("takes the offer's tax unless an item says otherwise, and nothing else about tax", async () => {
     const { factoryInput, factoryQuoteInput, factoryQuoteLineInput, revisionInput } = await import("../src");
     expect(factoryInput.parse({ name: "X" })).not.toHaveProperty("vatRate");
-    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10 }).taxRate).toBe(13);
+    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10 }).taxRate).toBeUndefined();
+    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, taxRate: "" }).taxRate).toBeUndefined();
+    expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, taxRate: "0" }).taxRate).toBe(0);
     expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, taxRate: "9" }).taxRate).toBe(9);
     expect(factoryQuoteLineInput.parse({ description: "x", quantity: 1, unitPrice: 10, hsCode: "8437", rebateRate: 13 })).not.toHaveProperty("hsCode");
     const quote = factoryQuoteInput.parse({ newFactoryName: "X", receivedOn: "2026-10-20", lines: [{ description: "x", quantity: 1, unitPrice: 10 }] });
     expect(quote).not.toHaveProperty("vatRate");
+    expect(quote.taxIncluded).toBeUndefined();
+    expect(quote.taxRate).toBeUndefined();
+    const set = factoryQuoteInput.parse({ newFactoryName: "X", receivedOn: "2026-10-20", taxIncluded: "true", taxRate: "13" });
+    expect([set.taxIncluded, set.taxRate]).toEqual([true, 13]);
+    expect(factoryQuoteInput.parse({ newFactoryName: "X", receivedOn: "2026-10-20", taxIncluded: "false" }).taxIncluded).toBe(false);
     expect(revisionInput.parse({ validUntil: "2026-11-01", vatRate: 13, options: [{ prices: [] }] })).not.toHaveProperty("vatRate");
   });
 });

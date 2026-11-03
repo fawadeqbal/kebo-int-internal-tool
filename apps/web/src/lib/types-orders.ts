@@ -123,7 +123,7 @@ export interface OrderLineView {
   /** What reached the customer; null when Delivery & SAT is off for the company. */
   delivered: { qty: string; condition: LineCondition | null; note: string | null } | null;
   /** The factory's price it was bought at; null for people who do not see factory prices (or not known). */
-  factoryPrice: { unitPrice: string; taxRate: string; currency: string | null } | null;
+  factoryPrice: { unitPrice: string; taxRate: string; taxIncluded: boolean; currency: string | null } | null;
 }
 
 /** The goods side of GET /orders/:id: what came in from the factory and the packing list. */

@@ -19,7 +19,7 @@ import {
   PRIORITIES,
   REVISION_STATUSES,
 } from "../enums";
-import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, percentOr, phone, quantity, text } from "./common";
+import { amount, bool, currency, email, id, isoDate, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, optionalPercent, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
 import { CANCEL_CUSTOMER_MONEY, CANCEL_FACTORY_MONEY, FACTORY_DUE_RULES } from "../workflows/money-route";
 import { FLOW_STEPS } from "../workflows/flow";
@@ -206,9 +206,9 @@ export const factoryQuoteLineInput = z.object({
   model: optionalText(120),
   quantity,
   unit: z.string().trim().max(20).default("pcs"),
-  unitPrice: amount("Enter the factory's price (without tax)"),
-  /** Tax % added on top of this item's price. */
-  taxRate: percentOr(DEFAULT_TAX_RATE),
+  unitPrice: amount("Enter the factory's price"),
+  /** This item's tax %; left out: the offer's tax %. Added on top of the price, or included in it, as the offer says. */
+  taxRate: optionalPercent,
 });
 
 export const factoryQuoteInput = z
@@ -220,6 +220,13 @@ export const factoryQuoteInput = z
     receivedOn: isoDate(),
     validUntil: optionalDate,
     currency: currency.default("CNY"),
+    /**
+     * The factory's prices have the tax in them (true) or the tax is added on top (false), and the
+     * offer's tax %, applied to its lines (a line can have its own). Left out: a new offer takes the
+     * company's default (Settings), an edited one keeps what it has.
+     */
+    taxIncluded: bool.optional(),
+    taxRate: optionalPercent,
     /** The factory's price basis (EXW, FOB…) and its place ("Zhangjiagang", "Qingdao"). */
     basis: z.preprocess((v) => (v === "" ? null : v), z.enum(INCOTERMS).nullable().default(null)),
     basisPlace: optionalText(60),
@@ -261,7 +268,7 @@ export const factoryLinePatch = z.object({
   model: optionalText(120).optional(),
   quantity: quantity.optional(),
   unit: z.string().trim().min(1).max(20).optional(),
-  unitPrice: amount("Enter the factory's price (without tax)").optional(),
+  unitPrice: amount("Enter the factory's price").optional(),
   taxRate: percentOr(DEFAULT_TAX_RATE).optional(),
   reason: reasonField,
 });

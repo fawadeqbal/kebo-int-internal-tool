@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
-import { fromMinor, multiplyMinor, orderCosting, roundHalfAway, settle, withTaxMinor, type Minor } from "@kebo/money";
+import { factoryUnitCostMinor, fromMinor, multiplyMinor, orderCosting, roundHalfAway, settle, type Minor } from "@kebo/money";
 import {
   can,
   FLOW_STEPS,
@@ -94,11 +94,11 @@ export class CostsService {
     );
     const onQuote = costing.costedRevenueMinor - costing.goodsCostMinor - plan.plannedMinor;
     const expected = onQuote - plan.notPlannedMinor - position.bankChargesMinor;
-    // What the factories charge for the goods, in their own currencies (prices frozen on the lines, with tax).
+    // What the factories charge for the goods, in their own currencies (prices frozen on the lines, with tax on top unless included).
     const factoryOwed = new Map<string, Minor>();
     for (const l of o.lines) {
       if (l.factoryUnitPrice === null || !l.factoryCurrency) continue;
-      const unit = withTaxMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0);
+      const unit = factoryUnitCostMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0, l.factoryTaxIncluded);
       factoryOwed.set(l.factoryCurrency, (factoryOwed.get(l.factoryCurrency) ?? 0) + multiplyMinor(unit, l.quantity.toString()));
     }
 

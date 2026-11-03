@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FIRST_COMPANY_ID, seedCompanyBase } from "@kebo/database";
-import { multiplyMinor, toMinor, withTaxMinor } from "@kebo/money";
+import { factoryUnitCostMinor, multiplyMinor, toMinor, withTaxMinor } from "@kebo/money";
 import { todayIn } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
 import { owedLineSql } from "../src/modules/money/due";
@@ -579,21 +579,31 @@ describe("money fixes", () => {
     let seed = 42;
     const rnd = (n: number) => ((seed = (seed * 1103515245 + 12345) % 2 ** 31), seed % n);
     const cents = (n: number) => (rnd(n) / 100).toFixed(2);
-    const cases: [string, string, string][] = [
-      ["100.50", "13", "1"],
-      ["19.85", "0", "4.10"],
-      ["1.15", "13", "1"],
-      ["0.01", "50", "0.50"],
-      ["99999.99", "100", "99999.99"],
+    // [price, tax %, quantity, tax included]
+    const cases: [string, string, string, boolean][] = [
+      ["100.50", "13", "1", false],
+      ["19.85", "0", "4.10", false],
+      ["1.15", "13", "1", false],
+      ["0.01", "50", "0.50", false],
+      ["99999.99", "100", "99999.99", false],
+      ["113.57", "13", "1", true],
+      ["19.85", "13", "4.10", true],
     ];
-    for (let i = 0; i < 2000; i++) cases.push([cents(10_000_000), cents(10_001), cents(1_000_000)]);
+    for (let i = 0; i < 2000; i++) cases.push([cents(10_000_000), cents(10_001), cents(1_000_000), rnd(4) === 0]);
     const rows = await db().$queryRaw<{ i: number; owed: string }[]>`
-      select i, ${owedLineSql(Prisma.sql`p`, Prisma.sql`t`, Prisma.sql`q`)}::text as owed
-      from unnest(${cases.map((c) => c[0])}::numeric[], ${cases.map((c) => c[1])}::numeric[], ${cases.map((c) => c[2])}::numeric[]) with ordinality as x(p, t, q, i)`;
-    const app = rows.map((r) =>
-      multiplyMinor(withTaxMinor(toMinor(cases[Number(r.i) - 1]![0]), cases[Number(r.i) - 1]![1]), cases[Number(r.i) - 1]![2]),
-    );
+      select i, ${owedLineSql(Prisma.sql`p`, Prisma.sql`t`, Prisma.sql`inc`, Prisma.sql`q`)}::text as owed
+      from unnest(${cases.map((c) => c[0])}::numeric[], ${cases.map((c) => c[1])}::numeric[], ${cases.map((c) => c[2])}::numeric[], ${cases.map((c) => c[3])}::boolean[]) with ordinality as x(p, t, q, inc, i)`;
+    const app = rows.map((r) => {
+      const [price, tax, qty, included] = cases[Number(r.i) - 1]!;
+      return multiplyMinor(factoryUnitCostMinor(toMinor(price), tax, included), qty);
+    });
     expect(rows.map((r) => Number(r.owed))).toEqual(app);
     expect(app.slice(0, 2)).toEqual([113_57, 81_39]);
+    // Without tax it is exactly what it was before (price + tax on top).
+    cases.forEach(([price, tax, qty, included], n) => {
+      if (!included) expect(app[n]).toBe(multiplyMinor(withTaxMinor(toMinor(price), tax), qty));
+    });
+    // Tax included: the price as it is.
+    expect(app.slice(5, 7)).toEqual([113_57, 81_39]);
   });
 });

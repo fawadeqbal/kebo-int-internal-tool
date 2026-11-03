@@ -150,7 +150,13 @@ function lineView(l: LineRow, no: string, show: LineShows) {
       : null,
     factoryPrice:
       show.factoryPrices && l.factoryUnitPrice !== null
-        ? { unitPrice: l.factoryUnitPrice.toFixed(2), taxRate: l.factoryTaxRate?.toString() ?? "0", currency: l.factoryCurrency }
+        ? {
+            unitPrice: l.factoryUnitPrice.toFixed(2),
+            taxRate: l.factoryTaxRate?.toString() ?? "0",
+            /** The price already has the tax in it (not added again). */
+            taxIncluded: l.factoryTaxIncluded,
+            currency: l.factoryCurrency,
+          }
         : null,
   };
 }
@@ -212,7 +218,9 @@ export class OrdersService {
         lines: {
           orderBy: { sortOrder: "asc" },
           include: {
-            factoryQuoteLine: { select: { unitPrice: true, taxRate: true, factoryQuote: { select: { factoryId: true, currency: true } } } },
+            factoryQuoteLine: {
+              select: { unitPrice: true, taxRate: true, factoryQuote: { select: { factoryId: true, currency: true, taxIncluded: true } } },
+            },
           },
         },
         costs: true,
@@ -260,6 +268,7 @@ export class OrdersService {
             factoryId: l.factoryQuoteLine?.factoryQuote.factoryId ?? null,
             factoryUnitPrice: l.factoryQuoteLine?.unitPrice ?? null,
             factoryTaxRate: l.factoryQuoteLine?.taxRate ?? null,
+            factoryTaxIncluded: l.factoryQuoteLine?.factoryQuote.taxIncluded ?? false,
             factoryCurrency: l.factoryQuoteLine?.factoryQuote.currency ?? null,
           })),
         },
