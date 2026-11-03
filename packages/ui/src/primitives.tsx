@@ -354,6 +354,57 @@ export function DataRow({ href, flash, className, ...props }: ComponentProps<"tr
   );
 }
 
+/**
+ * A list on a phone (design system: tables become rows), shown below 640px in
+ * place of the DataTable: one PhoneRow per record.
+ */
+export function PhoneList({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <ul aria-label={label} className={cn("divide-y divide-line sm:hidden", className)}>
+      {children}
+    </ul>
+  );
+}
+
+/**
+ * One record on a phone: its name, one line under it, and on the right its
+ * status (StatusBadge) over the key number. The whole row opens the record.
+ */
+export function PhoneRow({
+  href,
+  title,
+  line,
+  status,
+  figure,
+  flash,
+  muted,
+}: {
+  href: string;
+  title: ReactNode;
+  line?: ReactNode;
+  status?: ReactNode;
+  figure?: ReactNode;
+  flash?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <li className={flash ? "animate-flash" : undefined}>
+      <Link href={href} className="flex items-start justify-between gap-3 px-4 py-3 active:bg-surface-2">
+        <span className="min-w-0">
+          <span className={cn("block truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
+          {line && <span className="block truncate text-xs text-text-2">{line}</span>}
+        </span>
+        {(status || (figure !== undefined && figure !== null && figure !== "")) && (
+          <span className="flex shrink-0 flex-col items-end gap-1 text-right text-xs text-text-2 tabular">
+            {status}
+            {figure !== undefined && figure !== null && figure !== "" && <span className="block">{figure}</span>}
+          </span>
+        )}
+      </Link>
+    </li>
+  );
+}
+
 /* ---------------------------------------------------------------- Detail list */
 
 /** Label/value grid for detail panels. */

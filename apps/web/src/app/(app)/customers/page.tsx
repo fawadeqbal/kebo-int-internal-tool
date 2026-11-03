@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
@@ -148,24 +148,19 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         ) : (
           <>
             {/* Phones: a row per customer — name, one line, the key number. */}
-            <ul className="divide-y divide-line sm:hidden">
+            <PhoneList label="Customers">
               {data.rows.map((c) => (
-                <li key={c.id} className={sp.saved === c.id ? "animate-flash" : undefined}>
-                  <Link href={`/customers/${c.id}`} className="flex items-start justify-between gap-3 px-4 py-3 active:bg-surface-2">
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">{c.name}</span>
-                      <span className="block truncate text-xs text-text-2">
-                        {c.country === UNKNOWN_COUNTRY ? "Country not set" : countryName(c.country)} · {plural(c.openOrders, "open order")}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right text-xs text-text-2 tabular">
-                      {c.country === UNKNOWN_COUNTRY && <StatusBadge meaning="warn">Check country</StatusBadge>}
-                      <span className="block">{plural(c.openDeals, "inquiry", "inquiries")}</span>
-                    </span>
-                  </Link>
-                </li>
+                <PhoneRow
+                  key={c.id}
+                  href={`/customers/${c.id}`}
+                  flash={sp.saved === c.id}
+                  title={c.name}
+                  line={`${c.country === UNKNOWN_COUNTRY ? "Country not set" : countryName(c.country)} · ${plural(c.openOrders, "open order")}`}
+                  status={c.country === UNKNOWN_COUNTRY ? <StatusBadge meaning="warn">Check country</StatusBadge> : undefined}
+                  figure={plural(c.openDeals, "inquiry", "inquiries")}
+                />
               ))}
-            </ul>
+            </PhoneList>
             <DataTable label="Customers" clearParam="saved" className="max-sm:hidden">
               <THead>
                 <tr>
