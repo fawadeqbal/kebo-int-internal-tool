@@ -36,6 +36,7 @@ import { InquiriesService } from "../inquiries/inquiries.service";
 import { StagesService } from "../inquiries/stages.service";
 import { OrdersService } from "../orders/orders.service";
 import { requireReason } from "../../common/audit/reason";
+import { customerSnapshot } from "../orders/buyer";
 
 /** NUMERIC(14,2) can hold up to this; totals above it are refused with a clear message. */
 const MAX_TOTAL_MINOR = 999_999_999_999_99;
@@ -78,21 +79,8 @@ export function companySnapshot(s: Settings) {
   return company;
 }
 
-export async function customerSnapshot(tx: Tx, customerId: string, contactId: string | null) {
-  const c = await tx.customer.findUniqueOrThrow({
-    where: { id: customerId },
-    include: { contacts: { where: { deletedAt: null }, orderBy: { isPrimary: "desc" } } },
-  });
-  const contact = c.contacts.find((x) => x.id === contactId) ?? c.contacts[0] ?? null;
-  return {
-    name: c.name,
-    country: c.country,
-    address: c.address,
-    taxNo: c.taxNo,
-    regNo: c.regNo,
-    contact: contact && { name: contact.name, email: contact.email, phone: contact.phone ?? contact.whatsapp },
-  };
-}
+/** The customer as it is now (name, address, tax and registration numbers, the deal's contact): see orders/buyer. */
+export { customerSnapshot };
 
 type Db = Tx | PrismaService["db"];
 

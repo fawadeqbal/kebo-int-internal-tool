@@ -4,7 +4,10 @@ import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
   checkMove,
+  balanceTermsOf,
   balanceWhenOf,
+  buyerChanges,
+  type BuyerSnapshot,
   customerLetters,
   routePlan,
   nextStage,
@@ -42,6 +45,9 @@ import { chargedExpenses, fxOf, moneyFacts, positionOf, type MoneyCtx } from "..
 import { LimitsService } from "../../common/company/limits.service";
 import { checkAccount } from "../money/account-check";
 import { factoryPlansOf } from "../money/factory-plan";
+import { termsOf } from "../money/route-plan";
+import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
+import { freezeOrderDoc, packingFinalNow } from "./order-docs";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -233,6 +239,8 @@ export class OrdersService {
     // The order's rate to the main currency today, kept so its revenue never moves with later rates.
     const { sales } = await this.settings.get();
     const mainRate = fxRate(rev.currency, sales.currency, sales.currency, sales.exchangeRates);
+    // The buyer every paper of the order prints: the quotation's customer, details missing there from the customer now.
+    const buyer = await buyerAtOrder(tx, { customerId: inquiry.customerId, contactId: inquiry.contactId, sent: rev.customerSnapshot }, this.clock.today());
     const order = await tx.order.create({
       data: {
         refNo,
@@ -249,6 +257,7 @@ export class OrdersService {
         incotermPlace: rev.incotermPlace,
         mainCurrency: sales.currency,
         mainRate,
+        buyerSnapshot: buyer as unknown as Prisma.InputJsonValue,
         createdById: actorId,
         costs: {
           create: option.costs
@@ -426,15 +435,31 @@ export class OrdersService {
    */
   async issueProforma(user: SessionUser, id: string) {
     if (!can(user, "orders.update")) throw new ForbiddenError("You cannot issue proformas.");
-    const { company } = await this.settings.get();
+    const settings = await this.settings.get();
+    const { company } = settings;
+    const fx = fxOf(settings, await this.limits.allows("expenses"));
     await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
-      if (o.proformaNo) throw new DomainError(`The proforma is already issued as ${o.proformaNo}.`);
+      const today = this.clock.today();
+      if (o.proformaNo) {
+        // Issued, with its next version open (Make again): that version is made final as it prints now.
+        const latest = await tx.orderPaper.findFirst({ where: { orderId: id, kind: "proforma" }, orderBy: { version: "desc" } });
+        if (latest?.status !== "draft") throw new DomainError(`The proforma is already issued as ${o.proformaNo}.`);
+        await freezeOrderDoc(tx, id, "proforma", { settings, fx, today, byId: user.id });
+        await this.audit.record(tx, {
+          userId: user.id,
+          action: "paper.final",
+          entityType: "order",
+          entityId: id,
+          summary: `${o.refNo}: Proforma invoice ${o.proformaNo} made final (version ${latest.version})`,
+          newValues: { kind: "proforma", number: o.proformaNo, version: latest.version, step: "payment" },
+        });
+        return;
+      }
       const customer = await tx.customer.findUniqueOrThrow({ where: { id: o.customerId }, select: { name: true, initials: true } });
       const letters = customer.initials || customerLetters(customer.name);
-      const today = this.clock.today();
       // The count belongs to the person handling the deal (or whoever issues it when nobody does).
       const person = o.inquiry.assigneeId ?? user.id;
       const key = `pi:${person}:${today.slice(0, 4)}`;
@@ -450,6 +475,8 @@ export class OrdersService {
       }
       if (!number) throw new DomainError("Could not find a free proforma number. Try again.");
       await tx.order.update({ where: { id }, data: { proformaNo: number, proformaIssuedOn: toDbDate(today) } });
+      // Issued is final: exactly what it prints now is kept, and re-printing the number shows it.
+      await freezeOrderDoc(tx, id, "proforma", { settings, fx, today, byId: user.id });
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",
@@ -477,7 +504,8 @@ export class OrdersService {
     return {
       ...moneyFacts(position),
       currency: o.currency,
-      balanceTerms: o.balanceTerms,
+      // The terms the route now means (the accepted ones until a route is chosen).
+      balanceTerms: balanceTermsOf(termsOf(o), o.balanceTerms),
       position,
     };
   }
@@ -775,6 +803,7 @@ export class OrdersService {
         input.readyOn ?? null,
         data.shippedOn instanceof Date ? fromDbDate(data.shippedOn) : null,
       );
+      if (input.to === "shipped" && forward) await this.freezePacking(tx, o.id, user.id);
       await tx.orderStageChange.create({
         data: {
           orderId: o.id,
@@ -835,6 +864,7 @@ export class OrdersService {
     }
     await tx.order.update({ where: { id: o.id }, data });
     await this.datePlan(tx, o, to, true, null, shippedOn);
+    if (to === "shipped") await this.freezePacking(tx, o.id, user.id);
     await tx.orderStageChange.create({
       data: { orderId: o.id, fromStage: o.stage, toStage: to, note: why, confirmed: false, byId: user.id },
     });
@@ -864,6 +894,90 @@ export class OrdersService {
   }
 
   /**
+   * The packing list is final once the order is shipped and its packing filled in (whichever comes last):
+   * what it prints then is kept. A later change needs "Make again" (version 2).
+   */
+  private async freezePacking(tx: Tx, orderId: string, byId: string) {
+    const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { stage: true, packedAt: true } });
+    if (!packingFinalNow(o) || (await tx.orderPaper.findFirst({ where: { orderId, kind: "packing-list" }, select: { id: true } }))) return;
+    const settings = await this.settings.get();
+    await freezeOrderDoc(tx, orderId, "packing-list", {
+      settings,
+      fx: fxOf(settings, await this.limits.allows("expenses")),
+      today: this.clock.today(),
+      byId,
+    });
+  }
+
+  /**
+   * POST /orders/:id/buyer — "Refresh from customer": the buyer on the order's papers taken again from the
+   * customer as it is now, and why (in the history, with what changed). Only papers made from now on print
+   * it: final papers, the issued proforma included, keep the buyer they were printed with.
+   */
+  async refreshBuyer(user: SessionUser, id: string, reason: string) {
+    if (!can(user, "documents.manage") && !can(user, "orders.update")) throw new ForbiddenError("You cannot change the papers of orders.");
+    await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+      const o = await this.load(user, id, tx);
+      if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+      const full = await tx.order.findUniqueOrThrow({
+        where: { id },
+        select: { buyerSnapshot: true, customerId: true, inquiry: { select: { contactId: true } }, revision: { select: { customerSnapshot: true } } },
+      });
+      const today = this.clock.today();
+      const was = await buyerOf(tx, full, today);
+      const now = await buyerNow(tx, full.customerId, full.inquiry.contactId, today);
+      const changed = buyerChanges(was, now);
+      await tx.order.update({ where: { id }, data: { buyerSnapshot: now as unknown as Prisma.InputJsonValue } });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "order.buyer",
+        entityType: "order",
+        entityId: id,
+        summary: `${o.refNo}: buyer on the papers refreshed from the customer (${changed.length ? changed.join(", ") : "nothing changed"}) — ${reason}`,
+        oldValues: { buyer: was },
+        newValues: { buyer: now, step: "documents" },
+        reason,
+      });
+    });
+    return this.buyerView(user, id);
+  }
+
+  /** The buyer on the order's papers, and what differs from the customer now (the Make page's "Buyer as on the order"). */
+  async buyerView(user: SessionUser, id: string) {
+    await this.load(user, id);
+    const o = await this.prisma.db.order.findUniqueOrThrow({
+      where: { id },
+      select: { buyerSnapshot: true, customerId: true, inquiry: { select: { contactId: true } }, revision: { select: { customerSnapshot: true } } },
+    });
+    const today = this.clock.today();
+    const buyer: BuyerSnapshot = await buyerOf(this.prisma.db, o, today);
+    const now = await buyerNow(this.prisma.db, o.customerId, o.inquiry.contactId, today);
+    return { buyer, changes: buyerChanges(buyer, now) };
+  }
+
+  /** POST /orders/:id/quoted-terms — print the quotation's own payment text although the route now differs (or stop). */
+  async setQuotedTerms(user: SessionUser, id: string, print: boolean) {
+    if (!can(user, "documents.manage") && !can(user, "orders.update")) throw new ForbiddenError("You cannot change the papers of orders.");
+    await this.prisma.tx(async (tx) => {
+      await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
+      const o = await this.load(user, id, tx);
+      if (o.printQuotedTerms === print) return;
+      await tx.order.update({ where: { id }, data: { printQuotedTerms: print } });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "update",
+        entityType: "order",
+        entityId: id,
+        summary: `${o.refNo}: the quotation's payment text ${print ? "printed on the papers too" : "left off the papers"} (the route differs from it)`,
+        oldValues: { printQuotedTerms: o.printQuotedTerms },
+        newValues: { printQuotedTerms: print, step: "payment" },
+      });
+    });
+    return { print };
+  }
+
+  /**
    * Instalments with no date yet get one once it is known: a balance "before
    * shipment" is due by the ready date; other balances some days after the ship
    * date (the balance reminder). Dates someone set are never changed.
@@ -871,9 +985,10 @@ export class OrdersService {
   private async datePlan(tx: Tx, o: OrderRow, to: OrderStage, forward: boolean, readyOn: ISODate | null, shippedOn: ISODate | null) {
     if (!forward) return;
     let due: ISODate | null = null;
-    if (to === "in_production" && readyOn && o.balanceTerms === "before_shipment") due = readyOn;
+    const terms = balanceTermsOf(termsOf(o), o.balanceTerms);
+    if (to === "in_production" && readyOn && terms === "before_shipment") due = readyOn;
     if (to === "shipped" && shippedOn)
-      due = o.balanceTerms === "before_shipment" ? shippedOn : addDays(shippedOn, (await this.settings.get()).reminders.balanceDays);
+      due = terms === "before_shipment" ? shippedOn : addDays(shippedOn, (await this.settings.get()).reminders.balanceDays);
     // An LC's balance is dated by the bank step "Papers reached their bank", never here.
     if (due) await tx.paymentPlanItem.updateMany({ where: { orderId: o.id, dueOn: null, dueRule: null }, data: { dueOn: toDbDate(due) } });
   }
@@ -966,6 +1081,7 @@ export class OrdersService {
           packedAt: complete ? (o.packedAt ?? new Date()) : null,
         },
       });
+      await this.freezePacking(tx, o.id, user.id);
       await this.audit.record(tx, {
         userId: user.id,
         action: "packing_list",
