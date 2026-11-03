@@ -83,11 +83,19 @@ function useFloating(anchor: Anchor, onClose: () => void, opts: { width?: number
   return { panel, pos };
 }
 
+/** Shown in a menu with no item in it (a paper still waiting for its data): never an empty box. */
+const EMPTY = "Nothing to do here yet.";
+const emptyNote = <p data-menu-empty className="px-2.5 py-1.5 text-xs text-muted">{EMPTY}</p>;
+/** The note hides itself as soon as the menu has an item. */
+const HIDE_EMPTY = "[&:has([role=menuitem])>[data-menu-empty]]:hidden";
+
 /**
- * A menu of actions for a button (⋯, "Later"…). Drawn above the page, so a
- * scroll box or a card around the button never cuts it off; it flips above
- * the button near the bottom of the screen. On a phone it opens as a sheet
- * from the bottom of the screen with large rows.
+ * A menu of actions for a button (⋯, "Later"…). Drawn in a layer above the
+ * page (a portal, fixed next to its button), so a card or a scroll box around
+ * the button never cuts it off; it flips above the button when there is no
+ * room below, and stays next to it while the page scrolls. On a phone it opens
+ * as a sheet from the bottom of the screen with large rows. With nothing in
+ * it, it says so instead of showing an empty box.
  */
 export function FloatingMenu({
   anchor,
@@ -139,11 +147,15 @@ export function FloatingMenu({
           role="menu"
           aria-label={label}
           onKeyDown={keys}
-          className="relative flex max-h-[80dvh] flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base"
+          className={cn(
+            "relative flex max-h-[80dvh] flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-pop [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:text-base",
+            HIDE_EMPTY,
+          )}
         >
           <span className="mx-auto mb-1 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
           {header ?? <p className="px-2.5 pt-1 pb-2 text-xs font-medium text-muted">{label}</p>}
           {children}
+          {emptyNote}
         </div>
       </div>,
       document.body,
@@ -155,9 +167,14 @@ export function FloatingMenu({
       aria-label={label}
       onKeyDown={keys}
       style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width }}
-      className={cn("fixed z-[70] flex max-h-[min(70vh,28rem)] flex-col overflow-y-auto rounded-lg border border-line bg-surface p-1 text-left shadow-pop", !pos && "invisible")}
+      className={cn(
+        "fixed z-[70] flex max-h-[min(70vh,28rem)] flex-col overflow-y-auto rounded-lg border border-line bg-surface p-1 text-left shadow-pop",
+        HIDE_EMPTY,
+        !pos && "invisible",
+      )}
     >
       {children}
+      {emptyNote}
     </div>,
     document.body,
   );
