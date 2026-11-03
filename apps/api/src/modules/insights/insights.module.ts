@@ -24,11 +24,11 @@ class InsightsController {
     private readonly reminders: RemindersListService,
   ) {}
 
-  /** Managers: the business for a period (?from&to, default this month) against the period before. */
+  /** Managers: this month's company target and how far along it is (Home), from Insights' sales. */
   @RequireFeature("insights")
-  @Get("insights")
-  overview(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: ISODate; to?: ISODate }) {
-    return this.insights.overview(user, q);
+  @Get("insights/target")
+  monthTarget(@CurrentUser() user: SessionUser) {
+    return this.insights.monthTarget(user);
   }
 
   @RequireFeature("insights")

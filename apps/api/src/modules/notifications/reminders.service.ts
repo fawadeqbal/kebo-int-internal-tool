@@ -1,3 +1,4 @@
+import { PROFIT_LABEL } from "@kebo/money";
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
@@ -199,13 +200,13 @@ export class RemindersService {
   }
 
   /** The numbers for a period, read as the system (every permission): the insights service lives in another module. */
-  private async insights(from: string, to: string) {
+  private async insights(from: string, to: string, before?: { from: string; to: string }) {
     // The figures in the emails are Insights (a plan feature): without it the emails carry the counts only.
     if (!(await this.limits.allows("insights"))) return null;
     try {
       const service = this.modules.get(InsightsService, { strict: false });
       const system = { id: "00000000-0000-0000-0000-000000000000", name: "System", email: "", role: "super_admin", roleName: "System", permissions: [...PERMISSIONS], twoStepSetupRequired: false, sessionId: "" };
-      return await service.overview(system as never, { from, to });
+      return await service.figures(system as never, { from, to }, before);
     } catch (e) {
       this.log.warn(`insights for the email failed: ${(e as Error).message}`);
       return null;
@@ -223,7 +224,7 @@ export class RemindersService {
     ]);
     const i = await this.insights(`${today.slice(0, 7)}-01`, today);
     const m = (v: string | null | undefined) => (i && v !== null && v !== undefined ? `${i.currency} ${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : null);
-    const target = i?.target.amount ? `${m(i.target.reached)} of ${m(i.target.amount)} (${i.target.percent}%)` : null;
+    const target = i?.target ? `${m(i.target.reached)} of ${m(i.target.amount)} (${i.target.percent}%)` : null;
     await this.notifications.emailAdmins("dailySummary", `${(await this.settings.get()).company.name}: summary for ${today}`, {
       heading: `Summary for ${today}`,
       rows: [
@@ -231,11 +232,11 @@ export class RemindersService {
         ["Won / lost since yesterday", `${won} / ${lost}`],
         ["Open inquiries", String(open)],
         ["Open orders", String(overdueOrders)],
-        ["Sales this month", m(i?.kpis.revenue.value as string | null)],
+        ["Sales this month", m(i?.sales.value)],
         ["Monthly target", target],
-        ["Money in this month", m(i?.kpis.cashIn.value as string | null)],
-        ["Customers owe us", i ? `${m(i.now.toReceive)}${Number(i.now.overdue) > 0 ? ` (${m(i.now.overdue)} overdue)` : ""}` : null],
-        ["In our accounts", m(i?.now.cashInHand)],
+        ["Cash in this month", m(i?.cashIn)],
+        ["To receive", i ? `${m(i.toReceive)}${Number(i.overdue) > 0 ? ` (${m(i.overdue)} overdue)` : ""}` : null],
+        ["In our accounts", m(i?.inHand)],
       ],
       link: "/dashboard",
       linkLabel: "Open Home",
@@ -246,30 +247,27 @@ export class RemindersService {
   private async monthly(month: string) {
     const [y, mo] = month.split("-").map(Number) as [number, number];
     const to = `${month}-${String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0")}`;
-    const i = await this.insights(`${month}-01`, to);
+    const prevTo = new Date(Date.UTC(y, mo - 1, 0)).toISOString().slice(0, 10);
+    const i = await this.insights(`${month}-01`, to, { from: `${prevTo.slice(0, 7)}-01`, to: prevTo });
     if (!i) return;
     const name = new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
     const m = (v: unknown) => (v === null || v === undefined ? null : `${i.currency} ${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
     const ch = (c: number | null) => (c === null ? "" : ` (${c >= 0 ? "▲" : "▼"} ${Math.abs(c)}% vs the month before)`);
-    const k = i.kpis;
-    const top = i.topCustomers
-      .slice(0, 5)
-      .map((c, n) => `${n + 1}. ${c.customer.name}: ${m(c.revenue)}`)
-      .join("\n");
+    const top = i.topCustomers.map((c, n) => `${n + 1}. ${c.name}: ${m(c.sales)}`).join("\n");
     await this.notifications.emailAdmins("dailySummary", `${(await this.settings.get()).company.name}: ${name} in numbers`, {
       heading: `${name} in numbers`,
       rows: [
-        ["Sales (orders won)", `${m(k.revenue.value)}${ch(k.revenue.change)}`],
-        ["Gross profit", `${m(k.grossProfit.value)}${k.margin.value !== null ? ` · ${k.margin.value}% margin` : ""}`],
-        ["Profit after expenses", k.netProfit ? `${m(k.netProfit.value)}${ch(k.netProfit.change)}` : null],
-        ["Orders", `${k.orders.value}${ch(k.orders.change)}`],
-        ["Win rate", k.winRate.value === null ? null : `${k.winRate.value}%`],
-        ["Money in", m(k.cashIn.value)],
-        ["New customers", String(k.newCustomers.value)],
-        ["Customers owe us now", m(i.now.toReceive)],
+        ["Sales", `${m(i.sales.value)}${ch(i.sales.change)}`],
+        ["Gross profit", `${m(i.grossProfit.value)}${i.grossProfit.margin !== null ? ` · ${i.grossProfit.margin}% margin` : ""}`],
+        [PROFIT_LABEL.expected, i.profitExpected ? `${m(i.profitExpected.value)}${ch(i.profitExpected.change)}` : null],
+        ["Orders", `${i.orders.value}${ch(i.orders.change)}`],
+        ["Win rate", i.winRate === null ? null : `${i.winRate}%`],
+        ["Cash in", m(i.cashIn)],
+        ["New customers", String(i.newCustomers)],
+        ["To receive now", m(i.toReceive)],
       ],
       body: top ? `Best customers this month\n${top}` : null,
-      link: `/insights?from=${month}-01&to=${to}`,
+      link: `/insights?period=custom&from=${month}-01&to=${to}`,
       linkLabel: "See the full month",
     });
   }
