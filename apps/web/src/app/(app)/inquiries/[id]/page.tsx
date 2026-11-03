@@ -166,7 +166,7 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
           </Card>
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-5">
+        <aside aria-label="Beside the inquiry" className="flex min-w-0 flex-col gap-5">
           <Card>
             <CardHeader title="Customer" />
             <CardBody>

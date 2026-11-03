@@ -169,7 +169,9 @@ export function PapersTable({
             role="row"
             className="hidden grid-cols-[28px_minmax(0,1.35fr)_minmax(0,1fr)_120px_minmax(0,1.25fr)_190px] gap-x-3 border-b border-line px-2 py-2 text-xs font-medium text-text-2 md:grid"
           >
-            <span role="columnheader" />
+            <span role="columnheader" className="sr-only">
+              Done
+            </span>
             <span role="columnheader">Paper</span>
             <span role="columnheader">Number · date</span>
             <span role="columnheader">From</span>

@@ -411,7 +411,7 @@ export function OrderStory({ o, f }: { o: OverviewInput["o"]; f: OverviewFacts }
       <ol aria-label="The order's journey" className="hidden gap-2 md:flex">
         {f.stops.map((s, i) => (
           <li key={s.key} className="min-w-0 flex-1">
-            <Link href={s.href} className="group flex flex-col gap-1.5" aria-label={`${s.label}: ${STATE_WORD[s.state]}`}>
+            <Link href={s.href} className="group flex flex-col gap-1.5">
               <span className="flex items-center">
                 <Dot state={s.state} n={i + 1} />
                 {i < f.stops.length - 1 && <span aria-hidden className={cn("ml-1.5 h-[3px] flex-1 rounded-full", s.state === "done" ? "bg-ok" : "bg-line")} />}
@@ -423,6 +423,7 @@ export function OrderStory({ o, f }: { o: OverviewInput["o"]; f: OverviewFacts }
                 )}
               >
                 {s.label}
+                <span className="sr-only">: {STATE_WORD[s.state]}</span>
               </b>
               {s.top && <span className="text-xs text-text-2 tabular">{s.top}</span>}
               {s.sub && <span className="text-xs text-muted [overflow-wrap:anywhere]">{s.sub}</span>}

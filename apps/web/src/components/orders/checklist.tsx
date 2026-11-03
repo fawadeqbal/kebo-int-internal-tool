@@ -902,7 +902,7 @@ function AddItem({ step, label, run }: { step: FlowStep; label: string; run: Che
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
           placeholder={`Add an item to ${label}…`}
-          className="h-9 min-w-0 flex-1 rounded-lg border border-dashed border-line-strong bg-transparent px-3 text-sm placeholder:text-muted focus:border-primary focus:outline-none"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-dashed border-line-strong bg-transparent px-3 text-sm placeholder:text-muted focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
         />
         {title.trim() && (
           <Button type="submit" size="sm" variant="secondary" disabled={pending}>

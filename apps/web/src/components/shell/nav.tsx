@@ -339,7 +339,7 @@ export function AppShell({
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-surface lg:flex">
+      <aside aria-label="Sidebar" className="no-print fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-surface lg:flex">
         <SidebarContent groups={groups} companyName={companyName} roleLabel={user.role} logo={logo} />
       </aside>
 
@@ -347,7 +347,7 @@ export function AppShell({
       {open && (
         <div className="no-print fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute inset-y-0 left-0 flex w-64 animate-slide-in flex-col border-r border-line bg-surface shadow-pop">
+          <aside aria-label="Menu" className="absolute inset-y-0 left-0 flex w-64 animate-slide-in flex-col border-r border-line bg-surface shadow-pop">
             <button
               className="absolute top-3.5 right-3 rounded-md p-1.5 text-muted hover:bg-surface-2"
               onClick={() => setOpen(false)}
