@@ -41,6 +41,8 @@ export function CustomerPanel({
               router.refresh();
             }
           : undefined,
+      // The list is by name: a new customer may be on another page.
+      action: { label: "Open", href: `/customers/${d.id}` },
     });
     panel.close({ saved: d.id });
   };
