@@ -4,7 +4,7 @@ import { Badge, Card, CardHeader } from "@kebo/ui";
 import { date } from "@/lib/format";
 import type { ShipmentView } from "@/lib/types-flow";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepFiles, StepPage, StepViewDivider, ViewPair } from "@/components/orders/step-page";
+import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { DetailsCard, FieldsForm, PanelButton, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { packingAction, packingMarksAction, paymentAction } from "../../actions";
@@ -14,7 +14,7 @@ import { PackingCard } from "../goods";
 import { docHref, goodsOf } from "../shared";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
-import { StepPapers } from "../papers";
+import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · shipping" };
 
@@ -213,7 +213,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       action={shipments.length ? addShipment : undefined}
       side={
         <>
-          <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
+          <StepFilesSide id={o.id} step="shipping" />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
@@ -304,10 +304,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             />
           </Card>
         ))}
-      <ViewPair>
-        <StepPapers id={o.id} dealId={o.inquiry.id} step="shipping" />
-        <StepCosts id={o.id} step="shipping" />
-      </ViewPair>
+      <StepPapers id={o.id} step="shipping" />
+      <StepCosts id={o.id} step="shipping" />
     </StepPage>
   );
 }

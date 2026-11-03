@@ -26,6 +26,11 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      // A file of an order may show inside the app itself (Documents v3: View opens here), never elsewhere.
+      {
+        source: "/files/:path*",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
       // The print pages may show inside the app itself (the Make page's preview of a paper), never elsewhere.
       {
         source: "/print/:path*",

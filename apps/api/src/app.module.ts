@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ChecklistModule } from "./modules/checklist/checklist.module";
 import { FlowModule } from "./modules/flow/flow.module";
 import { PapersModule } from "./modules/papers/papers.module";
+import { OrderFilesModule } from "./modules/files/order-files.module";
 import { EnvModule } from "./config/env";
 import { PrismaModule } from "./database/prisma.service";
 import { CommonModule } from "./common/common.module";
@@ -34,6 +35,6 @@ import { PlatformModule } from "./platform/platform.module";
  */import { InsightsModule } from "./modules/insights/insights.module";
 
 @Module({
-  imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, ChecklistModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, SecurityModule, InsightsModule, FlowModule, PapersModule, CompanyModule, PlatformModule],
+  imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, ChecklistModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, SecurityModule, InsightsModule, FlowModule, PapersModule, OrderFilesModule, CompanyModule, PlatformModule],
 })
 export class AppModule {}

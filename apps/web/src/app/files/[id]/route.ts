@@ -19,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
   if (new URL(req.url).searchParams.get("view") === "1" && VIEWABLE.has(type)) {
     headers.set("content-disposition", (headers.get("content-disposition") ?? "").replace(/^attachment/, "inline") || "inline");
-    headers.set("content-security-policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'");
+    headers.set("content-security-policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'");
   }
   return new Response(res.body, { status: 200, headers });
 }

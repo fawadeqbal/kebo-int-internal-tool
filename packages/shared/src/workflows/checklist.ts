@@ -758,7 +758,7 @@ export function stepLine(
 export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | null {
   const nv = (newValues && typeof newValues === "object" ? newValues : {}) as Record<string, unknown>;
   const step = typeof nv.step === "string" && (FLOW_STEPS as readonly string[]).includes(nv.step) ? (nv.step as FlowStep) : null;
-  if (action.startsWith("checklist.") || action.startsWith("paper.")) return step;
+  if (action.startsWith("checklist.") || action.startsWith("paper.") || action.startsWith("file.")) return step;
   if (action.startsWith("expense")) return step;
   if (action.startsWith("payment_out")) return "factory";
   if (action.startsWith("payment_") || action === "payment_plan") return "payment";

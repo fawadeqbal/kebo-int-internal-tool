@@ -24,7 +24,7 @@ export function fileRoutes(apiPath: (id: string) => string, choose: string) {
     const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     if (new URL(req.url).searchParams.get("view") === "1" && VIEWABLE.has(type)) {
       headers.set("content-disposition", (headers.get("content-disposition") ?? "").replace(/^attachment/, "inline") || "inline");
-      headers.set("content-security-policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'");
+      headers.set("content-security-policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'");
     }
     return new Response(res.body, { status: 200, headers });
   }
@@ -51,4 +51,11 @@ export function fileRoutes(apiPath: (id: string) => string, choose: string) {
   }
 
   return { GET, POST };
+}
+
+/** Same site only: a form post from another site cannot add or change files. */
+export function sameSite(req: Request) {
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  return !!origin && !!host && new URL(origin).host === host;
 }

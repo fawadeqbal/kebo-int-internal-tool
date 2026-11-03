@@ -48,7 +48,7 @@ export function ProgressBar({ done, total, state, className }: { done: number; t
 export type StepHeaderData = Pick<StepView, "number" | "label" | "state" | "stateLabel" | "line"> & { done?: number; total?: number };
 
 /** The step's top: its number, name, state, n of m (when counted), one line on where it stands, progress, and its main buttons. */
-export function StepHeader({ step, action }: { step: StepHeaderData; action?: ReactNode }) {
+export function StepHeader({ step, action, line }: { step: StepHeaderData; action?: ReactNode; line?: string }) {
   const counted = step.total !== undefined;
   return (
     <section
@@ -83,7 +83,7 @@ export function StepHeader({ step, action }: { step: StepHeaderData; action?: Re
             </span>
           )}
         </h2>
-        {step.line && <p className="mt-0.5 text-sm text-text-2">{readable(step.line)}</p>}
+        {(line ?? step.line) && <p className="mt-0.5 text-sm text-text-2">{readable(line ?? step.line)}</p>}
         {counted && <ProgressBar done={step.done ?? 0} total={step.total!} state={step.state} className="mt-2.5 max-w-md" />}
       </div>
       {action && <div className="flex shrink-0 flex-wrap gap-2 has-[form]:basis-full sm:has-[form]:basis-auto">{action}</div>}
@@ -156,6 +156,7 @@ export function StepPage({
   step,
   base,
   action,
+  line,
   side,
   children,
 }: {
@@ -163,6 +164,8 @@ export function StepPage({
   step: FlowStep;
   base: string;
   action?: ReactNode;
+  /** The step's one line, when the page says it better than the checklist (Documents: papers ready, what is missing, the bank). */
+  line?: string;
   side: ReactNode;
   children: ReactNode;
 }) {
@@ -171,7 +174,7 @@ export function StepPage({
     <StepFrame
       header={
         view ? (
-          <StepHeader step={view} action={action} />
+          <StepHeader step={view} action={action} line={line} />
         ) : (
           <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
             {FLOW_STEP_LABEL[step]} is switched off for your company.

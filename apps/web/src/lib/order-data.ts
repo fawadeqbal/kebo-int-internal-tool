@@ -8,6 +8,7 @@ import type { OrderDefaults, OrderFlow } from "./types-flow";
 import type { OrderSteps } from "./types-checklist";
 import type { HistoryEntry } from "./types";
 import type { OrderPapers } from "./types-papers";
+import type { OrderFiles } from "./types-files";
 
 /**
  * An order's data, fetched once per request: the order layout (steps, Now
@@ -40,3 +41,5 @@ export const orderHistoryOf = cache((id: string, step?: string, limit?: number) 
 
 /** Every paper of the order with where it stands (step pages, Documents). */
 export const orderPapersOf = cache((id: string) => api.get<OrderPapers>(`/orders/${id}/papers`));
+/** Every file of the order in one list (Documents v3). */
+export const orderFilesOf = cache((id: string) => api.get<OrderFiles>(`/orders/${id}/files`));

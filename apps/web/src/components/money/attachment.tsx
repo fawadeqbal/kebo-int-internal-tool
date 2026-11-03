@@ -6,6 +6,7 @@ import { FileText, Paperclip, Trash2, Upload, X } from "lucide-react";
 import { Alert, Button, buttonClass, cn, Field, Input } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { AttachedFileInfo } from "@/lib/types-money";
+import { FileChip, useFileTools } from "@/components/files/file-tools";
 
 const VIEWABLE = /^(application\/pdf|image\/(png|jpeg|gif|webp))$/;
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
@@ -113,6 +114,8 @@ export function AttachedFile({
     if (input.current) input.current.value = "";
   };
   const viewable = !!file && VIEWABLE.test(file.type);
+  const tools = useFileTools();
+  const orderFile = file ? tools?.files.find((f) => f.href === src) : undefined;
   return (
     <div className="flex flex-col gap-2">
       {file ? (
@@ -128,15 +131,20 @@ export function AttachedFile({
             </span>
           )}
           <span className="min-w-0 text-sm">
-            <a
-              href={`${src}${viewable ? "?view=1" : ""}`}
-              target={viewable ? "_blank" : undefined}
-              rel="noreferrer"
-              className="block truncate font-medium hover:text-primary"
-            >
-              {file.name}
-            </a>
-            <span className="text-xs text-muted">{size(file.size)}</span>
+            {/* On an order's pages: the file with the same tools as everywhere (view here, download, ⋯). */}
+            {orderFile ? (
+              <FileChip file={orderFile} />
+            ) : (
+              <a
+                href={`${src}${viewable ? "?view=1" : ""}`}
+                target={viewable ? "_blank" : undefined}
+                rel="noreferrer"
+                className="block truncate font-medium hover:text-primary"
+              >
+                {file.name}
+              </a>
+            )}
+            <span className="block text-xs text-muted">{size(file.size)}</span>
           </span>
         </div>
       ) : (

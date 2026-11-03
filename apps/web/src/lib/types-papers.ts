@@ -12,6 +12,10 @@ export interface PaperRow {
   stateLabel: string;
   number: string | null;
   version: number | null;
+  /** The latest made version (draft or final): Delete the draft, Versions. */
+  paperId?: string | null;
+  /** The latest version is a draft. */
+  draft?: boolean;
   sub: string;
   ref: string | null;
   printable: boolean;

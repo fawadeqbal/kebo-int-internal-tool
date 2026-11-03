@@ -359,5 +359,5 @@ class MoneyController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, CostsService, AccountsService, CashService, LeaksService, PaymentFilesService], exports: [MoneyService, AccountsService, CashService, LeaksService] })
+@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, CostsService, AccountsService, CashService, LeaksService, PaymentFilesService], exports: [MoneyService, AccountsService, CashService, LeaksService, PaymentFilesService] })
 export class MoneyModule {}

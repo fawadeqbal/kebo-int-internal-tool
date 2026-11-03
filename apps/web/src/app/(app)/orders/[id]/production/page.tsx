@@ -7,7 +7,7 @@ import type { Person } from "@/lib/types";
 import type { ChecklistItem } from "@/lib/types-checklist";
 import { optional } from "@/components/print/data";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepFiles, StepPage, StepViewDivider, ViewPair } from "@/components/orders/step-page";
+import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { NewFactoryPayment } from "@/components/money/forms";
@@ -17,7 +17,7 @@ import { fieldsAction, lightAction } from "../../light-actions";
 import { GoodsExcel } from "../goods";
 import { goodsOf } from "../shared";
 import { stepData } from "../step-data";
-import { StepPapers } from "../papers";
+import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · production" };
 
@@ -130,7 +130,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       base={d.base}
       side={
         <>
-          <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
+          <StepFilesSide id={o.id} step="production" />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
@@ -177,10 +177,8 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
           editActions={<GoodsExcel lines={goods} />}
         />
       )}
-      <ViewPair>
-        <StepPapers id={o.id} dealId={o.inquiry.id} step="production" />
-        <StepCosts id={o.id} step="production" />
-      </ViewPair>
+      <StepPapers id={o.id} step="production" />
+      <StepCosts id={o.id} step="production" />
     </StepPage>
   );
 }

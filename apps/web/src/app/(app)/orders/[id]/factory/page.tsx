@@ -7,7 +7,7 @@ import { date } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepChanges, StepFiles, StepPage, StepViewDivider, ViewPair } from "@/components/orders/step-page";
+import { StepChanges, StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools, StepCosts } from "@/components/orders/costs-card";
 import { NewFactoryPayment } from "@/components/money/forms";
@@ -17,7 +17,7 @@ import { fieldsAction, lightAction } from "../../light-actions";
 import { FactoriesView } from "../money-cards";
 import { MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
-import { StepPapers } from "../papers";
+import { StepFilesSide, StepPapers } from "../papers";
 
 export const metadata = { title: "Order · factory order" };
 
@@ -112,7 +112,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       action={payFactory("Pay the factory", false)}
       side={
         <>
-          <StepFiles items={d.items} addHref={d.steps.canEdit ? `${d.base}/documents#files` : undefined} />
+          <StepFilesSide id={o.id} step="factory" />
           <StepChanges entries={d.changes} historyHref={d.historyHref} />
         </>
       }
@@ -194,10 +194,8 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           <FactoriesView m={m} people={people} today={now} fx={fx} />
         </MoneySection>
       )}
-      <ViewPair>
-        <StepPapers id={o.id} dealId={o.inquiry.id} step="factory" />
-        <StepCosts id={o.id} step="factory" />
-      </ViewPair>
+      <StepPapers id={o.id} step="factory" />
+      <StepCosts id={o.id} step="factory" />
     </StepPage>
   );
 }
