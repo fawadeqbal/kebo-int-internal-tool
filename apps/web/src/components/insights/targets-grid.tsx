@@ -85,7 +85,7 @@ export function TargetsGrid({ rows, people, actions, currency }: { rows: TargetR
                   {r.percent === null ? "" : `${r.percent}%${r.percent >= 100 ? " · reached" : ""}`}
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <Button size="xs" variant="ghost" onClick={() => setEditing(r.month)} aria-label={`Change the targets for ${r.label}`}>
+                  <Button size="xs" variant="ghost" onClick={() => setEditing(r.month)} aria-label={`${Object.values(r.values).some(Boolean) ? "Change" : "Set"} the targets for ${r.label}`}>
                     <Pencil aria-hidden /> {Object.values(r.values).some(Boolean) ? "Change" : "Set"}
                   </Button>
                 </td>
