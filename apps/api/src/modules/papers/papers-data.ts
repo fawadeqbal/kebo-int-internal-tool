@@ -935,12 +935,14 @@ function lcAmountCheck(c: PaperCtx): PaperCheck[] {
   if (a.lcMinor === null) return [];
   const currency = a.currency;
   return [
+    // Not ok: the paper still draws no more than the balance; the LC (or the plan) needs a look.
     check(
       "lcAmount",
-      `${lcWord(c)} amount against the ${lcWord(c)} balance`,
-      `${lcWord(c)} ${formatMinor(a.lcMinor, currency)} · ${lcWord(c)} balance ${formatMinor(a.balanceMinor, c.o.currency)}`,
+      `${lcWord(c)} amount`,
+      a.lcMinor === a.balanceMinor && currency === c.o.currency
+        ? `${formatMinor(a.lcMinor, currency)}, the ${lcWord(c)} balance`
+        : `${formatMinor(a.lcMinor, currency)}, balance ${formatMinor(a.balanceMinor, c.o.currency)}`,
       a.lcMinor === a.balanceMinor && currency === c.o.currency,
-      { href: "payment" },
     ),
   ];
 }

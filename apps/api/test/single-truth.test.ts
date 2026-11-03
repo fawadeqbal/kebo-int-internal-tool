@@ -69,7 +69,7 @@ describe("one money truth", () => {
   const payments = async (id: string) => (await api(app, manager).get(`/orders/${id}/payments`).expect(200)).body;
   const doc = async (id: string, kind: string, q = "") => (await api(app, manager).get(`/orders/${id}/papers/${kind}/doc${q}`).expect(200)).body.doc;
   const checks = async (id: string, kind: string) =>
-    (await api(app, manager).get(`/orders/${id}/papers/${kind}/checks`).expect(200)).body.checks as { key: string; ok: boolean; value: string; required: boolean }[];
+    (await api(app, manager).get(`/orders/${id}/papers/${kind}/checks`).expect(200)).body.checks as { key: string; label: string; ok: boolean; value: string; required: boolean }[];
   const pay = (id: string, amount: number, kind = "balance") =>
     api(app, manager).post(`/orders/${id}/payments`, { kind, amount, currency: "USD", paidOn: today }).expect(201);
   const listed = async (id: string, status = "open") =>
@@ -310,7 +310,7 @@ describe("one money truth", () => {
       await contract(10_000);
       expect((await doc(o.orderId, "bill-of-exchange")).total).toMatchObject({ amount: "7000.00" });
       const c = (await checks(o.orderId, "bill-of-exchange")).find((x) => x.key === "lcAmount");
-      expect(c).toMatchObject({ ok: false, value: "LC USD 10,000.00 · LC balance USD 7,000.00" });
+      expect(c).toMatchObject({ ok: false, required: false, label: "LC amount", value: "USD 10,000.00, balance USD 7,000.00" });
       expect((await checks(o.orderId, "bank-cover-letter")).find((x) => x.key === "lcAmount")?.ok).toBe(false);
       await contract(6000);
       expect((await doc(o.orderId, "bill-of-exchange")).total).toMatchObject({ amount: "6000.00" });

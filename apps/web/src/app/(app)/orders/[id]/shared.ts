@@ -26,10 +26,11 @@ export const goodsOf = (o: OrderView): GoodsLine[] =>
       packing: l.packing,
     }));
 
-/** "30% deposit, balance before shipment". */
+/** "30% deposit, balance before shipment": the deposit the plan asks for (a plan edited to 50% says 50%). */
 export function termsOf(o: OrderView) {
   const balance = BALANCE_TERMS_LABEL[o.balanceTerms];
-  return o.depositPercent > 0 ? `${o.depositPercent}% deposit, ${balance.charAt(0).toLowerCase()}${balance.slice(1)}` : balance;
+  const pct = o.money.depositPercent ?? o.depositPercent;
+  return pct > 0 ? `${pct}% deposit, ${balance.charAt(0).toLowerCase()}${balance.slice(1)}` : balance;
 }
 
 export const incotermOf = (o: OrderView) => `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
