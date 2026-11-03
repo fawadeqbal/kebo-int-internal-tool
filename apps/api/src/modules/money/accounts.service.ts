@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, orderMoney, roundHalfAway } from "@kebo/money";
-import { can, type LostReason } from "@kebo/shared";
+import { can, shippedOnOf, type LostReason } from "@kebo/shared";
 import { addDays, dateIn, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
@@ -110,7 +110,8 @@ export class AccountsService {
               mainRate: true,
               total: true,
               orderedOn: true,
-              shippedOn: true,
+              // The day it shipped: the earliest day one of its shipments left.
+              shipments: { select: { departedOn: true } },
               stage: true,
               status: true,
               factoryPaid: { where: { voidedAt: null }, select: { amount: true, rate: true } },
@@ -293,7 +294,7 @@ export class AccountsService {
           currency: o.currency,
           href: `/orders/${o.id}`,
         });
-        const shipped = fromDbDateOrNull(o.shippedOn);
+        const shipped = shippedOnOf(o.shipments.map((s) => ({ departedOn: fromDbDateOrNull(s.departedOn) })));
         if (shipped) events.push({ on: shipped, kind: "shipped", text: `${o.refNo} shipped`, href: `/orders/${o.id}` });
       }
     }

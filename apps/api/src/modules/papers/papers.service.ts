@@ -19,6 +19,7 @@ import {
   PAPER_KINDS,
   PAPER_LABEL,
   PAPER_MADE_FROM,
+  primaryShipment,
   PAPER_NUMBER_LABEL,
   PAPER_OPTION_LABEL,
   PAPER_ROUTES,
@@ -402,7 +403,7 @@ export class PapersService {
     const has = (f: PlanFeature) => !features || features.includes(f);
     const c = await this.ctx(user, o, null, {}, "");
     const out: PaperListRow[] = [];
-    const mode = o.shipments[0]?.mode ?? "sea";
+    const mode = primaryShipment(o.shipments)?.mode ?? "sea";
     // Settings › Papers we use: a switched-off paper is left out, unless it is already made or recorded.
     const off = c.settings.papers.off;
     const used = (key: string) => paperUsed(off, key);
@@ -650,7 +651,11 @@ export class PapersService {
             label: ORDER_DOCUMENT_LABEL[kind],
             step: UPLOAD_STEP[kind] ?? "documents",
             state: docState(d),
-            number: d?.number ?? (kind === "bill_of_lading" || kind === "airway_bill" ? (o.shipments[0]?.blNo ?? o.blNo) : null),
+            // A B/L or AWB prints its shipment's number (its row's shipment, else Shipment 1); the row keeps none.
+            number:
+              kind === "bill_of_lading" || kind === "airway_bill"
+                ? ((o.shipments.find((x) => x.id === d?.shipmentId) ?? primaryShipment(o.shipments))?.blNo ?? null)
+                : (d?.number ?? null),
             version: null,
             sub: d?.status === "elsewhere" ? `kept: ${d.keptWhere ?? ""}` : (d?.note ?? UPLOAD_SUB[kind] ?? ""),
             ref: null,
@@ -868,7 +873,8 @@ export class PapersService {
     const o = await this.order(user, orderId);
     await this.mayRead(user, kind, o);
     const v = input.value.trim();
-    const ship = o.shipments[0];
+    // Shipment 1: the shipment the papers print.
+    const ship = primaryShipment(o.shipments);
     const features = await this.limits.features();
     const shipping = !features || features.includes("shipping");
     switch (input.field) {
@@ -877,13 +883,10 @@ export class PapersService {
       case "etd":
       case "eta": {
         if (ship && shipping) await this.flow.updateShipment(user, ship.id, shipmentUpdateInput.parse({ [input.field]: v }));
+        // Without the shipping module (or with no shipment yet): the B/L is saved on Shipment 1 as the Details card does.
         else if (input.field === "blNo") await this.orders.setDetails(user, orderId, orderDetailsInput.parse({ blNo: v }));
-        else
-          await this.flow.addShipment(
-            user,
-            orderId,
-            shipmentInput.parse({ mode: "sea", [input.field]: v, portOfDischarge: o.portOfDischarge ?? "", blNo: o.blNo ?? "" }),
-          );
+        // A new shipment: its ports from the order's terms (not sent: the API fills them).
+        else await this.flow.addShipment(user, orderId, shipmentInput.parse({ mode: "sea", [input.field]: v }));
         break;
       }
       case "lcNo":

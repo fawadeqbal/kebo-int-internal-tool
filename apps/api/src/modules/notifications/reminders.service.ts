@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
-import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus } from "@kebo/shared";
+import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus, shippedOnOf } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -109,6 +109,7 @@ export class RemindersService {
         expenses: chargedExpenses,
         inquiry: { select: { id: true, assigneeId: true } },
         lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true } },
+        shipments: { select: { departedOn: true } },
       },
     });
     // Collected first and sent per person: a few one by one, many as one summary,
@@ -127,7 +128,7 @@ export class RemindersService {
           currency: o.currency,
           stageSince: dateIn(o.stageSince, this.clock.timeZone),
           readyOn: fromDbDateOrNull(o.readyOn),
-          shippedOn: fromDbDateOrNull(o.shippedOn),
+          shippedOn: shippedOnOf(o.shipments.map((x) => ({ departedOn: fromDbDateOrNull(x.departedOn) }))),
           goods: goodsOf(o.lines, o.packedAt),
         },
         today,

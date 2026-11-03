@@ -3,6 +3,7 @@ import { documentTotals, fromMinor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
   balanceTermsOf,
+  portsOf,
   routeAsAccepted,
   routePaymentSentence,
   type BalanceTerms,
@@ -15,6 +16,7 @@ import { chargedExpenses, positionOf, type MoneyCtx } from "../money/position";
 import { termsOf } from "../money/route-plan";
 import { buyerOf } from "./buyer";
 import { orderLineNumbers } from "./orders.service";
+import { orderShipments, shipFacts } from "./shipment-facts";
 
 /**
  * The order's own documents, the proforma invoice and the packing list (single source of truth, PR 2:
@@ -58,6 +60,8 @@ export const orderDocInclude = {
   expenses: chargedExpenses,
   inquiry: { select: { contactId: true } },
   papers: { where: { kind: { in: [...ORDER_DOCUMENTS] } }, orderBy: { version: "asc" } },
+  // The packing list prints the shipment's B/L, date, container and ports (Shipment 1).
+  shipments: orderShipments,
 } satisfies Prisma.OrderInclude;
 
 export type DocOrder = Prisma.OrderGetPayload<{ include: typeof orderDocInclude }>;
@@ -89,7 +93,9 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
   // Where the order stands, as on every screen: the plan's deposit (a plan edited to 50% says 50%), what was charged.
   const position = positionOf(o, c.fx);
   const depositPercent = position.depositPercent;
-  const shippedOn = fromDbDateOrNull(o.shippedOn);
+  // The shipment's, never the order's: shipped on (the earliest departure), Shipment 1's B/L, container and ports.
+  const ship = shipFacts(o.shipments);
+  const shippedOn = ship.shippedOn;
   const goodsOnly = kind === "packing-list";
   const lines = o.lines.filter((l) => !goodsOnly || l.type === "goods");
   const numbers = orderLineNumbers(lines);
@@ -118,7 +124,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       shipBy: fromDbDateOrNull(o.shipBy),
       readyOn: fromDbDateOrNull(o.readyOn),
       shippedOn,
-      blNo: o.blNo,
+      blNo: ship.blNo,
       incoterm: o.incoterm,
       incotermPlace: o.incotermPlace,
       quotation: `${rev.quotation.refNo} R${rev.number}`,
@@ -128,6 +134,13 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       /** e.g. "90 days after receiving advance payment". */
       leadTime: rev.leadTime,
     },
+    /**
+     * The packing list: the shipment it goes with (Shipment 1), its ports as the papers print them (its own,
+     * else from the terms). Versions made before this was so have none (they printed the order's).
+     */
+    shipment: goodsOnly
+      ? { mode: ship.primary?.mode ?? "sea", ...portsOf(o, ship.primary) }
+      : null,
     paymentTerms: paymentTermsOf(depositPercent, balanceTermsOf(terms, o.balanceTerms)),
     /** The payment terms from the route, e.g. "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
     paymentSentence: routePaymentSentence(depositPercent, terms, o.balanceTerms),
@@ -160,7 +173,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
     packing: goodsOnly
       ? {
           done: o.packedAt !== null,
-          containerNo: o.containerNo,
+          containerNo: ship.containerNo,
           shippingMarks: o.shippingMarks,
           totals: {
             packages: lines.reduce((s, l) => s + (l.packages ?? 0), 0),

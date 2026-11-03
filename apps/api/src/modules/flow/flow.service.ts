@@ -10,6 +10,7 @@ import {
   DEFAULT_SAT_CHECKS,
   flowSteps,
   ORDER_DOCUMENT_LABEL,
+  portsOf,
   appMakesDocument,
   PAYMENT_ROUTE_SHORT,
   balanceWhenOf,
@@ -56,6 +57,7 @@ import { SettingsService } from "../settings/settings.service";
 import { datePapers, lcChecksOf, rebuildRoutePlan, termsOf } from "../money/route-plan";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
 import { seedFactoryPlans } from "../money/factory-plan";
+import { onPrimaryShipment, SHIPMENT_ORDER } from "../orders/shipment-facts";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
@@ -107,6 +109,7 @@ function documentIn(o: Pick<FlowRows, "documents" | "proformaNo" | "packedAt">, 
 /** `papersOff`: Settings › Papers we use (switched-off papers are not counted unless already in). */
 export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly string[] = []): FlowFacts {
   const route = o.paymentRoute;
+  // The shipments come in their order (SHIPMENT_ORDER): Shipment 1 first.
   const required = documentsInUse(route, o.shipments[0]?.mode ?? "sea", papersOff, (k) => documentIn(o, k));
   const ready = required.filter((kind) => documentIn(o, kind)).length;
   const bankKinds = bankStepsFor(route);
@@ -239,7 +242,8 @@ export class FlowService {
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           include: { factory: { select: { id: true, name: true } } },
         },
-        shipments: { orderBy: { createdAt: "asc" } },
+        // Shipment 1 (the primary: the first made) first.
+        shipments: { orderBy: SHIPMENT_ORDER },
         documents: {
           orderBy: [{ kind: "asc" }, { updatedAt: "asc" }],
           include: { attachment: { select: { id: true, fileName: true, size: true, deletedAt: true } } },
@@ -277,8 +281,10 @@ export class FlowService {
       };
     });
 
-    const shipments = o.shipments.map((s) => ({
+    const shipments = o.shipments.map((s, i) => ({
       id: s.id,
+      /** 1 for Shipment 1 (the primary: what the papers print), 2… */
+      n: i + 1,
       mode: s.mode,
       status: s.status,
       forwarder: s.forwarder,
@@ -494,7 +500,7 @@ export class FlowService {
         planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         expenses: chargedExpenses,
         checklist: { where: productionWhere, select: { doneAt: true, skippedAt: true } },
-        shipments: { orderBy: { createdAt: "asc" }, select: { mode: true, status: true } },
+        shipments: { orderBy: SHIPMENT_ORDER, select: { mode: true, status: true } },
         documents: { select: { kind: true, status: true } },
         bankSteps: { select: { step: true } },
         satChecks: { select: { result: true } },
@@ -714,7 +720,16 @@ export class FlowService {
     await this.must(user, "shipping.manage", "shipping", "manage shipping");
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      const s = await tx.shipment.create({ data: { orderId: id, ...this.shipmentData(input) } });
+      // Ports not sent: from the order's terms (E/F terms load at the Incoterm place, C/D terms discharge there).
+      const ports = portsOf(o);
+      const s = await tx.shipment.create({
+        data: {
+          orderId: id,
+          ...this.shipmentData(input),
+          portOfLoading: input.portOfLoading === undefined ? ports.portOfLoading : input.portOfLoading,
+          portOfDischarge: input.portOfDischarge === undefined ? ports.portOfDischarge : input.portOfDischarge,
+        },
+      });
       await this.log(
         tx,
         user,
@@ -724,7 +739,7 @@ export class FlowService {
         undefined,
         { shipmentId: s.id, ...input },
       );
-      return this.shipped(tx, user, id, input.status, input.departedOn, input.blNo);
+      return this.shipped(tx, user, id, s.id, input.status, input.departedOn);
     });
     await this.orders.announce(event);
     return this.get(user, id);
@@ -753,9 +768,9 @@ export class FlowService {
         tx,
         user,
         orderId,
+        shipmentId,
         input.status ?? before.status,
         input.departedOn !== undefined ? input.departedOn : fromDbDateOrNull(before.departedOn),
-        input.blNo !== undefined ? input.blNo : before.blNo,
       );
     });
     await this.orders.announce(event);
@@ -782,17 +797,22 @@ export class FlowService {
     return this.get(user, orderId);
   }
 
-  /** A shipment that has left moves the order to Shipped (its date and B/L with it). */
-  private shipped(
+  /**
+   * A shipment that has left moves the order to Shipped (nothing is copied: the date and B/L stay on the
+   * shipment). Left without a date while no shipment of the order has one: it left today.
+   */
+  private async shipped(
     tx: Tx,
     user: SessionUser,
     orderId: string,
+    shipmentId: string,
     status: ShipmentStatus,
     departedOn: string | null | undefined,
-    blNo: string | null | undefined,
   ): Promise<DomainEvent | null> {
-    if (status !== "departed" && status !== "arrived" && status !== "cleared") return Promise.resolve(null);
-    return this.orders.followFlow(tx, user, orderId, "shipped", "a shipment left", { shippedOn: departedOn ?? null, blNo: blNo ?? null });
+    if (status !== "departed" && status !== "arrived" && status !== "cleared") return null;
+    if (!departedOn && !(await tx.shipment.findFirst({ where: { orderId, departedOn: { not: null } }, select: { id: true } })))
+      await tx.shipment.update({ where: { id: shipmentId }, data: { departedOn: toDbDate(this.clock.today()) } });
+    return this.orders.followFlow(tx, user, orderId, "shipped", "a shipment left");
   }
 
   private shipmentData(input: Partial<ShipmentInput>) {
@@ -847,6 +867,31 @@ export class FlowService {
     }
   }
 
+  /**
+   * A B/L or AWB row prints its shipment's number (that row's shipment, else Shipment 1): a number sent
+   * with it is saved on the shipment when that has none yet; another number is changed on the shipment.
+   * The row itself keeps none.
+   */
+  private async blOnShipment(
+    tx: Tx,
+    o: Awaited<ReturnType<FlowService["lockOrder"]>>,
+    kind: OrderDocumentKind,
+    shipmentId: string | null,
+    number: string | null | undefined,
+  ) {
+    if ((kind !== "bill_of_lading" && kind !== "airway_bill") || !number) return;
+    const s = shipmentId
+      ? await tx.shipment.findFirstOrThrow({ where: { id: shipmentId, orderId: o.id } })
+      : await tx.shipment.findFirst({ where: { orderId: o.id }, orderBy: SHIPMENT_ORDER });
+    if (s?.blNo === number) return;
+    if (s?.blNo)
+      throw new DomainError(
+        `The ${kind === "airway_bill" ? "AWB" : "B/L"} number is the shipment's (${s.blNo}): change it on the shipment, and this paper prints it.`,
+      );
+    if (s) await tx.shipment.update({ where: { id: s.id }, data: { blNo: number } });
+    else await onPrimaryShipment(tx, o, { blNo: number });
+  }
+
   async addDocument(user: SessionUser, id: string, input: OrderDocumentInput) {
     await this.must(user, "documents.manage", "bank_documents", "manage the documents");
     if (appMakesDocument(input.kind)) throw new DomainError(madeByTheApp(input.kind));
@@ -855,12 +900,14 @@ export class FlowService {
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       await this.checkDocumentLinks(tx, o, input.shipmentId, input.attachmentId);
+      const bl = input.kind === "bill_of_lading" || input.kind === "airway_bill";
+      await this.blOnShipment(tx, o, input.kind, input.shipmentId ?? null, input.number);
       await tx.orderDocument.create({
         data: {
           orderId: id,
           kind: input.kind,
           title: input.title,
-          number: input.number,
+          number: bl ? null : input.number,
           issuedOn: toDbDateOrNull(input.issuedOn),
           status: input.status,
           shipmentId: input.shipmentId,
@@ -905,6 +952,10 @@ export class FlowService {
       const data: Prisma.OrderDocumentUncheckedUpdateInput = {};
       for (const k of ["title", "number", "status", "shipmentId", "attachmentId", "note", "keptWhere"] as const)
         if (input[k] !== undefined) (data as Record<string, unknown>)[k] = input[k];
+      if (before.kind === "bill_of_lading" || before.kind === "airway_bill") {
+        await this.blOnShipment(tx, o, before.kind, input.shipmentId !== undefined ? input.shipmentId : before.shipmentId, input.number);
+        data.number = null;
+      }
       if (input.issuedOn !== undefined) data.issuedOn = toDbDateOrNull(input.issuedOn);
       await tx.orderDocument.update({ where: { id: docId }, data });
       await this.log(
@@ -1183,11 +1234,14 @@ export class FlowService {
       select: {
         id: true,
         customerId: true,
+        incoterm: true,
         incotermPlace: true,
         portOfDischarge: true,
+        shipBy: true,
+        inquiry: { select: { requiredBy: true, refNo: true } },
         factoryOrderedOn: true,
         revisionId: true,
-        shipments: { orderBy: { createdAt: "asc" }, take: 1, select: { portOfLoading: true, portOfDischarge: true } },
+        shipments: { orderBy: SHIPMENT_ORDER, take: 1, select: { portOfLoading: true, portOfDischarge: true } },
         lines: { where: { factoryId: { not: null } }, select: { factoryId: true } },
       },
     });
@@ -1200,8 +1254,8 @@ export class FlowService {
     // The forwarder: same port pair first, then the same factory.
     let forwarder: { name: string; refNo: string; why: "route" | "factory" } | null = null;
     if (has("shipping")) {
-      const pol = o.shipments[0]?.portOfLoading ?? o.incotermPlace;
-      const pod = o.shipments[0]?.portOfDischarge ?? o.portOfDischarge;
+      // Shipment 1's ports, else what the terms give (E/F terms load at the place, C/D terms discharge there).
+      const { portOfLoading: pol, portOfDischarge: pod } = portsOf(o, o.shipments[0]);
       const pick = { forwarder: true, order: { select: { refNo: true } } } as const;
       const byRoute =
         pol && pod
@@ -1254,6 +1308,10 @@ export class FlowService {
     return {
       forwarder,
       banks,
+      /** What a new shipment's ports start with: from the order's terms (portsOf). */
+      ports: portsOf(o),
+      /** Ship-by while empty: when the customer wanted it (the deal's "wanted by"). */
+      shipBy: !o.shipBy && o.inquiry.requiredBy ? { on: fromDbDate(o.inquiry.requiredBy), from: o.inquiry.refNo } : null,
       leadTime: text ? { text, days, from, readyOn: days ? addDays(from, days) : null } : null,
       priceBasis: can(user, "sourcing.manage") && option?.factoryBasis ? { basis: option.factoryBasis, place: option.factoryBasisPlace } : null,
     };
