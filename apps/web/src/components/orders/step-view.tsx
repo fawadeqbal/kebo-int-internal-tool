@@ -465,7 +465,7 @@ export function DetailsCard({
       id={id}
       target={target}
       title={title}
-      description={description ?? (editable ? "Click + Add, or a value's pencil, to change it right here; Edit opens everything." : undefined)}
+      description={description ?? (editable ? "Click + Add to fill one value right here; Edit opens everything." : undefined)}
       meter={{ n, of: counted.length }}
       canEdit={canEdit && hasPanel}
       actions={actions}
