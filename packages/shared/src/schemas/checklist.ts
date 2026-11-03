@@ -8,7 +8,7 @@ import { optionalDate, optionalId, optionalText, text } from "./common";
 /** Inputs for an order's checklist and the company's list (see workflows/checklist). */
 
 const maybe = <T extends z.ZodTypeAny>(s: T) => s.optional();
-/** The paper a Make or Send item makes (empty: none). */
+/** The paper a Make or Send item makes, or the report a Fill in item collects for (empty: none; see checklistPaperOf). */
 const optionalPaper = z.preprocess((v) => (v === "" || v === undefined ? null : v), z.enum(PAPER_KINDS).nullable());
 const optionalRoute = z.preprocess((v) => (v === "" || v === undefined ? null : v), z.enum(PAYMENT_ROUTES).nullable());
 

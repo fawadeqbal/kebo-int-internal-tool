@@ -32,6 +32,21 @@ import {
 export const CHECKLIST_TOOLS = ["done", "fill", "upload", "pay", "make", "send"] as const;
 export type ChecklistTool = (typeof CHECKLIST_TOOLS)[number];
 
+/** The reports a Fill in item collects for (its values print on the paper): bound by the item's `paper`. */
+export const REPORT_PAPERS = ["fat-report", "inspection-report"] as const satisfies readonly PaperKind[];
+export type ReportPaper = (typeof REPORT_PAPERS)[number];
+
+/**
+ * The paper an item is bound to, as kept: Make and Send items make it; any other item can only be the
+ * one a report is made from (usually a Fill in item: the FAT or inspection report reads it, whatever
+ * its title).
+ */
+export function checklistPaperOf(tool: ChecklistTool, paper: PaperKind | null | undefined): PaperKind | null {
+  if (!paper) return null;
+  if (tool === "make" || tool === "send") return paper;
+  return (REPORT_PAPERS as readonly string[]).includes(paper) ? paper : null;
+}
+
 /** The row's button for an own item. */
 export const TOOL_LABEL: Record<ChecklistTool, string> = {
   done: "Mark done",
@@ -594,6 +609,7 @@ export const DEFAULT_CHECKLIST: ChecklistTemplateItem[] = [
     step: "production",
     title: "Factory test run (FAT) with video",
     tool: "fill",
+    paper: "fat-report",
     fields: [fld("date", "Date", "date"), fld("result", "Result"), fld("video", "Video", "file")],
     sort: 40,
   },
@@ -601,6 +617,7 @@ export const DEFAULT_CHECKLIST: ChecklistTemplateItem[] = [
     step: "production",
     title: "Pre-shipment inspection",
     tool: "fill",
+    paper: "inspection-report",
     fields: [fld("inspector", "Inspector"), fld("date", "Date", "date"), fld("result", "Passed or not")],
     route,
     sort: 50,

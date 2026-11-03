@@ -33,7 +33,7 @@ type PlanOrder = {
 export async function rebuildRoutePlan(tx: Tx, o: PlanOrder, was: RouteTerms, t: RouteTerms, days: { depositDays: number; balanceDays: number }) {
   const [items, payments] = await Promise.all([
     tx.paymentPlanItem.findMany({ where: { orderId: o.id }, orderBy: { sortOrder: "asc" } }),
-    tx.payment.findMany({ where: { orderId: o.id, voidedAt: null, currency: o.currency }, select: { amount: true, bankCharges: true } }),
+    tx.payment.findMany({ where: { orderId: o.id, voidedAt: null }, select: { amount: true, bankCharges: true } }),
   ]);
   const totalMinor = decimalToMinor(o.total);
   // What came in (with the bank charges): it pays the instalments oldest first.

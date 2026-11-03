@@ -37,6 +37,7 @@ import { StagesService } from "../inquiries/stages.service";
 import { OrdersService } from "../orders/orders.service";
 import { requireReason } from "../../common/audit/reason";
 import { customerSnapshot } from "../orders/buyer";
+import { figuresOf } from "./revision-figures";
 
 /** NUMERIC(14,2) can hold up to this; totals above it are refused with a clear message. */
 const MAX_TOTAL_MINOR = 999_999_999_999_99;
@@ -275,11 +276,8 @@ export class QuotationsService {
       depositPercent: Number(r.depositPercent),
       balanceTerms: r.balanceTerms,
       validUntil: fromDbDate(r.validUntil),
-      /** Option A's (or, once accepted, the accepted option's) figures, for lists and reports. */
-      leadTime: r.leadTime,
-      subtotal: r.subtotal.toFixed(2),
-      discount: r.discount.toFixed(2),
-      total: r.total.toFixed(2),
+      /** The accepted option's figures (before that, Option A's), read from the options: `figuresOf` says which. */
+      ...figuresOf(r),
       paymentTerms: r.paymentTerms,
       deliveryTerms: r.deliveryTerms,
       notes: r.notes,
@@ -526,7 +524,6 @@ export class QuotationsService {
         costs,
       });
     }
-    const a = built[0]!.option;
     return {
       built,
       header: {
@@ -539,11 +536,6 @@ export class QuotationsService {
         paymentTerms: input.paymentTerms,
         deliveryTerms: input.deliveryTerms,
         notes: input.notes,
-        // The revision's own figures follow Option A until the customer accepts one.
-        leadTime: a.leadTime,
-        subtotal: a.subtotal!,
-        discount: a.discount!,
-        total: a.total!,
       },
     };
   }
@@ -735,14 +727,7 @@ export class QuotationsService {
           await tx.quotationOption.updateMany({ where: { revisionId: r.id, id: { not: chosen.id } }, data: { status: "not_chosen" } });
           await tx.quotationRevision.update({
             where: { id: r.id },
-            data: {
-              status: to,
-              answeredOn: toDbDate(day),
-              leadTime: chosen.leadTime,
-              subtotal: chosen.subtotal,
-              discount: chosen.discount,
-              total: chosen.total,
-            },
+            data: { status: to, answeredOn: toDbDate(day) },
           });
           const drafts = draftsDiscardedBy(refs, r.number);
           if (drafts.length)

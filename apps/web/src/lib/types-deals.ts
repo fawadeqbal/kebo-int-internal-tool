@@ -266,11 +266,14 @@ export interface RevisionView {
   incotermPlace: string | null;
   depositPercent: number;
   balanceTerms: BalanceTerms;
-  leadTime: string | null;
   validUntil: string;
+  /** Read from the options (the revision keeps none of its own): the accepted option's, else Option A's. */
+  leadTime: string | null;
   subtotal: string;
   discount: string;
   total: string;
+  /** Which option those are ("Option A of 3", "Option B, accepted"); empty with one option. */
+  figuresOf: string;
   /** Printed under the payment (beyond the deposit and balance). */
   paymentTerms: string | null;
   /** Printed under the delivery (packing, inspection, warranty…). */

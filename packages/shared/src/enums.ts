@@ -186,6 +186,7 @@ export type OrderDocumentStatus = (typeof ORDER_DOCUMENT_STATUSES)[number];
 export const BANK_STEP_KINDS = values("sent_to_our_bank", "couriered_to_customer_bank", "customer_bank_received", "copies_to_customer", "customer_paid_bank", "bank_paid_us");
 export type BankStepKind = (typeof BANK_STEP_KINDS)[number];
 
+/** The condition an order's goods arrived in: worked out from its lines (deliveryConditionOf), not stored. */
 export const DELIVERY_CONDITIONS = values("good", "minor_damage", "damaged", "partial");
 export type DeliveryCondition = (typeof DELIVERY_CONDITIONS)[number];
 
@@ -223,7 +224,6 @@ export const ENUMS = {
   OrderDocumentKind: ORDER_DOCUMENT_KINDS,
   OrderDocumentStatus: ORDER_DOCUMENT_STATUSES,
   BankStepKind: BANK_STEP_KINDS,
-  DeliveryCondition: DELIVERY_CONDITIONS,
   SatResult: SAT_RESULTS,
   ClaimStatus: CLAIM_STATUSES,
 } as const;

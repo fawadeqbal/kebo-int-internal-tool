@@ -271,7 +271,6 @@ export async function seedDemoData(
           validUntil: toDbDate(addDays(created, 20 + n * 5)),
           sentOn: toDbDate(addDays(created, 4 + n * 3)),
           answeredOn: status === "accepted" || status === "rejected" ? toDbDate(addDays(created, 6 + n * 3)) : null,
-          ...header,
           balanceTerms: o.order?.terms ?? "before_shipment",
           createdById: o.assignee ?? people.staff.id,
         },

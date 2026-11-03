@@ -33,7 +33,7 @@ export const chargedExpenses = {
 
 /** The relations positionOf reads (payments and the plan as most screens load them). */
 export const positionRelations = {
-  payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, currency: true, voidedAt: true } },
+  payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, voidedAt: true } },
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
 } satisfies Prisma.OrderInclude;
@@ -44,7 +44,7 @@ export interface PositionFacts {
   depositPercent: Decimalish;
   mainCurrency: string | null;
   mainRate: Decimalish | null;
-  payments: { amount: Decimalish; bankCharges: Decimalish; currency: string; voidedAt?: Date | null }[];
+  payments: { amount: Decimalish; bankCharges: Decimalish; voidedAt?: Date | null }[];
   planItems: { amount: Decimalish; part: string | null }[];
   /** At least the expenses charged to the customer (others are left out here). */
   expenses: { amount: Decimalish; currency: string; rate: Decimalish; borneBy?: string; voidedAt?: Date | null }[];
@@ -70,7 +70,7 @@ export function positionOf(o: PositionFacts, fx: MoneyCtx, toleranceMinor = 0): 
   return orderPosition({
     totalMinor: minor(o.total),
     payments: o.payments
-      .filter((p) => p.currency === o.currency && !p.voidedAt)
+      .filter((p) => !p.voidedAt)
       .map((p) => ({ amountMinor: minor(p.amount), bankChargesMinor: minor(p.bankCharges) })),
     plan: o.planItems.map((p) => ({ amountMinor: minor(p.amount), part: p.part })),
     depositPercent: Number(o.depositPercent.toString()),

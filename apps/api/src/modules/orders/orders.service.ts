@@ -362,7 +362,7 @@ export class OrdersService {
       const o = await this.load(user, id, tx);
       if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
       // Money in from the customer (in the order's currency), and money out to the factories (per factory and currency).
-      const inMinor = o.payments.filter((p) => p.currency === o.currency).reduce((t, p) => t + decimalToMinor(p.amount), 0);
+      const inMinor = o.payments.reduce((t, p) => t + decimalToMinor(p.amount), 0);
       const factoryPaid = await tx.factoryPayment.findMany({ where: { orderId: id, voidedAt: null }, include: { factory: { select: { id: true, name: true } } } });
       const customerMoney = inMinor > 0 ? (money.customerMoney ?? "credit") : null;
       const factoryMoney = factoryPaid.length ? (money.factoryMoney ?? "refund_due") : null;

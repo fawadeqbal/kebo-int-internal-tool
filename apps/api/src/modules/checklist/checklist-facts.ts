@@ -12,7 +12,7 @@ export const checklistOrderInclude = {
   payments: {
     where: { voidedAt: null },
     orderBy: { paidOn: "asc" },
-    select: { currency: true, amount: true, bankCharges: true, paidOn: true },
+    select: { amount: true, bankCharges: true, paidOn: true },
   },
   bankContract: true,
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
@@ -33,9 +33,9 @@ export const checklistOrderInclude = {
 export type ChecklistOrderRow = Prisma.OrderGetPayload<{ include: typeof checklistOrderInclude }>;
 
 /** The first payment date by which the money (with the bank charges) reached `targetMinor`. */
-function reachedOn(payments: ChecklistOrderRow["payments"], currency: string, targetMinor: number): ISODate | null {
+function reachedOn(payments: ChecklistOrderRow["payments"], targetMinor: number): ISODate | null {
   let sum = 0;
-  for (const p of payments.filter((x) => x.currency === currency)) {
+  for (const p of payments) {
     sum += decimalToMinor(p.amount) + decimalToMinor(p.bankCharges);
     if (sum >= targetMinor) return fromDbDate(p.paidOn);
   }
@@ -74,10 +74,10 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
       : null,
     depositPercent: percent,
     depositIn,
-    depositOn: depositIn && deposit > 0 ? reachedOn(o.payments, o.currency, deposit) : null,
+    depositOn: depositIn && deposit > 0 ? reachedOn(o.payments, deposit) : null,
     deposit: fromMinor(deposit),
     due: fromMinor(position.dueMinor),
-    paidInFullOn: position.dueMinor === 0 ? reachedOn(o.payments, o.currency, position.owedMinor) : null,
+    paidInFullOn: position.dueMinor === 0 ? reachedOn(o.payments, position.owedMinor) : null,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
     factoryOrderNo: o.factoryOrderNo,
     factories,

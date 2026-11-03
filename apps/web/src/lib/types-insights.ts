@@ -43,7 +43,9 @@ export interface Insights {
     toReceive: string;
     overdue: string;
     toPay: string | null;
+    /** Sent quotations at their lowest option; `pipelineUpTo` at their highest, when options differ. */
     pipeline: string;
+    pipelineUpTo: string | null;
     pipelineDeals: number;
     weightedPipeline: string | null;
   };

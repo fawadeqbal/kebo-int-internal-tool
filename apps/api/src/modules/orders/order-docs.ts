@@ -3,6 +3,7 @@ import { documentTotals, fromMinor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
   balanceTermsOf,
+  packingListNo,
   portsOf,
   routeAsAccepted,
   routePaymentSentence,
@@ -18,6 +19,7 @@ import { buyerOf } from "./buyer";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
 import { readyOnOf, readySelect } from "./ready";
+import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /**
  * The order's own documents, the proforma invoice and the packing list (single source of truth, PR 2:
@@ -33,7 +35,6 @@ export const ORDER_DOCUMENTS = ["proforma", "packing-list"] as const;
 export type OrderDocKind = (typeof ORDER_DOCUMENTS)[number];
 
 const TITLE: Record<OrderDocKind, string> = { proforma: "Proforma invoice", "packing-list": "Packing list" };
-const PREFIX: Record<OrderDocKind, string> = { proforma: "PI", "packing-list": "PL" };
 
 /** "30% deposit, balance against B/L copy": only the first letter of the terms is lowered, so "B/L" stays as written. */
 export function paymentTermsOf(depositPercent: number, balanceTerms: BalanceTerms): string {
@@ -55,7 +56,8 @@ export const orderDocInclude = {
       },
     },
   },
-  revision: { include: { quotation: { select: { refNo: true } } } },
+  // The accepted option's discount and lead time (the revision keeps no figures of its own).
+  revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   payments: { where: { voidedAt: null }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] },
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
@@ -79,7 +81,7 @@ export interface DocCtx {
 
 /** The document's number: the proforma's once issued (null before), the packing list's from the order's. */
 export const docNumber = (o: { refNo: string; proformaNo: string | null }, kind: OrderDocKind) =>
-  kind === "proforma" ? o.proformaNo : o.refNo.replace(/^[A-Z]+-/, `${PREFIX[kind]}-`);
+  kind === "proforma" ? o.proformaNo : packingListNo(o.refNo);
 
 /** The packing list is made final once the order is shipped and its packing is filled in. */
 export const packingFinalNow = (o: { stage: string; packedAt: Date | null }) => !!o.packedAt && (o.stage === "shipped" || o.stage === "done");
@@ -91,7 +93,7 @@ export const quotedTermsPrinted = (o: Parameters<typeof termsOf>[0] & { balanceT
 /** The document made from the order as it is now (a draft, or what a final version keeps). */
 export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
   const rev = o.revision;
-  const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), rev.discount.toString());
+  const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), figuresOf(rev).discount);
   // Where the order stands, as on every screen: the plan's deposit (a plan edited to 50% says 50%), what was charged.
   const position = positionOf(o, c.fx);
   const depositPercent = position.depositPercent;
@@ -134,7 +136,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       documentTitle: o.documentTitle,
       portOfDischarge: o.portOfDischarge,
       /** e.g. "90 days after receiving advance payment". */
-      leadTime: rev.leadTime,
+      leadTime: figuresOf(rev).leadTime,
     },
     /**
      * The packing list: the shipment it goes with (Shipment 1), its ports as the papers print them (its own,

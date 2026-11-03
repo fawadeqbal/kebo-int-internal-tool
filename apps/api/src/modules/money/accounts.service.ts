@@ -115,7 +115,7 @@ export class AccountsService {
               stage: true,
               status: true,
               factoryPaid: { where: { voidedAt: null }, select: { amount: true, rate: true } },
-              payments: { where: { voidedAt: null }, select: { bankCharges: true, currency: true } },
+              payments: { where: { voidedAt: null }, select: { bankCharges: true } },
             },
           },
         },
@@ -201,7 +201,7 @@ export class AccountsService {
         const costedRevenue = inMain(c.costedRevenueMinor);
         const goodsCost = inMain(c.goodsCostMinor) + inMain(c.basisCostMinor);
         const bank = inMain(
-          order.payments.filter((p) => p.currency === order.currency).reduce((s, p) => s + decimalToMinor(p.bankCharges), 0),
+          order.payments.reduce((s, p) => s + decimalToMinor(p.bankCharges), 0),
         );
         // Profit now expected, as on the order's Costs page (freight paid for the planned basis costs counted there once).
         const p = orderMoney({
@@ -265,8 +265,7 @@ export class AccountsService {
       };
     });
     for (const p of payments)
-      t.received +=
-        p.currency === p.order.currency ? fx.order(decimalToMinor(p.amount), p.order) : fx.live(decimalToMinor(p.amount), p.currency);
+      t.received += fx.order(decimalToMinor(p.amount), p.order);
 
     const won = deals.filter((d) => d.orders.length > 0).length;
     const lostCount = deals.filter((d) => d.orders.length === 0 && d.stage === "lost").length;

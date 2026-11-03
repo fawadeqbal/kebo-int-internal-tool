@@ -385,6 +385,12 @@ export function paperNumber(refNo: string, kind: PaperKind, n?: number | null): 
   return `${PAPER_PREFIX[kind]}-${tail}${n ? `-${n}` : ""}`;
 }
 
+/**
+ * The packing list's number, from the order's (SO-2026-0005 → PL-2026-0005): the one formula for the
+ * packing list itself, the Papers list and the bank cover letter.
+ */
+export const packingListNo = (refNo: string): string => refNo.replace(/^[A-Z]+-/, "PL-");
+
 /* ---------------------------------------------------------------- where a paper stands */
 
 export const PAPER_STATES = ["ready", "draft", "can", "wait", "up", "miss", "else"] as const;

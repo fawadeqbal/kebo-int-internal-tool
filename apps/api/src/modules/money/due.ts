@@ -35,7 +35,7 @@ const chargedSql = (fx: MoneyCtx) =>
 
 /** What came in on order `o` in its currency, with the bank charges (minor units). */
 const settledSql = Prisma.sql`coalesce((select sum((p.amount + p.bank_charges) * 100) from payments p
-                                         where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)`;
+                                         where p.order_id = o.id and p.voided_at is null), 0)`;
 
 export interface PositionRow {
   id: string;

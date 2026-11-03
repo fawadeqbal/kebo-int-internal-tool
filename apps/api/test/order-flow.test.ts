@@ -257,8 +257,13 @@ describe("order flow: from asking factories to SAT", () => {
   it("delivery, SAT by our engineer, and a claim", async () => {
     const engineer = (await api(app, sana).get("/auth/me")).body.id;
     await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: "2026-11-01" }).expect(400); // not delivered yet
-    let f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { deliveredOn: "2026-11-01", deliveryCondition: "minor_damage", satEngineerId: engineer, satPlannedOn: "2026-11-03" }).expect(200)).body;
-    expect(f.delivery).toMatchObject({ deliveredOn: "2026-11-01", condition: "minor_damage", satEngineer: { id: engineer } });
+    // The order keeps no condition of its own (an old client's is ignored): it is the goods lines', the worst of them.
+    let f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { deliveredOn: "2026-11-01", deliveryCondition: "good", satEngineerId: engineer, satPlannedOn: "2026-11-03" }).expect(200)).body;
+    expect(f.delivery).toMatchObject({ deliveredOn: "2026-11-01", condition: null, satEngineer: { id: engineer } });
+    const goods = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body.lines.filter((l: { type: string }) => l.type === "goods");
+    await api(app, sana).patch(`/order-lines/${goods[0].id}`, { set: "delivered", deliveredQty: goods[0].quantity, condition: "minor_damage" }).expect(200);
+    f = (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
+    expect(f.delivery.condition).toBe("minor_damage");
 
     f = (await api(app, sana).put(`/orders/${orderId}/sat`, { checks: f.delivery.suggestedSat.map((item: string) => ({ item })) }).expect(200)).body;
     expect(f.delivery.sat.every((c: { result: string }) => c.result === "pending")).toBe(true);
@@ -389,10 +394,10 @@ describe("order flow tables are company tables", () => {
         join pg_class pa on pa.oid = k.confrelid
         join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
        where k.contype = 'f' and cl.relrowsecurity and pa.relrowsecurity and a.attname <> 'company_id'
-         and cl.relname in ('factory_requests', 'order_bank_contracts', 'production_steps', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders', 'order_checklist_items', 'checklist_templates', 'payments', 'customer_receipts', 'customer_credits', 'factory_payment_plans', 'order_papers')
+         and cl.relname in ('factory_requests', 'order_bank_contracts', 'shipments', 'order_documents', 'order_bank_steps', 'sat_checks', 'order_claims', 'orders', 'order_checklist_items', 'checklist_templates', 'payments', 'customer_receipts', 'customer_credits', 'factory_payment_plans', 'order_papers')
          and not exists (select 1 from pg_trigger t where t.tgrelid = k.conrelid and t.tgname = left('same_company_' || k.conname, 63))`;
     expect(unchecked).toEqual([]);
-    for (const t of ["factory_requests", "order_bank_contracts", "production_steps", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims", "order_checklist_items", "checklist_templates", "customer_receipts", "customer_credits", "factory_payment_plans", "order_papers"]) {
+    for (const t of ["factory_requests", "order_bank_contracts", "shipments", "order_documents", "order_bank_steps", "sat_checks", "order_claims", "order_checklist_items", "checklist_templates", "customer_receipts", "customer_credits", "factory_payment_plans", "order_papers"]) {
       const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean; policies: bigint }[]>(
         `select c.relrowsecurity as rls, (select count(*) from pg_policies p where p.tablename = c.relname) as policies from pg_class c where c.relname = $1`,
         t,

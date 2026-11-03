@@ -2,6 +2,7 @@ import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo
 import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
+  deliveryConditionOf,
   LINE_CONDITION_LABEL,
   ORDER_DOCUMENT_LABEL,
   PAYMENT_KIND_LABEL,
@@ -16,6 +17,7 @@ import {
   type FactoryDueRule,
   documentDone,
   documentsInUse,
+  packingListNo,
   portsOf as portsOfOrder,
   shipByVsLc,
   SAT_RESULT_LABEL,
@@ -40,6 +42,7 @@ import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 import { factoryReadyOf, readySelect } from "../orders/ready";
 import { livePlanOfOrder } from "../money/plan-live";
 import { advanceOf } from "../money/factory-plan";
+import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -58,7 +61,8 @@ export const paperOrderInclude = {
       factory: { select: { id: true, name: true, address: true } },
     },
   },
-  revision: { include: { quotation: { select: { refNo: true } } } },
+  // The accepted option's discount and lead time (the revision keeps no figures of its own).
+  revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   // Receipts are numbered when the payment is recorded (Payment.receiptNo); listed in date order.
   payments: { where: { voidedAt: null }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] },
   planItems: { orderBy: { sortOrder: "asc" } },
@@ -176,7 +180,7 @@ export function linesOf(c: PaperCtx) {
   const numbers = orderLineNumbers(c.o.lines);
   const t = documentTotals(
     c.o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })),
-    c.o.revision.discount.toString(),
+    figuresOf(c.o.revision).discount,
   );
   return {
     lines: c.o.lines.map((l, i) => ({ ...l, no: numbers[i] ?? String(i + 1) })),
@@ -280,6 +284,8 @@ function salesContract(c: PaperCtx): Built {
   const route = c.o.paymentRoute;
   const b = c.o.bankContract;
   const rev = c.o.revision;
+  // The accepted option's lead time (the revision keeps none of its own).
+  const leadTime = figuresOf(rev).leadTime;
   const shipBy = fromDbDateOrNull(c.o.shipBy);
   // With an LC: its latest shipment date beside ours, and a warning when ours is later (we keep our own).
   const lcLatest = LC(c) ? fromDbDateOrNull(b?.latestShipOn) : null;
@@ -344,7 +350,7 @@ function salesContract(c: PaperCtx): Built {
         ...(routeLine ? [routeLine] : []),
         ...quotedTerms(c),
         `Shipment: by ${mode}${pol ? ` from ${pol}` : ""}${pod ? ` to ${pod}` : ""}, ${c.o.incoterm}${c.o.incotermPlace ? ` ${c.o.incotermPlace}` : ""}${shipBy ? `, latest ${paperDateText(shipBy)}` : ""}.`,
-        ...(rev.leadTime ? [`Delivery: ${rev.leadTime}.`.replace(/\.\.$/, ".")] : []),
+        ...(leadTime ? [`Delivery: ${leadTime}.`.replace(/\.\.$/, ".")] : []),
         has(c, "delivery_sat")
           ? "Inspection: FAT at the factory before shipment; SAT at the buyer's site."
           : "Inspection: FAT at the factory before shipment.",
@@ -757,14 +763,12 @@ function paymentRequest(c: PaperCtx): Built {
   };
 }
 
-/** The production checklist's own item a report is made from: the FAT or the inspection. */
+/**
+ * The checklist's own item a report is made from: the Fill in item bound to it by its `paper` (the FAT or
+ * the inspection), whatever its title; one for another payment route does not count.
+ */
 export function reportItem(c: { o: PaperOrder }, kind: "fat-report" | "inspection-report") {
-  const re = kind === "fat-report" ? /\bFAT\b|factory (acceptance |test)/i : /inspection/i;
-  return (
-    c.o.checklist.find((i) => i.paper === kind) ??
-    c.o.checklist.find((i) => i.step === "production" && re.test(i.title ?? "") && (!i.route || i.route === c.o.paymentRoute)) ??
-    null
-  );
+  return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === c.o.paymentRoute)) ?? null;
 }
 
 function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
@@ -840,11 +844,13 @@ function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
 
 function deliveryNote(c: PaperCtx): Built {
   const on = fromDbDateOrNull(c.o.deliveredOn);
-  const condition = c.o.deliveryCondition ? DELIVERY_CONDITION_LABEL[c.o.deliveryCondition] : null;
+  // Worked out from the goods lines (the worst of them): the only place a condition is recorded.
+  const worked = deliveryConditionOf(c.o.lines.filter((l) => l.type === "goods"));
+  const condition = worked ? DELIVERY_CONDITION_LABEL[worked] : null;
   return {
     checks: [
       check("delivered", "Delivered on", on ? paperDateText(on) : "not recorded", !!on, { required: true, href: "delivery" }),
-      check("condition", "Condition", condition ?? "not recorded", !!condition, { href: "delivery" }),
+      check("condition", "Condition", condition ? `${condition} (from the lines)` : "not recorded on the lines", !!condition, { href: "delivery" }),
       linesCheck(c, c.o.lines.filter((l) => l.type === "goods").length),
     ],
     doc: {
@@ -858,10 +864,10 @@ function deliveryNote(c: PaperCtx): Built {
         { key: "delivered", label: "Delivered", width: 62 },
         { key: "condition", label: "Condition", width: 82, wrap: true },
       ],
-      // What reached the customer line by line (the line table's Delivered columns); the order's condition otherwise.
+      // What reached the customer line by line (the line table's Delivered columns).
       rows: itemRows(c, true).map(({ line: l, cells }) => {
         const got = Number(l.deliveredQty);
-        const cond = l.deliveredCondition ? LINE_CONDITION_LABEL[l.deliveredCondition as LineCondition] : condition;
+        const cond = l.deliveredCondition ? LINE_CONDITION_LABEL[l.deliveredCondition as LineCondition] : null;
         return {
           no: cells.no!,
           item: cells.item!,
@@ -1096,7 +1102,7 @@ function coverLetter(c: PaperCtx): Built {
     const row = c.o.documents.find((d) => d.kind === kind && d.number);
     if (row) return row.number;
     if (kind === "proforma_invoice") return c.o.proformaNo;
-    if (kind === "packing_list") return paperNumber(c.o.refNo, "commercial-invoice").replace(/^CI-/, "PL-");
+    if (kind === "packing_list") return packingListNo(c.o.refNo);
     return null;
   };
   const papers: { label: string; number: string | null; set: [number, number] }[] = [

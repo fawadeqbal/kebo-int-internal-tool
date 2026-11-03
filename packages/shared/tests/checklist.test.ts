@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTO_ITEMS,
+  checklistPaperOf,
   autoChecklist,
   itemLink,
   checklistAutoInput,
@@ -289,5 +290,21 @@ describe("itemLink: where a checklist item's data lives", () => {
     });
     expect(itemLink({ key: null, tool: "upload", title: "Signed contract", file: { id: "a1", name: "c.pdf" } })?.targets).toEqual(["file.a1", "files"]);
     expect(itemLink({ key: null, tool: "done", title: "Call the customer" })).toBeNull();
+  });
+});
+
+describe("the paper an item is bound to", () => {
+  it("is any paper for a Make or Send item; for any other item only a report it is made from", () => {
+    expect(checklistPaperOf("make", "commercial-invoice")).toBe("commercial-invoice");
+    expect(checklistPaperOf("send", "shipping-advice")).toBe("shipping-advice");
+    expect(checklistPaperOf("fill", "fat-report")).toBe("fat-report");
+    expect(checklistPaperOf("fill", "inspection-report")).toBe("inspection-report");
+    expect(checklistPaperOf("fill", "commercial-invoice")).toBeNull();
+    expect(checklistPaperOf("done", null)).toBeNull();
+  });
+
+  it("binds the FAT and inspection items of the starting list to their reports", () => {
+    expect(DEFAULT_CHECKLIST.filter((i) => i.paper === "fat-report").map((i) => i.title)).toEqual(["Factory test run (FAT) with video"]);
+    expect(DEFAULT_CHECKLIST.filter((i) => i.paper === "inspection-report").map((i) => i.route)).toEqual(["letter_of_credit", "bank_contract"]);
   });
 });

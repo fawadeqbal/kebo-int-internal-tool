@@ -15,6 +15,7 @@ import { ordersWithMoneyDue } from "../money/due";
 import { chargedExpenses, fxOf, positionOf } from "../money/position";
 import { basisOfOrders, convert, costingsOf, countedExpenses, MainMoney } from "../money/order-money";
 import { livePlansOf } from "../money/plan-live";
+import { optionFigures, worthOf } from "../quotations/revision-figures";
 
 const ymOf = (d: ISODate) => d.slice(0, 7);
 const ymParts = (ym: string) => ym.split("-").map(Number) as [number, number];
@@ -215,13 +216,12 @@ export class InsightsService {
           on: ISODate;
           minor: number;
           charges: number;
-          currency: string;
           orderCurrency: string;
           mainCurrency: string | null;
           mainRate: string | null;
         }[]
       >`
-        select to_char(p.paid_on, 'YYYY-MM-DD') as "on", (p.amount * 100)::float8 as minor, (p.bank_charges * 100)::float8 as charges, p.currency,
+        select to_char(p.paid_on, 'YYYY-MM-DD') as "on", (p.amount * 100)::float8 as minor, (p.bank_charges * 100)::float8 as charges,
                o.currency as "orderCurrency", o.main_currency as "mainCurrency", o.main_rate::text as "mainRate"
         from payments p join orders o on o.id = p.order_id
         where p.voided_at is null and p.paid_on between ${loadFrom}::date and ${to}::date`,
@@ -246,9 +246,12 @@ export class InsightsService {
         where i.deleted_at is null
           and ((i.created_at >= ${startOfDayIn(loadFrom, tz)} and i.created_at < ${startOfDayIn(addDays(to, 1), tz)})
             or (i.closed_at >= ${startOfDayIn(loadFrom, tz)} and i.closed_at < ${startOfDayIn(addDays(to, 1), tz)}))`,
+      // What each sent revision is worth: its accepted option, else its lowest option (revisionWorth).
       this.prisma.db.$queryRaw<{ on: ISODate; minor: number; currency: string }[]>`
-        select to_char(sent_on, 'YYYY-MM-DD') as "on", (total * 100)::float8 as minor, currency
-        from quotation_revisions where deleted_at is null and status <> 'draft' and sent_on between ${loadFrom}::date and ${to}::date`,
+        select to_char(r.sent_on, 'YYYY-MM-DD') as "on", r.currency,
+               (coalesce((select o.total from quotation_options o where o.revision_id = r.id and o.status = 'accepted' limit 1),
+                         (select min(o.total) from quotation_options o where o.revision_id = r.id), 0) * 100)::float8 as minor
+        from quotation_revisions r where r.deleted_at is null and r.status <> 'draft' and r.sent_on between ${loadFrom}::date and ${to}::date`,
       this.prisma.db.order.groupBy({ by: ["customerId"], where: { status: { not: "cancelled" } }, _min: { orderedOn: true } }),
       this.prisma.db.salesTarget.findMany({ where: { month: { in: seriesMonths } } }),
     ]);
@@ -327,9 +330,8 @@ export class InsightsService {
     }
     for (const p of payments) {
       const order = { currency: p.orderCurrency, mainCurrency: p.mainCurrency, mainRate: p.mainRate };
-      const same = p.currency === p.orderCurrency;
-      const v = same ? fx.order(Math.round(p.minor), order) : toMain(Math.round(p.minor), p.currency);
-      const charges = same ? fx.order(Math.round(p.charges), order) : toMain(Math.round(p.charges), p.currency);
+      const v = fx.order(Math.round(p.minor), order);
+      const charges = fx.order(Math.round(p.charges), order);
       events.push({
         on: p.on,
         add: (f) => {
@@ -457,16 +459,20 @@ export class InsightsService {
               where: { deletedAt: null, status: "sent" },
               orderBy: { number: "desc" },
               take: 1,
-              select: { total: true, currency: true },
+              select: { currency: true, ...optionFigures },
             },
           },
         },
       },
     });
-    const pipeline = quoted.reduce((t, d) => {
-      const r = d.quotation?.revisions[0];
-      return t + (r ? toMain(decimalToMinor(r.total), r.currency) : 0);
-    }, 0);
+    // Each sent quotation at its lowest option (and, in pipelineUpTo, its highest) until the customer chooses.
+    const pipelineOf = (side: "lowMinor" | "highMinor") =>
+      quoted.reduce((t, d) => {
+        const r = d.quotation?.revisions[0];
+        return t + (r ? toMain(worthOf(r)[side], r.currency) : 0);
+      }, 0);
+    const pipeline = pipelineOf("lowMinor");
+    const pipelineHigh = pipelineOf("highMinor");
     const winRate = pct(cur.won, cur.won + cur.lost);
 
     /* ----- month by month */
@@ -651,6 +657,8 @@ export class InsightsService {
         overdue: fromMinor(overdue),
         toPay: toPay === null ? null : fromMinor(toPay),
         pipeline: fromMinor(pipeline),
+        /** Set when quotations offer options at different prices: the pipeline at their highest options. */
+        pipelineUpTo: pipelineHigh !== pipeline ? fromMinor(pipelineHigh) : null,
         pipelineDeals: quoted.length,
         /** The pipeline times the win rate of the period: what it is likely to bring. */
         weightedPipeline: winRate === null ? null : fromMinor(Math.round((pipeline * winRate) / 100)),

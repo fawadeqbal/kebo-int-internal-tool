@@ -10,6 +10,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { LimitsService } from "../../common/company/limits.service";
 import { convert, costingsOf, MainMoney } from "./order-money";
+import { optionFigures, worthOf } from "../quotations/revision-figures";
 
 /** part ÷ whole in %, one decimal, half away from zero (−6.25 → −6.3). */
 const pct = (part: number, whole: number) => (whole > 0 ? roundHalfAway((part / whole) * 1000) / 10 : null);
@@ -135,7 +136,7 @@ export class LeaksService {
           expenses: { where: { voidedAt: null }, select: { amount: true, rate: true } },
           quotation: {
             select: {
-              revisions: { where: { deletedAt: null }, orderBy: { number: "desc" }, take: 1, select: { total: true, currency: true } },
+              revisions: { where: { deletedAt: null }, orderBy: { number: "desc" }, take: 1, select: { currency: true, ...optionFigures } },
             },
           },
         },
@@ -153,9 +154,9 @@ export class LeaksService {
                  where p.order_id = o.id and p.voided_at is null), 0)::float8 as "factoryPaidMinor",
                (select to_char(min(p.paid_on), 'YYYY-MM-DD') from factory_payments p where p.order_id = o.id and p.voided_at is null) as "firstFactoryPaid",
                coalesce((select sum((p.amount + p.bank_charges) * 100) from payments p
-                 where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "receivedMinor",
+                 where p.order_id = o.id and p.voided_at is null), 0)::float8 as "receivedMinor",
                coalesce((select sum(p.bank_charges * 100) from payments p
-                 where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "bankChargesMinor",
+                 where p.order_id = o.id and p.voided_at is null), 0)::float8 as "bankChargesMinor",
                coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
                  cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
                  where e.order_id = o.id and e.voided_at is null and e.borne_by = 'us' and e.category = any(${[...BASIS_COST_CATEGORIES]}::text[])), 0)::float8 as "basisPaidMinor",
@@ -339,11 +340,14 @@ export class LeaksService {
     for (const d of openDeals) {
       const spent = d.expenses.reduce((t, e) => t + inMain(e), 0);
       const q = d.quotation?.revisions[0];
-      const value = q ? toMain(decimalToMinor(q.total), q.currency) : 0;
+      // Against its lowest option, when it offers several (what the customer may well choose).
+      const worth = q ? worthOf(q) : null;
+      const value = q && worth ? toMain(worth.lowMinor, q.currency) : 0;
+      const of = worth && worth.highMinor !== worth.lowMinor ? "its quotation's lowest option" : "its quotation";
       if (value > 0 && (spent / value) * 100 >= LIMITS.dealSpendPercent)
         warnings.push({
           level: "warn",
-          text: `${d.refNo} (${d.customer.name}): ${show(spent)} spent, ${pct(spent, value)}% of its quotation, and not won yet.`,
+          text: `${d.refNo} (${d.customer.name}): ${show(spent)} spent, ${pct(spent, value)}% of ${of}, and not won yet.`,
           href: `/inquiries/${d.id}`,
         });
     }

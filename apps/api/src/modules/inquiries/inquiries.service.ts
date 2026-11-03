@@ -24,6 +24,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
 import { SettingsService } from "../settings/settings.service";
 import { StagesService } from "./stages.service";
+import { optionFigures, revisionRow } from "../quotations/revision-figures";
 
 /** Staff see the deals they handle or created; managers see all. */
 export function inquiryAccess(user: SessionUser): Prisma.InquiryWhereInput {
@@ -123,7 +124,7 @@ export class InquiriesService {
                 where: { deletedAt: null },
                 orderBy: { number: "desc" },
                 take: 1,
-                select: { number: true, status: true, total: true, currency: true },
+                select: { number: true, status: true, currency: true, ...optionFigures },
               },
             },
           },
@@ -157,7 +158,9 @@ export class InquiriesService {
         customer: i.customer,
         assignee: i.assignee,
         items: i._count.items,
-        quotation: i.quotation ? { refNo: i.quotation.refNo, latest: i.quotation.revisions[0] ?? null } : null,
+        quotation: i.quotation
+          ? { refNo: i.quotation.refNo, latest: i.quotation.revisions[0] ? revisionRow(i.quotation.revisions[0]) : null }
+          : null,
         order: i.orders[0] ?? null,
         createdAt: i.createdAt,
         updatedAt: i.updatedAt,
@@ -203,8 +206,8 @@ export class InquiriesService {
                 id: true,
                 number: true,
                 status: true,
-                total: true,
                 currency: true,
+                ...optionFigures,
                 validUntil: true,
                 sentOn: true,
                 answeredOn: true,
@@ -254,6 +257,7 @@ export class InquiriesService {
     const numbers = lineNumbers(i.items.map((it) => ({ key: it.id, parentKey: it.parentId })));
     return {
       ...i,
+      quotation: i.quotation ? { ...i.quotation, revisions: i.quotation.revisions.map(revisionRow) } : null,
       /** Items in order, parts right after their item: "3", "3.1"; `priced` once a factory has priced it (changing it then needs a reason). */
       items: i.items.map((it, n) => ({ ...it, no: numbers[n], priced: priced.has(it.id) })),
       requiredBy: fromDbDateOrNull(i.requiredBy),

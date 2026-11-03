@@ -773,6 +773,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   const renumbered: { revisionId: string; ref: string; parent: string; version: number }[] = [];
   let depositDefaulted = 0;
   const revisionTerms = new Map<string, { depositPercent: number; balanceTerms: BalanceTerms }>();
+  // Each version's figures go on its Option A (a revision keeps none of its own).
+  const figures = new Map<string, { subtotal: string; discount: string; total: string }>();
   for (const d of deals.values()) {
     const versions = versionsOf.get(d.q.id) ?? [];
     if (!versions.length) continue;
@@ -799,10 +801,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         depositPercent,
         balanceTerms,
         validUntil: toDbDate(v.due_date),
-        // Sales carry no tax; an old version with tax keeps its total (reported below).
-        subtotal: v.subtotal,
-        discount: v.discount,
-        total: v.total,
         paymentTerms: v.terms,
         notes: v.notes,
         sentOn: v.submitted_at ? toDbDate(v.submitted_at) : null,
@@ -814,6 +812,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         createdAt: v.created_at,
         updatedAt: v.updated_at,
       });
+      // Sales carry no tax; an old version with tax keeps its total (reported below).
+      figures.set(v.id, { subtotal: v.subtotal, discount: v.discount, total: v.total });
       if (v.ref_no !== parentRef) renumbered.push({ revisionId: v.id, ref: v.ref_no, parent: parentRef, version: v.version });
     }
   }
@@ -827,10 +827,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       revisionId: r.id!,
       letter: "A",
       status: r.status === "accepted" || r.status === "void" ? ("accepted" as const) : ("open" as const),
-      leadTime: r.leadTime ?? null,
-      subtotal: r.subtotal,
-      discount: r.discount,
-      total: r.total,
+      ...figures.get(r.id!)!,
     })),
   });
   for (const v of old.quotations.filter((q) => Number(q.tax_amount) !== 0))
@@ -1074,7 +1071,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       .sort((a, b) =>
         a.p.paid_at < b.p.paid_at ? -1 : a.p.paid_at > b.p.paid_at ? 1 : a.p.created_at.getTime() - b.p.created_at.getTime(),
       )
-      .forEach(({ p, inv }, i) =>
+      .forEach(({ p, inv }, i) => {
+        // A payment counts on its order in the order's currency (the database holds it to that); the old app
+        // has no rate to turn one in another currency into it.
+        if (inv.currency !== o.currency)
+          throw new Error(`Payment against invoice ${inv.invoice_no} is in ${inv.currency}, its order in ${o.currency}: record it in the order's currency.`);
         paymentRows.push({
           id: p.id,
           kind: map.paymentKind(i),
@@ -1090,8 +1091,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
           note: `Paid against invoice ${inv.invoice_no} (old app).`,
           recordedById: p.recorded_by,
           createdAt: p.created_at,
-        }),
-      );
+        });
+      });
   }
   await tx.payment.createMany({ data: paymentRows });
   report.judge(
@@ -1215,7 +1216,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   );
 
   const newPay = await tx.payment.findMany({ select: { amount: true } });
-  const newRev = await tx.quotationRevision.findMany({ select: { total: true } });
+  // One option per old version: its figures are the version's.
+  const newRev = await tx.quotationOption.findMany({ select: { total: true } });
   const newOrders = await tx.order.findMany({ select: { total: true } });
   const check = (what: string, oldMinor: number, newMinor: number) =>
     report.totals.push({ what, old: fromMinor(oldMinor), new: fromMinor(newMinor), ok: oldMinor === newMinor });
