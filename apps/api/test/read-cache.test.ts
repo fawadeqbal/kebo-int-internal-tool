@@ -51,21 +51,19 @@ describe("read cache", () => {
       await app?.close();
     });
 
-    it("shows a payment in Insights at once, though Insights is remembered", async () => {
-      const before = (await api(app, manager).get("/insights").expect(200)).body.kpis.cashIn.value as string;
-      expect((await api(app, manager).get("/insights").expect(200)).body.kpis.cashIn.value).toBe(before);
-      const orders = (await api(app, manager).get("/orders?status=open").expect(200)).body as { id: string; currency: string }[];
-      let paid = false;
-      for (const o of orders) {
-        const p = (await api(app, manager).get(`/orders/${o.id}/payments`).expect(200)).body;
-        if (Number(p.due) < 5 || o.currency !== "USD") continue;
-        await api(app, manager).post(`/orders/${o.id}/payments`, { kind: "balance", amount: 3, currency: o.currency, paidOn: new Date().toISOString().slice(0, 10) }).expect(201);
-        paid = true;
-        break;
-      }
-      expect(paid).toBe(true);
-      const after = (await api(app, manager).get("/insights").expect(200)).body.kpis.cashIn.value as string;
-      expect(Number(after) - Number(before)).toBeCloseTo(3, 2);
+    it("shows a new expense in where we lose money at once, though that report is remembered", async () => {
+      const day = new Date().toISOString().slice(0, 10);
+      const spent = async () => {
+        const r = (await api(app, manager).get(`/reports/leaks?from=${day.slice(0, 4)}-01-01&to=${day}`).expect(200)).body;
+        return Number(r.trend.at(-1).expenses);
+      };
+      const before = await spent();
+      expect(await spent()).toBe(before);
+      const order = ((await api(app, manager).get("/orders?status=open").expect(200)).body as { id: string; currency: string }[]).find((o) => o.currency === "USD")!;
+      await api(app, manager)
+        .post("/expenses", { orderId: order.id, category: "inspection", description: "Read cache", amount: 3, currency: "USD", spentOn: day })
+        .expect(201);
+      expect((await spent()) - before).toBeCloseTo(3, 2);
     });
   });
 });

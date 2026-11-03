@@ -224,11 +224,11 @@ describe("money fixes", () => {
         marginPercent: 7.1,
         coveragePercent: 97,
       });
-      const i = (await api(app, manager).get(`/insights?from=${monthStart}&to=${today}`).expect(200)).body;
-      expect(i.topCustomers.find((c: { customer: { id: string } }) => c.customer.id === d.customerId)).toMatchObject({
-        revenue: "14500.00",
-        grossProfit: "1000.00",
-        uncostedRevenue: "500.00",
+      const i = (await api(app, manager).get(`/insights/facts/orders/groups?from=${monthStart}&to=${today}&period=all&by=customer`).expect(200)).body;
+      expect(i.rows.find((c: { key: string }) => c.key === d.customerId)).toMatchObject({
+        sales: "14500.00",
+        costed: "14000.00",
+        profitQuote: "1000.00",
       });
       // Where we lose money lists the 15 largest leaks of the period: asked for a day of its own (other test
       // files' orders of this month, whatever order they ran in, cannot push this one off the list).
@@ -518,7 +518,9 @@ describe("money fixes", () => {
       const d = await deal("Jos Tin");
       const count = async (from: string, to: string) => (await report(from, to)).funnel.received as number;
       const before = { nov: await count("2025-11-01", "2025-11-30"), oct: await count("2025-10-01", "2025-10-31") };
-      const insightsBefore = (await api(app, manager).get("/insights?from=2025-11-01&to=2025-11-01").expect(200)).body.kpis.received.value;
+      const received = async () =>
+        ((await api(app, manager).get("/insights/facts/inquiries/groups?from=2025-11-01&to=2025-11-01&period=all").expect(200)).body.rows[0]?.inquiries ?? 0) as number;
+      const insightsBefore = await received();
       // 2025-11-01 05:00 in Shanghai is 2025-10-31 21:00 UTC; lost at the same moment.
       await db()
         .$executeRaw`update inquiries set created_at = '2025-10-31T21:00:00Z', closed_at = '2025-10-31T21:00:00Z', stage = 'lost', lost_reason = 'no_reply' where id = ${d.inquiryId}::uuid`;
@@ -526,9 +528,7 @@ describe("money fixes", () => {
       expect(await count("2025-10-01", "2025-10-31")).toBe(before.oct);
       const trend = (await report("2025-11-01", "2025-11-30")).trend;
       expect(trend.at(-1)).toMatchObject({ month: "2025-11" });
-      expect((await api(app, manager).get("/insights?from=2025-11-01&to=2025-11-01").expect(200)).body.kpis.received.value).toBe(
-        insightsBefore + 1,
-      );
+      expect(await received()).toBe(insightsBefore + 1);
       const refNo = (await api(app, sana).get(`/inquiries/${d.inquiryId}`)).body.refNo;
       const lost = async (day: string) =>
         (await api(app, manager).get(`/reports/leaks?from=${day}&to=${day}`).expect(200)).body.lostDeals.map(

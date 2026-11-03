@@ -1,30 +1,34 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
-import { costDocLines, fromMinor, profitBy, profitTotals, type CostedSoldLine } from "@kebo/money";
-import { can, LOST_REASONS, OPEN_STAGES, QUOTED_STATUSES, type LostReason } from "@kebo/shared";
-import { addDays, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
+import { fromDbDate, type Prisma } from "@kebo/database";
+import { fromMinor, toMinor } from "@kebo/money";
+import { can, OPEN_STAGES } from "@kebo/shared";
+import { addDays, ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
-import { ordersWithMoneyDue } from "../money/due";
-import { fxOf, positionOf, positionRelations } from "../money/position";
-import { LimitsService } from "../../common/company/limits.service";
-import { MainMoney } from "../money/order-money";
-import { optionFigures, worthOf, worthView } from "../quotations/revision-figures";
+import { optionFigures, worthView } from "../quotations/revision-figures";
+import { FactsReadService } from "../insights/facts/facts-read.service";
 
 export interface Range {
   from: ISODate;
   to: ISODate;
 }
 
-/** Quoted value counts only each quotation's live revision (never superseded, draft or deleted ones), so revising never doubles it. */
-const LIVE_QUOTED = [...QUOTED_STATUSES, "void" as const];
-
 /** A calendar day for date columns (stored as dates, no time zone). */
 const day = (d: ISODate) => new Date(`${d}T00:00:00Z`);
+/** "2026-11" for the month `n` months after `d`'s. */
+const monthStartOf = (d: ISODate, n = 0) => {
+  const x = new Date(`${d.slice(0, 7)}-01T00:00:00Z`);
+  x.setUTCMonth(x.getUTCMonth() + n);
+  return x.toISOString().slice(0, 7);
+};
+/** The last day of `d`'s month. */
+const monthEnd = (d: ISODate): ISODate => addDays(`${monthStartOf(d, 1)}-01`, -1);
+/** The 12 months up to `d`'s: ["2025-12", …, "2026-11"]. */
+const monthsUpTo = (d: ISODate) => Array.from({ length: 12 }, (_, i) => monthStartOf(d, i - 11));
 
 @Injectable()
 export class ReportsService {
@@ -33,7 +37,7 @@ export class ReportsService {
     private readonly clock: Clock,
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
-    private readonly limits: LimitsService,
+    private readonly facts: FactsReadService,
   ) {}
 
   /* ---------------------------------------------------------------- dashboard */
@@ -105,101 +109,63 @@ export class ReportsService {
         currency: r.currency,
         inquiry: r.quotation.inquiry,
       })),
-      money: manager ? await this.moneyNow(today) : null,
-      workload: manager ? await this.workload() : null,
+      money: manager ? await this.moneyNow(user, today) : null,
+      workload: manager ? await this.workload(user) : null,
     };
   }
 
   /**
-   * This month's money and what is open right now. Orders at the rate stored on
-   * them, quotations at today's rates; currencies without a rate are listed in
-   * `missingRates` (and left out), never added as 0 silently.
+   * This month's money and what is open right now (managers), from the Insights tables: the same figures
+   * and labels as Insights (Sales, Cash in, To receive, Overdue, Quoted value) for the same month.
    */
-  private async moneyNow(today: ISODate) {
-    const { sales } = await this.settings.get();
-    const main = sales.currency;
-    const fx = new MainMoney(main, sales.exchangeRates);
-    const ctx = fxOf({ sales }, await this.limits.allows("expenses"));
-    const monthStart = `${today.slice(0, 7)}-01`;
-    const rated = { currency: true, mainCurrency: true, mainRate: true } as const;
-    const [quoted, won, paidIn, openOrders] = await Promise.all([
-      this.prisma.db.quotationRevision.findMany({
-        where: { deletedAt: null, status: { in: LIVE_QUOTED }, sentOn: { gte: day(monthStart) } },
-        select: { currency: true, ...optionFigures },
-      }),
-      this.prisma.db.order.findMany({
-        where: { status: { not: "cancelled" }, orderedOn: { gte: day(monthStart) } },
-        select: { total: true, ...rated },
-      }),
-      this.prisma.db.payment.findMany({
-        where: { voidedAt: null, paidOn: { gte: day(monthStart) } },
-        select: { amount: true, currency: true, order: { select: rated } },
-      }),
-      this.prisma.db.order.findMany({
-        // Closed orders too, while money is still owed on them.
-        where: { OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, ctx) } }] },
-        select: {
-          total: true,
-          depositPercent: true,
-          ...rated,
-          stage: true,
-          status: true,
-          ...positionRelations,
-        },
-      }),
+  private async moneyNow(user: SessionUser, today: ISODate) {
+    const month = { from: `${today.slice(0, 7)}-01` as ISODate, to: monthEnd(today) };
+    const [orders, cash, funnel, owed, work] = await Promise.all([
+      this.facts.orderGroups(user, { ...month, period: "all", by: "company" }, true),
+      this.facts.cash(user, month, true),
+      this.facts.funnel(user, month, true),
+      this.facts.aging(user, { side: "receivable" }, true),
+      this.facts.work(user),
     ]);
-    const worths = quoted.map((r) => ({ w: worthOf(r), currency: r.currency }));
-    const quotedLow = worths.reduce((t, x) => t + fx.live(x.w.lowMinor, x.currency), 0);
-    const quotedHigh = worths.reduce((t, x) => t + fx.live(x.w.highMinor, x.currency), 0);
-    let receivable = 0;
-    const byStage = { confirmed: 0, in_production: 0, shipped: 0 };
-    for (const o of openOrders) {
-      // Still due as on the order: the total and what was charged to the customer, less what came in.
-      receivable += fx.order(positionOf(o, ctx).dueMinor, o);
-      if (o.status === "open" && o.stage in byStage) byStage[o.stage as keyof typeof byStage] += 1;
-    }
+    const t = orders.rows[0];
+    const stage = (k: string) => work.ordersByStage[k] ?? 0;
     return {
-      currency: main,
+      currency: orders.currency,
       thisMonth: {
-        // The accepted option of each revision; before the customer chooses, its lowest option (and, in
-        // quotedUpTo, its highest: a revision with options at 10,000 and 14,000 is quoted 10,000–14,000).
-        quoted: fromMinor(quotedLow),
-        quotedUpTo: quotedHigh !== quotedLow ? fromMinor(quotedHigh) : null,
-        won: fromMinor(won.reduce((t, o) => t + fx.order(decimalToMinor(o.total), o), 0)),
-        // What arrived (the bank charges never reached us), as in profit & loss and Insights.
-        received: fromMinor(
-          paidIn.reduce(
-            (t, p) =>
-              t +
-              fx.order(decimalToMinor(p.amount), p.order),
-            0,
-          ),
-        ),
+        // Inquiries that came in this month and were quoted, each at its latest quotation (accepted option, else lowest).
+        quoted: funnel.quotedValue,
+        quotedUpTo: null,
+        /** Sales: the orders made this month. */
+        won: t?.sales ?? "0.00",
+        /** Cash in: what customers paid this month. */
+        received: fromMinor(cash.months.reduce((s, m) => s + toMinor(m.in), 0)),
       },
-      now: { toReceive: fromMinor(receivable), openOrders: openOrders.filter((o) => o.status === "open").length, ordersByStage: byStage },
+      now: {
+        toReceive: owed.total,
+        overdue: fromMinor(toMinor(owed.d30) + toMinor(owed.d60) + toMinor(owed.d90) + toMinor(owed.older)),
+        openOrders: work.openOrders,
+        ordersByStage: { confirmed: stage("confirmed"), in_production: stage("in_production"), shipped: stage("shipped") },
+      },
       /** Currencies with no exchange rate: their amounts are left out of the figures above. */
-      missingRates: fx.missingRates,
+      missingRates: [...new Set([...orders.missingRates, ...cash.missingRates])].sort(),
     };
   }
 
-  /** Open deals and orders per person, and their late order steps. */
-  private async workload() {
+  /** Open deals and orders per person (the Insights tables), and who works only their own deals. */
+  private async workload(user: SessionUser) {
     const people = await this.prisma.db.user.findMany({
       where: { isActive: true, isSystem: false },
       select: { id: true, name: true, role: true, access: { select: { superAdmin: true, permissions: true } } },
       orderBy: { name: "asc" },
     });
-    const [deals, orders] = await Promise.all([
-      this.prisma.db.inquiry.groupBy({ by: ["assigneeId"], where: { deletedAt: null, stage: { in: [...OPEN_STAGES] } }, _count: true }),
-      this.prisma.db.order.findMany({ where: { status: "open" }, select: { inquiry: { select: { assigneeId: true } } } }),
-    ]);
+    const work = await this.facts.work(user);
     return people
       .map(({ access, ...p }) => ({
         ...p,
         /** Works only their own deals (no "see every deal"): always listed, even with nothing open. */
         ownWork: !access.superAdmin && !access.permissions.includes("inquiries.viewAll"),
-        openDeals: deals.find((d) => d.assigneeId === p.id)?._count ?? 0,
-        openOrders: orders.filter((o) => o.inquiry.assigneeId === p.id).length,
+        openDeals: work.inquiriesOf(p.id),
+        openOrders: work.ordersOf(p.id),
       }))
       .filter((p) => p.openDeals || p.openOrders || p.ownWork)
       .sort((a, b) => b.openDeals + b.openOrders - (a.openDeals + a.openOrders));
@@ -207,164 +173,85 @@ export class ReportsService {
 
   /* ---------------------------------------------------------------- reports */
 
+  /**
+   * The printable report (View / Print, PDF, CSV, Excel) for a span, from the Insights tables with the same
+   * definitions as Insights: inquiries by when they came in (the funnel, channels, categories, people, the
+   * 12 months), orders by when they were ordered (sales and profit on the quote). `staffId`: one person's.
+   */
   async report(user: SessionUser, r: Range, staffId?: string) {
     if (!can(user, "reports.view")) throw new ForbiddenError();
-    const { sales } = await this.settings.get();
-    const main = sales.currency;
-    const fx = new MainMoney(main, sales.exchangeRates);
-    const person: Prisma.InquiryWhereInput = staffId ? { assigneeId: staffId } : {};
-    // Days in the company's time zone: a deal at 05:00 on 1 November in Shanghai is November's.
-    const tz = this.clock.timeZone;
-    const span = { gte: startOfDayIn(r.from, tz), lt: startOfDayIn(addDays(r.to, 1), tz) };
-    const received: Prisma.InquiryWhereInput = { deletedAt: null, ...person, createdAt: span };
-    const closed: Prisma.InquiryWhereInput = { deletedAt: null, ...person, closedAt: span };
-
-    const [inRange, quotedDeals, wonDeals, lostDeals, byChannel, byCategory, lostReasons, closedRows, ordersInRange, staff] =
-      await Promise.all([
-        this.prisma.db.inquiry.count({ where: received }),
-        this.prisma.db.inquiry.count({
-          where: { ...received, quotation: { revisions: { some: { deletedAt: null, status: { not: "draft" } } } } },
-        }),
-        this.prisma.db.inquiry.count({ where: { ...closed, stage: "won" } }),
-        this.prisma.db.inquiry.count({ where: { ...closed, stage: "lost" } }),
-        this.prisma.db.inquiry.groupBy({ by: ["channel"], where: received, _count: true }),
-        this.prisma.db.inquiry.groupBy({
-          by: ["category"],
-          where: received,
-          _count: true,
-          orderBy: { _count: { category: "desc" } },
-          take: 10,
-        }),
-        this.prisma.db.inquiry.groupBy({ by: ["lostReason"], where: { ...closed, stage: "lost" }, _count: true }),
-        this.prisma.db.inquiry.findMany({
-          where: { ...closed, stage: { in: ["won", "lost"] } },
-          select: { stage: true, createdAt: true, closedAt: true, assigneeId: true },
-        }),
-        this.prisma.db.order.findMany({
-          where: {
-            status: { not: "cancelled" },
-            orderedOn: { gte: day(r.from), lte: day(r.to) },
-            ...(staffId ? { inquiry: { assigneeId: staffId } } : {}),
-          },
-          include: {
-            lines: { orderBy: { sortOrder: "asc" } },
-            costs: { select: { cost: true } },
-            customer: { select: { name: true } },
-            inquiry: { select: { category: true, assignee: { select: { name: true } } } },
-          },
-        }),
-        this.prisma.db.user.findMany({ where: { isSystem: false }, select: { id: true, name: true } }),
-      ]);
-
-    const avg = (rows: typeof closedRows) =>
-      rows.length ? Math.round(rows.reduce((t, x) => t + (x.closedAt!.getTime() - x.createdAt.getTime()), 0) / rows.length) : null;
-    // Estimated profit on the orders won in the range: worked out in each order's currency from the costs on its
-    // lines and the costs to reach the basis it was sold on (as on the order's page), then each line turned into
-    // the main currency at the order's own rate. Lines without a cost are left out of profit and shown apart.
-    const costed = ordersInRange.flatMap((o): CostedSoldLine[] => {
-      if (!fx.known(o)) {
-        fx.order(0, o); // listed as missing
-        return [];
-      }
-      const linesSum = o.lines.reduce((t, l) => t + decimalToMinor(l.lineTotal), 0);
-      const keys = { customer: o.customer.name, category: o.inquiry.category, person: o.inquiry.assignee?.name ?? "Unassigned" };
-      return costDocLines({
-        id: o.id,
-        discountMinor: Math.max(linesSum - decimalToMinor(o.total), 0),
-        extraCostMinor: o.costs.reduce((t, c) => t + decimalToMinor(c.cost), 0),
-        lines: o.lines.map((l) => ({
-          docId: o.id,
-          lineTotalMinor: decimalToMinor(l.lineTotal),
-          quantity: l.quantity.toString(),
-          unitCostMinor: l.unitCost === null ? null : decimalToMinor(l.unitCost),
-          keys,
-        })),
-      }).map((l) => {
-        const revenue = fx.order(l.revenueMinor, o);
-        const cost = l.costMinor === null ? null : fx.order(l.costMinor, o);
-        return { ...l, revenueMinor: revenue, costMinor: cost, profitMinor: cost === null ? null : revenue - cost };
-      });
-    });
-    const totals = profitTotals(costed);
-    const money = (t: ReturnType<typeof profitTotals>) => ({
-      revenue: fromMinor(t.revenueMinor),
-      /** Sales whose lines have no cost: left out of profit and margin. */
-      uncostedRevenue: fromMinor(t.uncostedRevenueMinor),
-      cost: fromMinor(t.costMinor),
-      profit: fromMinor(t.profitMinor),
-      marginPercent: t.marginPercent,
-      coveragePercent: t.coveragePercent,
-      orders: t.documents,
-    });
-    const name = (id: string | null) => staff.find((u) => u.id === id)?.name ?? "Unassigned";
-    const perPerson = new Map<string, { won: number; lost: number }>();
-    for (const c of closedRows) {
-      const k = name(c.assigneeId);
-      const p = perPerson.get(k) ?? { won: 0, lost: 0 };
-      p[c.stage as "won" | "lost"] += 1;
-      perPerson.set(k, p);
-    }
+    const span = { from: r.from, to: r.to, ...(staffId ? { personId: staffId } : {}) };
+    const twelve = { ...span, from: `${monthStartOf(r.to, -11)}-01` as ISODate };
+    const [funnel, inquiries, byChannel, byCategory, byPerson, orders, ordersByCustomer, ordersByCategory, ordersByPerson, months] = await Promise.all([
+      this.facts.funnel(user, span),
+      this.facts.inquiryGroups(user, { ...span, period: "all", by: "company" }),
+      this.facts.inquiryGroups(user, { ...span, period: "all", by: "channel" }),
+      this.facts.inquiryGroups(user, { ...span, period: "all", by: "category" }),
+      this.facts.inquiryGroups(user, { ...span, period: "all", by: "person" }),
+      this.facts.orderGroups(user, { ...span, period: "all", by: "company" }),
+      this.facts.orderGroups(user, { ...span, period: "all", by: "customer" }),
+      this.facts.orderGroups(user, { ...span, period: "all", by: "category" }),
+      this.facts.orderGroups(user, { ...span, period: "all", by: "person" }),
+      this.facts.inquiryGroups(user, { ...twelve, period: "month", by: "company" }),
+    ]);
+    type OrderRow = (typeof orders.rows)[number];
+    // Profit on the quote, on the sales whose lines have a cost (the rest shown apart), as Insights.
+    const money = (g: OrderRow | undefined) => {
+      const sales = toMinor(g?.sales ?? "0");
+      const costed = toMinor(g?.costed ?? "0");
+      const profit = toMinor(g?.profitQuote ?? "0");
+      return {
+        revenue: fromMinor(sales),
+        /** Sales whose lines have no cost: left out of profit and margin. */
+        uncostedRevenue: fromMinor(sales - costed),
+        cost: fromMinor(costed - profit),
+        profit: fromMinor(profit),
+        marginPercent: g?.marginQuote ?? null,
+        coveragePercent: sales > 0 ? Math.round((costed / sales) * 100) : null,
+        orders: g?.orders ?? 0,
+      };
+    };
+    const groups = (rows: OrderRow[]) =>
+      [...rows].sort((a, b) => toMinor(b.sales) - toMinor(a.sales) || a.label.localeCompare(b.label)).map((g) => ({ key: g.label, ...money(g) }));
+    const total = inquiries.rows[0];
+    const last = monthsUpTo(r.to);
     return {
       range: r,
-      currency: main,
+      currency: orders.currency,
       funnel: {
-        received: inRange,
-        quoted: quotedDeals,
-        won: wonDeals,
-        lost: lostDeals,
-        winRatePercent: wonDeals + lostDeals ? Math.round((wonDeals / (wonDeals + lostDeals)) * 100) : null,
+        received: funnel.inquiries,
+        quoted: funnel.quoted,
+        won: funnel.won,
+        lost: funnel.lost,
+        winRatePercent: funnel.winRate,
       },
-      turnaroundMs: { won: avg(closedRows.filter((x) => x.stage === "won")), lost: avg(closedRows.filter((x) => x.stage === "lost")) },
-      lostReasons: LOST_REASONS.map((reason: LostReason) => ({
-        reason,
-        count: lostReasons.find((g) => g.lostReason === reason)?._count ?? 0,
-      })).filter((x) => x.count),
-      byChannel: byChannel.map((g) => ({ key: g.channel, count: g._count })),
-      byCategory: byCategory.map((g) => ({ key: g.category, count: g._count })),
-      people: [...perPerson.entries()].map(([person, v]) => ({
-        person,
-        ...v,
-        winRatePercent: Math.round((v.won / (v.won + v.lost)) * 100),
-      })),
-      wonValue: fromMinor(ordersInRange.reduce((t, o) => t + fx.order(decimalToMinor(o.total), o), 0)),
+      /** From coming in to won or lost, on average (days), for the inquiries that came in in the span. */
+      turnaroundDays: { won: total?.daysToWin ?? null, lost: total?.daysToLose ?? null },
+      lostReasons: funnel.lostReasons,
+      byChannel: [...byChannel.rows].sort((a, b) => b.inquiries - a.inquiries).map((g) => ({ key: g.key, count: g.inquiries })),
+      byCategory: [...byCategory.rows]
+        .sort((a, b) => b.inquiries - a.inquiries || a.key.localeCompare(b.key))
+        .slice(0, 10)
+        .map((g) => ({ key: g.key, count: g.inquiries })),
+      people: byPerson.rows
+        .filter((p) => p.won + p.lost > 0)
+        .map((p) => ({ person: p.label, won: p.won, lost: p.lost, winRatePercent: p.winRate ?? 0 })),
+      /** Sales: the orders made in the span. */
+      wonValue: orders.rows[0]?.sales ?? "0.00",
       profit: {
-        total: money(totals),
-        byCustomer: profitBy(costed, "customer").map((g) => ({ key: g.key, ...money(g) })),
-        byCategory: profitBy(costed, "category").map((g) => ({ key: g.key, ...money(g) })),
-        byPerson: profitBy(costed, "person").map((g) => ({ key: g.key, ...money(g) })),
+        total: money(orders.rows[0]),
+        byCustomer: groups(ordersByCustomer.rows),
+        byCategory: groups(ordersByCategory.rows),
+        byPerson: groups(ordersByPerson.rows),
       },
-      trend: await this.trend(r.to, staffId),
+      /** The 12 months up to `to`: inquiries that came in each month, and how many of them were won. */
+      trend: last.map((m) => {
+        const row = months.rows.find((x) => x.period === m);
+        return { month: m, received: row?.inquiries ?? 0, won: row?.won ?? 0 };
+      }),
       /** Currencies with no exchange rate: their amounts are left out (never counted as 0 silently). */
-      missingRates: fx.missingRates,
+      missingRates: orders.missingRates,
     };
-  }
-
-  /** The 12 months up to `to`: deals received and won. */
-  private async trend(to: ISODate, staffId?: string) {
-    const months: string[] = [];
-    const d = new Date(`${to.slice(0, 7)}-01T00:00:00Z`);
-    for (let i = 11; i >= 0; i--) {
-      const m = new Date(d);
-      m.setUTCMonth(d.getUTCMonth() - i);
-      months.push(m.toISOString().slice(0, 7));
-    }
-    const tz = this.clock.timeZone;
-    // The first month from its first day in the company's time zone (not UTC: the first hours would be lost).
-    const start = startOfDayIn(`${months[0]}-01`, tz);
-    const person = staffId ? `and assignee_id = '${staffId.replace(/[^0-9a-f-]/gi, "")}'` : "";
-    const rows = await this.prisma.db.$queryRawUnsafe<{ m: string; received: bigint; won: bigint }[]>(
-      `select to_char(date_trunc('month', created_at at time zone $1), 'YYYY-MM') as m,
-              count(*) as received,
-              count(*) filter (where stage = 'won') as won
-         from inquiries where deleted_at is null and created_at >= $2 ${person}
-        group by 1`,
-      tz,
-      start,
-    );
-    return months.map((m) => {
-      const row = rows.find((x) => x.m === m);
-      return { month: m, received: Number(row?.received ?? 0), won: Number(row?.won ?? 0) };
-    });
   }
 
   /* ---------------------------------------------------------------- audit */

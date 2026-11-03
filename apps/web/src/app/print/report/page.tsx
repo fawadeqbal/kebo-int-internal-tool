@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { CHANNEL_LABEL, LOST_REASON_LABEL } from "@kebo/shared";
-import { formatDuration } from "@kebo/utils";
+import { CHANNEL_LABEL } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { requirePermission, docBrand, hasFeature } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
@@ -10,6 +9,9 @@ import type { CompanySnapshot } from "@/lib/types-orders";
 import { Letterhead, LinesTable, Sheet } from "@/components/print/doc";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { PROFIT_LABEL } from "@kebo/money";
+
+/** "under a day", "1 day", "4.5 days". */
+const days = (d: number) => (d < 1 ? "under a day" : `${d.toLocaleString("en-US", { maximumFractionDigits: 1 })} day${d === 1 ? "" : "s"}`);
 
 export const metadata = { title: "Sales report" };
 
@@ -138,14 +140,14 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
               value: f.quoted,
               hint: f.received ? `${Math.round((f.quoted / f.received) * 100)}% of those received` : undefined,
             },
-            { label: "Won", value: f.won, hint: r.turnaroundMs.won ? `Took ${formatDuration(r.turnaroundMs.won)} on average` : undefined },
+            { label: "Won", value: f.won, hint: r.turnaroundDays.won !== null ? `Took ${days(r.turnaroundDays.won)} on average` : undefined },
             {
               label: "Lost",
               value: f.lost,
-              hint: r.turnaroundMs.lost ? `Took ${formatDuration(r.turnaroundMs.lost)} on average` : undefined,
+              hint: r.turnaroundDays.lost !== null ? `Took ${days(r.turnaroundDays.lost)} on average` : undefined,
             },
             { label: "Win rate", value: pct(f.winRatePercent), hint: "Won ÷ (won + lost)" },
-            { label: "Won value", value: money(r.wonValue, r.currency), hint: "Orders made in the period" },
+            { label: "Sales", value: money(r.wonValue, r.currency), hint: "Orders made in the period" },
           ]}
         />
 
@@ -177,7 +179,7 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
         <div className="grid grid-cols-2 gap-x-6">
           <Counts
             title="Why inquiries were lost"
-            rows={r.lostReasons.map((x) => ({ label: LOST_REASON_LABEL[x.reason], count: x.count }))}
+            rows={r.lostReasons.map((x) => ({ label: x.label, count: x.count }))}
             empty="No inquiries lost in this period."
           />
           <Counts
@@ -193,7 +195,7 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
           <div className="min-w-0 break-inside-avoid">
             <H2>Win rate by person</H2>
             {r.people.length === 0 ? (
-              <p className="text-[#64748b]">No inquiries closed in this period.</p>
+              <p className="text-[#64748b]">None of the inquiries that came in has been won or lost yet.</p>
             ) : (
               <LinesTable
                 rows={r.people}

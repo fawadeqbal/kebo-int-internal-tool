@@ -99,8 +99,12 @@ export class FactsReadService {
     private readonly limits: LimitsService,
   ) {}
 
-  private async open(user: SessionUser) {
-    if (!can(user, "reports.view")) throw new ForbiddenError("Only managers can see insights.");
+  /**
+   * Work the queue off and read the settings. `trusted`: the caller (Home, Reports, Leaks, targets) already
+   * checked who may see its figures, with its own permission as before; Insights' own endpoints never pass it.
+   */
+  private async open(user: SessionUser, trusted = false) {
+    if (!trusted && !can(user, "reports.view")) throw new ForbiddenError("Only managers can see insights.");
     await this.facts.drain(5);
     const seeMoney = can(user, "expenses.manage");
     const expensesOn = await this.limits.allows("expenses");
@@ -161,8 +165,8 @@ export class FactsReadService {
    * Orders (not cancelled) by when they were ordered, added up per period × group: sales, profit, margin, what
    * came in and is still due (overdue on today), shipping on time and speed, paying in full and on time.
    */
-  async orderGroups(user: SessionUser, q: Span & FactsFilter & { period: Period; by: OrderGroup }) {
-    const { seeMoney, seeExpenses, today, currency } = await this.open(user);
+  async orderGroups(user: SessionUser, q: Span & FactsFilter & { period: Period; by: OrderGroup }, trusted = false) {
+    const { seeMoney, seeExpenses, today, currency } = await this.open(user, trusted);
     const rows = await this.prisma.db.$queryRaw<Record<string, unknown>[]>`
       select ${periodSql(q.period, "f.ordered_on")} as period, ${groupSql(q.by)} as key,
              count(*)::int as orders, count(distinct f.customer_id)::int as customers,
@@ -184,12 +188,17 @@ export class FactsReadService {
       group by 1, 2 order by 1, 2`;
     const names = await this.labels(q.by, rows.map((r) => String(r.key)));
     const countries = q.by === "customer" ? await this.countries(rows.map((r) => String(r.key))) : null;
+    const missing = await this.prisma.db.$queryRaw<{ currency: string }[]>`
+      select distinct f.currency from order_facts f
+      where f.status <> 'cancelled' and not f.rate_known ${this.span(q, "f.ordered_on")} ${this.filter(q, "order")} order by 1`;
     return {
       currency,
       seeMoney,
       seeExpenses,
       period: q.period,
       by: q.by,
+      /** Currencies of these orders with no rate to the main currency (their money counts 0). */
+      missingRates: missing.map((m) => m.currency),
       rows: rows.map((r) => {
         const costed = toMinor(String(r.costed));
         return {
@@ -237,8 +246,8 @@ export class FactsReadService {
    * were decided (`on` = closed): in, got prices, quoted (and worth), won (and the orders' value), lost, open,
    * speed to the first quote and to the decision.
    */
-  async inquiryGroups(user: SessionUser, q: Span & FactsFilter & { period: Period; by: OrderGroup; on?: "received" | "closed" }) {
-    const { currency } = await this.open(user);
+  async inquiryGroups(user: SessionUser, q: Span & FactsFilter & { period: Period; by: OrderGroup; on?: "received" | "closed" }, trusted = false) {
+    const { currency } = await this.open(user, trusted);
     const column = q.on === "closed" ? "f.closed_on" : "f.received_on";
     const rows = await this.prisma.db.$queryRaw<Record<string, unknown>[]>`
       select ${periodSql(q.period, column)} as period, ${groupSql(q.by)} as key,
@@ -250,6 +259,7 @@ export class FactsReadService {
              avg(f.days_to_first_quote)::float8 as "daysToFirstQuote",
              percentile_cont(0.5) within group (order by f.days_to_first_quote) as "medianDaysToFirstQuote",
              avg(f.days_to_close) filter (where f.outcome = 'won')::float8 as "daysToWin",
+             avg(f.days_to_close) filter (where f.outcome = 'lost')::float8 as "daysToLose",
              percentile_cont(0.5) within group (order by f.days_to_close) as "medianDaysToClose"
       from inquiry_facts f
       left join order_facts o on o.inquiry_id = f.inquiry_id and o.status <> 'cancelled'
@@ -280,14 +290,15 @@ export class FactsReadService {
         daysToFirstQuote: days(r.daysToFirstQuote),
         medianDaysToFirstQuote: days(r.medianDaysToFirstQuote),
         daysToWin: days(r.daysToWin),
+        daysToLose: days(r.daysToLose),
         medianDaysToClose: days(r.medianDaysToClose),
       })),
     };
   }
 
   /** The funnel for a span (inquiries that came in then): the stages, why we lose, and the medians. */
-  async funnel(user: SessionUser, q: Span & FactsFilter) {
-    const totals = (await this.inquiryGroups(user, { ...q, period: "all", by: "company" })).rows[0];
+  async funnel(user: SessionUser, q: Span & FactsFilter, trusted = false) {
+    const totals = (await this.inquiryGroups(user, { ...q, period: "all", by: "company" }, trusted)).rows[0];
     const reasons = await this.prisma.db.$queryRaw<{ reason: string | null; count: number }[]>`
       select f.lost_reason::text as reason, count(*)::int as count from inquiry_facts f
       where f.outcome = 'lost' ${this.span(q, "f.received_on")} ${this.filter(q, "inquiry")}
@@ -377,8 +388,12 @@ export class FactsReadService {
    * What customers owe us (receivable) or we owe factories (payable) by how late it is today, from the open
    * parts of each plan: not due yet (or undated), 1–30, 31–60, 61–90 and over 90 days. `bucket` lists the orders.
    */
-  async aging(user: SessionUser, q: { side: "receivable" | "payable"; bucket?: "notDue" | "d30" | "d60" | "d90" | "older"; customerId?: string; factoryId?: string }) {
-    const { seeMoney, today, currency } = await this.open(user);
+  async aging(
+    user: SessionUser,
+    q: { side: "receivable" | "payable"; bucket?: "notDue" | "d30" | "d60" | "d90" | "older"; customerId?: string; factoryId?: string },
+    trusted = false,
+  ) {
+    const { seeMoney, today, currency } = await this.open(user, trusted);
     if (q.side === "payable" && !seeMoney) throw new ForbiddenError("Only people who may see money see what we owe factories.");
     const table = Prisma.raw(q.side === "receivable" ? "order_facts" : "factory_order_facts");
     const scope =
@@ -428,8 +443,8 @@ export class FactsReadService {
    * Money in and out by month, straight from the money itself: what customers paid (at each order's rate),
    * what we paid factories and every expense (each at its own rate), and the expenses by kind.
    */
-  async cash(user: SessionUser, q: Span) {
-    const { seeMoney, seeExpenses, ctx, currency, today } = await this.open(user);
+  async cash(user: SessionUser, q: Span, trusted = false) {
+    const { seeMoney, seeExpenses, ctx, currency, today } = await this.open(user, trusted);
     const to = q.to ?? today;
     const from = q.from ?? `${to.slice(0, 4)}-01-01`;
     const fx = new MainMoney(ctx.fx.main, ctx.fx.rates);
@@ -496,8 +511,8 @@ export class FactsReadService {
    * they are likely to bring, quotations running out this week, customers overdue, factories late on their
    * ready dates, orders of the span under 10% margin, and (money) what is owed each way in its own currency.
    */
-  async now(user: SessionUser, q: Span) {
-    const { seeMoney, seeExpenses, today, currency, ctx } = await this.open(user);
+  async now(user: SessionUser, q: Span, trusted = false) {
+    const { seeMoney, seeExpenses, today, currency, ctx } = await this.open(user, trusted);
     const db = this.prisma.db;
     const week = new Date(Date.parse(`${today}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
     const yearAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 365 * 86_400_000).toISOString().slice(0, 10);
@@ -578,6 +593,68 @@ export class FactsReadService {
       lateFactories: late.map((r) => ({ factoryId: r.factoryId, name: r.name, days: r.days, orders: r.orders })),
       lowMargin: { orders: low!.count, costsOverPlan: seeExpenses ? amount(low!.over) : null },
       byCurrency,
+    };
+  }
+
+  /**
+   * Open work right now (Home): open orders by stage, and open inquiries and orders per person handling them.
+   * Callers check who may see it (Home: managers).
+   */
+  async work(user: SessionUser) {
+    await this.open(user, true);
+    const db = this.prisma.db;
+    const [stages, orders, inquiries] = await Promise.all([
+      db.$queryRaw<{ stage: string; n: number }[]>`
+        select f.stage::text as stage, count(*)::int as n from order_facts f where f.status = 'open' group by 1`,
+      db.$queryRaw<{ person: string | null; n: number }[]>`
+        select f.handled_by as person, count(*)::int as n from order_facts f where f.status = 'open' group by 1`,
+      db.$queryRaw<{ person: string | null; n: number }[]>`
+        select f.handled_by as person, count(*)::int as n from inquiry_facts f where f.outcome = 'open' group by 1`,
+    ]);
+    return {
+      openOrders: stages.reduce((t, s) => t + s.n, 0),
+      ordersByStage: Object.fromEntries(stages.map((s) => [s.stage, s.n])) as Record<string, number>,
+      ordersOf: (id: string) => orders.find((o) => o.person === id)?.n ?? 0,
+      inquiriesOf: (id: string) => inquiries.find((o) => o.person === id)?.n ?? 0,
+    };
+  }
+
+  /**
+   * Each order's money as the tables hold it, for Leaks (callers check the permission): the orders ordered in
+   * the span (not cancelled) and every open one, with what we owe and paid their factories (main currency).
+   */
+  async moneyByOrder(user: SessionUser, q: Required<Span>) {
+    const { currency } = await this.open(user, true);
+    const rows = await this.prisma.db.$queryRaw<Record<string, unknown>[]>`
+      select f.order_id as "orderId", f.inquiry_id as "inquiryId", o.ref_no as "refNo", f.customer_id as "customerId", c.name as customer,
+             f.status::text as status, to_char(f.ordered_on, 'YYYY-MM-DD') as "orderedOn", f.rate_known as "rateKnown", f.currency,
+             f.total_main::text as sales, f.costed_main::text as costed, f.profit_quote_main::text as "profitQuote",
+             f.profit_expected_main::text as "profitExpected", f.costs_over_plan_main::text as "costsOverPlan", f.received_main::text as received,
+             coalesce((select sum(x.owed_main) from factory_order_facts x where x.order_id = f.order_id), 0)::text as "factoryOwed",
+             coalesce((select sum(x.paid_main) from factory_order_facts x where x.order_id = f.order_id), 0)::text as "factoryPaid"
+      from order_facts f join orders o on o.id = f.order_id join customers c on c.id = f.customer_id
+      where f.status <> 'cancelled' and (f.ordered_on between ${q.from}::date and ${q.to}::date or f.status = 'open')
+      order by f.ordered_on, o.ref_no`;
+    return {
+      currency,
+      rows: rows.map((r) => ({
+        orderId: r.orderId as string,
+        inquiryId: r.inquiryId as string,
+        refNo: r.refNo as string,
+        customer: { id: r.customerId as string, name: r.customer as string },
+        status: r.status as string,
+        orderedOn: r.orderedOn as ISODate,
+        rateKnown: r.rateKnown as boolean,
+        currency: r.currency as string,
+        salesMinor: toMinor(amount(r.sales)),
+        costedMinor: toMinor(amount(r.costed)),
+        profitQuoteMinor: toMinor(amount(r.profitQuote)),
+        profitExpectedMinor: toMinor(amount(r.profitExpected)),
+        costsOverPlanMinor: toMinor(amount(r.costsOverPlan)),
+        receivedMinor: toMinor(amount(r.received)),
+        factoryOwedMinor: toMinor(amount(r.factoryOwed)),
+        factoryPaidMinor: toMinor(amount(r.factoryPaid)),
+      })),
     };
   }
 

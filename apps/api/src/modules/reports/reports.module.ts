@@ -8,6 +8,7 @@ import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
 import { ReportsService } from "./reports.service";
+import { FactsModule } from "../insights/facts/facts.module";
 
 const rangeQuery = z.object({ from: optionalDate, to: optionalDate, staff: z.uuid().optional() });
 const auditQuery = z.object({
@@ -49,5 +50,5 @@ class ReportsController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [ReportsController], providers: [ReportsService] })
+@Module({ imports: [OrdersModule, FactsModule], controllers: [ReportsController], providers: [ReportsService] })
 export class ReportsModule {}

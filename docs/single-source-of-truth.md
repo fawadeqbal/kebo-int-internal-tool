@@ -19,6 +19,14 @@ This is the outcome of the single-source-of-truth refactor (audit:
 5. Numbers given to the outside (receipts, requests, papers) are stored once and never worked out again.
 6. Insights' calculated tables are not copies to keep in step: a new figure there is worked out in `compute.ts`
    with the helper named below (never a formula of its own), and the nightly check holds them to it.
+7. A figure over many orders or inquiries (a month's sales, what customers owe, a win rate, profit and margin of a
+   span) is read from those tables through `FactsReadService`, never added up again elsewhere. Home, the report
+   (print, PDF, CSV, Excel), Leaks, targets and the summary emails do; `test/one-figure.test.ts` holds them equal
+   to Insights for the same period and filters. Exceptions, on purpose (each built on the helpers below):
+   Profit and loss month by month (`money.service.ts profitAndLoss`: by the day each cost and payment fell, which
+   the tables do not date), one customer's account (`accounts.service.ts`), and lists that need "still owes" as a
+   filter (`ordersWithMoneyDue`, the SQL twin). Leaks adds up only plain expenses (a deal's selling cost, factory
+   visits), each at its own rate with `convert`, as Insights' cash does.
 
 ## Where each fact lives
 
@@ -45,7 +53,7 @@ This is the outcome of the single-source-of-truth refactor (audit:
 | Packing (packages, weights, CBM) | `OrderLine` packing fields; `Order.packedAt` | the packing list paper | |
 | Shipped on time | `Order.shipBy` and the shipments | `shippedOnTime` (`packages/shared/src/workflows/shipment.ts`) | Shipped by the ship-by date; unknown before shipping or without one. |
 | A factory's goods actually ready, and late or not | the factory's goods lines (`receivedQty`, `receivedOn`) and the shipments | `factoryReadyActual` / `readyDelay` (`packages/shared/src/workflows/ready.ts`) | The day its last line came in full, or the day the order first shipped, whichever is earlier; against that factory's ready date. |
-| Insights' figures per order, inquiry and order × factory | **calculated tables** `order_facts`, `inquiry_facts`, `factory_order_facts` (never typed, never kept in step by hand) | written only by `FactsService` (`apps/api/src/modules/insights/facts/compute.ts`) through the helpers above; read by `FactsReadService` (`GET /insights/facts/...`) | Triggers on the source tables queue what changed (`facts_queue`); the API works it off after each change and before each read; the worker rebuilds everything every night, compares, logs and fixes. Money in the main currency at the order's rate (factory money and quotations at today's Settings rates). They can always be thrown away and made again. |
+| Insights' figures per order, inquiry and order × factory | **calculated tables** `order_facts`, `inquiry_facts`, `factory_order_facts` (never typed, never kept in step by hand) | written only by `FactsService` (`apps/api/src/modules/insights/facts/compute.ts`) through the helpers above; read by `FactsReadService` (`GET /insights/facts/...`; Home, Reports, Leaks, targets and the emails call it too) | Triggers on the source tables queue what changed (`facts_queue`); the API works it off after each change and before each read; the worker rebuilds everything every night, compares, logs and fixes. Money in the main currency at the order's rate (factory money and quotations at today's Settings rates). They can always be thrown away and made again. |
 
 ## Frozen snapshots (copies on purpose) and their labels
 
@@ -70,3 +78,5 @@ This is the outcome of the single-source-of-truth refactor (audit:
 - Payment filters on `currency = order.currency` — the database holds it.
 - Finding the FAT / inspection item by a regex on its title — bound by `paper`.
 - Three packing-list number formulas — `packingListNo`.
+- Insights' old overview (`GET /insights`, `computeOverview`), Reports' own funnel, profit and trend, Home's
+  `moneyNow`, Leaks' own sums of payments and order expenses — the Insights tables (rule 7).

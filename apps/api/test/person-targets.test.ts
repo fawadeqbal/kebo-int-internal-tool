@@ -41,9 +41,9 @@ describe("targets per person", () => {
     expect(Number(mine.sold)).toBeGreaterThanOrEqual(0);
     // Someone without a target gets nothing to show.
     expect((await api(app, manager).get("/me/target").expect(200)).body).toMatchObject({ target: null });
-    const i = (await api(app, manager).get("/insights").expect(200)).body;
-    const row = i.people.find((p: { id: string }) => p.id === sanaId);
-    if (row) expect(row.month).toMatchObject({ target: "25000.00" });
+    // Insights › People reads everyone's targets.
+    const year = (await api(app, manager).get(`/insights/targets/people?year=${month.slice(0, 4)}`).expect(200)).body;
+    expect(year.targets).toEqual(expect.arrayContaining([expect.objectContaining({ month, userId: sanaId, amount: "25000.00" })]));
     // Removing it.
     await api(app, manager).put(`/insights/targets/${month}/people/${sanaId}`, { amount: 0 }).expect(200);
     expect((await api(app, sana).get("/me/target").expect(200)).body.target).toBeNull();

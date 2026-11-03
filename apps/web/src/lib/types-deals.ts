@@ -385,8 +385,9 @@ export interface ReportView {
   range: { from: string; to: string };
   currency: string;
   funnel: { received: number; quoted: number; won: number; lost: number; winRatePercent: number | null };
-  turnaroundMs: { won: number | null; lost: number | null };
-  lostReasons: { reason: LostReason; count: number }[];
+  /** From coming in to won or lost, on average (days), for the inquiries that came in in the span. */
+  turnaroundDays: { won: number | null; lost: number | null };
+  lostReasons: { reason: LostReason | "not_said"; label: string; count: number }[];
   byChannel: { key: InquiryChannel; count: number }[];
   byCategory: { key: string; count: number }[];
   people: { person: string; won: number; lost: number; winRatePercent: number }[];

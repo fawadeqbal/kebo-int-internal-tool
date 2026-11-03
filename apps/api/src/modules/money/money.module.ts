@@ -45,6 +45,7 @@ import { CurrentUser, RequireFeature, RequirePermissions } from "../../common/au
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersModule } from "../orders/orders.module";
+import { FactsModule } from "../insights/facts/facts.module";
 import { MoneyService } from "./money.service";
 import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
@@ -359,5 +360,5 @@ class MoneyController {
   }
 }
 
-@Module({ imports: [OrdersModule], controllers: [MoneyController], providers: [MoneyService, CostsService, AccountsService, CashService, LeaksService, PaymentFilesService], exports: [MoneyService, AccountsService, CashService, LeaksService, PaymentFilesService] })
+@Module({ imports: [OrdersModule, FactsModule], controllers: [MoneyController], providers: [MoneyService, CostsService, AccountsService, CashService, LeaksService, PaymentFilesService], exports: [MoneyService, AccountsService, CashService, LeaksService, PaymentFilesService] })
 export class MoneyModule {}
