@@ -392,7 +392,7 @@ export class InsightsService {
 
     /* ----- right now: cash, what customers owe (by age), what we owe factories, the pipeline */
     const openOrders = await this.prisma.db.order.findMany({
-      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fxOf({ sales })) } },
+      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fxOf({ sales }, await this.limits.allows("expenses"))) } },
       select: {
         currency: true,
         mainCurrency: true,
@@ -409,7 +409,7 @@ export class InsightsService {
     let overdue = 0;
     for (const o of openOrders) {
       // Still due as on the order (charged expenses included); what the plan does not date is "not due yet".
-      const settled = positionOf(o, fxOf({ sales }));
+      const settled = positionOf(o, fxOf({ sales }, await this.limits.allows("expenses")));
       if (settled.dueMinor <= 0) continue;
       toReceive += fx.order(settled.dueMinor, o);
       const plan = planStatus(
@@ -806,7 +806,7 @@ export class InsightsService {
   async receivables(user: SessionUser) {
     if (!can(user, "payments.record") && !can(user, "expenses.manage")) throw new ForbiddenError("You do not record money.");
     const today = this.clock.today();
-    const fx = fxOf(await this.settings.get());
+    const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     const orders = await this.prisma.db.order.findMany({
       where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fx) } },
       select: {

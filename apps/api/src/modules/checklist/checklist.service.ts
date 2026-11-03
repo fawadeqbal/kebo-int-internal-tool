@@ -223,7 +223,7 @@ export class ChecklistService {
     const today = this.clock.today();
     const settings = await this.settings.get();
     // Settings › Papers we use: switched-off papers leave the Documents step (unless already in).
-    const facts = { ...checklistFactsOf(o, factories, tz, fxOf(settings), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
+    const facts = { ...checklistFactsOf(o, factories, tz, fxOf(settings, await this.limits.allows("expenses")), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
     const steps = orderSteps(features);
     const overrides = new Map(rows.filter((r) => r.key).map((r) => [r.key!, r]));
     const late = (done: boolean, skipped: boolean, due: ISODate | null) => !done && !skipped && !!due && due < today;

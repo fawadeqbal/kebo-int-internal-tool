@@ -11,6 +11,7 @@ import { OrdersService } from "../orders/orders.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { ordersWithMoneyDue } from "../money/due";
 import { fxOf, positionOf, positionRelations } from "../money/position";
+import { LimitsService } from "../../common/company/limits.service";
 import { MainMoney } from "../money/order-money";
 
 export interface Range {
@@ -31,6 +32,7 @@ export class ReportsService {
     private readonly clock: Clock,
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
+    private readonly limits: LimitsService,
   ) {}
 
   /* ---------------------------------------------------------------- dashboard */
@@ -115,6 +117,7 @@ export class ReportsService {
     const { sales } = await this.settings.get();
     const main = sales.currency;
     const fx = new MainMoney(main, sales.exchangeRates);
+    const ctx = fxOf({ sales }, await this.limits.allows("expenses"));
     const monthStart = `${today.slice(0, 7)}-01`;
     const rated = { currency: true, mainCurrency: true, mainRate: true } as const;
     const [quoted, won, paidIn, openOrders] = await Promise.all([
@@ -132,7 +135,7 @@ export class ReportsService {
       }),
       this.prisma.db.order.findMany({
         // Closed orders too, while money is still owed on them.
-        where: { OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, fxOf({ sales })) } }] },
+        where: { OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, ctx) } }] },
         select: {
           total: true,
           depositPercent: true,
@@ -147,7 +150,7 @@ export class ReportsService {
     const byStage = { confirmed: 0, in_production: 0, shipped: 0 };
     for (const o of openOrders) {
       // Still due as on the order: the total and what was charged to the customer, less what came in.
-      receivable += fx.order(positionOf(o, fxOf({ sales })).dueMinor, o);
+      receivable += fx.order(positionOf(o, ctx).dueMinor, o);
       if (o.status === "open" && o.stage in byStage) byStage[o.stage as keyof typeof byStage] += 1;
     }
     return {

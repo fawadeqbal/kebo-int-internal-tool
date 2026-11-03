@@ -145,7 +145,7 @@ export class MoneyService {
           orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
         })
       : [];
-    const fx = fxOf(s);
+    const fx = fxOf(s, await this.limits.allows("expenses"));
     // Where the order stands with the customer: the same position as every screen and paper (charged expenses included).
     const position = positionOf(o, fx);
     const terms = termsOf(o);
@@ -613,7 +613,7 @@ export class MoneyService {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
     // Only orders where a factory may still be owed (worked out in the database, the same rule), not every order ever.
     const s = await this.settings.get();
-    const fx = fxOf(s);
+    const fx = fxOf(s, await this.limits.allows("expenses"));
     const owing = await ordersOwingFactories(this.prisma, fx);
     const orders = await this.prisma.db.order.findMany({
       where: { status: { not: "cancelled" }, id: { in: owing } },

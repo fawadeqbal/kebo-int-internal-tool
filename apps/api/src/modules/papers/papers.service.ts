@@ -201,7 +201,7 @@ export class PapersService {
         expenses: chargedExpenses,
       },
     });
-    const fx = fxOf(await this.settings.get());
+    const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     return {
       orders: rows.map((o) => {
         // As on the order: what was charged to the customer is part of what they owe.

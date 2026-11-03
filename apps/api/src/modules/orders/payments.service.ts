@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, type Prisma } from "@kebo/database";
-import { formatMinor, fromMinor, fxRate, toMinor, type Fx, type Minor } from "@kebo/money";
+import { formatMinor, fromMinor, fxRate, toMinor, type Minor } from "@kebo/money";
 import {
   bankStepsFor,
   can,
@@ -28,11 +28,11 @@ import { checkAccount } from "../money/account-check";
 import { LimitsService } from "../../common/company/limits.service";
 import { fileView } from "../money/payment-file-view";
 import { SettingsService } from "../settings/settings.service";
-import { chargedExpenses, fxOf, positionOf, type PositionFacts } from "../money/position";
+import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
 
 type Live = { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; currency: string };
 /** Where the order stands with these payments (orderPosition: what was charged to the customer can be paid too). */
-const settledOf = (o: Omit<PositionFacts, "payments">, payments: Live[], fx: Fx) => positionOf({ ...o, payments }, fx);
+const settledOf = (o: Omit<PositionFacts, "payments">, payments: Live[], fx: MoneyCtx) => positionOf({ ...o, payments }, fx);
 
 /** What arrived, before it is split over orders. */
 interface Arrived {
@@ -90,7 +90,7 @@ export class PaymentsService {
       orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
     });
     const live = all.filter((p) => !p.voidedAt && p.currency === o.currency);
-    const position = positionOf(o, fxOf(await this.settings.get()));
+    const position = positionOf(o, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
     // Who recorded each payment, and where the order stood after it (counted payments in date order).
     const people = new Map(
       (await this.prisma.db.user.findMany({ where: { id: { in: [...new Set(all.map((p) => p.recordedById))] } }, select: { id: true, name: true } })).map((u) => [u.id, u]),
@@ -188,7 +188,7 @@ export class PaymentsService {
     const today = this.clock.today();
     const settings = await this.settings.get();
     const soon = settings.reminders.dueSoonDays;
-    const fx = fxOf(settings);
+    const fx = fxOf(settings, await this.limits.allows("expenses"));
     const totals = new Map<string, { totalMinor: number; receivedMinor: number; dueMinor: number; orders: number }>();
     const rows = orders.map((o) => {
       const live = payments.filter((p) => p.orderId === o.id && !p.voidedAt && p.currency === o.currency);
@@ -324,7 +324,7 @@ export class PaymentsService {
       if (o.customerId !== customerId) throw new DomainError(`${o.refNo} is another customer's order.`);
       if (o.status === "cancelled") throw new DomainError(`${o.refNo} is cancelled.`);
       if (o.currency !== currency) throw new DomainError(`${o.refNo} is in ${o.currency}: a transfer pays orders in one currency (${currency}).`);
-      const pos = settledOf(o, o.payments, fxOf(await this.settings.get()));
+      const pos = settledOf(o, o.payments, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
       const amountMinor = toMinor(p.amount);
       if (amountMinor > pos.dueMinor) throw new DomainError(`${o.refNo}: that is more than is still due (${formatMinor(pos.dueMinor, o.currency)}).`);
       out.push({ order: o, kind: pos.depositOutstandingMinor > 0 ? "deposit" : "balance", amountMinor, bankChargesMinor: 0 });
@@ -448,7 +448,7 @@ export class PaymentsService {
       const countsMinor = countsAsMinor(receivedMinor, rate, same);
       if (countsMinor <= 0) throw new DomainError("At that rate the payment counts as nothing. Check the rate.");
       const chargesMinor = toMinor(input.bankCharges);
-      const before = settledOf(o, o.payments, fxOf(await this.settings.get()));
+      const before = settledOf(o, o.payments, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
       // This order's part: as sent (money v2), else what it counts as up to what is still due.
       const explicit = input.receivedAmount !== null && input.amount !== null ? toMinor(input.amount) : null;
       const thisMinor = explicit ?? Math.min(countsMinor, Math.max(before.dueMinor - chargesMinor, 0));
@@ -564,7 +564,7 @@ export class PaymentsService {
       const balance = (await this.creditOf(o.customerId, tx))[o.currency] ?? 0;
       const amountMinor = toMinor(input.amount);
       if (amountMinor > balance) throw new DomainError(`The customer has ${formatMinor(balance, o.currency)} of credit.`);
-      const pos = settledOf(o, o.payments, fxOf(await this.settings.get()));
+      const pos = settledOf(o, o.payments, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
       if (amountMinor > pos.dueMinor) throw new DomainError(`That is more than is still due (${formatMinor(pos.dueMinor, o.currency)}).`);
       const p = await tx.payment.create({
         data: {
@@ -684,7 +684,7 @@ export class PaymentsService {
       // The rate stays as recorded while the currency stays, unless a new one is sent.
       const rate = await this.rateFor(receivedCurrency, o.currency, input.rate ?? (receivedCurrency === p.receivedCurrency ? Number(p.rate) : null));
       const amountMinor = countsAsMinor(receivedMinor, rate, same);
-      const others = settledOf(o, o.payments.filter((x) => x.id !== p.id), fxOf(await this.settings.get()));
+      const others = settledOf(o, o.payments.filter((x) => x.id !== p.id), fxOf(await this.settings.get(), await this.limits.allows("expenses")));
       if (amountMinor + toMinor(input.bankCharges) > others.dueMinor) throw new DomainError(`That is more than is still due (${formatMinor(others.dueMinor, o.currency)}).`);
       await tx.payment.update({
         where: { id: p.id },

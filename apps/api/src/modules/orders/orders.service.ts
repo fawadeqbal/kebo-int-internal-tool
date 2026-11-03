@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, fxRate, type Fx } from "@kebo/money";
+import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
   checkMove,
@@ -38,7 +38,7 @@ import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../money/due";
-import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../money/position";
+import { chargedExpenses, fxOf, moneyFacts, positionOf, type MoneyCtx } from "../money/position";
 import { LimitsService } from "../../common/company/limits.service";
 import { checkAccount } from "../money/account-check";
 import { factoryPlansOf } from "../money/factory-plan";
@@ -472,7 +472,7 @@ export class OrdersService {
   }
 
   /** Where the order stands with the customer (orderPosition: the same on every screen), in the order's currency. */
-  private moneyOf(o: OrderRow, fx: Fx) {
+  private moneyOf(o: OrderRow, fx: MoneyCtx) {
     const position = positionOf(o, fx);
     return {
       ...moneyFacts(position),
@@ -482,7 +482,7 @@ export class OrdersService {
     };
   }
 
-  private facts(o: OrderRow, fx: Fx): OrderFacts {
+  private facts(o: OrderRow, fx: MoneyCtx): OrderFacts {
     const m = this.moneyOf(o, fx);
     return {
       ...moneyFacts(m.position),
@@ -505,7 +505,7 @@ export class OrdersService {
   private async view(o: OrderRow, user: SessionUser) {
     const show = await this.lineShows(user);
     const settings = await this.settings.get();
-    const fx = fxOf(settings);
+    const fx = fxOf(settings, await this.limits.allows("expenses"));
     const m = this.moneyOf(o, fx);
     const p = m.position;
     const days = settings.reminders;
@@ -656,7 +656,7 @@ export class OrdersService {
     });
     const settings = await this.settings.get();
     const days = settings.reminders;
-    const fx = fxOf(settings);
+    const fx = fxOf(settings, await this.limits.allows("expenses"));
     const today = this.clock.today();
     const items = rows.map((o) => {
       const p = positionOf(o, fx);
@@ -687,7 +687,7 @@ export class OrdersService {
   async todo(user: SessionUser) {
     // Closed orders appear only while money is still owed on them: the database picks those, so years
     // of finished orders are not read on every Home.
-    const due = await ordersWithMoneyDue(this.prisma, fxOf(await this.settings.get()));
+    const due = await ordersWithMoneyDue(this.prisma, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
     const all = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed", ids: due }))];
     // A checklist item of the order that is late or due soon comes first when it is due before what the order needs.
     const today = this.clock.today();
@@ -713,7 +713,7 @@ export class OrdersService {
     if (can(user, "sourcing.manage")) {
       const { sales } = await this.settings.get();
       for (const i of all.filter((x) => x.status === "open")) {
-        for (const p of await factoryPlansOf(this.prisma.db, i.id, sales.factoryAdvancePercent, today, soon, fxOf(await this.settings.get()))) {
+        for (const p of await factoryPlansOf(this.prisma.db, i.id, sales.factoryAdvancePercent, today, soon, fxOf(await this.settings.get(), await this.limits.allows("expenses")))) {
           const n = p.next;
           if (!n?.due || (n.status !== "due" && n.status !== "late")) continue;
           if (!i.needs || n.due < i.needs.due) i.needs = { title: `Pay ${p.factory.name}: ${n.label} ${p.currency} ${n.open}`, due: n.due, late: n.due < today };
@@ -740,7 +740,7 @@ export class OrdersService {
       // Lock the order first: two people pressing the button at once are served one after the other.
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.load(user, id, tx);
-      const m = this.moneyOf(o, fxOf(await this.settings.get()));
+      const m = this.moneyOf(o, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
       const check = checkMove(o.stage, input.to, o.status, { ...m, goods: goodsOf(o.lines, o.packedAt) });
       if (!check.ok) throw new GateError(check.message, check.code);
       if (check.warnings.some((w) => w.code === "money_due") && !can(user, "orders.manage")) {

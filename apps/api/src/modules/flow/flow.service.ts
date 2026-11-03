@@ -54,8 +54,7 @@ import { orderAccess, OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 import { SettingsService } from "../settings/settings.service";
 import { datePapers, lcChecksOf, rebuildRoutePlan, termsOf } from "../money/route-plan";
-import { chargedExpenses, fxOf, positionOf, type PositionFacts } from "../money/position";
-import type { Fx } from "@kebo/money";
+import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
 import { seedFactoryPlans } from "../money/factory-plan";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
@@ -126,7 +125,7 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
 }
 
 /** The deposit (the plan's deposit row, else the accepted %; with no deposit: everything) has come in, as orderPosition says. */
-function depositInOf(o: PositionFacts, fx: Fx) {
+function depositInOf(o: PositionFacts, fx: MoneyCtx) {
   return positionOf(o, fx).depositReceived;
 }
 
@@ -245,7 +244,7 @@ export class FlowService {
     const has = (f: PlanFeature) => !features || features.includes(f);
 
     const settings = await this.settings.get();
-    const depositIn = depositInOf(o, fxOf(settings));
+    const depositIn = depositInOf(o, fxOf(settings, await this.limits.allows("expenses")));
 
     const route = o.paymentRoute;
     const mode = o.shipments[0]?.mode ?? "sea";
@@ -492,10 +491,11 @@ export class FlowService {
       orderBy: { stageSince: "asc" },
       take: 300,
     });
-    const [features, settings] = await Promise.all([this.limits.features(), this.settings.get()]);
+    const [features, settings, expensesOn] = await Promise.all([this.limits.features(), this.settings.get(), this.limits.allows("expenses")]);
+    const fx = fxOf(settings, expensesOn);
     return {
       items: rows.map((o) => {
-        const steps = flowSteps(factsOf(o, depositInOf(o, fxOf(settings)), settings.papers.off), features);
+        const steps = flowSteps(factsOf(o, depositInOf(o, fx), settings.papers.off), features);
         const current = steps.find((s) => s.state === "current") ?? null;
         return { id: o.id, current: current && { key: current.key, label: current.label, sub: current.sub } };
       }),

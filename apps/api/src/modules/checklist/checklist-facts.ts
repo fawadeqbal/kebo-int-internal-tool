@@ -1,8 +1,8 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, type Fx } from "@kebo/money";
+import { fromMinor } from "@kebo/money";
 import type { ChecklistFacts } from "@kebo/shared";
 import { lcChecksOf } from "../money/route-plan";
-import { chargedExpenses, positionOf } from "../money/position";
+import { chargedExpenses, positionOf, type MoneyCtx } from "../money/position";
 import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
@@ -39,7 +39,7 @@ function reachedOn(payments: ChecklistOrderRow["payments"], currency: string, ta
  * The checklist's facts for one order. `factories` comes from the order's money
  * (null when the person may not see factory money).
  */
-export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, fx: Fx, lcCourierDays = 4): ChecklistFacts {
+export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): ChecklistFacts {
   // Where the order stands with the customer, as everywhere: the plan's deposit, what was charged to them.
   const position = positionOf(o, fx);
   const percent = position.depositPercent;

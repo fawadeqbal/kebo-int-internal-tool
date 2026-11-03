@@ -26,7 +26,7 @@ describe("one money truth", () => {
   const today = todayIn(process.env.APP_TIME_ZONE ?? "Asia/Shanghai");
   const day = (n: number) => new Date(Date.parse(`${today}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
   const db = () => prisma.company(FIRST_COMPANY_ID);
-  const fx = async () => fxOf(readSettings(Object.fromEntries((await db().setting.findMany()).map((r) => [r.key, r.value]))));
+  const fx = async () => fxOf(readSettings(Object.fromEntries((await db().setting.findMany()).map((r) => [r.key, r.value]))), true);
 
   let n = 0;
   /** An order of 10 pumps at USD 1,000 (USD 10,000, 30% deposit) bought at CNY 1,000 + tax from a factory of its own. */
@@ -327,30 +327,35 @@ describe("one money truth", () => {
       await api(app, manager)
         .post("/expenses", { orderId: o.orderId, category: "courier", description: `Courier CNY ${tag}`, amount: 355.55, currency: "CNY", rate: 7.1, spentOn: today, borneBy: "customer" })
         .expect(201);
-      const f = await fx();
       const rows = await db().order.findMany({ where: { status: { not: "cancelled" } }, include: positionRelations });
       expect(rows.length).toBeGreaterThan(3);
-      const sql = new Map((await positionsSql(db(), f)).map((r) => [r.id, r]));
-      for (const r of rows) {
-        const p = positionOf(r, f);
-        expect([r.refNo, sql.get(r.id)?.chargedMinor, sql.get(r.id)?.settledMinor, sql.get(r.id)?.dueMinor]).toEqual([r.refNo, p.chargedMinor, p.settledMinor, p.dueMinor]);
+      // With the expenses module, and without it (then nothing counts as charged, in both).
+      for (const f of [await fx(), { ...(await fx()), expensesOn: false }]) {
+        const sql = new Map((await positionsSql(db(), f)).map((r) => [r.id, r]));
+        for (const r of rows) {
+          const p = positionOf(r, f);
+          expect([r.refNo, sql.get(r.id)?.chargedMinor, sql.get(r.id)?.settledMinor, sql.get(r.id)?.dueMinor]).toEqual([r.refNo, p.chargedMinor, p.settledMinor, p.dueMinor]);
+        }
       }
-      expect(positionOf(rows.find((r) => r.id === o.orderId)!, f)).toMatchObject({ chargedMinor: 50_08, settledMinor: 3_000_00, dueMinor: 7_050_08 });
+      // CNY 355.55 at 7.1 = USD 50.08.
+      expect(positionOf(rows.find((r) => r.id === o.orderId)!, await fx())).toMatchObject({ chargedMinor: 50_08, settledMinor: 3_000_00, dueMinor: 7_050_08 });
+      expect(positionOf(rows.find((r) => r.id === o.orderId)!, { ...(await fx()), expensesOn: false })).toMatchObject({ chargedMinor: 0, dueMinor: 7_000_00 });
     });
 
     it("SQL factory positions equal factoryPositionOf on every order", async () => {
-      const f = await fx();
       const rows = await db().order.findMany({
         where: { status: { not: "cancelled" } },
         include: { lines: true, factoryPaid: { where: { voidedAt: null } }, expenses: factoryBorneExpenses },
       });
-      const sql = await factoryPositionsSql(db(), f);
-      for (const r of rows) {
-        const ts = factoryPositionOf(r, f).filter((x) => x.lines > 0);
-        const mine = sql.filter((x) => x.orderId === r.id);
-        expect(mine.map((x) => [x.factoryId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort()).toEqual(
-          ts.map((x) => [x.factoryId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort(),
-        );
+      for (const f of [await fx(), { ...(await fx()), expensesOn: false }]) {
+        const sql = await factoryPositionsSql(db(), f);
+        for (const r of rows) {
+          const ts = factoryPositionOf(r, f).filter((x) => x.lines > 0);
+          const mine = sql.filter((x) => x.orderId === r.id);
+          expect(mine.map((x) => [x.factoryId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort()).toEqual(
+            ts.map((x) => [x.factoryId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort(),
+          );
+        }
       }
     });
 

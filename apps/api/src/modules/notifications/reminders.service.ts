@@ -102,7 +102,7 @@ export class RemindersService {
     const orders = await this.prisma.db.order.findMany({
       // Closed orders too: one closed with money still owed keeps being chased (orderNeeds decides).
       // Closed ones only while money is still owed on them (found in the database, not by reading every order).
-      where: { inquiry: { onHold: false }, OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, fxOf(s)) } }] },
+      where: { inquiry: { onHold: false }, OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, fxOf(s, await this.limits.allows("expenses"))) } }] },
       include: {
         payments: { where: { voidedAt: null } },
         planItems: { orderBy: { sortOrder: "asc" } },
@@ -116,7 +116,7 @@ export class RemindersService {
     type Late = { orderId: string; refNo: string; title: string; due: string; lateBy: number };
     const lateFor = new Map<string, Late[]>();
     const escalated: Late[] = [];
-    const fx = fxOf(s);
+    const fx = fxOf(s, await this.limits.allows("expenses"));
     for (const o of orders) {
       // The same position as the order page: the plan's deposit, what was charged to the customer.
       const need = orderNeeds(

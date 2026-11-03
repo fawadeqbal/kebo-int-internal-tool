@@ -65,7 +65,7 @@ export class CostsService {
     });
     const settings = await this.settings.get();
     const { sales } = settings;
-    const fx = fxOf(settings);
+    const fx = fxOf(settings, await this.limits.allows("expenses"));
     const perMain = orderRate(o, sales.currency, sales.exchangeRates);
     /** An expense in the order's currency: its amount at its own rate into the main currency, then at the order's rate. */
     const inOrder = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) =>

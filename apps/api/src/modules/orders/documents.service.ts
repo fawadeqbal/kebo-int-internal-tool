@@ -10,6 +10,7 @@ import { SettingsService } from "../settings/settings.service";
 import { companySnapshot, customerSnapshot } from "../quotations/quotations.service";
 import { orderLineNumbers, OrdersService } from "./orders.service";
 import { chargedExpenses, fxOf, positionOf } from "../money/position";
+import { LimitsService } from "../../common/company/limits.service";
 
 export const ORDER_DOCUMENTS = ["proforma", "packing-list"] as const;
 export type OrderDocumentKind = (typeof ORDER_DOCUMENTS)[number];
@@ -41,6 +42,7 @@ export class DocumentsService {
     private readonly clock: Clock,
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
+    private readonly limits: LimitsService,
   ) {}
 
   /** The customer as sent on the quotation; details missing there (e.g. a registration number added later) come from the customer now. */
@@ -69,7 +71,7 @@ export class DocumentsService {
     const rev = o.revision;
     const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), rev.discount.toString());
     // Where the order stands, as on every screen: the plan's deposit (a plan edited to 50% says 50%), what was charged.
-    const position = positionOf(o, fxOf(settings));
+    const position = positionOf(o, fxOf(settings, await this.limits.allows("expenses")));
     const depositPercent = position.depositPercent;
     const shippedOn = fromDbDateOrNull(o.shippedOn);
     const goodsOnly = kind === "packing-list";

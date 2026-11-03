@@ -13,8 +13,17 @@ import { orderRate } from "./order-money";
 
 type Decimalish = Prisma.Decimal | { toString(): string } | number | string;
 
-/** Settings' main currency and rates, as the money functions take them. */
-export const fxOf = (s: Pick<Settings, "sales">): Fx => ({ main: s.sales.currency, rates: s.sales.exchangeRates });
+/**
+ * What the money rules need besides the order: Settings' main currency and
+ * rates, and whether the company has the expenses module. Expenses are a plan
+ * feature: without it nothing counts as charged to the customer or borne by a
+ * factory (as the order's money always showed), on every screen and in SQL.
+ */
+export interface MoneyCtx extends Fx {
+  expensesOn: boolean;
+}
+
+export const fxOf = (s: Pick<Settings, "sales">, expensesOn: boolean): MoneyCtx => ({ main: s.sales.currency, rates: s.sales.exchangeRates, expensesOn });
 
 /** The expenses charged to the customer (added to what they owe), to load with an order. */
 export const chargedExpenses = {
@@ -43,11 +52,12 @@ export interface PositionFacts {
 
 const minor = (d: Decimalish) => decimalToMinor(d as Prisma.Decimal);
 
-/** Each expense charged to the customer in the order's currency (null: no rate to turn it). */
+/** Each expense charged to the customer in the order's currency (null: no rate to turn it); none without the expenses module. */
 export function chargedOf<E extends PositionFacts["expenses"][number]>(
   o: { currency: string; mainCurrency: string | null; mainRate: Decimalish | null; expenses: E[] },
-  fx: Fx,
+  fx: MoneyCtx,
 ) {
+  if (!fx.expensesOn) return [];
   const perMain = orderRate({ currency: o.currency, mainCurrency: o.mainCurrency, mainRate: o.mainRate as never }, fx.main, fx.rates);
   return o.expenses
     .filter((e) => (e.borneBy ?? "customer") === "customer" && !e.voidedAt)
@@ -55,7 +65,7 @@ export function chargedOf<E extends PositionFacts["expenses"][number]>(
 }
 
 /** Where the order stands with the customer (see orderPosition in @kebo/money). */
-export function positionOf(o: PositionFacts, fx: Fx, toleranceMinor = 0): OrderPosition {
+export function positionOf(o: PositionFacts, fx: MoneyCtx, toleranceMinor = 0): OrderPosition {
   const charged = chargedOf(o, fx).reduce((t, c) => t + (c.minor ?? 0), 0);
   return orderPosition({
     totalMinor: minor(o.total),
@@ -99,7 +109,7 @@ export interface FactoryFacts {
 }
 
 /** What we owe each factory on the order and where it stands (see factoryPosition in @kebo/money). */
-export function factoryPositionOf(o: FactoryFacts, fx: Fx): FactoryOwing[] {
+export function factoryPositionOf(o: FactoryFacts, fx: MoneyCtx): FactoryOwing[] {
   return factoryPosition(
     o.lines.flatMap((l) =>
       l.factoryId && l.factoryUnitPrice !== null && l.factoryCurrency
@@ -117,7 +127,7 @@ export function factoryPositionOf(o: FactoryFacts, fx: Fx): FactoryOwing[] {
     ),
     o.factoryPaid.filter((p) => !p.voidedAt).map((p) => ({ factoryId: p.factoryId, currency: p.currency, amountMinor: minor(p.amount) })),
     o.expenses
-      .filter((e) => (e.borneBy ?? "factory") === "factory" && !e.voidedAt && e.factoryId)
+      .filter((e) => fx.expensesOn && (e.borneBy ?? "factory") === "factory" && !e.voidedAt && e.factoryId)
       .map((e) => ({ factoryId: e.factoryId!, currency: e.currency, amountMinor: minor(e.amount), rate: e.rate.toString() })),
     fx,
   );

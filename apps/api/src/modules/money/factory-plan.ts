@@ -1,9 +1,9 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, type Fx } from "@kebo/money";
+import { fromMinor } from "@kebo/money";
 import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
-import { factoryBorneExpenses, factoryPositionOf } from "./position";
+import { factoryBorneExpenses, factoryPositionOf, type MoneyCtx } from "./position";
 
 type Db = PrismaService["db"] | Tx;
 type FactoryRef = { id: string; name: string };
@@ -17,7 +17,7 @@ export function owedByFactory<F extends FactoryRef>(
   lines: { factory: F | null; factoryUnitPrice: Prisma.Decimal | null; factoryCurrency: string | null; factoryTaxRate: Prisma.Decimal | null; factoryTaxIncluded: boolean; quantity: Prisma.Decimal }[],
 ) {
   // The one formula (factoryPosition), without payments or expenses: only what the lines owe.
-  const rows = factoryPositionOf({ lines: lines.map((l) => ({ ...l, factoryId: l.factory?.id ?? null })), factoryPaid: [], expenses: [] }, { main: "", rates: {} });
+  const rows = factoryPositionOf({ lines: lines.map((l) => ({ ...l, factoryId: l.factory?.id ?? null })), factoryPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
   const factories = new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
   return new Map(rows.map((r) => [r.key, { factory: factories.get(r.factoryId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
 }
@@ -43,7 +43,7 @@ const planLines = {
  * shows the company's default (advance on order, balance on the ready date)
  * until one is saved; the balance's date follows the order's ready date.
  */
-export async function factoryPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number, fx: Fx) {
+export async function factoryPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
   const o = await db.order.findUniqueOrThrow({
     where: { id: orderId },
     select: {

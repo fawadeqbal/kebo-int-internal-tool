@@ -1,5 +1,5 @@
 import { Prisma } from "@kebo/database";
-import type { Fx } from "@kebo/money";
+import type { MoneyCtx } from "./position";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 
 type Db = PrismaService["db"] | Tx;
@@ -13,7 +13,7 @@ type Db = PrismaService["db"] | Tx;
  */
 
 /** Units of the order's currency per one unit of the main currency, as orderRate: 1, the order's own rate, else Settings'. */
-const orderPerMainSql = (fx: Fx) =>
+const orderPerMainSql = (fx: MoneyCtx) =>
   Prisma.sql`(case when o.currency = ${fx.main} then 1::numeric
                    when o.main_currency = ${fx.main} and o.main_rate > 0 then o.main_rate
                    else nullif((${JSON.stringify(fx.rates)}::jsonb ->> o.currency::text)::numeric, 0) end)`;
@@ -26,9 +26,11 @@ const orderPerMainSql = (fx: Fx) =>
 const expenseInSql = (to: Prisma.Sql, perMain: Prisma.Sql) =>
   Prisma.sql`(case when e.currency = ${to} then round(e.amount * 100) else round(round(e.amount * 100 / e.rate) * ${perMain}) end)`;
 
-/** Expenses charged to the customer on order `o`, in its currency (minor units). */
-const chargedSql = (fx: Fx) =>
-  Prisma.sql`coalesce((select sum(${expenseInSql(Prisma.sql`o.currency`, orderPerMainSql(fx))})
+/** Expenses charged to the customer on order `o`, in its currency (minor units); none without the expenses module. */
+const chargedSql = (fx: MoneyCtx) =>
+  !fx.expensesOn
+    ? Prisma.sql`0`
+    : Prisma.sql`coalesce((select sum(${expenseInSql(Prisma.sql`o.currency`, orderPerMainSql(fx))})
                        from expenses e where e.order_id = o.id and e.voided_at is null and e.borne_by = 'customer'), 0)`;
 
 /** What came in on order `o` in its currency, with the bank charges (minor units). */
@@ -45,7 +47,7 @@ export interface PositionRow {
 }
 
 /** Each order's total, charged, settled and due, worked out in the database (cancelled orders left out). */
-export async function positionsSql(db: Db, fx: Fx, ids?: string[]): Promise<PositionRow[]> {
+export async function positionsSql(db: Db, fx: MoneyCtx, ids?: string[]): Promise<PositionRow[]> {
   return db.$queryRaw<PositionRow[]>`
     select id, "totalMinor", "chargedMinor", "settledMinor", greatest("totalMinor" + "chargedMinor" - "settledMinor", 0) as "dueMinor"
     from (
@@ -60,7 +62,7 @@ export async function positionsSql(db: Db, fx: Fx, ids?: string[]): Promise<Posi
  * what was charged to them, less what was received in its currency (amount
  * plus bank charges).
  */
-export async function ordersWithMoneyDue(prisma: PrismaService, fx: Fx): Promise<string[]> {
+export async function ordersWithMoneyDue(prisma: PrismaService, fx: MoneyCtx): Promise<string[]> {
   return (await positionsSql(prisma.db, fx)).filter((r) => r.dueMinor > 0).map((r) => r.id);
 }
 
@@ -91,7 +93,7 @@ export interface FactoryPositionRow {
  * expenses it bears (in the expense's currency when it owes in it, else its
  * first currency A→Z, turned at the expense's rate and the Settings rate).
  */
-export async function factoryPositionsSql(db: Db, fx: Fx, orderIds?: string[]): Promise<FactoryPositionRow[]> {
+export async function factoryPositionsSql(db: Db, fx: MoneyCtx, orderIds?: string[]): Promise<FactoryPositionRow[]> {
   const perMain = Prisma.sql`(case when t.currency = ${fx.main} then 1::numeric else nullif((${JSON.stringify(fx.rates)}::jsonb ->> t.currency::text)::numeric, 0) end)`;
   return db.$queryRaw<FactoryPositionRow[]>`
     with owed as (
@@ -116,7 +118,7 @@ export async function factoryPositionsSql(db: Db, fx: Fx, orderIds?: string[]): 
                (select min(w.currency) from owed w where w.order_id = e.order_id and w.factory_id = e.factory_id)
              ) as currency
       from expenses e
-      where e.voided_at is null and e.borne_by = 'factory' and e.factory_id is not null and e.order_id is not null
+      where e.voided_at is null and e.borne_by = 'factory' and e.factory_id is not null and e.order_id is not null and ${fx.expensesOn}
     ),
     taken as (
       select t.order_id, t.factory_id, t.currency,
@@ -138,6 +140,6 @@ export async function factoryPositionsSql(db: Db, fx: Fx, orderIds?: string[]): 
  * prices frozen on the order, with tax, in the factory's currency) against
  * what we paid that factory in that currency and the expenses it bears.
  */
-export async function ordersOwingFactories(prisma: PrismaService, fx: Fx): Promise<string[]> {
+export async function ordersOwingFactories(prisma: PrismaService, fx: MoneyCtx): Promise<string[]> {
   return [...new Set((await factoryPositionsSql(prisma.db, fx)).filter((r) => r.toPayMinor > 0).map((r) => r.orderId))];
 }

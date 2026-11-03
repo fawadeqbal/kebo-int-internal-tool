@@ -173,7 +173,7 @@ export function linesOf(c: PaperCtx) {
 
 /** Received and due on the order (in its currency), as on every screen: orderPosition, charged expenses included. */
 export function positionOf(c: PaperCtx) {
-  const p = orderPositionOf(c.o, fxOf(c.settings));
+  const p = orderPositionOf(c.o, fxOf(c.settings, has(c, "expenses")));
   return {
     total: fromMinor(p.totalMinor),
     charged: fromMinor(p.chargedMinor),
@@ -451,7 +451,7 @@ function purchaseOrder(c: PaperCtx): Built {
   const tax = poTax(priced);
   const paid = c.o.factoryPaid.filter((p) => f && p.factoryId === f.id);
   // Where we stand with this factory, as on the order's money (factoryPosition): paid, what it bears, still to pay.
-  const position = f && currency ? (factoryPositionOf(c.o, fxOf(c.settings)).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
+  const position = f && currency ? (factoryPositionOf(c.o, fxOf(c.settings, has(c, "expenses"))).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
   const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.factoryId === f.id);
   const terms = f && currency ? poPaymentTerms(c, f.id, currency, tax.owedMinor) : null;
   return {
