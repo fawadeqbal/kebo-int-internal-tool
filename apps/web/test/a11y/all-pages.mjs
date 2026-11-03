@@ -109,7 +109,7 @@ async function primaries(page) {
       if (el.getAttribute("role") === "switch" || el.closest("[role=dialog],[role=alertdialog],[role=menu]")) continue;
       const r = el.getBoundingClientRect();
       const s = getComputedStyle(el);
-      if (!r.width || !r.height || s.visibility === "hidden" || s.display === "none") continue;
+      if (!r.width || !r.height || s.visibility === "hidden" || s.display === "none" || !el.checkVisibility({ contentVisibilityAuto: true })) continue;
       seen.push((el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60));
     }
     return seen;
@@ -128,8 +128,7 @@ async function markFocusables(page, scope) {
       if (el.closest("nextjs-portal,[inert],[hidden]") || el.matches(":disabled") || el.getAttribute("tabindex") === "-1") continue;
       if (!scope && el.closest("[role=dialog],[role=alertdialog],[role=menu],[data-layer]")) continue;
       if (el.closest("[aria-hidden=true]") && !el.closest("[role=dialog]")) continue;
-      const s = getComputedStyle(el);
-      if (!el.getClientRects().length || s.visibility === "hidden") continue;
+      if (!el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true })) continue;
       // A group of radio buttons is one stop for Tab (arrow keys move inside it).
       if (el.matches("input[type=radio]")) {
         const g = `${el.form?.id ?? ""}|${el.name}`;
@@ -287,7 +286,7 @@ async function layers(page, where, kind, path) {
     const main = document.querySelector("main") ?? document.body;
     const out = [];
     for (const el of main.querySelectorAll('[aria-haspopup=dialog], a[href*="panel="]')) {
-      if (el.closest("[role=dialog],[role=menu]") || !el.getClientRects().length || el.matches(":disabled")) continue;
+      if (el.closest("[role=dialog],[role=menu]") || !el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true }) || el.matches(":disabled")) continue;
       const label = (el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 50);
       el.dataset.a11yOpener = String(out.length);
       out.push(label);
@@ -319,7 +318,7 @@ async function layers(page, where, kind, path) {
       const main = document.querySelector("main") ?? document.body;
       let k = 0;
       for (const el of main.querySelectorAll('[aria-haspopup=dialog], a[href*="panel="]')) {
-        if (el.closest("[role=dialog],[role=menu]") || !el.getClientRects().length || el.matches(":disabled")) continue;
+        if (el.closest("[role=dialog],[role=menu]") || !el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true }) || el.matches(":disabled")) continue;
         el.dataset.a11yOpener = String(k++);
       }
     });
