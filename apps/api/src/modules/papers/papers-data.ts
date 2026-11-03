@@ -136,7 +136,7 @@ function check(
   label: string,
   value: string,
   ok: boolean,
-  more: { required?: boolean; fix?: PaperFixField | null; href?: string | null } = {},
+  more: { required?: boolean; fix?: PaperFixField | null; href?: string | null; warn?: string | null } = {},
 ): PaperCheck {
   return {
     key,
@@ -146,6 +146,7 @@ function check(
     required: more.required ?? false,
     fix: ok ? null : (more.fix ?? null),
     href: ok ? null : (more.href ?? null),
+    ...(more.warn ? { warn: more.warn } : {}),
   };
 }
 
@@ -307,16 +308,13 @@ function salesContract(c: PaperCtx): Built {
           .join(" · "),
         true,
       ),
+      // Both shown; ours printed. Later than the LC's latest shipment: warned (a new date can be typed here).
       check(
         "shipBy",
         "Ship by",
-        shipBy
-          ? `${paperDateText(shipBy)}${lcLatest ? ` · LC latest ${paperDateText(lcLatest)}${vsLc?.late ? " · ours is later than the LC allows" : ""}` : ""}`
-          : lcLatest
-            ? `not set · LC latest ${paperDateText(lcLatest)}`
-            : "not set",
+        shipBy ? `${paperDateText(shipBy)}${lcLatest ? ` · LC latest ${paperDateText(lcLatest)}` : ""}` : lcLatest ? `not set · LC latest ${paperDateText(lcLatest)}` : "not set",
         !!shipBy && !vsLc?.late,
-        { fix: "shipBy" },
+        { fix: "shipBy", warn: vsLc?.late ? `Ours is later than the LC allows: ship by ${paperDateText(lcLatest!)}, or ask for an amendment.` : null },
       ),
       hs.check,
       check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {

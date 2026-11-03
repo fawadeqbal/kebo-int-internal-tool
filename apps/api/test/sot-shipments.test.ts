@@ -54,6 +54,9 @@ describe("the shipment is the shipment", () => {
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "sent" }).expect(200);
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "accepted" }).expect(200);
     const o = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0];
+    // Won and ordered months ago: this month's reports elsewhere are left as they are.
+    await prisma.platform.$executeRaw`update orders set ordered_on = ordered_on - 75 where id = ${o.id}::uuid`;
+    await prisma.platform.$executeRaw`update inquiries set closed_at = closed_at - interval '75 days' where id = ${inquiry.id}::uuid`;
     return { id: o.id as string, refNo: o.refNo as string };
   };
   const order = async (id: string) => (await api(app, sana).get(`/orders/${id}`).expect(200)).body;
@@ -61,7 +64,9 @@ describe("the shipment is the shipment", () => {
   const shipments = async (id: string) => (await flow(id)).shipping.shipments as Record<string, unknown>[];
   const paperDoc = async (id: string, kind: string) => (await api(app, sana).get(`/orders/${id}/papers/${kind}/doc`).expect(200)).body;
   const paperChecks = async (id: string, kind: string) =>
-    (await api(app, sana).get(`/orders/${id}/papers/${kind}/checks`).expect(200)).body as { checks: { key: string; ok: boolean; value: string }[] };
+    (await api(app, sana).get(`/orders/${id}/papers/${kind}/checks`).expect(200)).body as {
+      checks: { key: string; ok: boolean; value: string; fix: string | null; warn?: string | null }[];
+    };
   const items = async (id: string) =>
     (await api(app, sana).get(`/orders/${id}/steps`).expect(200)).body.items as { key: string; done: boolean; late: boolean; needs: string | null; data: [string, string][] }[];
   const history = async (id: string) =>
@@ -131,11 +136,11 @@ describe("the shipment is the shipment", () => {
     expect((await order(o.id)).shipBySuggested).toBeNull();
 
     // The Details card's B/L and ship date: an implicit Shipment 1 is made, with the ports the terms give.
-    await api(app, sana).patch(`/orders/${o.id}/details`, { blNo: "OOLU-1", shippedOn: day(-3), containerNo: "TGHU 1" }).expect(200);
+    await api(app, sana).patch(`/orders/${o.id}/details`, { blNo: "OOLU-1", shippedOn: day(-43), containerNo: "TGHU 1" }).expect(200);
     const [s] = await shipments(o.id);
-    expect(s).toMatchObject({ n: 1, status: "departed", blNo: "OOLU-1", departedOn: day(-3), containerNo: "TGHU 1", portOfLoading: null, portOfDischarge: "Karachi" });
+    expect(s).toMatchObject({ n: 1, status: "departed", blNo: "OOLU-1", departedOn: day(-43), containerNo: "TGHU 1", portOfLoading: null, portOfDischarge: "Karachi" });
     v = await order(o.id);
-    expect(v).toMatchObject({ shippedOn: day(-3), blNo: "OOLU-1", shipment: { id: s!.id, count: 1, blNo: "OOLU-1", containerNo: "TGHU 1" } });
+    expect(v).toMatchObject({ shippedOn: day(-43), blNo: "OOLU-1", shipment: { id: s!.id, count: 1, blNo: "OOLU-1", containerNo: "TGHU 1" } });
     expect(v.goods.containerNo).toBe("TGHU 1");
     // Changed on the shipment: the order shows the shipment's (one place).
     await api(app, sana).patch(`/shipments/${s!.id}`, { containerNo: "TGHU 2" }).expect(200);
@@ -193,12 +198,12 @@ describe("the shipment is the shipment", () => {
     const first = (await api(app, sana).post(`/orders/${o.id}/shipments`, { mode: "sea", status: "booked", blNo: "S1-BL", vessel: "MSC One" }).expect(201)).body
       .shipping.shipments[0];
     const second = (
-      await api(app, sana).post(`/orders/${o.id}/shipments`, { mode: "sea", status: "departed", departedOn: day(-35), blNo: "S2-BL" }).expect(201)
+      await api(app, sana).post(`/orders/${o.id}/shipments`, { mode: "sea", status: "departed", departedOn: day(-65), blNo: "S2-BL" }).expect(201)
     ).body.shipping.shipments[1];
     expect([first.n, second.n]).toEqual([1, 2]);
     // The second one left first: the order shipped then, and moved to Shipped by itself (nothing copied).
     const v = await order(o.id);
-    expect(v).toMatchObject({ stage: "shipped", shippedOn: day(-35), blNo: "S1-BL", shipment: { id: first.id, count: 2 } });
+    expect(v).toMatchObject({ stage: "shipped", shippedOn: day(-65), blNo: "S1-BL", shipment: { id: first.id, count: 2 } });
     // The papers speak of Shipment 1.
     expect((await paperDoc(o.id, "commercial-invoice")).doc.meta).toContainEqual({ label: "B/L No.", value: "S1-BL" });
     expect((await paperDoc(o.id, "shipping-advice")).doc.bullets).toContainEqual({ label: "Vessel:", value: "MSC One" });
@@ -207,7 +212,7 @@ describe("the shipment is the shipment", () => {
     await packed(o2.id);
     await api(app, sana).post(`/orders/${o2.id}/shipments`, { mode: "sea", status: "departed" }).expect(201);
     expect(await order(o2.id)).toMatchObject({ stage: "shipped", shippedOn: today });
-    await api(app, sana).patch(`/shipments/${(await shipments(o2.id))[0]!.id}`, { departedOn: day(-33) }).expect(200);
+    await api(app, sana).patch(`/shipments/${(await shipments(o2.id))[0]!.id}`, { departedOn: day(-63) }).expect(200);
   });
 
   it("our ship-by is kept beside the LC's latest shipment date and warned about when later", async () => {
@@ -226,8 +231,9 @@ describe("the shipment is the shipment", () => {
     expect(lcItem.needs).toMatch(/our ship-by is not after the lc's latest shipment/i);
     // The sales contract's Make page shows both and warns (ours is printed; the check fails).
     let shipBy = (await paperChecks(o.id, "sales-contract")).checks.find((c) => c.key === "shipBy")!;
-    expect(shipBy).toMatchObject({ ok: false });
-    expect(shipBy.value).toMatch(/LC latest .* ours is later than the LC allows/);
+    expect(shipBy).toMatchObject({ ok: false, fix: "shipBy" });
+    expect(shipBy.value).toMatch(/LC latest/);
+    expect(shipBy.warn).toMatch(/^Ours is later than the LC allows: ship by .*, or ask for an amendment\.$/);
     // Ours moved inside the LC's date: both still shown, the check passes.
     await api(app, sana).patch(`/orders/${o.id}/details`, { shipBy: day(28) }).expect(200);
     expect((await flow(o.id)).payment.lcChecks.find((c: { key: string }) => c.key === "our_ship_by")).toMatchObject({ ok: true });
@@ -257,12 +263,12 @@ describe("the shipment is the shipment", () => {
           container,
           stage,
         );
-      await set(onlyOrder.id, day(-30), "OLD-A", "CONT-A");
-      await api(app, sana).post(`/orders/${onlyShipment.id}/shipments`, { mode: "sea", status: "departed", departedOn: day(-31), blNo: "SHIP-B" }).expect(201);
-      await api(app, sana).post(`/orders/${both.id}/shipments`, { mode: "sea", status: "departed", departedOn: day(-20), blNo: "SHIP-C", containerNo: "SC-1" }).expect(201);
-      await set(both.id, day(-22), "ORDER-C", "SC-1");
+      await set(onlyOrder.id, day(-70), "OLD-A", "CONT-A");
+      await api(app, sana).post(`/orders/${onlyShipment.id}/shipments`, { mode: "sea", status: "departed", departedOn: day(-71), blNo: "SHIP-B" }).expect(201);
+      await api(app, sana).post(`/orders/${both.id}/shipments`, { mode: "sea", status: "departed", departedOn: day(-60), blNo: "SHIP-C", containerNo: "SC-1" }).expect(201);
+      await set(both.id, day(-62), "ORDER-C", "SC-1");
       await api(app, sana).post(`/orders/${gaps.id}/shipments`, { mode: "sea", status: "booked", forwarder: "Sino Trans" }).expect(201);
-      await set(gaps.id, day(-10), "ORDER-D", "OC-D");
+      await set(gaps.id, day(-50), "ORDER-D", "OC-D");
       await api(app, sana).post(`/orders/${docOnly.id}/shipments`, { mode: "sea", status: "booked" }).expect(201);
       await db.$executeRawUnsafe(
         `INSERT INTO order_documents (id, company_id, order_id, kind, number, status, updated_at) SELECT gen_random_uuid(), company_id, id, 'bill_of_lading', 'DOC-E', 'ready', now() FROM orders WHERE id = $1::uuid`,
@@ -277,30 +283,30 @@ describe("the shipment is the shipment", () => {
 
     // Order-only: Shipment 1 made from its facts, ports from the terms (CFR Karachi: discharge), the history says so.
     expect(await shipments(onlyOrder.id)).toEqual([
-      expect.objectContaining({ n: 1, mode: "sea", status: "departed", departedOn: day(-30), blNo: "OLD-A", containerNo: "CONT-A", portOfLoading: null, portOfDischarge: "Karachi" }),
+      expect.objectContaining({ n: 1, mode: "sea", status: "departed", departedOn: day(-70), blNo: "OLD-A", containerNo: "CONT-A", portOfLoading: null, portOfDischarge: "Karachi" }),
     ]);
-    expect(await order(onlyOrder.id)).toMatchObject({ shippedOn: day(-30), blNo: "OLD-A" });
+    expect(await order(onlyOrder.id)).toMatchObject({ shippedOn: day(-70), blNo: "OLD-A" });
     expect((await history(onlyOrder.id)).map((h) => h.summary)).toContainEqual(
-      `${onlyOrder.refNo}: ship date ${day(-30)}, B/L OLD-A, container CONT-A moved from the order to Shipment 1 (one place for the shipment)`,
+      `${onlyOrder.refNo}: ship date ${day(-70)}, B/L OLD-A, container CONT-A moved from the order to Shipment 1 (one place for the shipment)`,
     );
     // Shipment-only: untouched, nothing in the history.
-    expect(await shipments(onlyShipment.id)).toEqual([expect.objectContaining({ blNo: "SHIP-B", departedOn: day(-31) })]);
+    expect(await shipments(onlyShipment.id)).toEqual([expect.objectContaining({ blNo: "SHIP-B", departedOn: day(-71) })]);
     expect((await history(onlyShipment.id)).some((h) => /one place for the shipment/.test(h.summary))).toBe(false);
     // Both, differing: the shipment's is kept; the order's old values are in the history.
-    expect(await shipments(both.id)).toEqual([expect.objectContaining({ blNo: "SHIP-C", departedOn: day(-20), containerNo: "SC-1" })]);
+    expect(await shipments(both.id)).toEqual([expect.objectContaining({ blNo: "SHIP-C", departedOn: day(-60), containerNo: "SC-1" })]);
     const moved = (await history(both.id)).find((h) => /differed/.test(h.summary))!;
     expect(moved.summary).toBe(
-      `${both.refNo}: the order's own B/L ORDER-C, ship date ${day(-22)} differed from the shipment's (B/L SHIP-C, left ${day(-20)}): the shipment's is kept (one place for the shipment)`,
+      `${both.refNo}: the order's own B/L ORDER-C, ship date ${day(-62)} differed from the shipment's (B/L SHIP-C, left ${day(-60)}): the shipment's is kept (one place for the shipment)`,
     );
     expect(moved.changes).toEqual(
       expect.arrayContaining([
         { field: "blNo", from: "ORDER-C", to: "SHIP-C" },
-        { field: "shippedOn", from: day(-22), to: day(-20) },
+        { field: "shippedOn", from: day(-62), to: day(-60) },
       ]),
     );
     // A shipment without them takes the order's (what the papers printed), and moves on to departed.
     expect(await shipments(gaps.id)).toEqual([
-      expect.objectContaining({ status: "departed", forwarder: "Sino Trans", blNo: "ORDER-D", departedOn: day(-10), containerNo: "OC-D" }),
+      expect.objectContaining({ status: "departed", forwarder: "Sino Trans", blNo: "ORDER-D", departedOn: day(-50), containerNo: "OC-D" }),
     ]);
     // The document set's B/L number went to the shipment; the row keeps none.
     expect((await shipments(docOnly.id))[0]).toMatchObject({ blNo: "DOC-E" });

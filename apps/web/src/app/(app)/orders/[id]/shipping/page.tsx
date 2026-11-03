@@ -32,7 +32,7 @@ interface ShipBy {
 function shipByFields(b: ShipBy): DetailField[] {
   return [
     {
-      label: "Ship by (ours)",
+      label: b.lc ? "Ship by (ours)" : "Ship by",
       value: b.ours,
       show: b.ours ? (
         b.late ? (
@@ -279,7 +279,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             id="shipments"
             target="shipment"
             title="Shipment"
-            description={canShip ? "Not booked yet: + Add any value starts the shipment, from the order's ports." : "Not booked yet."}
+            description={canShip ? "Not booked yet: + Add any value starts the shipment, its ports from the terms." : "Not booked yet."}
             fields={shipmentFields(fresh, shipBy)}
             action={fieldsAction.bind(null, o.id, "shipment:new")}
             canEdit={canShip}

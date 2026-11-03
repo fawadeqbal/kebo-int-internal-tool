@@ -492,6 +492,8 @@ export interface PaperCheck {
   fix: PaperFixField | null;
   /** Or where to record it. */
   href: string | null;
+  /** What is wrong with the value it has (e.g. our ship-by is later than the LC's latest shipment). */
+  warn?: string | null;
 }
 
 export const PAPER_FIX_FIELDS = [

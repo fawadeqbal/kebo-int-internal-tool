@@ -123,7 +123,12 @@ function CheckRow({
           </span>
         )}
       </div>
-      {input && <p className="pl-6 text-xs text-muted">Adding it here also saves it on {fix.saves}.</p>}
+      {c.warn && (
+        <p className="pl-6 text-xs text-bad">
+          <span className="font-medium">{c.value}</span> · {c.warn}
+        </p>
+      )}
+      {input && <p className="pl-6 text-xs text-muted">{c.warn ? "A new date typed here" : "Adding it here"} also saves it on {fix.saves}.</p>}
       {canFix && !c.ok && c.fix === "hs" && hsLines.length > 0 && (
         <ul className="flex flex-col gap-1.5 pl-6">
           {hsLines.map((l) => (
