@@ -1,6 +1,7 @@
 import { divideMinor, multiplyMinor, payInstalments, percentOfMinor, splitDeposit, formatMinor, type Minor } from "@kebo/money";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import type { BalanceTerms, PaymentRoute } from "../enums";
+import { paymentSentenceOf } from "./quotation";
 
 /**
  * Money v2 (order flow v3, phase 5), the rules shared by the API, the web and
@@ -170,12 +171,60 @@ export function rebuildPlan<T extends StoredPlanItem>(existing: T[], settledMino
   return { keep, add };
 }
 
-/** The balance terms on the papers, from the route (kept for the quotation-era fields). */
+/**
+ * The balance terms the route now means, from the terms as accepted (Order.balanceTerms stays as the
+ * quotation said: nothing writes it after the order is made). No route yet: the accepted terms.
+ */
 export function balanceTermsOf(t: RouteTerms, current: BalanceTerms): BalanceTerms {
   if (t.route === "letter_of_credit") return "letter_of_credit";
   if (t.route === "informal") return t.balanceWhen ?? (current === "letter_of_credit" ? "before_shipment" : current);
   if (t.route === "bank_contract") return current === "letter_of_credit" ? "against_bl_copy" : current;
   return current;
+}
+
+/**
+ * The route is still what the quotation said: no route chosen yet, an LC for "letter of credit", an
+ * informal route with the same "before shipment" / "against B/L copy". While it is, the quotation's own
+ * payment text may be printed on the papers; once it differs, only if someone chooses to.
+ */
+export function routeAsAccepted(t: RouteTerms, accepted: BalanceTerms): boolean {
+  if (!t.route) return true;
+  if (accepted === "letter_of_credit") return t.route === "letter_of_credit";
+  if (accepted === "before_shipment" || accepted === "against_bl_copy")
+    return t.route === "informal" && (t.balanceWhen ?? "before_shipment") === accepted;
+  return false;
+}
+
+/** "LC at sight", "Informal, against the B/L copy", "Bank contract": the route in a few words (the accepted terms without one). */
+export function routeWords(t: RouteTerms, accepted: BalanceTerms): string {
+  return routeSummary(t) ?? BALANCE_TERMS_WORDS[accepted];
+}
+const BALANCE_TERMS_WORDS: Record<BalanceTerms, string> = {
+  before_shipment: "balance before shipment",
+  against_bl_copy: "balance against B/L copy",
+  after_arrival: "balance after arrival",
+  letter_of_credit: "letter of credit",
+};
+
+/**
+ * The payment sentence on the proforma, the sales contract and the payment requests, from the route
+ * (route, balance when, LC terms and days) and the deposit the plan asks for. Before a route is chosen:
+ * the terms as accepted, worded as the quotation was.
+ *   "Our usual payment is made by 30% Advance deposit and 70% before shipment."
+ *   "Our usual payment is made by 30% Advance deposit and 70% by irrevocable letter of credit at sight."
+ */
+export function routePaymentSentence(depositPercent: number, t: RouteTerms, accepted: BalanceTerms): string {
+  if (!t.route) return paymentSentenceOf(depositPercent, accepted);
+  if (t.route === "informal") return paymentSentenceOf(depositPercent, t.balanceWhen === "against_bl_copy" ? "against_bl_copy" : "before_shipment");
+  const how =
+    t.route === "letter_of_credit"
+      ? t.lcTerms === "deferred"
+        ? `by irrevocable letter of credit, payable ${t.lcDays ?? 0} days after the documents reach the buyer's bank`
+        : "by irrevocable letter of credit at sight"
+      : "through the banks against the shipping documents";
+  if (depositPercent <= 0) return `Payment: 100% ${how}.`;
+  if (depositPercent >= 100) return "Our usual payment is made by 100% Advance payment.";
+  return `Our usual payment is made by ${depositPercent}% Advance deposit and ${100 - depositPercent}% ${how}.`;
 }
 
 /** The route's terms an order starts with from its balance terms (an informal order "against B/L copy"). */
