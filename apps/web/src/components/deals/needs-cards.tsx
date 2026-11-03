@@ -13,7 +13,8 @@ import type { ActionState } from "@/lib/actions";
 import type { DealItem } from "@/lib/types";
 import { ITEM_COLUMNS } from "./deal-form";
 import { DocumentsPanel, type DocumentRow } from "./documents-panel";
-import { READ_ONLY_LINES, rowKey } from "./form-bits";
+import { rowKey } from "./form-bits";
+import { LinesExcel, LinesView } from "./lines-view";
 import { addChipClass, FileChips } from "./inquiry-side";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -50,16 +51,7 @@ export function ItemsView({ items, requirements, phone = false }: { items: DealI
   return (
     <div className="flex flex-col gap-3">
       {items.length > 0 && phone && <ItemsPhone items={items} />}
-      {items.length > 0 && !phone && (
-        <LineTable
-          rows={rowsOf(items)}
-          columns={ITEM_COLUMNS}
-          noun="item"
-          readOnly
-          sheet={{ name: "Customer items" }}
-          {...READ_ONLY_LINES}
-        />
-      )}
+      {items.length > 0 && !phone && <LinesView rows={rowsOf(items)} columns={ITEM_COLUMNS} numbers={items.map((it) => it.no)} />}
       {requirements && <p className="rounded-lg bg-surface-2 p-3 text-sm whitespace-pre-line">{requirements}</p>}
       {!items.length && !requirements && <p className="text-sm text-muted">Nothing written yet.</p>}
     </div>
@@ -223,4 +215,9 @@ export function DocumentChips({ dealId, files, canAdd }: { dealId: string; files
       }
     />
   );
+}
+
+/** "What they need" header's Excel: the customer's items as a file. */
+export function ItemsExcel({ items }: { items: DealItem[] }) {
+  return <LinesExcel name="Customer items" noun="items" rows={rowsOf(items)} columns={ITEM_COLUMNS} numbers={items.map((it) => it.no)} />;
 }

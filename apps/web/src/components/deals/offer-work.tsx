@@ -26,7 +26,7 @@ import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { FileDrop, send, type Staged } from "./documents-panel";
 import { BASIS_HINT, FactoryPicker, OfferHeaderForm, type QuoteState } from "./factory-quote-form";
-import { READ_ONLY_LINES } from "./form-bits";
+import { LinesExcel, LinesView } from "./lines-view";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Items = SourcingView["items"];
@@ -519,17 +519,10 @@ export function OfferLines({
         q.lines.length ? undefined : "No lines yet: Edit lines to type, paste or upload them, or start from the customer's list."
       }
       canEdit={canEdit}
+      actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
       view={
         q.lines.length ? (
-          <LineTable
-            rows={rows}
-            columns={viewColumns}
-            noun="line"
-            readOnly
-            sheet={{ name: sheet.name }}
-            footer={footer}
-            {...READ_ONLY_LINES}
-          />
+          <LinesView rows={rows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
         ) : (
           <p className="text-sm text-muted">No lines yet.</p>
         )

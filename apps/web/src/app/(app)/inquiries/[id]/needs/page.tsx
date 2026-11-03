@@ -9,7 +9,7 @@ import { optional } from "@/components/print/data";
 import { StepChanges, StepFrame, StepHeader, StepPrevNext } from "@/components/orders/step-page";
 import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { changesIn, FilesCard } from "@/components/deals/inquiry-side";
-import { DocumentChips, DocumentsButton, ItemsEditor, ItemsView } from "@/components/deals/needs-cards";
+import { DocumentChips, DocumentsButton, ItemsEditor, ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
 import { dealFieldsAction, describeFileAction, removeFileAction } from "../../actions";
 import { askFactories } from "../ask";
 import { inquirySteps, itemsLine } from "../steps";
@@ -124,6 +124,7 @@ export default async function DealNeeds({ params }: { params: Promise<{ id: stri
         title="What they need"
         description={itemsLine(d)}
         canEdit={canEdit}
+        actions={<ItemsExcel items={d.items} />}
         view={<ItemsView items={d.items} requirements={d.requirements} />}
         phone={<ItemsView items={d.items} requirements={d.requirements} phone />}
         edit={<ItemsEditor items={d.items} requirements={d.requirements} action={dealFieldsAction.bind(null, d.id)} upload={!quoted} />}

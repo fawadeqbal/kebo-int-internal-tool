@@ -156,7 +156,7 @@ export default async function SourcingPage({
         </>
       ) : (
         <>
-          <ViewCard title={`Offers · ${s.quotes.length}`} canEdit={false} actions={addOffer({ variant: "secondary", size: "xs" })}>
+          <ViewCard title={`Offers · ${s.quotes.length}`} canEdit={false}>
             <OffersTable quotes={s.quotes} view={s} selected={selected?.id ?? null} base={base} letterOf={letterOf} />
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3 text-xs text-muted">
               <span>Click a factory to see its offer below. Our cost = their price to our basis, with tax, in {s.currency}.</span>

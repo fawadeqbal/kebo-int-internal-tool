@@ -55,7 +55,3 @@ export function MiniLabel({ htmlFor, children }: { htmlFor: string; children: Re
     </label>
   );
 }
-
-const nothing = async () => ({ ok: false as const, message: "Read only" });
-/** The line table's handlers for a read-only table (nothing can be changed there). */
-export const READ_ONLY_LINES = { onAdd: nothing, onEdit: nothing, onRemove: nothing, onMove: nothing };
