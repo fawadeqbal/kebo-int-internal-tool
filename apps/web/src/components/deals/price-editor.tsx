@@ -7,6 +7,7 @@ import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRa
 import { basisText, BASIS_STEP_LABEL, optionLetter } from "@kebo/shared";
 import { Badge, Button, Card, cn, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
+import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import { UNITS } from "@/components/lines/line-table";
 import type { ActionState } from "@/lib/actions";
@@ -550,9 +551,13 @@ export function PriceEditor({
               <Button size="xs" variant="ghost" className="max-sm:hidden" onClick={() => setPaste((v) => (v === null ? "" : null))} aria-expanded={paste !== null}>
                 <ClipboardPaste aria-hidden /> Paste a list
               </Button>
-              <Button size="xs" variant="ghost" className="sm:hidden" onClick={() => setChargesOpen((v) => !v)} aria-expanded={chargesOpen}>
-                {chargesOpen ? "Done" : "Edit"}
-              </Button>
+              {chargesOpen ? (
+                <Button size="xs" variant="secondary" className="sm:hidden" onClick={() => setChargesOpen(false)} aria-expanded>
+                  Done
+                </Button>
+              ) : (
+                <EditButton size="xs" className="sm:hidden" onClick={() => setChargesOpen(true)} aria-expanded={false} />
+              )}
             </div>
             {paste !== null && (
               <div className="flex flex-col gap-2 border-b border-line px-4 py-3">

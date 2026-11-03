@@ -7,6 +7,7 @@ import { Pencil, Plus, X } from "lucide-react";
 import { Alert, Button, Card, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { EditableRows, EditButton, useFocusRow } from "@/components/common/edit-button";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -176,9 +177,15 @@ export interface DetailField {
   hint?: string;
   /** Shown in the card when it is empty, instead of "+ Add" or "—" (e.g. a file's own add button). */
   empty?: ReactNode;
+  /** Its checklist link name when it has no `name` (or another one): the card's target + "." + this. */
+  target?: string;
+  /** Filled, it is not changed in place (only in the panel). */
+  fixed?: boolean;
 }
 
 const filled = (f: DetailField) => f.value !== null && f.value !== undefined && f.value !== "";
+/** How a filled value reads: its own `show`, a date as "14 Jan 2027", or the value. */
+const shownOf = (f: DetailField): ReactNode => f.show ?? (f.type === "date" && f.value && ISO.test(f.value) ? dayLabel(f.value) : f.value);
 
 function Control({ f, id, value, onChange, autoFocus, onKeyDown }: { f: DetailField; id: string; value?: string; onChange?: (v: string) => void; autoFocus?: boolean; onKeyDown?: (e: React.KeyboardEvent) => void }) {
   const common = {
@@ -249,12 +256,17 @@ export function FieldsForm({ action, fields, save }: { action: Action; fields: D
 
 /* ---------------------------------------------------------------- "+ Add" in place */
 
-/** One empty value: "+ Add" turns into its input and Save (Enter saves, Esc cancels). */
-function AddInPlace({ f, action }: { f: DetailField; action: Action }) {
+/**
+ * One value changed right there: an empty one is "+ Add", a filled one shows
+ * a small pencil on hover (`shown`); either turns into its input and Save
+ * (Enter saves, Esc cancels).
+ */
+function AddInPlace({ f, action, shown }: { f: DetailField; action: Action; shown?: ReactNode }) {
   const id = useId();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [v, setV] = useState(f.type === "select" ? (f.options?.[0]?.value ?? "") : "");
+  const initial = () => (shown !== undefined && f.value ? f.value : f.type === "select" ? (f.options?.[0]?.value ?? "") : "");
+  const [v, setV] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const save = () =>
@@ -269,6 +281,21 @@ function AddInPlace({ f, action }: { f: DetailField; action: Action }) {
         router.refresh();
       } else setError(r.message ?? "Something went wrong. Please try again.");
     });
+  if (!open && shown !== undefined)
+    return (
+      <span className="group/value inline-flex max-w-full items-baseline gap-1.5">
+        <span className="min-w-0">{shown}</span>
+        <button
+          type="button"
+          onClick={() => (setV(initial()), setOpen(true))}
+          className="grid size-5 shrink-0 translate-y-0.5 place-items-center self-start rounded text-primary opacity-0 transition-opacity group-hover/value:opacity-100 hover:bg-primary-soft focus-visible:opacity-100 [@media(hover:none)]:hidden"
+          aria-label={`Change the ${f.label.toLowerCase()}`}
+          title={`Change the ${f.label.toLowerCase()}`}
+        >
+          <Pencil className="size-3" aria-hidden />
+        </button>
+      </span>
+    );
   if (!open)
     return (
       <button
@@ -343,6 +370,7 @@ function FilledMeter({ n, of, word = "filled" }: { n: number; of: number; word?:
  */
 export function ViewCard({
   id,
+  target,
   title,
   description,
   meter,
@@ -354,6 +382,8 @@ export function ViewCard({
   className,
 }: {
   id?: string;
+  /** Where a checklist item's link lands (data-target, see goTo). */
+  target?: string;
   title: ReactNode;
   description?: ReactNode;
   meter?: { n: number; of: number; word?: string };
@@ -367,7 +397,7 @@ export function ViewCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <Card id={id} className={cn("scroll-mt-24", className)}>
+    <Card id={id} data-target={target} data-target-card={target ? "" : undefined} className={cn("scroll-mt-24", className)}>
       <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-text">{title}</h3>
@@ -376,11 +406,7 @@ export function ViewCard({
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
           {meter && meter.of > 0 && <FilledMeter {...meter} />}
           {actions}
-          {canEdit && panel && (
-            <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
-              {editLabel}
-            </Button>
-          )}
+          {canEdit && panel && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
         </div>
       </div>
       {children}
@@ -401,6 +427,7 @@ export function ViewCard({
  */
 export function DetailsCard({
   id,
+  target,
   title,
   description,
   fields,
@@ -413,6 +440,8 @@ export function DetailsCard({
   footer,
 }: {
   id?: string;
+  /** Where checklist links land: the card is `target`, each value `target.name` (see goTo). */
+  target?: string;
   title: ReactNode;
   description?: ReactNode;
   fields: DetailField[];
@@ -434,6 +463,7 @@ export function DetailsCard({
   return (
     <ViewCard
       id={id}
+      target={target}
       title={title}
       description={description ?? (editable ? "Click + Add to fill one value right here; Edit opens everything." : undefined)}
       meter={{ n, of: counted.length }}
@@ -451,11 +481,19 @@ export function DetailsCard({
     >
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5 px-4 py-4 lg:grid-cols-3">
         {shown.map((f) => (
-          <div key={f.name ?? f.label} className="flex min-w-0 flex-col gap-0.5">
+          <div
+            key={f.name ?? f.label}
+            data-target={target ? `${target}.${f.target ?? f.name ?? f.label.toLowerCase()}` : undefined}
+            className="-mx-1.5 flex min-w-0 flex-col gap-0.5 px-1.5 py-0.5"
+          >
             <dt className="text-xs text-muted">{f.label}</dt>
             <dd className="min-w-0 text-sm font-medium break-words text-text tabular">
               {filled(f) ? (
-                (f.show ?? (f.type === "date" && f.value && ISO.test(f.value) ? dayLabel(f.value) : f.value))
+                editable && f.name && f.type !== "textarea" && !f.fixed ? (
+                  <AddInPlace f={f} action={action!} shown={shownOf(f)} />
+                ) : (
+                  shownOf(f)
+                )
               ) : f.empty !== undefined ? (
                 f.empty
               ) : editable && f.name ? (
@@ -492,6 +530,7 @@ export function LinesCard({
   actions,
   editActions,
   editLabel = "Edit lines",
+  target,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -504,11 +543,18 @@ export function LinesCard({
   /** Shown while editing (e.g. Excel, Mark all received). */
   editActions?: ReactNode;
   editLabel?: string;
+  /** Where checklist links land ("lines.packing"; see goTo). */
+  target?: string;
 }) {
   const [editing, setEditing] = useState(false);
+  // The row clicked in the read-only lines: selected in the editor once it is open.
+  const [row, setRow] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const editBox = useRef<HTMLDivElement>(null);
+  const editable = canEdit && !!edit;
+  useFocusRow(editing ? row : null, editBox, () => setRow(null));
   useEffect(() => {
-    if (!canEdit || !edit) return;
+    if (!editable) return;
     const check = () => {
       if (window.location.hash === "#edit-lines") {
         setEditing(true);
@@ -518,40 +564,47 @@ export function LinesCard({
     check();
     window.addEventListener("hashchange", check);
     return () => window.removeEventListener("hashchange", check);
-  }, [canEdit, edit]);
+  }, [editable]);
+  const desktop = editable ? (
+    <EditableRows label="Click a row to change it" onRow={(n) => (setRow(n), setEditing(true))}>
+      {view}
+    </EditableRows>
+  ) : (
+    view
+  );
   return (
     <div ref={ref} id="lines" className="scroll-mt-24">
       <ViewCard
         title={title}
-        description={description}
+        target={target}
+        description={description ?? (editable && !editing ? "Click a row to change it, or edit them all." : undefined)}
         canEdit={false}
         actions={
           <>
             {editing ? editActions : actions}
-            {canEdit && edit && (
-              <Button size="xs" variant={editing ? "secondary" : "ghost"} onClick={() => setEditing((e) => !e)}>
-                {editing ? (
-                  "Done"
-                ) : (
-                  <>
-                    <Pencil aria-hidden className="sm:hidden" /> {editLabel}
-                  </>
-                )}
-              </Button>
-            )}
+            {editable &&
+              (editing ? (
+                <Button size="sm" variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setEditing(false)}>
+                  Done
+                </Button>
+              ) : (
+                <EditButton label={editLabel} onClick={() => setEditing(true)} />
+              ))}
           </>
         }
       >
         <div className="p-4">
           {editing ? (
-            <LinesClose.Provider value={() => setEditing(false)}>{edit}</LinesClose.Provider>
+            <div ref={editBox}>
+              <LinesClose.Provider value={() => setEditing(false)}>{edit}</LinesClose.Provider>
+            </div>
           ) : phone ? (
             <>
               <div className="sm:hidden">{phone}</div>
-              <div className="max-sm:hidden">{view}</div>
+              <div className="max-sm:hidden">{desktop}</div>
             </>
           ) : (
-            view
+            desktop
           )}
         </div>
       </ViewCard>

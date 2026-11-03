@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   BANK_CONTRACT_STATUS_LABEL,
   BANK_CONTRACT_STATUSES,
@@ -29,6 +29,7 @@ import {
 } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, SelectCard, SelectCardList, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
+import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
 import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
@@ -702,9 +703,7 @@ export function EditSwap({ view, form, label = "Edit", allowed }: { view: ReactN
       {view}
       {allowed && (
         <div>
-          <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
-            <Pencil aria-hidden /> {label}
-          </Button>
+          <EditButton label={label} onClick={() => setOpen(true)} />
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2, Pencil } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { LINE_CONDITION_LABEL } from "@kebo/shared";
 import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -10,6 +10,7 @@ import type { ActionState } from "@/lib/actions";
 import type { LinePacking, OrderLineView } from "@/lib/types-orders";
 import { ExcelMenu } from "@/components/sheets/excel-menu";
 import { FileActions } from "@/components/common/file-actions";
+import { EditableRows, EditButton, useFocusRow } from "@/components/common/edit-button";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { headerKey, sheetNumber, type ReadSheet, type SheetSpec } from "@/lib/sheet-spec";
 
@@ -289,6 +290,10 @@ export function PackingCard({
   toggle?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  // The row clicked in the read-only lines: selected in the editor once it is open.
+  const [row, setRow] = useState<number | null>(null);
+  const tableBox = useRef<HTMLDivElement>(null);
+  useFocusRow(editing ? row : null, tableBox, () => setRow(null));
   useEffect(() => {
     if (!toggle || !canEdit) return;
     const check = () => window.location.hash === "#edit-lines" && setEditing(true);
@@ -329,11 +334,15 @@ export function PackingCard({
           <>
             {badge}
             <FileActions excel={excel} viewHref={links?.view} pdfHref={links?.pdf} />
-            {toggle && canEdit && (
-              <Button size="xs" variant={editing ? "secondary" : "ghost"} onClick={() => setEditing((e) => !e)}>
-                {editing ? "Done" : "Edit lines"}
-              </Button>
-            )}
+            {toggle &&
+              canEdit &&
+              (editing ? (
+                <Button size="sm" variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setEditing(false)}>
+                  Done
+                </Button>
+              ) : (
+                <EditButton label="Edit lines" onClick={() => setEditing(true)} />
+              ))}
           </>
         }
       />
@@ -380,15 +389,28 @@ export function PackingCard({
             <PhoneLines set="packing" lines={lines} />
           </div>
         )}
-        <div className={cn(toggle && !editing && "max-sm:hidden")}>
-          <OrderLines
-            set="packing"
-            orderId={orderId}
-            lines={lines}
-            canEdit={editable}
-            today={today}
-            footer={<PackingMarks containerNo={containerNo} shippingMarks={shippingMarks} canEdit={editable} action={marksAction} />}
-          />
+        <div ref={tableBox} className={cn(toggle && !editing && "max-sm:hidden")}>
+          {toggle && canEdit && !editing ? (
+            <EditableRows label="Click a row to change it" onRow={(n) => (setRow(n), setEditing(true))}>
+              <OrderLines
+                set="packing"
+                orderId={orderId}
+                lines={lines}
+                canEdit={false}
+                today={today}
+                footer={<PackingMarks containerNo={containerNo} shippingMarks={shippingMarks} canEdit={false} action={marksAction} />}
+              />
+            </EditableRows>
+          ) : (
+            <OrderLines
+              set="packing"
+              orderId={orderId}
+              lines={lines}
+              canEdit={editable}
+              today={today}
+              footer={<PackingMarks containerNo={containerNo} shippingMarks={shippingMarks} canEdit={editable} action={marksAction} />}
+            />
+          )}
         </div>
       </CardBody>
     </Card>
@@ -432,11 +454,7 @@ function PackingMarks({ containerNo, shippingMarks, canEdit, action }: { contain
           <dd className="min-w-0 font-medium whitespace-pre-line">{shippingMarks ?? <span className="text-muted">—</span>}</dd>
         </div>
       </dl>
-      {canEdit && (
-        <Button size="xs" variant="ghost" onClick={() => setEditing(true)}>
-          <Pencil aria-hidden /> Change
-        </Button>
-      )}
+      {canEdit && <EditButton size="xs" label="Change" onClick={() => setEditing(true)} />}
     </div>
   );
 }
