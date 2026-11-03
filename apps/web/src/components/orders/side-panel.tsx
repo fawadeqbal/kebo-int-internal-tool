@@ -52,13 +52,15 @@ export interface ChangeLine {
   when: string;
   /** The whole change (all of a paper's folded versions), on hover. */
   title: string;
+  /** The order step it belongs to (the overview's Recent changes). */
+  step: string | null;
 }
 
 /**
  * A step's changes, one line each: who, what (short), when. A paper's drafts,
  * finals and remakes fold into one line (the newest); History keeps every one.
  */
-export function compactChanges(entries: HistoryEntry[]): ChangeLine[] {
+export function compactChanges(entries: (HistoryEntry & { step?: string | null })[]): ChangeLine[] {
   const now = today();
   const out: (ChangeLine & { paper?: string; all: string[] })[] = [];
   for (const e of entries) {
@@ -82,11 +84,12 @@ export function compactChanges(entries: HistoryEntry[]): ChangeLine[] {
       text,
       when: when(e.at, now),
       title: full,
+      step: e.step ?? null,
       paper,
       all: [full],
     });
   }
-  return out.map(({ id, initial, who, text, when, title }) => ({ id, initial, who, text, when, title }));
+  return out.map(({ id, initial, who, text, when, title, step }) => ({ id, initial, who, text, when, title, step }));
 }
 
 /** The change lines (the side panel's Changes, the Documents page's side card), as list items: avatar, the whole sentence, the time under it. */

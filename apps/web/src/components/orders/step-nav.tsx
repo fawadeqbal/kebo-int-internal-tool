@@ -109,7 +109,7 @@ export function StepNav({
   return (
     <>
       <nav aria-label={label} className="no-print mt-4 hidden border-b border-line md:block">
-        <ul className="-mb-px flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="relative -mb-px flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {links.map((l) => {
             const s = "number" in l ? l : null;
             const on = active(l.href);
