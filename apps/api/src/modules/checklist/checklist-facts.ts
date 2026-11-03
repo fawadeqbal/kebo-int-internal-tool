@@ -1,6 +1,7 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
 import type { ChecklistFacts } from "@kebo/shared";
+import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 import { lcChecksOf } from "../money/route-plan";
 import { chargedExpenses, positionOf, type MoneyCtx } from "../money/position";
 import { dateIn, type ISODate } from "@kebo/utils";
@@ -15,8 +16,9 @@ export const checklistOrderInclude = {
   bankContract: true,
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
   expenses: chargedExpenses,
-  shipments: { orderBy: { createdAt: "asc" } },
-  documents: { select: { kind: true, status: true, number: true, issuedOn: true } },
+  // Shipment 1 (the primary) first: the facts list them in their order.
+  shipments: { orderBy: SHIPMENT_ORDER },
+  documents: { select: { kind: true, status: true, number: true, issuedOn: true, shipmentId: true } },
   bankSteps: true,
   satChecks: { select: { result: true } },
   claims: { select: { status: true } },
@@ -49,10 +51,13 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
   const received = goods.filter((l) => Number(l.receivedQty) >= Number(l.quantity)).length;
   const sum = (f: (l: (typeof goods)[number]) => number) => goods.reduce((t, l) => t + f(l), 0);
   const b = o.bankContract;
+  const ship = shipFacts(o.shipments);
+  // A B/L or AWB row prints its shipment's number (Shipment 1's when it names none).
+  const blOf = (shipmentId: string | null) => (ship.list.find((s) => s.id === shipmentId) ?? ship.primary)?.blNo ?? null;
   return {
     currency: o.currency,
     route: o.paymentRoute,
-    shipMode: o.shipments[0]?.mode ?? null,
+    shipMode: ship.primary?.mode ?? null,
     bankContract: b
       ? {
           status: b.status,
@@ -82,7 +87,7 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
           cbm: sum((l) => Number(l.cbm ?? 0)).toFixed(2),
         }
       : null,
-    shipments: o.shipments.map((s) => ({
+    shipments: ship.list.map((s) => ({
       status: s.status,
       mode: s.mode,
       forwarder: s.forwarder,
@@ -98,10 +103,15 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
       arrivedOn: fromDbDateOrNull(s.arrivedOn),
       portOfDischarge: s.portOfDischarge,
     })),
-    shippedOn: fromDbDateOrNull(o.shippedOn),
-    blNo: o.blNo,
+    shippedOn: ship.shippedOn,
+    blNo: ship.blNo,
     proforma: o.proformaNo ? { number: o.proformaNo, issuedOn: fromDbDateOrNull(o.proformaIssuedOn) } : null,
-    documents: o.documents.map((d) => ({ kind: d.kind, status: d.status, number: d.number, issuedOn: fromDbDateOrNull(d.issuedOn) })),
+    documents: o.documents.map((d) => ({
+      kind: d.kind,
+      status: d.status,
+      number: d.kind === "bill_of_lading" || d.kind === "airway_bill" ? blOf(d.shipmentId) : d.number,
+      issuedOn: fromDbDateOrNull(d.issuedOn),
+    })),
     bankSteps: o.bankSteps.map((s) => ({ step: s.step, doneOn: fromDbDate(s.doneOn), reference: s.reference })),
     deliveredOn: fromDbDateOrNull(o.deliveredOn),
     satDoneOn: fromDbDateOrNull(o.satDoneOn),

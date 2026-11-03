@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { can, SHIP_MODE_LABEL, SHIP_MODES, SHIPMENT_STATUS_LABEL, SHIPMENT_STATUSES } from "@kebo/shared";
+import { can, portsOf, SHIP_MODE_LABEL, SHIP_MODES, SHIPMENT_STATUS_LABEL, SHIPMENT_STATUSES, shipByVsLc } from "@kebo/shared";
 import { Badge, Card, CardHeader } from "@kebo/ui";
 import { date } from "@/lib/format";
 import type { ShipmentView } from "@/lib/types-flow";
@@ -21,8 +21,37 @@ export const metadata = { title: "Order · shipping" };
 const LOADED = ["loaded", "departed", "arrived", "cleared"];
 const SAILED = ["departed", "arrived", "cleared"];
 
+/** Our ship-by and, on an LC order, the LC's latest shipment date: both shown, ours warned about when it is later. */
+interface ShipBy {
+  ours: string | null;
+  lc: string | null;
+  late: boolean;
+}
+
+/** The ship-by rows of a card: ours, and the LC's latest shipment date beside it (read-only here). */
+function shipByFields(b: ShipBy): DetailField[] {
+  return [
+    {
+      label: b.lc ? "Ship by (ours)" : "Ship by",
+      value: b.ours,
+      show: b.ours ? (
+        b.late ? (
+          <span className="flex flex-col">
+            {date(b.ours)}
+            <span className="text-xs font-medium text-bad">Later than the LC allows</span>
+          </span>
+        ) : (
+          date(b.ours)
+        )
+      ) : null,
+      uncounted: true,
+    },
+    ...(b.lc ? [{ label: "LC latest shipment", value: b.lc, show: date(b.lc), uncounted: true } satisfies DetailField] : []),
+  ];
+}
+
 /** A shipment's values for its card and its Edit panel (board OrderV4ShippingEdit), grouped as the panel shows them. */
-function shipmentFields(s: Partial<ShipmentView>, shipBy: string | null): DetailField[] {
+function shipmentFields(s: Partial<ShipmentView>, shipBy: ShipBy): DetailField[] {
   const air = s.mode === "air";
   const ports = s.portOfLoading || s.portOfDischarge ? `${s.portOfLoading ?? "?"} → ${s.portOfDischarge ?? "?"}` : null;
   const container = [s.containerType, s.containerNo].filter(Boolean).join(" · ") || null;
@@ -65,7 +94,7 @@ function shipmentFields(s: Partial<ShipmentView>, shipBy: string | null): Detail
     { name: "blNo", label: air ? "AWB no." : "B/L no.", value: s.blNo, group: air ? "Air waybill" : "Vessel and B/L", placeholder: air ? "e.g. 999-12345675" : "e.g. MEDU1234567" },
     { name: "etd", label: "ETD", value: s.etd, type: "date", group: "Dates" },
     { name: "eta", label: "ETA", value: s.eta, type: "date", group: "Dates" },
-    { label: "Ship by (LC)", value: shipBy, show: shipBy ? date(shipBy) : null },
+    ...shipByFields(shipBy).map((f) => ({ ...f, cardOnly: true })),
   );
   if (!air) out.push({ label: "Loaded on", value: s.loadedOn, show: s.loadedOn ? date(s.loadedOn) : null, name: "loadedOn", type: "date", cardOnly: true });
   out.push(
@@ -88,7 +117,9 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const canEdit = can(me, "orders.update") && d.open;
   const canPay = can(me, "payments.record") && d.open;
   const goods = goodsOf(o);
-  const shipBy = flow?.payment.bankContract?.latestShipOn ?? o.shipBy;
+  // Our ship-by stays ours; with an LC its latest shipment date is shown beside it (warned about when ours is later).
+  const lcLatest = flow?.payment.route === "letter_of_credit" ? (flow.payment.bankContract?.latestShipOn ?? null) : null;
+  const shipBy: ShipBy = { ours: o.shipBy, lc: lcLatest, late: !!shipByVsLc(o.shipBy, lcLatest)?.late };
   const totals = o.goods.totals;
 
   // Each light row works on the first shipment not past it (a new one when there is none).
@@ -130,7 +161,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       fields: air
         ? [{ name: "loadedOn", label: "Handed over on", type: "date", value: toLoad?.loadedOn ?? now, max: now, required: true }]
         : [
-            { name: "containerNo", label: "Container no.", value: toLoad?.containerNo ?? o.goods.containerNo, required: true, placeholder: "e.g. MSKU 7741203" },
+            { name: "containerNo", label: "Container no.", value: toLoad?.containerNo, required: true, placeholder: "e.g. MSKU 7741203" },
             { name: "loadedOn", label: "Loaded on", type: "date", value: toLoad?.loadedOn ?? now, max: now, required: true },
             { name: "sealNo", label: "Seal no.", value: toLoad?.sealNo, placeholder: "e.g. 0048812" },
           ],
@@ -154,7 +185,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       label: sailAir ? "Add the AWB" : "Add B/L",
       action: lightAction.bind(null, o.id, `sailed:${toSail?.id ?? "new"}${sailAir ? ":air" : ""}`),
       fields: [
-        { name: "blNo", label: sailAir ? "AWB no." : "B/L no.", value: toSail?.blNo ?? o.blNo, required: true, placeholder: sailAir ? "e.g. 999-12345675" : "e.g. MEDU1234567" },
+        { name: "blNo", label: sailAir ? "AWB no." : "B/L no.", value: toSail?.blNo, required: true, placeholder: sailAir ? "e.g. 999-12345675" : "e.g. MEDU1234567" },
         ...(sailAir ? [] : [{ name: "vessel", label: "Vessel", value: toSail?.vessel, required: true, placeholder: "e.g. MSC Aurora" }]),
         { name: "departedOn", label: sailAir ? "Flown on" : "Sailed on", type: "date" as const, value: toSail?.departedOn ?? now, max: now, required: true },
       ],
@@ -191,8 +222,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   if (close) tools.closed = { kind: "node", node: close };
 
   const showPacking = o.goods.allReceived || o.stage !== "confirmed";
-  // A new shipment starts from the order's ports.
-  const fresh: Partial<ShipmentView> = { mode: "sea", status: "planned", portOfLoading: o.incotermPlace, portOfDischarge: o.portOfDischarge };
+  // A new shipment starts from the ports the terms give: E/F terms load at the Incoterm place, C/D terms discharge there.
+  const fresh: Partial<ShipmentView> = { mode: "sea", status: "planned", ...portsOf(o) };
   const addShipment =
     shipping && canShip ? (
       <PanelButton
@@ -248,7 +279,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             id="shipments"
             target="shipment"
             title="Shipment"
-            description={canShip ? "Not booked yet: + Add any value starts the shipment, from the order's ports." : "Not booked yet."}
+            description={canShip ? "Not booked yet: + Add any value starts the shipment, its ports from the terms." : "Not booked yet."}
             fields={shipmentFields(fresh, shipBy)}
             action={fieldsAction.bind(null, o.id, "shipment:new")}
             canEdit={canShip}
@@ -265,7 +296,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             { name: "shippedOn", label: "Shipped on", value: o.shippedOn, type: "date", max: now, show: o.shippedOn ? date(o.shippedOn) : null },
             { name: "blNo", label: "B/L no.", value: o.blNo },
             { name: "containerNo", label: "Container no.", value: o.goods.containerNo },
-            { name: "shipBy", label: "Ship by", value: o.shipBy, type: "date", show: o.shipBy ? date(o.shipBy) : null },
+            { name: "shipBy", label: "Ship by", value: o.shipBy, type: "date", show: shipByFields(shipBy)[0]!.show },
+            ...shipByFields(shipBy).slice(1),
           ]}
           action={fieldsAction.bind(null, o.id, "order")}
           canEdit={canEdit}
@@ -284,6 +316,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
               lines={o.lines.filter((l) => l.type === "goods")}
               goods={goods}
               containerNo={o.goods.containerNo}
+              containerHref="#goto=shipment.containerNo"
               shippingMarks={o.goods.shippingMarks}
               canEdit={canEdit}
               canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}

@@ -193,7 +193,9 @@ export class InsightsService {
       // Flat rows from the database: years of orders stay quick. Their costing is read just after.
       this.prisma.db.$queryRaw<OrderRow[]>`
         select o.id, o.currency, o.main_currency as "mainCurrency", o.main_rate::text as "mainRate", (o.total * 100)::float8 as "totalMinor",
-               to_char(o.ordered_on, 'YYYY-MM-DD') as "orderedOn", to_char(o.ship_by, 'YYYY-MM-DD') as "shipBy", to_char(o.shipped_on, 'YYYY-MM-DD') as "shippedOn",
+               to_char(o.ordered_on, 'YYYY-MM-DD') as "orderedOn", to_char(o.ship_by, 'YYYY-MM-DD') as "shipBy",
+               -- Shipped on: the earliest day one of the order's shipments left (the shipment is the only place for it).
+               (select to_char(min(s.departed_on), 'YYYY-MM-DD') from shipments s where s.order_id = o.id) as "shippedOn",
                o.customer_id as "customerId", c.name as "customerName", c.country, i.category, i.channel::text as channel, i.assignee_id as "assigneeId"
         from orders o
         join customers c on c.id = o.customer_id

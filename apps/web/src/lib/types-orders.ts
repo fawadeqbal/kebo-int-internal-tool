@@ -1,6 +1,6 @@
 import type { AttachedFileInfo } from "./types-money";
 import type { OfferFile } from "./types-deals";
-import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus } from "@kebo/shared";
+import type { BalanceTerms, Incoterm, LineCondition, LineType, OrderStage, OrderStatus, PaymentKind, PaymentMethod, RevisionStatus, ShipMode } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for orders (four stages), their payments and the printed documents. Keep in step with apps/api/src/modules/orders. */
@@ -54,11 +54,18 @@ export interface OrderView {
   inquiry: { id: string; refNo: string; title: string; assigneeId: string | null; assignee: Person | null };
   customer: { id: string; name: string; country: string };
   orderedOn: string;
+  /** Our ship-by (the promise to the customer). */
   shipBy: string | null;
+  /** While ship-by is empty: when the customer wanted it (the deal's "wanted by"). */
+  shipBySuggested?: string | null;
   readyOn: string | null;
+  /** The shipments', never the order's: the earliest day one left, and Shipment 1's B/L. */
   shippedOn: string | null;
   blNo: string | null;
+  /** Shipment 1, where shipped on, the B/L and the container live (null: no shipment yet). */
+  shipment?: { id: string; mode: ShipMode; count: number; blNo: string | null; containerNo: string | null; departedOn: string | null } | null;
   documentTitle: string | null;
+  /** The contract destination (the default port of discharge of a new shipment). */
   portOfDischarge: string | null;
   currency: string;
   total: string;
@@ -281,6 +288,8 @@ export interface OrderDocument {
     portOfDischarge: string | null;
     leadTime: string | null;
   };
+  /** Packing list versions made since the shipment is the one place: its ports as printed (older ones: none). */
+  shipment?: { mode: ShipMode; portOfLoading: string | null; portOfDischarge: string | null } | null;
   paymentTerms: string;
   /** "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
   paymentSentence: string;

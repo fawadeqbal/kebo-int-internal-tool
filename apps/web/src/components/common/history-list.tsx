@@ -6,6 +6,8 @@ import { dateTime } from "@/lib/format";
 const FIELD: Record<string, string> = {
   blNo: "B/L number",
   shippedOn: "Shipped on",
+  departedOn: "Left on",
+  containerNo: "Container",
   shipBy: "Ship by",
   readyOn: "Ready on",
   onHold: "On hold",

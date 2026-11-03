@@ -21,6 +21,7 @@ import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { orderAccess } from "../orders/orders.service";
+import { SHIPMENT_ORDER } from "../orders/shipment-facts";
 import { LeaksService } from "../money/leaks.service";
 import { LimitsService } from "../../common/company/limits.service";
 import { ChecklistService } from "../checklist/checklist.service";
@@ -368,11 +369,11 @@ export class RemindersListService {
           number: true,
           latestShipOn: true,
           expiresOn: true,
-          order: { select: { id: true, refNo: true, shippedOn: true, shipments: { select: { status: true } }, ...handler } },
+          order: { select: { id: true, refNo: true, shipments: { select: { status: true, departedOn: true } }, ...handler } },
         },
       });
       for (const c of contracts) {
-        const shipped = !!c.order.shippedOn || c.order.shipments.some((s) => ["departed", "arrived", "cleared"].includes(s.status));
+        const shipped = c.order.shipments.some((s) => !!s.departedOn || ["departed", "arrived", "cleared"].includes(s.status));
         const ship = fromDbDateOrNull(c.latestShipOn);
         const exp = fromDbDateOrNull(c.expiresOn);
         const name = c.number ? `LC ${c.number}` : "the LC";
@@ -444,7 +445,8 @@ export class RemindersListService {
           proformaNo: true,
           packedAt: true,
           customer: { select: { name: true } },
-          shipments: { orderBy: { createdAt: "asc" }, select: { mode: true, departedOn: true, eta: true } },
+          // Shipment 1 first (the one the papers go with).
+          shipments: { orderBy: SHIPMENT_ORDER, select: { mode: true, departedOn: true, eta: true } },
           documents: { select: { kind: true, status: true } },
           bankSteps: { select: { step: true } },
           ...handler,

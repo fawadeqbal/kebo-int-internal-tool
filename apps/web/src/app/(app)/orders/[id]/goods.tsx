@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { LINE_CONDITION_LABEL } from "@kebo/shared";
-import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, Field, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -261,6 +261,7 @@ export function PackingCard({
   lines,
   goods,
   containerNo,
+  containerHref,
   shippingMarks,
   canEdit,
   canUpload,
@@ -276,7 +277,9 @@ export function PackingCard({
   orderId: string;
   lines: OrderLineView[];
   goods: GoodsLine[];
+  /** Shipment 1's container: shown here, changed on the shipment (`containerHref` lands there lit up). */
   containerNo: string | null;
+  containerHref?: string;
   shippingMarks: string | null;
   canEdit: boolean;
   /** A filled template can be uploaded (until the order ships). */
@@ -371,7 +374,7 @@ export function PackingCard({
                   <input
                     type="hidden"
                     name="payload"
-                    value={JSON.stringify({ containerNo, shippingMarks, lines: fromFile.rows })}
+                    value={JSON.stringify({ shippingMarks, lines: fromFile.rows })}
                   />
                   <SubmitButton size="xs" pendingText="Saving…">
                     Save {fromFile.filled} line{fromFile.filled === 1 ? "" : "s"}
@@ -398,7 +401,7 @@ export function PackingCard({
                 lines={lines}
                 canEdit={false}
                 today={today}
-                footer={<PackingMarks containerNo={containerNo} shippingMarks={shippingMarks} canEdit={false} action={marksAction} />}
+                footer={<PackingMarks containerNo={containerNo} containerHref={containerHref} shippingMarks={shippingMarks} canEdit={false} action={marksAction} />}
               />
             </EditableRows>
           ) : (
@@ -408,7 +411,7 @@ export function PackingCard({
               lines={lines}
               canEdit={editable}
               today={today}
-              footer={<PackingMarks containerNo={containerNo} shippingMarks={shippingMarks} canEdit={editable} action={marksAction} />}
+              footer={<PackingMarks containerNo={containerNo} containerHref={containerHref} shippingMarks={shippingMarks} canEdit={editable} action={marksAction} />}
             />
           )}
         </div>
@@ -417,16 +420,37 @@ export function PackingCard({
   );
 }
 
-/** The container and the shipping marks, under the packing totals; "Change" opens them. */
-function PackingMarks({ containerNo, shippingMarks, canEdit, action }: { containerNo: string | null; shippingMarks: string | null; canEdit: boolean; action: Action }) {
+/** The container (the shipment's, read-only here) and the shipping marks, under the packing totals; "Change" opens the marks. */
+function PackingMarks({
+  containerNo,
+  containerHref,
+  shippingMarks,
+  canEdit,
+  action,
+}: {
+  containerNo: string | null;
+  containerHref?: string;
+  shippingMarks: string | null;
+  canEdit: boolean;
+  action: Action;
+}) {
   const [editing, setEditing] = useState(false);
+  const fromShipment = containerHref ? (
+    <a href={containerHref} className="text-xs font-normal text-primary hover:underline">
+      {containerNo ? "from Shipment 1 · change it there" : "add it on the shipment"}
+    </a>
+  ) : null;
   if (editing)
     return (
       <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3 border-t border-line pt-3">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Container number" htmlFor="pk-container" optional>
-            <Input id="pk-container" name="containerNo" maxLength={120} defaultValue={containerNo ?? ""} placeholder="e.g. TGHU 123456-7" />
-          </Field>
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Container number</span>
+            <span id="pk-container" className="flex min-h-9 flex-wrap items-center gap-x-2 rounded-md border border-line bg-surface-2/60 px-3 text-sm" aria-readonly="true">
+              {containerNo ?? <span className="text-muted">—</span>}
+            </span>
+            {fromShipment}
+          </div>
           <Field label="Shipping marks" htmlFor="pk-marks" optional hint="As printed on the cartons">
             <Textarea id="pk-marks" name="shippingMarks" rows={2} className="min-h-0" maxLength={2000} defaultValue={shippingMarks ?? ""} />
           </Field>
@@ -445,9 +469,10 @@ function PackingMarks({ containerNo, shippingMarks, canEdit, action }: { contain
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-t border-line pt-2 text-sm">
       <dl className="flex min-w-0 flex-wrap gap-x-6 gap-y-1">
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap items-baseline gap-1.5">
           <dt className="text-muted">Container</dt>
           <dd className="font-medium">{containerNo ?? <span className="text-muted">—</span>}</dd>
+          {fromShipment && <dd>{fromShipment}</dd>}
         </div>
         <div className="flex min-w-0 gap-1.5">
           <dt className="shrink-0 text-muted">Shipping marks</dt>

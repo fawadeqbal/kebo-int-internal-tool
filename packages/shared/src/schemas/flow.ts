@@ -137,6 +137,9 @@ export const shipmentInput = z
     mode: shipmentFields.mode.default("sea"),
     status: shipmentFields.status.default("planned"),
     vgmKg: shipmentFields.vgmKg.optional().transform((v) => v ?? null),
+    /** Not sent: from the order's terms (portsOf: E/F terms load at the Incoterm place, C/D terms discharge there). Empty: none. */
+    portOfLoading: shipmentFields.portOfLoading.optional(),
+    portOfDischarge: shipmentFields.portOfDischarge.optional(),
   })
   .refine(etaAfterEtd, etaMessage);
 export type ShipmentInput = z.infer<typeof shipmentInput>;

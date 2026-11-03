@@ -42,23 +42,18 @@ export async function moveStageAction(orderId: string, _prev: ActionState, form:
   return r;
 }
 
-/** Ship-by, ready, shipped dates and the B/L number. */
+const DETAIL_FIELDS = ["shipBy", "readyOn", "shippedOn", "blNo", "containerNo", "documentTitle", "portOfDischarge"] as const;
+
+/**
+ * The Details card: ship-by, ready date, the contract destination and the heading; shipped on, the B/L and
+ * the container too when the order has no shipping module (they are saved on Shipment 1). Only the fields
+ * the form has are sent: a field it does not show is never cleared.
+ */
 export async function detailsAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(
-    form,
-    () =>
-      api.patch(`/orders/${orderId}/details`, {
-        shipBy: v.shipBy || null,
-        readyOn: v.readyOn || null,
-        shippedOn: v.shippedOn || null,
-        blNo: v.blNo?.trim() || null,
-        documentTitle: v.documentTitle?.trim() || null,
-        portOfDischarge: v.portOfDischarge?.trim() || null,
-        reason: reasonOf(form),
-      }),
-    "Details saved.",
-  );
+  const body: Record<string, string | null> = {};
+  for (const k of DETAIL_FIELDS) if (k in v) body[k] = v[k]?.trim() || null;
+  const r = await attempt(form, () => api.patch(`/orders/${orderId}/details`, { ...body, reason: reasonOf(form) }), "Details saved.");
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -70,21 +65,17 @@ export async function receiptAction(orderId: string, _prev: ActionState, form: F
   return r;
 }
 
-/** The packing list: payload { containerNo, shippingMarks, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] }. */
+/** The packing list: payload { shippingMarks, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } (the container is the shipment's). */
 export async function packingAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.put(`/orders/${orderId}/packing`, formBody(form)), "Packing list saved.");
   if (r.ok) refresh(orderId);
   return r;
 }
 
-/** The packing list's container and shipping marks (the order's details; nothing else changes). */
+/** The packing list's shipping marks (the order's details; nothing else changes: the container is the shipment's, edited on Shipping). */
 export async function packingMarksAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(
-    form,
-    () => api.patch(`/orders/${orderId}/details`, { containerNo: v.containerNo?.trim() || null, shippingMarks: v.shippingMarks?.trim() || null }),
-    "Saved.",
-  );
+  const r = await attempt(form, () => api.patch(`/orders/${orderId}/details`, { shippingMarks: v.shippingMarks?.trim() || null }), "Saved.");
   if (r.ok) refresh(orderId);
   return r;
 }

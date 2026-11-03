@@ -332,8 +332,6 @@ export async function seedDemoData(
         closedAt: o.order.stage === "done" ? new Date(`${stageSince}T09:00:00Z`) : null,
         orderedOn: toDbDate(orderedOn),
         readyOn: o.order.readyInDays === undefined ? null : toDbDate(addDays(orderedOn, o.order.readyInDays)),
-        shippedOn: shippedOn ? toDbDate(shippedOn) : null,
-        blNo: shippedOn ? `QDLOS${blSerial++}` : null,
         currency: "USD",
         total: fromMinor(accepted.total),
         depositPercent: 30,
@@ -371,8 +369,18 @@ export async function seedDemoData(
         ...(shippedOn
           ? {
               packedAt: new Date(`${addDays(shippedOn, -2)}T09:00:00Z`),
-              containerNo: "TGHU 882741-3",
               shippingMarks: `${customer.name.toUpperCase()}\nMADE IN CHINA`,
+              // The shipment that left: its B/L, the day it sailed and the container (FOB Qingdao: loaded there).
+              shipments: {
+                create: {
+                  mode: "sea",
+                  status: o.order.stage === "done" ? "arrived" : "departed",
+                  blNo: `QDLOS${blSerial++}`,
+                  containerNo: "TGHU 882741-3",
+                  departedOn: toDbDate(shippedOn),
+                  portOfLoading: "Qingdao",
+                },
+              },
             }
           : {}),
       },

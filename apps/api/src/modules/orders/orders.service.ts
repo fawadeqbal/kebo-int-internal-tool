@@ -48,6 +48,7 @@ import { factoryPlansOf } from "../money/factory-plan";
 import { termsOf } from "../money/route-plan";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
+import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -77,7 +78,9 @@ const orderInclude = {
     },
   },
   customer: { select: { id: true, name: true, country: true } },
-  inquiry: { select: { id: true, refNo: true, title: true, assigneeId: true, assignee: { select: { id: true, name: true } } } },
+  inquiry: { select: { id: true, refNo: true, title: true, assigneeId: true, requiredBy: true, assignee: { select: { id: true, name: true } } } },
+  // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
+  shipments: orderShipments,
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -169,8 +172,8 @@ function lineView(l: LineRow, no: string, show: LineShows) {
   };
 }
 
-/** The goods side of the order: what came in, whether it is packed, the container and the packing totals. */
-function goodsSummary(o: Pick<OrderRow, "lines" | "packedAt" | "containerNo" | "shippingMarks">) {
+/** The goods side of the order: what came in, whether it is packed, the container (Shipment 1's) and the packing totals. */
+function goodsSummary(o: Pick<OrderRow, "lines" | "packedAt" | "shipments" | "shippingMarks">) {
   const g = goodsOf(o.lines, o.packedAt);
   const goodsLines = o.lines.filter((l) => l.type === "goods");
   const sum = (f: (l: (typeof goodsLines)[number]) => number) => goodsLines.reduce((t, l) => t + f(l), 0);
@@ -181,7 +184,8 @@ function goodsSummary(o: Pick<OrderRow, "lines" | "packedAt" | "containerNo" | "
     short: g.short,
     packed: g.packed,
     packedAt: o.packedAt,
-    containerNo: o.containerNo,
+    /** Shipment 1's container (edited on the shipment; read-only on the packing form). */
+    containerNo: shipFacts(o.shipments).containerNo,
     shippingMarks: o.shippingMarks,
     totals: {
       packages: sum((l) => l.packages ?? 0),
@@ -519,7 +523,7 @@ export class OrdersService {
       status: o.status,
       stageSince: dateIn(o.stageSince, this.clock.timeZone),
       readyOn: fromDbDateOrNull(o.readyOn),
-      shippedOn: fromDbDateOrNull(o.shippedOn),
+      shippedOn: shipFacts(o.shipments).shippedOn,
       goods: goodsOf(o.lines, o.packedAt),
     };
   }
@@ -544,19 +548,35 @@ export class OrdersService {
     });
     const back = o.status === "cancelled" ? null : previousStage(o.stage);
     const numbers = orderLineNumbers(o.lines);
+    const ship = shipFacts(o.shipments);
+    const { requiredBy, ...inquiry } = o.inquiry;
     return {
       id: o.id,
       refNo: o.refNo,
       status: o.status,
       stage: o.stage,
       stageSince: dateIn(o.stageSince, this.clock.timeZone),
-      inquiry: o.inquiry,
+      inquiry,
       customer: o.customer,
       orderedOn: fromDbDate(o.orderedOn),
       shipBy: fromDbDateOrNull(o.shipBy),
+      /** When the customer wanted it (the deal's "wanted by"): the suggestion for ship-by while it is empty. */
+      shipBySuggested: o.shipBy ? null : fromDbDateOrNull(requiredBy),
       readyOn: fromDbDateOrNull(o.readyOn),
-      shippedOn: fromDbDateOrNull(o.shippedOn),
-      blNo: o.blNo,
+      /** The shipment's, never the order's: the earliest day a shipment left, and Shipment 1's B/L. */
+      shippedOn: ship.shippedOn,
+      blNo: ship.blNo,
+      /** Shipment 1, where shipped on / B/L / container are edited (null: no shipment yet). */
+      shipment: ship.primary
+        ? {
+            id: ship.primary.id,
+            mode: ship.primary.mode,
+            count: ship.list.length,
+            blNo: ship.primary.blNo,
+            containerNo: ship.primary.containerNo,
+            departedOn: fromDbDateOrNull(ship.primary.departedOn),
+          }
+        : null,
       documentTitle: o.documentTitle,
       portOfDischarge: o.portOfDischarge,
       currency: o.currency,
@@ -698,7 +718,7 @@ export class OrdersService {
         inquiry: o.inquiry,
         orderedOn: fromDbDate(o.orderedOn),
         readyOn: fromDbDateOrNull(o.readyOn),
-        shippedOn: fromDbDateOrNull(o.shippedOn),
+        shippedOn: shipFacts(o.shipments).shippedOn,
         currency: o.currency,
         total: o.total.toFixed(2),
         received: fromMinor(p.settledMinor),
@@ -787,22 +807,22 @@ export class OrdersService {
           : given;
       const data: Prisma.OrderUpdateInput = { stage: input.to, stageSince: new Date() };
       if (input.to === "in_production" && input.readyOn) data.readyOn = toDbDate(input.readyOn);
+      let shippedOn: ISODate | null = null;
       if (input.to === "shipped" && forward) {
-        // Shipped again after a move back: keep the real ship date unless a new one is given.
-        data.shippedOn = input.shippedOn ? toDbDate(input.shippedOn) : (o.shippedOn ?? toDbDate(today));
-        if (input.blNo) data.blNo = input.blNo;
+        // The ship date and B/L are the shipment's (Shipment 1, made when there is none). Shipped again after
+        // a move back: the real ship date is kept unless a new one is given.
+        const was = shipFacts(o.shipments).shippedOn;
+        if (input.shippedOn || !was || input.blNo)
+          await onPrimaryShipment(tx, o, {
+            ...(input.shippedOn || !was ? { departedOn: input.shippedOn ?? today } : {}),
+            ...(input.blNo ? { blNo: input.blNo } : {}),
+          });
+        shippedOn = await this.shippedOn(tx, o.id);
       }
       if (input.to === "done") Object.assign(data, { status: "closed", closedAt: new Date() });
       if (o.stage === "done" && !forward) Object.assign(data, { status: "open", closedAt: null });
       await tx.order.update({ where: { id: o.id }, data });
-      await this.datePlan(
-        tx,
-        o,
-        input.to,
-        forward,
-        input.readyOn ?? null,
-        data.shippedOn instanceof Date ? fromDbDate(data.shippedOn) : null,
-      );
+      await this.datePlan(tx, o, input.to, forward, input.readyOn ?? null, shippedOn);
       if (input.to === "shipped" && forward) await this.freezePacking(tx, o.id, user.id);
       await tx.orderStageChange.create({
         data: {
@@ -842,26 +862,14 @@ export class OrdersService {
    * The order flow moved on (ordered from the factory, a shipment left): the
    * order's stage follows by itself, forward only and only while it is open.
    * No warnings are asked (the work already happened); the history says why.
+   * Nothing is copied: the ship date and B/L stay on the shipment.
    * Runs inside the caller's transaction; publish the returned event after it.
    */
-  async followFlow(
-    tx: Tx,
-    user: SessionUser,
-    orderId: string,
-    to: "in_production" | "shipped",
-    why: string,
-    facts: { shippedOn?: ISODate | null; blNo?: string | null } = {},
-  ) {
+  async followFlow(tx: Tx, user: SessionUser, orderId: string, to: "in_production" | "shipped", why: string) {
     const o = await this.load(user, orderId, tx);
     if (o.status !== "open" || STAGE_FLOW.indexOf(o.stage) >= STAGE_FLOW.indexOf(to)) return null;
     const data: Prisma.OrderUpdateInput = { stage: to, stageSince: new Date() };
-    let shippedOn: ISODate | null = null;
-    if (to === "shipped") {
-      const today = this.clock.today();
-      shippedOn = facts.shippedOn && facts.shippedOn <= today ? facts.shippedOn : (fromDbDateOrNull(o.shippedOn) ?? today);
-      data.shippedOn = toDbDate(shippedOn);
-      if (facts.blNo && !o.blNo) data.blNo = facts.blNo;
-    }
+    const shippedOn = to === "shipped" ? (shipFacts(o.shipments).shippedOn ?? this.clock.today()) : null;
     await tx.order.update({ where: { id: o.id }, data });
     await this.datePlan(tx, o, to, true, null, shippedOn);
     if (to === "shipped") await this.freezePacking(tx, o.id, user.id);
@@ -886,6 +894,11 @@ export class OrdersService {
       actorId: user.id,
       notify: [o.inquiry.assigneeId].filter((v): v is string => !!v),
     } satisfies DomainEvent;
+  }
+
+  /** Shipped on: the earliest day one of the order's shipments left. */
+  private async shippedOn(tx: Tx, orderId: string) {
+    return shipFacts(await tx.shipment.findMany({ where: { orderId }, ...orderShipments })).shippedOn;
   }
 
   /** Publish what followFlow returned, once its transaction is committed. */
@@ -1075,12 +1088,11 @@ export class OrdersService {
       const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
       await tx.order.update({
         where: { id: o.id },
-        data: {
-          containerNo: input.containerNo,
-          shippingMarks: input.shippingMarks,
-          packedAt: complete ? (o.packedAt ?? new Date()) : null,
-        },
+        data: { shippingMarks: input.shippingMarks, packedAt: complete ? (o.packedAt ?? new Date()) : null },
       });
+      // The container is the shipment's: sent here (older clients), it is saved on Shipment 1.
+      if (input.containerNo !== undefined && input.containerNo !== shipFacts(o.shipments).containerNo)
+        await onPrimaryShipment(tx, o, { containerNo: input.containerNo });
       await this.freezePacking(tx, o.id, user.id);
       await this.audit.record(tx, {
         userId: user.id,
@@ -1217,7 +1229,11 @@ export class OrdersService {
     return { line: lineView(o.lines[at]!, numbers[at]!, await this.lineShows(user)), goods: goodsSummary(o) };
   }
 
-  /** Dates and the B/L number, editable at any stage. Only the fields sent change; an empty one is cleared. */
+  /**
+   * Dates and details, editable at any stage. Only the fields sent change; an empty one is cleared.
+   * Shipped on, the B/L and the container are Shipment 1's (made when there is none): saved there, the one
+   * place the papers, the checklist and the reports read them from.
+   */
   async setDetails(user: SessionUser, id: string, input: OrderDetailsInput) {
     if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     if (input.shippedOn && input.shippedOn > this.clock.today()) throw new DomainError("The ship date cannot be in the future.");
@@ -1228,29 +1244,33 @@ export class OrdersService {
       const data: Prisma.OrderUpdateInput = {};
       if (input.shipBy !== undefined) data.shipBy = toDbDateOrNull(input.shipBy);
       if (input.readyOn !== undefined) data.readyOn = toDbDateOrNull(input.readyOn);
-      if (input.shippedOn !== undefined) data.shippedOn = toDbDateOrNull(input.shippedOn);
-      if (input.blNo !== undefined) data.blNo = input.blNo;
       if (input.documentTitle !== undefined) data.documentTitle = input.documentTitle;
       if (input.portOfDischarge !== undefined) data.portOfDischarge = input.portOfDischarge;
-      if (input.containerNo !== undefined) data.containerNo = input.containerNo;
       if (input.shippingMarks !== undefined) data.shippingMarks = input.shippingMarks;
+      const ship = shipFacts(o.shipments);
       // Once shipped, the ship date and B/L are on the customer's documents: changing them says why.
       const shippedFacts =
         (o.stage === "shipped" || o.stage === "done") &&
-        ((input.shippedOn !== undefined && input.shippedOn !== fromDbDateOrNull(o.shippedOn) && o.shippedOn !== null) ||
-          (input.blNo !== undefined && (input.blNo ?? null) !== o.blNo && o.blNo !== null));
+        ((input.shippedOn !== undefined && input.shippedOn !== ship.shippedOn && ship.shippedOn !== null) ||
+          (input.blNo !== undefined && (input.blNo ?? null) !== ship.blNo && ship.blNo !== null));
       const reason = shippedFacts ? requireReason(input.reason, "shipping", "the ship date or B/L changes after shipping") : input.reason;
       const before = {
         shipBy: fromDbDateOrNull(o.shipBy),
         readyOn: fromDbDateOrNull(o.readyOn),
-        shippedOn: fromDbDateOrNull(o.shippedOn),
-        blNo: o.blNo,
+        shippedOn: ship.shippedOn,
+        blNo: ship.blNo,
         documentTitle: o.documentTitle,
         portOfDischarge: o.portOfDischarge,
-        containerNo: o.containerNo,
+        containerNo: ship.containerNo,
         shippingMarks: o.shippingMarks,
       };
-      await tx.order.update({ where: { id: o.id }, data });
+      const onShipment = {
+        ...(input.shippedOn !== undefined && input.shippedOn !== ship.shippedOn ? { departedOn: input.shippedOn } : {}),
+        ...(input.blNo !== undefined && input.blNo !== ship.blNo ? { blNo: input.blNo } : {}),
+        ...(input.containerNo !== undefined && input.containerNo !== ship.containerNo ? { containerNo: input.containerNo } : {}),
+      };
+      if (Object.keys(onShipment).length) await onPrimaryShipment(tx, o, onShipment);
+      if (Object.keys(data).length) await tx.order.update({ where: { id: o.id }, data });
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",

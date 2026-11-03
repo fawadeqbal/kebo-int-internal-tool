@@ -13,6 +13,7 @@ import {
   planWhen,
   routeSummary,
   STEP_OF_CATEGORY,
+  shippedOnOf,
   type ExpenseBearer,
   type ExpenseCategory,
   type ExpenseInput,
@@ -1110,13 +1111,14 @@ export class MoneyService {
 
     const [shipped, payments, factoryPaid, expenses] = await Promise.all([
       this.prisma.db.order.findMany({
-        where: { status: { not: "cancelled" }, shippedOn: { gte: from, lte: to } },
+        // Shipped this year: the earliest day one of its shipments left (narrowed below).
+        where: { status: { not: "cancelled" }, shipments: { some: { departedOn: { gte: from, lte: to } } } },
         select: {
           id: true,
           refNo: true,
           ...rated,
           total: true,
-          shippedOn: true,
+          shipments: { select: { departedOn: true } },
           customer: { select: { name: true } },
           // Only those borne by us: the customer pays the others back, or they come off what we owe a factory.
           expenses: { where: { voidedAt: null, borneBy: "us" }, select: { amount: true, rate: true, category: true } },
@@ -1173,7 +1175,9 @@ export class MoneyService {
       profit: number;
     }[] = [];
     for (const o of shipped) {
-      const m = monthOf(o.shippedOn!);
+      const on = shippedOnOf(o.shipments.map((s) => ({ departedOn: fromDbDateOrNull(s.departedOn) })));
+      if (!on || on < `${year}-01-01` || on > `${year}-12-31`) continue;
+      const m = monthOf(toDbDate(on));
       const c = costings.get(o.id)!;
       const inMain = (minor: Minor) => fx.order(minor, o);
       const exp = o.expenses.reduce((t, e) => t + convert(decimalToMinor(e.amount), Number(e.rate)), 0);

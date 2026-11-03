@@ -1,6 +1,6 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, planDeposit, type Minor } from "@kebo/money";
-import { lcChecks, rebuildPlan, routePlan, type BalanceWhen, type LcCheck, type LcTerms, type RouteTerms } from "@kebo/shared";
+import { lcChecks, primaryShipment, rebuildPlan, routePlan, shippedOnOf, type BalanceWhen, type LcCheck, type LcTerms, type RouteTerms } from "@kebo/shared";
 import { addDays, type ISODate } from "@kebo/utils";
 import type { Tx } from "../../database/prisma.service";
 
@@ -20,7 +20,6 @@ type PlanOrder = {
   orderedOn: Date;
   stage: string;
   readyOn: Date | null;
-  shippedOn: Date | null;
 };
 
 /**
@@ -42,7 +41,9 @@ export async function rebuildRoutePlan(tx: Tx, o: PlanOrder, t: RouteTerms, days
   const fresh = routePlan(totalMinor, Number(o.depositPercent), t, fromDbDate(o.orderedOn), days.depositDays, papers ? fromDbDate(papers.doneOn) : null);
   const { keep, add } = rebuildPlan(stored, settled, fresh);
   // A balance not tied to the papers is dated as the stage dates it: ready date (before shipment), ship date (+ days).
-  const shipped = o.shippedOn ? fromDbDate(o.shippedOn) : null;
+  // The ship date is the shipments' (the earliest day one left).
+  const departures = await tx.shipment.findMany({ where: { orderId: o.id }, select: { departedOn: true } });
+  const shipped = shippedOnOf(departures.map((d) => ({ departedOn: fromDbDateOrNull(d.departedOn) })));
   const ready = o.readyOn ? fromDbDate(o.readyOn) : null;
   const before = (t.route === "informal" || t.route === null) && t.balanceWhen !== "against_bl_copy";
   const knownDue = (): ISODate | null => {
@@ -100,9 +101,11 @@ export function lcChecksOf(
     total: Prisma.Decimal;
     depositPercent: Prisma.Decimal;
     readyOn: Date | null;
+    /** Our ship-by: checked against the LC's latest shipment date. */
+    shipBy: Date | null;
     planItems?: { amount: Prisma.Decimal; dueRule: string | null; part?: string | null }[];
     bankContract: { amount: Prisma.Decimal | null; currency: string | null; latestShipOn: Date | null; expiresOn: Date | null } | null;
-    shipments: { eta: Date | null }[];
+    shipments: { id: string; createdAt: Date; eta: Date | null }[];
   },
   courierDays: number,
 ): LcCheck[] | null {
@@ -115,7 +118,9 @@ export function lcChecksOf(
       ? { amount: b.amount?.toFixed(2) ?? null, currency: b.currency, latestShipOn: fromDbDateOrNull(b.latestShipOn), expiresOn: fromDbDateOrNull(b.expiresOn) }
       : null,
     readyOn: fromDbDateOrNull(o.readyOn),
-    eta: fromDbDateOrNull(o.shipments.find((s) => s.eta)?.eta ?? null),
+    // Shipment 1's ETA: the shipment the papers go with.
+    eta: fromDbDateOrNull(primaryShipment(o.shipments)?.eta ?? null),
     courierDays,
+    shipBy: fromDbDateOrNull(o.shipBy),
   });
 }

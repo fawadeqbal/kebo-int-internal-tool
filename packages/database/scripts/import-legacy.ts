@@ -19,7 +19,7 @@ import "./env";
 import { randomUUID } from "node:crypto";
 import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
-import type { BalanceTerms, Incoterm, InquiryStage } from "@kebo/shared";
+import { portsOf, type BalanceTerms, type Incoterm, type InquiryStage } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
 import { freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, toDbDate, type Prisma } from "../src";
 import * as map from "./import-legacy/map";
@@ -928,7 +928,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         status,
         stage: staged.stage,
         stageSince: toDbDate(staged.since),
-        shippedOn: staged.shippedOn ? toDbDate(staged.shippedOn) : null,
         orderedOn: toDbDate(d.orderedOn!),
         currency: rev.currency,
         total: rev.total,
@@ -941,6 +940,19 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         cancelReason: status === "cancelled" ? (d.q.status_reason ?? "Closed as not completed in the old app.") : null,
         createdById: rev.created_by,
         createdAt: toDbDate(d.orderedOn!),
+        // Shipped: its shipment (the ship date lives there), with the ports the terms give.
+        ...(staged.shippedOn
+          ? {
+              shipments: {
+                create: {
+                  mode: "sea",
+                  status: staged.stage === "done" ? "arrived" : "departed",
+                  departedOn: toDbDate(staged.shippedOn),
+                  ...portsOf({ incoterm: d.incoterm.incoterm, incotermPlace: d.incoterm.place, portOfDischarge: null }),
+                },
+              },
+            }
+          : {}),
       },
     });
     orderOfRevision.set(rev.id, id);
@@ -1028,10 +1040,17 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   const plsOfOrder = groupBy(livePls, (p) => orderForInvoice(invoiceById.get(p.invoice_id)!));
   for (const [orderId, pls] of plsOfOrder) {
     const last = pls[pls.length - 1]!;
-    await tx.order.update({
-      where: { id: orderId },
-      data: { packedAt: pls[0]!.created_at, containerNo: last.container_no?.slice(0, 120) ?? null, shippingMarks: last.marks },
-    });
+    await tx.order.update({ where: { id: orderId }, data: { packedAt: pls[0]!.created_at, shippingMarks: last.marks } });
+    // The container is the shipment's: on Shipment 1 (made for it when the order has none).
+    const containerNo = last.container_no?.slice(0, 120) || null;
+    if (containerNo) {
+      const first = await tx.shipment.findFirst({ where: { orderId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true } });
+      if (first) await tx.shipment.update({ where: { id: first.id }, data: { containerNo } });
+      else {
+        const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { incoterm: true, incotermPlace: true, portOfDischarge: true } });
+        await tx.shipment.create({ data: { orderId, mode: "sea", status: "planned", containerNo, ...portsOf(o) } });
+      }
+    }
   }
   if (livePls.length)
     report.judge(

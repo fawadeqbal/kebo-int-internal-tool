@@ -16,6 +16,8 @@ import {
   type FactoryDueRule,
   documentDone,
   documentsInUse,
+  portsOf as portsOfOrder,
+  shipByVsLc,
   SAT_RESULT_LABEL,
   SHIP_MODE_LABEL,
   type OrderDocumentKind,
@@ -34,6 +36,7 @@ import { orderLineNumbers } from "../orders/orders.service";
 import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../money/position";
 import { lcBalanceMinor, termsOf } from "../money/route-plan";
 import { quotedTermsPrinted } from "../orders/order-docs";
+import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -64,7 +67,8 @@ export const paperOrderInclude = {
     select: { id: true, amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, factoryId: true, description: true, spentOn: true },
   },
   bankContract: true,
-  shipments: { orderBy: { createdAt: "asc" } },
+  // Shipment 1 (the primary: the first made) first; the papers print it.
+  shipments: { orderBy: SHIPMENT_ORDER },
   documents: {
     orderBy: [{ kind: "asc" }, { updatedAt: "asc" }],
     include: { attachment: { select: { id: true, fileName: true, deletedAt: true } } },
@@ -132,7 +136,7 @@ function check(
   label: string,
   value: string,
   ok: boolean,
-  more: { required?: boolean; fix?: PaperFixField | null; href?: string | null } = {},
+  more: { required?: boolean; fix?: PaperFixField | null; href?: string | null; warn?: string | null } = {},
 ): PaperCheck {
   return {
     key,
@@ -142,6 +146,7 @@ function check(
     required: more.required ?? false,
     fix: ok ? null : (more.fix ?? null),
     href: ok ? null : (more.href ?? null),
+    ...(more.warn ? { warn: more.warn } : {}),
   };
 }
 
@@ -196,14 +201,13 @@ export const termsSentence = (c: PaperCtx) => routePaymentSentence(positionOf(c)
 /** The quotation's own payment text: while the route is still the accepted one, or when chosen on the Make page. */
 const quotedTerms = (c: PaperCtx) => (quotedTermsPrinted(c.o) ? bullets(c.o.revision.paymentTerms) : []);
 
-/** The ports: from the shipment, else the Incoterm place (loading for E/F terms, discharge for C/D terms) and the order's port. */
+/** The shipment the papers speak of (Shipment 1), shipped on (the earliest departure), its B/L and container. */
+const shipOf = (c: PaperCtx) => shipFacts(c.o.shipments);
+
+/** The ports: Shipment 1's, else from the terms (loading at the Incoterm place for E/F terms, discharge there for C/D terms, unless the order names its destination). */
 function portsOf(c: PaperCtx) {
-  const s = c.o.shipments[0];
-  const loadingTerm = ["EXW", "FCA", "FAS", "FOB"].includes(c.o.incoterm);
-  return {
-    pol: s?.portOfLoading ?? (loadingTerm ? c.o.incotermPlace : null),
-    pod: s?.portOfDischarge ?? c.o.portOfDischarge ?? (loadingTerm ? null : c.o.incotermPlace),
-  };
+  const p = portsOfOrder(c.o, shipOf(c).primary);
+  return { pol: p.portOfLoading, pod: p.portOfDischarge };
 }
 
 const totalLabel = (c: PaperCtx) => `Total ${c.o.incoterm}${c.o.incotermPlace ? ` ${c.o.incotermPlace}` : ""}`;
@@ -269,6 +273,9 @@ function salesContract(c: PaperCtx): Built {
   const b = c.o.bankContract;
   const rev = c.o.revision;
   const shipBy = fromDbDateOrNull(c.o.shipBy);
+  // With an LC: its latest shipment date beside ours, and a warning when ours is later (we keep our own).
+  const lcLatest = LC(c) ? fromDbDateOrNull(b?.latestShipOn) : null;
+  const vsLc = shipByVsLc(shipBy, lcLatest);
   const prices = c.options.prices !== false;
   const columns = [COL.no, COL.item, ...(hs.show ? [COL.hs] : []), COL.qty, ...(prices ? [COL.amount] : [])];
   // The LC / bank contract itself, once known (the sentence above already says how the balance is paid).
@@ -278,7 +285,7 @@ function salesContract(c: PaperCtx): Built {
       : route === "bank_contract" && (b?.customerBank || b?.number)
         ? `Bank contract${b?.customerBank ? ` with ${b.customerBank}` : ""}${b?.number ? `, No. ${b.number}` : ""}.`
         : null;
-  const mode = SHIP_MODE_LABEL[c.o.shipments[0]?.mode ?? "sea"].toLowerCase();
+  const mode = SHIP_MODE_LABEL[shipOf(c).primary?.mode ?? "sea"].toLowerCase();
   return {
     checks: [
       buyerCheck(c),
@@ -301,7 +308,14 @@ function salesContract(c: PaperCtx): Built {
           .join(" · "),
         true,
       ),
-      check("shipBy", "Ship by", shipBy ? paperDateText(shipBy) : "not set", !!shipBy, { fix: "shipBy" }),
+      // Both shown; ours printed. Later than the LC's latest shipment: warned (a new date can be typed here).
+      check(
+        "shipBy",
+        "Ship by",
+        shipBy ? `${paperDateText(shipBy)}${lcLatest ? ` · LC latest ${paperDateText(lcLatest)}` : ""}` : lcLatest ? `not set · LC latest ${paperDateText(lcLatest)}` : "not set",
+        !!shipBy && !vsLc?.late,
+        { fix: "shipBy", warn: vsLc?.late ? `Ours is later than the LC allows: ship by ${paperDateText(lcLatest!)}, or ask for an amendment.` : null },
+      ),
       hs.check,
       check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {
         href: "/settings?tab=sales",
@@ -337,13 +351,14 @@ function salesContract(c: PaperCtx): Built {
 
 function commercialInvoice(c: PaperCtx): Built {
   const hs = hsOf(c);
-  const s = c.o.shipments[0];
+  const ship = shipOf(c);
+  const s = ship.primary;
   const { pol, pod } = portsOf(c);
-  const blNo = s?.blNo ?? c.o.blNo;
+  const blNo = ship.blNo;
   const vessel = s?.vessel ?? null;
   const b = c.o.bankContract;
   const lcNo = BANK_ROUTE(c) ? (b?.number ?? null) : null;
-  const shipped = fromDbDateOrNull(s?.departedOn) ?? fromDbDateOrNull(c.o.shippedOn);
+  const shipped = ship.shippedOn;
   const prices = c.options.prices !== false;
   const ships = has(c, "shipping");
   return {
@@ -532,9 +547,10 @@ const kg = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 }
 const m3 = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 3 });
 
 function shippingAdvice(c: PaperCtx): Built {
-  const s = c.o.shipments[0];
+  const ship = shipOf(c);
+  const s = ship.primary;
   const { pol, pod } = portsOf(c);
-  const blNo = s?.blNo ?? c.o.blNo;
+  const blNo = ship.blNo;
   const etd = fromDbDateOrNull(s?.etd);
   const eta = fromDbDateOrNull(s?.eta);
   const rows = itemRows(c, true);
@@ -547,7 +563,7 @@ function shippingAdvice(c: PaperCtx): Built {
       check("blNo", air ? "AWB number" : "B/L number", blNo ?? "needed", !!blNo, { required: true, fix: "blNo" }),
       check("etd", "ETD", etd ? paperDateText(etd) : "needed", !!etd, { required: true, fix: "etd" }),
       check("eta", "ETA", eta ? paperDateText(eta) : "not known", !!eta, { fix: "eta" }),
-      check("container", "Container", s?.containerNo ?? c.o.containerNo ?? "not set", !!(s?.containerNo ?? c.o.containerNo), {
+      check("container", "Container", s?.containerNo ?? "not set", !!s?.containerNo, {
         href: "shipping#shipments",
       }),
       check(
@@ -595,9 +611,7 @@ function shippingAdvice(c: PaperCtx): Built {
       bullets: [
         ...(s?.vessel ? [{ label: air ? "Flight:" : "Vessel:", value: s.vessel }] : []),
         ...(blNo ? [{ label: air ? "AWB No.:" : "B/L No.:", value: blNo }] : []),
-        ...(s?.containerNo || c.o.containerNo
-          ? [{ label: "Container:", value: `${s?.containerNo ?? c.o.containerNo}${s?.containerType ? ` (${s.containerType})` : ""}` }]
-          : []),
+        ...(s?.containerNo ? [{ label: "Container:", value: `${s.containerNo}${s.containerType ? ` (${s.containerType})` : ""}` }] : []),
         ...(pol ? [{ label: "Port of loading:", value: pol }] : []),
         ...(pod ? [{ label: "Port of discharge:", value: pod }] : []),
         ...(etd ? [{ label: "ETD:", value: date(etd) }] : []),
@@ -1054,17 +1068,21 @@ const SETS: Partial<Record<OrderDocumentKind | PaperKind, [number, number]>> = {
 
 function coverLetter(c: PaperCtx): Built {
   const b = c.o.bankContract;
-  const mode = c.o.shipments[0]?.mode ?? "sea";
+  const mode = shipOf(c).primary?.mode ?? "sea";
   // The papers enclosed: the set the shipment needs that the company uses (Settings › Papers we use), and any already in.
   const set = documentsInUse(c.o.paymentRoute, mode, c.settings.papers.off, (k) =>
     k === "proforma_invoice" ? !!c.o.proformaNo : k === "packing_list" ? !!c.o.packedAt : c.o.documents.some((d) => d.kind === k && documentDone(d.status)),
   );
   const numberOf = (kind: OrderDocumentKind) => {
+    // The B/L or AWB is the shipment's number (its row's shipment, else Shipment 1): the row keeps none of its own.
+    if (kind === "bill_of_lading" || kind === "airway_bill") {
+      const row = c.o.documents.find((d) => d.kind === kind && d.shipmentId);
+      return (c.o.shipments.find((x) => x.id === row?.shipmentId) ?? shipOf(c).primary)?.blNo ?? null;
+    }
     const row = c.o.documents.find((d) => d.kind === kind && d.number);
     if (row) return row.number;
     if (kind === "proforma_invoice") return c.o.proformaNo;
     if (kind === "packing_list") return paperNumber(c.o.refNo, "commercial-invoice").replace(/^CI-/, "PL-");
-    if (kind === "bill_of_lading" || kind === "airway_bill") return c.o.shipments[0]?.blNo ?? c.o.blNo;
     return null;
   };
   const papers: { label: string; number: string | null; set: [number, number] }[] = [

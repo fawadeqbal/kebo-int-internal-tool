@@ -63,7 +63,7 @@ async function flowOf(orderId: string) {
   return api.get<OrderFlow>(`/orders/${orderId}/flow`);
 }
 
-/** Saves a shipment's fields (a new one starts from the order's ports), moving its status on with them. */
+/** Saves a shipment's fields (a new one's ports, when not typed, come from the order's terms: the API fills them), moving its status on with them. */
 async function saveShipment(orderId: string, shipmentId: string | null, v: Record<string, string>, status?: ShipmentStatus) {
   const body: Record<string, unknown> = pick(v, SHIPMENT);
   let current: ShipmentView | undefined;
@@ -71,13 +71,7 @@ async function saveShipment(orderId: string, shipmentId: string | null, v: Recor
   const next = status ? forward(current?.status, status) : impliedStatus(current?.status, v);
   if (next) body.status = next;
   if (shipmentId) return api.patch(`/shipments/${shipmentId}`, body);
-  const o = await api.get<OrderView>(`/orders/${orderId}`);
-  return api.post(`/orders/${orderId}/shipments`, {
-    mode: "sea",
-    portOfLoading: o.incotermPlace ?? null,
-    portOfDischarge: o.portOfDischarge ?? null,
-    ...body,
-  });
+  return api.post(`/orders/${orderId}/shipments`, { mode: "sea", ...body });
 }
 
 /** Files and a note kept with an automatic item; a person who may not change the checklist keeps the file in the deal's files only. */

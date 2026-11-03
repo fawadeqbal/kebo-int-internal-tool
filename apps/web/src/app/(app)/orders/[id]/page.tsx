@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
-import { can, STEP_PATH } from "@kebo/shared";
+import { can, shipByVsLc, STEP_PATH } from "@kebo/shared";
 import { buttonClass, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -63,6 +63,9 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const doNow = steps.doNow;
   const finished = o.status === "closed" && !doNow;
   const f = overviewFacts({ o, steps, flow, m, costs, deal, now });
+  // Shipped on, the B/L and the container are Shipment 1's: edited on Shipping when the company has the module.
+  const onShipping = flow?.modules.shipping ?? true;
+  const lcLatest = flow?.payment.route === "letter_of_credit" ? (flow.payment.bankContract?.latestShipOn ?? null) : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -127,6 +130,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
               readyOn: o.readyOn,
               shippedOn: o.shippedOn,
               blNo: o.blNo,
+              containerNo: o.goods.containerNo,
               documentTitle: o.documentTitle,
               portOfDischarge: o.portOfDischarge,
             }}
@@ -136,6 +140,13 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
               shippedOn: o.shippedOn ? date(o.shippedOn) : null,
               blNo: o.blNo,
             }}
+            shipment={{
+              onShipping,
+              label: "Shipment 1",
+              href: `${base}/shipping#goto=shipment.departedOn,shipment.blNo,shipment.containerNo`,
+            }}
+            lc={lcLatest ? { latest: date(lcLatest), late: !!shipByVsLc(o.shipBy, lcLatest)?.late } : null}
+            suggestShipBy={o.shipBySuggested ? { on: o.shipBySuggested, shown: date(o.shipBySuggested) } : null}
           />
           <WhoIsInvolved o={o} f={f} deal={deal} />
           <KeyDates o={o} f={f} deal={deal} />
