@@ -3,13 +3,15 @@ import { Plus, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Avatar, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, ListToolbar, PAGE_SIZE, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
+import { OpenPanelButton } from "@/components/common/panel";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { timeAgo } from "@/lib/format";
-import type { UserRow } from "@/lib/types-people";
+import type { RoleRow, UserRow } from "@/lib/types-people";
 import { RoleBadge } from "@/components/people/role-badge";
 import { TwoStepRemind } from "@/components/people/two-step-remind";
-import { remindTwoStepAction, setActiveAction } from "./actions";
+import { createUserAction, remindTwoStepAction, setActiveAction } from "./actions";
+import { NewUserPanel } from "./forms";
 
 export const metadata = { title: "Users" };
 
@@ -28,7 +30,7 @@ const shows: Record<Show, (u: UserRow) => boolean> = {
 /**
  * Users (design system: List frame): everyone who can sign in, their role,
  * whether they are switched on, two-step sign-in and last sign-in. Add a
- * person is the one primary (its own page for now); search and a chip per
+ * person is the one primary (in the side panel, ?panel=new-user); search and a chip per
  * state with its count in one row; rows open the person, ⋯ at the end; 25 a
  * page, every filter in the URL. A company has tens of people, so the whole
  * list is read and filtered here.
@@ -36,7 +38,12 @@ const shows: Record<Show, (u: UserRow) => boolean> = {
 export default async function UsersPage({ searchParams }: { searchParams: Promise<Params> }) {
   const me = await requirePermission("users.manage");
   const sp = await searchParams;
-  const users = await api.get<UserRow[]>("/users");
+  const adding = sp.panel === "new-user";
+  const [users, roles] = await Promise.all([
+    api.get<UserRow[]>("/users"),
+    // Frozen roles (custom roles, not in the company's plan) cannot be given.
+    adding ? api.get<RoleRow[]>("/roles").then((rs) => rs.filter((r) => !r.frozen)) : null,
+  ]);
   const active = users.filter((u) => u.isActive).length;
   const show: Show = SHOWS.includes(sp.show as Show) ? (sp.show as Show) : "all";
   const term = sp.q?.trim().toLowerCase();
@@ -54,6 +61,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   }));
   const rowMenu = (u: UserRow): MenuEntry[] => [
     { label: "Open", href: `/users/${u.id}` },
+    { label: "Edit", href: `/users/${u.id}?panel=edit-user&id=${u.id}` },
     { label: "Copy link", copy: `/users/${u.id}` },
     ...(u.isActive && u.id !== me.id
       ? [
@@ -82,10 +90,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           </>
         }
         primary={
-          <ButtonLink href="/users/new" variant="primary">
+          <OpenPanelButton panel="new-user" variant="primary" label="Add a person">
             <Plus aria-hidden /> <span className="sm:hidden">Add</span>
             <span className="max-sm:hidden">Add a person</span>
-          </ButtonLink>
+          </OpenPanelButton>
         }
       />
       {without.length > 0 && (
@@ -138,6 +146,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 <PhoneRow
                   key={u.id}
                   href={`/users/${u.id}`}
+                  flash={sp.saved === u.id}
                   title={`${u.name}${u.id === me.id ? " (you)" : ""}`}
                   line={`${u.access.name} · ${u.email}`}
                   muted={!u.isActive}
@@ -146,7 +155,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 />
               ))}
             </PhoneList>
-            <DataTable label="Users" className="max-sm:hidden">
+            <DataTable label="Users" clearParam="saved" className="max-sm:hidden">
               <THead>
                 <tr>
                   <Th>Person</Th>
@@ -161,7 +170,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               </THead>
               <tbody>
                 {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((u) => (
-                  <DataRow key={u.id} href={`/users/${u.id}`} className={cn(!u.isActive && "text-text-2")}>
+                  <DataRow key={u.id} href={`/users/${u.id}`} flash={sp.saved === u.id} className={cn(!u.isActive && "text-text-2")}>
                     <Td>
                       <span className="flex items-center gap-3">
                         <Avatar name={u.name} size={30} className={cn(!u.isActive && "bg-surface-3 text-muted")} />
@@ -201,6 +210,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         )}
         <Pager base="/users" params={keep} page={page} total={rows.length} />
       </Card>
+
+      {roles && <NewUserPanel action={createUserAction} roles={roles} />}
     </div>
   );
 }

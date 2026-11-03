@@ -10,12 +10,14 @@ const refresh = (id?: string) => {
   if (id) revalidatePath(`/users/${id}`);
 };
 
+/** Add a person (in the side panel over Users): answers with their id and name, and the list updates in place. */
 export async function createUserAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const r = await attempt(form, () => api.post<{ id: string; name: string }>("/users", { name: v.name, email: v.email, role: v.role, password: v.password }));
   if (!r.ok) return r;
   refresh();
-  redirect(`/users?toast=${encodeURIComponent(`${v.name.trim()} can now sign in.`)}`);
+  const made = r.data as { id: string; name?: string };
+  return { ok: true, data: { id: made.id, name: made.name ?? v.name?.trim() ?? "" } };
 }
 
 export async function updateUserAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {

@@ -6,10 +6,12 @@ import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
-import { importFactoriesAction, removeFactoryAction } from "./actions";
+import { OpenPanelButton } from "@/components/common/panel";
+import { importFactoriesAction, removeFactoryAction, saveFactoryAction } from "./actions";
+import { FactoryPanel } from "./factory-form";
 import { requirePermission } from "@/lib/session";
-import type { Paged } from "@/lib/types";
-import type { FactoryRow } from "@/lib/types-people";
+import type { Paged, Person } from "@/lib/types";
+import type { FactoryDetail, FactoryRow } from "@/lib/types-people";
 
 export const metadata = { title: "Factories" };
 
@@ -23,7 +25,7 @@ const reach = (f: FactoryRow) => [f.phone, f.wechat && `WeChat ${f.wechat}`, f.e
 /**
  * Factories (design system: List frame): the suppliers the team buys from,
  * who looks after each and how many price quotes each has. New factory is the
- * one primary (its own page for now); search, All / Mine chips with counts and
+ * one primary (in the side panel, ?panel=new-factory; Edit is ?panel=edit-factory&id=…); search, All / Mine chips with counts and
  * Excel in one row; rows open the factory, ⋯ at the end; 25 a page. ?mine=1:
  * the ones I look after. Prices and costs here are never shown to customers.
  */
@@ -33,10 +35,13 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   const mine = sp.mine === "1";
   const keep = { q: sp.q, mine: mine ? "1" : undefined };
   const href = (patch: Params) => buildHref("/factories", keep, { page: undefined, ...patch });
-  const [data, other] = await Promise.all([
+  const panel = sp.panel === "new-factory" || (sp.panel === "edit-factory" && sp.id) ? sp.panel : undefined;
+  const [data, other, people, editing] = await Promise.all([
     api.get<Paged<FactoryRow>>("/factories", { q: sp.q, page: toPage(sp.page), mine: mine ? "true" : undefined }),
     // The other chip's count (for the same search).
     api.get<Paged<FactoryRow>>("/factories", { q: sp.q, pageSize: 1, mine: mine ? undefined : "true" }),
+    panel ? api.get<Person[]>("/users/people") : null,
+    panel === "edit-factory" ? api.get<FactoryDetail>(`/factories/${sp.id}`).catch(() => null) : null,
   ]);
   const all = mine ? other.total : data.total;
   const mineCount = mine ? data.total : other.total;
@@ -44,7 +49,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
 
   const rowMenu = (f: FactoryRow): MenuEntry[] => [
     { label: "Open", href: `/factories/${f.id}` },
-    { label: "Edit", href: `/factories/${f.id}/edit` },
+    { label: "Edit", panel: "edit-factory", id: f.id },
     { label: "Copy link", copy: `/factories/${f.id}` },
     ...(canRemove
       ? [
@@ -71,10 +76,10 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           </>
         }
         primary={
-          <ButtonLink href="/factories/new" variant="primary">
+          <OpenPanelButton panel="new-factory" variant="primary" label="New factory">
             <Plus aria-hidden /> <span className="sm:hidden">New</span>
             <span className="max-sm:hidden">New factory</span>
-          </ButtonLink>
+          </OpenPanelButton>
         }
       />
 
@@ -97,9 +102,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
               title="No factories yet"
               description="The suppliers you buy from show here, with who looks after each. They are added here, or when you record a factory's prices on an inquiry."
               action={
-                <ButtonLink href="/factories/new" size="sm">
+                <OpenPanelButton panel="new-factory" size="sm">
                   <Plus aria-hidden /> Add the first factory
-                </ButtonLink>
+                </OpenPanelButton>
               }
             />
           ) : (
@@ -121,13 +126,14 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                 <PhoneRow
                   key={f.id}
                   href={`/factories/${f.id}`}
+                  flash={sp.saved === f.id}
                   title={f.name}
                   line={`${f.contactPerson ?? "No contact person"} · ${f.owner ? `looked after by ${f.owner.name}` : "nobody looks after it yet"}`}
                   figure={plural(f._count.quotes, "quote")}
                 />
               ))}
             </PhoneList>
-            <DataTable label="Factories" className="max-sm:hidden">
+            <DataTable label="Factories" clearParam="saved" className="max-sm:hidden">
               <THead>
                 <tr>
                   <Th>Factory</Th>
@@ -141,7 +147,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
               </THead>
               <tbody>
                 {data.rows.map((f) => (
-                  <DataRow key={f.id} href={`/factories/${f.id}`}>
+                  <DataRow key={f.id} href={`/factories/${f.id}`} flash={sp.saved === f.id}>
                     <Td>
                       <Link href={`/factories/${f.id}`} className="font-semibold hover:text-primary">
                         {f.name}
@@ -171,6 +177,10 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         )}
         <Pager base="/factories" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
       </Card>
+
+      {people && (panel === "new-factory" || editing) && (
+        <FactoryPanel key={editing?.id ?? "new"} action={saveFactoryAction.bind(null, editing?.id ?? null)} factory={editing} people={people} meId={me.id} />
+      )}
     </div>
   );
 }

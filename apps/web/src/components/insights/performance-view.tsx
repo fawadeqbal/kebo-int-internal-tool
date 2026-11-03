@@ -32,7 +32,7 @@ export function PerformanceView({
   const [scope, setScope] = useState<"year" | "all">("all");
   const list = scope === "year" ? year : all;
   return (
-    <Card className="mb-5">
+    <Card>
       <CardHeader
         title={title}
         description={description}
