@@ -6,7 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { ImportResult, FactoryInput } from "@kebo/shared";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
 
-/** Create or edit a factory. */
+/** Create or edit a factory (in the side panel): answers with its id and name, and the page updates in place. */
 export async function saveFactoryAction(id: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formValues(form);
   const r = await attempt(form, () => (id ? api.put<{ id: string }>(`/factories/${id}`, body) : api.post<{ id: string }>("/factories", body)));
@@ -14,7 +14,7 @@ export async function saveFactoryAction(id: string | null, _prev: ActionState, f
   const savedId = id ?? (r.data as { id: string }).id;
   revalidatePath("/factories");
   revalidatePath(`/factories/${savedId}`);
-  redirect(`/factories/${savedId}?toast=${encodeURIComponent(id ? "Factory saved." : "Factory added.")}`);
+  return { ok: true, data: { id: savedId, name: (body.name ?? "").trim() } };
 }
 
 export async function removeFactoryAction(id: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
