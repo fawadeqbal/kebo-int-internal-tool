@@ -2,6 +2,8 @@ import { daysBetween, type ISODate } from "@kebo/utils";
 import { lcChecksLine, type LcCheck } from "./money-route";
 import type { BankContractStatus, BankStepKind, OrderDocumentKind, PaymentRoute, ShipMode, ShipmentStatus } from "../enums";
 import { documentsInUse, type PaperKind } from "./papers";
+import { categoryOfItem } from "./costs";
+import { EXPENSE_CATEGORY_LABEL } from "../labels";
 import {
   BANK_STEP_LABEL,
   bankStepsFor,
@@ -806,3 +808,80 @@ export const STEP_PATH: Record<FlowStep, string> = {
   documents: "documents",
   delivery: "delivery",
 };
+
+/* ---------------------------------------------------------------- where an item's data lives */
+
+/**
+ * Where a checklist item's data lives, for its link chip ("Shipment ·
+ * container →"): the step whose page shows it (null: the right panel of the
+ * page the item is on), the places on that page to light up, and the chip's
+ * words. Targets are stable names the screens put on their cards and values
+ * (`data-target="shipment.containerNo"` on the web): a card is one word
+ * ("shipment", "plan", "sat"), a value or a row of it card.name
+ * ("shipment.sealNo", "plan.deposit"); a screen that lacks the exact one lights
+ * up the nearest it has (the row of a table whose text starts with the name,
+ * then the card). Null: nothing to point at (own items without a file).
+ */
+export interface ItemLink {
+  step: FlowStep | null;
+  targets: string[];
+  label: string;
+}
+
+const SHIPMENT_TARGETS: Record<string, { fields: string[]; label: string }> = {
+  booked: { fields: ["forwarder", "bookingNo", "etd"], label: "Shipment · booking" },
+  loaded: { fields: ["containerNo", "sealNo", "loadedOn"], label: "Shipment · container" },
+  sailed: { fields: ["vessel", "blNo", "departedOn"], label: "Shipment · vessel and B/L" },
+  shipped: { fields: ["shippedOn", "blNo"], label: "Shipment · shipped" },
+  arrived: { fields: ["arrivedOn", "eta"], label: "Shipment · arrival" },
+};
+
+const AUTO_LINKS: Record<string, ItemLink> = {
+  route: { step: "payment", targets: ["payment.route"], label: "Payment · how they pay" },
+  contract: {
+    step: "payment",
+    targets: ["payment.number", "payment.amount", "payment.customerBank", "payment.ourBank", "payment.latestShipOn", "payment.expiresOn"],
+    label: "Payment · how they pay",
+  },
+  deposit_in: { step: "payment", targets: ["plan.deposit", "payments.received"], label: "Payment · the plan" },
+  balance_in: { step: "payment", targets: ["plan.balance", "payments.received"], label: "Payment · the plan" },
+  factory_ordered: { step: "factory", targets: ["factory.factoryOrderNo", "factory.factoryOrderedOn"], label: "Factory order · details" },
+  factory_advance: { step: "factory", targets: ["factory.plan.advance"], label: "Factory order · payment plan" },
+  ready_date: { step: "production", targets: ["production.readyOn"], label: "Production · ready date" },
+  goods_received: { step: "production", targets: ["lines.received"], label: "Lines · from the factory" },
+  factory_paid: { step: "factory", targets: ["factory.plan.balance"], label: "Factory order · plan" },
+  packing_list: { step: "shipping", targets: ["lines.packing"], label: "Lines · packing" },
+  delivered: { step: "delivery", targets: ["delivery.deliveredOn", "lines.delivered"], label: "Delivery · delivered" },
+  sat_done: { step: "delivery", targets: ["sat"], label: "SAT results" },
+  claims_closed: { step: "delivery", targets: ["claims"], label: "Claims" },
+  ...Object.fromEntries(
+    Object.entries(SHIPMENT_TARGETS).map(([key, t]) => [key, { step: "shipping", targets: t.fields.map((f) => `shipment.${f}`), label: t.label }]),
+  ),
+};
+
+/** The link of one checklist item (see ItemLink). */
+export function itemLink(item: {
+  key: string | null;
+  tool: ChecklistTool | null;
+  title: string;
+  /** Its file (an own item's upload or attached file). */
+  file?: { id: string; name: string } | null;
+}): ItemLink | null {
+  const key = item.key;
+  if (key?.startsWith("doc:")) {
+    const kind = key.slice(4) as OrderDocumentKind;
+    return { step: "documents", targets: [`paper.${kind}`, "papers"], label: `Papers · ${ORDER_DOCUMENT_LABEL[kind] ?? kind}` };
+  }
+  if (key?.startsWith("bank:")) {
+    const step = key.slice(5) as BankStepKind;
+    return { step: "documents", targets: [`bank.${step}`], label: `Banks · ${BANK_STEP_LABEL[step] ?? step}` };
+  }
+  if (key) return AUTO_LINKS[key] ?? null;
+  // Own items: a cost paid from the row lands on its line in Costs; one with a file on the file.
+  if (item.tool === "pay") {
+    const category = categoryOfItem(item.title);
+    if (category) return { step: null, targets: [`costs.${category}`, "costs"], label: `Costs · ${EXPENSE_CATEGORY_LABEL[category]}` };
+  }
+  if (item.file) return { step: null, targets: [`file.${item.file.id}`, "files"], label: "Files" };
+  return null;
+}
