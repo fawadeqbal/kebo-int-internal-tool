@@ -299,7 +299,9 @@ function PlansTable({ plans, demo }: { plans: SitePlan[]; demo: (cta: string) =>
         <caption className="sr-only">The plans compared</caption>
         <thead>
           <tr className="align-top">
-            <th scope="col" className="w-[26%] min-w-56 p-5" />
+            <th scope="col" className="w-[26%] min-w-56 p-5">
+              <span className="sr-only">What you get</span>
+            </th>
             {plans.map((p) => (
               <th key={p.id} scope="col" className="border-l border-(--s-line) p-5 font-normal">
                 <span className="s-heading block text-xl">{p.name}</span>

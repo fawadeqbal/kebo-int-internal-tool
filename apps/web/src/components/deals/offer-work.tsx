@@ -546,7 +546,7 @@ export function OfferLines({
       actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
       view={
         q.lines.length ? (
-          <LinesView rows={rows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
+          <LinesView label={`${q.factory.name} · lines`} rows={rows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
         ) : (
           <p className="text-sm text-muted">No lines yet.</p>
         )

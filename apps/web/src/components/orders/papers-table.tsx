@@ -169,7 +169,9 @@ export function PapersTable({
             role="row"
             className="hidden grid-cols-[28px_minmax(0,1.35fr)_minmax(0,1fr)_120px_minmax(0,1.25fr)_190px] gap-x-3 border-b border-line px-2 py-2 text-xs font-medium text-text-2 md:grid"
           >
-            <span role="columnheader" />
+            <span role="columnheader" className="sr-only">
+              Done
+            </span>
             <span role="columnheader">Paper</span>
             <span role="columnheader">Number · date</span>
             <span role="columnheader">From</span>
@@ -446,10 +448,15 @@ function PaperLine({
           {busy && <span className="text-xs text-muted">…</span>}
           <PaperMenu r={r} orderId={orderId} canMake={canMake} canRecord={canRecord} issuing={!!issue} onRecord={setOpen} />
         </span>
-        {action && <span className="col-start-2 flex flex-wrap gap-1.5 sm:hidden">{action}</span>}
+        {/* A row holds only cells: the phone's own place for the action is one too. */}
+        {action && (
+          <span role="cell" className="col-start-2 flex flex-wrap gap-1.5 sm:hidden">
+            {action}
+          </span>
+        )}
       </div>
       {open && (
-        <div className="pb-3 md:pl-[40px]">
+        <div role="cell" className="pb-3 md:pl-[40px]">
           <RecordForm
             r={{
               ...r,

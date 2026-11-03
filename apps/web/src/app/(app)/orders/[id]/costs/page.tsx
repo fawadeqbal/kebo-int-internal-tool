@@ -137,7 +137,7 @@ export default async function OrderCostsPage({
                 />
                 <Link
                   href={href({ step, missing: !missing })}
-                  aria-pressed={missing}
+                  aria-current={missing ? "true" : undefined}
                   className={cn("text-xs", missing ? "font-semibold text-primary" : "text-text-2 hover:text-text")}
                 >
                   Missing receipts ({costs.totals.receiptsMissing})
@@ -172,7 +172,7 @@ export default async function OrderCostsPage({
           )}
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-5">
+        <aside aria-label="Beside the costs" className="flex min-w-0 flex-col gap-5">
           {p && (
             <Card>
               <CardHeader title="Profit on this order" />

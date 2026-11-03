@@ -38,7 +38,7 @@ export function PaymentsReceived({
   const canPay = can(me, "payments.record") && o.status !== "cancelled";
   const canManage = can(me, "orders.manage");
   return (
-    <section aria-label="Payments received" className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <h3 className="text-sm font-semibold">
         Payments received <span className="font-normal text-muted">· bank charges the banks kept count as paid</span>
       </h3>
@@ -182,7 +182,7 @@ export function PaymentsReceived({
           })()}
         />
       )}
-    </section>
+    </div>
   );
 }
 

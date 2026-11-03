@@ -210,7 +210,7 @@ export function RecordRow({
   muted?: boolean;
 }) {
   return (
-    <li className={cn("group relative flex items-center gap-3 px-4 py-2.5 transition-colors", href && "hover:bg-primary-soft/60 focus-within:bg-primary-soft/40")}>
+    <li className={cn("group relative flex items-center gap-3 px-4 py-2.5 transition-colors", href && "hover:bg-primary-soft/60 focus-within:bg-primary-soft/40 has-[>span>a:focus-visible]:ring-2 has-[>span>a:focus-visible]:ring-ring has-[>span>a:focus-visible]:ring-inset")}>
       <span className="min-w-0 flex-1">
         {href ? (
           <Link href={href} className={cn("block truncate text-sm font-semibold outline-none after:absolute after:inset-0 hover:text-primary focus-visible:underline", muted && "text-text-2")}>

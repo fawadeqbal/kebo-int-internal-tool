@@ -206,7 +206,7 @@ export async function ProfitTable({
                 {pnl.orders.map((o) => (
                   <Tr key={o.id} className="hover:bg-surface-2/50">
                     <Td>
-                      <Link href={`/orders/${o.id}`} className="font-medium hover:text-primary">
+                      <Link href={`/orders/${o.id}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {o.refNo}
                       </Link>
                       <span className="block max-w-60 truncate text-xs text-muted">{o.customer}</span>

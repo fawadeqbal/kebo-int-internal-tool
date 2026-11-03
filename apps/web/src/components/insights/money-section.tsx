@@ -108,7 +108,7 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
                 {d.age.orders.map((o) => (
                   <Tr key={`${o.orderId}-${o.factory ?? ""}`}>
                     <Td>
-                      <Link href={`/orders/${o.orderId}/payment`} className="font-medium hover:text-primary">
+                      <Link href={`/orders/${o.orderId}/payment`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {o.refNo}
                       </Link>
                     </Td>
@@ -208,7 +208,7 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
                 {d.leaks.map((l) => (
                   <Tr key={l.orderId}>
                     <Td className="whitespace-nowrap">
-                      <Link href={`/orders/${l.orderId}/costs`} className="font-medium hover:text-primary">
+                      <Link href={`/orders/${l.orderId}/costs`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {l.refNo}
                       </Link>
                     </Td>

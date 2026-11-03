@@ -87,6 +87,7 @@ export async function CustomerMoney({
                 today={profit.today}
                 choices={profit.choices}
                 label="Add an expense for them"
+                quiet
               />
             </div>
           )
@@ -237,7 +238,7 @@ function ProfitBody({
                 return (
                   <tr key={d.id} className="border-t border-line">
                     <td className={td}>
-                      <Link href={`/inquiries/${d.id}`} className="font-medium hover:text-primary">
+                      <Link href={`/inquiries/${d.id}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {d.refNo}
                       </Link>
                       <span className="block max-w-72 truncate text-xs text-muted">{d.title}</span>

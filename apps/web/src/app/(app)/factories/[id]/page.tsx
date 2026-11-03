@@ -277,7 +277,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
           </>
         }
         side={
-          <SidePanelCard label="Changes">
+          <SidePanelCard>
             <div id="changes" className="scroll-mt-32">
               <SideSection
                 title="Changes"

@@ -439,9 +439,11 @@ function AutoForm({ tool, onDone }: { tool: AutoTool; onDone: () => void }) {
  */
 function ToData({ link, page, orderBase, chip, children }: { link: ItemLink; page: FlowStep; orderBase: string; chip?: boolean; children: ReactNode }) {
   const here = link.step === null || link.step === page;
+  // Both take a 24px tall target and keep their look and place: the chip's transparent border is
+  // outside its background, the data line's padding is taken back by its margin.
   const className = chip
-    ? "inline-flex max-w-full items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-primary"
-    : "text-left hover:underline hover:decoration-primary/60 underline-offset-2 focus-visible:outline-2 focus-visible:outline-primary rounded-sm";
+    ? "-my-0.5 inline-flex max-w-full items-center gap-1 rounded-full border-y-2 border-transparent bg-primary-soft bg-clip-padding px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-primary"
+    : "-my-1 inline-block py-1 text-left hover:underline hover:decoration-primary/60 underline-offset-2 focus-visible:outline-2 focus-visible:outline-primary rounded-sm";
   const label = chip ? `Go to ${link.label}` : undefined;
   const body = (
     <>
@@ -716,7 +718,7 @@ function Row({
       data-drop-attach={canEdit && (item.key || item.id) && !item.key?.startsWith("doc:") && !item.key?.startsWith("bank:") ? `checklist:${item.key ?? item.id}` : undefined}
       data-drop-label={item.title}
       className={cn(
-        "grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-lg px-3 py-3",
+        "grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 rounded-lg px-3 py-3",
         item.late ? "bg-bad-soft" : (now || showForm) && !closed ? "bg-primary-soft/70 ring-1 ring-primary/15" : "",
       )}
     >
@@ -902,7 +904,7 @@ function AddItem({ step, label, run }: { step: FlowStep; label: string; run: Che
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
           placeholder={`Add an item to ${label}…`}
-          className="h-9 min-w-0 flex-1 rounded-lg border border-dashed border-line-strong bg-transparent px-3 text-sm placeholder:text-muted focus:border-primary focus:outline-none"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-dashed border-line-strong bg-transparent px-3 text-sm placeholder:text-muted focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
         />
         {title.trim() && (
           <Button type="submit" size="sm" variant="secondary" disabled={pending}>

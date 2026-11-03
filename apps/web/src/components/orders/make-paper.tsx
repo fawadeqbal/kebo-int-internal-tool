@@ -75,6 +75,7 @@ function CheckRow({
     <Check className="size-4 shrink-0 text-ok" strokeWidth={3} aria-label="From the order" />
   ) : (
     <span
+      role="img"
       className={cn("mx-1 block size-2.5 shrink-0 rounded-full", c.required ? "bg-[#9a3412]" : "bg-warn")}
       aria-label={c.required ? "Needed" : "Missing"}
     />
@@ -103,7 +104,7 @@ function CheckRow({
               value={v}
               onChange={(e) => setV(e.target.value)}
               placeholder="Add it here"
-              className="h-8 w-36 min-w-0 rounded-md border-[1.5px] border-primary/60 bg-surface px-2.5 text-sm focus:border-primary focus:outline-none"
+              className="h-8 w-36 min-w-0 rounded-md border-[1.5px] border-primary/60 bg-surface px-2.5 text-sm focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
             />
             {v.trim() && (
               <Button type="submit" size="xs" variant="secondary" disabled={pending}>
@@ -149,7 +150,7 @@ function CheckRow({
                   onChange={(e) => setHs((x) => ({ ...x, [l.id]: e.target.value }))}
                   placeholder="e.g. 8422.40"
                   inputMode="decimal"
-                  className="h-7 w-28 rounded-md border border-line-strong bg-surface px-2 text-xs focus:border-primary focus:outline-none"
+                  className="h-7 w-28 rounded-md border border-line-strong bg-surface px-2 text-xs focus:border-primary focus:outline-none focus-visible:ring-3 focus-visible:ring-ring"
                 />
                 {hs[l.id]?.trim() && (
                   <Button type="submit" size="xs" variant="secondary" disabled={pending}>

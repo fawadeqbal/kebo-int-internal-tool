@@ -49,13 +49,14 @@ export function FileActions({
           </a>
         ))}
       {viewHref && (
-        <Link href={viewHref} target="_blank" className={b} aria-label={of ? `View or print the ${of}` : undefined}>
-          <Printer aria-hidden /> View / Print
+        <Link href={viewHref} target="_blank" className={b}>
+          {/* The words on the button start its name (what voice control users say); "of" only adds to it. */}
+          <Printer aria-hidden /> View / Print{of && <span className="sr-only"> the {of}</span>}
         </Link>
       )}
       {pdfHref && (
-        <a href={pdfHref} className={b} aria-label={of ? `Download the ${of} as PDF` : undefined}>
-          <Download aria-hidden /> Download PDF
+        <a href={pdfHref} className={b}>
+          <Download aria-hidden /> Download PDF{of && <span className="sr-only"> of the {of}</span>}
         </a>
       )}
       {allHref && (

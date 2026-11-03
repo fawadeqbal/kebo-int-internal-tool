@@ -169,8 +169,14 @@ function OptionLines({ o, currency, incoterm, single }: { o: OptionView; currenc
   };
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-x-auto rounded-lg border border-line">
-        <table className="w-full border-collapse text-sm" aria-label={single ? "The lines" : `Option ${o.letter} lines`}>
+      {/* It can scroll sideways, so Tab stops on it. */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label={single ? "The lines" : `Option ${o.letter} lines`}
+        className="overflow-x-auto rounded-lg border border-line focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+      >
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-surface-2 text-xs text-text-2">
               <th className="w-12 border-b border-line px-2 py-2 text-left font-medium">No.</th>

@@ -94,7 +94,7 @@ export function ExpenseRecord({
           label: "For",
           value: e.order ? (
             <>
-              <Link href={`/orders/${e.order.id}/payment`} className="font-medium hover:text-primary">
+              <Link href={`/orders/${e.order.id}/payment`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                 Order {e.order.refNo}
               </Link>
               {e.customer && (
@@ -105,7 +105,7 @@ export function ExpenseRecord({
             </>
           ) : e.deal ? (
             <>
-              <Link href={`/inquiries/${e.deal.id}`} className="font-medium hover:text-primary">
+              <Link href={`/inquiries/${e.deal.id}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                 Inquiry {e.deal.refNo}
               </Link>{" "}
               <Badge tone={INQUIRY_STAGE_TONE[e.deal.stage]}>{INQUIRY_STAGE_LABEL[e.deal.stage]}</Badge>
@@ -117,7 +117,7 @@ export function ExpenseRecord({
               )}
             </>
           ) : e.customer ? (
-            <Link href={`/customers/${e.customer.id}`} className="font-medium hover:text-primary">
+            <Link href={`/customers/${e.customer.id}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
               {e.customer.name}
             </Link>
           ) : (

@@ -27,7 +27,8 @@ export function AuthShell({
           </span>
           <div className="leading-tight">
             <p className="font-semibold text-text">{title}</p>
-            <p className="text-xs text-muted">{subtitle}</p>
+            {/* text-2, not muted: it sits on the purple glow, where muted is under 4.5:1. */}
+            <p className="text-xs text-text-2">{subtitle}</p>
           </div>
         </div>
         <Card className="p-6">{children}</Card>

@@ -20,15 +20,14 @@ export function PaymentRecord({
   removed = false,
   fields,
   actions,
-  label,
 }: {
   summary: ReactNode;
   sub: ReactNode;
   removed?: boolean;
   fields: RecordField[];
   actions?: ReactNode;
-  /** For screen readers: "Payment of USD 14,692.15 on 12 Oct 2026". */
-  label: string;
+  /** "Payment of USD 14,692.15 on 12 Oct 2026" (the row is named by what it shows; aria-expanded says open or closed). */
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -37,7 +36,6 @@ export function PaymentRecord({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={`${label}: ${open ? "hide" : "show"} the details`}
         className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left hover:bg-surface-2/60"
       >
         <span className="min-w-0">
@@ -103,7 +101,7 @@ export function RecordTable({ label, columns, rows, foot }: { label: string; col
                 {c.label}
               </th>
             ))}
-            <th scope="col" className="w-10 py-2">
+            <th scope="col" className="relative w-10 py-2">
               <span className="sr-only">Details</span>
             </th>
           </tr>
