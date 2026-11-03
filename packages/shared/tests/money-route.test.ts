@@ -104,6 +104,16 @@ describe("money v2: LC checks", () => {
     const bad = lcChecks({ ...base, lc: { amount: "40000", currency: "EUR", latestShipOn: null, expiresOn: null } });
     expect(bad.slice(0, 2).map((c) => c.ok)).toEqual([false, false]);
   });
+
+  it("warns when our ship-by is later than the LC's latest shipment (we keep ours, both are shown)", () => {
+    const lc = { amount: "44100.00", currency: "USD", latestShipOn: "2027-01-15", expiresOn: "2027-02-20" };
+    const late = lcChecks({ ...base, lc, shipBy: "2027-01-20" }).find((c) => c.key === "our_ship_by")!;
+    expect(late).toMatchObject({ ok: false, detail: "our ship-by 2027-01-20 is after the LC's latest shipment 2027-01-15 · ship by 2027-01-15, or ask for an amendment" });
+    expect(lcChecks({ ...base, lc, shipBy: "2027-01-15" }).find((c) => c.key === "our_ship_by")).toMatchObject({ ok: true, detail: "ship by 2027-01-15 · LC latest 2027-01-15" });
+    expect(lcChecks({ ...base, lc: { ...lc, latestShipOn: null }, shipBy: "2027-01-15" }).find((c) => c.key === "our_ship_by")!.ok).toBeNull();
+    // No ship-by of ours: nothing to compare (the four checks as before).
+    expect(lcChecks({ ...base, lc }).map((c) => c.key)).toEqual(["amount", "currency", "ship_by", "expiry"]);
+  });
 });
 
 describe("money v2: one transfer, credit", () => {

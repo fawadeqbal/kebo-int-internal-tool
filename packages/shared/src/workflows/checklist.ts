@@ -116,6 +116,7 @@ export interface ChecklistFacts {
   goods: { lines: number; received: number };
   packedAt: ISODate | null;
   packing: { packages: number; grossKg: string | null; cbm: string | null } | null;
+  /** The order's shipments in their order (shipmentsInOrder): Shipment 1, the primary, first. */
   shipments: {
     status: ShipmentStatus;
     mode: ShipMode;
@@ -132,7 +133,7 @@ export interface ChecklistFacts {
     arrivedOn: ISODate | null;
     portOfDischarge: string | null;
   }[];
-  /** Shipped (the order's own date) — used when the shipping module is off. */
+  /** Shipped on (the earliest day a shipment left) and Shipment 1's B/L — the one "Shipped" item when the shipping module is off. */
   shippedOn: ISODate | null;
   blNo: string | null;
   proforma: { number: string; issuedOn: ISODate | null } | null;
@@ -353,6 +354,7 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
 
   /* Shipping */
   const ships = on("shipping");
+  // Shipment 1, the primary (the facts list the shipments in their order).
   const first = f.shipments[0] ?? null;
   const air = (first?.mode ?? f.shipMode) === "air";
   if (ships) {

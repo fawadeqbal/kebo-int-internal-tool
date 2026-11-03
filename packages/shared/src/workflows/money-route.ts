@@ -235,7 +235,7 @@ export function balanceWhenOf(terms: BalanceTerms): BalanceWhen | null {
 /* ---------------------------------------------------------------- LC checks */
 
 export interface LcCheck {
-  key: "amount" | "currency" | "ship_by" | "expiry";
+  key: "amount" | "currency" | "ship_by" | "our_ship_by" | "expiry";
   label: string;
   /** null: not known yet (data missing). */
   ok: boolean | null;
@@ -246,7 +246,9 @@ export interface LcCheck {
  * The LC against the order: the amount covers the balance, it is in the
  * order's currency, the latest ship date is not before the factory's ready
  * date, and the papers can reach the bank before it expires (ETA, else the
- * latest ship date, plus the courier days).
+ * latest ship date, plus the courier days). With our own ship-by date (the
+ * promise to the customer): it is not later than the LC's latest shipment date
+ * (owner, 3 Nov 2026: we keep our own, show both and warn when ours is later).
  */
 export function lcChecks(i: {
   currency: string;
@@ -256,6 +258,8 @@ export function lcChecks(i: {
   readyOn: ISODate | null;
   eta: ISODate | null;
   courierDays: number;
+  /** Our ship-by (Order.shipBy): checked against the LC's latest shipment date when set. */
+  shipBy?: ISODate | null;
 }): LcCheck[] {
   const lc = i.lc;
   const amountMinor = lc?.amount ? Math.round(Number(lc.amount) * 100) : null;
@@ -292,6 +296,17 @@ export function lcChecks(i: {
           ? "needs the LC's latest ship date"
           : "needs the factory's ready date",
   });
+  if (i.shipBy)
+    checks.push({
+      key: "our_ship_by",
+      label: "Our ship-by is not after the LC's latest shipment",
+      ok: ship ? i.shipBy <= ship : null,
+      detail: ship
+        ? i.shipBy <= ship
+          ? `ship by ${i.shipBy} · LC latest ${ship}`
+          : `our ship-by ${i.shipBy} is after the LC's latest shipment ${ship} · ship by ${ship}, or ask for an amendment`
+        : `ship by ${i.shipBy} · needs the LC's latest ship date`,
+    });
   const from = i.eta ?? ship;
   const reach = from ? addDays(from, i.courierDays) : null;
   checks.push({

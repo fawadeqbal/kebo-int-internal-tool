@@ -370,7 +370,11 @@ export const moveStageInput = z.object({
 });
 export type MoveStageInput = z.infer<typeof moveStageInput>;
 
-/** The order's dates and B/L, editable at any time. Only the fields sent change (empty clears one). */
+/**
+ * The order's dates and details, editable at any time. Only the fields sent change (empty clears one).
+ * Shipped on, the B/L and the container are the shipment's (Shipment 1, made when there is none yet):
+ * typed here for orders without the shipping module, otherwise edited on Shipping.
+ */
 export const orderDetailsInput = z.object({
   shipBy: optionalDate.optional(),
   readyOn: optionalDate.optional(),
@@ -403,9 +407,9 @@ export type ReceiptInput = z.infer<typeof receiptInput>;
 
 const measure = (max: number) => z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), z.coerce.number().min(0, "Cannot be negative").max(max).nullable());
 
-/** The packing list: per goods line the packages, weights and volume; for the order the container and shipping marks. */
+/** The packing list: per goods line the packages, weights and volume; for the order the shipping marks (the container is the shipment's: sent, it is saved there). */
 export const packingInput = z.object({
-  containerNo: optionalText(120),
+  containerNo: optionalText(120).optional(),
   shippingMarks: optionalText(2000),
   lines: z
     .array(

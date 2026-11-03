@@ -4,6 +4,7 @@ export * from "./permissions";
 export * from "./workflows/inquiry";
 export * from "./workflows/quotation";
 export * from "./workflows/order";
+export * from "./workflows/shipment";
 export * from "./workflows/tax";
 export * from "./workflows/reasons";
 export * from "./workflows/money";
