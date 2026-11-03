@@ -54,6 +54,20 @@ import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
 import { readyByOf, readyOnOf, readySelect, readyWords, setReadyAll, setReadyDates } from "./ready";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
+/** Orders whose number, customer or inquiry (number, title) has the words. */
+function orderSearch(term: string | undefined): Prisma.OrderWhereInput {
+  const t = term?.trim();
+  if (!t) return {};
+  return {
+    OR: [
+      { refNo: { contains: t, mode: "insensitive" } },
+      { customer: { name: { contains: t, mode: "insensitive" } } },
+      { inquiry: { refNo: { contains: t, mode: "insensitive" } } },
+      { inquiry: { title: { contains: t, mode: "insensitive" } } },
+    ],
+  };
+}
+
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
   if (can(user, "inquiries.viewAll")) return {};
   return { inquiry: { OR: [{ assigneeId: user.id }, { createdById: user.id }] } };
@@ -695,25 +709,31 @@ export class OrdersService {
     user: SessionUser,
     filter: {
       mine?: boolean;
-      status?: "open" | "closed" | "cancelled";
+      /** "all": every status. */
+      status?: "open" | "closed" | "cancelled" | "all";
       stage?: OrderStage;
       lateOnly?: boolean;
       recent?: boolean;
       limit?: number;
+      skip?: number;
       ids?: string[];
+      /** A search (refNo, customer, inquiry). */
+      q?: string;
     },
   ) {
     const rows = await this.prisma.db.order.findMany({
       where: {
         ...orderAccess(user),
         ...(filter.ids ? { id: { in: filter.ids } } : {}),
-        status: filter.status ?? "open",
+        ...(filter.status === "all" ? {} : { status: filter.status ?? "open" }),
         ...(filter.stage ? { stage: filter.stage } : {}),
         ...(filter.mine ? { inquiry: { assigneeId: user.id } } : {}),
+        ...orderSearch(filter.q),
       },
       include: orderInclude,
       // Waiting longest first on the board; the latest first for Done.
-      orderBy: [{ stageSince: filter.recent ? "desc" : "asc" }],
+      orderBy: [{ stageSince: filter.recent ? "desc" : "asc" }, { id: "asc" }],
+      skip: filter.skip,
       take: filter.limit ?? 300,
     });
     const settings = await this.settings.get();
@@ -743,6 +763,36 @@ export class OrdersService {
       };
     });
     return filter.lateOnly ? items.filter((i) => i.needs?.late) : items;
+  }
+
+  /**
+   * The orders list, a page at a time: ?status=open (the default) | late | closed | cancelled | all, with
+   * mine and a search, and how many each status chip holds for the same search. Late is worked out from
+   * what each open order needs (not stored), so the open orders are read for it; the open and late lists
+   * show the late ones first, then by when the next thing is needed.
+   */
+  async page(
+    user: SessionUser,
+    q: { status: "open" | "late" | "closed" | "cancelled" | "all"; mine?: boolean; q?: string; page: number; pageSize: number },
+  ) {
+    const where: Prisma.OrderWhereInput = { ...orderAccess(user), ...(q.mine ? { inquiry: { assigneeId: user.id } } : {}), ...orderSearch(q.q) };
+    const [open, closed, cancelled, openRows] = await Promise.all([
+      this.prisma.db.order.count({ where: { ...where, status: "open" } }),
+      this.prisma.db.order.count({ where: { ...where, status: "closed" } }),
+      this.prisma.db.order.count({ where: { ...where, status: "cancelled" } }),
+      this.list(user, { mine: q.mine, q: q.q, status: "open", limit: 1000 }),
+    ]);
+    const late = openRows.filter((o) => o.needs?.late);
+    const counts = { open, late: late.length, closed, cancelled, all: open + closed + cancelled };
+    const skip = (q.page - 1) * q.pageSize;
+    const urgentFirst = (a: (typeof openRows)[number], b: (typeof openRows)[number]) =>
+      Number(!!b.needs?.late) - Number(!!a.needs?.late) || (a.needs?.due ?? "9999").localeCompare(b.needs?.due ?? "9999");
+    const rows =
+      q.status === "open" || q.status === "late"
+        ? (q.status === "late" ? late : openRows).sort(urgentFirst).slice(skip, skip + q.pageSize)
+        : await this.list(user, { mine: q.mine, q: q.q, status: q.status, recent: true, skip, limit: q.pageSize });
+    const total = q.status === "late" ? late.length : q.status === "open" ? openRows.length : counts[q.status];
+    return { rows, total, page: q.page, pageSize: q.pageSize, counts };
   }
 
   /** "My to-do": what each open order I handle needs, late ones first, then by date. */

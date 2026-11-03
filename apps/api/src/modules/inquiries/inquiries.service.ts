@@ -107,7 +107,7 @@ export class InquiriesService {
           : q.sort === "updated"
             ? [{ updatedAt: "desc" }]
             : [{ createdAt: "desc" }];
-    const [rows, total, byStage] = await Promise.all([
+    const [rows, total, byStage, overdue, onHold] = await Promise.all([
       this.prisma.db.inquiry.findMany({
         where,
         orderBy,
@@ -133,6 +133,9 @@ export class InquiriesService {
       }),
       this.prisma.db.inquiry.count({ where }),
       this.prisma.db.inquiry.groupBy({ by: ["stage"], where: this.where(user, { ...q, stage: undefined }), _count: true }),
+      // The list's two other chips (past needed-by, on hold), for the same search.
+      this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "overdue" }) }),
+      this.prisma.db.inquiry.count({ where: this.where(user, { ...q, stage: "on_hold" }) }),
     ]);
     const sorted =
       q.sort === "priority"
@@ -143,7 +146,8 @@ export class InquiriesService {
       total,
       page: q.page,
       pageSize: q.pageSize,
-      counts: Object.fromEntries(byStage.map((g) => [g.stage, g._count])),
+      /** By stage, and `overdue` / `on_hold` (open ones past their needed-by date / on hold). */
+      counts: { ...Object.fromEntries(byStage.map((g) => [g.stage, g._count])), overdue, on_hold: onHold } as Record<string, number>,
       rows: sorted.map((i) => ({
         id: i.id,
         refNo: i.refNo,

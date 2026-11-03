@@ -182,6 +182,7 @@ export function PageHeader({
   badge,
   summary,
   papers,
+  views,
   primary,
   more,
   description,
@@ -197,6 +198,8 @@ export function PageHeader({
   summary?: ReactNode;
   /** View / Print and Download PDF, where the page is a paper; hidden on a phone (put them in ⋯). */
   papers?: ReactNode;
+  /** A switch between the page's views (Segmented: List · Board), before the primary. */
+  views?: ReactNode;
   /** The one primary button: the next step. Leave it out when nothing is next. */
   primary?: ReactNode;
   /** The ⋯ menu (MoreMenu): everything else; delete last, in red. */
@@ -207,8 +210,8 @@ export function PageHeader({
   backLabel?: string;
   children?: ReactNode;
 }) {
-  const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined;
-  const right = actions || papers || primary || more;
+  const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined || views !== undefined;
+  const right = actions || papers || views || primary || more;
   return (
     <header className="mb-5">
       {backHref && (
@@ -234,6 +237,7 @@ export function PageHeader({
                 {papers}
               </div>
             )}
+            {views}
             {primary && <div data-slot="primary" className="contents">{primary}</div>}
             {more}
           </div>
@@ -351,6 +355,76 @@ export function DataRow({ href, flash, className, ...props }: ComponentProps<"tr
       className={cn("group cursor-pointer transition-colors last:[&>td]:border-b-0 hover:bg-primary-soft/70", flash && "animate-flash", className)}
       {...props}
     />
+  );
+}
+
+/**
+ * A list on a phone (design system: tables become rows), shown below 640px in
+ * place of the DataTable: one PhoneRow per record.
+ */
+export function PhoneList({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <ul aria-label={label} className={cn("divide-y divide-line sm:hidden", className)}>
+      {children}
+    </ul>
+  );
+}
+
+/**
+ * One record on a phone: its name, one line under it, and on the right its
+ * status (StatusBadge) over the key number. The whole row opens the record.
+ */
+export function PhoneRow({
+  href,
+  title,
+  line,
+  status,
+  figure,
+  flash,
+  muted,
+  prefetch,
+  extra,
+}: {
+  /** Where the row goes; without it the row is plain (a record with no page). */
+  href?: string;
+  /** false: never fetched ahead (a link that does something when opened). */
+  prefetch?: boolean;
+  title: ReactNode;
+  line?: ReactNode;
+  status?: ReactNode;
+  figure?: ReactNode;
+  flash?: boolean;
+  muted?: boolean;
+  /** Under the row, outside its link (e.g. a "Show changes" disclosure). */
+  extra?: ReactNode;
+}) {
+  const hasFigure = figure !== undefined && figure !== null && figure !== "";
+  const inner = (
+    <>
+      <span className="min-w-0">
+        <span className={cn("block truncate text-sm font-semibold", muted && "text-text-2")}>{title}</span>
+        {line && <span className="block truncate text-xs text-text-2">{line}</span>}
+      </span>
+      {(status || hasFigure) && (
+        <span className="flex shrink-0 flex-col items-end gap-1 text-right text-xs text-text-2 tabular">
+          {status}
+          {hasFigure && <span className="block">{figure}</span>}
+        </span>
+      )}
+    </>
+  );
+  const cls = "flex items-start justify-between gap-3 px-4 py-3";
+  return (
+    <li className={flash ? "animate-flash" : undefined}>
+      {href ? (
+        <Link href={href} prefetch={prefetch} className={cn(cls, "active:bg-surface-2")}>
+          {inner}
+        </Link>
+      ) : (
+        <div className={cls}>{inner}</div>
+      )}
+      {extra && <div className="-mt-1.5 px-4 pb-3">{extra}</div>}
+    </li>
   );
 }
 

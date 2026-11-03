@@ -63,6 +63,18 @@ describe("orders: four stages", () => {
     await api(app, manager).get(`/orders/${orderId}`).expect(200);
   });
 
+  it("lists orders a page at a time, with a search and each status's count", async () => {
+    const found = (await api(app, sana).get(`/orders/page?q=${encodeURIComponent(`Kano Agro ${tag}`)}`).expect(200)).body;
+    expect(found).toMatchObject({ total: 1, page: 1, pageSize: 25, counts: { open: 1, late: 0, closed: 0, cancelled: 0, all: 1 } });
+    expect(found.rows[0]).toMatchObject({ id: orderId, stage: "confirmed", needs: expect.objectContaining({ late: false }) });
+    // Other statuses for the same search are empty; staff do not find someone else's order.
+    expect((await api(app, sana).get(`/orders/page?status=closed&q=${encodeURIComponent(`Kano Agro ${tag}`)}`).expect(200)).body).toMatchObject({ total: 0, rows: [] });
+    expect((await api(app, bilal).get(`/orders/page?status=all&q=${encodeURIComponent(`Kano Agro ${tag}`)}`).expect(200)).body.counts.all).toBe(0);
+    // Pages: one a page, the second page of a single order is empty.
+    expect((await api(app, manager).get(`/orders/page?status=all&q=${encodeURIComponent(tag)}&pageSize=1&page=2`).expect(200)).body.rows).toEqual([]);
+    await api(app, manager).get("/orders/page?status=nope").expect(422);
+  });
+
   it("shows staff only their own orders on a customer's page", async () => {
     await api(app, bilal).post("/inquiries", { customerId, category: "Machinery", items: [{ description: "Access test", quantity: 1 }] }).expect(201);
     const asBilal = (await api(app, bilal).get(`/customers/${customerId}`).expect(200)).body;

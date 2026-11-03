@@ -376,9 +376,11 @@ export class ReportsService {
       ...(q.entityId ? { entityId: q.entityId } : {}),
       ...(q.userId ? { userId: q.userId } : {}),
     };
-    const [rows, total] = await Promise.all([
+    const [rows, total, byType] = await Promise.all([
       this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
       this.prisma.db.auditLog.count({ where }),
+      // The list's chips: how many entries of each kind of record, for the same record and person.
+      this.prisma.db.auditLog.groupBy({ by: ["entityType"], where: { ...where, entityType: undefined }, _count: true }),
     ]);
     const names = Object.fromEntries(
       (
@@ -392,6 +394,7 @@ export class ReportsService {
       total,
       page: q.page,
       pageSize: q.pageSize,
+      counts: Object.fromEntries(byType.map((g) => [g.entityType, g._count])) as Record<string, number>,
       rows: rows.map((r) => ({ ...r, userName: r.userId ? (names[r.userId] ?? "—") : "System" })),
     };
   }
