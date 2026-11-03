@@ -230,7 +230,12 @@ describe("money fixes", () => {
         grossProfit: "1000.00",
         uncostedRevenue: "500.00",
       });
-      const leaks = (await api(app, manager).get(`/reports/leaks?from=${monthStart}&to=${today}`).expect(200)).body;
+      // Where we lose money lists the 15 largest leaks of the period: asked for a day of its own (other test
+      // files' orders of this month, whatever order they ran in, cannot push this one off the list).
+      const [{ was }] = await prisma.platform.$queryRaw<{ was: string }[]>`select ordered_on::text as was from orders where id = ${orderId}::uuid`;
+      await prisma.platform.$executeRaw`update orders set ordered_on = '2001-02-03' where id = ${orderId}::uuid`;
+      const leaks = (await api(app, manager).get(`/reports/leaks?from=2001-02-03&to=2001-02-03`).expect(200)).body;
+      await prisma.platform.$executeRaw`update orders set ordered_on = ${was}::date where id = ${orderId}::uuid`;
       expect(leaks.orders.find((o: { id: string }) => o.id === orderId)).toMatchObject({
         planned: "1000.00",
         actual: "1000.00",
