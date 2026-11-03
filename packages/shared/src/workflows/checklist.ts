@@ -112,7 +112,10 @@ export interface ChecklistFacts {
     | null;
   /** An LC order: the LC checked against the order (amount, currency, ship-by, expiry); null otherwise. */
   lcChecks?: LcCheck[] | null;
+  /** The order's ready date: the latest of its factories', once each has given one. */
   readyOn: ISODate | null;
+  /** Each factory's own ready date (one per factory; one row, factory null, when the lines name none). */
+  readyBy?: { factory: string | null; readyOn: ISODate | null }[];
   goods: { lines: number; received: number };
   packedAt: ISODate | null;
   packing: { packages: number; grossKg: string | null; cbm: string | null } | null;
@@ -323,11 +326,20 @@ export function autoChecklist(f: ChecklistFacts, features: readonly string[] | n
   }
 
   /* Production */
+  // One ready date per factory: done once each factory has given its own (the order's is the latest).
+  const each = (f.readyBy ?? []).length > 1 ? f.readyBy! : null;
   add("production", "ready_date", {
     done: !!f.readyOn,
     doneOn: null,
-    data: pairs([["Ready", f.readyOn]]),
-    needs: f.readyOn ? null : "the date the factory gives",
+    data: each ? each.map((r): [string, string] => [r.factory ?? "Factory", r.readyOn ?? "not given yet"]) : pairs([["Ready", f.readyOn]]),
+    needs: f.readyOn
+      ? null
+      : each
+        ? `the date ${each
+            .filter((r) => !r.readyOn)
+            .map((r) => r.factory ?? "a factory")
+            .join(" and ")} give${each.filter((r) => !r.readyOn).length > 1 ? "" : "s"}`
+        : "the date the factory gives",
   });
   if (owing.length) {
     const paid = owing.every((x) => isZero(x.toPay) || Number(x.toPay) < 0);

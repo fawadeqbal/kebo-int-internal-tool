@@ -3,6 +3,7 @@ import { fromMinor } from "@kebo/money";
 import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
+import { factoryReadyOf, readySelect } from "../orders/ready";
 import { factoryBorneExpenses, factoryPositionOf, type MoneyCtx } from "./position";
 
 type Db = PrismaService["db"] | Tx;
@@ -32,8 +33,24 @@ const planLines = {
     factoryTaxRate: true,
     factoryTaxIncluded: true,
     quantity: true,
+    // The offer the line was bought on: the advance it asks.
+    quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { advancePercent: true } } } } } },
   },
 } as const;
+
+type AdvanceLine = { factoryId: string | null; quoteLine: { factoryQuoteLine: { factoryQuote: { advancePercent: Prisma.Decimal | null } } | null } | null };
+
+/**
+ * The advance a factory asks on this order: its offer's (FactoryQuote.advancePercent, the offer the lines
+ * were bought on), else the company's default (Settings).
+ */
+export function advanceOf(lines: AdvanceLine[], factoryId: string, fallback: number): number {
+  for (const l of lines) {
+    const p = l.factoryId === factoryId ? l.quoteLine?.factoryQuoteLine?.factoryQuote.advancePercent : null;
+    if (p !== null && p !== undefined) return Number(p);
+  }
+  return fallback;
+}
 
 /**
  * Each factory's payment plan on an order, with what is paid on each part and
@@ -41,14 +58,15 @@ const planLines = {
  * (taken off what we owe it, as on the order's money: factoryPosition), so a
  * balance the factory bore is not shown late. A factory without a stored plan
  * shows the company's default (advance on order, balance on the ready date)
- * until one is saved; the balance's date follows the order's ready date.
+ * until one is saved (the advance its offer asks, else Settings'); the balance's date follows that
+ * factory's own ready date.
  */
 export async function factoryPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
   const o = await db.order.findUniqueOrThrow({
     where: { id: orderId },
     select: {
       factoryOrderedOn: true,
-      readyOn: true,
+      ...readySelect,
       lines: planLines,
       factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true } },
       expenses: factoryBorneExpenses,
@@ -68,7 +86,6 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
     }
   }
   const orderedOn = fromDbDateOrNull(o.factoryOrderedOn);
-  const readyOn = fromDbDateOrNull(o.readyOn);
   return [...owed.entries()].map(([key, f]) => {
     const stored = o.factoryPlan.filter((r) => `${r.factoryId}:${r.currency}` === key);
     const rows: FactoryPlanRow[] = stored.length
@@ -79,14 +96,18 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
           dueRule: r.dueRule as FactoryDueRule,
           dueOn: fromDbDateOrNull(r.dueOn),
         }))
-      : defaultFactoryPlan(f.owedMinor, advancePercent);
+      : defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent));
     const paidMinor = f.settledMinor;
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
+    // This factory's own ready date (one per factory; the order's is the latest).
+    const readyOn = factoryReadyOf(o, f.factory.id);
     const status = factoryPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays);
     const next = status.find((r) => r.status !== "paid") ?? null;
     return {
       factory: f.factory,
       currency: f.currency,
+      /** The factory's ready date ("on the ready date" rows fall due then). */
+      readyOn,
       owed: fromMinor(f.owedMinor),
       /** Saved for this order (false: the company's default, shown until saved). */
       saved: stored.length > 0,
@@ -116,13 +137,13 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
 
 export type FactoryPlanView = Awaited<ReturnType<typeof factoryPlansOf>>[number];
 
-/** Ordered from the factory: each factory owed on the order gets the default plan, unless it has one. */
+/** Ordered from the factory: each factory owed on the order gets the default plan (its offer's advance), unless it has one. */
 export async function seedFactoryPlans(tx: Tx, orderId: string, advancePercent: number) {
   const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { lines: planLines, factoryPlan: { select: { factoryId: true, currency: true } } } });
   for (const [key, f] of owedByFactory(o.lines)) {
     if (f.owedMinor <= 0 || o.factoryPlan.some((r) => `${r.factoryId}:${r.currency}` === key)) continue;
     await tx.factoryPaymentPlan.createMany({
-      data: defaultFactoryPlan(f.owedMinor, advancePercent).map((r, i) => ({
+      data: defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent)).map((r, i) => ({
         orderId,
         factoryId: f.factory.id,
         label: r.label,

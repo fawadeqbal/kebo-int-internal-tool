@@ -126,6 +126,8 @@ export class SourcingService {
         leadTime: q.leadTime,
         moq: q.moq,
         paymentTerms: q.paymentTerms,
+        /** The advance the factory asks when we order, in % (null: the company's default). */
+        advancePercent: q.advancePercent === null ? null : Number(q.advancePercent),
         notes: q.notes,
         /** null when the exchange rate for this currency is missing in Settings. */
         fxRate: rate,
@@ -288,6 +290,8 @@ export class SourcingService {
       leadTime: input.leadTime,
       moq: input.moq,
       paymentTerms: input.paymentTerms,
+      // Left out on an edit: kept as it is (a new offer takes the company's default, see create).
+      ...(input.advancePercent !== undefined ? { advancePercent: input.advancePercent } : {}),
       notes: input.notes,
     };
   }
@@ -302,7 +306,9 @@ export class SourcingService {
       // Tax not said: the company's default for new offers (Without tax · 0% unless changed in Settings).
       const { sales } = await this.settings.get();
       const tax = { taxIncluded: input.taxIncluded ?? sales.factoryTaxIncluded, taxRate: input.taxRate ?? sales.factoryTaxRate };
-      const q = await tx.factoryQuote.create({ data: { ...this.header(input), ...tax, inquiryId, factoryId: factory.id, createdById: user.id } });
+      // The advance not said: the company's default (Settings), so the plan and the PO show what was assumed.
+      const advancePercent = input.advancePercent ?? sales.factoryAdvancePercent;
+      const q = await tx.factoryQuote.create({ data: { ...this.header(input), ...tax, advancePercent, inquiryId, factoryId: factory.id, createdById: user.id } });
       if (input.lines) await this.writeLines(tx, q.id, inquiryId, input.lines, tax.taxRate);
       await this.audit.record(tx, {
         userId: user.id,

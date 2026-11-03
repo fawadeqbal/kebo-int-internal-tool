@@ -17,6 +17,7 @@ import { termsOf } from "../money/route-plan";
 import { buyerOf } from "./buyer";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
+import { readyOnOf, readySelect } from "./ready";
 
 /**
  * The order's own documents, the proforma invoice and the packing list (single source of truth, PR 2:
@@ -62,6 +63,7 @@ export const orderDocInclude = {
   papers: { where: { kind: { in: [...ORDER_DOCUMENTS] } }, orderBy: { version: "asc" } },
   // The packing list prints the shipment's B/L, date, container and ports (Shipment 1).
   shipments: orderShipments,
+  ...readySelect,
 } satisfies Prisma.OrderInclude;
 
 export type DocOrder = Prisma.OrderGetPayload<{ include: typeof orderDocInclude }>;
@@ -122,7 +124,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       status: o.status,
       orderedOn: fromDbDate(o.orderedOn),
       shipBy: fromDbDateOrNull(o.shipBy),
-      readyOn: fromDbDateOrNull(o.readyOn),
+      readyOn: readyOnOf(o),
       shippedOn,
       blNo: ship.blNo,
       incoterm: o.incoterm,

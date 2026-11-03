@@ -9,6 +9,8 @@ import {
   buyerChanges,
   type BuyerSnapshot,
   customerLetters,
+  orderReadyOn,
+  routeFromTerms,
   routePlan,
   nextStage,
   numberQuoteLines,
@@ -49,6 +51,7 @@ import { termsOf } from "../money/route-plan";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
+import { readyByOf, readyOnOf, readySelect, readyWords, setReadyAll, setReadyDates } from "./ready";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
@@ -81,6 +84,8 @@ const orderInclude = {
   inquiry: { select: { id: true, refNo: true, title: true, assigneeId: true, requiredBy: true, assignee: { select: { id: true, name: true } } } },
   // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
   shipments: orderShipments,
+  // Each factory's ready date (the order's is the latest of them).
+  ...readySelect,
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -292,16 +297,16 @@ export class OrdersService {
         },
       },
     });
-    // The customer's payment plan starts from the terms (deposit dated, balance dated when the ship date is known);
-    // choosing the route later rebuilds the parts not paid yet.
+    // The order starts on the route the accepted terms imply (an LC for "letter of credit", informal with that
+    // balance timing), shown "from the quotation" and changeable (choosing another rebuilds what is not paid or
+    // changed by hand). The plan is built from it: the deposit dated, the balance with its due rule.
     const days = (await this.settings.get()).reminders;
-    const plan = routePlan(
-      decimalToMinor(option.total),
-      Number(rev.depositPercent),
-      { route: null, balanceWhen: balanceWhenOf(rev.balanceTerms), lcTerms: null, lcDays: null },
-      acceptedOn,
-      days.depositDays,
-    );
+    const implied = routeFromTerms(rev.balanceTerms);
+    const route =
+      implied.route && implied.route !== "informal" && !(await this.limits.allows("bank_contracts"))
+        ? { route: null, balanceWhen: balanceWhenOf(rev.balanceTerms), lcTerms: null, lcDays: null }
+        : implied;
+    const plan = routePlan(decimalToMinor(option.total), Number(rev.depositPercent), route, acceptedOn, days.depositDays, days.balanceDays);
     await tx.paymentPlanItem.createMany({
       data: plan.map((p, i) => ({
         orderId: order.id,
@@ -309,10 +314,16 @@ export class OrdersService {
         amount: fromMinor(p.amountMinor),
         dueOn: toDbDateOrNull(p.dueOn),
         part: p.part,
+        dueRule: p.dueRule,
+        dueDays: p.dueDays,
         sortOrder: i,
       })),
     });
-    if (balanceWhenOf(rev.balanceTerms)) await tx.order.update({ where: { id: order.id }, data: { balanceWhen: balanceWhenOf(rev.balanceTerms) } });
+    if (route.route || route.balanceWhen)
+      await tx.order.update({
+        where: { id: order.id },
+        data: { paymentRoute: route.route, balanceWhen: route.balanceWhen, lcTerms: route.lcTerms, lcDays: route.lcDays },
+      });
     await this.audit.record(tx, {
       userId: actorId,
       action: "create",
@@ -522,7 +533,7 @@ export class OrdersService {
       stage: o.stage,
       status: o.status,
       stageSince: dateIn(o.stageSince, this.clock.timeZone),
-      readyOn: fromDbDateOrNull(o.readyOn),
+      readyOn: readyOnOf(o),
       shippedOn: shipFacts(o.shipments).shippedOn,
       goods: goodsOf(o.lines, o.packedAt),
     };
@@ -562,7 +573,10 @@ export class OrdersService {
       shipBy: fromDbDateOrNull(o.shipBy),
       /** When the customer wanted it (the deal's "wanted by"): the suggestion for ship-by while it is empty. */
       shipBySuggested: o.shipBy ? null : fromDbDateOrNull(requiredBy),
-      readyOn: fromDbDateOrNull(o.readyOn),
+      /** The latest of the factories' ready dates (known once each has given one). */
+      readyOn: readyOnOf(o),
+      /** Each factory's own ready date. */
+      readyBy: readyByOf(o).map((r) => ({ ...r, name: o.lines.find((l) => l.factory?.id === r.factoryId)?.factory?.name ?? null })),
       /** The shipment's, never the order's: the earliest day a shipment left, and Shipment 1's B/L. */
       shippedOn: ship.shippedOn,
       blNo: ship.blNo,
@@ -717,7 +731,7 @@ export class OrdersService {
         customer: o.customer,
         inquiry: o.inquiry,
         orderedOn: fromDbDate(o.orderedOn),
-        readyOn: fromDbDateOrNull(o.readyOn),
+        readyOn: readyOnOf(o),
         shippedOn: shipFacts(o.shipments).shippedOn,
         currency: o.currency,
         total: o.total.toFixed(2),
@@ -806,8 +820,6 @@ export class OrdersService {
           ? requireReason(given, "closeWithDue", "the order closes with money still due")
           : given;
       const data: Prisma.OrderUpdateInput = { stage: input.to, stageSince: new Date() };
-      if (input.to === "in_production" && input.readyOn) data.readyOn = toDbDate(input.readyOn);
-      let shippedOn: ISODate | null = null;
       if (input.to === "shipped" && forward) {
         // The ship date and B/L are the shipment's (Shipment 1, made when there is none). Shipped again after
         // a move back: the real ship date is kept unless a new one is given.
@@ -817,12 +829,12 @@ export class OrdersService {
             ...(input.shippedOn || !was ? { departedOn: input.shippedOn ?? today } : {}),
             ...(input.blNo ? { blNo: input.blNo } : {}),
           });
-        shippedOn = await this.shippedOn(tx, o.id);
       }
       if (input.to === "done") Object.assign(data, { status: "closed", closedAt: new Date() });
       if (o.stage === "done" && !forward) Object.assign(data, { status: "open", closedAt: null });
       await tx.order.update({ where: { id: o.id }, data });
-      await this.datePlan(tx, o, input.to, forward, input.readyOn ?? null, shippedOn);
+      // The goods' ready date (every factory's): the customer's and the factories' plans follow it by themselves.
+      if (input.to === "in_production" && input.readyOn) await setReadyAll(tx, o.id, input.readyOn);
       if (input.to === "shipped" && forward) await this.freezePacking(tx, o.id, user.id);
       await tx.orderStageChange.create({
         data: {
@@ -869,9 +881,7 @@ export class OrdersService {
     const o = await this.load(user, orderId, tx);
     if (o.status !== "open" || STAGE_FLOW.indexOf(o.stage) >= STAGE_FLOW.indexOf(to)) return null;
     const data: Prisma.OrderUpdateInput = { stage: to, stageSince: new Date() };
-    const shippedOn = to === "shipped" ? (shipFacts(o.shipments).shippedOn ?? this.clock.today()) : null;
     await tx.order.update({ where: { id: o.id }, data });
-    await this.datePlan(tx, o, to, true, null, shippedOn);
     if (to === "shipped") await this.freezePacking(tx, o.id, user.id);
     await tx.orderStageChange.create({
       data: { orderId: o.id, fromStage: o.stage, toStage: to, note: why, confirmed: false, byId: user.id },
@@ -894,11 +904,6 @@ export class OrdersService {
       actorId: user.id,
       notify: [o.inquiry.assigneeId].filter((v): v is string => !!v),
     } satisfies DomainEvent;
-  }
-
-  /** Shipped on: the earliest day one of the order's shipments left. */
-  private async shippedOn(tx: Tx, orderId: string) {
-    return shipFacts(await tx.shipment.findMany({ where: { orderId }, ...orderShipments })).shippedOn;
   }
 
   /** Publish what followFlow returned, once its transaction is committed. */
@@ -988,22 +993,6 @@ export class OrdersService {
       });
     });
     return { print };
-  }
-
-  /**
-   * Instalments with no date yet get one once it is known: a balance "before
-   * shipment" is due by the ready date; other balances some days after the ship
-   * date (the balance reminder). Dates someone set are never changed.
-   */
-  private async datePlan(tx: Tx, o: OrderRow, to: OrderStage, forward: boolean, readyOn: ISODate | null, shippedOn: ISODate | null) {
-    if (!forward) return;
-    let due: ISODate | null = null;
-    const terms = balanceTermsOf(termsOf(o), o.balanceTerms);
-    if (to === "in_production" && readyOn && terms === "before_shipment") due = readyOn;
-    if (to === "shipped" && shippedOn)
-      due = terms === "before_shipment" ? shippedOn : addDays(shippedOn, (await this.settings.get()).reminders.balanceDays);
-    // An LC's balance is dated by the bank step "Papers reached their bank", never here.
-    if (due) await tx.paymentPlanItem.updateMany({ where: { orderId: o.id, dueOn: null, dueRule: null }, data: { dueOn: toDbDate(due) } });
   }
 
   /* ---------------------------------------------------------------- goods */
@@ -1243,7 +1232,6 @@ export class OrdersService {
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
       const data: Prisma.OrderUpdateInput = {};
       if (input.shipBy !== undefined) data.shipBy = toDbDateOrNull(input.shipBy);
-      if (input.readyOn !== undefined) data.readyOn = toDbDateOrNull(input.readyOn);
       if (input.documentTitle !== undefined) data.documentTitle = input.documentTitle;
       if (input.portOfDischarge !== undefined) data.portOfDischarge = input.portOfDischarge;
       if (input.shippingMarks !== undefined) data.shippingMarks = input.shippingMarks;
@@ -1256,7 +1244,7 @@ export class OrdersService {
       const reason = shippedFacts ? requireReason(input.reason, "shipping", "the ship date or B/L changes after shipping") : input.reason;
       const before = {
         shipBy: fromDbDateOrNull(o.shipBy),
-        readyOn: fromDbDateOrNull(o.readyOn),
+        readyOn: readyOnOf(o),
         shippedOn: ship.shippedOn,
         blNo: ship.blNo,
         documentTitle: o.documentTitle,
@@ -1271,6 +1259,15 @@ export class OrdersService {
       };
       if (Object.keys(onShipment).length) await onPrimaryShipment(tx, o, onShipment);
       if (Object.keys(data).length) await tx.order.update({ where: { id: o.id }, data });
+      // The ready date is each factory's: one date for all of them, or each factory's own.
+      const ready =
+        input.readyBy !== undefined
+          ? await setReadyDates(tx, o.id, input.readyBy)
+          : input.readyOn !== undefined
+            ? await setReadyAll(tx, o.id, input.readyOn)
+            : null;
+      const names = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.name] as const] : [])));
+      const { readyBy: _readyBy, ...sent } = input;
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",
@@ -1279,9 +1276,16 @@ export class OrdersService {
         summary:
           input.containerNo !== undefined || input.shippingMarks !== undefined
             ? `${o.refNo}: container and shipping marks changed`
-            : `${o.refNo}: dates and B/L changed`,
-        oldValues: before,
-        newValues: { ...input, reason: undefined },
+            : ready && ready.after.length > 1
+              ? `${o.refNo}: ready dates ${readyWords(ready.after, names)}`
+              : `${o.refNo}: dates and B/L changed`,
+        oldValues: { ...before, ...(ready && ready.before.length > 1 ? { readyBy: readyWords(ready.before, names) } : {}) },
+        newValues: {
+          ...sent,
+          ...(ready ? { readyOn: orderReadyOn(ready.after.flatMap((r) => (r.factoryId ? [r.factoryId] : [])), ready.after) } : {}),
+          ...(ready && ready.after.length > 1 ? { readyBy: readyWords(ready.after, names) } : {}),
+          reason: undefined,
+        },
         reason,
       });
     });

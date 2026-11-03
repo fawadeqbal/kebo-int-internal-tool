@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, toMinor, type Minor } from "@kebo/money";
 import {
   bankStepsFor,
@@ -29,6 +29,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import { fileView } from "../money/payment-file-view";
 import { SettingsService } from "../settings/settings.service";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
+import { livePlansOf } from "../money/plan-live";
 
 type Live = { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; currency: string };
 /** Where the order stands with these payments (orderPosition: what was charged to the customer can be paid too). */
@@ -181,6 +182,8 @@ export class PaymentsService {
       orderBy: [{ orderedOn: "desc" }, { refNo: "desc" }],
     });
     const byId = new Map(orders.map((o) => [o.id, o]));
+    // Each order's plan as it stands now (dates from the rules, names from the amounts).
+    const plans = await livePlansOf(this.prisma.db, orders.map((o) => o.id));
     const payments = orders.length
       ? await this.prisma.db.payment.findMany({
           where: { orderId: { in: orders.map((o) => o.id) } },
@@ -204,7 +207,7 @@ export class PaymentsService {
         totals.set(o.currency, t);
       }
       const plan = planStatus(
-        o.planItems.map((p) => ({ label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })),
+        plans.get(o.id)?.items ?? [],
         pos.settledMinor,
         today,
         soon,
@@ -462,7 +465,8 @@ export class PaymentsService {
       const leftMinor = countsMinor - thisMinor - others.reduce((t, p) => t + p.amountMinor, 0);
       if (leftMinor < 0)
         throw new DomainError(`The parts add up to more than the payment counts as (${formatMinor(countsMinor, o.currency)}).`);
-      const kind: PaymentKind = input.kind;
+      // What the money pays (the deposit while it is open, else the balance); only "other" is taken as sent.
+      const kind: PaymentKind = input.kind === "other" ? "other" : before.depositOutstandingMinor > 0 ? "deposit" : "balance";
       const parts: Part[] = [...(thisMinor > 0 ? [{ order: o, kind, amountMinor: thisMinor, bankChargesMinor: chargesMinor }] : []), ...others];
       const a: Arrived = {
         receivedMinor,
@@ -691,7 +695,17 @@ export class PaymentsService {
       await tx.payment.update({
         where: { id: p.id },
         data: {
-          kind: input.kind,
+          // What it pays, against the payments before it; "other" only when sent so (or kept so when not sent).
+          kind:
+            input.kind === "other" || (input.kind === undefined && p.kind === "other")
+              ? "other"
+              : settledOf(
+                    o,
+                    o.payments.filter((x) => x.id !== p.id && (fromDbDate(x.paidOn) < input.paidOn || (fromDbDate(x.paidOn) === input.paidOn && x.createdAt < p.createdAt))),
+                    fxOf(await this.settings.get(), await this.limits.allows("expenses")),
+                  ).depositOutstandingMinor > 0
+                ? "deposit"
+                : "balance",
           amount: fromMinor(amountMinor),
           bankCharges: input.bankCharges,
           currency: o.currency,

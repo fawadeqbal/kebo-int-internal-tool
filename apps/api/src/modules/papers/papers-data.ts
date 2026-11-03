@@ -37,6 +37,9 @@ import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../money
 import { lcBalanceMinor, termsOf } from "../money/route-plan";
 import { quotedTermsPrinted } from "../orders/order-docs";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
+import { factoryReadyOf, readySelect } from "../orders/ready";
+import { livePlanOfOrder } from "../money/plan-live";
+import { advanceOf } from "../money/factory-plan";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -48,7 +51,8 @@ export const paperOrderInclude = {
           requestedItemId: true,
           requestedItem: { select: { parentId: true } },
           factoryQuoteLineId: true,
-          factoryQuoteLine: { select: { parentId: true } },
+          // The offer's advance %: the factory's plan starts from it (and the PO prints it).
+          factoryQuoteLine: { select: { parentId: true, factoryQuote: { select: { advancePercent: true } } } },
         },
       },
       factory: { select: { id: true, name: true, address: true } },
@@ -82,6 +86,10 @@ export const paperOrderInclude = {
   papers: { orderBy: [{ version: "asc" }] },
   satEngineer: { select: { name: true } },
   inquiry: { select: { id: true, contactId: true } },
+  // Each factory's ready date (its purchase order prints its own), and the papers' day at the customer's bank
+  // (an LC's instalment is due from it): what the plan's dates are worked out from.
+  ...readySelect,
+  bankSteps: { where: { step: "customer_bank_received" }, select: { doneOn: true }, orderBy: { doneOn: "asc" } },
 } satisfies Prisma.OrderInclude;
 
 export type PaperOrder = Prisma.OrderGetPayload<{ include: typeof paperOrderInclude }>;
@@ -454,7 +462,7 @@ function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMi
         dueRule: r.dueRule as FactoryDueRule,
         dueOn: fromDbDateOrNull(r.dueOn),
       }))
-    : defaultFactoryPlan(owedMinor, c.settings.sales.factoryAdvancePercent);
+    : defaultFactoryPlan(owedMinor, advanceOf(c.o.lines, factoryId, c.settings.sales.factoryAdvancePercent));
   if (!rows.length || owedMinor <= 0) return null;
   const when = (r: (typeof rows)[number]) =>
     r.dueRule === "on_order" ? "when we order" : r.dueRule === "on_ready" ? "on the ready date" : r.dueOn ? `by ${paperDateText(r.dueOn)}` : FACTORY_DUE_RULE_LABEL[r.dueRule];
@@ -471,7 +479,8 @@ function purchaseOrder(c: PaperCtx): Built {
   // The factory's currency, frozen on its lines (never guessed).
   const currency = mine.find((l) => l.factoryCurrency)?.factoryCurrency ?? null;
   const priced = mine.filter((l) => l.factoryUnitPrice !== null);
-  const readyOn = fromDbDateOrNull(c.o.readyOn);
+  // This factory's own ready date (one per factory).
+  const readyOn = factoryReadyOf(c.o, f?.id ?? null);
   const tax = poTax(priced);
   const paid = c.o.factoryPaid.filter((p) => f && p.factoryId === f.id);
   // Where we stand with this factory, as on the order's money (factoryPosition): paid, what it bears, still to pay.
@@ -690,13 +699,18 @@ function paymentReceipt(c: PaperCtx): Built {
   };
 }
 
+/** The order's plan as it stands now: each instalment named from its amount and dated from its rule. */
+export function livePlanOfPaper(o: PaperOrder) {
+  return livePlanOfOrder(o).items;
+}
+
 function paymentRequest(c: PaperCtx): Built {
-  const items = c.o.planItems;
+  const items = livePlanOfPaper(c.o);
   const pos = positionOf(c);
   const item = items.find((x) => x.id === c.ref) ?? null;
-  const amount = item ? item.amount.toFixed(2) : pos.due;
+  const amount = item ? fromMinor(item.amountMinor) : pos.due;
   const label = item ? item.label : "Balance due on the order";
-  const due = item ? fromDbDateOrNull(item.dueOn) : null;
+  const due = item ? item.dueOn : null;
   // Its number was given when the plan row was made (never moved by a void, a back-date or a rebuilt plan);
   // the balance asked for without a plan has the order's own (PR-2026-0031).
   const n = item ? (item.requestNo ?? items.indexOf(item) + 1) : null;

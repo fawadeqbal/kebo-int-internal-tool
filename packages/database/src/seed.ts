@@ -331,7 +331,6 @@ export async function seedDemoData(
         stageSince: new Date(`${stageSince}T09:00:00Z`),
         closedAt: o.order.stage === "done" ? new Date(`${stageSince}T09:00:00Z`) : null,
         orderedOn: toDbDate(orderedOn),
-        readyOn: o.order.readyInDays === undefined ? null : toDbDate(addDays(orderedOn, o.order.readyInDays)),
         currency: "USD",
         total: fromMinor(accepted.total),
         depositPercent: 30,
@@ -403,14 +402,24 @@ export async function seedDemoData(
         },
       });
     }
-    // The customer's plan from the terms; the balance is dated once shipped.
+    // Each factory's ready date (one per factory; the order's is the latest of them).
+    if (o.order.readyInDays !== undefined) {
+      const readyOn = toDbDate(addDays(orderedOn, o.order.readyInDays));
+      const made = await db.orderLine.findMany({ where: { orderId: order.id }, select: { factoryId: true } });
+      const ids = [...new Set(made.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
+      await db.orderFactory.createMany({ data: (ids.length ? ids : [null]).map((factoryId) => ({ orderId: order.id, factoryId, readyOn })) });
+    }
+    // The customer's plan from the terms: the deposit on its date, the balance 14 days after the goods leave.
     for (const [k, p] of defaultPlan(accepted.total, 30, orderedOn, 7).entries()) {
       await db.paymentPlanItem.create({
         data: {
           orderId: order.id,
           label: p.label,
           amount: fromMinor(p.amountMinor),
-          dueOn: p.dueOn ? toDbDate(p.dueOn) : shippedOn ? toDbDate(addDays(shippedOn, 14)) : null,
+          dueOn: p.dueOn ? toDbDate(p.dueOn) : null,
+          part: p.dueOn ? "deposit" : "balance",
+          dueRule: p.dueOn ? "fixed" : "on_ship_plus_days",
+          dueDays: p.dueOn ? null : 14,
           sortOrder: k,
         },
       });
