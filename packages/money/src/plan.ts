@@ -96,24 +96,64 @@ export interface OrderMoneyFacts {
   bankChargesMinor?: Minor;
 }
 
-export function orderProfit(f: OrderMoneyFacts) {
+/**
+ * An order's profit as named figures, the same on every screen (the order's
+ * money, its Costs page, Reports, Insights, Leaks and the customer's account):
+ * - grossOnQuote, "Profit on the quote": the revenue that has a cost less its
+ *   goods and the planned costs to reach the basis (what the quotation promised);
+ * - expected, "Profit now expected": that, less the expenses we bear beyond the
+ *   planned costs and the bank charges taken from the customer's payments (the
+ *   order's money page used to call it "earned");
+ * - net, "After the deal's costs": expected less what was spent on the deal
+ *   before it became the order (`beforeSaleMinor`);
+ * - cash, "Cash so far": what came in less what we paid the factories and every
+ *   expense paid so far.
+ */
+export function orderMoney(f: OrderMoneyFacts & { beforeSaleMinor?: Minor }) {
   const basis = Math.max(f.basisCostMinor ?? 0, 0);
   const covered = Math.min(basis, Math.max(f.basisPaidMinor ?? 0, 0), Math.max(f.expensesMinor, 0));
   const expenses = f.expensesMinor - covered;
   const bank = f.bankChargesMinor ?? 0;
-  const earned = f.costedRevenueMinor - f.goodsCostMinor - basis - expenses - bank;
-  const cash = f.receivedMinor - f.factoryPaidMinor - f.expensesMinor;
+  const grossOnQuote = f.costedRevenueMinor - f.goodsCostMinor - basis;
+  const expected = grossOnQuote - expenses - bank;
+  const margin = (m: Minor) => (f.costedRevenueMinor > 0 ? roundHalfAway((m / f.costedRevenueMinor) * 1000) / 10 : null);
   return {
-    earnedMinor: earned,
-    cashMinor: cash,
+    grossOnQuoteMinor: grossOnQuote,
+    expectedMinor: expected,
+    netMinor: expected - Math.max(f.beforeSaleMinor ?? 0, 0),
+    cashMinor: f.receivedMinor - f.factoryPaidMinor - f.expensesMinor,
     uncostedRevenueMinor: f.revenueMinor - f.costedRevenueMinor,
-    /** Expenses counted in earned profit: those not already in the planned basis costs. */
+    /** Expenses counted in the expected profit: those not already in the planned basis costs. */
     expensesCountedMinor: expenses,
     /** Expenses that paid for the planned basis costs (counted there). */
     coveredMinor: covered,
-    /** Earned profit ÷ the revenue that has a cost, one decimal (half away from zero); null without any. */
-    marginPercent: f.costedRevenueMinor > 0 ? roundHalfAway((earned / f.costedRevenueMinor) * 1000) / 10 : null,
+    /** Profit on the quote ÷ the revenue that has a cost, one decimal (half away from zero); null without any. */
+    grossMarginPercent: margin(grossOnQuote),
+    /** Expected profit ÷ the revenue that has a cost. */
+    marginPercent: margin(expected),
     /** Share of the revenue whose factory cost is known, 0–100. */
     coveragePercent: f.revenueMinor > 0 ? Math.round((f.costedRevenueMinor / f.revenueMinor) * 100) : null,
+  };
+}
+
+/** The labels of orderMoney's figures: one name for one figure on every screen. */
+export const PROFIT_LABEL = {
+  grossOnQuote: "Profit on the quote",
+  expected: "Profit now expected",
+  net: "After the deal's costs",
+  cash: "Cash so far",
+} as const;
+
+/** orderMoney under its older names (earned = expected). */
+export function orderProfit(f: OrderMoneyFacts) {
+  const m = orderMoney(f);
+  return {
+    earnedMinor: m.expectedMinor,
+    cashMinor: m.cashMinor,
+    uncostedRevenueMinor: m.uncostedRevenueMinor,
+    expensesCountedMinor: m.expensesCountedMinor,
+    coveredMinor: m.coveredMinor,
+    marginPercent: m.marginPercent,
+    coveragePercent: m.coveragePercent,
   };
 }

@@ -1,7 +1,8 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, settle, splitDeposit } from "@kebo/money";
+import { fromMinor } from "@kebo/money";
 import type { ChecklistFacts } from "@kebo/shared";
 import { lcChecksOf } from "../money/route-plan";
+import { chargedExpenses, positionOf, type MoneyCtx } from "../money/position";
 import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
@@ -12,7 +13,8 @@ export const checklistOrderInclude = {
     select: { currency: true, amount: true, bankCharges: true, paidOn: true },
   },
   bankContract: true,
-  planItems: { select: { amount: true, dueRule: true } },
+  planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
+  expenses: chargedExpenses,
   shipments: { orderBy: { createdAt: "asc" } },
   documents: { select: { kind: true, status: true, number: true, issuedOn: true } },
   bankSteps: true,
@@ -37,18 +39,12 @@ function reachedOn(payments: ChecklistOrderRow["payments"], currency: string, ta
  * The checklist's facts for one order. `factories` comes from the order's money
  * (null when the person may not see factory money).
  */
-export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, lcCourierDays = 4): ChecklistFacts {
-  const totalMinor = decimalToMinor(o.total);
-  const percent = Number(o.depositPercent);
-  const position = settle(
-    totalMinor,
-    o.payments
-      .filter((p) => p.currency === o.currency)
-      .map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-    percent,
-  );
-  const deposit = percent > 0 ? splitDeposit(totalMinor, percent).deposit : 0;
-  const depositIn = position.depositOutstandingMinor === 0 && (percent > 0 || position.outstandingMinor === 0);
+export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): ChecklistFacts {
+  // Where the order stands with the customer, as everywhere: the plan's deposit, what was charged to them.
+  const position = positionOf(o, fx);
+  const percent = position.depositPercent;
+  const deposit = position.depositMinor;
+  const depositIn = position.depositReceived;
   const goods = o.lines.filter((l) => l.type === "goods");
   const received = goods.filter((l) => Number(l.receivedQty) >= Number(l.quantity)).length;
   const sum = (f: (l: (typeof goods)[number]) => number) => goods.reduce((t, l) => t + f(l), 0);
@@ -70,8 +66,8 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
     depositIn,
     depositOn: depositIn && deposit > 0 ? reachedOn(o.payments, o.currency, deposit) : null,
     deposit: fromMinor(deposit),
-    due: fromMinor(position.outstandingMinor),
-    paidInFullOn: position.outstandingMinor === 0 ? reachedOn(o.payments, o.currency, totalMinor) : null,
+    due: fromMinor(position.dueMinor),
+    paidInFullOn: position.dueMinor === 0 ? reachedOn(o.payments, o.currency, position.owedMinor) : null,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
     factoryOrderNo: o.factoryOrderNo,
     factories,

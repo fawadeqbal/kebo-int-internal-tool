@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
-import { factoryUnitCostMinor, fromMinor, multiplyMinor, orderCosting, roundHalfAway, settle, type Minor } from "@kebo/money";
+import { fromMinor, orderCosting, orderMoney, roundHalfAway, type Minor } from "@kebo/money";
 import {
   can,
   FLOW_STEPS,
@@ -17,6 +17,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { convert, orderRate } from "./order-money";
+import { factoryPositionOf, fxOf, positionOf } from "./position";
 
 const person = { select: { id: true, name: true } } as const;
 
@@ -48,6 +49,8 @@ export class CostsService {
         lines: { orderBy: { sortOrder: "asc" } },
         costs: true,
         payments: { where: { voidedAt: null } },
+        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true } },
         expenses: {
           orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
           include: {
@@ -60,7 +63,9 @@ export class CostsService {
         },
       },
     });
-    const { sales } = await this.settings.get();
+    const settings = await this.settings.get();
+    const { sales } = settings;
+    const fx = fxOf(settings, await this.limits.allows("expenses"));
     const perMain = orderRate(o, sales.currency, sales.exchangeRates);
     /** An expense in the order's currency: its amount at its own rate into the main currency, then at the order's rate. */
     const inOrder = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) =>
@@ -86,20 +91,24 @@ export class CostsService {
       totalMinor,
       plan.plannedMinor,
     );
-    const position = settle(
-      totalMinor,
-      o.payments
-        .filter((p) => p.currency === o.currency)
-        .map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-    );
-    const onQuote = costing.costedRevenueMinor - costing.goodsCostMinor - plan.plannedMinor;
-    const expected = onQuote - plan.notPlannedMinor - position.bankChargesMinor;
-    // What the factories charge for the goods, in their own currencies (prices frozen on the lines, with tax on top unless included).
-    const factoryOwed = new Map<string, Minor>();
-    for (const l of o.lines) {
-      if (l.factoryUnitPrice === null || !l.factoryCurrency) continue;
-      const unit = factoryUnitCostMinor(decimalToMinor(l.factoryUnitPrice), l.factoryTaxRate?.toString() ?? 0, l.factoryTaxIncluded);
-      factoryOwed.set(l.factoryCurrency, (factoryOwed.get(l.factoryCurrency) ?? 0) + multiplyMinor(unit, l.quantity.toString()));
+    // The same position and profit as the order's money: one function each.
+    const position = positionOf(o, fx);
+    const m = orderMoney({
+      ...costing,
+      receivedMinor: position.receivedMinor,
+      factoryPaidMinor: 0,
+      expensesMinor: plan.spentMinor,
+      basisPaidMinor: plan.coveredMinor,
+      bankChargesMinor: position.bankChargesMinor,
+    });
+    const onQuote = m.grossOnQuoteMinor;
+    const expected = m.expectedMinor;
+    // What the factories charge for the goods, in their own currencies (prices frozen on the lines, with tax on top unless
+    // included), and what is still to pay them after our payments and the expenses they bear: factoryPosition.
+    const factoryOwed = new Map<string, { owed: Minor; toPay: Minor }>();
+    for (const r of factoryPositionOf(o, fx).filter((x) => x.lines > 0)) {
+      const cur = factoryOwed.get(r.currency) ?? { owed: 0, toPay: 0 };
+      factoryOwed.set(r.currency, { owed: cur.owed + r.owedMinor, toPay: cur.toPay + r.toPayMinor });
     }
 
     // Paid from someone's own money and not repaid yet: per person and currency.
@@ -196,7 +205,7 @@ export class CostsService {
               sale: fromMinor(costing.costedRevenueMinor),
               uncosted: fromMinor(costing.uncostedRevenueMinor),
               factory: fromMinor(costing.goodsCostMinor),
-              factoryOwed: [...factoryOwed].map(([currency, minor]) => ({ currency, amount: fromMinor(minor) })),
+              factoryOwed: [...factoryOwed].map(([currency, f]) => ({ currency, amount: fromMinor(f.owed), toPay: fromMinor(f.toPay) })),
               planned: fromMinor(plan.plannedMinor),
               notPlanned: fromMinor(plan.notPlannedMinor),
               /** Taken by banks from the customer's payments. */

@@ -9,6 +9,7 @@ import type { PersonWithRole, ProfitRow, ReportView } from "@/lib/types-deals";
 import type { CompanySnapshot } from "@/lib/types-orders";
 import { Letterhead, LinesTable, Sheet } from "@/components/print/doc";
 import { PrintToolbar } from "@/components/print/toolbar";
+import { PROFIT_LABEL } from "@kebo/money";
 
 export const metadata = { title: "Sales report" };
 
@@ -76,7 +77,7 @@ function Profit({ title, rows, currency }: { title: string; rows: (ProfitRow & {
               render: (r) => (Number(r.uncostedRevenue) > 0 ? money(r.uncostedRevenue, currency) : "—"),
             },
             {
-              label: "Profit",
+              label: PROFIT_LABEL.grossOnQuote,
               className: "w-28 text-right tabular whitespace-nowrap font-medium",
               render: (r) => money(r.profit, currency),
             },
@@ -165,7 +166,7 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
               value: money(t.revenue, r.currency),
               hint: Number(t.uncostedRevenue) > 0 ? `${money(t.uncostedRevenue, r.currency)} not costed` : undefined,
             },
-            { label: "Profit", value: money(t.profit, r.currency), hint: `Cost ${money(t.cost, r.currency)}` },
+            { label: PROFIT_LABEL.grossOnQuote, value: money(t.profit, r.currency), hint: `Cost ${money(t.cost, r.currency)}` },
             { label: "Margin", value: pct(t.marginPercent) },
           ]}
         />

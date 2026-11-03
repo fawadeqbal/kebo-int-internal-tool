@@ -1,5 +1,5 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, settle, splitDeposit, type Minor } from "@kebo/money";
+import { fromMinor, planDeposit, type Minor } from "@kebo/money";
 import { lcChecks, rebuildPlan, routePlan, type BalanceWhen, type LcCheck, type LcTerms, type RouteTerms } from "@kebo/shared";
 import { addDays, type ISODate } from "@kebo/utils";
 import type { Tx } from "../../database/prisma.service";
@@ -36,11 +36,8 @@ export async function rebuildRoutePlan(tx: Tx, o: PlanOrder, t: RouteTerms, days
     tx.orderBankStep.findFirst({ where: { orderId: o.id, step: "customer_bank_received" } }),
   ]);
   const totalMinor = decimalToMinor(o.total);
-  const settled = settle(
-    totalMinor,
-    payments.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-    Number(o.depositPercent),
-  ).settledMinor;
+  // What came in (with the bank charges): it pays the instalments oldest first.
+  const settled = payments.reduce((t, p) => t + decimalToMinor(p.amount) + decimalToMinor(p.bankCharges), 0);
   const stored = items.map((i) => ({ id: i.id, label: i.label, amountMinor: decimalToMinor(i.amount), dueOn: fromDbDateOrNull(i.dueOn) }));
   const fresh = routePlan(totalMinor, Number(o.depositPercent), t, fromDbDate(o.orderedOn), days.depositDays, papers ? fromDbDate(papers.doneOn) : null);
   const { keep, add } = rebuildPlan(stored, settled, fresh);
@@ -78,10 +75,21 @@ export async function datePapers(tx: Tx, orderId: string, papersOn: ISODate | nu
     await tx.paymentPlanItem.update({ where: { id: i.id }, data: { dueOn: papersOn ? toDbDate(addDays(papersOn, i.dueDays ?? 0)) : null } });
 }
 
-/** What an LC must cover: the plan's LC part, else the order's balance after the deposit. */
-export function lcBalanceMinor(o: { total: Prisma.Decimal; depositPercent: Prisma.Decimal; planItems?: { amount: Prisma.Decimal; dueRule: string | null }[] }): Minor {
-  const lcPart = (o.planItems ?? []).filter((p) => p.dueRule === "after_papers").reduce((t, p) => t + decimalToMinor(p.amount), 0);
-  return lcPart > 0 ? lcPart : splitDeposit(decimalToMinor(o.total), Number(o.depositPercent)).balance;
+/**
+ * What an LC must cover: the plan's LC part, else the order's balance after the
+ * deposit (the plan's deposit row, else the accepted %). The bill of exchange and
+ * the cover letter draw it (never more), and the LC checks compare against it.
+ */
+export function lcBalanceMinor(o: {
+  total: Prisma.Decimal;
+  depositPercent: Prisma.Decimal;
+  planItems?: { amount: Prisma.Decimal; dueRule: string | null; part?: string | null }[];
+}): Minor {
+  const plan = o.planItems ?? [];
+  const lcPart = plan.filter((p) => p.dueRule === "after_papers").reduce((t, p) => t + decimalToMinor(p.amount), 0);
+  if (lcPart > 0) return lcPart;
+  const total = decimalToMinor(o.total);
+  return total - planDeposit(total, plan.map((p) => ({ amountMinor: decimalToMinor(p.amount), part: p.part ?? null })), Number(o.depositPercent)).depositMinor;
 }
 
 /** The LC checked against the order (null: not an LC order). */
@@ -92,7 +100,7 @@ export function lcChecksOf(
     total: Prisma.Decimal;
     depositPercent: Prisma.Decimal;
     readyOn: Date | null;
-    planItems?: { amount: Prisma.Decimal; dueRule: string | null }[];
+    planItems?: { amount: Prisma.Decimal; dueRule: string | null; part?: string | null }[];
     bankContract: { amount: Prisma.Decimal | null; currency: string | null; latestShipOn: Date | null; expiresOn: Date | null } | null;
     shipments: { eta: Date | null }[];
   },

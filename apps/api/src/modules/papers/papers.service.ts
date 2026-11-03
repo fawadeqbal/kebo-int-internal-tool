@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { fromMinor, settle } from "@kebo/money";
+import { fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { fromMinor } from "@kebo/money";
+import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../money/position";
 import {
   bankContractInput,
   BANK_PAPERS,
@@ -194,24 +195,25 @@ export class PapersService {
     const rows = await this.prisma.db.order.findMany({
       where: { customerId, status: { not: "cancelled" }, ...orderAccess(user) },
       orderBy: { orderedOn: "asc" },
-      include: { payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } } },
+      include: {
+        payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
+        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        expenses: chargedExpenses,
+      },
     });
+    const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     return {
       orders: rows.map((o) => {
-        const p = settle(
-          decimalToMinor(o.total),
-          o.payments
-            .filter((x) => x.currency === o.currency)
-            .map((x) => ({ amountMinor: decimalToMinor(x.amount), bankChargesMinor: decimalToMinor(x.bankCharges) })),
-          Number(o.depositPercent),
-        );
+        // As on the order: what was charged to the customer is part of what they owe.
+        const p = orderPositionOf(o, fx);
         return {
           refNo: o.refNo,
           orderedOn: fromDbDate(o.orderedOn),
           currency: o.currency,
           total: o.total.toFixed(2),
+          charged: fromMinor(p.chargedMinor),
           received: fromMinor(p.settledMinor),
-          due: fromMinor(p.outstandingMinor),
+          due: fromMinor(p.dueMinor),
         };
       }),
       payments: rows

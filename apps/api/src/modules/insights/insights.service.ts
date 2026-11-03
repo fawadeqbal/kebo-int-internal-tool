@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull } from "@kebo/database";
-import { fromMinor, orderProfit, roundHalfAway, settle, type Minor } from "@kebo/money";
+import { fromMinor, orderMoney as moneyOfOrder, roundHalfAway, type Minor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, PAYMENT_ROUTE_SHORT, planStatus, planWhen, type BalanceWhen, type InquiryChannel, type InquiryStage, type LcTerms, type LostReason } from "@kebo/shared";
 import { addDays, daysBetween, DomainError, ForbiddenError, startOfDayIn, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -12,6 +12,7 @@ import { SettingsService } from "../settings/settings.service";
 import { CashService } from "../money/cash.service";
 import { MoneyService } from "../money/money.service";
 import { ordersWithMoneyDue } from "../money/due";
+import { chargedExpenses, fxOf, positionOf } from "../money/position";
 import { basisOfOrders, convert, costingsOf, countedExpenses, MainMoney } from "../money/order-money";
 
 const ymOf = (d: ISODate) => d.slice(0, 7);
@@ -259,13 +260,14 @@ export class InsightsService {
     );
     const orderMoney = orders.map((o) => {
       const c = costings.get(o.id)!;
-      const profit = orderProfit({ ...c, receivedMinor: 0, factoryPaidMinor: 0, expensesMinor: 0 });
+      // Profit on the quote (expenses come in by their own dates below): the same figure as the order's Costs page.
+      const profit = moneyOfOrder({ ...c, receivedMinor: 0, factoryPaidMinor: 0, expensesMinor: 0 });
       return {
         o,
         on: o.orderedOn,
         revenue: fx.order(c.revenueMinor, o),
         costedRevenue: fx.order(c.costedRevenueMinor, o),
-        cost: fx.order(c.costedRevenueMinor - profit.earnedMinor, o),
+        cost: fx.order(c.costedRevenueMinor - profit.grossOnQuoteMinor, o),
       };
     });
     // Freight and the like paid on an order pay for its planned costs to reach the basis first (counted there once).
@@ -390,34 +392,34 @@ export class InsightsService {
 
     /* ----- right now: cash, what customers owe (by age), what we owe factories, the pipeline */
     const openOrders = await this.prisma.db.order.findMany({
-      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma) } },
+      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fxOf({ sales }, await this.limits.allows("expenses"))) } },
       select: {
         currency: true,
         mainCurrency: true,
         mainRate: true,
         total: true,
+        depositPercent: true,
         payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, currency: true } },
-        planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true } },
+        planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true } },
+        expenses: chargedExpenses,
       },
     });
     const aging = { notDue: 0, d30: 0, d60: 0, d90: 0, older: 0 };
     let toReceive = 0;
     let overdue = 0;
     for (const o of openOrders) {
-      const settled = settle(
-        decimalToMinor(o.total),
-        o.payments
-          .filter((p) => p.currency === o.currency)
-          .map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-      );
-      if (settled.outstandingMinor <= 0) continue;
-      toReceive += fx.order(settled.outstandingMinor, o);
+      // Still due as on the order (charged expenses included); what the plan does not date is "not due yet".
+      const settled = positionOf(o, fxOf({ sales }, await this.limits.allows("expenses")));
+      if (settled.dueMinor <= 0) continue;
+      toReceive += fx.order(settled.dueMinor, o);
       const plan = planStatus(
         o.planItems.map((p) => ({ id: p.id, label: p.label, amountMinor: decimalToMinor(p.amount), dueOn: fromDbDateOrNull(p.dueOn) })),
         settled.settledMinor,
         today,
         0,
       );
+      const charged = settled.dueMinor - plan.reduce((t, p) => t + Math.max(p.openMinor, 0), 0);
+      if (charged > 0) aging.notDue += fx.order(charged, o);
       for (const p of plan) {
         if (p.openMinor <= 0) continue;
         const v = fx.order(p.openMinor, o);
@@ -804,12 +806,17 @@ export class InsightsService {
   async receivables(user: SessionUser) {
     if (!can(user, "payments.record") && !can(user, "expenses.manage")) throw new ForbiddenError("You do not record money.");
     const today = this.clock.today();
+    const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     const orders = await this.prisma.db.order.findMany({
-      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma) } },
+      where: { status: { in: ["open", "closed"] }, id: { in: await ordersWithMoneyDue(this.prisma, fx) } },
       select: {
         id: true,
         refNo: true,
         currency: true,
+        mainCurrency: true,
+        mainRate: true,
+        depositPercent: true,
+        expenses: chargedExpenses,
         total: true,
         stage: true,
         status: true,
@@ -825,13 +832,8 @@ export class InsightsService {
     });
     const rows = orders
       .map((o) => {
-        const settled = settle(
-          decimalToMinor(o.total),
-          o.payments
-            .filter((p) => p.currency === o.currency)
-            .map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-        );
-        if (settled.outstandingMinor <= 0) return null;
+        const settled = positionOf(o, fx);
+        if (settled.dueMinor <= 0) return null;
         const plan = planStatus(
           o.planItems.map((p) => ({
             id: p.id,
@@ -864,7 +866,9 @@ export class InsightsService {
           currency: o.currency,
           total: o.total.toFixed(2),
           received: fromMinor(settled.settledMinor),
-          due: fromMinor(settled.outstandingMinor),
+          /** Expenses charged to the customer: part of what is due. */
+          charged: fromMinor(settled.chargedMinor),
+          due: fromMinor(settled.dueMinor),
           overdue: fromMinor(late.reduce((t, p) => t + p.openMinor, 0)),
           daysLate: late.length && late[0]!.dueOn ? daysBetween(late[0]!.dueOn, today) : 0,
           next: next && {

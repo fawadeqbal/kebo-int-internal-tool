@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, OctagonAlert } from "lucide-react";
 import { Alert, Card, CardBody, CardHeader, cn, LinkTabs, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { money } from "@/lib/format";
 import type { LeakCustomer, LeakGroup, LeaksReport } from "@/lib/types-money";
+import { PROFIT_LABEL } from "@kebo/money";
 
 export type LeakView = "attention" | "deals" | "orders" | "customers" | "spending";
 export const LEAK_VIEWS: readonly LeakView[] = ["attention", "deals", "orders", "customers", "spending"];
@@ -155,7 +156,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
         />
         <Figure label="Win rate" value={s.winRate === null ? "—" : `${s.winRate}%`} hint="Won ÷ (won + lost)" />
         <Figure
-          label="Profit planned"
+          label={PROFIT_LABEL.grossOnQuote}
           value={money(s.planned, c)}
           hint={
             Number(s.uncostedRevenue) > 0
@@ -313,7 +314,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
                   <THead>
                     <tr>
                       <Th>Order</Th>
-                      <Th className="text-right">Planned</Th>
+                      <Th className="text-right">On the quote</Th>
                       <Th className="text-right">Order costs</Th>
                       <Th className="text-right">Before the sale</Th>
                       <Th className="text-right">Paid factories extra</Th>

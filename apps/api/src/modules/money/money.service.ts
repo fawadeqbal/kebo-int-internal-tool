@@ -2,18 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
-import {
-  formatMinor,
-  fromMinor,
-  fxRate,
-  orderCosting,
-  orderProfit,
-  planTotalMinor,
-  roundHalfAway,
-  settle,
-  toMinor,
-  type Minor,
-} from "@kebo/money";
+import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
   can,
@@ -41,6 +30,7 @@ import { ordersOwingFactories } from "./due";
 import { convert, costingsOf, MainMoney, orderRate, paysBasis } from "./order-money";
 import { fileView } from "./payment-file-view";
 import { factoryPlansOf, owedByFactory } from "./factory-plan";
+import { chargedOf, factoryBorneExpenses, factoryPositionOf, fxOf, positionOf } from "./position";
 import { termsOf } from "./route-plan";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
@@ -124,43 +114,6 @@ export class MoneyService {
   /* ---------------------------------------------------------------- one order */
 
   /**
-   * What we owe each factory for the order's goods (the price frozen on each
-   * line when the order was made, plus tax, × the quantity ordered), in the
-   * factory's currency. Changing or removing the factory's offer later changes nothing.
-   */
-  private owedByFactory(lines: Prisma.OrderLineGetPayload<{ include: (typeof linesWithFactory)["include"] }>[]) {
-    return owedByFactory<FactoryRow>(lines);
-  }
-
-  /**
-   * Expenses a factory bears, in the currency we owe it in, per `factoryId:currency`
-   * (the first currency we owe it in, when several): taken off what we owe it.
-   * An expense in another currency goes through the main currency at today's
-   * Settings rate; without one it is left out (and still shows as an expense).
-   */
-  private takenOffFactories(
-    expenses: { factoryId: string | null; amount: Prisma.Decimal; rate: Prisma.Decimal; currency: string }[],
-    owed: { factoryId: string; currency: string }[],
-    main: string,
-    rates: Record<string, number>,
-  ) {
-    const out = new Map<string, Minor>();
-    for (const e of expenses) {
-      const row = owed.find((r) => r.factoryId === e.factoryId && r.currency === e.currency) ?? owed.find((r) => r.factoryId === e.factoryId);
-      if (!row) continue;
-      let minor: Minor | null = decimalToMinor(e.amount);
-      if (e.currency !== row.currency) {
-        const per = fxRate(row.currency, main, main, rates);
-        minor = per === null ? null : roundHalfAway(convert(minor, Number(e.rate)) * per);
-      }
-      if (minor === null) continue;
-      const key = `${row.factoryId}:${row.currency}`;
-      out.set(key, (out.get(key) ?? 0) + minor);
-    }
-    return out;
-  }
-
-  /**
    * Everything about an order's money: the plan (all who see the order), what
    * we owe and paid the factories (people who see costs), its expenses and
    * profit (managers).
@@ -192,12 +145,9 @@ export class MoneyService {
           orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
         })
       : [];
-    const live = o.payments.filter((p) => p.currency === o.currency);
-    const position = settle(
-      totalMinor,
-      live.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
-      Number(o.depositPercent),
-    );
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    // Where the order stands with the customer: the same position as every screen and paper (charged expenses included).
+    const position = positionOf(o, fx);
     const terms = termsOf(o);
     const plan = planStatus(
       o.planItems.map((p) => ({
@@ -225,24 +175,19 @@ export class MoneyService {
       roundHalfAway(convert(decimalToMinor(e.amount), Number(e.rate)) * orderPerMain!);
     const liveAll = expensesOn ? o.expenses.filter((e) => !e.voidedAt) : [];
 
-    // Charged to the customer: added to what they owe on this order (in its currency, at its own rate).
-    const charged = orderPerMain === null ? [] : liveAll.filter((e) => e.borneBy === "customer");
-    const chargedMinor = charged.reduce((t, e) => t + inOrder(e), 0);
-    const dueMinor = Math.max(totalMinor + chargedMinor - position.settledMinor, 0);
+    // Charged to the customer: added to what they owe on this order (in its currency, at its own rate), as in the position.
+    const charged = chargedOf(o, fx).filter((c) => c.minor !== null);
+    const chargedMinor = position.chargedMinor;
+    const dueMinor = position.dueMinor;
 
-    // Factories: owed from the order's lines, paid from the factory payments (same currency only).
-    const owed = this.owedByFactory(o.lines);
+    // Factories: owed from the order's lines (with tax), less what we paid them and the expenses they bear: factoryPosition.
     const livePaid = o.factoryPaid.filter((p) => !p.voidedAt);
-    for (const p of livePaid) {
-      const key = `${p.factoryId}:${p.currency}`;
-      if (!owed.has(key)) {
-        const f = await this.prisma.db.factory.findUniqueOrThrow({
-          where: { id: p.factoryId },
-          select: { id: true, name: true, owner: person },
-        });
-        owed.set(key, { factory: f, currency: p.currency, owedMinor: 0, lines: 0 });
-      }
-    }
+    const factoryRows = factoryPositionOf(o, fx);
+    const factoryOf = new Map<string, FactoryRow>(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+    for (const r of factoryRows)
+      if (!factoryOf.has(r.factoryId))
+        factoryOf.set(r.factoryId, await this.prisma.db.factory.findUniqueOrThrow({ where: { id: r.factoryId }, select: { id: true, name: true, owner: person } }));
+    const owed = new Map(factoryRows.map((r) => [r.key, r]));
     // For each counted factory payment: paid so far to that factory (same currency) and what is left after it.
     const factoryAfter = new Map<string, { paid: string; toPay: string }>();
     const running = new Map<string, number>();
@@ -260,28 +205,20 @@ export class MoneyService {
         })
       ).map((u) => [u.id, u]),
     );
-    const takenOff = this.takenOffFactories(
-      liveAll.filter((e) => e.borneBy === "factory" && e.factoryId),
-      [...owed.values()].map((f) => ({ factoryId: f.factory.id, currency: f.currency })),
-      s.sales.currency,
-      s.sales.exchangeRates,
-    );
-    const factories = [...owed.entries()].map(([key, f]) => {
-      const paidMinor =
-        livePaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0) +
-        (takenOff.get(key) ?? 0);
+    const factories = factoryRows.map((r) => {
+      const f = factoryOf.get(r.factoryId)!;
       return {
-        factory: { id: f.factory.id, name: f.factory.name },
-        lookedAfterBy: f.factory.owner,
-        currency: f.currency,
-        lines: f.lines,
-        owed: fromMinor(f.owedMinor),
+        factory: { id: f.id, name: f.name },
+        lookedAfterBy: f.owner,
+        currency: r.currency,
+        lines: r.lines,
+        owed: fromMinor(r.owedMinor),
         /** Paid, with the expenses the factory bears (taken off what we owe it). */
-        paid: fromMinor(paidMinor),
-        takenOff: fromMinor(takenOff.get(key) ?? 0),
-        toPay: fromMinor(Math.max(f.owedMinor - paidMinor, 0)),
+        paid: fromMinor(r.settledMinor),
+        takenOff: fromMinor(r.takenOffMinor),
+        toPay: fromMinor(r.toPayMinor),
         /** Paid more than its prices add up to (extra work, or a price that changed). */
-        overpaid: paidMinor > f.owedMinor && f.owedMinor > 0 ? fromMinor(paidMinor - f.owedMinor) : null,
+        overpaid: r.overpaidMinor > 0 ? fromMinor(r.overpaidMinor) : null,
       };
     });
 
@@ -311,15 +248,16 @@ export class MoneyService {
     const profit =
       expensesMinor === null
         ? null
-        : orderProfit({
+        : orderMoney({
             ...costing,
             receivedMinor: position.receivedMinor,
             factoryPaidMinor,
             expensesMinor,
             basisPaidMinor,
             bankChargesMinor: position.bankChargesMinor,
+            beforeSaleMinor: beforeSaleMinor ?? 0,
           });
-    const netMinor = profit ? profit.earnedMinor - (beforeSaleMinor ?? 0) : 0;
+    const netMinor = profit ? profit.netMinor : 0;
 
     return {
       orderId: o.id,
@@ -333,7 +271,7 @@ export class MoneyService {
       /** Still due: the order total and what was charged to the customer, less what came in. */
       due: fromMinor(dueMinor),
       /** Expenses charged to the customer on this order: "Charged to you: …" lines. */
-      charged: charged.map((e) => ({ id: e.id, description: e.description, spentOn: fromDbDate(e.spentOn), amount: fromMinor(inOrder(e)) })),
+      charged: charged.map((c) => ({ id: c.expense.id, description: c.expense.description, spentOn: fromDbDate(c.expense.spentOn), amount: fromMinor(c.minor!) })),
       chargedTotal: fromMinor(chargedMinor),
       plan: {
         items: plan.map((p) => ({
@@ -387,7 +325,7 @@ export class MoneyService {
             })),
             canRecord: can(user, "payments.record") && o.status !== "cancelled",
             /** Each factory's payment plan (advance on order, balance on the ready date) with what is paid on each part. */
-            plans: await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays),
+            plans: await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx),
             canPlan: can(user, "sourcing.manage") && o.status !== "cancelled",
           }
         : null,
@@ -418,7 +356,12 @@ export class MoneyService {
               expensesCounted: fromMinor(profit.expensesCountedMinor),
               /** Taken by banks from the customer's payments: a cost. */
               bankCharges: fromMinor(position.bankChargesMinor),
-              earned: fromMinor(profit.earnedMinor),
+              /** Profit on the quote: the costed revenue less the goods and the planned basis costs. */
+              grossOnQuote: fromMinor(profit.grossOnQuoteMinor),
+              /** Profit now expected (the Costs page's "expected"): also less our expenses beyond the plan and the bank charges. */
+              expected: fromMinor(profit.expectedMinor),
+              /** The same figure under its older name. */
+              earned: fromMinor(profit.expectedMinor),
               /** Spent on the deal before the sale, and the profit once that is taken off too. */
               beforeSale: fromMinor(beforeSaleMinor ?? 0),
               net: fromMinor(netMinor),
@@ -668,8 +611,10 @@ export class MoneyService {
   /** What we still owe each factory across all orders that are not cancelled (people who see costs). */
   async payables(user: SessionUser, mine: boolean) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
-    // Only orders where a factory may still be owed (worked out in the database), not every order ever.
-    const owing = await ordersOwingFactories(this.prisma);
+    // Only orders where a factory may still be owed (worked out in the database, the same rule), not every order ever.
+    const s = await this.settings.get();
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    const owing = await ordersOwingFactories(this.prisma, fx);
     const orders = await this.prisma.db.order.findMany({
       where: { status: { not: "cancelled" }, id: { in: owing } },
       select: {
@@ -679,15 +624,10 @@ export class MoneyService {
         customer: { select: { name: true } },
         lines: linesWithFactory,
         factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true } },
-        expenses: {
-          where: { voidedAt: null, borneBy: "factory", factoryId: { not: null } },
-          select: { factoryId: true, amount: true, rate: true, currency: true },
-        },
+        expenses: factoryBorneExpenses,
       },
       orderBy: { orderedOn: "asc" },
     });
-    const { sales } = await this.settings.get();
-    const expensesOn = await this.limits.allows("expenses");
     const byFactory = new Map<
       string,
       {
@@ -698,34 +638,23 @@ export class MoneyService {
         orders: { id: string; refNo: string; stage: string; customer: string; toPay: string; next: { label: string; due: string | null; open: string; status: string } | null }[];
       }
     >();
-    const s = await this.settings.get();
     const today = this.clock.today();
     for (const o of orders) {
-      const owedHere = this.owedByFactory(o.lines);
-      const takenOff = expensesOn
-        ? this.takenOffFactories(
-            o.expenses,
-            [...owedHere.values()].map((f) => ({ factoryId: f.factory.id, currency: f.currency })),
-            sales.currency,
-            sales.exchangeRates,
-          )
-        : new Map<string, Minor>();
-      for (const [key, f] of owedHere) {
-        const paid =
-          o.factoryPaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0) +
-          (takenOff.get(key) ?? 0);
-        const left = f.owedMinor - paid;
+      const factoryOf = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+      // What we owe each factory here, less what we paid and what it bears: factoryPosition, as on the order.
+      for (const f of factoryPositionOf(o, fx).filter((r) => r.lines > 0)) {
         // Only orders with something still to pay count, so "paid X of Y" is about those.
-        if (left <= 0) continue;
-        const row = byFactory.get(key) ?? { factory: f.factory, currency: f.currency, owedMinor: 0, paidMinor: 0, orders: [] };
+        if (f.toPayMinor <= 0) continue;
+        const factory = factoryOf.get(f.factoryId)!;
+        const row = byFactory.get(f.key) ?? { factory, currency: f.currency, owedMinor: 0, paidMinor: 0, orders: [] };
         row.owedMinor += f.owedMinor;
-        row.paidMinor += paid;
+        row.paidMinor += f.settledMinor;
         // The next part of its payment plan (advance, balance on the ready date…): when it is due.
-        const plan = (await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays)).find(
-          (p) => `${p.factory.id}:${p.currency}` === key,
+        const plan = (await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx)).find(
+          (p) => `${p.factory.id}:${p.currency}` === f.key,
         );
-        row.orders.push({ id: o.id, refNo: o.refNo, stage: o.stage, customer: o.customer.name, toPay: fromMinor(left), next: plan?.next ?? null });
-        byFactory.set(key, row);
+        row.orders.push({ id: o.id, refNo: o.refNo, stage: o.stage, customer: o.customer.name, toPay: fromMinor(f.toPayMinor), next: plan?.next ?? null });
+        byFactory.set(f.key, row);
       }
     }
     return [...byFactory.values()]
@@ -1254,7 +1183,7 @@ export class MoneyService {
       const costedRevenue = inMain(c.costedRevenueMinor);
       const goodsCost = inMain(c.goodsCostMinor);
       const basisCost = inMain(c.basisCostMinor);
-      const p = orderProfit({
+      const p = orderMoney({
         revenueMinor: revenue,
         costedRevenueMinor: costedRevenue,
         goodsCostMinor: goodsCost,
@@ -1283,7 +1212,7 @@ export class MoneyService {
         goodsCost,
         basisCost,
         expenses: p.expensesCountedMinor + bank,
-        profit: p.earnedMinor,
+        profit: p.expectedMinor,
       });
     }
     for (const e of expenses) {

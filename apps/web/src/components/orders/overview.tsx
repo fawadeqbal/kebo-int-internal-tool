@@ -2,6 +2,7 @@ import "server-only";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { PROFIT_LABEL } from "@kebo/money";
 import { CHANNEL_LABEL, FLOW_STEP_LABEL, STEP_PATH, type FlowStep } from "@kebo/shared";
 import { Badge, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
 import { date, money, qty, whole } from "@/lib/format";
@@ -79,8 +80,10 @@ export function overviewFacts({ o, steps, flow, m, costs, deal, now }: OverviewI
 
   const total = Number(o.money.total);
   const received = Number(o.money.received);
-  const due = Number(m?.due ?? o.money.due);
-  const receivedPct = pct(received, total);
+  // The order's own position: the same due whether or not the money data loaded (charged expenses included).
+  const due = Number(o.money.due);
+  const charged = Number(o.money.charged ?? 0);
+  const receivedPct = pct(received, total + charged);
   const rest = m?.plan.items.find((i) => Number(i.open) > 0) ?? null;
   const restHow = rest?.how.trim() ? `by ${rest.how.trim()}${rest.when ? `, ${rest.when}` : ""}` : null;
 
@@ -488,7 +491,7 @@ export function OrderFigures({ o, f, steps }: { o: OverviewInput["o"]; f: Overvi
   if (f.profit) {
     figures.push({
       key: "profit",
-      label: "Expected profit",
+      label: PROFIT_LABEL.expected,
       value: whole(f.profit.expected, c),
       tone: Number(f.profit.expected) < 0 ? "bad" : "neutral",
       sub: [f.profit.margin !== null ? `${f.profit.margin.toFixed(1)}%` : null, f.profit.onQuoteMargin !== null ? `quoted at ${f.profit.onQuoteMargin.toFixed(1)}%` : null]
@@ -700,7 +703,7 @@ export function MoneyCard({ f, costs, base }: { f: OverviewFacts; costs: OrderCo
         )}
         {f.profit && (
           <p className="flex items-baseline justify-between gap-3 border-t border-line pt-2.5 text-xs text-text-2">
-            Expected profit
+            {PROFIT_LABEL.expected}
             <b className={cn("text-sm font-semibold tabular", Number(f.profit.expected) < 0 ? "text-bad" : "text-text")}>
               {whole(f.profit.expected, c)}
               {f.profit.margin !== null ? ` · ${f.profit.margin.toFixed(1)}%` : ""}

@@ -26,16 +26,25 @@ export const STAGE_BUTTON: Record<OrderStage, string> = {
   done: "Close the order",
 };
 
-/** What the money looks like, in minor units of the order's currency. */
+/**
+ * What the money looks like, in minor units of the order's currency (from
+ * orderPosition in @kebo/money: the API fills it from there).
+ */
 export interface OrderMoney {
   totalMinor: Minor;
   /** Received from the customer so far (bank charges they bore count as paid). */
   receivedMinor: Minor;
   depositPercent: number;
+  /** Expenses charged to the customer: added to what they owe. */
+  chargedMinor?: Minor;
+  /** The deposit asked for (the plan's deposit row); without it, depositPercent of the total. */
+  depositMinor?: Minor;
 }
 
-export const depositOf = (m: OrderMoney): Minor => (m.depositPercent > 0 ? splitDeposit(m.totalMinor, m.depositPercent).deposit : 0);
-export const dueOf = (m: OrderMoney): Minor => Math.max(m.totalMinor - m.receivedMinor, 0);
+export const depositOf = (m: OrderMoney): Minor =>
+  m.depositMinor ?? (m.depositPercent > 0 ? splitDeposit(m.totalMinor, m.depositPercent).deposit : 0);
+/** Still due: the total and what was charged to the customer, less what came in. */
+export const dueOf = (m: OrderMoney): Minor => Math.max(m.totalMinor + (m.chargedMinor ?? 0) - m.receivedMinor, 0);
 
 export interface StageWarning {
   code: "no_deposit" | "balance_before_shipping" | "money_due" | "not_received" | "no_packing_list";

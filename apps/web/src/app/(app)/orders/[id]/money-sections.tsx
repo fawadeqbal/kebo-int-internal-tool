@@ -238,9 +238,14 @@ export function MoneySection({
 export function CustomerSummary({ o }: { o: Awaited<ReturnType<typeof orderOf>> }) {
   const c = o.currency;
   const st = PAY_STATUS[o.money.status] ?? { label: o.money.status, tone: "neutral" as const };
-  const total = Number(o.money.total);
-  const pct = total > 0 ? Math.min(100, Math.round((Number(o.money.received) / total) * 100)) : 0;
+  const charged = Number(o.money.charged ?? 0);
+  // Everything the customer owes: the order and what was charged to them.
+  const owed = Number(o.money.total) + charged;
+  const pct = owed > 0 ? Math.min(100, Math.round((Number(o.money.received) / owed) * 100)) : 0;
   const due = Number(o.money.due);
+  // The deposit asked for (the plan's deposit row, else the accepted %): its % and where it sits on the bar.
+  const depositPct = o.money.depositPercent ?? o.depositPercent;
+  const depositAt = owed > 0 ? Math.round((Number(o.money.deposit) / owed) * 1000) / 10 : 0;
   return (
     <section aria-label="Money from the customer" className="flex flex-col gap-4 rounded-lg bg-surface-2/60 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -258,6 +263,7 @@ export function CustomerSummary({ o }: { o: Awaited<ReturnType<typeof orderOf>> 
             <dd className={cn("truncate text-base font-bold tabular sm:text-xl", due > 0.005 ? "text-warn" : "text-ok")}>
               {money(o.money.due, c)}
             </dd>
+            {charged > 0.005 && <dd className="truncate text-xs text-muted tabular">incl. {money(o.money.charged, c)} charged</dd>}
           </div>
         </dl>
         <Badge tone={st.tone} dot>
@@ -274,26 +280,26 @@ export function CustomerSummary({ o }: { o: Awaited<ReturnType<typeof orderOf>> 
           aria-label={`${pct}% of the order received`}
         >
           <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
-          {o.depositPercent > 0 && o.depositPercent < 100 && (
+          {depositPct > 0 && depositAt > 0 && depositAt < 100 && (
             <span
               aria-hidden
               className="absolute top-0 bottom-0 w-0.5 bg-surface"
-              style={{ left: `${o.depositPercent}%` }}
-              title={`Deposit ${o.depositPercent}%`}
+              style={{ left: `${depositAt}%` }}
+              title={`Deposit ${depositPct}%`}
             />
           )}
         </div>
         <p className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-muted">
           <span>
             {pct}% received
-            {o.depositPercent > 0 &&
+            {depositPct > 0 &&
               (Number(o.money.depositDue) > 0 ? (
                 <span className="text-warn">
                   {" "}
-                  · deposit ({o.depositPercent}%): {money(o.money.depositDue, c)} still missing
+                  · deposit ({depositPct}%): {money(o.money.depositDue, c)} still missing
                 </span>
               ) : (
-                <span className="text-ok"> · deposit ({o.depositPercent}%) received</span>
+                <span className="text-ok"> · deposit ({depositPct}%) received</span>
               ))}
           </span>
           {Number(o.money.bankCharges) > 0 && <span>received includes {money(o.money.bankCharges, c)} bank charges</span>}

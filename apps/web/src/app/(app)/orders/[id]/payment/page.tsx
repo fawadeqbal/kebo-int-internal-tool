@@ -116,7 +116,14 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   // How they pay: the route and its terms, and on a bank route the LC or contract (+ Add each value).
   const fields: DetailField[] = [
     { label: "Route", value: route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : null },
-    { label: "Deposit", value: o.depositPercent > 0 ? `${o.depositPercent}% · ${money(o.money.deposit, c)}` : "None" },
+    {
+      label: "Deposit",
+      // The deposit the plan asks for; the % accepted on the quotation beside it when the plan was changed.
+      value:
+        o.money.depositPercent > 0
+          ? `${o.money.depositPercent}% · ${money(o.money.deposit, c)}${o.money.depositPercent !== o.depositPercent ? ` (plan; ${o.depositPercent}% as accepted)` : ""}`
+          : "None",
+    },
     { label: "Balance", value: flow?.payment.summary ?? BALANCE_TERMS_LABEL[o.balanceTerms] },
   ];
   if (bankRoute)
