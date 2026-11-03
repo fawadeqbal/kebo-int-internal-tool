@@ -33,14 +33,12 @@ basis); selects open under their own field. Sticky footer with Save / Cancel (+ 
 right for offers).
 
 ## 3. Settings › Papers we use
-Company setting (settings JSON, managers with settings.manage): a list of every paper kind the app makes,
-each with a switch. Default OFF: payment request, customer statement, shipping advice, FAT report,
-inspection report, delivery/handover note. Default ON: quotation, proforma, sales contract, packing list,
-commercial invoice, purchase order, payment receipt, SAT certificate (and uploads: B/L/AWB, certificate of
-origin, insurance). The three LC papers (bill of exchange, beneficiary certificate, cover letter to our bank)
-are not company switches: they appear on an order only when the LC details have "this LC asks for it" ticked
-for each (store on the bank contract / LC record). Hidden papers disappear from Papers lists, counts, the
-step's numbers, checklist `doc:*` items and "missing" warnings; already made papers stay visible.
+Company setting (settings JSON, managers with settings.manage): a list of every paper kind the app makes
+or tracks, each with an on/off switch. **Every paper starts switched ON — nothing is hidden by default.**
+The company turns any paper off (or back on) here. The three LC papers (bill of exchange, beneficiary
+certificate, cover letter to our bank) are ordinary switches in the same list (still only apply to LC orders).
+Switched-off papers disappear from Papers lists, counts, the step's numbers, checklist `doc:*` items and
+"missing" warnings; papers already made stay visible.
 
 ## 4. Fixes
 - Checklist: remove "Drawings approved by the customer", "Materials and parts in", "Machining and assembly"
