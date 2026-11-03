@@ -47,6 +47,8 @@ export interface DetailValue {
   wide?: boolean;
   /** Not counted and not shown when missing (a field few records have). */
   optional?: boolean;
+  /** Not changed in the panel (when someone signed in last): no pencil. */
+  readOnly?: boolean;
 }
 
 const missing = (v: ReactNode) => v === null || v === undefined || v === "" || v === false;
@@ -116,7 +118,7 @@ export function DetailsCard({
                 ) : (
                   <span className="inline">
                     {i.value}
-                    {edit && (
+                    {edit && !i.readOnly && (
                       <OpenPanelButton
                         panel={edit.panel}
                         id={edit.id}
