@@ -1,23 +1,32 @@
-import { Check, Minus } from "lucide-react";
+import { Check, Minus, Plus } from "lucide-react";
 import { PLAN_FEATURES, planFeatureName } from "@kebo/shared";
-import { Badge, Card, CardBody, CardHeader, PageHeader } from "@kebo/ui";
+import { Card, CardBody, CardHeader, PageHeader, StatusBadge } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { money } from "@/lib/format";
 import type { Plan } from "@/lib/types-platform";
 import { createPlanAction, deletePlanAction, updatePlanAction } from "@/app/platform/actions";
-import { ActionButton } from "../companies/[id]/forms";
-import { EditPlan, PlanForm } from "./forms";
+import { OpenPanelButton } from "@/components/common/panel";
+import { PlanActions, PlanPanels } from "./forms";
 
 export const metadata = { title: "Plans" };
 
-/** What companies pay for: a price, limits on people and files, and the features included. */
+/**
+ * What companies pay for: a price, limits on people and files, and the features
+ * included. Each plan is a card with ✎ Edit (side panel) and ⋯ Delete; "New
+ * plan" is the page's one primary and opens the same panel.
+ */
 export default async function PlansPage() {
   const plans = await platformApi.get<Plan[]>("/plans");
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Plans"
-        description="Near a limit a company sees a warning; at the limit, adding people or files stops. Nothing is ever deleted."
+        summary="Near a limit a company sees a warning; at the limit, adding people or files stops. Nothing is ever deleted."
+        primary={
+          <OpenPanelButton panel="new-plan" variant="primary" label="New plan">
+            <Plus aria-hidden /> New plan
+          </OpenPanelButton>
+        }
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {plans.map((p) => (
@@ -25,10 +34,12 @@ export default async function PlansPage() {
             <CardHeader
               title={
                 <span className="flex items-center gap-2">
-                  {p.name} {!p.isActive && <Badge tone="outline">Not offered</Badge>}
+                  {p.name} {!p.isActive && <StatusBadge meaning="neutral">Not offered</StatusBadge>}
                 </span>
               }
               description={`${money(p.priceMinor / 100, p.currency)} per ${p.period} · ${p.companies} compan${p.companies === 1 ? "y" : "ies"}`}
+              className="max-sm:flex-row max-sm:gap-3"
+              actions={<PlanActions plan={p} remove={p.companies === 0 ? deletePlanAction.bind(null, p.id) : undefined} />}
             />
             <CardBody className="flex flex-col gap-2 text-sm">
               {p.description && <p className="text-text-2">{p.description}</p>}
@@ -55,27 +66,11 @@ export default async function PlansPage() {
                   </li>
                 ))}
               </ul>
-              {p.companies === 0 && (
-                <div className="pt-1">
-                  <ActionButton
-                    action={deletePlanAction.bind(null, p.id)}
-                    label="Delete"
-                    variant="ghost"
-                    confirm={`Delete the plan ${p.name}?`}
-                  />
-                </div>
-              )}
             </CardBody>
-            <EditPlan plan={p} action={updatePlanAction.bind(null, p.id)} />
           </Card>
         ))}
       </div>
-      <Card className="max-w-2xl">
-        <CardHeader title="New plan" />
-        <CardBody>
-          <PlanForm action={createPlanAction} submit="Make the plan" />
-        </CardBody>
-      </Card>
+      <PlanPanels plans={plans} create={createPlanAction} update={Object.fromEntries(plans.map((p) => [p.id, updatePlanAction.bind(null, p.id)]))} />
     </div>
   );
 }

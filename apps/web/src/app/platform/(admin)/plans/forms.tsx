@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { MODULE_PRESETS, PLAN_FEATURES, withPreset } from "@kebo/shared";
 import { Button, Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
+import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
+import { EditButton } from "@/components/common/edit-button";
+import { MoreMenu } from "@/components/common/more-menu";
+import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { Plan } from "@/lib/types-platform";
 
@@ -12,10 +15,20 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** A plan's price, limits and features. */
 export function PlanForm({ action, plan, onDone, submit }: { action: Action; plan?: Plan; onDone?: () => void; submit: string }) {
+  const close = useClosePanel();
   const [features, setFeatures] = useState<string[]>(() => (plan ? [...plan.features] : Object.keys(PLAN_FEATURES)));
   const toggle = (k: string, on: boolean) => setFeatures((f) => (on ? [...f, k] : f.filter((x) => x !== k)));
   return (
-    <ActionForm action={action} onDone={onDone} resetOnSuccess={!plan} keepFields className="flex flex-col gap-4">
+    <ActionForm
+      action={action}
+      onDone={(r) => {
+        toast(r.message ?? "Saved");
+        onDone?.();
+      }}
+      showSuccess={false}
+      keepFields
+      className={PANEL_FORM}
+    >
       {(s) => (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -78,11 +91,13 @@ export function PlanForm({ action, plan, onDone, submit }: { action: Action; pla
               <Checkbox name="isActive" value="on" defaultChecked={plan.isActive} /> Offered for new companies
             </label>
           )}
-          <div>
-            <SubmitButton size="sm" variant="primary">
-              {submit}
-            </SubmitButton>
-          </div>
+          <PanelActions>
+            <SubmitButton pendingText="Saving…">{submit}</SubmitButton>
+            <button type="button" className="text-sm font-medium text-text-2 hover:text-text" onClick={() => close()}>
+              Cancel
+            </button>
+            <PanelKeys />
+          </PanelActions>
         </>
       )}
     </ActionForm>
@@ -97,7 +112,7 @@ export function PresetButtons({ features, onPick }: { features: readonly string[
       {MODULE_PRESETS.map((p) => {
         const same = withPreset(features, p).sort().join() === [...features].sort().join();
         return (
-          <Button key={p.key} type="button" size="xs" variant={same ? "primary" : "secondary"} title={p.hint} aria-pressed={same} onClick={() => onPick(withPreset(features, p))}>
+          <Button key={p.key} type="button" size="xs" variant="secondary" className="aria-pressed:border-primary aria-pressed:bg-primary-soft aria-pressed:text-primary" title={p.hint} aria-pressed={same} onClick={() => onPick(withPreset(features, p))}>
             {p.name}
           </Button>
         );
@@ -106,20 +121,42 @@ export function PresetButtons({ features, onPick }: { features: readonly string[
   );
 }
 
-export function EditPlan({ plan, action }: { plan: Plan; action: Action }) {
-  const [open, setOpen] = useState(false);
-  return open ? (
-    <div className="border-t border-line p-4">
-      <PlanForm action={action} plan={plan} onDone={() => setOpen(false)} submit="Save the plan" />
-      <Button size="sm" variant="ghost" className="mt-2" onClick={() => setOpen(false)}>
-        Cancel
-      </Button>
-    </div>
-  ) : (
-    <div className="border-t border-line px-4 py-2">
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        Edit
-      </Button>
-    </div>
+/** ✎ Edit and ⋯ (Delete, only for a plan no company uses) in a plan card's header. */
+export function PlanActions({ plan, remove }: { plan: Plan; remove?: Action }) {
+  const panel = useSidePanel("edit-plan");
+  return (
+    <>
+      <EditButton aria-label={`Edit the plan ${plan.name}`} onClick={() => panel.openPanel(plan.id)} />
+      {remove && (
+        <MoreMenu
+          label={`More for the plan ${plan.name}`}
+          items={[{ label: "Delete the plan…", danger: true, confirm: { title: `Delete the plan ${plan.name}?`, body: "No company uses it.", confirmLabel: "Delete the plan" }, action: remove }]}
+        />
+      )}
+    </>
   );
+}
+
+/** "New plan" and "Edit plan · name" in the side panel (?panel=new-plan, ?panel=edit-plan&id=…). */
+export function PlanPanels({ plans, create, update }: { plans: Plan[]; create: Action; update: Record<string, Action> }) {
+  const add = useSidePanel("new-plan");
+  const edit = useSidePanel("edit-plan");
+  const plan = plans.find((p) => p.id === edit.id);
+  if (add.open)
+    return (
+      <SidePanel title="New plan" description="A price, limits on people and files, and the features included." onClose={() => add.close()}>
+        <PanelBody>
+          <PlanForm action={create} onDone={() => add.close()} submit="Make the plan" />
+        </PanelBody>
+      </SidePanel>
+    );
+  if (edit.open && plan)
+    return (
+      <SidePanel title={`Edit plan · ${plan.name}`} description="Companies on it get the change at once." onClose={() => edit.close()}>
+        <PanelBody>
+          <PlanForm action={update[plan.id]!} plan={plan} onDone={() => edit.close()} submit="Save the plan" />
+        </PanelBody>
+      </SidePanel>
+    );
+  return null;
 }
