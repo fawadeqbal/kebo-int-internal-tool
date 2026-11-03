@@ -128,6 +128,8 @@ async function primaries(page) {
     for (const el of main.querySelectorAll("a, button, [role=button]")) {
       if (typeof el.className !== "string" || !el.className.split(/\s+/).includes("bg-primary-solid")) continue;
       if (el.getAttribute("role") === "switch" || el.closest("[role=dialog],[role=alertdialog],[role=menu]")) continue;
+      // A table row's own confirm (LineTable's ✓ on its new-item row) belongs to the row, as a side panel's Save does.
+      if (el.closest("tr")) continue;
       const r = el.getBoundingClientRect();
       const s = getComputedStyle(el);
       if (!r.width || !r.height || s.visibility === "hidden" || s.display === "none" || !el.checkVisibility({ contentVisibilityAuto: true })) continue;
@@ -165,8 +167,8 @@ async function markFocusables(page, scope) {
 }
 
 /** The focused control: its mark, and whether a focus ring shows (outline or shadow differs from unfocused). */
-async function focusedInfo(page) {
-  return page.evaluate(() => {
+async function focusedInfo(page, last) {
+  return page.evaluate((last) => {
     const el = document.activeElement;
     if (!el || el === document.body) return { id: null };
     let id = el.dataset?.a11y ?? null;
@@ -175,6 +177,9 @@ async function focusedInfo(page) {
       const first = [...document.querySelectorAll("input[type=radio]")].find((r) => r.dataset.a11yGroup === g && r.dataset.a11y != null);
       id = first?.dataset.a11y ?? null;
     }
+    // Still on the same control (a date input takes a Tab per part): it was looked at already, and
+    // blurring it again would put focus back on its first part, so Tab would never leave it.
+    if (id != null && id === last) return { id, ring: true, same: true };
     const chain = [el, el.parentElement, el.parentElement?.parentElement].filter(Boolean);
     const look = () =>
       chain.map((c) => {
@@ -192,7 +197,7 @@ async function focusedInfo(page) {
     const other = on.some((o, i) => o.border !== off[i].border || o.bg !== off[i].bg);
     const r = el.getBoundingClientRect();
     return { id, ring, other, label, tag: el.tagName.toLowerCase(), inView: r.width > 0 && r.height > 0 };
-  });
+  }, last ?? null);
 }
 
 /** Tab through the page from the top: every marked control is reached and shows a focus ring. */
@@ -214,11 +219,14 @@ async function keyboard(page, where) {
   const reached = new Set();
   const noRing = new Map();
   let firstId;
+  let last = null;
   // A paper preview (iframe) takes Tab through its own page too.
   const budget = names.length * 2 + 60;
   for (let n = 0; n < budget; n++) {
     await page.keyboard.press("Tab");
-    const f = await focusedInfo(page);
+    const f = await focusedInfo(page, last);
+    last = f.id;
+    if (f.same) continue;
     if (f.id == null) {
       if (n > names.length && reached.size >= names.length) break;
       continue;

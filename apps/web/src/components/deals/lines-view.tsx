@@ -11,7 +11,20 @@ import type { ReactNode } from "react";
  * line table's columns — no tool row, nothing to click — and its totals.
  * The export lives in the card header (LinesExcel).
  */
-export function LinesView({ rows, columns, numbers, footer }: { rows: LineRow[]; columns: LineColumn[]; numbers: string[]; footer?: ReactNode }) {
+export function LinesView({
+  rows,
+  columns,
+  numbers,
+  footer,
+  label = "The lines",
+}: {
+  rows: LineRow[];
+  columns: LineColumn[];
+  numbers: string[];
+  footer?: ReactNode;
+  /** The box's name (it can scroll sideways, so Tab stops on it); unique on the page. */
+  label?: string;
+}) {
   const shown = (c: LineColumn, r: LineRow): ReactNode => {
     if (c.format) return c.format(r.values, r);
     if (c.input === "select") return c.options?.find((o) => o.value === r.values[c.key])?.label ?? r.values[c.key];
@@ -19,7 +32,12 @@ export function LinesView({ rows, columns, numbers, footer }: { rows: LineRow[];
     return v ? v : <span className="text-muted">—</span>;
   };
   return (
-    <div className="overflow-x-auto rounded-lg border border-line">
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label={label}
+      className="overflow-x-auto rounded-lg border border-line focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+    >
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="bg-surface-2 text-xs text-text-2">
