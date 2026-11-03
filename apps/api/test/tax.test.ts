@@ -136,7 +136,8 @@ describe("tax", () => {
     const body = { factoryId: q0.factory.id, receivedOn: q0.receivedOn, currency: "CNY" };
     await api(app, sana).put(`/factory-quotes/${id}`, { ...body, taxIncluded: true, taxRate: 13 }).expect(200);
     const q1 = await quoteOf(inquiryId, id);
-    expect(q1).toMatchObject({ taxIncluded: true, taxRate: 13 });
+    // The tax inside, on the total at each %: 200 − 200/1.13 = 23.01, 20 − 20/1.09 = 1.65.
+    expect(q1).toMatchObject({ taxIncluded: true, taxRate: 13, factoryTotal: "220.00", taxTotal: "24.66" });
     expect(q1.lines.map((l: Line) => [l.taxRate, l.costNote])).toEqual([
       [13, "CNY 100.00, tax 13% included (CNY 11.50)"],
       [9, "CNY 10.00, tax 9% included (CNY 0.83)"],

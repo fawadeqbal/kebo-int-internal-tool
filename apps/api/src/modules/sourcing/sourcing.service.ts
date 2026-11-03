@@ -79,11 +79,9 @@ export class SourcingService {
         const unitPriceMinor = decimalToMinor(l.unitPrice);
         const costInFactoryCurrency = factoryUnitCostMinor(unitPriceMinor, taxRate, q.taxIncluded);
         const cost = rate ? convertMinor(costInFactoryCurrency, rate) : null;
-        // The line's total at the factory's prices, and the tax on top of it (or inside it), in the factory's currency.
+        // The line's total at the factory's prices, and the tax on top of it (without tax), in the factory's currency.
         const totalMinor = multiplyMinor(unitPriceMinor, l.quantity.toString());
-        const taxMinor = q.taxIncluded
-          ? factoryTaxMinor(totalMinor, taxRate, true)
-          : multiplyMinor(costInFactoryCurrency, l.quantity.toString()) - totalMinor;
+        const taxMinor = q.taxIncluded ? 0 : multiplyMinor(costInFactoryCurrency, l.quantity.toString()) - totalMinor;
         return {
           id: l.id,
           /** "1", "2", "2.1" within this offer. */
@@ -134,8 +132,18 @@ export class SourcingService {
         lines: lines.map(({ costMinor: _c, totalMinor: _t, taxMinor: _x, ...l }) => l),
         /** The lines at the factory's prices, in its currency (without tax, or tax included, as the offer says). */
         factoryTotal: fromMinor(lines.reduce((t, l) => t + l.totalMinor, 0)),
-        /** The tax in that: added on top (without tax) or the part already inside (tax included), in the factory's currency. */
-        taxTotal: fromMinor(lines.reduce((t, l) => t + l.taxMinor, 0)),
+        /**
+         * The tax in that, in the factory's currency: added on top (without tax: each line's, as in our cost),
+         * or the part already inside (tax included: worked out on the total at each %, only shown).
+         */
+        taxTotal: fromMinor(
+          q.taxIncluded
+            ? [...new Set(lines.map((l) => l.taxRate))].reduce(
+                (t, r) => t + factoryTaxMinor(lines.filter((l) => l.taxRate === r).reduce((x, l) => x + l.totalMinor, 0), r, true),
+                0,
+              )
+            : lines.reduce((t, l) => t + l.taxMinor, 0),
+        ),
         /** What the whole offer costs us in the selling currency (null when a rate is missing). */
         totalCost: rate === null ? null : fromMinor(lines.reduce((t, l) => t + (l.costMinor ?? 0), 0)),
         /** Lines still without a price (a line priced in its parts does not count). */
