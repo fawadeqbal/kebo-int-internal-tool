@@ -192,9 +192,8 @@ async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                   <Th>Customer</Th>
                   <Th>Status</Th>
                   <Th>Needs now</Th>
-                  <Th className="text-right">Total</Th>
                   <Th className="text-right">Still due</Th>
-                  <Th>Handled by</Th>
+                  <Th className="max-xl:hidden">Handled by</Th>
                   <Th className="w-12">
                     <span className="sr-only">Actions</span>
                   </Th>
@@ -207,17 +206,19 @@ async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                       <Link href={`/orders/${o.id}`} className="font-semibold whitespace-nowrap hover:text-primary">
                         {o.refNo}
                       </Link>
-                      <span className="block max-w-64 truncate text-xs text-text-2">{o.inquiry.title}</span>
+                      <span className="block max-w-40 truncate text-xs text-text-2">{o.inquiry.title}</span>
                     </Td>
                     <Td>
-                      <span className="block max-w-52 truncate">{o.customer.name}</span>
+                      <span className="block max-w-40 truncate">{o.customer.name}</span>
                       {o.customer.country === UNKNOWN_COUNTRY && <span className="block text-xs text-warn">Country not set</span>}
                     </Td>
                     <Td>{statusBadge(o)}</Td>
                     <Td>
                       {o.needs ? (
                         <>
-                          <span className="block max-w-64 truncate text-sm">{o.needs.title}</span>
+                          <span className="block max-w-48 truncate text-sm" title={o.needs.title}>
+                            {o.needs.title}
+                          </span>
                           <span className={cn("block text-xs", o.needs.late ? "font-medium text-bad" : "text-text-2")}>
                             {o.needs.late ? `Was due ${date(o.needs.due)}` : `By ${date(o.needs.due)}`}
                           </span>
@@ -226,9 +227,11 @@ async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                         <span className="text-xs text-text-2">{o.status === "open" ? "Nothing now" : "—"}</span>
                       )}
                     </Td>
-                    <Td className="text-right whitespace-nowrap tabular">{money(o.total, o.currency)}</Td>
-                    <Td className="text-right whitespace-nowrap tabular">{due(o)}</Td>
-                    <Td>{o.inquiry.assignee?.name ?? <span className="text-xs text-text-2">Nobody</span>}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">
+                      {due(o)}
+                      <span className="block text-xs text-text-2">of {money(o.total, o.currency)}</span>
+                    </Td>
+                    <Td className="max-xl:hidden">{o.inquiry.assignee?.name ?? <span className="text-xs text-text-2">Nobody</span>}</Td>
                     <Td className="text-right">
                       <RowMenu items={rowMenu(o)} label={`Actions for ${o.refNo}`} />
                     </Td>
