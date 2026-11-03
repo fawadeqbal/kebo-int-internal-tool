@@ -16,12 +16,14 @@ export function UploadButton({
   label = "Upload",
   className,
   variant = "secondary",
+  size = "xs",
 }: {
   orderId: string;
   step: FlowStep | null;
   label?: string;
   className?: string;
   variant?: "secondary" | "ghost";
+  size?: "xs" | "sm";
 }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
@@ -39,7 +41,7 @@ export function UploadButton({
   return (
     <>
       <input ref={input} type="file" multiple hidden onChange={(e) => (send(e.target.files), (e.target.value = ""))} />
-      <button type="button" className={cn(buttonClass(variant, "xs"), className)} disabled={busy} onClick={() => input.current?.click()}>
+      <button type="button" className={cn(buttonClass(variant, size), className)} disabled={busy} onClick={() => input.current?.click()}>
         <Plus aria-hidden /> {busy ? "Sending…" : label}
       </button>
       {error && (

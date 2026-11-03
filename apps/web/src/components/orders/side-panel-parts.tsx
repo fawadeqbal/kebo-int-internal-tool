@@ -10,7 +10,7 @@ import type { OrderFile } from "@/lib/types-files";
 import { FileIcon, FileMenuButton, useFileTools } from "@/components/files/file-tools";
 import { PaperMenu, type PaperLineRow } from "./papers-table";
 
-/** How many one-line rows a section shows before it scrolls (desktop) or folds behind "Show all n" (phone). */
+/** How many rows a section shows before it folds behind "Show all n" (phone); on a wide screen it scrolls after about six. */
 const ROWS = 5;
 
 /**
@@ -46,8 +46,8 @@ export function SidePanelCard({ children, label }: { children: ReactNode; label:
 }
 
 /**
- * One section of the panel: "Title n" and its button, then one-line rows — at
- * most five, then the list scrolls inside (desktop) or shows "Show all n"
+ * One section of the panel: "Title n" and its button, then two-line rows —
+ * about six, then the list scrolls inside (desktop), or five and "Show all n"
  * (phone) — then an optional footer (the costs' total).
  */
 export function SideSection({
@@ -67,36 +67,36 @@ export function SideSection({
   action?: ReactNode;
   empty?: ReactNode;
   footer?: ReactNode;
-  /** Changes: 30px rows (the rest 34px). */
+  /** Changes: scrolls after 300px (the rest 330px). */
   dense?: boolean;
   children?: ReactNode;
 }) {
   const [all, setAll] = useState(false);
   const rows = Children.toArray(children);
   return (
-    <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className="border-b border-line px-3.5 pt-2.5 pb-2 last:border-b-0">
-      <div className="mb-0.5 flex min-h-7 items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold">
+    <section aria-label={title} data-target={target} data-target-card={target ? "" : undefined} className="border-b border-line px-[18px] pt-3.5 pb-3 last:border-b-0">
+      <div className="mb-1 flex min-h-8 items-center justify-between gap-2">
+        <h3 className="text-[15px] font-semibold">
           {title}
-          {count !== undefined && <span className="ml-1 text-xs font-normal text-muted tabular">{count}</span>}
+          {count !== undefined && <span className="ml-1.5 text-[13px] font-normal text-muted tabular">{count}</span>}
         </h3>
         {action && <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">{action}</span>}
       </div>
       {rows.length ? (
         <ul
           className={cn(
-            "[scrollbar-width:thin] lg:-mr-2 lg:overflow-y-auto lg:pr-2",
-            dense ? "lg:max-h-[151px]" : "lg:max-h-[171px]",
+            "[scrollbar-width:thin] lg:-mr-2.5 lg:overflow-y-auto lg:pr-2.5",
+            dense ? "lg:max-h-[300px]" : "lg:max-h-[330px]",
             !all && "max-lg:[&>li:nth-child(n+6)]:hidden",
           )}
         >
           {rows}
         </ul>
       ) : (
-        empty && <p className="my-1 text-xs text-muted">{empty}</p>
+        empty && <p className="my-1.5 text-sm text-muted">{empty}</p>
       )}
       {rows.length > ROWS && !all && (
-        <button type="button" className="mt-1 text-xs font-medium text-primary hover:underline lg:hidden" onClick={() => setAll(true)}>
+        <button type="button" className="mt-1 text-sm font-medium text-primary hover:underline lg:hidden" onClick={() => setAll(true)}>
           Show all {rows.length}
         </button>
       )}
@@ -105,10 +105,7 @@ export function SideSection({
   );
 }
 
-/** "PR-2026-0031-1" → "PR-…-1" when it would not fit; short numbers stay whole. */
-const shortNumber = (n: string) => (n.length > 12 ? n.replace(/^([A-Z]{2,4})-.*-(\w+)$/, "$1-…-$2") : n);
-
-/** A paper on one line: ✓ / •, its name, its number or what it waits for ("Make", "missing"), and its ⋯ menu. */
+/** A paper in two lines: ✓ / • on the left, its whole name, under it its number or what it waits for ("can be made" links to make it), and its ⋯ menu. */
 export function SidePaperRow({
   r,
   orderId,
@@ -128,33 +125,34 @@ export function SidePaperRow({
   const papersHref = `/orders/${orderId}/documents?tab=all#papers`;
   const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
   const canMakeIt = !!make && canMake && !r.live && (r.state === "can" || r.state === "wait" || r.state === "draft");
-  const what = done ? (r.number ? shortNumber(r.number) : (sub ?? r.stateLabel.toLowerCase())) : r.state === "miss" ? "missing" : null;
+  const what = done ? (r.number ?? sub ?? r.stateLabel.toLowerCase()) : r.state === "miss" ? "missing" : r.stateLabel.toLowerCase();
   return (
-    <li className="flex h-[34px] items-center gap-2 border-b border-line last:border-b-0">
-      <span className="grid w-3.5 shrink-0 place-items-center">
+    <li className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-line py-2 last:border-b-0">
+      <span className="grid place-items-center">
         {done ? (
-          <Check className="size-3.5 text-ok" strokeWidth={3} role="img" aria-label="Ready" />
+          <Check className="size-4 text-ok" strokeWidth={3} role="img" aria-label="Ready" />
         ) : (
           <span role="img" aria-label="Open" className={cn("size-1.5 rounded-full", r.state === "miss" ? "bg-warn" : "bg-primary")} />
         )}
       </span>
-      <Link href={canMakeIt ? make! : papersHref} className="min-w-0 flex-1 truncate text-[13px] font-medium hover:text-primary" title={r.label}>
-        {r.label}
-      </Link>
-      {canMakeIt ? (
-        <Link href={make!} className="shrink-0 text-xs text-muted hover:text-primary hover:underline">
-          {r.state === "draft" ? "Continue" : "Make"}
+      <span className="min-w-0">
+        <Link href={canMakeIt ? make! : papersHref} className="block text-sm font-medium [overflow-wrap:anywhere] hover:text-primary">
+          {r.label}
         </Link>
-      ) : (
-        <span className="max-w-[45%] shrink-0 truncate text-xs text-muted tabular" title={r.number ?? undefined}>
-          {what ?? r.stateLabel.toLowerCase()}
-        </span>
-      )}
+        {canMakeIt ? (
+          <Link href={make!} className="block text-xs text-text-2 hover:text-primary hover:underline">
+            {r.state === "draft" ? "draft · continue" : what}
+          </Link>
+        ) : (
+          <span className={cn("block text-xs [overflow-wrap:anywhere] text-text-2", done && r.number && "tabular")}>{what}</span>
+        )}
+      </span>
       <PaperMenu
         r={r}
         orderId={orderId}
         canMake={canMake}
         canRecord={canRecord}
+        size="icon-sm"
         lead={(item) => (
           <>
             {canMakeIt && item(r.state === "draft" ? "Continue the draft" : "Make", () => router.push(make!))}
@@ -167,33 +165,33 @@ export function SidePaperRow({
   );
 }
 
-/** A file on one line: its icon, name (opens it), what it is attached to, 👁 and ⋯ — the order's file tools. */
-export function SideFileRow({ file, set }: { file: OrderFile; set: OrderFile[] }) {
+/** A file in two lines: its icon, its whole name (opens it), under it what it belongs to · who · when; 👁 and ⋯ — the order's file tools. */
+export function SideFileRow({ file, set, meta }: { file: OrderFile; set: OrderFile[]; meta: string }) {
   const tools = useFileTools();
-  const where = file.attachedTo.label.replace(/^(Checklist|Paper|Inquiry|Step) · /, "");
   return (
-    <li data-target={`file.${file.sourceId}`} className="flex h-[34px] items-center gap-2 border-b border-line last:border-b-0">
+    <li data-target={`file.${file.sourceId}`} className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-line py-2 last:border-b-0">
       <FileIcon file={file} />
-      <button
-        type="button"
-        className="min-w-0 flex-1 truncate text-left text-[13px] hover:text-primary"
-        title={file.name}
-        onClick={() => tools?.view(file, set)}
-      >
-        {file.name}
-      </button>
-      <span className="max-w-[38%] shrink-0 truncate text-xs text-muted" title={where}>
-        {where}
+      <span className="min-w-0">
+        <button
+          type="button"
+          className="block w-full text-left text-sm font-medium [overflow-wrap:anywhere] hover:text-primary"
+          onClick={() => tools?.view(file, set)}
+        >
+          {file.name}
+        </button>
+        <span className="block text-xs [overflow-wrap:anywhere] text-text-2">{meta}</span>
       </span>
-      <button
-        type="button"
-        aria-label={`View ${file.name}`}
-        className={buttonClass("ghost", "icon-xs", "hidden sm:inline-flex")}
-        onClick={() => tools?.view(file, set)}
-      >
-        <Eye aria-hidden />
-      </button>
-      <FileMenuButton file={file} set={set} />
+      <span className="flex items-center">
+        <button
+          type="button"
+          aria-label={`View ${file.name}`}
+          className={buttonClass("ghost", "icon-sm", "hidden sm:inline-flex [&_svg]:size-4")}
+          onClick={() => tools?.view(file, set)}
+        >
+          <Eye aria-hidden />
+        </button>
+        <FileMenuButton file={file} set={set} className="size-8" />
+      </span>
     </li>
   );
 }
