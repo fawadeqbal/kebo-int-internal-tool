@@ -32,8 +32,8 @@ export const checklistOrderInclude = {
 
 export type ChecklistOrderRow = Prisma.OrderGetPayload<{ include: typeof checklistOrderInclude }>;
 
-/** The first payment date by which the money (with the bank charges) reached `targetMinor`. */
-function reachedOn(payments: ChecklistOrderRow["payments"], targetMinor: number): ISODate | null {
+/** The first payment date by which the money (with the bank charges) reached `targetMinor` (payments in date order). */
+export function reachedOn(payments: readonly { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; paidOn: Date }[], targetMinor: number): ISODate | null {
   let sum = 0;
   for (const p of payments) {
     sum += decimalToMinor(p.amount) + decimalToMinor(p.bankCharges);
