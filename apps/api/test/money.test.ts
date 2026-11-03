@@ -46,6 +46,8 @@ describe("money", () => {
         newFactoryName: `Wenling Pumps ${tag}`,
         receivedOn: "2026-10-01",
         currency: "CNY",
+        // The factory charges 13% tax on top of its prices.
+        taxRate: 13,
         lines: [{ requestedItemId: item.id, description: "Centrifugal pump", quantity: 10, unitPrice: 1000 }],
       })
       .expect(201);

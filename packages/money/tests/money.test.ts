@@ -21,6 +21,8 @@ import {
   splitDeposit,
   toMinor,
   withTaxMinor,
+  factoryUnitCostMinor,
+  factoryTaxMinor,
   orderProfit,
   orderCosting,
   payInstalments,
@@ -125,6 +127,26 @@ describe("costing", () => {
     expect(withTaxMinor(10_00, 12.5)).toBe(11_25);
     expect(withTaxMinor(1_01, 0.5)).toBe(1_02); // 1.01505
     expect(withTaxMinor(-100_50, 13)).toBe(-113_57);
+  });
+
+  it("costs a factory price without tax exactly as before (tax added on top)", () => {
+    for (const [price, rate] of [[100_00, 13], [1_15, 13], [100_50, "13.00"], [10_00, 12.5], [1_01, 0.5], [185_000_00, 13], [9_500_00, 9], [0, 13]] as const)
+      expect(factoryUnitCostMinor(price, rate)).toBe(withTaxMinor(price, rate));
+    expect(factoryUnitCostMinor(100_00, 13, false)).toBe(113_00);
+    expect(factoryUnitCostMinor(100_00, 0, false)).toBe(100_00);
+    expect(factoryTaxMinor(100_50, 13)).toBe(13_07); // 113.57 − 100.50
+    expect(factoryTaxMinor(302_000_00, 0)).toBe(0);
+  });
+
+  it("costs a factory price with tax included as the price itself, the tax inside shown only", () => {
+    expect(factoryUnitCostMinor(113_00, 13, true)).toBe(113_00);
+    expect(factoryUnitCostMinor(185_000_00, 13, true)).toBe(185_000_00);
+    expect(factoryUnitCostMinor(100_00, 0, true)).toBe(100_00);
+    expect(factoryTaxMinor(113_00, 13, true)).toBe(13_00);
+    expect(factoryTaxMinor(302_000_00, 13, true)).toBe(34_743_36); // 302,000 − 302,000 / 1.13 = 34,743.3628…
+    expect(factoryTaxMinor(302_000_00, "13.00", true)).toBe(34_743_36);
+    expect(factoryTaxMinor(100_00, 0, true)).toBe(0);
+    expect(factoryTaxMinor(10_00, 12.5, true)).toBe(1_11); // 10 − 8.888… = 1.111…
   });
 
   it("multiplies money by quantities and percentages exactly", () => {

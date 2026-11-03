@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, type Prisma } from "@kebo/database";
-import { convertMinor, costSummary, documentTotals, fromMinor, fxRate, priceForMargin, toMinor, withTaxMinor } from "@kebo/money";
+import { convertMinor, costSummary, documentTotals, factoryUnitCostMinor, fromMinor, fxRate, priceForMargin, toMinor } from "@kebo/money";
 import {
   BASIS_STEP_LABEL,
   BASIS_STEPS,
@@ -148,7 +148,7 @@ export class QuotationsService {
       const rate = fxRate(q.currency, currency, sales.currency, sales.exchangeRates);
       const no = lineNumbers(q.lines.map((l) => ({ key: l.id, parentKey: l.parentId })));
       const lines = q.lines.map((l, n) => {
-        const cost = rate ? convertMinor(withTaxMinor(decimalToMinor(l.unitPrice), Number(l.taxRate)), rate) : null;
+        const cost = rate ? convertMinor(factoryUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded), rate) : null;
         return {
           id: l.id,
           no: no[n]!,
@@ -471,7 +471,7 @@ export class QuotationsService {
         basis = { factoryBasis: q.basis, factoryBasisPlace: q.basisPlace };
         const rate = fxRate(q.currency, input.currency, sales.currency, sales.exchangeRates);
         for (const l of q.lines) {
-          const cost = rate ? convertMinor(withTaxMinor(decimalToMinor(l.unitPrice), Number(l.taxRate)), rate) : null;
+          const cost = rate ? convertMinor(factoryUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded), rate) : null;
           lines.push({
             requestedItemId: l.requestedItemId,
             type: "goods",

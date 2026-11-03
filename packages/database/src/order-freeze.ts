@@ -3,7 +3,7 @@ import type { Db } from "./client";
 /**
  * For orders made outside the API (the demo seed, data loads, the old app's
  * import): copy onto them what the API freezes when a quotation is accepted —
- * the factory price, tax and currency of each line, the costs to reach the
+ * the factory price, tax (and whether the price had it in) and currency of each line, the costs to reach the
  * basis it was sold on (from its option), and its main currency and rate.
  * Only fills what is still empty; the same as the money migration does for
  * orders made before it.
@@ -12,7 +12,8 @@ export async function freezeOrderMoney(db: Db, orderIds: string[]): Promise<void
   if (!orderIds.length) return;
   await db.$executeRaw`
     update order_lines ol
-       set factory_id = fq.factory_id, factory_unit_price = fql.unit_price, factory_tax_rate = fql.tax_rate, factory_currency = fq.currency
+       set factory_id = fq.factory_id, factory_unit_price = fql.unit_price, factory_tax_rate = fql.tax_rate,
+           factory_tax_included = fq.tax_included, factory_currency = fq.currency
       from quote_lines ql
       join factory_quote_lines fql on fql.id = ql.factory_quote_line_id
       join factory_quotes fq on fq.id = fql.factory_quote_id

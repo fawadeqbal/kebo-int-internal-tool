@@ -66,6 +66,7 @@ describe("order costs", () => {
         newFactoryName: `Costs Pumps ${tag}`,
         receivedOn: "2026-10-01",
         currency: "CNY",
+        taxRate: 13,
         basis: "EXW",
         lines: [{ requestedItemId: item.id, description: "Pump", quantity: 10, unitPrice: 1000 }],
       })

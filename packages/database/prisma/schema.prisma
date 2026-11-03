@@ -817,6 +817,11 @@ model FactoryQuote {
   receivedOn   DateTime  @map("received_on") @db.Date
   validUntil   DateTime? @map("valid_until") @db.Date
   currency     String    @default("CNY") @db.Char(3)
+  /// The factory's prices have the tax in them (true: the price is our cost, the tax inside is only
+  /// shown) or not (false: each line's tax % is added on top).
+  taxIncluded  Boolean   @default(false) @map("tax_included")
+  /// The offer's tax %, given to its lines (a line can still have its own).
+  taxRate      Decimal   @default(0) @map("tax_rate") @db.Decimal(5, 2)
   /// The factory's price basis (EXW, FOB, CFR…): what its prices already pay for.
   basis        Incoterm?
   /// Where the basis applies: "Zhangjiagang" (EXW), "Qingdao" (FOB)…
@@ -857,10 +862,10 @@ model FactoryQuoteLine {
   model           String?            @db.VarChar(120)
   quantity        Decimal            @db.Decimal(12, 2)
   unit            String             @default("pcs") @db.VarChar(20)
-  /// The factory's price for one unit, without tax.
+  /// The factory's price for one unit: without tax, or with tax included, as its offer says.
   unitPrice       Decimal            @map("unit_price") @db.Decimal(14, 2)
-  /// Tax % added on top of this item's price (13 unless changed): price + tax is what one unit costs Kebo.
-  taxRate         Decimal            @default(13) @map("tax_rate") @db.Decimal(5, 2)
+  /// This item's tax % (the offer's unless changed): added on top of the price, or already in it when the offer's prices include tax.
+  taxRate         Decimal            @default(0) @map("tax_rate") @db.Decimal(5, 2)
   sortOrder       Int                @default(0) @map("sort_order")
   /// A part of another line of the same offer (the factory's own breakdown: machine, conveyor, spares…).
   parentId        String?            @map("parent_id") @db.Uuid
@@ -1175,6 +1180,8 @@ model OrderLine {
   factory          Factory? @relation(fields: [factoryId], references: [id], onDelete: Restrict)
   factoryUnitPrice Decimal? @map("factory_unit_price") @db.Decimal(14, 2)
   factoryTaxRate   Decimal? @map("factory_tax_rate") @db.Decimal(5, 2)
+  /// The factory's price already had the tax in it (its offer said so): the tax is not added again.
+  factoryTaxIncluded Boolean @default(false) @map("factory_tax_included")
   factoryCurrency  String?  @map("factory_currency") @db.Char(3)
 
   /// How many have come in from the factory so far (goods lines), and when last.

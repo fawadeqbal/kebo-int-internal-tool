@@ -8,7 +8,7 @@ import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 
 type Items = SourcingView["items"];
 
-/** Their total: the factory's prices × quantities, without tax, in their currency (minor units). */
+/** Their total: the factory's prices × quantities (without tax, or tax included, as the offer says), in their currency (minor units). */
 export const theirTotalMinor = (q: FactoryQuoteView) =>
   q.lines.reduce((t, l) => t + Math.round(toMinor(l.unitPrice) * Number(l.quantity)), 0);
 export const theirTotal = (q: FactoryQuoteView) => formatMinor(theirTotalMinor(q), q.currency);

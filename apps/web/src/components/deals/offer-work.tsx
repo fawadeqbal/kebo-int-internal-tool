@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Download, Eye, FileText, Info, ListPlus, Plus, Trash2 } from "lucide-react";
 import { formatMinor, fxRate, toMinor } from "@kebo/money";
-import { ATTACHMENT_KIND_LABEL, basisText, DEFAULT_TAX_RATE, INCOTERMS, type AttachmentKind, type Incoterm } from "@kebo/shared";
+import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, offerTaxText, type AttachmentKind, type Incoterm } from "@kebo/shared";
 import { Badge, Button, cn, Field, Input, Select } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -25,7 +25,7 @@ import { rateSentence } from "@/lib/fx";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { FileDrop, send, type Staged } from "./documents-panel";
-import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, type QuoteState } from "./factory-quote-form";
+import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, TaxBox, type QuoteState } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -52,8 +52,8 @@ const guessOfferKind = (name: string, type: string): AttachmentKind => {
 
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
-/** A line as the offer's API takes it. */
-function toBody(v: LineValues) {
+/** A line as the offer's API takes it; a blank tax % is the offer's (`offerRate`, or the API's when not given). */
+function toBody(v: LineValues, offerRate?: number) {
   return {
     description: v.description,
     model: v.model?.trim() || null,
@@ -61,7 +61,7 @@ function toBody(v: LineValues) {
     quantity: (v.quantity ?? "").replace(/,/g, "").trim(),
     unit: v.unit?.trim() || "pcs",
     unitPrice: (v.unitPrice ?? "").replace(/,/g, "").trim() || "0",
-    taxRate: (v.taxRate ?? "").trim() || String(DEFAULT_TAX_RATE),
+    taxRate: (v.taxRate ?? "").trim() || (offerRate === undefined ? undefined : String(offerRate)),
   };
 }
 
@@ -144,6 +144,8 @@ export function OfferDetails({
         ),
     },
     { name: "leadTime", label: "Lead time", value: q.leadTime, placeholder: "e.g. 45 days" },
+    // Changed with the offer's form (Edit): it moves the lines' tax too.
+    { label: "Tax", value: String(q.taxRate), show: offerTaxText(q.taxRate, q.taxIncluded), uncounted: true },
     {
       name: "validUntil",
       label: "Valid until",
@@ -445,7 +447,7 @@ export function OfferLines({
       width: "3.5rem",
       input: "number",
       align: "right",
-      initial: String(DEFAULT_TAX_RATE),
+      initial: String(q.taxRate),
       phoneHidden: true,
     },
     { key: "total", label: "Total", width: "9.5rem", align: "right", format: lineTotal },
@@ -480,23 +482,25 @@ export function OfferLines({
         : c,
     );
 
+  // One % for every line: said in the footer ("Tax 13%"); lines with their own %: "Tax".
+  const rates = [...new Set(q.lines.map((l) => Number(l.taxRate)))];
+  const ratePart = rates.length === 1 ? ` ${rates[0]}%` : "";
+  const strong = (v: ReactNode) => <span className="font-semibold text-text tabular">{v}</span>;
   const footer =
     q.lines.length > 0 ? (
-      <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-3 py-2 text-sm">
-        <span className="text-muted">
-          Factory total{" "}
-          <span className="font-semibold text-text tabular">
-            {formatMinor(
-              q.lines.reduce((t, l) => t + Math.round(toMinor(l.unitPrice) * Number(l.quantity)), 0),
-              q.currency,
-            )}
-          </span>{" "}
-          without tax
+      <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1 px-3 py-2 text-sm text-muted">
+        <span>
+          Factory total {strong(formatMinor(toMinor(q.factoryTotal), q.currency))} {q.taxIncluded ? "tax included" : "without tax"}
+        </span>
+        <span aria-hidden>·</span>
+        <span>
+          {q.taxIncluded ? `of which tax${ratePart}` : `Tax${ratePart}`} {strong(formatMinor(toMinor(q.taxTotal), q.currency))}
         </span>
         {q.totalCost && (
-          <span className="text-muted">
-            Our cost with tax <span className="font-semibold text-text tabular">{amount(q.totalCost, mainCurrency)}</span>
-          </span>
+          <>
+            <span aria-hidden>·</span>
+            <span>Our cost {strong(amount(q.totalCost, mainCurrency))}</span>
+          </>
         )}
       </div>
     ) : undefined;
@@ -514,7 +518,7 @@ export function OfferLines({
         quantity: it.quantity,
         unit: it.unit,
         unitPrice: "",
-        taxRate: String(DEFAULT_TAX_RATE),
+        taxRate: String(q.taxRate),
       },
     })),
   };
@@ -523,7 +527,11 @@ export function OfferLines({
     <LinesCard
       title={`${q.factory.name} · lines`}
       description={
-        q.lines.length ? undefined : "No lines yet: Edit lines to type, paste or upload them, or start from the customer's list."
+        q.lines.length
+          ? q.taxIncluded
+            ? `Tax included · ${q.taxRate}%: the tax inside the price is shown, not added again`
+            : `Without tax · ${q.taxRate}%: ${q.taxRate > 0 ? "the tax is added on top for our cost" : "our cost is the factory's price"}`
+          : "No lines yet: Edit lines to type, paste or upload them, or start from the customer's list."
       }
       canEdit={canEdit}
       actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
@@ -688,7 +696,7 @@ function OfferLinesEditor({
         onAdd={async (newLines: NewLine[], at, reason) =>
           result(
             await lines.add(q.id, {
-              lines: newLines.map((l) => ({ ...toBody(l.values), partOf: l.partOf })),
+              lines: newLines.map((l) => ({ ...toBody(l.values, q.taxRate), partOf: l.partOf })),
               afterId: at.afterKey,
               parentId: at.parentKey,
               reason,
@@ -697,7 +705,7 @@ function OfferLinesEditor({
         }
         onEdit={async (key, values, reason) => {
           const body: Record<string, unknown> = { reason };
-          const full = toBody({ ...rows.find((r) => r.key === key)!.values, ...values });
+          const full = toBody({ ...rows.find((r) => r.key === key)!.values, ...values }, q.taxRate);
           for (const k of Object.keys(values)) body[k] = full[k as keyof typeof full];
           return result(await lines.edit(key, body));
         }}
@@ -727,6 +735,7 @@ export function AddOfferButton({
   searchFactories,
   createAction,
   addLines,
+  taxDefault,
   label = "Add an offer",
   variant = "secondary",
   size = "md",
@@ -741,6 +750,8 @@ export function AddOfferButton({
   /** saveFactoryQuoteAction bound to the deal and null (a new offer). */
   createAction: Action;
   addLines: OfferLineActions["add"];
+  /** A new offer's tax: the company's default (Settings). */
+  taxDefault: { included: boolean; rate: number };
   label?: string;
   variant?: "primary" | "secondary" | "ghost";
   size?: "xs" | "sm" | "md";
@@ -767,6 +778,7 @@ export function AddOfferButton({
             searchFactories={searchFactories}
             createAction={createAction}
             addLines={addLines}
+            taxDefault={taxDefault}
           />
         </EditPanel>
       )}
@@ -794,6 +806,7 @@ function AddOfferForm({
   searchFactories,
   createAction,
   addLines,
+  taxDefault,
 }: {
   dealId: string;
   items: Items;
@@ -803,6 +816,7 @@ function AddOfferForm({
   searchFactories: (q: string) => Promise<FactoryOption[]>;
   createAction: Action;
   addLines: OfferLineActions["add"];
+  taxDefault: { included: boolean; rate: number };
 }) {
   const router = useRouter();
   const close = useClosePanel();
@@ -811,6 +825,8 @@ function AddOfferForm({
   const [basisPlace, setBasisPlace] = useState("");
   const [currency, setCurrency] = useState("CNY");
   const [leadTime, setLeadTime] = useState("");
+  const [taxIncluded, setTaxIncluded] = useState(taxDefault.included);
+  const [taxRate, setTaxRate] = useState(String(taxDefault.rate));
   const [shown, setShown] = useState<Extra[]>([]);
   const [extra, setExtra] = useState<Record<Exclude<Extra, "file">, string>>({ validUntil: "", paymentTerms: "", moq: "", reference: "" });
   const [file, setFile] = useState<File | null>(null);
@@ -833,6 +849,8 @@ function AddOfferForm({
     moq: extra.moq,
     paymentTerms: extra.paymentTerms,
     notes: "",
+    taxIncluded,
+    taxRate: taxRate.trim() || "0",
   };
 
   return (
@@ -972,6 +990,15 @@ function AddOfferForm({
                   ))}
                 </div>
               )}
+              <TaxBox
+                idPrefix="add"
+                className="mt-4"
+                included={taxIncluded}
+                rate={taxRate}
+                onIncluded={setTaxIncluded}
+                onRate={setTaxRate}
+                error={s.errors?.taxRate ?? s.errors?.taxIncluded}
+              />
             </section>
 
             <section>
@@ -1035,7 +1062,7 @@ function AddOfferForm({
                     ))}
                   </ul>
                   <p className="mt-2 text-xs text-muted">
-                    Type each price ({currency}, without tax), leave out what they don&apos;t offer. Their own wording, models and extra
+                    Type each price ({currency}, {taxIncluded ? "tax included" : "without tax"}), leave out what they don&apos;t offer. Their own wording, models and extra
                     lines:{" "}
                     <button type="button" className="font-medium text-primary hover:underline" onClick={() => setOwn(true)}>
                       Paste from Excel

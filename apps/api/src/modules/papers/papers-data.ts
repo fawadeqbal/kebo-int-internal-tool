@@ -1,5 +1,5 @@
 import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
-import { documentTotals, fromMinor, settle } from "@kebo/money";
+import { documentTotals, factoryUnitCostMinor, fromMinor, multiplyMinor, settle } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
   LINE_CONDITION_LABEL,
@@ -374,6 +374,30 @@ export function factoriesOf(o: PaperOrder) {
   return [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
 }
 
+/**
+ * A purchase order's tax, from the prices frozen on the order's lines: whether
+ * they had the tax in them and at what %. Its total is what we owe the factory
+ * (factoryUnitCostMinor × quantity, as on the order's money); with tax added
+ * on top, also the prices' own total. The sentence: "Prices include 13% tax.",
+ * "Prices are without tax; 13% tax is added on top.", or none at 0%.
+ */
+export function poTax(lines: { factoryUnitPrice: Prisma.Decimal | null; factoryTaxRate: Prisma.Decimal | null; factoryTaxIncluded: boolean; quantity: Prisma.Decimal }[]) {
+  const taxed = lines.filter((l) => l.factoryUnitPrice !== null && Number(l.factoryTaxRate ?? 0) > 0);
+  const pricesMinor = lines.reduce((t, l) => t + multiplyMinor(decimalToMinor(l.factoryUnitPrice ?? 0), l.quantity.toString()), 0);
+  const owedMinor = lines.reduce(
+    (t, l) =>
+      t + multiplyMinor(factoryUnitCostMinor(decimalToMinor(l.factoryUnitPrice ?? 0), l.factoryTaxRate?.toString() ?? 0, l.factoryTaxIncluded), l.quantity.toString()),
+    0,
+  );
+  const rates = [...new Set(taxed.map((l) => Number(l.factoryTaxRate)))].sort((a, b) => a - b);
+  const rate = rates.length === 1 ? rates[0]! : null;
+  const pct = rate === null ? `${rates.join("% or ")}% (by line)` : `${rate}%`;
+  const included = taxed.length > 0 && taxed.every((l) => l.factoryTaxIncluded);
+  const added = taxed.some((l) => !l.factoryTaxIncluded);
+  const sentence = !taxed.length ? null : included ? `Prices include ${pct} tax.` : `Prices are without tax; ${pct} tax is added on top.`;
+  return { pricesMinor, owedMinor, rate, added, sentence };
+}
+
 function purchaseOrder(c: PaperCtx): Built {
   const factories = factoriesOf(c.o);
   const f = factories.find((x) => x.id === c.ref) ?? factories[0] ?? null;
@@ -381,9 +405,8 @@ function purchaseOrder(c: PaperCtx): Built {
   const mine = lines.filter((l) => f && l.factoryId === f.id);
   const currency = mine.find((l) => l.factoryCurrency)?.factoryCurrency ?? "CNY";
   const priced = mine.filter((l) => l.factoryUnitPrice !== null);
-  const total = mine.reduce((t, l) => t + Number(l.factoryUnitPrice ?? 0) * Number(l.quantity), 0);
   const readyOn = fromDbDateOrNull(c.o.readyOn);
-  const tax = mine.find((l) => l.factoryTaxRate !== null && Number(l.factoryTaxRate) > 0)?.factoryTaxRate;
+  const tax = poTax(priced);
   const paid = c.o.factoryPaid.filter((p) => f && p.factoryId === f.id);
   return {
     n: factories.length > 1 && f ? factories.indexOf(f) + 1 : null,
@@ -420,13 +443,19 @@ function purchaseOrder(c: PaperCtx): Built {
         price: l.factoryUnitPrice !== null ? money(l.factoryUnitPrice.toString(), currency) : "",
         amount: l.factoryUnitPrice !== null ? money(Number(l.factoryUnitPrice) * Number(l.quantity), currency) : "",
       })),
-      sums: [],
-      total: { label: "Total", amount: total.toFixed(2), currency },
+      // Tax added on top: the prices' total, the tax and the total with tax (what we owe the factory).
+      sums: tax.added
+        ? [
+            { label: "Total without tax", value: money(fromMinor(tax.pricesMinor), currency) },
+            { label: tax.rate === null ? "Tax" : `Tax ${tax.rate}%`, value: money(fromMinor(tax.owedMinor - tax.pricesMinor), currency) },
+          ]
+        : [],
+      total: { label: tax.added ? "Total with tax" : "Total", amount: fromMinor(tax.owedMinor), currency },
       foot: null,
       boxTitle: "Terms",
       bullets: [
         readyOn ? { label: "Ready by:", value: date(readyOn) } : "Ready date: to be confirmed by the factory.",
-        ...(tax ? [`Prices include ${Number(tax)}% tax.`] : []),
+        ...(tax.sentence ? [tax.sentence] : []),
         ...paid.map((p) => ({ label: `Paid on ${paperDateText(fromDbDate(p.paidOn))}:`, value: money(p.amount.toString(), p.currency) })),
         "Balance before the goods leave the factory, after our inspection.",
         `Please quote our order number ${c.o.refNo} on every paper and on the packing.`,

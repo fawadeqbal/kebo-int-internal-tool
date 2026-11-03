@@ -77,6 +77,12 @@ export const salesSettings = z.object({
   /** The advance we pay a factory when we order (its payment plan starts from it). */
   factoryAdvancePercent: z.coerce.number().min(0).max(100).default(30),
   defaultIncoterm: z.enum(INCOTERMS).default("FOB"),
+  /**
+   * New factory offers start with these: prices without tax (the tax % is added on top) or with
+   * tax included, and the tax %. 0 unless the factories charge tax (e.g. 13% VAT in China).
+   */
+  factoryTaxIncluded: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).default(false),
+  factoryTaxRate: z.coerce.number().min(0, "Cannot be negative").max(100, "Cannot be more than 100%").refine((n) => Math.round(n * 100) === n * 100, "Use at most 2 decimals").default(0),
   /** Payment terms that go on every new quotation (beyond the deposit and balance). */
   defaultPaymentTerms: z.string().trim().max(5000).default(""),
   /** Delivery terms that go on every new quotation (packing, inspection, warranty…). */

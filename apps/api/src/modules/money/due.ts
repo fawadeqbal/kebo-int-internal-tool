@@ -21,13 +21,14 @@ export async function ordersWithMoneyDue(prisma: PrismaService): Promise<string[
 
 /**
  * What one order line owes its factory, in minor units of the factory's
- * currency: its frozen price with tax on top, rounded to the cent, times the
- * quantity, rounded again. Exact numeric arithmetic and round() (half away from
- * zero), the same as withTaxMinor and multiplyMinor in @kebo/money, so the
- * database and the app agree to the cent.
+ * currency: its frozen price with tax on top (or as it is, when the price had
+ * the tax included), rounded to the cent, times the quantity, rounded again.
+ * Exact numeric arithmetic and round() (half away from zero), the same as
+ * factoryUnitCostMinor and multiplyMinor in @kebo/money, so the database and
+ * the app agree to the cent.
  */
-export const owedLineSql = (price: Prisma.Sql, tax: Prisma.Sql, quantity: Prisma.Sql) =>
-  Prisma.sql`round(round(${price} * (100 + greatest(${tax}, 0))) * ${quantity})`;
+export const owedLineSql = (price: Prisma.Sql, tax: Prisma.Sql, included: Prisma.Sql, quantity: Prisma.Sql) =>
+  Prisma.sql`round(round(${price} * (case when ${included} then 100 else 100 + greatest(coalesce(${tax}, 0), 0) end)) * ${quantity})`;
 
 /**
  * Orders where we still owe a factory: what the factory lines cost (their
@@ -38,7 +39,7 @@ export async function ordersOwingFactories(prisma: PrismaService): Promise<strin
   const rows = await prisma.db.$queryRaw<{ id: string }[]>`
     with owed as (
       select ol.order_id, ol.factory_id, ol.factory_currency as currency,
-             sum(${owedLineSql(Prisma.sql`ol.factory_unit_price`, Prisma.sql`ol.factory_tax_rate`, Prisma.sql`ol.quantity`)}) as owed
+             sum(${owedLineSql(Prisma.sql`ol.factory_unit_price`, Prisma.sql`ol.factory_tax_rate`, Prisma.sql`ol.factory_tax_included`, Prisma.sql`ol.quantity`)}) as owed
       from order_lines ol
       join orders o on o.id = ol.order_id and o.status <> 'cancelled'
       where ol.factory_id is not null and ol.factory_unit_price is not null

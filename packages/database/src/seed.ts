@@ -222,6 +222,8 @@ export async function seedDemoData(
           factoryId: factories[f].id,
           receivedOn: toDbDate(addDays(created, 2)),
           currency: "CNY",
+          // The demo factories charge 13% VAT on top of their prices.
+          taxRate: 13,
           leadTime: "35 days after deposit",
           createdById: o.assignee ?? people.staff.id,
           lines: {

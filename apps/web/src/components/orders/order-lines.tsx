@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { formatMinor, multiplyMinor, toMinor, withTaxMinor } from "@kebo/money";
+import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
 import { LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
 import { LineTable, type LineColumn, type LineResult, type LineRow, type LineValues } from "@/components/lines/line-table";
@@ -307,7 +307,7 @@ function Totals({ set, lines, extra }: { set: LineSet; lines: OrderLineView[]; e
     for (const l of lines) {
       const p = l.factoryPrice;
       if (!p?.currency) continue;
-      totals.set(p.currency, (totals.get(p.currency) ?? 0) + multiplyMinor(withTaxMinor(toMinor(p.unitPrice), p.taxRate), l.quantity));
+      totals.set(p.currency, (totals.get(p.currency) ?? 0) + multiplyMinor(factoryUnitCostMinor(toMinor(p.unitPrice), p.taxRate, p.taxIncluded), l.quantity));
     }
     body = totals.size ? item("Factory total", [...totals].map(([c, m]) => formatMinor(m, c)).join(" + ")) : null;
   } else if (set === "received") {

@@ -108,6 +108,9 @@ export const percent = z.preprocess(blank, percentNumber);
 /** A percentage where a blank field takes `fallback`. */
 export const percentOr = (fallback: number) => z.preprocess(blank, percentNumber.default(fallback));
 
+/** A percentage that may be left out: blank → undefined (the caller decides). */
+export const optionalPercent = z.preprocess(blank, percentNumber.optional());
+
 /** Quantities are NUMERIC(12,2): at least 0.01, at most 2 decimals. */
 export const quantity = z.preprocess(
   blank,

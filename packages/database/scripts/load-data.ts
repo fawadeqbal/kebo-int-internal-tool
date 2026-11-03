@@ -282,6 +282,8 @@ async function main() {
         receivedOn: toDbDate(upTo(addDays(created, 2))),
         validUntil: toDbDate(addDays(created, 32)),
         currency: "CNY",
+        // The demo factories charge 13% VAT on top of their prices.
+        taxRate: 13,
         leadTime: "35 days after deposit",
         createdById: assignee ?? lead.id,
         lines: {

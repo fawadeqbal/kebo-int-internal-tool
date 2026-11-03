@@ -83,6 +83,17 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "defaultDepositPercent", label: "Usual deposit", kind: "number", unit: "%", hint: "Asked from the customer before production starts" },
       { name: "defaultBalanceTerms", label: "Usual balance terms", kind: "select", options: BALANCE_TERMS.map((b) => ({ value: b, label: BALANCE_TERMS_LABEL[b] })), hint: "When the rest of the money is due" },
       { name: "defaultIncoterm", label: "Usual Incoterm", kind: "select", options: INCOTERMS.map((i) => ({ value: i, label: i })), hint: "Who pays freight and insurance. FOB: we deliver onto the ship at the Chinese port." },
+      {
+        name: "factoryTaxIncluded",
+        label: "Factory prices are",
+        kind: "select",
+        options: [
+          { value: "false", label: "Without tax · tax is added on top" },
+          { value: "true", label: "Tax included · the price already has the tax in it" },
+        ],
+        hint: "How a new factory offer starts. Each offer can say otherwise.",
+      },
+      { name: "factoryTaxRate", label: "Factory tax", kind: "number", unit: "%", hint: "A new offer's tax %: 0 unless the factories charge tax, e.g. 13% VAT in China" },
       { name: "defaultPaymentTerms", label: "Payment terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the deposit and balance, e.g. By T/T; L/C at sight accepted" },
       { name: "defaultDeliveryTerms", label: "Delivery terms on new quotations", kind: "textarea", wide: true, hint: "Printed under the delivery time, e.g. packing, inspection, warranty" },
       { name: "warrantyTerms", label: "Warranty on sales contracts", kind: "textarea", wide: true, hint: "Printed on the sales contract and the SAT certificate" },

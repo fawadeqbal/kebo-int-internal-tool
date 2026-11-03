@@ -143,6 +143,8 @@ describe("quotation options from factory offers", () => {
           newFactoryName: `Guangzhou Lines ${tag}`,
           receivedOn: "2026-10-21",
           currency: "CNY",
+          // 13% tax on top of its prices.
+          taxRate: 13,
           leadTime: "60 days",
           lines: [
             { requestedItemId: line!.id, description: "Juice line complete", model: "CGF-18", quantity: 1, unit: "set", unitPrice: 250000 },

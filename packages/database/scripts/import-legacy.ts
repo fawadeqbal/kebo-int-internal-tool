@@ -710,8 +710,21 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     })),
   });
 
-  /* ---- factory prices: always without tax now, with one tax % per quote added on top */
+  /* ---- factory prices: imported without tax (prices with tax are stored without it), each line's tax % added on top;
+          the offer's tax % is the one most of its lines have (13 without lines), as the factory_tax migration does */
   const quoteIncludesVat = new Map(old.supplierQuotes.map((s) => [s.id, s.prices_include_vat]));
+  const quoteTaxRate = new Map<string, number>();
+  {
+    const counts = new Map<string, Map<number, number>>();
+    for (const l of old.supplierQuoteItems) {
+      const c = counts.get(l.supplier_quote_id) ?? new Map<number, number>();
+      const r = Number(l.vat_rate) || 0;
+      c.set(r, (c.get(r) ?? 0) + 1);
+      counts.set(l.supplier_quote_id, c);
+    }
+    for (const [id, c] of counts)
+      quoteTaxRate.set(id, [...c.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]![0]);
+  }
   await tx.factoryQuote.createMany({
     data: old.supplierQuotes.map((s) => ({
       id: s.id,
@@ -721,6 +734,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       receivedOn: toDbDate(s.quoted_on),
       validUntil: s.valid_until ? toDbDate(s.valid_until) : null,
       currency: s.currency,
+      taxIncluded: false,
+      taxRate: quoteTaxRate.get(s.id) ?? 13,
       basis: map.basisFromText(s.price_basis).basis,
       basisPlace: map.basisFromText(s.price_basis).place,
       leadTime: s.lead_time,

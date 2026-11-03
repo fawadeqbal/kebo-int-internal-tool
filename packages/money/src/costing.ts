@@ -67,6 +67,32 @@ export function withTaxMinor(unitPriceMinor: Minor, taxRate: number | string): M
   return Number(divideHalfAway(BigInt(roundHalfAway(unitPriceMinor)) * (100n * s + rate.n), 100n * s));
 }
 
+/**
+ * What one unit of a factory line costs us, in the factory's currency. Each
+ * factory offer says whether its prices are without tax (the tax % is added on
+ * top: price + tax, as withTaxMinor) or have the tax included (the price as it
+ * is: the tax inside is only shown, never added again). Every place that works
+ * out a cost from a factory price uses this one function.
+ */
+export function factoryUnitCostMinor(unitPriceMinor: Minor, taxRate: number | string, taxIncluded = false): Minor {
+  return taxIncluded ? roundHalfAway(unitPriceMinor) : withTaxMinor(unitPriceMinor, taxRate);
+}
+
+/**
+ * The tax in an amount at a factory's prices: added on top when the prices are
+ * without tax (amount × r/100), or the part already inside when tax is
+ * included (amount − amount / (1 + r/100)). Exact, rounded half away from zero.
+ * For one unit without tax it is withTaxMinor − price, to the cent.
+ */
+export function factoryTaxMinor(amountMinor: Minor, taxRate: number | string, taxIncluded = false): Minor {
+  const amount = roundHalfAway(amountMinor);
+  const rate = exactDecimal(Math.max(Number(taxRate) || 0, 0));
+  if (!rate || !rate.n) return 0;
+  const s = 10n ** BigInt(rate.scale);
+  if (!taxIncluded) return withTaxMinor(amount, taxRate) - amount;
+  return amount - Number(divideHalfAway(BigInt(amount) * 100n * s, 100n * s + rate.n));
+}
+
 /** Margin as a share of the selling price, in % with one decimal: (price − cost) / price. */
 export function marginPercent(unitPriceMinor: Minor, unitCost: Minor): number | null {
   if (!(unitPriceMinor > 0)) return null;

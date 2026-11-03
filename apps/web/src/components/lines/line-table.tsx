@@ -58,7 +58,7 @@ export interface LineColumn {
   options?: { value: string; label: string }[];
   placeholder?: string;
   maxLength?: number;
-  /** The value for a new row (unit "pcs", tax "13"). */
+  /** The value for a new row (unit "pcs", tax "0"). */
   initial?: string | ((parentKey: string | null) => string);
   /** How a saved row shows the value. */
   format?: (values: LineValues, row: LineRow) => ReactNode;

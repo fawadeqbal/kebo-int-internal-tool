@@ -284,6 +284,33 @@ describe("order papers", () => {
     const po = await doc("purchase-order");
     expect(po.doc.party.name).toBe(`Papers Works ${tag}`);
     expect(po.doc.total).toMatchObject({ currency: "CNY", amount: "300000.00" });
+    // The tax follows the prices frozen on the order: 0% says nothing about tax.
+    const taxBullets = (d: { doc: { bullets: unknown[] } }) => d.doc.bullets.filter((b) => typeof b === "string" && /tax/i.test(b));
+    expect(taxBullets(po)).toEqual([]);
+    expect(po.doc.sums).toEqual([]);
+    const freeze = (rate: number, included: boolean) =>
+      prisma.company(FIRST_COMPANY_ID).orderLine.updateMany({ where: { orderId, factoryId }, data: { factoryTaxRate: rate, factoryTaxIncluded: included } });
+    try {
+      // Without tax at 13%: the tax is added on top, and the total is what we owe the factory.
+      await freeze(13, false);
+      const added = await doc("purchase-order");
+      expect(taxBullets(added)).toEqual(["Prices are without tax; 13% tax is added on top."]);
+      expect(added.doc.sums).toEqual([
+        { label: "Total without tax", value: { money: "300000.00", currency: "CNY" } },
+        { label: "Tax 13%", value: { money: "39000.00", currency: "CNY" } },
+      ]);
+      expect(added.doc.total).toMatchObject({ label: "Total with tax", amount: "339000.00", currency: "CNY" });
+      expect((await api(app, sana).get(`/orders/${orderId}/money`).expect(200)).body.factories.rows[0].owed).toBe("339000.00");
+      // Tax included: the prices are the total, the tax is only said.
+      await freeze(13, true);
+      const included = await doc("purchase-order");
+      expect(taxBullets(included)).toEqual(["Prices include 13% tax."]);
+      expect(included.doc.sums).toEqual([]);
+      expect(included.doc.total).toMatchObject({ label: "Total", amount: "300000.00" });
+      expect((await api(app, sana).get(`/orders/${orderId}/money`).expect(200)).body.factories.rows[0].owed).toBe("300000.00");
+    } finally {
+      await freeze(0, false);
+    }
     const receiptDoc = await doc("payment-receipt", `?ref=${receipt.key.split(":")[1]}`);
     expect(receiptDoc).toMatchObject({ live: true, watermark: null });
     expect(receiptDoc.doc.total).toMatchObject({ label: "Received", amount: "1000.00" });
