@@ -22,7 +22,7 @@ import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, priceForMargin, splitDeposit, toMinor, withTaxMinor } from "@kebo/money";
 import { defaultPlan, type OrderStage } from "@kebo/shared";
 import { addDays, daysBetween, todayIn, type ISODate } from "@kebo/utils";
-import { freezeOrderMoney, nextReference, openCompany, toDbDate, type PrismaClient } from "../src";
+import { freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, toDbDate, type PrismaClient } from "../src";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -453,6 +453,7 @@ async function main() {
     });
     orders++;
     await freezeOrderMoney(db, [order.id]);
+    await freezeOrderBuyer(db, [order.id], orderedOn);
     const flow: OrderStage[] = ["confirmed", "in_production", "shipped", "done"];
     const stageDay = (st: OrderStage) =>
       st === "confirmed" ? orderedOn : st === "in_production" ? upTo(addDays(orderedOn, 5)) : st === "shipped" ? shippedOn! : doneOn!;
