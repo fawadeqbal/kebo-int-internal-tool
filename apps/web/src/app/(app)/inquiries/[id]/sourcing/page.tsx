@@ -1,20 +1,28 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft, Factory } from "lucide-react";
 import { basisText } from "@kebo/shared";
-import { Alert, Badge, ButtonLink, Card, cn, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, Badge, buttonClass, ButtonLink, Card, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { hasFeature, load, requirePermission } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { date, money, qty } from "@/lib/format";
-import type { DealDetail } from "@/lib/types";
+import { dealHistoryOf, dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { FactoryQuoteView, SalesSettings, SourcingView } from "@/lib/types-deals";
-import { FactoryQuotes } from "@/components/deals/sourcing-board";
+import { optional } from "@/components/print/data";
+import { StepChanges, StepFrame, StepHeader, StepPrevNext } from "@/components/orders/step-page";
+import { ViewCard } from "@/components/orders/step-view";
+import { changesIn, FilesCard } from "@/components/deals/inquiry-side";
+import { cheapestComplete, coverOf, detailsFilled, offerNeeds, shortName, theirTotalMinor } from "@/components/deals/offer-facts";
+import { AddOfferButton, CoverBadge, OfferDetails, OfferLines } from "@/components/deals/offer-work";
 import { removeFileAction } from "../../actions";
+import { askFactories } from "../ask";
+import { inquirySteps, plural } from "../steps";
 import {
   addOfferLinesAction,
   copyOfferLinesAction,
   editOfferLineAction,
   moveOfferLineAction,
+  offerFieldsAction,
   removeFactoryQuoteAction,
   removeOfferLineAction,
   saveFactoryQuoteAction,
@@ -25,35 +33,110 @@ export const metadata = { title: "Factory prices" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
+/** "USD 51,741": whole units for the step's header line. */
+const whole = (v: string | number, currency: string) => `${currency} ${Math.round(Number(v)).toLocaleString("en-US")}`;
+
 /**
- * The factories' offers for the deal, in two views: "Offers" (one offer at a
- * time: its details, what is still missing, its lines and files) and "Compare
- * side by side" (each of the customer's items across the offers, cheapest
- * marked, then each whole offer's cost, coverage and terms). The quotation
- * offers whole offers as options A, B…
+ * Step 2, Factory prices (board InqV4Prices): the offers as one compare table
+ * (click a row to open it below: its details and its lines, read only until
+ * Edit), Add an offer in a short side panel, and "Compare side by side" for
+ * each of the customer's items across the offers. The quotation offers whole
+ * offers as options A, B…
  */
 export default async function SourcingPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ view?: string; offer?: string }>;
+  searchParams: Promise<{ view?: string; offer?: string; add?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  await requirePermission("sourcing.manage");
-  const [d, s, settings] = await Promise.all([
-    load(() => api.get<DealDetail>(`/inquiries/${id}`)),
-    load(() => api.get<SourcingView>(`/inquiries/${id}/sourcing`)),
+  const me = await requirePermission("sourcing.manage");
+  const [d, s, settings, q, history] = await Promise.all([
+    dealOf(id),
+    sourcingOf(id),
     api.get<{ sales: SalesSettings }>("/settings"),
+    optional(() => quotationOf(id)),
+    optional(() => dealHistoryOf(id)),
   ]);
   const canEdit = d.allowed.source;
-  const compare = sp.view === "compare";
-  const withLines = s.quotes.filter((q) => q.lines.length);
   const base = `/inquiries/${d.id}/sourcing`;
+  const today = todayIn(TZ);
+  const step = inquirySteps(d, s.quotes.length).find((x) => x.key === "sourcing")!;
+  const ask = await askFactories(d, me, "ghost");
+  const compare = sp.view === "compare";
+  const selected = s.quotes.find((x) => x.id === sp.offer) ?? s.quotes[0] ?? null;
+  const cheapest = cheapestComplete(s.quotes);
+  // Which quotation option each offer is, on the newest revision (a draft when one is open).
+  const revs = [...(q?.revisions ?? [])].sort((a, b) => b.number - a.number);
+  const current = revs[0] ?? null;
+  const letterOf = new Map((current?.options ?? []).filter((o) => o.factoryQuoteId).map((o) => [o.factoryQuoteId!, o.letter]));
+  const needing = (selected && offerNeeds(selected, s.items).length ? selected : null) ?? s.quotes.find((x) => offerNeeds(x, s.items).length) ?? null;
+  const line = s.quotes.length
+    ? [
+        `${plural(s.quotes.length, "offer")} in`,
+        needing ? `${shortName(needing.factory.name)}'s offer needs ${offerNeeds(needing, s.items).join(", ")}` : "every offer is complete",
+        cheapest?.totalCost ? `cheapest that covers everything: ${shortName(cheapest.factory.name)} ${whole(cheapest.totalCost, s.currency)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "No offers yet: ask two or three factories, then add each one's prices.";
+  const withLines = s.quotes.some((x) => x.lines.length);
+  const lines = {
+    add: addOfferLinesAction.bind(null, d.id),
+    edit: editOfferLineAction.bind(null, d.id),
+    move: moveOfferLineAction.bind(null, d.id),
+    remove: removeOfferLineAction.bind(null, d.id),
+    copy: copyOfferLinesAction.bind(null, d.id),
+    removeFile: removeFileAction.bind(null, d.id),
+  };
+  const addOffer = (props: { variant?: "primary" | "secondary" | "ghost"; size?: "xs" | "sm" | "md"; label?: string; open?: boolean }) =>
+    canEdit ? (
+      <AddOfferButton
+        dealId={d.id}
+        items={s.items}
+        today={today}
+        mainCurrency={s.currency}
+        rates={settings.sales.exchangeRates}
+        searchFactories={searchFactoriesAction}
+        createAction={saveFactoryQuoteAction.bind(null, d.id, null)}
+        addLines={lines.add}
+        variant={props.variant}
+        size={props.size}
+        label={props.label}
+        defaultOpen={props.open}
+      />
+    ) : null;
+  const quotationHref = `/inquiries/${d.id}/quotation`;
+  const offerFiles = s.quotes.flatMap((x) => x.files.map((f) => ({ id: f.id, name: f.fileName, offer: x.factory.name })));
 
   return (
-    <div className="flex flex-col gap-4">
+    <StepFrame
+      header={
+        <StepHeader
+          step={{ number: step.number, label: step.label, state: step.state, stateLabel: step.stateLabel, line }}
+          action={
+            <>
+              {ask?.button}
+              {s.quotes.length > 0 && addOffer({ variant: "secondary", open: sp.add === "1" })}
+              {withLines && (
+                <Link href={current ? quotationHref : `${quotationHref}?start=1`} className={buttonClass("primary", "md", "max-sm:w-full")}>
+                  {current ? "Open the quotation" : "Make the quotation"}
+                </Link>
+              )}
+            </>
+          }
+        />
+      }
+      side={
+        <>
+          <FilesCard files={offerFiles.map((f) => ({ id: f.id, name: f.name }))} empty="No factory files yet." />
+          {history && <StepChanges entries={changesIn(history, "sourcing", offerFiles.map((f) => f.name))} historyHref={`/inquiries/${d.id}/history`} />}
+        </>
+      }
+      prevNext={<StepPrevNext prev={{ href: `/inquiries/${d.id}/needs`, label: "Needs" }} next={{ href: quotationHref, label: "Quotation" }} />}
+    >
       {!canEdit && (
         <Alert tone="info">
           {d.stage === "won" || d.stage === "lost"
@@ -62,48 +145,155 @@ export default async function SourcingPage({
         </Alert>
       )}
 
-      {s.quotes.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Segmented
-            label="View"
-            options={[
-              { href: base, label: `Offers (${s.quotes.length})`, active: !compare },
-              { href: `${base}?view=compare`, label: "Compare side by side", active: compare },
-            ]}
-          />
-          {withLines.length > 0 && (
-            <ButtonLink href={`/inquiries/${d.id}/quotation`} variant="primary" size="sm">
-              Go to the quotation <ArrowRight aria-hidden />
-            </ButtonLink>
-          )}
-        </div>
-      )}
-
-      {compare ? (
-        <CompareView view={s} dealId={d.id} />
+      {s.quotes.length === 0 ? (
+        <NoOffers items={s.items} add={addOffer({ variant: "primary", label: "Add the first offer", open: sp.add === "1" })} />
+      ) : compare ? (
+        <>
+          <Link href={base} className={buttonClass("ghost", "sm", "self-start px-1")}>
+            <ArrowLeft aria-hidden /> Back to the offers
+          </Link>
+          <CompareView view={s} dealId={d.id} />
+        </>
       ) : (
-        <FactoryQuotes
-          dealId={d.id}
-          askFactories={await hasFeature("factory_requests")}
-          quotes={s.quotes}
-          items={s.items}
-          canEdit={canEdit}
-          today={todayIn(TZ)}
-          mainCurrency={s.currency}
-          rates={settings.sales.exchangeRates}
-          initialOffer={sp.offer ?? null}
-          saveAction={saveFactoryQuoteAction.bind(null, d.id)}
-          removeAction={removeFactoryQuoteAction.bind(null, d.id)}
-          searchFactories={searchFactoriesAction}
-          lines={{
-            add: addOfferLinesAction.bind(null, d.id),
-            edit: editOfferLineAction.bind(null, d.id),
-            move: moveOfferLineAction.bind(null, d.id),
-            remove: removeOfferLineAction.bind(null, d.id),
-            copy: copyOfferLinesAction.bind(null, d.id),
-            removeFile: removeFileAction.bind(null, d.id),
-          }}
+        <>
+          <ViewCard title={`Offers · ${s.quotes.length}`} canEdit={false}>
+            <OffersTable quotes={s.quotes} view={s} selected={selected?.id ?? null} base={base} letterOf={letterOf} />
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3 text-xs text-muted">
+              <span>Click a factory to see its offer below. Our cost = their price to our basis, with tax, in {s.currency}.</span>
+              <Link href={`${base}?view=compare`} className={buttonClass("ghost", "xs")}>
+                Compare side by side
+              </Link>
+            </div>
+          </ViewCard>
+          {selected && (
+            <>
+              <OfferDetails
+                key={`d-${selected.id}`}
+                dealId={d.id}
+                q={selected}
+                canEdit={canEdit}
+                today={today}
+                mainCurrency={s.currency}
+                rates={settings.sales.exchangeRates}
+                searchFactories={searchFactoriesAction}
+                saveAction={saveFactoryQuoteAction.bind(null, d.id, selected.id)}
+                fieldsAction={offerFieldsAction.bind(null, d.id, selected.id)}
+                removeAction={removeFactoryQuoteAction.bind(null, d.id, selected.id)}
+                removeFile={lines.removeFile}
+              />
+              <OfferLines
+                key={`l-${selected.id}`}
+                q={selected}
+                others={s.quotes.filter((x) => x.id !== selected.id && x.lines.length)}
+                items={s.items}
+                canEdit={canEdit}
+                mainCurrency={s.currency}
+                lines={lines}
+              />
+            </>
+          )}
+        </>
+      )}
+    </StepFrame>
+  );
+}
+
+/** One row per offer: who and on what basis, valid until, their total, our cost, what it covers, how complete it is, and its quotation option. */
+function OffersTable({
+  quotes,
+  view,
+  selected,
+  base,
+  letterOf,
+}: {
+  quotes: FactoryQuoteView[];
+  view: SourcingView;
+  selected: string | null;
+  base: string;
+  letterOf: Map<string, string>;
+}) {
+  return (
+    <div className="overflow-x-auto px-4 pt-2 pb-3">
+      <Table>
+        <THead>
+          <tr>
+            <Th>Factory</Th>
+            <Th className="hidden md:table-cell">Valid until</Th>
+            <Th className="hidden text-right lg:table-cell">Their total</Th>
+            <Th className="text-right">Our cost</Th>
+            <Th className="hidden sm:table-cell">Covers</Th>
+            <Th className="hidden xl:table-cell">Details</Th>
+            <Th className="hidden md:table-cell">Quotation</Th>
+          </tr>
+        </THead>
+        <tbody>
+          {quotes.map((x) => {
+            const on = x.id === selected;
+            const filled = detailsFilled(x);
+            const letter = letterOf.get(x.id);
+            return (
+              <Tr key={x.id} className={cn("relative", on ? "bg-primary-soft/60 shadow-[inset_3px_0_0_var(--color-primary)]" : "hover:bg-surface-2/60")}>
+                <Td>
+                  <Link href={`${base}?offer=${x.id}`} scroll={false} aria-current={on ? "true" : undefined} className="block font-medium after:absolute after:inset-0">
+                    {x.factory.name}
+                  </Link>
+                  <span className="block text-xs text-muted">
+                    {[x.basis ? basisText(x.basis, x.basisPlace) : "Basis not said", x.leadTime].filter(Boolean).join(" · ")}
+                  </span>
+                  <span className="mt-1 block sm:hidden">
+                    <CoverBadge cover={coverOf(x, view.items)} />
+                  </span>
+                </Td>
+                <Td className="hidden whitespace-nowrap text-text-2 md:table-cell">{x.validUntil ? date(x.validUntil) : <span className="text-muted">—</span>}</Td>
+                <Td className="hidden text-right whitespace-nowrap tabular lg:table-cell">{x.lines.length ? whole(theirTotalMinor(x) / 100, x.currency) : <span className="text-muted">—</span>}</Td>
+                <Td className="text-right font-semibold whitespace-nowrap tabular">
+                  {x.totalCost === null ? <span className="text-xs font-medium text-warn">No rate</span> : x.lines.length ? whole(x.totalCost, view.currency) : <span className="text-muted">—</span>}
+                </Td>
+                <Td className="hidden sm:table-cell">
+                  <CoverBadge cover={coverOf(x, view.items)} />
+                </Td>
+                <Td className="hidden text-xs whitespace-nowrap text-text-2 tabular xl:table-cell">
+                  {filled.n} of {filled.of}
+                </Td>
+                <Td className="hidden md:table-cell">{letter ? <Badge tone="primary">Option {letter}</Badge> : <span className="text-muted">—</span>}</Td>
+              </Tr>
+            );
+          })}
+        </tbody>
+      </Table>
+    </div>
+  );
+}
+
+/** No offer yet: what to do, and what the factories quote on. */
+function NoOffers({ items, add }: { items: SourcingView["items"]; add: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-5">
+      <Card className="flex items-center justify-center">
+        <EmptyState
+          icon={Factory}
+          title="No factory offers yet"
+          description="Send the customer's list to two or three factories (Ask factories, above). When each one replies, add its offer here: the customer's items are listed with a price box each."
+          action={add ?? undefined}
         />
+      </Card>
+      {items.length > 0 && (
+        <Card className="flex flex-col gap-2 p-4">
+          <h3 className="text-sm font-semibold">What the factories quote on</h3>
+          <ul className="flex flex-col divide-y divide-line">
+            {items.map((it) => (
+              <li key={it.id} className={cn("flex items-baseline justify-between gap-3 py-2 text-sm", it.parentId && "pl-5")}>
+                <span className="min-w-0">
+                  <span className="mr-1.5 rounded bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-text-2 tabular">{it.no}</span>
+                  {it.description.split("\n")[0]}
+                </span>
+                <span className="shrink-0 text-text-2 tabular">
+                  {qty(it.quantity)} {it.unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </div>
   );

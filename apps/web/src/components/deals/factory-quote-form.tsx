@@ -15,7 +15,7 @@ import { CurrencySelect } from "@/components/common/currency-select";
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /** What each basis means for us, in a few words. */
-const BASIS_HINT: Partial<Record<Incoterm, string>> = {
+export const BASIS_HINT: Partial<Record<Incoterm, string>> = {
   EXW: "At their factory: we pay transport to the port and everything after",
   FCA: "Handed to our carrier, export cleared: we pay the freight and after",
   FOB: "On board at the port: we pay the sea freight and after",
@@ -25,7 +25,7 @@ const BASIS_HINT: Partial<Record<Incoterm, string>> = {
   DDP: "Delivered, duties paid",
 };
 
-interface QuoteState {
+export interface QuoteState {
   factory: { id: string | null; name: string } | null;
   reference: string;
   currency: string;
@@ -78,7 +78,7 @@ function payload(s: QuoteState, convertible?: boolean) {
 }
 
 /** Choose a known factory, or type a new one's name (it is added to the factory list on save). */
-function FactoryPicker({
+export function FactoryPicker({
   value,
   onChange,
   search,
