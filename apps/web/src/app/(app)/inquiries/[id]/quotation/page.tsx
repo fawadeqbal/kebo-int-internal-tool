@@ -73,9 +73,21 @@ export default async function QuotationPage({
   const checks = draft ? draftChecks(draft) : [];
   // R1 starts from the offer the API picks: say which, so nobody has to guess.
   const firstOffer = revs.length === 0 && startValues?.options[0]?.factoryQuoteId ? (offers?.offers.find((o) => o.factoryQuoteId === startValues.options[0]!.factoryQuoteId) ?? null) : null;
-  const start = (props: { open?: boolean; label?: string }) =>
+  // What R1 starts with, under the editor's title (and over the button while it is closed).
+  const startNote = firstOffer ? (
+    <>
+      Starts with <b className="font-semibold text-text">{firstOffer.factory.name}</b>:{" "}
+      {firstOffer.coverage.missing.length ? `covers all but ${firstOffer.coverage.missing.join(", ")}` : "covers everything asked for"}
+      {showCosts && firstOffer.totalCost ? `, cost ${money(firstOffer.totalCost, offers!.currency)}` : ""}, priced at your default {offers!.defaultMargin}%.
+      {offers!.offers.length > 1 ? " Add more offers as Options B, C… for the customer to choose from." : ""}
+    </>
+  ) : undefined;
+  // R1 open: the editor takes the page's full width (no side column).
+  const startOpen = revs.length === 0 && sp.start === "1" && manage && q.canStartRevision && !!startValues;
+  const start = (props: { open?: boolean; label?: string; empty?: boolean }) =>
     quoter ? (
       <StartRevision
+        key={props.open ? "open" : "closed"}
         action={createRevisionAction.bind(null, d.id)}
         draft={startValues}
         offers={offers}
@@ -86,6 +98,13 @@ export default async function QuotationPage({
         first={revs.length === 0}
         defaultOpen={props.open}
         label={props.label}
+        note={revs.length === 0 ? startNote : undefined}
+        empty={
+          props.empty
+            ? { title: "No quotation yet", description: "Each option you offer is one factory's offer from Factory prices, with your prices. The customer accepts one option." }
+            : undefined
+        }
+        openHref={props.empty ? "?start=1" : undefined}
       />
     ) : null;
   // The customer said no (or let it lapse) and nothing new is being drafted: the next step is a new revision.
@@ -169,10 +188,12 @@ export default async function QuotationPage({
         />
       }
       side={
-        <>
-          <FilesCard files={pdfs} empty="The PDF of each revision sent shows here." />
-          {history && <StepChanges entries={changesIn(history, "quotation")} historyHref={`${base}/history`} />}
-        </>
+        startOpen ? undefined : (
+          <>
+            <FilesCard files={pdfs} empty="The PDF of each revision sent shows here." />
+            {history && <StepChanges entries={changesIn(history, "quotation")} historyHref={`${base}/history`} />}
+          </>
+        )
       }
       prevNext={
         <StepPrevNext
@@ -203,28 +224,20 @@ export default async function QuotationPage({
         </Alert>
       )}
 
-      {revs.length === 0 && (
-        <Card>
-          <CardHeader
-            title="No quotation yet"
-            description="Each option you offer is one factory's offer from Factory prices, with your prices. The customer accepts one option."
-          />
-          <CardBody className="flex flex-col gap-3">
-            {firstOffer && manage && (
-              <div className="flex flex-col gap-0.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5 text-sm">
-                <span className="text-xs font-semibold tracking-wide text-muted uppercase">R1 will start with</span>
-                <span>
-                  <b>Option A · {firstOffer.factory.name}</b>:{" "}
-                  {firstOffer.coverage.missing.length ? `covers all but ${firstOffer.coverage.missing.join(", ")}` : "covers everything the customer asked for"}
-                  {showCosts && firstOffer.totalCost ? `, our cost ${money(firstOffer.totalCost, offers!.currency)}` : ""}, priced at your default {offers!.defaultMargin}% margin.
-                </span>
-                {offers!.offers.length > 1 && <span className="text-xs text-text-2">Add the other offers as Options B, C… inside the draft.</span>}
-              </div>
-            )}
-            {quoter ? start({ open: sp.start === "1" }) : <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this inquiry makes the quotation."}</p>}
-          </CardBody>
-        </Card>
-      )}
+      {revs.length === 0 &&
+        (quoter ? (
+          start({ open: sp.start === "1", empty: true })
+        ) : (
+          <Card>
+            <CardHeader
+              title="No quotation yet"
+              description="Each option you offer is one factory's offer from Factory prices, with your prices. The customer accepts one option."
+            />
+            <CardBody>
+              <p className="text-sm text-muted">{q.whyNotStart ?? "The person handling this inquiry makes the quotation."}</p>
+            </CardBody>
+          </Card>
+        ))}
 
       {draft && checks.length > 0 && (
         <div role="status" className="flex items-start gap-2 rounded-xl border border-warn/30 bg-warn-soft/60 px-4 py-3 text-sm">

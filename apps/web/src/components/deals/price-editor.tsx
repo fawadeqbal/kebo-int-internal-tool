@@ -19,6 +19,7 @@ import {
   asLineOf,
   BasisCosts,
   extraOf,
+  Fig,
   fromDraft,
   gapOf,
   linesOf,
@@ -131,6 +132,8 @@ export function PriceEditor({
   // What can still be added: offers not used yet, and the customer's items when no option uses them.
   const used = new Set(s.options.map((o) => o.factoryQuoteId ?? "items"));
   const addable = [...offers.offers.filter((o) => !used.has(o.factoryQuoteId)), ...(!used.has("items") ? [null] : [])];
+  const nOffers = addable.filter(Boolean).length;
+  const addHint = nOffers ? `${nOffers} more offer${nOffers === 1 ? "" : "s"} to add` : "the customer's items, by hand";
   const addOption = (factoryQuoteId: string | null) => {
     const off = offers.offers.find((o) => o.factoryQuoteId === factoryQuoteId);
     const ls = off?.lines ?? offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
@@ -308,9 +311,12 @@ export function PriceEditor({
                   type="button"
                   onClick={() => setAdding((v) => !v)}
                   aria-expanded={adding}
-                  className="flex shrink-0 items-center justify-center gap-1 rounded-xl border border-dashed border-line-strong px-5 py-3 text-sm font-medium text-primary hover:border-primary"
+                  className="flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-line-strong px-5 py-3 text-sm font-medium text-primary hover:border-primary"
                 >
-                  <Plus className="size-4" aria-hidden /> Add an option
+                  <span className="flex items-center gap-1">
+                    <Plus className="size-4" aria-hidden /> Add an option
+                  </span>
+                  <span className="text-xs font-normal text-text-2">{addHint}</span>
                 </button>
               )}
             </div>
@@ -701,15 +707,6 @@ function PriceInput({ value, onChange, className, ...props }: Omit<React.Compone
       onBlur={() => setTyping(false)}
       onChange={(e) => onChange(e.target.value)}
     />
-  );
-}
-
-function Fig({ label, children, strong, className }: { label: string; children: ReactNode; strong?: boolean; className?: string }) {
-  return (
-    <div className="flex flex-col">
-      <dt className="text-xs text-text-2">{label}</dt>
-      <dd className={cn("text-sm font-semibold whitespace-nowrap tabular", strong && "text-base", className)}>{children}</dd>
-    </div>
   );
 }
 
