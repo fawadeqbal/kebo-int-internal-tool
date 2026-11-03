@@ -107,3 +107,44 @@ BEGIN
 END $$;
 
 DROP TABLE "production_steps";
+
+-- 4. A payment is in its order's currency (its amount is "what it counts as on the order"; what really arrived
+--    is received_amount / received_currency). The database now holds it to that, so readers no longer filter
+--    payments on their currency. A live payment in another currency could not be counted (its rate is not
+--    known): the migration refuses while there is one (void it and record it again in the order's currency).
+DO $$
+DECLARE n bigint;
+BEGIN
+  SELECT count(*) INTO n FROM "payments" p JOIN "orders" o ON o."id" = p."order_id"
+   WHERE p."voided_at" IS NULL AND p."currency" <> o."currency";
+  IF n > 0 THEN
+    RAISE EXCEPTION '% live payment(s) are not in their order''s currency: void them and record them again in the order''s currency before this migration', n;
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION payment_in_order_currency() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE c text;
+BEGIN
+  SELECT o."currency" INTO c FROM "orders" o WHERE o."id" = NEW."order_id";
+  IF c IS NOT NULL AND NEW."currency" <> c THEN
+    RAISE EXCEPTION 'a payment is in its order''s currency (%), not %', c, NEW."currency" USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER "payments_in_order_currency" BEFORE INSERT OR UPDATE OF "currency", "order_id" ON "payments"
+  FOR EACH ROW EXECUTE FUNCTION payment_in_order_currency();
+
+-- An order's currency does not change under its payments either.
+CREATE OR REPLACE FUNCTION order_currency_keeps_payments() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM "payments" p WHERE p."order_id" = NEW."id" AND p."voided_at" IS NULL AND p."currency" <> NEW."currency") THEN
+    RAISE EXCEPTION 'order % has payments in %: its currency stays', NEW."ref_no", OLD."currency" USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER "orders_currency_keeps_payments" BEFORE UPDATE OF "currency" ON "orders"
+  FOR EACH ROW WHEN (NEW."currency" IS DISTINCT FROM OLD."currency") EXECUTE FUNCTION order_currency_keeps_payments();

@@ -1071,7 +1071,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       .sort((a, b) =>
         a.p.paid_at < b.p.paid_at ? -1 : a.p.paid_at > b.p.paid_at ? 1 : a.p.created_at.getTime() - b.p.created_at.getTime(),
       )
-      .forEach(({ p, inv }, i) =>
+      .forEach(({ p, inv }, i) => {
+        // A payment counts on its order in the order's currency (the database holds it to that); the old app
+        // has no rate to turn one in another currency into it.
+        if (inv.currency !== o.currency)
+          throw new Error(`Payment against invoice ${inv.invoice_no} is in ${inv.currency}, its order in ${o.currency}: record it in the order's currency.`);
         paymentRows.push({
           id: p.id,
           kind: map.paymentKind(i),
@@ -1087,8 +1091,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
           note: `Paid against invoice ${inv.invoice_no} (old app).`,
           recordedById: p.recorded_by,
           createdAt: p.created_at,
-        }),
-      );
+        });
+      });
   }
   await tx.payment.createMany({ data: paymentRows });
   report.judge(

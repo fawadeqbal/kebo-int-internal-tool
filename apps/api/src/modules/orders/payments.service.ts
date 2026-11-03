@@ -90,7 +90,7 @@ export class PaymentsService {
       include: { account: { select: { id: true, name: true } } },
       orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
     });
-    const live = all.filter((p) => !p.voidedAt && p.currency === o.currency);
+    const live = all.filter((p) => !p.voidedAt);
     const position = positionOf(o, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
     // Who recorded each payment, and where the order stood after it (counted payments in date order).
     const people = new Map(
@@ -196,7 +196,7 @@ export class PaymentsService {
     const fx = fxOf(settings, await this.limits.allows("expenses"));
     const totals = new Map<string, { totalMinor: number; receivedMinor: number; dueMinor: number; orders: number }>();
     const rows = orders.map((o) => {
-      const live = payments.filter((p) => p.orderId === o.id && !p.voidedAt && p.currency === o.currency);
+      const live = payments.filter((p) => p.orderId === o.id && !p.voidedAt);
       const pos = positionOf({ ...o, payments: live }, fx);
       if (o.status !== "cancelled") {
         const t = totals.get(o.currency) ?? { totalMinor: 0, receivedMinor: 0, dueMinor: 0, orders: 0 };

@@ -216,13 +216,12 @@ export class InsightsService {
           on: ISODate;
           minor: number;
           charges: number;
-          currency: string;
           orderCurrency: string;
           mainCurrency: string | null;
           mainRate: string | null;
         }[]
       >`
-        select to_char(p.paid_on, 'YYYY-MM-DD') as "on", (p.amount * 100)::float8 as minor, (p.bank_charges * 100)::float8 as charges, p.currency,
+        select to_char(p.paid_on, 'YYYY-MM-DD') as "on", (p.amount * 100)::float8 as minor, (p.bank_charges * 100)::float8 as charges,
                o.currency as "orderCurrency", o.main_currency as "mainCurrency", o.main_rate::text as "mainRate"
         from payments p join orders o on o.id = p.order_id
         where p.voided_at is null and p.paid_on between ${loadFrom}::date and ${to}::date`,
@@ -331,9 +330,8 @@ export class InsightsService {
     }
     for (const p of payments) {
       const order = { currency: p.orderCurrency, mainCurrency: p.mainCurrency, mainRate: p.mainRate };
-      const same = p.currency === p.orderCurrency;
-      const v = same ? fx.order(Math.round(p.minor), order) : toMain(Math.round(p.minor), p.currency);
-      const charges = same ? fx.order(Math.round(p.charges), order) : toMain(Math.round(p.charges), p.currency);
+      const v = fx.order(Math.round(p.minor), order);
+      const charges = fx.order(Math.round(p.charges), order);
       events.push({
         on: p.on,
         add: (f) => {

@@ -171,9 +171,7 @@ export class ReportsService {
           paidIn.reduce(
             (t, p) =>
               t +
-              (p.currency === p.order.currency
-                ? fx.order(decimalToMinor(p.amount), p.order)
-                : fx.live(decimalToMinor(p.amount), p.currency)),
+              fx.order(decimalToMinor(p.amount), p.order),
             0,
           ),
         ),

@@ -518,7 +518,7 @@ export class FlowService {
         depositPercent: true,
         mainCurrency: true,
         mainRate: true,
-        payments: { where: { voidedAt: null }, select: { currency: true, amount: true, bankCharges: true } },
+        payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true } },
         planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         expenses: chargedExpenses,
         checklist: { where: productionWhere, select: { doneAt: true, skippedAt: true } },

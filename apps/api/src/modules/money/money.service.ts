@@ -426,7 +426,7 @@ export class MoneyService {
       );
       const now = describe(rows.map((r) => ({ ...r, amount: fromMinor(toMinor(r.amount)) })));
       if (was === now) return;
-      const paid = o.payments.some((p) => p.currency === o.currency);
+      const paid = o.payments.length > 0;
       const reason = paid
         ? requireReason(input.reason, "plan", "the payment plan changes after the customer has paid")
         : (input.reason ?? null);
@@ -1143,7 +1143,7 @@ export class MoneyService {
           customer: { select: { name: true } },
           // Only those borne by us: the customer pays the others back, or they come off what we owe a factory.
           expenses: { where: { voidedAt: null, borneBy: "us" }, select: { amount: true, rate: true, category: true } },
-          payments: { where: { voidedAt: null }, select: { bankCharges: true, currency: true } },
+          payments: { where: { voidedAt: null }, select: { bankCharges: true } },
         },
       }),
       this.prisma.db.payment.findMany({
@@ -1205,7 +1205,7 @@ export class MoneyService {
       const basisPaid = o.expenses
         .filter((e) => paysBasis(e.category))
         .reduce((t, e) => t + convert(decimalToMinor(e.amount), Number(e.rate)), 0);
-      const bank = inMain(o.payments.filter((p) => p.currency === o.currency).reduce((t, p) => t + decimalToMinor(p.bankCharges), 0));
+      const bank = inMain(o.payments.reduce((t, p) => t + decimalToMinor(p.bankCharges), 0));
       const revenue = inMain(c.revenueMinor);
       const costedRevenue = inMain(c.costedRevenueMinor);
       const goodsCost = inMain(c.goodsCostMinor);
@@ -1249,11 +1249,10 @@ export class MoneyService {
       monthOf(e.spentOn).cash.expenses += inMain;
     }
     for (const p of payments) {
-      // Cash in is what arrived; bank charges never reached us. (Old payments in another currency: at today's rate.)
-      monthOf(p.paidOn).cash.in +=
-        p.currency === p.order.currency ? fx.order(decimalToMinor(p.amount), p.order) : fx.live(decimalToMinor(p.amount), p.currency);
+      // Cash in is what arrived; bank charges never reached us.
+      monthOf(p.paidOn).cash.in += fx.order(decimalToMinor(p.amount), p.order);
       // Bank charges on a cancelled order's payments: a general cost of the month (no shipped order carries them).
-      if (p.order.status === "cancelled" && p.currency === p.order.currency)
+      if (p.order.status === "cancelled")
         monthOf(p.paidOn).earned.bankCharges += fx.order(decimalToMinor(p.bankCharges), p.order);
     }
     for (const p of factoryPaid) monthOf(p.paidOn).cash.factories += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);

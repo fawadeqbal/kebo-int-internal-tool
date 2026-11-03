@@ -154,9 +154,9 @@ export class LeaksService {
                  where p.order_id = o.id and p.voided_at is null), 0)::float8 as "factoryPaidMinor",
                (select to_char(min(p.paid_on), 'YYYY-MM-DD') from factory_payments p where p.order_id = o.id and p.voided_at is null) as "firstFactoryPaid",
                coalesce((select sum((p.amount + p.bank_charges) * 100) from payments p
-                 where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "receivedMinor",
+                 where p.order_id = o.id and p.voided_at is null), 0)::float8 as "receivedMinor",
                coalesce((select sum(p.bank_charges * 100) from payments p
-                 where p.order_id = o.id and p.voided_at is null and p.currency = o.currency), 0)::float8 as "bankChargesMinor",
+                 where p.order_id = o.id and p.voided_at is null), 0)::float8 as "bankChargesMinor",
                coalesce((select sum(sign(v.x) * floor(abs(v.x) + 0.5)) from expenses e
                  cross join lateral (select (e.amount * 100)::float8 / e.rate::float8 as x) v
                  where e.order_id = o.id and e.voided_at is null and e.borne_by = 'us' and e.category = any(${[...BASIS_COST_CATEGORIES]}::text[])), 0)::float8 as "basisPaidMinor",
