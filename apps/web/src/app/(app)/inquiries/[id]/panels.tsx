@@ -4,7 +4,8 @@ import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from
 import { Button, Field, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelButton, useClosePanel } from "@/components/orders/step-view";
+import { PanelButton } from "@/components/orders/step-view";
+import { PANEL_FORM, PanelActions, PanelBody, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;

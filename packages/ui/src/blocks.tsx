@@ -319,6 +319,85 @@ export function Tracker({ steps, label }: { steps: { key: string; title: ReactNo
   );
 }
 
+/* ---------------------------------------------------------------- SectionNav */
+
+export interface SectionNavItem {
+  href: string;
+  label: ReactNode;
+  active: boolean;
+  /** Before the label: a step's tick or number (StepMark). */
+  mark?: ReactNode;
+  /** After the label: a count or progress ("3/5", "8"), with words for screen readers inside if needed. */
+  count?: ReactNode;
+  /** The count in red (late). */
+  alert?: boolean;
+}
+
+/**
+ * Where you are in a record or a module, always visible (design system:
+ * section navigation): numbered steps (orders, inquiries) or a list of
+ * sections (Insights, Settings), with counts that show progress. From a
+ * tablet up, a row of links on a line; on a phone, a row of chips that
+ * scrolls sideways with the current one filled (`phone="chips"`), or nothing
+ * when the page has its own phone picker (`phone="none"`).
+ */
+export function SectionNav({
+  label,
+  items,
+  phone = "chips",
+  className,
+}: {
+  label: string;
+  items: SectionNavItem[];
+  phone?: "chips" | "none";
+  className?: string;
+}) {
+  return (
+    <>
+      <nav aria-label={label} className={cn("no-print hidden border-b border-line md:block", className)}>
+        <ul className="relative -mb-px flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {items.map((l) => (
+            <li key={l.href} className="shrink-0">
+              <Link
+                href={l.href}
+                aria-current={l.active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-1.5 border-b-2 px-2 py-2.5 text-sm whitespace-nowrap transition-colors xl:px-2.5",
+                  l.active ? "border-primary font-semibold text-text" : "border-transparent text-text-2 hover:text-text",
+                )}
+              >
+                {l.mark}
+                <span>{l.label}</span>
+                {l.count !== undefined && l.count !== null && l.count !== "" && (
+                  <span className={cn("text-[11px] tabular", l.alert ? "text-bad" : "text-muted")}>{l.count}</span>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      {phone === "chips" && (
+        <nav aria-label={label} className={cn("no-print -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden", className)}>
+          {items.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              aria-current={l.active ? "page" : undefined}
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap",
+                l.active ? "bg-primary-soft font-semibold text-primary" : "bg-surface-2 text-text-2 hover:text-text",
+              )}
+            >
+              {l.label}
+              {l.count !== undefined && l.count !== null && l.count !== "" && <span className={cn("tabular", l.alert ? "text-bad" : "opacity-80")}>{l.count}</span>}
+            </Link>
+          ))}
+        </nav>
+      )}
+    </>
+  );
+}
+
 /* ---------------------------------------------------------------- StickyBar */
 
 /** Save and Cancel of a long form, kept in view; above the phone's bottom bar. */

@@ -18,7 +18,8 @@ import {
   type LineValues,
   type NewLine,
 } from "@/components/lines/line-table";
-import { DetailsCard, EditPanel, LinesCard, PanelActions, PanelBody, useClosePanel, type DetailField } from "@/components/orders/step-view";
+import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
+import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, money as amount } from "@/lib/format";
 import { rateSentence } from "@/lib/fx";
@@ -772,7 +773,7 @@ export function AddOfferButton({
         <Plus aria-hidden /> {label}
       </Button>
       {open && (
-        <EditPanel
+        <SidePanel
           title="Add a factory offer"
           description="Who and their prices. The rest can be added later."
           onClose={() => setOpen(false)}
@@ -788,7 +789,7 @@ export function AddOfferButton({
             addLines={addLines}
             taxDefault={taxDefault}
           />
-        </EditPanel>
+        </SidePanel>
       )}
     </>
   );
