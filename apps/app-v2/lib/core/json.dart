@@ -1,0 +1,44 @@
+/// A JSON object from the API.
+typedef Json = Map<String, dynamic>;
+
+/// Typed reads that never throw on a missing or null key: models stay simple
+/// and an older server that leaves a field out still loads.
+extension JsonRead on Json {
+  String str(String k, [String fallback = '']) => switch (this[k]) { String s => s, num n => '$n', _ => fallback };
+
+  String? strOrNull(String k) => switch (this[k]) { String s when s.isNotEmpty => s, num n => '$n', _ => null };
+
+  int integer(String k) => switch (this[k]) { int n => n, num n => n.toInt(), String s => int.tryParse(s) ?? 0, _ => 0 };
+
+  bool boolean(String k) => this[k] == true;
+
+  DateTime? date(String k) => switch (this[k]) { String s => DateTime.tryParse(s), _ => null };
+
+  T? obj<T>(String k, T Function(Json) read) => switch (this[k]) { Map<String, dynamic> m => read(m), _ => null };
+
+  List<T> list<T>(String k, T Function(Json) read) =>
+      switch (this[k]) { List<dynamic> l => [for (final e in l) if (e is Map<String, dynamic>) read(e)], _ => const [] };
+}
+
+/// "2026-10-28" for a date field sent to the API.
+String? isoDay(DateTime? d) => d?.toIso8601String().substring(0, 10);
+
+/// One page of a list endpoint: `{ total, page, pageSize, rows }`.
+class Paged<T> {
+  const Paged(this.rows, {required this.total, required this.page, required this.pageSize});
+
+  factory Paged.fromJson(Json j, T Function(Json) read) => Paged(
+        j.list('rows', read),
+        total: j.integer('total'),
+        page: j.integer('page'),
+        pageSize: j.integer('pageSize'),
+      );
+
+  /// An endpoint that answers with every row at once.
+  factory Paged.all(List<T> rows) => Paged(rows, total: rows.length, page: 1, pageSize: rows.length);
+
+  final List<T> rows;
+  final int total, page, pageSize;
+
+  bool get hasMore => page * pageSize < total;
+}

@@ -1,0 +1,26 @@
+# The phone app: name, tabs and the shared lists of values.
+# Everything under lib/generated comes from the files in this folder:
+#   python3 -m gen          write the generated code
+#   python3 -m gen --check  CI: fail when the generated code is out of date
+app: RFQ Desk
+tabs:
+  - { label: Home, icon: home, path: /home }
+  - { label: Inquiries, icon: inbox, path: /inquiries }
+  - { label: Orders, icon: orders, path: /orders }
+  - { label: More, icon: more, path: /more }
+
+# Lists of values. A tone is one of the five status meanings shared with the web:
+# neutral, info, ok, warn, bad.
+enums:
+  CustomerType: { company: Company, individual: Person }
+  Currency: { USD: USD, CNY: CNY, PKR: PKR }
+  InquiryStage:
+    new: { label: New, tone: info }
+    sourcing: { label: Getting prices, tone: info }
+    quoted: { label: Quoted, tone: warn }
+    won: { label: Won, tone: ok }
+    lost: { label: Lost, tone: neutral }
+  OrderStatus:
+    open: { label: Open, tone: info }
+    closed: { label: Done, tone: ok }
+    cancelled: { label: Cancelled, tone: neutral }
