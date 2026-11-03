@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { ArrowLeft, XCircle } from "lucide-react";
+import { XCircle } from "lucide-react";
 import { PAYMENT_ROUTE_SHORT, STEP_PATH } from "@kebo/shared";
-import { Badge, cn, OrderStageBadge } from "@kebo/ui";
+import { cn, OrderStageBadge, PageHeader, StatusBadge } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date, money, whole } from "@/lib/format";
 import { FileActions } from "@/components/common/file-actions";
+import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
 import { StepNav } from "@/components/orders/step-nav";
 import { orderCostsSetup } from "@/components/orders/costs-data";
@@ -15,9 +16,11 @@ import { OrderDrop } from "@/components/files/order-drop";
 import { docHref } from "./shared";
 
 /**
- * Every page of an order shares one top: the order number with its stage, the
- * customer, total, route and who handles it, the proforma's View / Print and
- * Download PDF, and the order's navigation (Overview, the six steps, History).
+ * Every page of an order shares one top (design system: page header): ← Orders,
+ * the order number with its stage, one summary line (customer · inquiry · total
+ * · route · who handles it), the proforma's View / Print and Download PDF (the
+ * papers; in ⋯ on a phone) and ⋯ more; then the order's navigation (Overview,
+ * the six steps, History). Each step's own header has that page's one primary.
  */
 export default async function OrderLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,6 +39,18 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const proforma = o.documents.find((d) => d.kind === "proforma");
   const pdf = proforma ? docHref(o, proforma) : null;
   const now = steps?.doNow;
+  // On a phone the paper buttons fold into ⋯ (design system: page header).
+  const paperItems: MenuEntry[] = pdf
+    ? [
+        { label: "View / Print the proforma", href: pdf.view, newTab: true },
+        { label: "Download the proforma PDF", href: pdf.pdf, download: true },
+      ]
+    : [];
+  const moreItems: MenuEntry[] = [
+    { label: `Open the inquiry ${o.inquiry.refNo}`, href: `/inquiries/${o.inquiry.id}` },
+    { label: `Open the customer ${o.customer.name}`, href: `/customers/${o.customer.id}` },
+    { label: "Copy link to this order", copy: base },
+  ];
 
   const meta = [
     <Link key="c" href={`/customers/${o.customer.id}`} className="font-medium text-text hover:underline">
@@ -72,31 +87,33 @@ export default async function OrderLayout({ children, params }: { children: Reac
           </div>
         }
       >
-        <header className="flex flex-col gap-1">
-          <Link href="/orders" className="inline-flex w-fit items-center gap-1 text-xs text-muted hover:text-text">
-            <ArrowLeft className="size-3.5" aria-hidden /> Orders
-          </Link>
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-              <h1 className="text-xl font-semibold tracking-tight tabular sm:text-2xl">{o.refNo}</h1>
+        <PageHeader
+          backHref="/orders"
+          backLabel="Orders"
+          title={<span className="tabular">{o.refNo}</span>}
+          badge={
+            <>
               <OrderStageBadge stage={o.stage} />
-              {!open && <Badge tone="bad">Cancelled</Badge>}
-              <p className="min-w-0 basis-full text-sm text-text-2 sm:basis-auto">
-                {meta.map((m, i) => (
-                  <span key={i}>
-                    {i > 0 && (
-                      <span aria-hidden className="px-1.5 text-muted">
-                        ·
-                      </span>
-                    )}
-                    {m}
-                  </span>
-                ))}
-              </p>
-            </div>
-            {pdf && <FileActions viewHref={pdf.view} pdfHref={pdf.pdf} of="proforma invoice" className="shrink-0" />}
-          </div>
-        </header>
+              {!open && <StatusBadge meaning="bad">Cancelled</StatusBadge>}
+            </>
+          }
+          summary={
+            <p className="min-w-0">
+              {meta.map((m, i) => (
+                <span key={i}>
+                  {i > 0 && (
+                    <span aria-hidden className="px-1.5 text-muted">
+                      ·
+                    </span>
+                  )}
+                  {m}
+                </span>
+              ))}
+            </p>
+          }
+          papers={pdf ? <FileActions viewHref={pdf.view} pdfHref={pdf.pdf} of="proforma invoice" /> : undefined}
+          more={<MoreMenu label={`More for ${o.refNo}`} phoneItems={paperItems} items={moreItems} />}
+        />
 
         {o.cancelled && (
           <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/25 bg-bad-soft p-4 text-sm">

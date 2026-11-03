@@ -185,7 +185,7 @@ export function RouteForm({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <SubmitButton size="sm" pendingText="Saving…" disabled={!pick || !changed || (pick === "letter_of_credit" && lcTerms === "deferred" && !Number(lcDays))}>
+        <SubmitButton size="sm" variant="secondary" pendingText="Saving…" disabled={!pick || !changed || (pick === "letter_of_credit" && lcTerms === "deferred" && !Number(lcDays))}>
           Save the payment route
         </SubmitButton>
         {onDone && (

@@ -46,7 +46,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       >
         {tab === "password" && (
           <Card>
-            <CardHeader title="Password" description="What you sign in with. Changing it signs you out on your other devices." actions={<PasswordEdit action={changePasswordAction} />} />
+            <CardHeader title="Password" description="What you sign in with. Changing it signs you out on your other devices." className="max-sm:flex-row max-sm:gap-3" actions={<PasswordEdit action={changePasswordAction} />} />
             <CardBody>
               <dl>
                 <dt className="text-xs text-muted">Password</dt>

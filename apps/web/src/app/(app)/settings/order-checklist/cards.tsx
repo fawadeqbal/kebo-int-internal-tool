@@ -30,6 +30,7 @@ export function ChecklistCards({ value, action }: { value: ChecklistSettings; ac
             <CardHeader
               title={`${n + 1} · ${FLOW_STEP_LABEL[step]}`}
               description={`${mine.length ? `${mine.length} item${mine.length === 1 ? "" : "s"} of your own` : "None of your own"}${auto.length ? ` · ${shown} of ${auto.length} ticked from the data` : ""}`}
+              className="max-sm:flex-row max-sm:gap-3"
               actions={<EditButton aria-label={`Edit the ${FLOW_STEP_LABEL[step]} checklist`} onClick={() => panel.openPanel(step)} />}
             />
             <ul className="flex flex-col divide-y divide-line">

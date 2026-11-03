@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, Clock, FilePlus2, Pencil, Send, Trash2, XCircle } from "lucide-react";
-import { Button, ButtonLink, Card, CardBody, CardHeader, cn, Field, Input } from "@kebo/ui";
+import { Button, ButtonLink, Card, cn, EmptyState, Field, Input } from "@kebo/ui";
 import { money } from "@/lib/format";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { FileActions } from "@/components/common/file-actions";
@@ -63,11 +63,11 @@ export function StartRevision({
     (first
       ? "Starts with the factory offer that covers the most at the lowest cost, priced at the default margin. Add more offers as Options B, C… for the customer to choose from."
       : "Starts as a copy of the latest revision. Change what is different, then save the draft.");
-  const frame = (body: ReactNode) =>
+  // Nothing made yet: an empty state with the one way to start (design system); the page header has the primary.
+  const frame = (body: ReactNode, description?: ReactNode) =>
     empty ? (
       <Card>
-        <CardHeader title={empty.title} description={empty.description} />
-        <CardBody className="flex flex-col gap-3">{body}</CardBody>
+        <EmptyState framed title={empty.title} description={description ?? empty.description} action={body} />
       </Card>
     ) : (
       body
@@ -75,22 +75,25 @@ export function StartRevision({
   // Nothing to offer yet: no factory offer with lines, and no list from the customer to price by hand.
   const nothing = !!offers && offers.offers.length === 0 && offers.items.length === 0;
   if (nothing)
-    return frame(
+    return empty ? (
+      frame(null, "Add a factory offer with its lines on the Factory prices tab first; each offer becomes an option the customer can choose.")
+    ) : (
       <p className="text-sm text-muted">
         Add a factory offer with its lines on the Factory prices tab first; each offer becomes an option the customer can choose.
-      </p>,
+      </p>
     );
   if (!open || !draft || !offers) {
     const can = allowed && !!draft && !!offers;
+    // In an empty card the header already has the primary: this is its secondary twin.
+    const variant = first && !empty ? "primary" : "secondary";
     return frame(
-      <div className="flex flex-col items-start gap-1.5">
-        {empty && note && can && <p className="mb-1.5 text-sm text-text-2">{note}</p>}
+      <div className={cn("flex flex-col gap-1.5", empty ? "items-center" : "items-start")}>
         {openHref && can ? (
-          <ButtonLink href={openHref} variant={first ? "primary" : "secondary"}>
+          <ButtonLink href={openHref} variant={variant}>
             <FilePlus2 aria-hidden /> {label}
           </ButtonLink>
         ) : (
-          <Button variant={first ? "primary" : "secondary"} onClick={() => setOpen(true)} disabled={!can} aria-describedby={!allowed && whyNot ? "why-not-start" : undefined}>
+          <Button variant={variant} onClick={() => setOpen(true)} disabled={!can} aria-describedby={!allowed && whyNot ? "why-not-start" : undefined}>
             <FilePlus2 aria-hidden /> {label}
           </Button>
         )}
@@ -100,6 +103,11 @@ export function StartRevision({
           </p>
         )}
       </div>,
+      empty && note && can ? (
+        <>
+          {empty.description} {note}
+        </>
+      ) : undefined,
     );
   }
   const close = () => {
@@ -191,10 +199,10 @@ export function DraftPanel({
   return (
     <div ref={top} className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" onClick={() => setEditing(true)}>
+        <Button variant="secondary" onClick={() => setEditing(true)}>
           <Pencil aria-hidden /> Edit
         </Button>
-        <Button variant={sending ? "primary" : "secondary"} onClick={() => setSending((v) => !v)} aria-expanded={sending}>
+        <Button variant="secondary" className="aria-expanded:bg-surface-2" onClick={() => setSending((v) => !v)} aria-expanded={sending}>
           <Send aria-hidden /> Mark as sent…
         </Button>
         <FileActions className="ml-auto" viewHref={printHref} pdfHref={pdfHref} />

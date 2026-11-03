@@ -50,6 +50,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
                 {r.frozen && <StatusBadge meaning="warn">Frozen: not in your plan</StatusBadge>}
               </span>
             }
+            className="max-sm:flex-row max-sm:gap-3"
             description={r.key === me.role ? "This is your own role." : "What it is called, what it is for, and whether its people must use two-step sign-in."}
             actions={
               <>
@@ -106,6 +107,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
           <CardHeader
             title="What people in this role may do"
             description={r.superAdmin ? "Every permission, including any added later." : `${r.permissions.length - r.notInPlan.length} permissions. A change applies to its people from their next click.`}
+            className="max-sm:flex-row max-sm:gap-3"
             actions={r.superAdmin ? undefined : edit}
           />
           <CardBody className="grid gap-x-6 gap-y-4 md:grid-cols-2">

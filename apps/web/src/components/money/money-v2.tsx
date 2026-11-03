@@ -1117,7 +1117,7 @@ export function FactoryPlanCard({
                 </Field>
                 {rule === "fixed" && <Input aria-label="Balance due on" type="date" className="w-40" value={fixedOn} onChange={(e) => setFixedOn(e.target.value)} />}
                 {(changed || !plan.saved) && (
-                  <SubmitButton size="sm" pendingText="Saving…" disabled={rule === "fixed" && !fixedOn}>
+                  <SubmitButton size="sm" variant="secondary" pendingText="Saving…" disabled={rule === "fixed" && !fixedOn}>
                     {plan.saved ? "Save the plan" : "Keep this plan"}
                   </SubmitButton>
                 )}

@@ -15,6 +15,7 @@ export async function AddressCard() {
       <CardHeader
         title="Company address"
         description="Where your team signs in and works. Links in emails go here too."
+        className="max-sm:flex-row max-sm:gap-3"
         actions={view.canChange && !wait ? <AddressEdit view={view} /> : undefined}
       />
       <CardBody className="flex flex-col gap-5">

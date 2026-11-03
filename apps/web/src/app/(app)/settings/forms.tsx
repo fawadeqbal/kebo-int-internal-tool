@@ -75,7 +75,7 @@ function ImageControl({ f, text, error }: { f: SettingField; text: string; error
  * The top of the company's documents as the fields above say right now: the
  * logo (or the title's initials), the title, the line under it, and the names.
  */
-export function BrandPreview({ initial }: { initial: Record<string, unknown> }) {
+export function BrandPreview({ initial, label = "The top of your documents" }: { initial: Record<string, unknown>; label?: string | null }) {
   const box = useRef<HTMLDivElement>(null);
   const read = (form: HTMLFormElement | null) => {
     const d = form ? new FormData(form) : null;
@@ -106,7 +106,7 @@ export function BrandPreview({ initial }: { initial: Record<string, unknown> }) 
       .join("") || "·";
   return (
     <div ref={box} className="sm:col-span-2">
-      <p className="mb-1.5 text-sm font-medium">The top of your documents</p>
+      {label && <p className="mb-1.5 text-sm font-medium">{label}</p>}
       <div className="overflow-x-auto rounded-lg border border-line bg-white p-5 text-[#1a1a1a]">
         <div className="flex min-w-[26rem] items-center gap-3.5">
           {b.logo ? (

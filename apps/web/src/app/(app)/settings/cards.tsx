@@ -116,17 +116,20 @@ export function SettingsCard({
       <CardHeader
         title={card.title}
         description={card.description}
+        // ✎ Edit stays top right on a phone too (design system: card header actions).
+        className="max-sm:flex-row max-sm:gap-3"
         actions={<EditButton aria-label={`Edit ${card.title.toLowerCase()}`} onClick={() => panel.openPanel()} />}
       />
       <CardBody className="flex flex-col gap-4">
-        {card.preview && <BrandPreview initial={values} />}
+        {card.preview && <BrandPreview initial={values} label={null} />}
         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
           {fields.map((f) => {
             const value = f.kind === "currencies" ? values.currency : values[f.name];
             const wide = f.wide || f.kind === "currencies";
             return (
               <div key={f.name} className={cn("min-w-0", wide && "sm:col-span-2")}>
-                <dt className="text-xs text-muted">{f.label}</dt>
+                {/* A card of one value is named by its title already. */}
+                <dt className={cn("text-xs text-muted", fields.length === 1 && "sr-only")}>{f.label}</dt>
                 <dd className="mt-0.5 text-sm text-text">
                   {f.kind === "currencies" ? (
                     <CurrenciesText values={values} />
