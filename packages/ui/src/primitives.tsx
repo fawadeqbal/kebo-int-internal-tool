@@ -182,6 +182,7 @@ export function PageHeader({
   badge,
   summary,
   papers,
+  views,
   primary,
   more,
   description,
@@ -197,6 +198,8 @@ export function PageHeader({
   summary?: ReactNode;
   /** View / Print and Download PDF, where the page is a paper; hidden on a phone (put them in ⋯). */
   papers?: ReactNode;
+  /** A switch between the page's views (Segmented: List · Board), before the primary. */
+  views?: ReactNode;
   /** The one primary button: the next step. Leave it out when nothing is next. */
   primary?: ReactNode;
   /** The ⋯ menu (MoreMenu): everything else; delete last, in red. */
@@ -207,8 +210,8 @@ export function PageHeader({
   backLabel?: string;
   children?: ReactNode;
 }) {
-  const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined;
-  const right = actions || papers || primary || more;
+  const framed = badge !== undefined || summary !== undefined || primary !== undefined || papers !== undefined || more !== undefined || views !== undefined;
+  const right = actions || papers || views || primary || more;
   return (
     <header className="mb-5">
       {backHref && (
@@ -234,6 +237,7 @@ export function PageHeader({
                 {papers}
               </div>
             )}
+            {views}
             {primary && <div data-slot="primary" className="contents">{primary}</div>}
             {more}
           </div>

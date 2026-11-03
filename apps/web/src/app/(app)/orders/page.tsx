@@ -1,49 +1,306 @@
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
-import { ORDER_STAGE_LABEL, STAGE_FLOW, type FlowStep, type OrderStage } from "@kebo/shared";
-import { buildHref, Card, cn, EmptyState, FilterBar, FilterChip, LinkTabs, OrderStageBadge, PageHeader } from "@kebo/ui";
+import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
+import {
+  buildHref,
+  ButtonLink,
+  Card,
+  cn,
+  DataRow,
+  EmptyState,
+  LinkTabs,
+  ListToolbar,
+  OrderStageBadge,
+  PageHeader,
+  Pager,
+  PhoneList,
+  PhoneRow,
+  Segmented,
+  StatusBadge,
+  Td,
+  Th,
+  THead,
+  toPage,
+} from "@kebo/ui";
+import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
+import { DataTable } from "@/components/common/data-table";
+import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { hasFeature, requireUser } from "@/lib/session";
 import { optional } from "@/components/print/data";
 import { date, money } from "@/lib/format";
+import type { Paged } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
 
 export const metadata = { title: "Orders" };
 
-/** How many finished orders the Done column shows. */
+type Params = Record<string, string | undefined>;
+
+/** How many finished orders the board's Done column shows. */
 const RECENT_DONE = 8;
 
+const STATUSES = ["open", "late", "closed", "cancelled", "all"] as const;
+type Status = (typeof STATUSES)[number];
+const STATUS_CHIP: Record<Status, string> = { open: "Open", late: "Late", closed: "Done", cancelled: "Cancelled", all: "All" };
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
 /**
- * Orders as a board: Confirmed, In production, Shipped and the recently Done,
- * each card with what it needs now (late in red). On a phone, one stage at a
- * time with tabs. ?mine=1 for my orders, ?view=cancelled for cancelled ones.
+ * Orders, two views. The list (design system: List frame): a chip per status
+ * with its count (Open, the working list, first; Late is worked out from what
+ * each order needs), "handled by", the search and Excel in one row; rows open
+ * the order, ⋯ at the end; 25 a page, every filter in the URL. The board
+ * (?view=board, or a board step from the dashboard, ?stage=…): a column per
+ * step, each card with what it needs now. ?mine=1 (or the reminders'
+ * ?view=mine): my orders; ?view=cancelled: the cancelled ones.
  */
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ view?: string; mine?: string; stage?: string }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<Params> }) {
   await requireUser();
   const sp = await searchParams;
-  // ?view=mine is what the reminders link to.
   const mine = sp.mine === "1" || sp.view === "mine";
-  const cancelled = sp.view === "cancelled";
-  const keep = { mine: mine ? "1" : undefined, view: cancelled ? "cancelled" : undefined };
+  const board = sp.view === "board" || (!!sp.stage && !sp.status);
+  return board ? <Board sp={sp} mine={mine} /> : <List sp={sp} mine={mine} />;
+}
+
+/** List · Board, in the header. */
+function Views({ board, mine }: { board: boolean; mine: boolean }) {
+  const m = mine ? "1" : undefined;
+  return (
+    <Segmented
+      label="View"
+      options={[
+        { href: buildHref("/orders", { mine: m }, {}), label: "List", active: !board },
+        { href: buildHref("/orders", { mine: m }, { view: "board" }), label: "Board", active: board },
+      ]}
+    />
+  );
+}
+
+function statusBadge(o: OrderRow) {
+  if (o.status === "cancelled") return <StatusBadge meaning="neutral">Cancelled</StatusBadge>;
+  return <StatusBadge meaning={ORDER_STAGE_TONE[o.stage]}>{ORDER_STAGE_LABEL[o.stage]}</StatusBadge>;
+}
+
+async function List({ sp, mine }: { sp: Params; mine: boolean }) {
+  const status: Status = STATUSES.includes(sp.status as Status) ? (sp.status as Status) : sp.view === "cancelled" ? "cancelled" : "open";
+  const keep = { q: sp.q, mine: mine ? "1" : undefined, status: status === "open" ? undefined : status };
+  const href = (patch: Params) => buildHref("/orders", keep, { page: undefined, ...patch });
+  const data = await api.get<Paged<OrderRow> & { counts: Record<Status, number> }>("/orders/page", {
+    status,
+    mine: mine ? "true" : undefined,
+    q: sp.q,
+    page: toPage(sp.page),
+  });
+  const c = data.counts;
+  const narrowed = !!(sp.q || mine);
+
+  const chips = STATUSES.filter((s) => s === status || s === "open" || s === "all" || c[s] > 0).map((s) => ({
+    key: s,
+    label: STATUS_CHIP[s],
+    count: c[s],
+    href: href({ status: s === "open" ? undefined : s }),
+    active: status === s,
+  }));
+
+  const rowMenu = (o: OrderRow): MenuEntry[] => [
+    { label: "Open", href: `/orders/${o.id}` },
+    { label: `Inquiry ${o.inquiry.refNo}`, href: `/inquiries/${o.inquiry.id}` },
+    { label: "The customer", href: `/customers/${o.customer.id}` },
+    { label: "Copy link", copy: `/orders/${o.id}` },
+  ];
+
+  const due = (o: OrderRow) =>
+    o.status === "cancelled" ? <span className="text-text-2">—</span> : Number(o.due) > 0 ? money(o.due, o.currency) : <span className="font-medium text-ok">Paid</span>;
+
+  return (
+    <div>
+      <PageHeader
+        title="Orders"
+        summary={
+          <>
+            {plural(c.open, "open order")}
+            {c.late > 0 && <span className="text-bad"> · {c.late} late</span>}
+            <span className="max-sm:hidden"> · each says what it needs now</span>
+          </>
+        }
+        views={<Views board={false} mine={mine} />}
+      />
+
+      <ListToolbar
+        search={{ placeholder: "Search order no., customer, inquiry…", value: sp.q, clearHref: href({ q: undefined }) }}
+        keep={keep}
+        chips={chips}
+        label="Filter orders"
+        filters={
+          <form className="flex items-center gap-1.5">
+            {sp.q && <input type="hidden" name="q" value={sp.q} />}
+            {keep.status && <input type="hidden" name="status" value={keep.status} />}
+            <AutoSelect name="mine" defaultValue={mine ? "1" : ""} aria-label="Handled by" className="w-28">
+              <option value="">Anyone</option>
+              <option value="1">Mine</option>
+            </AutoSelect>
+          </form>
+        }
+        end={<ExportLink what="orders" query={{ status, mine: keep.mine, q: sp.q }} />}
+      />
+
+      <Card className="overflow-clip p-0">
+        {data.rows.length === 0 ? (
+          c.all === 0 && !narrowed ? (
+            <EmptyState
+              framed
+              title="No orders yet"
+              description="An order appears here when a customer accepts a quotation, with what it needs next."
+              action={
+                <ButtonLink href="/inquiries?stage=quoted" size="sm">
+                  Quoted inquiries
+                </ButtonLink>
+              }
+            />
+          ) : (
+            <EmptyState
+              framed
+              title="No orders match these filters"
+              description={sp.q ? `Nothing matches “${sp.q}” here. Try part of the order number, the customer or the inquiry.` : "Try another status, or clear the filters."}
+              action={
+                <ButtonLink href={c.open > 0 && !narrowed ? "/orders" : "/orders?status=all"} size="sm">
+                  Clear filters
+                </ButtonLink>
+              }
+            />
+          )
+        ) : (
+          <>
+            <PhoneList label="Orders">
+              {data.rows.map((o) => (
+                <PhoneRow
+                  key={o.id}
+                  href={`/orders/${o.id}`}
+                  title={o.customer.name}
+                  line={`${o.refNo} · ${o.needs ? `${o.needs.title}${o.needs.late ? " (late)" : ""}` : o.inquiry.title}`}
+                  status={o.needs?.late ? <StatusBadge meaning="bad">Late</StatusBadge> : statusBadge(o)}
+                  figure={due(o)}
+                  muted={o.status === "cancelled"}
+                />
+              ))}
+            </PhoneList>
+            <DataTable label="Orders" className="max-sm:hidden">
+              <THead>
+                <tr>
+                  <Th>Order</Th>
+                  <Th>Customer</Th>
+                  <Th>Status</Th>
+                  <Th>Needs now</Th>
+                  <Th className="text-right">Total</Th>
+                  <Th className="text-right">Still due</Th>
+                  <Th>Handled by</Th>
+                  <Th className="w-12">
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                </tr>
+              </THead>
+              <tbody>
+                {data.rows.map((o) => (
+                  <DataRow key={o.id} href={`/orders/${o.id}`} className={cn(o.status === "cancelled" && "text-text-2")}>
+                    <Td>
+                      <Link href={`/orders/${o.id}`} className="font-semibold whitespace-nowrap hover:text-primary">
+                        {o.refNo}
+                      </Link>
+                      <span className="block max-w-64 truncate text-xs text-text-2">{o.inquiry.title}</span>
+                    </Td>
+                    <Td>
+                      <span className="block max-w-52 truncate">{o.customer.name}</span>
+                      {o.customer.country === UNKNOWN_COUNTRY && <span className="block text-xs text-warn">Country not set</span>}
+                    </Td>
+                    <Td>{statusBadge(o)}</Td>
+                    <Td>
+                      {o.needs ? (
+                        <>
+                          <span className="block max-w-64 truncate text-sm">{o.needs.title}</span>
+                          <span className={cn("block text-xs", o.needs.late ? "font-medium text-bad" : "text-text-2")}>
+                            {o.needs.late ? `Was due ${date(o.needs.due)}` : `By ${date(o.needs.due)}`}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-text-2">{o.status === "open" ? "Nothing now" : "—"}</span>
+                      )}
+                    </Td>
+                    <Td className="text-right whitespace-nowrap tabular">{money(o.total, o.currency)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">{due(o)}</Td>
+                    <Td>{o.inquiry.assignee?.name ?? <span className="text-xs text-text-2">Nobody</span>}</Td>
+                    <Td className="text-right">
+                      <RowMenu items={rowMenu(o)} label={`Actions for ${o.refNo}`} />
+                    </Td>
+                  </DataRow>
+                ))}
+              </tbody>
+            </DataTable>
+          </>
+        )}
+        <Pager base="/orders" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} />
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * The board: Confirmed, In production, Shipped and the recently Done (or, with
+ * the orders board module, a column per step after acceptance), each card with
+ * what it needs now (late in red). On a phone, one column at a time.
+ */
+async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
+  const keep = { mine: mine ? "1" : undefined, view: "board" };
   const q = { mine: mine ? "true" : undefined };
   // Done: only the latest few and how many there are (a company has thousands over the years).
-  const [openRows, recentDone, doneCount, cancelledRows] = await Promise.all([
-    cancelled ? Promise.resolve([] as OrderRow[]) : api.get<OrderRow[]>("/orders", { ...q, status: "open" }),
-    cancelled ? Promise.resolve([] as OrderRow[]) : api.get<OrderRow[]>("/orders", { ...q, status: "closed", recent: "true", limit: String(RECENT_DONE) }),
-    cancelled ? Promise.resolve(0) : api.get<{ count: number }>("/orders/count", { ...q, status: "closed" }).then((r) => r.count),
-    cancelled ? api.get<OrderRow[]>("/orders", { ...q, status: "cancelled", recent: "true" }) : Promise.resolve([] as OrderRow[]),
+  const [openRows, recentDone, doneCount] = await Promise.all([
+    api.get<OrderRow[]>("/orders", { ...q, status: "open" }),
+    api.get<OrderRow[]>("/orders", { ...q, status: "closed", recent: "true", limit: String(RECENT_DONE) }),
+    api.get<{ count: number }>("/orders/count", { ...q, status: "closed" }).then((r) => r.count),
   ]);
-  const columns: { stage: OrderStage; rows: OrderRow[]; note?: string; count?: number }[] = STAGE_FLOW.map((stage) => ({
-    stage,
-    rows: stage === "done" ? recentDone : openRows.filter((r) => r.stage === stage),
-    note: stage === "done" && doneCount > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneCount}` : undefined,
-    count: stage === "done" ? doneCount : undefined,
-  }));
+  const late = openRows.filter((o) => o.needs?.late).length;
+  const header = (
+    <>
+      <PageHeader
+        title="Orders"
+        summary={
+          <>
+            {plural(openRows.length, "open order")}
+            {late > 0 && <span className="text-bad"> · {late} late</span>}
+            <span className="max-sm:hidden"> · each card says what it needs now</span>
+          </>
+        }
+        views={<Views board mine={mine} />}
+      />
+      <ListToolbar
+        chips={[
+          { key: "all", label: "Everyone's", href: buildHref("/orders", { view: "board" }, {}), active: !mine },
+          { key: "mine", label: "Mine", href: buildHref("/orders", { view: "board" }, { mine: "1" }), active: mine },
+        ]}
+        label="Whose orders"
+        end={<ExportLink what="orders" query={{ mine: keep.mine }} />}
+      />
+    </>
+  );
+  const empty = (
+    <Card className="p-0">
+      <EmptyState
+        framed
+        title={mine ? "No orders of yours yet" : "No orders yet"}
+        description="An order appears here when a customer accepts a quotation, with what it needs next."
+        action={
+          <ButtonLink href="/inquiries?stage=quoted" size="sm">
+            Quoted inquiries
+          </ButtonLink>
+        }
+      />
+    </Card>
+  );
+
   // With the orders board module, the columns are the steps after acceptance (the design's board); else the four stages.
-  const board = !cancelled && (await hasFeature("orders_board")) ? await optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", q)) : null;
-  if (board) {
-    const at = new Map(board.items.map((i) => [i.id, i.current]));
+  const flow = (await hasFeature("orders_board")) ? await optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", q)) : null;
+  if (flow) {
+    const at = new Map(flow.items.map((i) => [i.id, i.current]));
     const on = {
       production: await hasFeature("production"),
       shipping: await hasFeature("shipping"),
@@ -75,14 +332,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     const phoneCol = cols.find((c) => c.key === phoneKey)!;
     return (
       <div>
-        <PageHeader
-          title="Orders"
-          description={`${openRows.length} open · each card says what it needs now`}
-          actions={<ExportLink what="orders" query={{ mine: mine ? "1" : undefined }} />}
-        />
-        <Filters mine={mine} cancelled={false} keep={keep} />
+        {header}
         {openRows.length + doneCount === 0 ? (
-          <EmptyState title={mine ? "No orders of yours yet" : "No orders yet"} description="An order appears when a customer accepts a quotation." />
+          empty
         ) : (
           <>
             <div className="xl:hidden">
@@ -99,30 +351,20 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       </div>
     );
   }
+
+  const columns: { stage: OrderStage; rows: OrderRow[]; note?: string; count?: number }[] = STAGE_FLOW.map((stage) => ({
+    stage,
+    rows: stage === "done" ? recentDone : openRows.filter((r) => r.stage === stage),
+    note: stage === "done" && doneCount > RECENT_DONE ? `The latest ${RECENT_DONE} of ${doneCount}` : undefined,
+    count: stage === "done" ? doneCount : undefined,
+  }));
   const phoneStage: OrderStage = STAGE_FLOW.includes(sp.stage as OrderStage) ? (sp.stage as OrderStage) : (columns.find((c) => c.stage !== "done" && c.rows.length)?.stage ?? "confirmed");
   const phone = columns.find((c) => c.stage === phoneStage)!;
-
   return (
     <div>
-      <PageHeader
-        title="Orders"
-        description="Every order moves Confirmed → In production → Shipped → Done. Each card says what it needs now."
-        actions={<ExportLink what="orders" query={{ mine: mine ? "1" : undefined, view: cancelled ? "cancelled" : undefined }} />}
-      />
-      <Filters mine={mine} cancelled={cancelled} keep={keep} />
-
-      {cancelled ? (
-        cancelledRows.length === 0 ? (
-          <EmptyState title="No cancelled orders" description="Orders the customer called off are kept here." />
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {cancelledRows.map((o) => (
-              <OrderCard key={o.id} o={o} />
-            ))}
-          </div>
-        )
-      ) : openRows.length + doneCount === 0 ? (
-        <EmptyState title={mine ? "No orders of yours yet" : "No orders yet"} description="An order appears when a customer accepts a quotation." />
+      {header}
+      {openRows.length + doneCount === 0 ? (
+        empty
       ) : (
         <>
           {/* Phones and small tablets: one stage at a time. */}
@@ -143,23 +385,6 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         </>
       )}
     </div>
-  );
-}
-
-function Filters({ mine, cancelled, keep }: { mine: boolean; cancelled: boolean; keep: { mine?: string; view?: string } }) {
-  return (
-    <FilterBar className="mb-5 rounded-xl border bg-surface">
-      <FilterChip href={buildHref("/orders", { view: keep.view }, {})} active={!mine}>
-        All
-      </FilterChip>
-      <FilterChip href={buildHref("/orders", { view: keep.view }, { mine: "1" })} active={mine}>
-        Mine
-      </FilterChip>
-      <span className="mx-1 h-5 w-px bg-line" aria-hidden />
-      <FilterChip href={buildHref("/orders", { mine: keep.mine }, cancelled ? {} : { view: "cancelled" })} active={cancelled}>
-        Cancelled
-      </FilterChip>
-    </FilterBar>
   );
 }
 
