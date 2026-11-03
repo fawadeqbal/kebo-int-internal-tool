@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Lock } from "lucide-react";
 import { convertMinor, costSummary, documentTotals, formatMinor, fromMinor, fxRate, landedUnitCosts, marginPercent, priceForMargin, toMinor } from "@kebo/money";
 import {
@@ -260,6 +260,13 @@ export function RevisionEditor({
   const [offers, setOffers] = useState(initialOffers);
   const [active, setActive] = useState(initialOption);
   const [adding, setAdding] = useState(startAdding);
+  const row = useRef<HTMLDivElement>(null);
+  const shown = useRef(active);
+  useEffect(() => {
+    if (shown.current === active) return;
+    shown.current = active;
+    row.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
   const terms = part !== "options";
   /** The terms alone, in the Quotation step's side panel: sections and the panel's footer. */
   const inPanel = part === "terms";
@@ -412,6 +419,7 @@ export function RevisionEditor({
     return out.map((c) => ({ key: `${o.key}-${c.key}`, text: <><b>Option {L}</b>{c.key === "price" || c.key === "gone" ? ": " : " "}{c.text}</> }));
   };
   const optChecks = checksOf(opt, at);
+  const cancel = () => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel?.();
   const letter = optionLetter(at);
   /** Section numbers when the form has both parts ("1 · Terms", "2 · Options for the customer"). */
   const both = terms && options;
@@ -532,7 +540,14 @@ export function RevisionEditor({
                 {terms && (
                   <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-line px-4 py-3.5 sm:px-5">
                     <div className="min-w-0 flex-1 basis-80">
-                      <h3 className="text-lg font-semibold">{title ?? `R${number}`}</h3>
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="text-lg font-semibold">{title ?? `R${number}`}</h3>
+                        {onCancel && (
+                          <Button size="sm" variant="ghost" className="-mr-2 sm:hidden" onClick={cancel}>
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
                       {note && <p className="mt-0.5 text-xs text-text-2">{note}</p>}
                     </div>
                     <Field label="Valid until" htmlFor={`valid-${number}`} error={st.errors?.validUntil} hint="the whole quotation" className="w-44 max-sm:w-full">
@@ -550,13 +565,13 @@ export function RevisionEditor({
                       {/* Two kinds of terms: side by side on a wide screen, one under the other on a phone. */}
                       <div className="grid gap-4 lg:grid-cols-2">
                         <TermsGroup id={`pay-${number}`} title="Payment terms">
-                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
                             <Field
                               label="Currency"
                               htmlFor={`cur-${number}`}
                               error={st.errors?.currency}
                               hint={converted ? <span className={converted.ok ? undefined : "text-warn"}>{converted.text}</span> : "Changing it converts the prices at the Settings rates"}
-                              className="col-span-2 sm:col-span-1"
+                              className="col-span-2 sm:col-span-1 lg:col-span-2 xl:col-span-1"
                             >
                               <CurrencySelect id={`cur-${number}`} value={s.currency} onChange={(e) => void changeCurrency(e.target.value)} />
                             </Field>
@@ -612,38 +627,40 @@ export function RevisionEditor({
                       </SectionTitle>
 
                       {/* The options as a row of cards on top; on a phone the row scrolls sideways. */}
-                      <SelectCardList label="Options" className="sm:-mx-5 sm:scroll-px-5 sm:px-5 lg:mx-0 lg:scroll-px-0 lg:px-0.5">
-                        {s.options.map((o, i) => {
-                          const t = totalsOf(o);
-                          const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
-                          const n = checksOf(o, i).length;
-                          return (
-                            <SelectCard
-                              key={o.key}
-                              title={`Option ${optionLetter(i)}`}
-                              figure={fmt(t.totals.total)}
-                              meta={`${o.factoryQuoteId ? (off?.factory.name ?? "A removed offer") : "The customer's items"}${o.leadTime ? ` · ${o.leadTime}` : ""}`}
-                              badges={
-                                <>
-                                  {showCosts && t.costing.marginPercent !== null && <Badge tone={t.costing.marginPercent < 0 ? "bad" : "neutral"}>margin {t.costing.marginPercent.toFixed(1)}%</Badge>}
-                                  {n ? <Badge tone="warn">{n} to check</Badge> : <Badge tone="ok">Ready</Badge>}
-                                </>
-                              }
-                              selected={i === at}
-                              onSelect={() => setActive(i)}
-                            />
-                          );
-                        })}
-                        {addable.length > 0 && (
-                          <AddCard
-                            expanded={adding}
-                            onClick={() => setAdding((v) => !v)}
-                            hint={nOffers ? `${nOffers} more offer${nOffers === 1 ? "" : "s"} to add` : "the customer's items, by hand"}
-                          >
-                            Add an option
-                          </AddCard>
-                        )}
-                      </SelectCardList>
+                      <div ref={row}>
+                        <SelectCardList label="Options" className="sm:mx-0 sm:scroll-px-0 sm:flex-wrap sm:overflow-visible sm:px-0.5">
+                          {s.options.map((o, i) => {
+                            const t = totalsOf(o);
+                            const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
+                            const n = checksOf(o, i).length;
+                            return (
+                              <SelectCard
+                                key={o.key}
+                                title={`Option ${optionLetter(i)}`}
+                                figure={fmt(t.totals.total)}
+                                meta={`${o.factoryQuoteId ? (off?.factory.name ?? "A removed offer") : "The customer's items"}${o.leadTime ? ` · ${o.leadTime}` : ""}`}
+                                badges={
+                                  <>
+                                    {showCosts && t.costing.marginPercent !== null && <Badge tone={t.costing.marginPercent < 0 ? "bad" : "neutral"}>margin {t.costing.marginPercent.toFixed(1)}%</Badge>}
+                                    {n ? <Badge tone="warn">{n} to check</Badge> : <Badge tone="ok">Ready</Badge>}
+                                  </>
+                                }
+                                selected={i === at}
+                                onSelect={() => setActive(i)}
+                              />
+                            );
+                          })}
+                          {addable.length > 0 && (
+                            <AddCard
+                              expanded={adding}
+                              onClick={() => setAdding((v) => !v)}
+                              hint={nOffers ? `${nOffers} more offer${nOffers === 1 ? "" : "s"} to add` : "the customer's items, by hand"}
+                            >
+                              Add an option
+                            </AddCard>
+                          )}
+                        </SelectCardList>
+                      </div>
 
                       {adding && (
                         <ul className="flex flex-col divide-y divide-line rounded-lg border border-line" aria-label="Offers to add">
@@ -690,9 +707,9 @@ export function RevisionEditor({
                               </p>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                             {showCosts && (
-                              <>
+                              <span className="flex items-center gap-2">
                                 <label htmlFor={`margin-${number}`} className="text-xs text-text-2">
                                   Price all at
                                 </label>
@@ -707,52 +724,54 @@ export function RevisionEditor({
                                 >
                                   Apply
                                 </Button>
-                                <span className="mx-1 h-6 w-px bg-line" aria-hidden />
-                              </>
+                                <span className="mx-1 h-6 w-px bg-line max-sm:hidden" aria-hidden />
+                              </span>
                             )}
-                            <Button
-                              size="icon-xs"
-                              variant="ghost"
-                              disabled={at === 0}
-                              aria-label={`Move option ${letter} left`}
-                              onClick={() => {
-                                setS((x) => ({ ...x, options: swap(x.options, at, at - 1) }));
-                                setActive(at - 1);
-                              }}
-                            >
-                              <ArrowLeft aria-hidden />
-                            </Button>
-                            <Button
-                              size="icon-xs"
-                              variant="ghost"
-                              disabled={at === s.options.length - 1}
-                              aria-label={`Move option ${letter} right`}
-                              onClick={() => {
-                                setS((x) => ({ ...x, options: swap(x.options, at, at + 1) }));
-                                setActive(at + 1);
-                              }}
-                            >
-                              <ArrowRight aria-hidden />
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant="danger-ghost"
-                              disabled={s.options.length === 1}
-                              title={s.options.length === 1 ? "A quotation keeps at least one option" : undefined}
-                              aria-label={`Remove option ${letter}`}
-                              onClick={() => {
-                                setS((x) => ({ ...x, options: x.options.filter((_, n) => n !== at) }));
-                                setActive(Math.max(0, at - 1));
-                              }}
-                            >
-                              Remove
-                            </Button>
+                            <span className="flex items-center gap-1">
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                disabled={at === 0}
+                                aria-label={`Move option ${letter} left`}
+                                onClick={() => {
+                                  setS((x) => ({ ...x, options: swap(x.options, at, at - 1) }));
+                                  setActive(at - 1);
+                                }}
+                              >
+                                <ArrowLeft aria-hidden />
+                              </Button>
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                disabled={at === s.options.length - 1}
+                                aria-label={`Move option ${letter} right`}
+                                onClick={() => {
+                                  setS((x) => ({ ...x, options: swap(x.options, at, at + 1) }));
+                                  setActive(at + 1);
+                                }}
+                              >
+                                <ArrowRight aria-hidden />
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="danger-ghost"
+                                disabled={s.options.length === 1}
+                                title={s.options.length === 1 ? "A quotation keeps at least one option" : undefined}
+                                aria-label={`Remove option ${letter}`}
+                                onClick={() => {
+                                  setS((x) => ({ ...x, options: x.options.filter((_, n) => n !== at) }));
+                                  setActive(Math.max(0, at - 1));
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </span>
                           </div>
                         </div>
 
                         <div className="flex flex-col gap-4 p-3 sm:p-4">
                           <ChecksBox
-                            title={`Option ${letter}: before you send R${number}`}
+                            title={`Before you send R${number}`}
                             items={optChecks}
                             ready={
                               <>
@@ -1027,7 +1046,7 @@ export function RevisionEditor({
                 <div className="ml-auto flex items-center gap-2">
                   {dirty && requireChanges && <span className="text-xs text-warn max-lg:hidden">Unsaved changes</span>}
                   {onCancel && (
-                    <Button variant="ghost" onClick={() => (!dirty || window.confirm("Leave without saving? Your changes will be lost.")) && onCancel()}>
+                    <Button variant="ghost" className={cn(terms && "max-sm:hidden")} onClick={cancel}>
                       Cancel
                     </Button>
                   )}
