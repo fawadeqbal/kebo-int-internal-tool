@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../ds/tab_def.dart';
 import 'screens/customer.g.dart';
 import 'screens/customers.g.dart';
+import 'screens/factories.g.dart';
+import 'screens/factory.g.dart';
 import 'screens/inquiries.g.dart';
 import 'screens/inquiry.g.dart';
 import 'screens/order.g.dart';
@@ -20,13 +22,18 @@ const appTabs = <TabDef>[
 ];
 
 /// Which tab is lit for a generated screen's path.
-const routeTabs = <String, int>{'/customers': 3, '/inquiries': 1, '/orders': 2};
+const routeTabs = <String, int>{'/customers': 3, '/factories': 3, '/inquiries': 1, '/orders': 2};
 
 final generatedRoutes = <RouteBase>[
   GoRoute(path: '/customers', builder: (c, s) => const CustomersScreen()),
   GoRoute(
     path: '/customers/:id',
     builder: (c, s) => CustomerScreen(id: s.pathParameters['id']!),
+  ),
+  GoRoute(path: '/factories', builder: (c, s) => const FactoriesScreen()),
+  GoRoute(
+    path: '/factories/:id',
+    builder: (c, s) => FactoryScreen(id: s.pathParameters['id']!),
   ),
   GoRoute(path: '/inquiries', builder: (c, s) => const InquiriesScreen()),
   GoRoute(

@@ -4,6 +4,9 @@ import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
 import '../generated/screens/customer_form.g.dart';
+import '../core/api.dart';
+import '../generated/repos.g.dart';
+import 'factory_visit.dart';
 import 'money.dart';
 import 'order_files.dart';
 
@@ -21,6 +24,7 @@ final _actions = <_Action>[
   _Action(Icons.photo_camera_outlined, 'Snap & attach', 'a photo or file to an order', _snap),
   _Action(Icons.payments_outlined, 'Money received', 'with the bank slip', _money, show: canAddMoney),
   _Action(Icons.receipt_long_outlined, 'Expense', 'with the receipt', addExpense, show: canAddExpense),
+  _Action(Icons.factory_outlined, 'Factory visit', 'ready date, FAT, photos', _visit, perm: 'orders.update'),
   _Action(Icons.person_add_alt, 'New customer', 'with their contacts', (c) async {
     if (await CustomerFormSheet.create(c) && c.mounted) toast(c, 'Customer saved');
   }, perm: 'customers.manage'),
@@ -86,6 +90,18 @@ Future<void> _snap(BuildContext context) async {
   final order = await pickOrder(context);
   if (order == null || !context.mounted) return;
   if (await uploadToOrder(context, order.str('id'), order.str('refNo')) && context.mounted) toast(context, 'Added to ${order.str('refNo')}');
+}
+
+/// Which order, then the visit.
+Future<void> _visit(BuildContext context) async {
+  final picked = await pickOrder(context);
+  if (picked == null || !context.mounted) return;
+  try {
+    final order = await OrderRepo(context.api).get(picked.str('id'));
+    if (context.mounted) await openFactoryVisit(context, order);
+  } on ApiException catch (e) {
+    if (context.mounted) toast(context, e.message);
+  }
 }
 
 /// Which order the money is for, then the form.

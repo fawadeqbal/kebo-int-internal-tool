@@ -20,26 +20,29 @@ frame: record
 entity: Customer
 path: /customers/:id
 header: { title: name, sub: [country, type, defaultCurrency] }
-primary: { label: Edit, sheet: CustomerForm, perm: customers.manage }
+primary: { label: New inquiry, run: customer_overview.newInquiryFor, perm: inquiries.create }
 sections:
+  - { title: Performance · all time, custom: CustomerOverview }   # lib/custom/customer_overview.dart: managers' figures and credit
   - title: Contacts
     list: contacts
     row: { title: name, sub: [position, phone, email] }
     actions: [phone, whatsapp, email]
     empty: No contacts yet
-  - title: Details
-    fields: [address, taxNo, regNo, defaultCurrency, initials]
-  - title: Inquiries
-    list: inquiries
-    row: { title: title, sub: [refNo, assignee.name, createdAt], badge: stage }
-    empty: No inquiries yet
   - title: Orders
     list: orders
     row: { title: refNo, sub: [orderedOn], badge: status, value: total }
+    open: Order
     empty: No orders yet
-  - title: Notes
-    fields: [notes]
+  - title: Inquiries
+    list: inquiries
+    row: { title: title, sub: [refNo, assignee.name, createdAt], badge: stage }
+    open: Inquiry
+    empty: No inquiries yet
+  - title: Details
+    fields: [address, taxNo, regNo, defaultCurrency, initials, notes]
+  - { title: Changes, history: customer }
 more:
+  - { label: Edit details, sheet: CustomerForm, perm: customers.manage }
   - { label: Delete customer, delete: true, perm: customers.delete, confirm: "Delete this customer? Their inquiries and orders stay." }
 
 ---

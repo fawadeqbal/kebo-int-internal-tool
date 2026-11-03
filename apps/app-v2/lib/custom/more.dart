@@ -23,7 +23,10 @@ class MoreScreen extends StatelessWidget {
             title: 'Work',
             child: Column(children: [
               PhoneRow(RowData(title: 'Customers', sub: const ['contacts, inquiries and orders'], onTap: () => openPage(context, '/customers')),
-                  divider: seesApprovals(context) || canAddExpense(context)),
+                  divider: context.can('sourcing.manage') || seesApprovals(context) || canAddExpense(context)),
+              if (context.can('sourcing.manage'))
+                PhoneRow(RowData(title: 'Factories', sub: const ['who to call, their offers and open orders'], onTap: () => openPage(context, '/factories')),
+                    divider: seesApprovals(context) || canAddExpense(context)),
               if (seesApprovals(context))
                 PhoneRow(
                   RowData(

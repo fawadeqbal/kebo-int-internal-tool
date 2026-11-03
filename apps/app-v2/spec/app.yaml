@@ -82,6 +82,22 @@ enums:
     due: { label: Due, tone: warn }
     open: { label: Not due yet, tone: neutral }
     later: { label: Not due yet, tone: neutral }
+  # Delivery & SAT (labels as on the web).
+  LineCondition:
+    good: { label: Good, tone: ok }
+    minor_damage: { label: Minor damage, tone: warn }
+    damaged: { label: Damaged, tone: bad }
+    missing: { label: Missing, tone: bad }
+  SatResult:
+    pending: { label: Pending, tone: neutral }
+    pass: { label: Passed, tone: ok }
+    fail: { label: Failed, tone: bad }
+    not_applicable: { label: Not needed, tone: neutral }
+  ClaimStatus:
+    open: { label: Open, tone: warn }
+    with_factory: { label: With the factory, tone: info }
+    resolved: { label: Resolved, tone: ok }
+    rejected: { label: Rejected, tone: neutral }
   OrderStage:
     confirmed: { label: Confirmed, tone: info }
     in_production: { label: In production, tone: info }

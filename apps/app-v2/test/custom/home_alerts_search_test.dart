@@ -79,7 +79,8 @@ void main() {
     expect(appPathFor('/orders/5e258e2e-7869-4225-a99e-4ad5cf0afc68?tab=money'), '/orders/5e258e2e-7869-4225-a99e-4ad5cf0afc68');
     expect(appPathFor('/customers/5e258e2e-7869-4225-a99e-4ad5cf0afc68'), '/customers/5e258e2e-7869-4225-a99e-4ad5cf0afc68');
     expect(appPathFor('/inquiries/5e258e2e-7869-4225-a99e-4ad5cf0afc68/sourcing'), '/inquiries/5e258e2e-7869-4225-a99e-4ad5cf0afc68');
-    expect(appPathFor('/factories/5e258e2e-7869-4225-a99e-4ad5cf0afc68'), isNull);
+    expect(appPathFor('/factories/5e258e2e-7869-4225-a99e-4ad5cf0afc68'), '/factories/5e258e2e-7869-4225-a99e-4ad5cf0afc68');
+    expect(appPathFor('/settings/company'), isNull);
     expect(appPathFor(null), isNull);
   });
 

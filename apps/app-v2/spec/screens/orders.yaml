@@ -29,3 +29,7 @@ sections:
     custom: OrderFiles         # lib/custom/order_files.dart: every file of the order
   - title: Details
     fields: [orderedOn, inquiry.refNo, inquiry.assignee.name, incoterm, incotermPlace, portOfDischarge, shipBy, readyOn, shippedOn, blNo]
+  - { title: Changes, history: order }
+more:
+  - { label: Factory visit, run: factory_visit.openFactoryVisit, perm: orders.update, when: { status: open } }
+  - { label: Delivery & SAT, run: delivery.openDelivery, when: { stage: [shipped, done] } }

@@ -249,6 +249,7 @@ def _row(spec: Spec, entity: str, row: dict, var: str, actions: list[str] | None
 def _imports(spec: Spec, s: Screen, extra: set[str], custom: set[str] | None = None) -> str:
     lines = [
         "import 'package:flutter/material.dart' hide Badge;",
+        "import '../../core/json.dart';",
         "import '../../core/scope.dart';",
         "import '../../ds/ds.dart';",
         "import '../countries.g.dart';",
@@ -258,8 +259,8 @@ def _imports(spec: Spec, s: Screen, extra: set[str], custom: set[str] | None = N
     ]
     for name in sorted(extra):
         lines.append(f"import '{snake(name)}.g.dart';")
-    for name in sorted(custom or ()):
-        lines.append(f"import '../../custom/{snake(name)}.dart';")
+    for name in sorted({snake(n) for n in custom or ()}):
+        lines.append(f"import '../../custom/{name}.dart';")
     return HEAD + "// ignore_for_file: unused_import\n" + "\n".join(lines) + "\n"
 
 
@@ -338,6 +339,8 @@ def record_screen(spec: Spec, s: Screen) -> str:
                 tests.append(f"x.{k} == {q(str(v))}")
         return " && ".join(tests) or None
 
+    runs: set[str] = set()
+
     def action(a: dict) -> str:
         visible = when(a)
         shown = f", visible: (x) => {visible}" if visible else ""
@@ -358,6 +361,10 @@ def record_screen(spec: Spec, s: Screen) -> str:
         if a.get("delete"):
             confirm = q(a.get("confirm", "Delete this?"))
             return f"RecordAction.delete(label: {q(a['label'])}, perm: {perm}{shown}, confirm: {confirm}, run: (api, x) => {e.name}Repo(api).delete(x.id))"
+        if a.get("run"):
+            mod, fn = a["run"].split(".")
+            runs.add(mod)
+            return f"RecordAction(label: {q(a['label'])}, perm: {perm}{shown}, run: {fn})"
         if a.get("sheet"):
             sheet = spec.screens[a["sheet"]]
             extra.add(sheet.name)
@@ -375,18 +382,27 @@ def record_screen(spec: Spec, s: Screen) -> str:
             custom.add(sec["custom"])
             guard = f"if (context.can({q(sec['perm'])})) " if sec.get("perm") else ""
             secs.append(f"{guard}CustomSection({title}, {sec['custom']}(x, title: {title}))")
+        elif "history" in sec:
+            secs.append(f"CustomSection({title}, HistorySection(type: {q(sec['history'])}, id: x.id, title: {title}))")
         elif "fields" in sec:
             pairs = ", ".join(f"({q(label_of(spec, e.name, p))}, {display(spec, e.name, p, 'x')})" for p in sec["fields"])
             secs.append(f"KvSection({title}, [{pairs}])")
         else:
             chain = resolve(spec, e.name, sec["list"], e.name)
             item = chain[-1].ref
-            row = _row(spec, item, sec["row"], "y", sec.get("actions"))
+            tap = None
+            if sec.get("open"):
+                # open: Order (the row's id) or { screen: Inquiry, id: inquiry.id } (another record's id).
+                o = sec["open"] if isinstance(sec["open"], dict) else {"screen": sec["open"], "id": "id"}
+                ref = access(resolve(spec, item, o.get("id", "id"), item), "y")
+                path = spec.screens[o["screen"]].raw["path"].replace(":id", "${" + ref + "}")
+                tap = f"{ref} == null ? null : () => openPage(context, '{path}')" if "?" in ref else f"() => openPage(context, '{path}')"
+            row = _row(spec, item, sec["row"], "y", sec.get("actions"), tap)
             empty = f", empty: {q(sec['empty'])}" if sec.get("empty") else ""
             src = access(chain, "x") + (f" ?? const <{item}>[]" if any(nullable(f) for f in chain[:-1]) else "")
             secs.append(f"ListSection({title}, [for (final y in {src}) {row}]{empty})")
     args.append(f"sections: (x) => [{', '.join(secs)}]")
-    return f"""{_imports(spec, s, extra, custom)}
+    return f"""{_imports(spec, s, extra, custom | runs)}
 class {screen_class(s)} extends StatelessWidget {{
   const {screen_class(s)}({{super.key, required this.id}});
   final String id;
@@ -428,11 +444,11 @@ def sheet_screen(spec: Spec, s: Screen) -> str:
 abstract final class {screen_class(s)} {{
   static const _groups = <FormGroup>[{', '.join(groups)}];
 
-  /// Opens the empty form; true when something was saved.
-  static Future<bool> create(BuildContext context) => FormSheet.open(
+  /// Opens the empty form ([prefill]: values already known, e.g. the customer); true when something was saved.
+  static Future<bool> create(BuildContext context, {{Json? prefill}}) => FormSheet.open(
         context,
         title: {q(titles.get('create', 'New ' + e.name.lower()))},
-        initial: {e.name}Fields.blank(),
+        initial: {{...{e.name}Fields.blank(), ...?prefill}},
         send: (api, body) => {e.name}Repo(api).create(body),
         {common},
       );
@@ -524,9 +540,11 @@ def tests(spec: Spec) -> str:
             for f in resolve(spec, e.name, s.raw["header"]["title"], e.name):
                 title = title[f.name]
             sections = [sec["title"] for sec in s.raw.get("sections") or []]
+            # Changes come from /api/history (an empty list here).
+            more = ", '/api/history': <Object?>[]" if any("history" in sec for sec in s.raw.get("sections") or []) else ""
             cases.append(f"""
   testWidgets({q(s.name + ' shows the record and passes the accessibility checks')}, (tester) async {{
-    await pumpScreen(tester, const {screen_class(s)}(id: {q(j['id'])}), {{'{e.api}/{j['id']}': jsonDecode({dart_json(j)})}});
+    await pumpScreen(tester, const {screen_class(s)}(id: {q(j['id'])}), {{'{e.api}/{j['id']}': jsonDecode({dart_json(j)}){more}}});
     expect(find.text({q(str(title))}), findsWidgets);
     for (final t in <String>[{', '.join(q(x) for x in sections)}]) {{
       final section = find.byKey(ValueKey('section:$t'));

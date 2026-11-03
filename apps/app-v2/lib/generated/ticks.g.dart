@@ -165,32 +165,6 @@ const tickForms = <String, TickForm>{
       'doneOn': ['today'],
     },
   ),
-  'delivered': TickForm(
-    method: 'PATCH',
-    path: '/api/orders/{order}/delivery',
-    fields: [
-      FieldDef('deliveredOn', 'Delivered on', FieldKind.date, required: true),
-      FieldDef('deliveryReceivedBy', 'Received by', FieldKind.text, max: 120),
-      FieldDef('deliveryNote', 'Note', FieldKind.multiline, max: 2000, hint: 'Anything damaged or missing'),
-    ],
-    prefill: {
-      'deliveredOn': ['today'],
-    },
-    file: TickFile(step: 'delivery', kind: 'photo', asField: null),
-  ),
-  'sat_done': TickForm(
-    method: 'POST',
-    path: '/api/orders/{order}/sat/all-passed',
-    fields: [
-      FieldDef('satDoneOn', 'SAT done on', FieldKind.date, required: true),
-      FieldDef('satSignedBy', 'Signed by', FieldKind.text, max: 120),
-    ],
-    prefill: {
-      'satDoneOn': ['today'],
-    },
-    hint: 'Every SAT check passed and the customer signed.',
-    file: TickFile(step: 'delivery', kind: 'other', asField: null),
-  ),
   'closed': TickForm(
     method: 'POST',
     path: '/api/orders/{order}/stage',
@@ -202,6 +176,6 @@ const tickForms = <String, TickForm>{
 
 /// Items ticked on the web for now, and why.
 const tickOnWeb = <String, String>{
-  'claims_closed': 'Claims are closed on the web.',
+  'claims_closed': 'Claims are closed on the web; Delivery & SAT shows them and opens new ones.',
   'bank:bank_paid_us': 'The bank\'s payment is recorded as Money received (Money reached us).',
 };

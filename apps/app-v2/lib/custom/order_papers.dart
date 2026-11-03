@@ -6,6 +6,7 @@ import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
 import '../generated/models.g.dart';
+import 'paper_make.dart';
 
 /// Where a paper stands, with the same words and colours as the web.
 const _state = {
@@ -23,9 +24,12 @@ const _hasInternal = {'proforma', 'revisions'};
 
 /// A paper of the order, ready to open.
 class _Paper {
-  const _Paper({required this.key, required this.label, required this.state, this.number, this.sub, this.file, this.internal});
+  const _Paper({required this.key, required this.label, required this.state, this.number, this.sub, this.file, this.internal, this.kind, this.ref, this.makeable = false});
   final String key, label, state;
-  final String? number, sub;
+  final String? number, sub, kind, ref;
+
+  /// The app makes it (Make opens its checks); false for papers others issue.
+  final bool makeable;
   final RemoteFile? file;
   final RemoteFile? internal;
 
@@ -47,6 +51,7 @@ class OrderPapers extends StatefulWidget {
 class _OrderPapersState extends State<OrderPapers> {
   List<_Paper>? papers;
   String? error;
+  bool canMake = false;
   bool all = false;
 
   @override
@@ -103,13 +108,24 @@ class _OrderPapersState extends State<OrderPapers> {
           internal: _hasInternal.contains(kind) && file != null && uploaded == null
               ? _pdf(kind, o.id, '$name (internal)', internal: true, note: 'Internal copy')
               : null,
+          kind: kind,
+          ref: p.strOrNull('ref'),
+          makeable: p.boolean('makeable'),
         ));
       }
-      if (mounted) setState(() => papers = out);
+      if (mounted) {
+        setState(() {
+          papers = out;
+          canMake = j.boolean('canMake') && context.can('documents.manage');
+        });
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => error = e.message);
     }
   }
+
+  /// The app makes this paper and the person may: "Make" under it.
+  bool _makes(_Paper p) => canMake && p.makeable && const {'can', 'draft', 'wait'}.contains(p.state);
 
   /// Notes in the order's history that a paper left the company.
   void _noted(String key, String via) {
@@ -165,8 +181,26 @@ class _OrderPapersState extends State<OrderPapers> {
             sub: [if (p.file != null) p.number, p.sub],
             badge: _state[p.state],
             onTap: p.file == null ? null : () => _open(p),
-            divider: p.internal == null && (i < shown.length - 1 || (!all && rest.isNotEmpty)),
+            divider: p.internal == null && !_makes(p) && (i < shown.length - 1 || (!all && rest.isNotEmpty)),
           ),
+          if (_makes(p))
+            Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    if (await openMakePaper(context, orderId: widget.order.id, kind: p.kind!, label: p.label, ref: p.ref) && context.mounted) {
+                      await _load();
+                      if (context.mounted) await RecordScope.reloadOf(context);
+                    }
+                  },
+                  icon: const Icon(Icons.edit_document, size: 16),
+                  label: Text(p.state == 'draft' ? 'Make it final' : 'Make', semanticsLabel: 'Make the ${p.label}'),
+                ),
+              ),
+            ),
+          if (_makes(p) && p.internal == null && (i < shown.length - 1 || (!all && rest.isNotEmpty))) Divider(height: 1, color: c.line),
           if (p.internal != null) ...[
             Padding(
               padding: const EdgeInsets.only(left: 28),

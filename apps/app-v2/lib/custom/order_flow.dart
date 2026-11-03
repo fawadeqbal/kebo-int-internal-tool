@@ -6,6 +6,7 @@ import '../core/scope.dart';
 import '../ds/ds.dart';
 import '../generated/models.g.dart';
 import '../generated/ticks.g.dart';
+import 'delivery.dart';
 import 'links.dart';
 import 'money.dart';
 import 'order_lines.dart';
@@ -297,6 +298,10 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
       return null;
     }
     return await openMoneyReceived(context, orderId: order.id, refNo: order.refNo ?? '', customer: order.customer?.name) ? '' : null;
+  }
+  // Delivery & SAT: one screen for what arrived, the SAT and claims.
+  if (key == 'delivered' || key == 'sat_done' || key == 'claims_closed') {
+    return await openDelivery(context, order) ? 'Saved' : null;
   }
   if (open && (key == 'factory_advance' || key == 'factory_paid')) {
     try {

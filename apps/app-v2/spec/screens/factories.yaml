@@ -1,0 +1,32 @@
+screen: Factories
+frame: list
+entity: Factory
+path: /factories
+title: Factories
+search: Name, contact or phone
+row:
+  title: name
+  sub: [contactPerson, owner.name]
+open: Factory
+
+---
+screen: Factory
+frame: record
+entity: Factory
+path: /factories/:id
+header: { title: name, sub: [contactPerson, owner.name] }
+sections:
+  - { title: Overview, custom: FactoryOverview }   # lib/custom/factory_overview.dart: call, WeChat, answers, what we owe
+  - title: Open orders
+    list: record.openOrders
+    row: { title: refNo, sub: [customer, readyOn] }
+    open: Order
+    empty: No open orders
+  - title: Their offers
+    list: quotes
+    row: { title: inquiry.title, sub: [inquiry.refNo, receivedOn, currency] }
+    open: { screen: Inquiry, id: inquiry.id }
+    empty: No offers yet
+  - title: Details
+    fields: [address, bankDetails, notes]
+  - { title: Changes, history: factory }
