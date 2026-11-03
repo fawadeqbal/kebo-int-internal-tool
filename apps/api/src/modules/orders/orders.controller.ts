@@ -50,6 +50,14 @@ const listQuery = z.object({
   limit: z.coerce.number().int().min(1).max(300).optional(),
 });
 
+const pageQuery = z.object({
+  status: z.enum(["open", "late", "closed", "cancelled", "all"]).default("open"),
+  mine: flag,
+  q: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+
 @ApiTags("orders")
 @Controller("orders")
 export class OrdersController {
@@ -63,6 +71,12 @@ export class OrdersController {
   @Get()
   list(@CurrentUser() user: SessionUser, @Query(Validate(listQuery)) q: z.infer<typeof listQuery>) {
     return this.orders.list(user, { mine: q.mine, status: q.status, stage: q.stage, lateOnly: q.late, recent: q.recent, limit: q.limit });
+  }
+
+  /** The orders list, a page at a time, with each status's count: ?status=open|late|closed|cancelled|all&mine=true&q&page&pageSize */
+  @Get("page")
+  page(@CurrentUser() user: SessionUser, @Query(Validate(pageQuery)) q: z.infer<typeof pageQuery>) {
+    return this.orders.page(user, q);
   }
 
   /** How many orders: ?status=open|closed|cancelled&mine=true → { count }. */

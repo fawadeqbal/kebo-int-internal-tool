@@ -108,16 +108,20 @@ async function deals(q: Q): Promise<SheetSpec> {
 
 async function orders(q: Q): Promise<SheetSpec> {
   const mine = q.mine === "1" ? "true" : undefined;
-  const cancelled = q.view === "cancelled";
-  const rows = cancelled
-    ? await api.get<OrderRow[]>("/orders", { status: "cancelled", mine })
-    : [
-        ...(await api.get<OrderRow[]>("/orders", { status: "open", mine })),
-        ...(await api.get<OrderRow[]>("/orders", { status: "closed", mine })),
-      ];
+  const cancelled = q.view === "cancelled" || q.status === "cancelled";
+  // From the list: what its status chip and search show. Without one (older links): open and done.
+  const rows = q.status
+    ? await allPages<OrderRow>("/orders/page", { status: q.status, mine, q: q.q })
+    : cancelled
+      ? await api.get<OrderRow[]>("/orders", { status: "cancelled", mine })
+      : [
+          ...(await api.get<OrderRow[]>("/orders", { status: "open", mine })),
+          ...(await api.get<OrderRow[]>("/orders", { status: "closed", mine })),
+        ];
+  const title = cancelled ? "Cancelled orders" : q.status === "late" ? "Late orders" : q.status === "open" ? "Open orders" : q.status === "closed" ? "Done orders" : "Orders";
   return {
-    name: `${cancelled ? "Cancelled orders" : "Orders"} ${stamp()}`,
-    title: cancelled ? "Cancelled orders" : "Orders",
+    name: `${title} ${stamp()}`,
+    title,
     columns: [
       text("Order no.", 14),
       text("Customer", 28),
