@@ -14,14 +14,14 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /**
  * One entry of a ⋯ menu, as plain data (a server page can pass it): a link,
- * a URL side panel to open ("Edit"), a link to copy, or a removal — always
- * last, in red, and only after a confirm.
+ * a URL side panel to open ("Edit"), a link to copy, or an action after a
+ * confirm (Switch on…); a removal is `danger` — always last, in red.
  */
 export type MenuEntry =
   | { label: string; href: string; newTab?: boolean; download?: boolean }
   | { label: string; panel: string; id?: string }
   | { label: string; copy: string }
-  | { label: string; danger: true; confirm: { title: string; body?: string; confirmLabel: string }; action: Action }
+  | { label: string; danger?: true; confirm: { title: string; body?: string; confirmLabel: string }; action: Action }
   | { separator: true };
 
 const itemClass =
@@ -49,7 +49,7 @@ export function MoreMenu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [asking, setAsking] = useState<Extract<MenuEntry, { danger: true }> | null>(null);
+  const [asking, setAsking] = useState<Extract<MenuEntry, { action: Action }> | null>(null);
   const [busy, setBusy] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const router = useRouter();
@@ -120,7 +120,7 @@ export function MoreMenu({
                 type="button"
                 role="menuitem"
                 onClick={() => run(e)}
-                className={cn(itemClass, "danger" in e && "text-bad hover:bg-bad-soft focus-visible:bg-bad-soft")}
+                className={cn(itemClass, "danger" in e && e.danger && "text-bad hover:bg-bad-soft focus-visible:bg-bad-soft")}
               >
                 {e.label}
               </button>
@@ -129,7 +129,7 @@ export function MoreMenu({
         </FloatingMenu>
       )}
       {asking && (
-        <ConfirmDialog title={asking.confirm.title} confirmLabel={asking.confirm.confirmLabel} danger busy={busy} onCancel={() => setAsking(null)} onConfirm={() => void confirm()}>
+        <ConfirmDialog title={asking.confirm.title} confirmLabel={asking.confirm.confirmLabel} danger={!!asking.danger} busy={busy} onCancel={() => setAsking(null)} onConfirm={() => void confirm()}>
           {asking.confirm.body}
         </ConfirmDialog>
       )}

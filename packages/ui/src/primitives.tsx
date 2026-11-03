@@ -189,9 +189,12 @@ export function PageHeader({
   actions,
   backHref,
   backLabel,
+  phoneStack,
   children,
 }: {
   title: ReactNode;
+  /** On a phone, the buttons go under the title (record pages, whose names are long). */
+  phoneStack?: boolean;
   /** The record's status (StatusBadge). */
   badge?: ReactNode;
   /** One line: who · what · how much · how paid · who handles it. */
@@ -219,7 +222,7 @@ export function PageHeader({
           ← {backLabel ?? "Back"}
         </Link>
       )}
-      <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap")}>
+      <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col")}>
         <div className={cn("min-w-0", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]")}>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <h1 className={cn("font-semibold tracking-tight text-text", framed ? "text-[22px] leading-7" : "text-xl")}>{title}</h1>

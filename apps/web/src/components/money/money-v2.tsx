@@ -546,7 +546,7 @@ export function ReceiptForm({ action, customer, orders, fx, today }: { action: A
   const [currency, setCurrency] = useState(currencies[0] ?? fx.main);
   if (!open)
     return (
-      <Button size="sm" variant="primary" className="w-fit" onClick={() => setOpen(true)}>
+      <Button size="sm" variant="secondary" className="w-fit" onClick={() => setOpen(true)}>
         <Plus aria-hidden /> Record money received
       </Button>
     );

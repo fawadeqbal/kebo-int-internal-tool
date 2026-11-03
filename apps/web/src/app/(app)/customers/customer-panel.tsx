@@ -11,21 +11,25 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /**
  * "New customer" and "Edit customer · name" in the side panel over the list
- * (?panel=new-customer, ?panel=edit-customer&id=…). After a save it closes,
- * the list updates in place with the row lit for 2 seconds, and a toast says
- * so — with Undo for a customer just added.
+ * or the customer's page (?panel=new-customer, ?panel=edit-customer&id=…).
+ * After a save it closes, the page updates in place with the row (list) or
+ * the Details card (`onRecord`) lit for 2 seconds, and a toast says so — with
+ * Undo for a customer just added.
  */
 export function CustomerPanel({
   action,
   undo,
   customer,
   currencies,
+  onRecord,
 }: {
   action: Action;
   /** Removes a customer just added (the toast's Undo). */
   undo?: (id: string) => Promise<ActionState>;
   customer: CustomerDetail | null;
   currencies: string[];
+  /** Opened on the customer's own page (no "Open" in the toast). */
+  onRecord?: boolean;
 }) {
   const router = useRouter();
   const panel = useSidePanel(customer ? "edit-customer" : "new-customer");
@@ -42,7 +46,7 @@ export function CustomerPanel({
             }
           : undefined,
       // The list is by name: a new customer may be on another page.
-      action: { label: "Open", href: `/customers/${d.id}` },
+      action: onRecord ? undefined : { label: "Open", href: `/customers/${d.id}` },
     });
     panel.close({ saved: d.id });
   };
