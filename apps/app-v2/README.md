@@ -43,6 +43,44 @@ Every file opens inside the app (`lib/ds/file_viewer.dart`, `lib/core/files.dart
 
 A record screen puts a hand-written section in its place with `custom: WidgetName` in the spec.
 
+## Share into the app
+
+From WhatsApp, email or the Files app, **Share → RFQ Desk** with a message and/or files (photos, PDFs, Word, Excel,
+drawings: the kinds the server takes) opens a new inquiry (`lib/custom/new_inquiry.dart`, route `/inquiries/new`):
+
+- The message goes in "Their message" and its first line becomes the title. An email's subject and body, or a
+  photo's caption, come along (`MainActivity.kt`, channel `rfqdesk/share`).
+- The files are listed on the form (remove, or add more) and sent to the inquiry one by one right after it is saved;
+  what fails is said in the toast, to add again on the inquiry. Kinds the server refuses (HEIC, video) are listed as not attached.
+- Signed out: sign-in comes first, then the share continues (`ShareInbox` in `lib/core/share_in.dart` keeps it).
+- The link `rfqdesk://inquiries/new?text=…` does the same with the text.
+
+The share sheet comes through `receive_sharing_intent`; tests use a fake `ShareSource` (`test/custom/share_in_test.dart`).
+
+## Android build
+
+```sh
+flutter build apk --release --dart-define=KEBO_SERVER=https://rfq.fawadiqbal.dev
+# → build/app/outputs/flutter-apk/app-release.apk  (package dev.fawadiqbal.rfqdesk, label "RFQ Desk")
+```
+
+- Version: `version:` in pubspec.yaml (name+code), or `--build-name` / `--build-number`.
+- Icon: `python3 -m gen.icon` draws "RQ" on the brand colour (primarySolid in `lib/ds/tokens.g.dart`) at every density, needs Pillow.
+- Permissions: INTERNET only. The camera opens through the system camera app, which needs none.
+- **Signing.** The release build uses `android/key.properties` when it exists, otherwise the debug key, so a local
+  test APK installs. `key.properties` and `*.jks` are never committed (.gitignore). `key.properties` holds:
+  ```
+  storeFile=../release.jks      # relative to android/
+  storePassword=…
+  keyAlias=rfqdesk
+  keyPassword=…
+  ```
+  For the GitHub release (later, with Fawad): the keystore goes into the repository secrets (base64), the release
+  workflow writes `release.jks` and `key.properties` from them before `flutter build apk --release`, then attaches the
+  APK to the release. Keep a copy of the keystore safe: an app signed with another key cannot update this one, and
+  people would have to uninstall it first. A debug-signed test APK has the same problem: uninstall it before
+  installing the first release-signed one.
+
 ## Commands (in apps/app-v2)
 
 ```sh

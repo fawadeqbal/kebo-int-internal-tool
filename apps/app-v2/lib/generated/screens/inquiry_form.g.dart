@@ -2,6 +2,7 @@
 // ignore_for_file: unused_import
 import 'package:flutter/material.dart' hide Badge;
 
+import '../../core/api.dart';
 import '../../core/json.dart';
 import '../../core/scope.dart';
 import '../../ds/ds.dart';
@@ -41,11 +42,23 @@ abstract final class InquiryFormSheet {
   ];
 
   /// Opens the empty form ([prefill]: values already known, e.g. the customer); true when something was saved.
-  static Future<bool> create(BuildContext context, {Json? prefill}) => FormSheet.open(
+  /// [extra]: more under the fields (e.g. files to attach). [then]: runs with the new record before the
+  /// sheet closes (e.g. sends those files); it must not throw, the record is already saved.
+  static Future<bool> create(
+    BuildContext context, {
+    Json? prefill,
+    Widget Function(StateSetter setState)? extra,
+    Future<void> Function(Api api, Inquiry saved)? then,
+  }) => FormSheet.open(
     context,
     title: 'New inquiry',
     initial: {...InquiryFields.blank(), ...?prefill},
-    send: (api, body) => InquiryRepo(api).create(body),
+    send: (api, body) async {
+      final saved = await InquiryRepo(api).create(body);
+      await then?.call(api, saved);
+      return saved;
+    },
+    extra: extra,
     save: 'Save inquiry',
     groups: _groups,
     rules: InquiryFields.rules,

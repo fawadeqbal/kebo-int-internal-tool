@@ -249,6 +249,7 @@ def _row(spec: Spec, entity: str, row: dict, var: str, actions: list[str] | None
 def _imports(spec: Spec, s: Screen, extra: set[str], custom: set[str] | None = None) -> str:
     lines = [
         "import 'package:flutter/material.dart' hide Badge;",
+        "import '../../core/api.dart';",
         "import '../../core/json.dart';",
         "import '../../core/scope.dart';",
         "import '../../ds/ds.dart';",
@@ -445,11 +446,23 @@ abstract final class {screen_class(s)} {{
   static const _groups = <FormGroup>[{', '.join(groups)}];
 
   /// Opens the empty form ([prefill]: values already known, e.g. the customer); true when something was saved.
-  static Future<bool> create(BuildContext context, {{Json? prefill}}) => FormSheet.open(
+  /// [extra]: more under the fields (e.g. files to attach). [then]: runs with the new record before the
+  /// sheet closes (e.g. sends those files); it must not throw, the record is already saved.
+  static Future<bool> create(
+    BuildContext context, {{
+    Json? prefill,
+    Widget Function(StateSetter setState)? extra,
+    Future<void> Function(Api api, {e.name} saved)? then,
+  }}) => FormSheet.open(
         context,
         title: {q(titles.get('create', 'New ' + e.name.lower()))},
         initial: {{...{e.name}Fields.blank(), ...?prefill}},
-        send: (api, body) => {e.name}Repo(api).create(body),
+        send: (api, body) async {{
+          final saved = await {e.name}Repo(api).create(body);
+          await then?.call(api, saved);
+          return saved;
+        }},
+        extra: extra,
         {common},
       );
 
