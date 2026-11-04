@@ -318,6 +318,60 @@ abstract final class PlanStatusEnum {
   static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
 }
 
+abstract final class LineConditionEnum {
+  static const values = <String>['good', 'minor_damage', 'damaged', 'missing'];
+  static const labels = <String, String>{
+    'good': 'Good',
+    'minor_damage': 'Minor damage',
+    'damaged': 'Damaged',
+    'missing': 'Missing',
+  };
+  static const tones = <String, Tone>{
+    'good': Tone.ok,
+    'minor_damage': Tone.warn,
+    'damaged': Tone.bad,
+    'missing': Tone.bad,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class SatResultEnum {
+  static const values = <String>['pending', 'pass', 'fail', 'not_applicable'];
+  static const labels = <String, String>{
+    'pending': 'Pending',
+    'pass': 'Passed',
+    'fail': 'Failed',
+    'not_applicable': 'Not needed',
+  };
+  static const tones = <String, Tone>{
+    'pending': Tone.neutral,
+    'pass': Tone.ok,
+    'fail': Tone.bad,
+    'not_applicable': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class ClaimStatusEnum {
+  static const values = <String>['open', 'with_factory', 'resolved', 'rejected'];
+  static const labels = <String, String>{
+    'open': 'Open',
+    'with_factory': 'With the factory',
+    'resolved': 'Resolved',
+    'rejected': 'Rejected',
+  };
+  static const tones = <String, Tone>{
+    'open': Tone.warn,
+    'with_factory': Tone.info,
+    'resolved': Tone.ok,
+    'rejected': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
 abstract final class OrderStageEnum {
   static const values = <String>['confirmed', 'in_production', 'shipped', 'done'];
   static const labels = <String, String>{

@@ -284,6 +284,185 @@ abstract final class OrderRowFields {
   static Json blank() => {};
 }
 
+class Factory {
+  const Factory({
+    this.id = '',
+    this.name = '',
+    this.contactPerson,
+    this.phone,
+    this.wechat,
+    this.email,
+    this.address,
+    this.bankDetails,
+    this.notes,
+    this.owner,
+    this.quotes = const [],
+    this.record,
+  });
+
+  final String id;
+  final String name;
+  final String? contactPerson;
+  final String? phone;
+  final String? wechat;
+  final String? email;
+  final String? address;
+  final String? bankDetails;
+  final String? notes;
+  final Person? owner;
+  final List<FactoryOfferRow> quotes;
+  final FactoryRecord? record;
+
+  factory Factory.fromJson(Json j) => Factory(
+    id: j.str('id'),
+    name: j.str('name'),
+    contactPerson: j.strOrNull('contactPerson'),
+    phone: j.strOrNull('phone'),
+    wechat: j.strOrNull('wechat'),
+    email: j.strOrNull('email'),
+    address: j.strOrNull('address'),
+    bankDetails: j.strOrNull('bankDetails'),
+    notes: j.strOrNull('notes'),
+    owner: j.obj('owner', Person.fromJson),
+    quotes: j.list('quotes', FactoryOfferRow.fromJson),
+    record: j.obj('record', FactoryRecord.fromJson),
+  );
+
+  Json toJson() => {
+    if (id.isNotEmpty) 'id': id,
+    'name': name,
+    'contactPerson': contactPerson,
+    'phone': phone,
+    'wechat': wechat,
+    'email': email,
+    'address': address,
+    'bankDetails': bankDetails,
+    'notes': notes,
+  };
+}
+
+abstract final class FactoryFields {
+  static const name = FieldDef('name', 'Name', FieldKind.text, required: true, max: 200);
+  static const contactPerson = FieldDef('contactPerson', 'Contact person', FieldKind.text, max: 120);
+  static const phone = FieldDef('phone', 'Phone', FieldKind.phone);
+  static const wechat = FieldDef('wechat', 'WeChat', FieldKind.text, max: 80);
+  static const email = FieldDef('email', 'Email', FieldKind.email);
+  static const address = FieldDef('address', 'Address', FieldKind.multiline, max: 500);
+  static const bankDetails = FieldDef('bankDetails', 'Bank details', FieldKind.multiline, max: 2000);
+  static const notes = FieldDef('notes', 'Notes', FieldKind.multiline, max: 5000);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty Factory as a form starts it.
+  static Json blank() => {};
+}
+
+class FactoryOfferRow {
+  const FactoryOfferRow({this.id = '', this.receivedOn, this.currency, this.inquiry});
+
+  final String id;
+  final DateTime? receivedOn;
+  final String? currency;
+  final InquiryRef? inquiry;
+
+  factory FactoryOfferRow.fromJson(Json j) => FactoryOfferRow(
+    id: j.str('id'),
+    receivedOn: j.date('receivedOn'),
+    currency: j.strOrNull('currency'),
+    inquiry: j.obj('inquiry', InquiryRef.fromJson),
+  );
+
+  Json toJson() => {if (id.isNotEmpty) 'id': id, 'receivedOn': isoDay(receivedOn), 'currency': currency};
+}
+
+abstract final class FactoryOfferRowFields {
+  static const receivedOn = FieldDef('receivedOn', 'Received', FieldKind.date);
+  static const currency = FieldDef('currency', 'Currency', FieldKind.text);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty FactoryOfferRow as a form starts it.
+  static Json blank() => {};
+}
+
+class FactoryRecord {
+  const FactoryRecord({
+    this.asked = 0,
+    this.answered = 0,
+    this.declined = 0,
+    this.noReply = 0,
+    this.avgDaysToAnswer,
+    this.lateSteps = 0,
+    this.openOrders = const [],
+  });
+
+  final int asked;
+  final int answered;
+  final int declined;
+  final int noReply;
+  final String? avgDaysToAnswer;
+  final int lateSteps;
+  final List<FactoryOrderRow> openOrders;
+
+  factory FactoryRecord.fromJson(Json j) => FactoryRecord(
+    asked: j.integer('asked'),
+    answered: j.integer('answered'),
+    declined: j.integer('declined'),
+    noReply: j.integer('noReply'),
+    avgDaysToAnswer: j.strOrNull('avgDaysToAnswer'),
+    lateSteps: j.integer('lateSteps'),
+    openOrders: j.list('openOrders', FactoryOrderRow.fromJson),
+  );
+
+  Json toJson() => {
+    'asked': asked,
+    'answered': answered,
+    'declined': declined,
+    'noReply': noReply,
+    'avgDaysToAnswer': avgDaysToAnswer,
+    'lateSteps': lateSteps,
+  };
+}
+
+abstract final class FactoryRecordFields {
+  static const asked = FieldDef('asked', 'Asked', FieldKind.integer);
+  static const answered = FieldDef('answered', 'Answered', FieldKind.integer);
+  static const declined = FieldDef('declined', 'Declined', FieldKind.integer);
+  static const noReply = FieldDef('noReply', 'No reply', FieldKind.integer);
+  static const avgDaysToAnswer = FieldDef('avgDaysToAnswer', 'Days to answer', FieldKind.decimal);
+  static const lateSteps = FieldDef('lateSteps', 'Late steps', FieldKind.integer);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty FactoryRecord as a form starts it.
+  static Json blank() => {};
+}
+
+class FactoryOrderRow {
+  const FactoryOrderRow({this.id = '', this.refNo, this.customer, this.readyOn});
+
+  final String id;
+  final String? refNo;
+  final String? customer;
+  final DateTime? readyOn;
+
+  factory FactoryOrderRow.fromJson(Json j) => FactoryOrderRow(
+    id: j.str('id'),
+    refNo: j.strOrNull('refNo'),
+    customer: j.strOrNull('customer'),
+    readyOn: j.date('readyOn'),
+  );
+
+  Json toJson() => {if (id.isNotEmpty) 'id': id, 'refNo': refNo, 'customer': customer, 'readyOn': isoDay(readyOn)};
+}
+
+abstract final class FactoryOrderRowFields {
+  static const refNo = FieldDef('refNo', 'Number', FieldKind.text);
+  static const customer = FieldDef('customer', 'Customer', FieldKind.text);
+  static const readyOn = FieldDef('readyOn', 'Ready', FieldKind.date);
+  static const rules = <AnyOf>[];
+
+  /// A new, empty FactoryOrderRow as a form starts it.
+  static Json blank() => {};
+}
+
 class Inquiry {
   const Inquiry({
     this.id = '',

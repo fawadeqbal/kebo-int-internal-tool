@@ -2,6 +2,7 @@
 // ignore_for_file: unused_import
 import 'package:flutter/material.dart' hide Badge;
 
+import '../../core/json.dart';
 import '../../core/scope.dart';
 import '../../ds/ds.dart';
 import '../countries.g.dart';
@@ -9,6 +10,7 @@ import '../enums.g.dart';
 import '../models.g.dart';
 import '../repos.g.dart';
 import 'customer_form.g.dart';
+import '../../custom/customer_overview.dart';
 
 class CustomerScreen extends StatelessWidget {
   const CustomerScreen({super.key, required this.id});
@@ -19,8 +21,9 @@ class CustomerScreen extends StatelessWidget {
     load: (api) => CustomerRepo(api).get(id),
     title: (x) => x.name,
     sub: (x) => [countryName(x.country), CustomerTypeEnum.label(x.type), CurrencyEnum.label(x.defaultCurrency)],
-    primary: RecordAction(label: 'Edit', perm: 'customers.manage', run: CustomerFormSheet.edit),
+    primary: RecordAction(label: 'New inquiry', perm: 'inquiries.create', run: newInquiryFor),
     more: [
+      RecordAction(label: 'Edit details', perm: 'customers.manage', run: CustomerFormSheet.edit),
       RecordAction.delete(
         label: 'Delete customer',
         perm: 'customers.delete',
@@ -29,6 +32,7 @@ class CustomerScreen extends StatelessWidget {
       ),
     ],
     sections: (x) => [
+      CustomSection('Performance · all time', CustomerOverview(x, title: 'Performance · all time')),
       ListSection('Contacts', [
         for (final y in x.contacts)
           RowData(
@@ -37,21 +41,6 @@ class CustomerScreen extends StatelessWidget {
             actions: [ContactAction.phone(y.phone), ContactAction.whatsapp(y.whatsapp), ContactAction.email(y.email)],
           ),
       ], empty: 'No contacts yet'),
-      KvSection('Details', [
-        ('Address', x.address),
-        ('Tax number', x.taxNo),
-        ('Registration number', x.regNo),
-        ('Currency', CurrencyEnum.label(x.defaultCurrency)),
-        ('Letters on papers', x.initials),
-      ]),
-      ListSection('Inquiries', [
-        for (final y in x.inquiries)
-          RowData(
-            title: y.title,
-            sub: [y.refNo, y.assignee?.name, fmtDate(y.createdAt)],
-            badge: InquiryStageEnum.badge(y.stage),
-          ),
-      ], empty: 'No inquiries yet'),
       ListSection('Orders', [
         for (final y in x.orders)
           RowData(
@@ -59,9 +48,27 @@ class CustomerScreen extends StatelessWidget {
             sub: [fmtDate(y.orderedOn)],
             badge: OrderStatusEnum.badge(y.status),
             value: fmtMoney(y.total, y.currency),
+            onTap: () => openPage(context, '/orders/${y.id}'),
           ),
       ], empty: 'No orders yet'),
-      KvSection('Notes', [('Notes', x.notes)]),
+      ListSection('Inquiries', [
+        for (final y in x.inquiries)
+          RowData(
+            title: y.title,
+            sub: [y.refNo, y.assignee?.name, fmtDate(y.createdAt)],
+            badge: InquiryStageEnum.badge(y.stage),
+            onTap: () => openPage(context, '/inquiries/${y.id}'),
+          ),
+      ], empty: 'No inquiries yet'),
+      KvSection('Details', [
+        ('Address', x.address),
+        ('Tax number', x.taxNo),
+        ('Registration number', x.regNo),
+        ('Currency', CurrencyEnum.label(x.defaultCurrency)),
+        ('Letters on papers', x.initials),
+        ('Notes', x.notes),
+      ]),
+      CustomSection('Changes', HistorySection(type: 'customer', id: x.id, title: 'Changes')),
     ],
   );
 }

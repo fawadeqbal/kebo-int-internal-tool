@@ -2,12 +2,15 @@
 // ignore_for_file: unused_import
 import 'package:flutter/material.dart' hide Badge;
 
+import '../../core/json.dart';
 import '../../core/scope.dart';
 import '../../ds/ds.dart';
 import '../countries.g.dart';
 import '../enums.g.dart';
 import '../models.g.dart';
 import '../repos.g.dart';
+import '../../custom/delivery.dart';
+import '../../custom/factory_visit.dart';
 import '../../custom/order_files.dart';
 import '../../custom/order_flow.dart';
 import '../../custom/order_lines.dart';
@@ -24,6 +27,20 @@ class OrderScreen extends StatelessWidget {
     title: (x) => x.refNo,
     sub: (x) => [x.customer?.name, x.inquiry?.assignee?.name, fmtMoney(x.total, x.currency)],
     badges: (x) => [OrderStageEnum.badge(x.stage)],
+    more: [
+      RecordAction(
+        label: 'Factory visit',
+        perm: 'orders.update',
+        visible: (x) => x.status == 'open',
+        run: openFactoryVisit,
+      ),
+      RecordAction(
+        label: 'Delivery & SAT',
+        perm: null,
+        visible: (x) => const ['shipped', 'done'].contains(x.stage),
+        run: openDelivery,
+      ),
+    ],
     sections: (x) => [
       CustomSection('Steps', OrderFlow(x, title: 'Steps')),
       CustomSection('Goods', OrderLines(x, title: 'Goods')),
@@ -42,6 +59,7 @@ class OrderScreen extends StatelessWidget {
         ('Shipped', fmtDate(x.shippedOn)),
         ('Bill of lading', x.blNo),
       ]),
+      CustomSection('Changes', HistorySection(type: 'order', id: x.id, title: 'Changes')),
     ],
   );
 }

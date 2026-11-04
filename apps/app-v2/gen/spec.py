@@ -302,8 +302,10 @@ def check(spec: Spec) -> None:
             for a in primaries + (raw.get("more") or []):
                 if a.get("sheet") and a["sheet"] not in spec.screens:
                     raise SpecError(f"{where}: no sheet '{a['sheet']}'")
-                if not (a.get("sheet") or a.get("delete") or a.get("post")):
-                    raise SpecError(f"{where}: action '{a.get('label')}' needs sheet, delete or post")
+                if not (a.get("sheet") or a.get("delete") or a.get("post") or a.get("run")):
+                    raise SpecError(f"{where}: action '{a.get('label')}' needs sheet, delete, post or run")
+                if a.get("run") and not re.fullmatch(r"[a-z][a-z0-9_]*\.[a-z][A-Za-z0-9]*", str(a["run"])):
+                    raise SpecError(f"{where}: action '{a.get('label')}': run: '{a['run']}' must be file.function, e.g. delivery.openDelivery")
                 for k in (a.get("when") or {}):
                     if k not in ent.fields:
                         raise SpecError(f"{where}: action '{a.get('label')}': when: {ent.name} has no field '{k}'")
@@ -322,6 +324,9 @@ def check(spec: Spec) -> None:
                 if "custom" in sec:
                     if not re.fullmatch(r"[A-Z][A-Za-z0-9]+", str(sec["custom"])):
                         raise SpecError(f"{where}: custom: '{sec['custom']}' must be a widget name like OrderPapers")
+                elif "history" in sec:
+                    if sec["history"] not in ("deal", "order", "customer", "factory"):
+                        raise SpecError(f"{where}: history: '{sec['history']}' must be deal, order, customer or factory")
                 elif "fields" in sec:
                     for f in sec["fields"]:
                         resolve(spec, ent.name, text_item(f)["of"], where)
@@ -330,11 +335,17 @@ def check(spec: Spec) -> None:
                     if lf.kind != "list":
                         raise SpecError(f"{where}: section '{sec.get('title')}': {sec['list']} is not a list")
                     _row(spec, lf.ref, sec.get("row") or {}, where)
+                    if sec.get("open"):
+                        o = sec["open"] if isinstance(sec["open"], dict) else {"screen": sec["open"], "id": "id"}
+                        t = spec.screens.get(o.get("screen"))
+                        if not t or t.frame != "record":
+                            raise SpecError(f"{where}: section '{sec.get('title')}': open: no record screen '{o.get('screen')}'")
+                        resolve(spec, lf.ref, o.get("id", "id"), where)
                     for a in sec.get("actions") or []:
                         if a not in CONTACT_ACTIONS or a not in spec.entities[lf.ref].fields:
                             raise SpecError(f"{where}: action '{a}' must be one of {', '.join(sorted(CONTACT_ACTIONS))} and a field of {lf.ref}")
                 else:
-                    raise SpecError(f"{where}: a section needs 'fields', 'list' or 'custom'")
+                    raise SpecError(f"{where}: a section needs 'fields', 'list', 'history' or 'custom'")
         if s.frame == "sheet":
             if not raw.get("save"):
                 raise SpecError(f"{where}: a sheet needs a 'save' label")

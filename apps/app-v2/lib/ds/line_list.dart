@@ -63,6 +63,7 @@ class LineSpec {
     this.save,
     this.addLabel,
     this.addFields = const [],
+    this.open,
   });
 
   final String title;
@@ -93,6 +94,9 @@ class LineSpec {
   /// "A line they added": new lines made on the phone.
   final String? addLabel;
   final List<FieldDef> addFields;
+
+  /// A line opened in its own form that saves at once (photos, a claim); its answer becomes the line's value.
+  final Future<Json?> Function(BuildContext context, LineRow row, Json value)? open;
 }
 
 /// Opens a line screen full screen; true when something was saved.
@@ -124,6 +128,9 @@ class _LinesScreenState extends State<LinesScreen> {
   int filter = 0;
   bool busy = false;
   String? problem;
+
+  /// A line's own form saved something (the screen answers true when closed).
+  bool saved = false;
 
   LineSpec get spec => widget.spec;
   bool get readOnly => spec.save == null;
@@ -216,6 +223,17 @@ class _LinesScreenState extends State<LinesScreen> {
         title: 'Discard ${count(changes.length, '1 change', '{} changes')}?', text: 'They are not saved yet.', yes: 'Discard', danger: true);
   }
 
+  /// [LineSpec.open]: the line's own form saved it; the row shows what the server now has.
+  Future<void> _openOwn(LineRow r) async {
+    final v = await spec.open!(context, r, valueOf(r));
+    if (v == null || !mounted) return;
+    setState(() {
+      final i = rows.indexWhere((x) => x.key == r.key);
+      if (i >= 0) rows[i] = LineRow(key: r.key, no: r.no, title: r.title, sub: r.sub, values: {...r.values, ...v});
+      saved = true;
+    });
+  }
+
   Future<void> _sheet(List<LineRow> list, int i) async {
     final done = await showModalBottomSheet<bool>(
       context: context,
@@ -281,9 +299,9 @@ class _LinesScreenState extends State<LinesScreen> {
     final list = shown;
     final sum = spec.summary(rows, valueOf);
     return PopScope(
-      canPop: changes.isEmpty,
+      canPop: changes.isEmpty && !saved,
       onPopInvokedWithResult: (didPop, _) async {
-        if (!didPop && await _leave() && context.mounted) Navigator.pop(context, false);
+        if (!didPop && await _leave() && context.mounted) Navigator.pop(context, saved);
       },
       child: Scaffold(
         appBar: AppBar(
@@ -401,6 +419,8 @@ class _LinesScreenState extends State<LinesScreen> {
     void tap() {
       if (choosing) {
         setState(() => isChosen ? chosen.remove(r.key) : chosen.add(r.key));
+      } else if (spec.open != null) {
+        _openOwn(r);
       } else if (spec.inline == null && spec.fields.isNotEmpty && !readOnly) {
         _sheet(list, i);
       } else if (spec.inline != null && !readOnly) {

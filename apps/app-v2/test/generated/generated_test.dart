@@ -8,6 +8,8 @@ import 'package:kebo_app/generated/models.g.dart';
 import 'package:kebo_app/generated/screens/customer.g.dart';
 import 'package:kebo_app/generated/screens/customer_form.g.dart';
 import 'package:kebo_app/generated/screens/customers.g.dart';
+import 'package:kebo_app/generated/screens/factories.g.dart';
+import 'package:kebo_app/generated/screens/factory.g.dart';
 import 'package:kebo_app/generated/screens/inquiries.g.dart';
 import 'package:kebo_app/generated/screens/inquiry.g.dart';
 import 'package:kebo_app/generated/screens/inquiry_form.g.dart';
@@ -60,6 +62,46 @@ void main() {
       '{"id": "order_row-1", "refNo": "OrderRow number", "status": "open", "total": "1250.50", "currency": "USD", "orderedOn": "2026-10-28"}',
     ) as Json;
     final x = OrderRow.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('Factory reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "factory-1", "name": "Factory name", "contactPerson": "Factory contact person", "phone": "+92 300 1234567", "wechat": "Factory wechat", "email": "ali@example.com", "address": "Factory address", "bankDetails": "Factory bank details", "notes": "Factory notes", "owner": {"id": "person-1", "name": "Person name"}, "quotes": [{"id": "factory_offer_row-1", "receivedOn": "2026-10-28", "currency": "USD", "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title"}}], "record": {"asked": 2, "answered": 2, "declined": 2, "noReply": 2, "avgDaysToAnswer": "2", "lateSteps": 2, "openOrders": [{"id": "factory_order_row-1", "refNo": "FactoryOrderRow number", "customer": "FactoryOrderRow customer", "readyOn": "2026-10-28"}]}}',
+    ) as Json;
+    final x = Factory.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('FactoryOfferRow reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "factory_offer_row-1", "receivedOn": "2026-10-28", "currency": "USD", "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title", "assignee": {"id": "person-1", "name": "Person name"}}}',
+    ) as Json;
+    final x = FactoryOfferRow.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('FactoryRecord reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"asked": 2, "answered": 2, "declined": 2, "noReply": 2, "avgDaysToAnswer": "2", "lateSteps": 2, "openOrders": [{"id": "factory_order_row-1", "refNo": "FactoryOrderRow number", "customer": "FactoryOrderRow customer", "readyOn": "2026-10-28"}]}',
+    ) as Json;
+    final x = FactoryRecord.fromJson(j);
+    final back = x.toJson();
+    for (final k in back.keys) {
+      if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
+    }
+  });
+  test('FactoryOrderRow reads and writes its JSON', () {
+    final j = jsonDecode(
+      '{"id": "factory_order_row-1", "refNo": "FactoryOrderRow number", "customer": "FactoryOrderRow customer", "readyOn": "2026-10-28"}',
+    ) as Json;
+    final x = FactoryOrderRow.fromJson(j);
     final back = x.toJson();
     for (final k in back.keys) {
       if (j[k] is! List && j[k] is! Map) expect(back[k], j[k], reason: k);
@@ -232,9 +274,10 @@ void main() {
       '/api/customers/customer-1': jsonDecode(
         '{"id": "customer-1", "type": "company", "name": "Customer name", "country": "PK", "defaultCurrency": "USD", "address": "Customer address", "taxNo": "Customer tax number", "regNo": "Customer registration number", "initials": "Customer letters on papers", "notes": "Customer notes", "contacts": [{"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}], "primaryContact": {"id": "contact-1", "name": "Contact name", "position": "Contact role", "phone": "+92 300 1234567", "whatsapp": "+92 300 1234567", "email": "ali@example.com", "wechat": "Contact wechat", "isPrimary": false}, "openDeals": 2, "openOrders": 2, "inquiries": [{"id": "inquiry_row-1", "refNo": "InquiryRow number", "title": "InquiryRow title", "stage": "new", "onHold": false, "createdAt": "2026-10-28T09:00:00.000Z", "assignee": {"id": "person-1", "name": "Person name"}}], "orders": [{"id": "order_row-1", "refNo": "OrderRow number", "status": "open", "total": "1250.50", "currency": "USD", "orderedOn": "2026-10-28"}]}',
       ),
+      '/api/history': <Object?>[],
     });
     expect(find.text('Customer name'), findsWidgets);
-    for (final t in <String>['Contacts', 'Details', 'Inquiries', 'Orders', 'Notes']) {
+    for (final t in <String>['Performance · all time', 'Contacts', 'Orders', 'Inquiries', 'Details', 'Changes']) {
       final section = find.byKey(ValueKey('section:$t'));
       await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
       expect(section, findsOneWidget);
@@ -247,6 +290,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Name is needed'), findsWidgets);
     expect(find.text('Country is needed'), findsWidgets);
+    await expectAccessible(tester);
+  });
+  testWidgets('Factories lists the rows and passes the accessibility checks', (tester) async {
+    await pumpScreen(tester, const FactoriesScreen(), {
+      '/api/factories': jsonDecode(
+        '{"total": 1, "page": 1, "pageSize": 25, "rows": [{"id": "factory-1", "name": "Factory name", "contactPerson": "Factory contact person", "phone": "+92 300 1234567", "wechat": "Factory wechat", "email": "ali@example.com", "address": "Factory address", "bankDetails": "Factory bank details", "notes": "Factory notes", "owner": {"id": "person-1", "name": "Person name"}, "quotes": [{"id": "factory_offer_row-1", "receivedOn": "2026-10-28", "currency": "USD", "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title"}}], "record": {"asked": 2, "answered": 2, "declined": 2, "noReply": 2, "avgDaysToAnswer": "2", "lateSteps": 2, "openOrders": [{"id": "factory_order_row-1", "refNo": "FactoryOrderRow number", "customer": "FactoryOrderRow customer", "readyOn": "2026-10-28"}]}}]}',
+      ),
+    });
+    expect(find.text('Factories'), findsWidgets);
+    expect(find.text('Factory name'), findsOneWidget);
+    await expectAccessible(tester);
+  });
+  testWidgets('Factory shows the record and passes the accessibility checks', (tester) async {
+    await pumpScreen(tester, const FactoryScreen(id: 'factory-1'), {
+      '/api/factories/factory-1': jsonDecode(
+        '{"id": "factory-1", "name": "Factory name", "contactPerson": "Factory contact person", "phone": "+92 300 1234567", "wechat": "Factory wechat", "email": "ali@example.com", "address": "Factory address", "bankDetails": "Factory bank details", "notes": "Factory notes", "owner": {"id": "person-1", "name": "Person name"}, "quotes": [{"id": "factory_offer_row-1", "receivedOn": "2026-10-28", "currency": "USD", "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title"}}], "record": {"asked": 2, "answered": 2, "declined": 2, "noReply": 2, "avgDaysToAnswer": "2", "lateSteps": 2, "openOrders": [{"id": "factory_order_row-1", "refNo": "FactoryOrderRow number", "customer": "FactoryOrderRow customer", "readyOn": "2026-10-28"}]}}',
+      ),
+      '/api/history': <Object?>[],
+    });
+    expect(find.text('Factory name'), findsWidgets);
+    for (final t in <String>['Overview', 'Open orders', 'Their offers', 'Details', 'Changes']) {
+      final section = find.byKey(ValueKey('section:$t'));
+      await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
+      expect(section, findsOneWidget);
+    }
     await expectAccessible(tester);
   });
   testWidgets('Inquiries lists the rows and passes the accessibility checks', (tester) async {
@@ -306,9 +374,10 @@ void main() {
       '/api/orders/order-1': jsonDecode(
         '{"id": "order-1", "refNo": "Order number", "status": "open", "stage": "confirmed", "customer": {"id": "customer_ref-1", "name": "CustomerRef name", "country": "PK"}, "inquiry": {"id": "inquiry_ref-1", "refNo": "InquiryRef inquiry", "title": "InquiryRef title", "assignee": {"id": "person-1", "name": "Person name"}}, "orderedOn": "2026-10-28", "readyOn": "2026-10-28", "shippedOn": "2026-10-28", "shipBy": "2026-10-28", "incoterm": "Order incoterm", "incotermPlace": "Order incoterm place", "portOfDischarge": "Order port of discharge", "blNo": "Order bill of lading", "currency": "USD", "total": "1250.50", "received": "1250.50", "due": "1250.50", "money": {"total": "1250.50", "charged": "1250.50", "deposit": "1250.50", "depositPercent": 2, "received": "1250.50", "bankCharges": "1250.50", "due": "1250.50"}, "needs": {"title": "OrderNeeds needs", "due": "2026-10-28", "late": false}, "next": {"label": "OrderNext next step", "hint": "OrderNext why"}, "documents": [{"kind": "OrderDocumentRef kind", "label": "OrderDocumentRef label", "revisionId": "OrderDocumentRef revision id"}], "lines": null}',
       ),
+      '/api/history': <Object?>[],
     });
     expect(find.text('Order number'), findsWidgets);
-    for (final t in <String>['Steps', 'Goods', 'Money', 'Papers', 'Files', 'Details']) {
+    for (final t in <String>['Steps', 'Goods', 'Money', 'Papers', 'Files', 'Details', 'Changes']) {
       final section = find.byKey(ValueKey('section:$t'));
       await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
       expect(section, findsOneWidget);

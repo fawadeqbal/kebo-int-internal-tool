@@ -1,0 +1,46 @@
+# A factory we buy from: who to call, how they answer, what they make for us now.
+entity: Factory
+api: /api/factories
+paged: true
+permissions: { create: sourcing.manage, edit: sourcing.manage, delete: sourcing.manage }
+fields:
+  id: id
+  name: { type: text!, max: 200 }
+  contactPerson: { type: text, max: 120, label: Contact person }
+  phone: phone
+  wechat: { type: text, max: 80, label: WeChat }
+  email: email
+  address: { type: multiline, max: 500 }
+  bankDetails: { type: multiline, max: 2000, label: Bank details }
+  notes: { type: multiline, max: 5000 }
+  owner: { obj: Person, readonly: true, label: Looked after by }
+  quotes: { list: FactoryOfferRow, readonly: true }
+  record: { obj: FactoryRecord, readonly: true }
+
+---
+entity: FactoryOfferRow
+fields:
+  id: id
+  receivedOn: { type: date, label: Received }
+  currency: text
+  inquiry: { obj: InquiryRef }
+
+---
+# How the factory answers our price requests, and its open orders.
+entity: FactoryRecord
+fields:
+  asked: int
+  answered: int
+  declined: int
+  noReply: { type: int, label: No reply }
+  avgDaysToAnswer: { type: number, label: Days to answer }
+  lateSteps: { type: int, label: Late steps }
+  openOrders: { list: FactoryOrderRow, readonly: true }
+
+---
+entity: FactoryOrderRow
+fields:
+  id: id
+  refNo: { type: text, label: Number }
+  customer: text
+  readyOn: { type: date, label: Ready }

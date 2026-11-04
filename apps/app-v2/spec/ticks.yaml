@@ -125,23 +125,7 @@ ticks:
       note: { type: text, max: 500 }
     prefill: { doneOn: today }
 
-  delivered:
-    write: PATCH /api/orders/{order}/delivery
-    fields:
-      deliveredOn: { type: date!, label: Delivered on }
-      deliveryReceivedBy: { type: text, max: 120, label: Received by }
-      deliveryNote: { type: multiline, max: 2000, label: Note, hint: Anything damaged or missing }
-    prefill: { deliveredOn: today }
-    file: { step: delivery, kind: photo }
-
-  sat_done:
-    write: POST /api/orders/{order}/sat/all-passed
-    hint: Every SAT check passed and the customer signed.
-    fields:
-      satDoneOn: { type: date!, label: SAT done on }
-      satSignedBy: { type: text, max: 120, label: Signed by }
-    prefill: { satDoneOn: today }
-    file: { step: delivery, kind: other }
+  # delivered, sat_done and claims_closed open Delivery & SAT (lib/custom/delivery.dart).
 
   closed:
     write: POST /api/orders/{order}/stage
@@ -152,5 +136,5 @@ ticks:
 
 # Ticked on the web for now, with the reason shown in the sheet.
 web:
-  claims_closed: Claims are closed on the web.
+  claims_closed: Claims are closed on the web; Delivery & SAT shows them and opens new ones.
   bank:bank_paid_us: The bank's payment is recorded as Money received (Money reached us).

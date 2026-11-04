@@ -2,6 +2,7 @@
 // ignore_for_file: unused_import
 import 'package:flutter/material.dart' hide Badge;
 
+import '../../core/json.dart';
 import '../../core/scope.dart';
 import '../../ds/ds.dart';
 import '../countries.g.dart';
@@ -39,11 +40,11 @@ abstract final class InquiryFormSheet {
     ),
   ];
 
-  /// Opens the empty form; true when something was saved.
-  static Future<bool> create(BuildContext context) => FormSheet.open(
+  /// Opens the empty form ([prefill]: values already known, e.g. the customer); true when something was saved.
+  static Future<bool> create(BuildContext context, {Json? prefill}) => FormSheet.open(
     context,
     title: 'New inquiry',
-    initial: InquiryFields.blank(),
+    initial: {...InquiryFields.blank(), ...?prefill},
     send: (api, body) => InquiryRepo(api).create(body),
     save: 'Save inquiry',
     groups: _groups,

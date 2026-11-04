@@ -72,11 +72,11 @@ void main() {
     expect(sent['departedOn'], isA<String>());
   });
 
-  testWidgets('an item done on the web says so', (tester) async {
+  testWidgets('claims open Delivery & SAT, which says when the company does not use it', (tester) async {
     await pumpScreen(tester, const OrderScreen(id: 'o1'), _server());
     await tester.tap(find.text('Claims closed'));
     await tester.pumpAndSettle();
-    expect(find.text('Claims are closed on the web.'), findsOneWidget);
-    expect(find.text('Open on the web'), findsOneWidget);
+    expect(find.text('Delivery & SAT'), findsOneWidget);
+    expect(find.text('Delivery & SAT is switched off'), findsOneWidget);
   });
 }
