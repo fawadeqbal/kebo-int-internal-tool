@@ -45,7 +45,7 @@ export function FileActions({
       {excel ??
         (excelHref && (
           <a href={excelHref} download className={b}>
-            <FileSpreadsheet aria-hidden /> Excel
+            <FileSpreadsheet aria-hidden /> Excel{of && <span className="sr-only"> of the {of}</span>}
           </a>
         ))}
       {viewHref && (

@@ -28,6 +28,7 @@ export function CustomersSection({
   chip,
   page,
   params,
+  base,
 }: {
   d: Awaited<ReturnType<typeof loadCustomers>>;
   p: Period;
@@ -36,6 +37,8 @@ export function CustomersSection({
   page: number;
   /** The page's other parameters, kept by the pager. */
   params: Record<string, string | undefined>;
+  /** The page's address, for the pager. */
+  base: string;
 }) {
   const c = d.currency;
   const vs = p.vsLabel;
@@ -150,7 +153,7 @@ export function CustomersSection({
           </DataTable>
         )}
         <div className="px-4 pb-3 empty:hidden [&>*]:mt-3">
-          <Pager base="/insights" params={params} page={page} pageSize={size} total={rows.length} />
+          <Pager base={base} params={params} page={page} pageSize={size} total={rows.length} />
         </div>
       </Card>
     </div>
@@ -164,11 +167,14 @@ export function FactoriesSection({
   p,
   page,
   params,
+  base,
 }: {
   d: Awaited<ReturnType<typeof loadFactories>>;
   p: Period;
   page: number;
   params: Record<string, string | undefined>;
+  /** The page's address, for the pager. */
+  base: string;
 }) {
   const c = d.currency;
   const size = 25;
@@ -223,7 +229,7 @@ export function FactoriesSection({
           </DataTable>
         )}
         <div className="px-4 pb-3 empty:hidden [&>*]:mt-3">
-          <Pager base="/insights" params={params} page={page} pageSize={size} total={d.rows.length} />
+          <Pager base={base} params={params} page={page} pageSize={size} total={d.rows.length} />
         </div>
       </Card>
     </div>

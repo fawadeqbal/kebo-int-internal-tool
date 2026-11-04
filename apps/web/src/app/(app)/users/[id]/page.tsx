@@ -74,8 +74,8 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   const more: MenuEntry[] = [
     ...(can(me, "security.manage")
       ? [
-          { label: "Where they are signed in", href: `/security/sessions?person=${u.id}` },
-          { label: "Their sign-in history", href: `/security/sign-ins?person=${u.id}` },
+          { label: "Where they are signed in", href: `/access/sessions?person=${u.id}` },
+          { label: "Their sign-in history", href: `/access/sign-ins?person=${u.id}` },
         ]
       : []),
     ...(seeAudit ? [{ label: "What they did (audit log)", href: `/audit?person=${u.id}` }] : []),

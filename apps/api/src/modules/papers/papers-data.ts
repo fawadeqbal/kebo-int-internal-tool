@@ -332,7 +332,7 @@ function salesContract(c: PaperCtx): Built {
       ),
       hs.check,
       check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {
-        href: "/settings?tab=sales",
+        href: "/settings/sales",
       }),
     ],
     doc: {
@@ -727,7 +727,7 @@ function paymentRequest(c: PaperCtx): Built {
       check("amount", "Amount", paperMoneyText(amount, c.o.currency), Number(amount) > 0, { required: true }),
       check("bank", "Our bank details", c.settings.company.bankDetails ? "from Settings" : "not set", !!c.settings.company.bankDetails, {
         required: true,
-        href: "/settings?tab=company",
+        href: "/settings/company",
       }),
     ],
     doc: {
@@ -912,7 +912,7 @@ function satCertificate(c: PaperCtx): Built {
       check("done", "Signed off on", on ? paperDateText(on) : "not yet", !!on, { required: true, href: "delivery" }),
       check("by", "Signed by", c.o.satSignedBy ?? "not recorded", !!c.o.satSignedBy, { href: "delivery" }),
       check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {
-        href: "/settings?tab=sales",
+        href: "/settings/sales",
       }),
     ],
     doc: {

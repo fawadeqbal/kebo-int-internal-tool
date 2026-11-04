@@ -226,14 +226,14 @@ async function MonthStrip({ today }: { today: string }) {
             value={bigMoney(h.sales.now, c)}
             delta={<Delta value={change(h.sales.now, h.sales.before)} vs={vs} />}
             sub={`this month · ${plural(h.sales.orders, "order")}`}
-            href="/insights?period=month"
+            href="/reports?period=month"
           />
           <Tile
             label="Gross profit"
             value={bigMoney(h.profit.now, c)}
             delta={<Delta value={change(h.profit.now, h.profit.before)} vs={vs} />}
             sub={`margin ${percent(h.profit.margin)}${h.profit.marginBefore !== null ? ` · was ${percent(h.profit.marginBefore)}` : ""}`}
-            href="/insights?period=month"
+            href="/reports?period=month"
           />
           <Tile
             label="To receive"
@@ -248,7 +248,7 @@ async function MonthStrip({ today }: { today: string }) {
                 "nothing overdue"
               )
             }
-            href="/money?tab=receive"
+            href="/finance/to-receive"
           />
           <Tile
             label="Open quotes"
@@ -284,8 +284,8 @@ async function SalesChart({ today }: { today: string }) {
       title="Sales and gross profit, last 6 months"
       description={c}
       actions={
-        <Link href="/insights" className="text-sm text-primary hover:underline">
-          Open Insights
+        <Link href="/reports" className="text-sm text-primary hover:underline">
+          Open Reports
         </Link>
       }
       table={{
@@ -345,7 +345,7 @@ async function MyOrders() {
       <CardHeader title="My orders" description={`${board.items.length} open, by where they are`} />
       <CardBody className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {cols.map(([label, key, steps]) => (
-          <Link key={key} href={`/orders?mine=1&stage=${key}`} className="rounded-xl border border-line p-3 transition-colors hover:border-line-strong">
+          <Link key={key} href={`/orders/board?mine=1&stage=${key}`} className="rounded-xl border border-line p-3 transition-colors hover:border-line-strong">
             <p className="truncate text-xs text-muted">{label}</p>
             <p className="text-2xl font-semibold tabular">{count(steps)}</p>
           </Link>

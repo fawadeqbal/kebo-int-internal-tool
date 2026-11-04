@@ -317,7 +317,7 @@ export class LeaksService {
       warnings.push({
         level: "warn",
         text: `Expenses in ${monthName(last.month)} (${show(last.expMinor)}) are ${Math.round((last.expMinor / avg) * 100 - 100)}% above the monthly average.`,
-        href: "/money?tab=expenses",
+        href: "/finance/expenses",
       });
 
     /* ----- factories: what visits and costs there came to */
@@ -340,7 +340,7 @@ export class LeaksService {
       warnings.push({
         level: "warn",
         text: `${unassigned} amount${unassigned === 1 ? " is" : "s are"} not on an account, so the cash book cannot match the bank.`,
-        href: "/money?tab=cash&acct=none",
+        href: "/finance/cash-book?acct=none",
       });
 
     const planned = leakRows.reduce((t, r) => t + r.plannedMinor, 0);

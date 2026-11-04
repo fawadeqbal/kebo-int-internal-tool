@@ -13,6 +13,7 @@ import { FollowUpRow } from "@/components/notes/cards";
 import { FollowUpForm } from "@/components/notes/note-forms";
 import { todayHere } from "@/components/notes/kinds";
 import { addFollowUpAction } from "./actions";
+import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Follow-ups" };
 
@@ -55,6 +56,7 @@ export default async function FollowUpsPage({
   return (
     <div className="max-w-4xl">
       <PageHeader
+        crumbs={crumbsFor("/follow-ups")}
         title="Follow-ups"
         summary={
           <>

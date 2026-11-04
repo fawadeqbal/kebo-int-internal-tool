@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { cookies } from "next/headers";
 import { can } from "@kebo/shared";
 import { Toast } from "@kebo/ui/client";
 import { api } from "@/lib/api";
@@ -7,7 +8,8 @@ import { Alert } from "@kebo/ui";
 import { FeaturesProvider } from "@/components/common/features";
 import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
-import { AppShell, type NavGroup, type NavItem } from "@/components/shell/nav";
+import { AppShell } from "@/components/shell/nav";
+import { buildModules, MODULE_PAGES, OPEN_COOKIE, RAIL_COOKIE, type ModuleKey } from "@/lib/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
 
@@ -40,31 +42,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           .catch(() => 0)
       : null;
 
-  const work: NavItem[] = [
-    { href: "/dashboard", label: "Home", icon: "dashboard" },
-    { href: "/inquiries", label: "Inquiries", icon: "deals" },
-    { href: "/orders", label: "Orders", icon: "orders" },
-    { href: "/follow-ups", label: "Follow-ups", icon: "followUps" },
-    ...(approvals !== null ? [{ href: "/approvals", label: "Approvals", icon: "approvals", badge: approvals, badgeLabel: approves ? "waiting" : "sent back" } as NavItem] : []),
-    { href: "/customers", label: "Customers", icon: "customers" },
-    { href: "/notifications", label: "Notifications", icon: "notifications", badge: unread },
-  ];
-  const trade: NavItem[] = [
-    ...(has("sourcing.manage") ? [{ href: "/factories", label: "Factories", icon: "factories" } as NavItem] : []),
-    ...(has("sourcing.manage") ? [{ href: "/money", label: "Cash & accounts", icon: "money" } as NavItem] : []),
-    ...(has("reports.view") && feature("insights") ? [{ href: "/insights", label: "Insights", icon: "reports" } as NavItem] : []),
-  ];
-  const admin: NavItem[] = [
-    ...(has("users.manage") ? [{ href: "/users", label: "Users", icon: "users" } as NavItem] : []),
-    ...(has("security.manage") ? [{ href: "/security", label: "Security", icon: "security" } as NavItem] : []),
-    ...(has("settings.manage") ? [{ href: "/settings", label: "Settings", icon: "settings" } as NavItem] : []),
-    ...(has("audit.view") && feature("audit_log") ? [{ href: "/audit", label: "Audit log", icon: "audit" } as NavItem] : []),
-  ];
-  const groups: NavGroup[] = [{ title: "Work", items: work }, ...(trade.length ? [{ title: "Trade", items: trade }] : []), ...(admin.length ? [{ title: "Administration", items: admin }] : [])];
+  // The sidebar's modules (design page 33): each page only for those who may open it, with the same checks as the page itself.
+  const modules = buildModules({
+    can: (p) => has(p as Parameters<typeof can>[1]),
+    feature,
+    approvals,
+    approves,
+    unread,
+    companyAddresses: !!process.env.BASE_DOMAIN,
+  });
+  const jar = await cookies();
+  const keys = new Set<string>(MODULE_PAGES.map((m) => m.key));
+  const initialOpen = (jar.get(OPEN_COOKIE)?.value ?? "").split(".").filter((k): k is ModuleKey => keys.has(k));
 
   return (
     <>
-      <AppShell groups={groups} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
+      <AppShell modules={modules} initialRail={jar.get(RAIL_COOKIE)?.value === "1"} initialOpen={initialOpen} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {me.viaPlatform && (
           <form action={leaveCompanyAction} className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
             <span>

@@ -6,7 +6,7 @@ import { addressCompany, apiFetch } from "@/lib/api";
 
 const DEMO_LOGINS = [
   { label: "Owner", hint: "Sees everything: money, profit, settings", email: "admin@example.com", password: "Admin@12345" },
-  { label: "Manager", hint: "Insights, team and the money pages", email: "manager@example.com", password: "Manager@12345" },
+  { label: "Manager", hint: "Reports, team and the money pages", email: "manager@example.com", password: "Manager@12345" },
   { label: "Sales person", hint: "Only their own inquiries and orders", email: "bilal@example.com", password: "Demo@12345" },
 ];
 

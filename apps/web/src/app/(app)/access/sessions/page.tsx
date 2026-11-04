@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { MonitorSmartphone } from "lucide-react";
 import { Card, CardHeader, EmptyState, FilterBar } from "@kebo/ui";
+import { PageHeader } from "@kebo/ui";
+import { crumbsFor } from "@/lib/nav";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import type { Person } from "@/lib/types";
@@ -9,7 +11,7 @@ import { ConfirmAction } from "@/components/people/confirm-action";
 import { SessionList } from "@/components/security/session-list";
 import { endSessionAction, signOutEverywhereAction } from "../actions";
 
-export const metadata = { title: "Signed in now · Security" };
+export const metadata = { title: "Sessions" };
 
 /** Every browser and phone signed in now, newest use first; sign out one, or someone everywhere. */
 export default async function SessionsPage({ searchParams }: { searchParams: Promise<{ person?: string }> }) {
@@ -18,6 +20,8 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   const who = person ? people.find((p) => p.id === person) : null;
   const byPerson = new Set(sessions.map((s) => s.user.id)).size;
   return (
+    <div>
+      <PageHeader crumbs={crumbsFor("/access/sessions")} title="Sessions" description="Every browser and phone signed in now. Sign one out, or someone everywhere." />
     <Card className="overflow-hidden p-0">
       <CardHeader
         title={who ? `${who.name}: signed in on ${sessions.length} device${sessions.length === 1 ? "" : "s"}` : `${sessions.length} device${sessions.length === 1 ? "" : "s"} signed in, ${byPerson} ${byPerson === 1 ? "person" : "people"}`}
@@ -39,7 +43,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
             ))}
           </AutoSelect>
           {person && (
-            <Link href="/security/sessions" className="text-xs font-medium text-muted hover:text-text">
+            <Link href="/access/sessions" className="text-xs font-medium text-muted hover:text-text">
               Everyone
             </Link>
           )}
@@ -51,5 +55,6 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
         <SessionList sessions={sessions} end={(id) => endSessionAction.bind(null, id)} showPerson={!who} />
       )}
     </Card>
+    </div>
   );
 }

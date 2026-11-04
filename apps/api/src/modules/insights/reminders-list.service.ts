@@ -254,7 +254,7 @@ export class RemindersListService {
           title: `The ${c} rate was last updated ${daysBetween(on, today)} days ago`,
           detail: `1 ${s.sales.currency} = ${s.sales.exchangeRates[c]} ${c} · totals and targets use it`,
           due: addDays(on, 30),
-          href: "/settings?tab=sales",
+          href: "/settings/sales",
           action: "Update rates",
           who: null,
         });
@@ -272,7 +272,7 @@ export class RemindersListService {
           title: w.text,
           detail: null,
           due: null,
-          href: w.href ?? "/insights?tab=profit",
+          href: w.href ?? "/finance/profit",
           action: "Open",
           who: null,
         });

@@ -12,6 +12,6 @@ export async function newFormKeyAction(_prev: ActionState, _form: FormData): Pro
     if (e instanceof ApiError) return { ok: false, message: e.message };
     throw e;
   }
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return { ok: true, message: "A new key is made. Put the new snippet on your website: the old one no longer works." };
 }

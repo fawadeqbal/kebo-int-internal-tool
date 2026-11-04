@@ -14,14 +14,14 @@ const roleBody = (form: FormData) => {
 export async function createRoleAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.post<{ key: string }>("/roles", roleBody(form)));
   if (!r.ok) return r;
-  revalidatePath("/security");
-  redirect(`/security/roles/${(r.data as { key: string }).key}?toast=${encodeURIComponent("Role made. Give it to people under Users.")}`);
+  revalidatePath("/access", "layout");
+  redirect(`/access/roles/${(r.data as { key: string }).key}?toast=${encodeURIComponent("Role made. Give it to people under Users.")}`);
 }
 
 export async function updateRoleAction(key: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.put(`/roles/${key}`, roleBody(form)), "Saved. People in this role have the new rights from their next click.");
   if (r.ok) {
-    revalidatePath("/security", "layout");
+    revalidatePath("/access", "layout");
     revalidatePath("/users");
   }
   return r;
@@ -30,20 +30,20 @@ export async function updateRoleAction(key: string, _prev: ActionState, form: Fo
 export async function deleteRoleAction(key: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/roles/${key}`));
   if (!r.ok) return r;
-  revalidatePath("/security");
-  redirect(`/security?toast=${encodeURIComponent("Role removed.")}`);
+  revalidatePath("/access", "layout");
+  redirect(`/access/roles?toast=${encodeURIComponent("Role removed.")}`);
 }
 
 export async function endSessionAction(id: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/security/sessions/${id}`), "Signed out.");
-  if (r.ok) revalidatePath("/security", "layout");
+  if (r.ok) revalidatePath("/access", "layout");
   return r;
 }
 
 export async function signOutEverywhereAction(userId: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
   const r = await attempt(null, () => api.post<{ ended: number }>(`/security/users/${userId}/sign-out`));
   if (!r.ok) return r;
-  revalidatePath("/security", "layout");
+  revalidatePath("/access", "layout");
   revalidatePath(`/users/${userId}`);
   const n = (r.data as { ended: number }).ended;
   return { ok: true, message: n ? `Signed out of ${n} device${n === 1 ? "" : "s"}.` : "They were not signed in anywhere." };

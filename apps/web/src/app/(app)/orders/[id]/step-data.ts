@@ -37,7 +37,7 @@ export async function stepData(id: string, step: FlowStep) {
     current: view?.state === "now" || view?.state === "late",
     run: checklistAction.bind(null, o.id),
     historyHref: `${base}/history?step=${step}`,
-    listHref: can(me, "settings.manage") ? "/settings?tab=order-checklist" : undefined,
+    listHref: can(me, "settings.manage") ? "/settings/order-checklist" : undefined,
     path: `${base}/${STEP_PATH[step]}`,
   };
 }

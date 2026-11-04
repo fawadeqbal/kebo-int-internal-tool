@@ -195,7 +195,8 @@ export async function useCreditAction(orderId: string, _prev: ActionState, form:
 const refreshCustomer = (customerId: string) => {
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/orders", "layout");
-  revalidatePath("/money");
+  revalidatePath("/finance", "layout");
+  revalidatePath("/purchasing", "layout");
 };
 
 /** One transfer over several of the customer's orders; the rest becomes their credit. */

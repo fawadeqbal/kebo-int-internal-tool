@@ -8,7 +8,8 @@ import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib
 const refresh = (orderId?: string | null, customerId?: string | null) => {
   if (orderId) revalidatePath(`/orders/${orderId}`, "layout");
   if (customerId) revalidatePath(`/customers/${customerId}`);
-  revalidatePath("/money");
+  revalidatePath("/finance", "layout");
+  revalidatePath("/purchasing", "layout");
 };
 
 /** The customer's instalments: payload { items: [{ id?, label, amount, dueOn }] }. */
@@ -216,13 +217,13 @@ export async function transferAction(_prev: ActionState, form: FormData): Promis
     note: v.note?.trim() || null,
   };
   const r = await attempt(form, () => api.post("/money/transfers", body), "Money moved.");
-  if (r.ok) revalidatePath("/money");
+  if (r.ok) revalidatePath("/finance", "layout");
   return r;
 }
 
 export async function voidTransferAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.post(`/money/transfers/${id}/void`, { reason: formValues(form).reason }), "Move removed.");
-  if (r.ok) revalidatePath("/money");
+  if (r.ok) revalidatePath("/finance", "layout");
   return r;
 }
 
@@ -241,7 +242,7 @@ export async function saveTargetAction(_prev: ActionState, form: FormData): Prom
   const amount = v.amount?.replace(/[,\s]/g, "") ?? "";
   const r = await attempt(form, () => api.put(`/insights/targets/${v.month}`, { amount: amount ? Number(amount) : null }), amount && Number(amount) > 0 ? "Target saved." : "Target removed.");
   if (r.ok) {
-    revalidatePath("/insights");
+    revalidatePath("/reports", "layout");
     revalidatePath("/dashboard");
   }
   return r;
@@ -275,7 +276,7 @@ export async function saveTargetRowAction(month: string, before: Record<string, 
     changed.length ? "Targets saved." : "Nothing changed.",
   );
   if (r.ok) {
-    revalidatePath("/insights");
+    revalidatePath("/reports", "layout");
     revalidatePath("/dashboard");
   }
   return r;
