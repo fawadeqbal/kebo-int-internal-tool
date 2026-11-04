@@ -595,7 +595,13 @@ model Factory {
   wechat        String?   @db.VarChar(80)
   email         String?   @db.VarChar(254)
   address       String?
+  /// Free-text bank details from before the structured fields ("Other bank details").
   bankDetails   String?   @map("bank_details")
+  /// Bank details for paying it, one field each so they can go on payment documents.
+  bankBeneficiary String? @map("bank_beneficiary") @db.VarChar(200)
+  bankName        String? @map("bank_name") @db.VarChar(200)
+  bankAccount     String? @map("bank_account") @db.VarChar(60)
+  bankSwift       String? @map("bank_swift") @db.VarChar(20)
   notes         String?
   /// The person in our team who looks after this factory.
   ownerId       String?   @map("owner_id") @db.Uuid
@@ -606,6 +612,7 @@ model Factory {
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  contacts   FactoryContact[]
   quotes     FactoryQuote[]
   payments   FactoryPayment[]
   expenses   Expense[]
@@ -624,6 +631,30 @@ model Factory {
   @@index([ownerId])
   @@index([companyId])
   @@map("factories")
+}
+
+/// The people we talk to at a factory, like a customer's contacts. The primary one is also kept in the
+/// factory's own contact columns (contactPerson, phone, wechat, email) for the places that still read them.
+model FactoryContact {
+  id        String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company   Company   @relation(fields: [companyId], references: [id])
+  factoryId String    @map("factory_id") @db.Uuid
+  factory   Factory   @relation(fields: [factoryId], references: [id], onDelete: Cascade)
+  name      String    @db.VarChar(120)
+  position  String?   @db.VarChar(80)
+  email     String?   @db.VarChar(254)
+  phone     String?   @db.VarChar(40)
+  wechat    String?   @db.VarChar(80)
+  isPrimary Boolean   @default(false) @map("is_primary")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([factoryId])
+  @@index([companyId])
+  @@map("factory_contacts")
 }
 
 // ============================================================================
@@ -2174,6 +2205,7 @@ model Company {
   counters            Counter[]
   customers           Customer[]
   contacts            Contact[]
+  factoryContacts     FactoryContact[]
   factories           Factory[]
   inquiries           Inquiry[]
   requestedItems      RequestedItem[]

@@ -192,7 +192,7 @@ export class AccountsService {
     const rows = deals.map((d) => {
       const spent = byDeal.get(d.id) ?? { beforeSale: 0, onOrder: 0, basisPaid: 0 };
       const order = d.orders[0] ?? null;
-      let money: { revenue: number; goodsCost: number; uncosted: number; profit: number; net: number } | null = null;
+      let money: { revenue: number; goodsCost: number; uncosted: number; quoted: number; profit: number; net: number } | null = null;
       if (order) {
         // As on the order's page: profit on the revenue that has a cost, with the costs to reach the basis and bank charges.
         const c = costings.get(order.id)!;
@@ -217,7 +217,7 @@ export class AccountsService {
           beforeSaleMinor: spent.beforeSale,
         });
         const profit = p.expectedMinor;
-        money = { revenue, goodsCost, uncosted: revenue - costedRevenue, profit, net: p.netMinor };
+        money = { revenue, goodsCost, uncosted: revenue - costedRevenue, quoted: p.grossOnQuoteMinor, profit, net: p.netMinor };
         t.sales += revenue;
         t.goodsCost += goodsCost;
         // What was spent on the order (cash); profit counts freight paid for the planned basis costs once.
@@ -258,7 +258,13 @@ export class AccountsService {
           /** Value on lines without a cost: left out of profit. */
           uncostedRevenue: fromMinor(money!.uncosted),
           goodsCost: fromMinor(money!.goodsCost),
+          orderedOn: fromDbDate(order.orderedOn),
+          currency: order.currency,
+          total: order.total.toFixed(2),
           costs: fromMinor(spent.onOrder),
+          /** What the quotation promised (profit on the quote). */
+          quotedProfit: fromMinor(money!.quoted),
+          /** Gross profit: the quoted profit less unplanned costs and bank charges (as on the order's Costing tab). */
           profit: fromMinor(money!.profit),
           net: fromMinor(money!.net),
         },

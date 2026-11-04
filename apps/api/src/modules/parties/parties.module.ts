@@ -7,6 +7,7 @@ import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/au
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomersService } from "./customers.service";
 import { FactoriesService } from "./factories.service";
+import { FactoryPurchasesService } from "./factory-purchases.service";
 
 const customerList = listQuery.extend({ country: z.string().trim().toUpperCase().length(2).optional() });
 /** ?mine=true: the factories I look after. */
@@ -67,7 +68,10 @@ class CustomersController {
 @ApiTags("factories")
 @Controller("factories")
 class FactoriesController {
-  constructor(private readonly factories: FactoriesService) {}
+  constructor(
+    private readonly factories: FactoriesService,
+    private readonly purchases: FactoryPurchasesService,
+  ) {}
 
   @Get()
   @RequirePermissions("sourcing.manage")
@@ -79,6 +83,19 @@ class FactoriesController {
   @RequirePermissions("sourcing.manage")
   get(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.factories.get(id, user);
+  }
+
+  /**
+   * Its purchase orders (the sales orders it makes goods for, that the person may see): { today, mainCurrency,
+   * orders: [{ id, refNo, customer, stage, status, orderedOn, production: on_track | overdue_step | ready |
+   * delivered | cancelled, readyOn, readyActual, onTime, daysLate, currency, total, paid, balanceDue, …Main,
+   * lateSteps, open: [instalments still open] }], payments (made to it), readiness: { onTime, known, avgDaysLate },
+   * totals per currency, waiting: [quote requests not answered] }.
+   */
+  @Get(":id/purchases")
+  @RequirePermissions("sourcing.manage")
+  purchaseOrders(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.purchases.purchases(user, id);
   }
 
   @Post()
@@ -111,5 +128,5 @@ class FactoriesController {
   }
 }
 
-@Module({ controllers: [CustomersController, FactoriesController], providers: [CustomersService, FactoriesService], exports: [CustomersService, FactoriesService] })
+@Module({ controllers: [CustomersController, FactoriesController], providers: [CustomersService, FactoriesService, FactoryPurchasesService], exports: [CustomersService, FactoriesService] })
 export class PartiesModule {}

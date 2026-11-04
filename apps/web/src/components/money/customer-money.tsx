@@ -1,103 +1,25 @@
 import Link from "next/link";
-import { INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE } from "@kebo/shared";
-import { Badge, cn } from "@kebo/ui";
+import { Plus } from "lucide-react";
+import { Card, cn } from "@kebo/ui";
+import { InfoTip } from "@kebo/ui/client";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { CustomerAccount, CustomerPayments, ExpenseList, ExpenseTargets } from "@/lib/types-money";
 import { expenseAction } from "@/app/(app)/money/actions";
-import { ViewSwitch } from "@/components/common/view-switch";
+import { PanelButton } from "@/components/orders/step-view";
+import { PanelBody } from "@/components/common/panel";
 import { NewExpense } from "./forms";
 import { ExpenseRecord } from "./expense-record";
-import { CustomerPaymentsBody } from "./customer-payments";
 import { CustomerCredit, ReceiptForm } from "./money-v2";
 import { customerReceiptAction, refundCreditAction, useCreditAction, voidCreditAction } from "@/app/(app)/orders/actions";
-import { lostReasonLabel } from "./customer-account";
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+const SHOWN = 10;
 
-export type CustomerMoneyView = "payments" | "profit";
-
-/**
- * A customer's money in one tab, as on an order: Payments (everyone who sees
- * their orders) and Profit (managers), one at a time, with a switch. Payments
- * are recorded on each order; expenses for the customer are added here.
- */
-export async function CustomerMoney({
-  customerId,
-  customerName,
-  view,
-  managers,
-}: {
-  customerId: string;
-  customerName: string;
-  view: CustomerMoneyView;
-  managers: boolean;
-}) {
-  const shown: CustomerMoneyView = managers ? view : "payments";
-  const [pay, a] = await Promise.all([
-    api.get<CustomerPayments>("/payments", { customerId }),
-    managers ? api.get<CustomerAccount>(`/customers/${customerId}/account`) : Promise.resolve(null),
-  ]);
-  const base = `/customers/${customerId}?tab=money`;
-  const one = pay.totals.length === 1 ? pay.totals[0]! : null;
-  const due = one ? Number(one.due) > 0.005 : false;
-  const net = a ? Number(a.totals.net) : 0;
-
-  const profit = shown === "profit" && a ? await profitData(customerId, customerName) : null;
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {managers ? (
-          <ViewSwitch
-            label="Money"
-            current={shown}
-            views={[
-              {
-                key: "payments",
-                label: "Payments",
-                href: base,
-                hint: one ? (due ? `${money(one.due, one.currency)} due` : "paid") : undefined,
-                tone: due ? "text-warn" : "text-ok",
-              },
-              {
-                key: "profit",
-                label: "Profit",
-                href: `${base}&view=profit`,
-                hint: a ? `${net >= 0 ? "+ " : ""}${money(a.totals.net, a.currency)}` : undefined,
-                tone: net < 0 ? "text-bad" : "text-ok",
-              },
-            ]}
-          />
-        ) : (
-          <h2 className="text-base font-semibold">Payments</h2>
-        )}
-        {shown === "payments" ? (
-          <span className="text-xs text-muted">Payments are recorded on each order.</span>
-        ) : (
-          profit && (
-            <div className="has-[form]:basis-full">
-              <NewExpense
-                action={expenseAction.bind(null, null, null)}
-                people={profit.people}
-                mainCurrency={a!.currency}
-                fx={profit.fx}
-                today={profit.today}
-                choices={profit.choices}
-                label="Add an expense for them"
-                quiet
-              />
-            </div>
-          )
-        )}
-      </div>
-      {shown === "payments" && <CreditAndReceipts customerId={customerId} customerName={customerName} pay={pay} />}
-      {shown === "payments" ? <CustomerPaymentsBody d={pay} /> : a && profit && <ProfitBody a={a} {...profit} customerId={customerId} />}
-    </div>
-  );
-}
+const th = "px-3 py-2 text-xs font-medium whitespace-nowrap text-text-2";
+const td = "px-3 py-2.5 align-top";
 
 async function profitData(customerId: string, customerName: string) {
   const today = todayIn(TZ);
@@ -122,262 +44,174 @@ async function profitData(customerId: string, customerName: string) {
   };
 }
 
-const th = "px-3 py-2 font-medium whitespace-nowrap";
-const td = "px-3 py-2.5 align-top";
-const SHOWN = 10;
-
 /**
- * What the customer is worth: earned from their orders, minus what was spent
- * on them, equals the net result; then deal by deal (with what was not tied
- * to a deal) adding up to it, and the expenses.
+ * The customer's Profit tab (managers): per sales order what the quotation promised (quoted profit), what is
+ * left after unplanned costs and bank charges (gross profit, as on the order's Costing tab) and after what we
+ * spent on the inquiry before the order (net contribution); then what we spent on them not tied to a sales
+ * order, and their expenses.
  */
-function ProfitBody({
-  a,
-  list,
-  people,
-  fx,
-  today,
-  choices,
-  customerId,
-}: Awaited<ReturnType<typeof profitData>> & { a: CustomerAccount; customerId: string }) {
+export async function CustomerProfit({ a, customerId, customerName }: { a: CustomerAccount; customerId: string; customerName: string }) {
+  const { list, people, fx, today, choices } = await profitData(customerId, customerName);
   const c = a.currency;
   const t = a.totals;
-  const spent = Number(t.beforeSale) + Number(t.lostDeals) + Number(t.openDeals) + Number(t.otherCosts);
-  const net = Number(t.net);
+  const orders = a.rows.filter((r) => r.order);
+  const away = Number(t.lostDeals) + Number(t.openDeals) + Number(t.otherCosts);
+  const quoted = orders.reduce((s, r) => s + Number(r.order!.quotedProfit), 0);
+  const signed = (v: number) => (v < 0 ? `−${money(-v, c)}` : money(v, c));
   const shown = list.rows.slice(0, SHOWN);
-  const orders = a.rows.filter((r) => r.order).length;
-  const signed = (v: number) => (v < 0 ? `− ${money(-v, c)}` : money(v, c));
-
   return (
     <div className="flex flex-col gap-5">
       {a.missingRates.length > 0 && (
-        <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
-          There is no exchange rate for {a.missingRates.join(", ")} in Settings, so some amounts are left out.
-        </p>
+        <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">No exchange rate for {a.missingRates.join(", ")}. Add it in Settings › Sales &amp; quotations.</p>
       )}
-      <section aria-label="What they are worth" className="grid gap-3 sm:grid-cols-3">
-        <div className="min-w-0 rounded-xl border border-line bg-surface p-4">
-          <p className="text-xs text-muted">Earned from their orders</p>
-          <p className={cn("truncate text-xl font-bold tabular", Number(t.profit) < 0 && "text-bad")}>{money(t.profit, c)}</p>
-          <p className="text-xs text-text-2">
-            profit on {orders} order{orders === 1 ? "" : "s"} worth {money(t.sales, c)}
-          </p>
+      <Card className="overflow-clip">
+        <div className="flex min-h-12 items-center gap-1 border-b border-line px-4 py-2.5">
+          <h2 className="text-[15px] font-semibold">Profit by sales order · {orders.length}</h2>
+          <InfoTip label="About profit by sales order">In {c}, at each sales order&rsquo;s exchange rate.</InfoTip>
         </div>
-        <div className="min-w-0 rounded-xl border border-line bg-surface p-4">
-          <p className="text-xs text-muted">Spent on them</p>
-          <p className="truncate text-xl font-bold tabular">{spent > 0 ? `− ${money(spent, c)}` : money(0, c)}</p>
-          <p className="text-xs text-text-2">trips, meals, inquiries we lost</p>
-        </div>
-        <div
-          className={cn(
-            "min-w-0 rounded-xl border p-4",
-            net < 0 ? "border-bad/30 bg-bad-soft text-bad" : "border-ok/30 bg-ok-soft text-ok",
-          )}
-        >
-          <p className="text-xs font-semibold">Net result</p>
-          <p className="truncate text-xl font-bold tabular">
-            {net > 0 ? "+ " : ""}
-            {money(t.net, c)}
-          </p>
-          <p className="text-xs">{net < 0 ? "they have cost us so far" : "what they are worth so far"}</p>
-        </div>
-      </section>
-
-      <p className="text-sm text-text-2">
-        {a.deals.total} {a.deals.total === 1 ? "inquiry" : "inquiries"} · {a.deals.won} won · {a.deals.lost} lost · {a.deals.open} open
-        {a.winRate !== null && (
-          <>
-            {" "}
-            · <span className="font-semibold text-text">{a.winRate}% won</span>
-          </>
-        )}
-        {t.sellingCostPerWin !== null && <> · selling cost per order won {money(t.sellingCostPerWin, c)}</>}
-      </p>
-
-      <section aria-label="Inquiry by inquiry" className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Inquiry by inquiry</h2>
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
-          <table data-fit="" className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-surface-2 text-left text-xs text-text-2">
-                <th scope="col" className={th}>
-                  Inquiry
-                </th>
-                <th scope="col" className={cn(th, "hidden sm:table-cell")}>
-                  Result
-                </th>
-                <th scope="col" className={cn(th, "hidden text-right md:table-cell")}>
-                  Order value
-                </th>
-                <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>
-                  Order profit
-                </th>
-                <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>
-                  Spent on it
-                </th>
-                <th scope="col" className={cn(th, "text-right")}>
-                  Net
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {a.rows.map((d) => {
-                // Spent on a won deal before the sale (what was spent on the order is inside its profit); on any other deal, all of it.
-                const away = d.order ? Number(d.beforeSale) : Number(d.spent);
-                const rowNet = d.order ? Number(d.order.net) : -away;
-                const result = d.order ? (
-                  <Link href={`/orders/${d.order.id}`} className="whitespace-nowrap hover:text-primary">
-                    <Badge tone="ok">Won · {d.order.refNo}</Badge>
-                  </Link>
-                ) : (
-                  <>
-                    <Badge tone={INQUIRY_STAGE_TONE[d.stage]}>{INQUIRY_STAGE_LABEL[d.stage]}</Badge>
-                    {d.lostReason && <span className="block text-xs text-muted">{lostReasonLabel(d.lostReason)}</span>}
-                  </>
-                );
-                return (
-                  <tr key={d.id} className="border-t border-line">
-                    <td className={td}>
-                      <Link href={`/inquiries/${d.id}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
-                        {d.refNo}
-                      </Link>
-                      <span className="block max-w-72 truncate text-xs text-muted">{d.title}</span>
-                      <span className="mt-1 block sm:hidden">{result}</span>
-                    </td>
-                    <td className={cn(td, "hidden sm:table-cell")}>{result}</td>
-                    <td className={cn(td, "hidden text-right whitespace-nowrap tabular md:table-cell")}>
-                      {d.order ? money(d.order.revenue, c) : <span className="text-muted">—</span>}
-                    </td>
-                    <td className={cn(td, "hidden text-right whitespace-nowrap tabular sm:table-cell")}>
-                      {d.order ? money(d.order.profit, c) : <span className="text-muted">—</span>}
-                    </td>
-                    <td
-                      className={cn(
-                        td,
-                        "hidden text-right whitespace-nowrap tabular sm:table-cell",
-                        away > 0 && !d.order && d.stage === "lost" && "text-bad",
-                      )}
-                    >
-                      {away > 0 ? `− ${money(away, c)}` : <span className="text-muted">—</span>}
-                    </td>
-                    <td
-                      className={cn(
-                        td,
-                        "text-right font-semibold whitespace-nowrap tabular",
-                        rowNet < 0 ? "text-bad" : rowNet > 0 ? "text-ok" : "text-muted",
-                      )}
-                    >
-                      {rowNet === 0 ? "—" : signed(rowNet)}
-                    </td>
-                  </tr>
-                );
-              })}
-              {Number(t.otherCosts) > 0 && (
-                <tr className="border-t border-line">
-                  <td className={td}>
-                    <span className="font-medium">Not tied to an inquiry</span>
-                    <span className="block text-xs text-muted">visits, meals, gifts for them</span>
-                  </td>
-                  <td className={cn(td, "hidden sm:table-cell")} />
-                  <td className={cn(td, "hidden md:table-cell")} />
-                  <td className={cn(td, "hidden sm:table-cell")} />
-                  <td className={cn(td, "hidden text-right whitespace-nowrap tabular sm:table-cell")}>− {money(t.otherCosts, c)}</td>
-                  <td className={cn(td, "text-right font-semibold whitespace-nowrap text-bad tabular")}>{signed(-Number(t.otherCosts))}</td>
+        {orders.length === 0 && away === 0 ? (
+          <p className="px-4 py-3.5 text-sm text-text-2">No sales orders yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[36rem] border-collapse text-sm">
+              <thead>
+                <tr className="bg-surface-2 text-left">
+                  <th scope="col" className={th}>
+                    Sales order
+                  </th>
+                  <th scope="col" className={cn(th, "text-right")}>
+                    Total ({c})
+                  </th>
+                  <th scope="col" className={cn(th, "text-right")}>
+                    <span className="inline-flex items-center gap-1">
+                      Quoted profit <InfoTip label="About quoted profit">What the quotation promised, before any extra costs.</InfoTip>
+                    </span>
+                  </th>
+                  <th scope="col" className={cn(th, "text-right")}>
+                    <span className="inline-flex items-center gap-1">
+                      Gross profit <InfoTip label="About gross profit">Quoted profit, less unplanned costs and bank charges.</InfoTip>
+                    </span>
+                  </th>
+                  <th scope="col" className={cn(th, "text-right")}>
+                    <span className="inline-flex items-center gap-1">
+                      Net contribution <InfoTip label="About net contribution" align="end">Gross profit, less what we spent on the inquiry before it.</InfoTip>
+                    </span>
+                  </th>
                 </tr>
-              )}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-line-strong bg-surface-2 font-semibold">
-                <td className={td}>Total</td>
-                <td className={cn(td, "hidden sm:table-cell")} />
-                <td className={cn(td, "hidden text-right whitespace-nowrap tabular md:table-cell")}>{money(t.sales, c)}</td>
-                <td className={cn(td, "hidden text-right whitespace-nowrap tabular sm:table-cell")}>{money(t.profit, c)}</td>
-                <td className={cn(td, "hidden text-right whitespace-nowrap tabular sm:table-cell")}>
-                  {spent > 0 ? `− ${money(spent, c)}` : "—"}
-                </td>
-                <td className={cn(td, "text-right whitespace-nowrap tabular", net < 0 ? "text-bad" : "text-ok")}>{signed(net)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        {Number(t.uncostedRevenue) > 0 && (
-          <p className="text-xs text-warn">
-            Not costed: {money(t.uncostedRevenue, c)} of their orders has no cost recorded yet. It is left out of profit until its cost is
-            added.
-          </p>
+              </thead>
+              <tbody>
+                {orders.map((r) => {
+                  const o = r.order!;
+                  return (
+                    <tr key={o.id} className="border-t border-line">
+                      <td className={td}>
+                        <Link href={`/orders/${o.id}/costs`} className="font-medium tabular hover:text-primary">
+                          {o.refNo}
+                        </Link>
+                        <span className="block max-w-72 truncate text-xs text-text-2">{r.title}</span>
+                      </td>
+                      <td className={cn(td, "text-right whitespace-nowrap tabular")}>{money(o.revenue, c)}</td>
+                      <td className={cn(td, "text-right whitespace-nowrap tabular")}>{signed(Number(o.quotedProfit))}</td>
+                      <td className={cn(td, "text-right whitespace-nowrap tabular", Number(o.profit) < 0 && "text-bad")}>{signed(Number(o.profit))}</td>
+                      <td className={cn(td, "text-right font-semibold whitespace-nowrap tabular", Number(o.net) < 0 && "text-bad")}>{signed(Number(o.net))}</td>
+                    </tr>
+                  );
+                })}
+                {away > 0 && (
+                  <tr className="border-t border-line">
+                    <td className={td}>
+                      <span className="inline-flex items-center gap-1 font-medium">
+                        Expenses not on a sales order
+                        <InfoTip label="About expenses not on a sales order">Visits, samples and inquiries we lost or that are still open.</InfoTip>
+                      </span>
+                    </td>
+                    <td className={td} />
+                    <td className={td} />
+                    <td className={td} />
+                    <td className={cn(td, "text-right font-semibold whitespace-nowrap text-bad tabular")}>{signed(-away)}</td>
+                  </tr>
+                )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-line-strong bg-surface-2 font-semibold">
+                  <td className={td}>Total</td>
+                  <td className={cn(td, "text-right whitespace-nowrap tabular")}>{money(t.sales, c)}</td>
+                  <td className={cn(td, "text-right whitespace-nowrap tabular")}>{signed(quoted)}</td>
+                  <td className={cn(td, "text-right whitespace-nowrap tabular")}>{signed(Number(t.profit))}</td>
+                  <td className={cn(td, "text-right whitespace-nowrap tabular", Number(t.net) < 0 ? "text-bad" : "text-ok")}>{signed(Number(t.net))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         )}
-      </section>
+        {Number(t.uncostedRevenue) > 0 && (
+          <p className="border-t border-line px-4 py-2 text-xs text-warn">{money(t.uncostedRevenue, c)} of their sales orders has no goods cost yet and is left out of profit.</p>
+        )}
+      </Card>
 
-      <section aria-label="Spent on them" className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">
-          Spent on them <span className="font-normal text-muted">· newest first</span>
-        </h2>
+      <Card className="overflow-clip">
+        <div className="flex min-h-12 items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+          <h2 className="text-[15px] font-semibold">Expenses · {list.rows.length}</h2>
+          <NewExpense action={expenseAction.bind(null, null, null)} people={people} mainCurrency={c} fx={fx} today={today} choices={choices} label="Add expense" quiet />
+        </div>
         {shown.length > 0 ? (
-          <ul
-            className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface"
-            aria-label="Spent on them"
-          >
+          <ul className="flex flex-col divide-y divide-line" aria-label="Expenses">
             {shown.map((e) => (
-              <ExpenseRecord
-                key={e.id}
-                e={e}
-                mainCurrency={c}
-                people={people}
-                fx={fx}
-                today={today}
-                choices={choices}
-                showFor={Boolean(e.order || e.deal)}
-              />
+              <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} choices={choices} showFor={Boolean(e.order || e.deal)} />
             ))}
           </ul>
         ) : (
-          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">Nothing spent on them yet.</p>
+          <p className="px-4 py-3.5 text-sm text-text-2">No expenses yet.</p>
         )}
         {list.rows.length > shown.length && (
-          <Link href={`/finance/expenses?p=${today.slice(0, 4)}&customer=${customerId}`} className="text-sm text-primary hover:underline">
-            See all {list.rows.length} on the Money page
+          <Link href={`/finance/expenses?p=${today.slice(0, 4)}&customer=${customerId}`} className="block border-t border-line px-4 py-2.5 text-[13px] font-medium text-primary hover:underline">
+            All {list.rows.length} →
           </Link>
         )}
-      </section>
+      </Card>
     </div>
   );
 }
 
-/**
- * Money v2 on the customer's page: one transfer over several of their orders
- * (oldest due first, the rest kept as credit), and the credit we hold for them
- * with "Use on an order" and "Refund it".
- */
-async function CreditAndReceipts({ customerId, customerName, pay }: { customerId: string; customerName: string; pay: CustomerPayments }) {
-  const canRecord = pay.credit.canRecord;
-  const hasCredit = pay.credit.entries.length > 0;
-  if (!canRecord && !hasCredit) return null;
+/** "Record payment": one transfer over several of their sales orders, the oldest balance due filled first; the rest kept as advance / credit. */
+export async function RecordPaymentButton({ customerId, customerName, pay }: { customerId: string; customerName: string; pay: CustomerPayments }) {
+  if (!pay.credit.canRecord) return null;
   const settings = await api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings");
-  const today = todayIn(TZ);
   const open = pay.orders.filter((o) => o.status !== "cancelled" && Number(o.due) > 0);
+  if (!open.length) return null;
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {canRecord && (
-        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
-          <div>
-            <h3 className="font-semibold">Money received</h3>
-            <p className="text-xs text-text-2">One transfer can pay several orders: the oldest due first is filled in for you; the rest is kept as credit.</p>
-          </div>
+    <PanelButton
+      size="sm"
+      variant="secondary"
+      icon={<Plus aria-hidden />}
+      label="Record payment"
+      title={`Record payment · ${customerName}`}
+      body={
+        <PanelBody>
           <ReceiptForm
             action={customerReceiptAction.bind(null, customerId)}
             customer={customerName}
             orders={open.map((o) => ({ id: o.id, refNo: o.refNo, currency: o.currency, orderedOn: o.orderedOn, due: o.due, next: o.next }))}
             fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
-            today={today}
+            today={todayIn(TZ)}
           />
-        </section>
-      )}
-      {(hasCredit || canRecord) && (
-        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
-          <div>
-            <h3 className="font-semibold">Customer credit</h3>
-            <p className="text-xs text-text-2">Money we hold for the customer: shown here, on Money › Customers owe us (as a minus), and offered when their next order wants a deposit.</p>
-          </div>
+        </PanelBody>
+      }
+    />
+  );
+}
+
+/** "Apply credit": the advance / credit we hold for them, used on a sales order or refunded (side panel). */
+export function ApplyCreditButton({ customerId, customerName, pay }: { customerId: string; customerName: string; pay: CustomerPayments }) {
+  const open = pay.orders.filter((o) => o.status !== "cancelled" && Number(o.due) > 0);
+  return (
+    <PanelButton
+      size="sm"
+      variant="secondary"
+      label="Apply credit"
+      title={`Advance / credit · ${customerName}`}
+      body={
+        <PanelBody>
           <CustomerCredit
             customer={customerName}
             credit={pay.credit}
@@ -385,11 +219,11 @@ async function CreditAndReceipts({ customerId, customerName, pay }: { customerId
             useActions={Object.fromEntries(open.map((o) => [o.id, useCreditAction.bind(null, o.id)]))}
             refundAction={refundCreditAction.bind(null, customerId)}
             voidActions={Object.fromEntries(pay.credit.entries.filter((e) => e.kind === "refund").map((e) => [e.id, voidCreditAction.bind(null, customerId, "credit", e.id)]))}
-            canManage={canRecord}
-            today={today}
+            canManage={pay.credit.canRecord}
+            today={todayIn(TZ)}
           />
-        </section>
-      )}
-    </div>
+        </PanelBody>
+      }
+    />
   );
 }

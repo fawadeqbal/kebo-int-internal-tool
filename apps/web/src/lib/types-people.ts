@@ -1,4 +1,4 @@
-import type { CustomerType, InquiryStage, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
+import type { CustomerType, InquiryStage, OrderStage, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
@@ -47,8 +47,20 @@ export interface CustomerDetail {
     onHold: boolean;
     createdAt: string;
     assignee: Person | null;
+    /** Quotation revisions sent to them, newest first. */
+    sent: { number: number; sentOn: string; by: Person }[];
   }[];
-  orders: { id: string; refNo: string; status: OrderStatus; total: string; currency: string; orderedOn: string }[];
+  orders: {
+    id: string;
+    refNo: string;
+    status: OrderStatus;
+    stage: OrderStage;
+    total: string;
+    currency: string;
+    orderedOn: string;
+    /** The latest of its factories' ready dates. */
+    readyOn: string | null;
+  }[];
 }
 
 export interface Factory {
@@ -59,6 +71,11 @@ export interface Factory {
   wechat: string | null;
   email: string | null;
   address: string | null;
+  bankBeneficiary: string | null;
+  bankName: string | null;
+  bankAccount: string | null;
+  bankSwift: string | null;
+  /** Other bank details (free text, from before the fields above). */
   bankDetails: string | null;
   notes: string | null;
   /** The person in our team who looks after this factory. */
@@ -71,7 +88,62 @@ export interface FactoryRow extends Factory {
   _count: { quotes: number };
 }
 
+export interface FactoryContact {
+  id: string;
+  name: string;
+  position: string | null;
+  email: string | null;
+  phone: string | null;
+  wechat: string | null;
+  isPrimary: boolean;
+}
+
+/** GET /factories/:id/purchases: its purchase orders with paid and balance due, payments made, readiness. */
+export interface FactoryPurchases {
+  today: string;
+  mainCurrency: string;
+  orders: {
+    id: string;
+    refNo: string;
+    customer: { id: string; name: string };
+    stage: OrderStage;
+    status: OrderStatus;
+    orderedOn: string;
+    production: "on_track" | "overdue_step" | "ready" | "delivered" | "cancelled";
+    readyOn: string | null;
+    readyActual: string | null;
+    onTime: boolean | null;
+    daysLate: number | null;
+    currency: string | null;
+    total: string | null;
+    paid: string | null;
+    balanceDue: string | null;
+    mainCurrency: string;
+    totalMain: string;
+    paidMain: string;
+    balanceDueMain: string;
+    lateSteps: { title: string; dueOn: string | null }[];
+    open: { label: string; due: string | null; open: string; currency: string; status: string }[];
+  }[];
+  payments: {
+    id: string;
+    order: { id: string; refNo: string };
+    kind: string;
+    amount: string;
+    currency: string;
+    paidOn: string;
+    method: string;
+    reference: string | null;
+    voided: boolean;
+    hasFile: boolean;
+  }[];
+  readiness: { onTime: number; known: number; avgDaysLate: number | null };
+  totals: { currency: string; orders: number; total: string; paid: string; balanceDue: string }[];
+  waiting: { id: string; inquiry: { id: string; refNo: string; title: string }; sentOn: string; replyBy: string | null }[];
+}
+
 export interface FactoryDetail extends Factory {
+  contacts: FactoryContact[];
   quotes: {
     id: string;
     receivedOn: string;
