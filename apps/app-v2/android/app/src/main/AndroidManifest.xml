@@ -1,7 +1,19 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- The only permission: the server. The camera is opened through the system camera app
          (image_picker), which needs no permission here. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Not needed, so taken out of what the plugins bring:
+         open_filex asks for storage only for files outside the app's folders; the app opens files
+         from its own cache (lib/core/files.dart). media3 (video_player) catches the missing network
+         permission and only takes a wake lock when asked to, which video_player does not. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove"/>
 
     <application
         android:label="RFQ Desk"

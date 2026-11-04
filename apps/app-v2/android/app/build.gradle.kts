@@ -15,7 +15,8 @@ val keyProps = Properties().apply {
 
 android {
     namespace = "dev.fawadiqbal.kebo_app"
-    compileSdk = flutter.compileSdkVersion
+    // 37, not Flutter's 36: receive_sharing_intent 1.9 compiles against 37. (targetSdk stays Flutter's.)
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
