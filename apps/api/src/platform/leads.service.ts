@@ -243,11 +243,23 @@ export class LeadsService {
       include: { company: { select: { id: true, slug: true, name: true, kind: true, status: true, endsAt: true } } },
     });
     if (!l) throw new NotFoundError("Lead");
-    const [notes, log] = await Promise.all([
+    const [notes, log, signIns] = await Promise.all([
       this.db.leadNote.findMany({ where: { leadId: id }, orderBy: { createdAt: "desc" } }),
       this.db.platformLog.findMany({ where: { leadId: id }, orderBy: { at: "desc" }, take: 30 }),
+      // Their demo or company: how often its people signed in (the platform admin's own visits are not sign-ins).
+      l.company && l.company.status !== "deleted"
+        ? this.db.$queryRaw<
+            { n: bigint }[]
+          >`select count(*) as n from sign_ins where company_id = ${l.company.id}::uuid and result = 'signed_in'`
+        : null,
     ]);
-    return { ...this.view(l), notes, log };
+    const view = this.view(l);
+    return {
+      ...view,
+      company: view.company ? { ...view.company, signIns: signIns ? Number(signIns[0]?.n ?? 0) : null } : null,
+      notes,
+      log,
+    };
   }
 
   async create(actor: Actor, input: z.infer<typeof leadInput>) {
@@ -269,6 +281,8 @@ export class LeadsService {
       email: input.email,
       phone: input.phone === undefined ? undefined : input.phone,
       country: input.country === undefined ? undefined : input.country,
+      teamSize: input.teamSize === undefined ? undefined : input.teamSize,
+      message: input.message === undefined ? undefined : input.message,
     };
     await this.db.lead.update({ where: { id }, data });
     const said = [
@@ -277,6 +291,11 @@ export class LeadsService {
         : null,
       input.followUpOn !== undefined && input.followUpOn !== fromDbDateOrNull(l.followUpOn)
         ? `follow up ${input.followUpOn ?? "cleared"}`
+        : null,
+      (["companyName", "name", "email", "phone", "country", "teamSize", "message"] as const).some(
+        (k) => input[k] !== undefined && input[k] !== l[k],
+      )
+        ? "details changed"
         : null,
     ].filter(Boolean);
     if (said.length) await this.companies.log(actor, "lead_update", `${l.name} (${l.companyName}): ${said.join("; ")}`, { leadId: id });

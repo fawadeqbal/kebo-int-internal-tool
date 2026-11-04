@@ -5,8 +5,6 @@ import { MODULE_PRESETS, PLAN_FEATURES, withPreset } from "@kebo/shared";
 import { Button, Checkbox, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { EditButton } from "@/components/common/edit-button";
-import { MoreMenu } from "@/components/common/more-menu";
 import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { Plan } from "@/lib/types-platform";
@@ -121,22 +119,6 @@ export function PresetButtons({ features, onPick }: { features: readonly string[
   );
 }
 
-/** ✎ Edit and ⋯ (Delete, only for a plan no company uses) in a plan card's header. */
-export function PlanActions({ plan, remove }: { plan: Plan; remove?: Action }) {
-  const panel = useSidePanel("edit-plan");
-  return (
-    <>
-      <EditButton aria-label={`Edit the plan ${plan.name}`} onClick={() => panel.openPanel(plan.id)} />
-      {remove && (
-        <MoreMenu
-          label={`More for the plan ${plan.name}`}
-          items={[{ label: "Delete the plan…", danger: true, confirm: { title: `Delete the plan ${plan.name}?`, body: "No company uses it.", confirmLabel: "Delete the plan" }, action: remove }]}
-        />
-      )}
-    </>
-  );
-}
-
 /** "New plan" and "Edit plan · name" in the side panel (?panel=new-plan, ?panel=edit-plan&id=…). */
 export function PlanPanels({ plans, create, update }: { plans: Plan[]; create: Action; update: Record<string, Action> }) {
   const add = useSidePanel("new-plan");
@@ -152,7 +134,7 @@ export function PlanPanels({ plans, create, update }: { plans: Plan[]; create: A
     );
   if (edit.open && plan)
     return (
-      <SidePanel title={`Edit plan · ${plan.name}`} description="Companies on it get the change at once." onClose={() => edit.close()}>
+      <SidePanel title={`Edit plan · ${plan.name}`} description={`${plan.companies} ${plan.companies === 1 ? "company" : "companies"} on it · they get the change at once`} onClose={() => edit.close()}>
         <PanelBody>
           <PlanForm action={update[plan.id]!} plan={plan} onDone={() => edit.close()} submit="Save the plan" />
         </PanelBody>

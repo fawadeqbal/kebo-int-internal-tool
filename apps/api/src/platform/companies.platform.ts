@@ -18,7 +18,7 @@ import {
   COMPANY_LOG_KINDS,
   type CompanyLogKind,
 } from "@kebo/shared";
-import { addDays, ConflictError, DomainError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
+import { addDays, ConflictError, daysBetween, DomainError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { CompaniesService, toInfo } from "../common/company/companies.service";
@@ -615,6 +615,122 @@ export class PlatformCompaniesService {
       ending: ending.map((c) => ({ id: c.id, name: c.name, slug: c.slug, kind: c.kind, status: c.status, endsAt: c.endsAt })),
       renewals: overdue.map((c) => ({ id: c.id, name: c.name, slug: c.slug, status: c.status, renewsOn: fromDbDateOrNull(c.renewsOn) })),
       recent,
+      dashboard: await this.dashboard(today),
+    };
+  }
+
+  /**
+   * The overview's figures (design system: dashboard frame): paying companies,
+   * income this month against last month, renewals in the next 30 days and
+   * what they bring, demos and trials (and how many end this week), new client
+   * inquiries; the server's warnings of the last day; and one list of the
+   * companies to look at — overdue, demos and trials ending within a week,
+   * renewals within 30 days.
+   */
+  private async dashboard(today: ISODate) {
+    const month = today.slice(0, 7);
+    const monthStart = `${month}-01` as ISODate;
+    const lastStart = (() => {
+      const [y, m] = month.split("-").map(Number) as [number, number];
+      return `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}-01` as ISODate;
+    })();
+    const in30 = addDays(today, 30);
+    const week = new Date(Date.now() + 7 * DAY);
+    const monday = (() => {
+      const d = new Date(`${today}T00:00:00Z`);
+      return addDays(today, -((d.getUTCDay() + 6) % 7));
+    })();
+    const [clients, payments, trials, newLeads, leadsThisWeek, warnings, demoRequests] = await Promise.all([
+      this.db.company.findMany({
+        where: { kind: "client", status: { notIn: ["deleted", "off"] } },
+        include: { plan: { select: { name: true, priceMinor: true, currency: true, period: true } } },
+      }),
+      this.db.subscriptionPayment.findMany({ where: { paidOn: { gte: toDbDate(lastStart) } }, select: { amountMinor: true, currency: true, paidOn: true } }),
+      this.db.company.findMany({
+        where: { kind: { in: ["demo", "trial"] }, status: { notIn: ["deleted", "off"] } },
+        include: { plan: { select: { name: true } } },
+        orderBy: { endsAt: "asc" },
+      }),
+      this.db.lead.count({ where: { status: "new" } }),
+      this.db.lead.count({ where: { createdAt: { gte: new Date(`${monday}T00:00:00Z`) } } }),
+      this.db.platformLog.findMany({
+        where: { action: "server_warning", at: { gte: new Date(Date.now() - 26 * 3_600_000) } },
+        orderBy: { at: "desc" },
+        select: { id: true, summary: true, details: true, at: true },
+      }),
+      this.db.lead.count({ where: { status: "new", source: "form" } }),
+    ]);
+    const sum = (from: ISODate, to: ISODate | null) => {
+      const by = new Map<string, number>();
+      for (const p of payments) {
+        const d = fromDbDateOrNull(p.paidOn)!;
+        if (d >= from && (!to || d < to)) by.set(p.currency, (by.get(p.currency) ?? 0) + p.amountMinor);
+      }
+      return [...by].map(([currency, amountMinor]) => ({ currency, amountMinor }));
+    };
+    const usage = await this.data.usageAll();
+    const row = (c: (typeof clients)[number] | (typeof trials)[number], kind: "overdue" | "ending" | "renews", date: string | null) => ({
+      id: c.id,
+      name: c.name,
+      kind: c.kind,
+      status: c.status,
+      plan: c.plan?.name ?? null,
+      date,
+      people: usage.get(c.id)?.users ?? 0,
+      reason: kind,
+    });
+    const overdue = clients.filter((c) => c.renewsOn && fromDbDateOrNull(c.renewsOn)! < today);
+    const renewing = clients.filter((c) => c.renewsOn && fromDbDateOrNull(c.renewsOn)! >= today && fromDbDateOrNull(c.renewsOn)! <= in30);
+    const ending = trials.filter((c) => c.endsAt && c.endsAt <= week);
+    const due = new Map<string, number>();
+    for (const c of renewing) if (c.plan?.priceMinor) due.set(c.plan.currency, (due.get(c.plan.currency) ?? 0) + c.plan.priceMinor);
+    return {
+      paying: clients.length,
+      payingNewThisMonth: clients.filter((c) => c.createdAt >= new Date(`${monthStart}T00:00:00Z`)).length,
+      incomeThisMonth: sum(monthStart, null),
+      incomeLastMonth: sum(lastStart, monthStart),
+      renewals: renewing.length,
+      renewalsDue: [...due].map(([currency, amountMinor]) => ({ currency, amountMinor })),
+      trials: trials.length,
+      trialsEndingThisWeek: ending.length,
+      newLeads,
+      newLeadsDemoRequests: demoRequests,
+      leadsThisWeek,
+      serverWarnings: warnings.map((w) => ({ id: w.id, title: w.summary.replace(/^Server: /, ""), detail: (w.details as { detail?: string } | null)?.detail ?? null, at: w.at })),
+      watch: [
+        ...overdue.map((c) => row(c, "overdue", fromDbDateOrNull(c.renewsOn))),
+        ...ending.map((c) => row(c, "ending", c.endsAt?.toISOString() ?? null)),
+        ...renewing.sort((a, b) => a.renewsOn!.getTime() - b.renewsOn!.getTime()).map((c) => row(c, "renews", fromDbDateOrNull(c.renewsOn))),
+      ],
+      overdue: overdue.map((c) => ({ id: c.id, name: c.name, days: daysBetween(fromDbDateOrNull(c.renewsOn)!, today) })),
+      ending: ending.map((c) => ({ id: c.id, name: c.name, endsAt: c.endsAt })),
+    };
+  }
+
+  /**
+   * How the platform is set up (Platform settings): what comes from the
+   * server's settings (read-only here), the platform admins, and the
+   * server's warnings (backups, disk) of the last week.
+   */
+  async settings(signUpOpen: boolean) {
+    const [admins, warnings] = await Promise.all([
+      this.db.platformAdmin.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, email: true, isActive: true, totpEnabledAt: true, lastLoginAt: true, createdAt: true },
+      }),
+      this.db.platformLog.findMany({ where: { action: "server_warning", at: { gte: new Date(Date.now() - 7 * DAY) } }, orderBy: { at: "desc" }, take: 20 }),
+    ]);
+    return {
+      signUpOpen,
+      emailOn: !!process.env.SMTP_HOST,
+      platformEmail: this.env.PLATFORM_EMAIL ? this.env.PLATFORM_EMAIL.split(",").map((e) => e.trim()).filter(Boolean) : null,
+      botCheck: !!process.env.TURNSTILE_SECRET_KEY,
+      inquiriesPerHour: Number(process.env.PUBLIC_INQUIRIES_PER_HOUR) || 40,
+      baseDomain: this.env.BASE_DOMAIN || null,
+      appUrl: this.env.APP_URL,
+      timeZone: this.env.APP_TIME_ZONE,
+      admins: admins.map((a) => ({ id: a.id, name: a.name, email: a.email, active: a.isActive, twoStepOn: !!a.totpEnabledAt, lastLoginAt: a.lastLoginAt, createdAt: a.createdAt })),
+      serverWarnings: warnings.map((w) => ({ id: w.id, title: w.summary.replace(/^Server: /, ""), detail: (w.details as { detail?: string } | null)?.detail ?? null, at: w.at })),
     };
   }
 }

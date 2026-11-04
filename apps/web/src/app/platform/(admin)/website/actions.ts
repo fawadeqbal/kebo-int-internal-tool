@@ -13,20 +13,20 @@ export async function saveSiteAction(_prev: ActionState, form: FormData): Promis
     return { ok: false, message: "Could not read the page. Reload and try again." };
   }
   const r = await attempt(null, () => platformApi.put("/site", { draft }), "Draft saved. Publish it when it is ready.");
-  revalidatePath("/platform/website");
+  revalidatePath("/platform/settings");
   return r;
 }
 
 /** The draft goes live. */
 export async function publishSiteAction(): Promise<ActionState> {
   const r = await attempt(null, () => platformApi.post("/site/publish"), "Published. The page shows the new words now.");
-  revalidatePath("/platform/website");
+  revalidatePath("/platform/settings");
   return r;
 }
 
 /** Throw the draft away: back to what visitors see. */
 export async function discardSiteAction(): Promise<ActionState> {
   const r = await attempt(null, () => platformApi.post("/site/discard"), "Draft thrown away: back to the live page.");
-  revalidatePath("/platform/website");
+  revalidatePath("/platform/settings");
   return r;
 }
