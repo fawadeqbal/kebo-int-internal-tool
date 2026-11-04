@@ -2143,6 +2143,8 @@ model Company {
   previousSlugUntil DateTime?     @map("previous_slug_until") @db.Timestamptz
   contactName       String?       @map("contact_name") @db.VarChar(120)
   contactEmail      String?       @map("contact_email") @db.VarChar(254)
+  /// Phone or WhatsApp of the main contact, with the country code.
+  contactPhone      String?       @map("contact_phone") @db.VarChar(40)
   notes             String?
   lastActiveAt      DateTime?     @map("last_active_at") @db.Timestamptz
   /// The company website form's key: the form sends it, and it decides the company (Settings → Website form).

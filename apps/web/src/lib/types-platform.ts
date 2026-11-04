@@ -33,6 +33,7 @@ export interface CompanyRow {
   billing: Billing;
   contactName: string | null;
   contactEmail: string | null;
+  contactPhone?: string | null;
   notes: string | null;
   lastActiveAt: string | null;
   createdAt: string;
@@ -51,18 +52,42 @@ export interface LogEntry {
   at: string;
 }
 
-export interface CompanyDetail extends CompanyRow {
+export interface CompanyDetail extends Omit<CompanyRow, "plan"> {
+  plan: (PlanRef & { features: string[]; priceMinor: number; currency: string; period: string }) | null;
   warnings: string[];
+  /** Where its people sign in. */
+  address: string;
+  /** The company's own details (its Settings → Company), read-only here; null once deleted. */
+  profile: { legalName: string | null; address: string | null; taxNo: string | null; phone: string | null; email: string | null; website: string | null } | null;
+  /** When and by whom each module now off was switched off. */
+  modulesOff: { feature: string; at: string | null; by: string | null }[];
+  /** Entries in its whole history. */
+  logCount: number;
   /** What the plan includes (null: no plan, every feature) and the modules switched off for this company. */
   planFeatures: string[] | null;
   featuresOff: string[];
   activity: {
     signInsLast30Days: number;
-    lastSignIn: { at: string; email: string } | null;
+    signedInThisWeek: number;
+    lastSignIn: { at: string; email: string; name: string | null } | null;
     inquiries: number;
     inquiriesLast30Days: number;
     orders: number;
-    people: { id: string; name: string; email: string; active: boolean; lastLoginAt: string | null; role: string; tenantAdmin: boolean }[];
+    openOrders: number;
+    customers: number;
+    factories: number;
+    twoStepOff: number;
+    people: {
+      id: string;
+      name: string;
+      email: string;
+      active: boolean;
+      lastLoginAt: string | null;
+      role: string;
+      tenantAdmin: boolean;
+      twoStep: boolean;
+      locked: boolean;
+    }[];
   } | null;
   payments: {
     id: string;
@@ -124,4 +149,10 @@ export interface Overview {
   ending: { id: string; name: string; slug: string; kind: CompanyKind; status: CompanyStatus; endsAt: string }[];
   renewals: { id: string; name: string; slug: string; status: CompanyStatus; renewsOn: string }[];
   recent: LogEntry[];
+}
+
+export interface CompanyHistory {
+  kind: string | null;
+  counts: Record<string, number>;
+  rows: LogEntry[];
 }

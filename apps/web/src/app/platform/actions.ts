@@ -138,22 +138,16 @@ async function flash(made: { id: string; link: string | null; emailed: boolean }
   });
 }
 
+/** Fields of a company a form may change; only the ones the form holds are sent (each side panel changes one group). */
+const COMPANY_FIELDS = ["name", "slug", "planId", "renewsOn", "contactName", "contactEmail", "contactPhone", "notes"] as const;
+/** Cleared when sent empty (the others are text, sent as typed). */
+const NULLABLE = new Set<string>(["planId", "renewsOn"]);
+
 export async function updateCompanyAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
-  const r = await attempt(
-    form,
-    () =>
-      platformApi.patch(`/companies/${id}`, {
-        name: v.name,
-        slug: v.slug,
-        planId: v.planId || null,
-        renewsOn: v.renewsOn || null,
-        contactName: v.contactName,
-        contactEmail: v.contactEmail,
-        notes: v.notes,
-      }),
-    "Saved.",
-  );
+  const body: Record<string, string | null> = {};
+  for (const k of COMPANY_FIELDS) if (form.has(k)) body[k] = NULLABLE.has(k) ? v[k] || null : (v[k] ?? "");
+  const r = await attempt(form, () => platformApi.patch(`/companies/${id}`, body), String(form.get("_saved") || "Saved."));
   after(id)();
   return r;
 }

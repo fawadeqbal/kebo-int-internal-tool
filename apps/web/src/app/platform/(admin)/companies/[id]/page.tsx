@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { Download, LogIn } from "lucide-react";
-import { LIFECYCLE } from "@kebo/shared";
-import { Alert, Badge, buttonClass, Card, CardBody, CardHeader, DetailList, PageHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { COMPANY_KIND_LABEL } from "@kebo/shared";
+import { Alert, Banner, buttonClass, PageHeader, SectionList, StatusBadge, toPage } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { platformApi } from "@/lib/api";
 import { loadPlatform, readFlash } from "@/lib/platform";
-import { date, dateTime, money, timeAgo } from "@/lib/format";
-import type { CompanyDetail, Plan } from "@/lib/types-platform";
-import { BillingBadge, CompanyStatusBadge, KindBadge, LeadStatusBadge } from "@/components/platform/badges";
+import { date } from "@/lib/format";
+import type { CompanyDetail, CompanyHistory, Plan } from "@/lib/types-platform";
+import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import {
   adminPasswordAction,
+  companyModulesAction,
   companyStatusAction,
   deleteCompanyAction,
   endAction,
@@ -19,64 +20,159 @@ import {
   paymentAction,
   removePaymentAction,
   updateCompanyAction,
-  companyModulesAction,
 } from "@/app/platform/actions";
-import { ActionButton, AdminPasswordForm, CopyLink, DeleteForm, DetailsForm, ExtendForm, MakeRealForm, ModulesForm, PaymentForm, StatusForm } from "./forms";
+import { CopyLink } from "./forms";
+import { headline, SECTIONS, sectionHref, sectionOf } from "./model";
+import { CompanyPanels, type SavedCard } from "./panels";
+import { BillingSection, DetailsSection, HistorySection, OverviewSection, PeopleSection, PlanSection } from "./sections";
 
 export const metadata = { title: "Company" };
 
 const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
-export default async function CompanyPage({ params }: { params: Promise<{ id: string }> }) {
+type Search = { section?: string; kind?: string; page?: string; saved?: string };
+
+/**
+ * A company, as the platform admin runs it (design system: record frame with
+ * a section list, approved page 30). Header: its name and where it stands,
+ * one summary line, Export, the one primary "Open company" and ⋯ (switch on /
+ * off, read-only, back to the rules, end a demo, the client inquiry; Delete
+ * last, in red). Sections (?section=): Overview · People · Plan & modules ·
+ * Billing · Details · History; each change happens in a side panel.
+ */
+export default async function CompanyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const { id } = await params;
-  const [c, plans, flash] = await Promise.all([
+  const sp = await searchParams;
+  const section = sectionOf(sp.section);
+  const [c, plans, flash, history] = await Promise.all([
     loadPlatform(() => platformApi.get<CompanyDetail>(`/companies/${id}`)),
     platformApi.get<Plan[]>("/plans"),
     readFlash(id),
+    section === "history" ? platformApi.get<CompanyHistory>(`/companies/${id}/history`, sp.kind ? { kind: sp.kind } : undefined) : null,
   ]);
+  const today = todayIn(TZ);
   const live = c.status !== "deleted";
-  const trial = c.kind !== "client";
-  const admins = c.activity?.people.filter((p) => p.tenantAdmin) ?? [];
+  const off = c.status === "off";
+  const head = headline(c);
+  const saved = sp.saved as SavedCard | undefined;
+  const people = c.activity?.people ?? [];
+  const active = people.filter((p) => p.active).length;
+  const lead = c.leads[0];
+
+  const exportEntry: MenuEntry = { label: "Export (zip of all its data)", href: `/platform/companies/${id}/export`, download: true };
+  const more: MenuEntry[] = live
+    ? [
+        ...(c.status !== "active" ? [{ label: "Switch on…", panel: "status", id: "active" }] : []),
+        ...(c.status !== "read_only" ? [{ label: "Make read-only…", panel: "status", id: "read_only" }] : []),
+        ...(c.status !== "off" ? [{ label: "Switch off…", panel: "status", id: "off" }] : []),
+        ...(c.statusManual ? [{ label: "Back to the automatic rules…", panel: "status", id: "auto" }] : []),
+        ...(c.kind !== "client"
+          ? [
+              {
+                label: `End the ${c.kind} now…`,
+                confirm: {
+                  title: `End the ${c.kind} now?`,
+                  body: "It becomes read-only now, then is switched off and deleted by the rules.",
+                  confirmLabel: "End it now",
+                },
+                action: endAction.bind(null, id),
+              } as MenuEntry,
+            ]
+          : []),
+        ...(lead ? [{ label: "Open the client inquiry", href: `/platform/leads/${lead.id}` }] : []),
+        { label: "Copy the web address", copy: c.address },
+        { separator: true } as const,
+        { label: "Delete…", panel: "delete", danger: true } as const,
+      ]
+    : lead
+      ? [{ label: "Open the client inquiry", href: `/platform/leads/${lead.id}` }]
+      : [];
+
+  const summary = [
+    COMPANY_KIND_LABEL[c.kind],
+    c.plan ? `${c.plan.name} plan` : "no plan",
+    c.kind === "client"
+      ? c.renewsOn
+        ? `paid until ${date(c.renewsOn)}`
+        : "no paid-until date"
+      : c.endsAt
+        ? `ends ${date(c.endsAt)}`
+        : null,
+    live ? `${active}${c.plan?.maxUsers ? ` of ${c.plan.maxUsers}` : ""} ${active === 1 && !c.plan?.maxUsers ? "person" : "people"}` : null,
+    live ? c.address.replace(/^https?:\/\//, "") : null,
+  ].filter(Boolean);
+
+  const counts: Record<string, number | undefined> = {
+    people: live ? people.length : undefined,
+    billing: c.kind === "client" ? c.payments.length : undefined,
+    history: c.logCount,
+  };
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PageHeader
-        title={
-          <span className="flex flex-wrap items-center gap-2">
-            {c.name} <KindBadge kind={c.kind} /> <CompanyStatusBadge status={c.status} />
-            {c.kind === "client" && live && c.billing !== "active" && <BillingBadge billing={c.billing} />}
-          </span>
-        }
-        description={
+        backHref="/platform/companies"
+        backLabel="Companies"
+        phoneStack
+        title={c.name}
+        badge={<StatusBadge meaning={head.meaning}>{head.label}</StatusBadge>}
+        summary={
           <>
-            <span className="font-mono">{c.slug}</span>
-            {c.previousSlug && <> (was {c.previousSlug})</>} · since {date(c.startsOn)} · {c.plan ? `plan ${c.plan.name}` : "no plan"}
-            {c.statusReason && <> · {c.statusReason}</>}
+            {summary.join(" · ")}
+            {c.previousSlug && <> (was {c.previousSlug})</>}
+            {lead && (
+              <>
+                {" "}
+                ·{" "}
+                <Link href={`/platform/leads/${lead.id}`} className="font-medium text-primary underline-offset-2 hover:underline">
+                  from client inquiry {lead.name} →
+                </Link>
+              </>
+            )}
           </>
         }
-        actions={
+        papers={
           live && (
-            <>
-              <a href={`/platform/companies/${id}/export`} className={buttonClass("secondary", "sm")}>
-                <Download aria-hidden /> Export
-              </a>
-              <form action={openCompanyAction.bind(null, id)}>
-                <button
-                  type="submit"
-                  className={buttonClass("primary", "sm")}
-                  disabled={c.status === "off"}
-                  title={c.status === "off" ? "Switch it on to open it" : "Work inside the company (logged)"}
-                >
-                  <LogIn aria-hidden /> Open company
-                </button>
-              </form>
-            </>
+            <a href={`/platform/companies/${id}/export`} className={buttonClass("secondary", "sm")}>
+              <Download aria-hidden /> Export
+            </a>
           )
         }
+        primary={
+          live && (
+            <form action={openCompanyAction.bind(null, id)}>
+              <button
+                type="submit"
+                className={buttonClass("primary", "sm")}
+                disabled={off}
+                aria-describedby={off ? "open-reason" : undefined}
+                title={off ? "Switch it on to open it" : "Work inside the company (it is logged)"}
+              >
+                <LogIn aria-hidden /> Open company
+              </button>
+            </form>
+          )
+        }
+        more={more.length > 0 && <MoreMenu label={`More for ${c.name}`} items={more} phoneItems={live ? [exportEntry] : []} />}
       />
 
+      {off && (
+        <Banner meaning="bad">
+          <span id="open-reason">
+            Switched off{c.statusReason ? ` (${c.statusReason})` : ""}: nobody can sign in, and it cannot be opened. Switch it on from ⋯ to
+            open it.
+          </span>
+        </Banner>
+      )}
+      {!live && (
+        <Banner meaning="info">
+          Deleted {c.deletedAt ? date(c.deletedAt) : ""}: its data and files are gone; a copy was kept in storage (see History). Its short
+          name stays taken for a while.
+        </Banner>
+      )}
       {flash && (
         <Alert tone="success">
-          {trial ? "The demo is ready." : "The company is ready."}{" "}
+          {c.kind !== "client" ? "The demo is ready." : "The company is ready."}{" "}
           {flash.link
             ? flash.emailed
               ? "The tenant admin was emailed a link to set a password. You can also send it yourself:"
@@ -85,217 +181,64 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
           {flash.link && <CopyLink link={flash.link} />}
         </Alert>
       )}
-      {c.warnings.map((w) => (
-        <Alert key={w} tone="warning">
-          {w}
-        </Alert>
-      ))}
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_22rem]">
-        <div className="flex min-w-0 flex-col gap-5">
-          {c.activity && (
-            <Card>
-              <CardHeader title="Activity" description="What is happening in the company (your own visits do not count)" />
-              <CardBody>
-                <DetailList
-                  columns={3}
-                  items={[
-                    { label: "People", value: `${c.usage?.users ?? 0}${c.plan?.maxUsers ? ` of ${c.plan.maxUsers}` : ""}` },
-                    {
-                      label: "Files",
-                      value: `${c.usage?.storageMb ?? 0} MB${c.plan?.maxStorageMb ? ` of ${c.plan.maxStorageMb} MB` : ""}`,
-                    },
-                    { label: "Last active", value: c.lastActiveAt ? timeAgo(c.lastActiveAt) : "Never" },
-                    { label: "Sign-ins, 30 days", value: c.activity.signInsLast30Days },
-                    { label: "Inquiries", value: `${c.activity.inquiries} (${c.activity.inquiriesLast30Days} in 30 days)` },
-                    { label: "Orders", value: c.activity.orders },
-                  ]}
-                />
-              </CardBody>
-              <Table>
-                <THead>
-                  <tr>
-                    <Th>Person</Th>
-                    <Th>Role</Th>
-                    <Th className="text-right">Last signed in</Th>
-                  </tr>
-                </THead>
-                <tbody>
-                  {c.activity.people.map((p) => (
-                    <Tr key={p.id} className={p.active ? "" : "text-muted"}>
-                      <Td>
-                        <span className="block font-medium">{p.name}</span>
-                        <span className="block text-xs text-muted">{p.email}</span>
-                      </Td>
-                      <Td>
-                        {p.role}
-                        {p.tenantAdmin && (
-                          <Badge tone="primary" className="ml-1.5">
-                            Tenant admin
-                          </Badge>
-                        )}
-                        {!p.active && <span className="ml-1.5 text-xs">(off)</span>}
-                      </Td>
-                      <Td className="text-right text-xs whitespace-nowrap text-muted">
-                        {p.lastLoginAt ? timeAgo(p.lastLoginAt) : "Never"}
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-              {admins.length > 0 && (
-                <CardBody className="border-t border-line">
-                  <p className="mb-2 text-sm text-text-2">
-                    Tenant admin locked out? Send a link to set a new password (it is emailed, and shown here).
-                  </p>
-                  <AdminPasswordForm action={adminPasswordAction.bind(null, id)} admins={admins} />
-                </CardBody>
-              )}
-            </Card>
-          )}
+      <SectionList
+        label="Company sections"
+        boxed
+        wide
+        items={SECTIONS.map((s) => ({ href: sectionHref(id, s.key), label: s.label, active: s.key === section, count: counts[s.key] }))}
+      >
+        {section === "overview" && <OverviewSection c={c} today={today} />}
+        {section === "people" && <PeopleSection c={c} />}
+        {section === "plan" && <PlanSection c={c} modules={companyModulesAction.bind(null, id)} saved={saved} />}
+        {section === "billing" && (
+          <BillingSection
+            c={c}
+            today={today}
+            saved={saved}
+            removePayment={Object.fromEntries(c.payments.map((p) => [p.id, removePaymentAction.bind(null, id, p.id)]))}
+          />
+        )}
+        {section === "details" && <DetailsSection c={c} saved={saved} />}
+        {section === "history" && history && <HistorySection c={c} history={history} page={toPage(sp.page)} />}
+      </SectionList>
 
-          {live && (
-            <Card>
-              <CardHeader
-                title="Modules"
-                description="What their plan includes. Switch a module off for this company alone (a client who wants less management): it is hidden in their app and refused by the API."
-              />
-              <CardBody>
-                <ModulesForm c={c} action={companyModulesAction.bind(null, id)} />
-              </CardBody>
-            </Card>
-          )}
-
-          {live && (
-            <Card>
-              <CardHeader title="Details" />
-              <CardBody>
-                <DetailsForm c={c} plans={plans} action={updateCompanyAction.bind(null, id)} />
-              </CardBody>
-            </Card>
-          )}
-
-          {c.kind === "client" && live && (
-            <Card>
-              <CardHeader
-                title="Payments"
-                description={c.renewsOn ? `Paid until ${date(c.renewsOn)}` : "Record each payment; it sets the paid-until date."}
-              />
-              {c.payments.length > 0 && (
-                <Table>
-                  <THead>
-                    <tr>
-                      <Th>Paid on</Th>
-                      <Th className="text-right">Amount</Th>
-                      <Th>Paid until</Th>
-                      <Th>Note</Th>
-                      <Th className="relative">
-                        <span className="sr-only">Remove</span>
-                      </Th>
-                    </tr>
-                  </THead>
-                  <tbody>
-                    {c.payments.map((p) => (
-                      <Tr key={p.id}>
-                        <Td className="whitespace-nowrap">{date(p.paidOn)}</Td>
-                        <Td className="text-right tabular">{money(p.amountMinor / 100, p.currency)}</Td>
-                        <Td className="whitespace-nowrap">{date(p.paidUntil)}</Td>
-                        <Td className="text-sm text-text-2">{p.note}</Td>
-                        <Td className="text-right">
-                          <ActionButton
-                            action={removePaymentAction.bind(null, id, p.id)}
-                            label="Remove"
-                            variant="ghost"
-                            confirm="Remove this payment? The paid-until date stays as it is."
-                          />
-                        </Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                </Table>
-              )}
-              <CardBody className="border-t border-line">
-                <PaymentForm action={paymentAction.bind(null, id)} today={todayIn(TZ)} currency={c.payments[0]?.currency ?? "USD"} />
-              </CardBody>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader title="History" description="Everything done to this company from the platform" />
-            <ul className="divide-y divide-line">
-              {c.log.map((e) => (
-                <li key={e.id} className="px-4 py-2 text-sm">
-                  <p>{e.summary}</p>
-                  <p className="text-xs text-muted">
-                    {e.adminName ?? "Automatic"} · {dateTime(e.at)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
-
-        <div className="flex flex-col gap-5">
-          {live && (
-            <Card>
-              <CardHeader
-                title="Switch on or off"
-                description={c.statusManual ? "Set by hand: the automatic rules leave it alone." : "Follows the automatic rules."}
-              />
-              <CardBody>
-                <StatusForm action={companyStatusAction.bind(null, id)} status={c.status} manual={c.statusManual} name={c.name} />
-              </CardBody>
-            </Card>
-          )}
-
-          {trial && live && (
-            <Card>
-              <CardHeader title={c.kind === "demo" ? "Demo" : "Trial"} description={c.endsAt ? `Ends ${dateTime(c.endsAt)}` : undefined} />
-              <CardBody className="flex flex-col gap-4">
-                <ExtendForm action={extendAction.bind(null, id)} />
-                <ActionButton
-                  action={endAction.bind(null, id)}
-                  label="End it now"
-                  confirm="End it now? It becomes read-only, then is switched off and deleted by the rules."
-                />
-                <p className="text-xs text-muted">
-                  After it ends: read-only for {LIFECYCLE.readOnlyDays} days, then off, then deleted after {LIFECYCLE.deleteAfterOffDays}{" "}
-                  more days. Their contact gets an email a day before the end.
-                </p>
-                <div className="border-t border-line pt-4">
-                  <p className="mb-2 text-sm font-medium">Make it real</p>
-                  <MakeRealForm action={makeRealAction.bind(null, id)} plans={plans} />
-                </div>
-              </CardBody>
-            </Card>
-          )}
-
-          {c.leads.length > 0 && (
-            <Card>
-              <CardHeader title="Client inquiry" />
-              <ul className="divide-y divide-line">
-                {c.leads.map((l) => (
-                  <li key={l.id}>
-                    <Link href={`/platform/leads/${l.id}`} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-surface-2/60">
-                      <span className="flex-1">{l.name}</span>
-                      <LeadStatusBadge status={l.status} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {live && (
-            <Card className="border-bad/30">
-              <CardHeader title="Delete" />
-              <CardBody>
-                <DeleteForm action={deleteCompanyAction.bind(null, id)} slug={c.slug} />
-              </CardBody>
-            </Card>
-          )}
-        </div>
-      </div>
+      {live && (
+        <CompanyPanels
+          c={{
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            kind: c.kind,
+            status: c.status,
+            statusManual: c.statusManual,
+            plan: c.plan,
+            renewsOn: c.renewsOn,
+            endsAt: c.endsAt,
+            contactName: c.contactName,
+            contactEmail: c.contactEmail,
+            contactPhone: c.contactPhone ?? null,
+            notes: c.notes,
+            previousSlug: c.previousSlug,
+            address: c.address,
+            people: people.map((p) => ({ id: p.id, name: p.name, email: p.email, tenantAdmin: p.tenantAdmin })),
+            currency: c.payments[0]?.currency ?? c.plan?.currency ?? "USD",
+          }}
+          plans={plans}
+          today={today}
+          actions={{
+            update: updateCompanyAction.bind(null, id),
+            status: companyStatusAction.bind(null, id),
+            extend: extendAction.bind(null, id),
+            end: endAction.bind(null, id),
+            makeReal: makeRealAction.bind(null, id),
+            remove: deleteCompanyAction.bind(null, id),
+            adminPassword: adminPasswordAction.bind(null, id),
+            payment: paymentAction.bind(null, id),
+            modules: companyModulesAction.bind(null, id),
+          }}
+        />
+      )}
     </div>
   );
 }
