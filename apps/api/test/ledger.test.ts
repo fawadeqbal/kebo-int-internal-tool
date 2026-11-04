@@ -728,6 +728,29 @@ describe("the ledger", () => {
     );
   });
 
+  it("statements: a paper per party and currency, numbered per party and year when issued", async () => {
+    const draft = (await api(app, manager).get(`/ledger/parties/customer/${customerId}/statement?from=${day(-30)}&to=${today}&currency=USD`).expect(200)).body;
+    expect(draft.doc.number).toBe("Draft");
+    expect(draft.issued).toBe(false);
+    expect(draft.doc.title).toBe("STATEMENT OF ACCOUNT");
+    expect(draft.doc.rows[0].item).toBe("Opening balance");
+    expect(draft.doc.rows.at(-1).balance).toEqual({ money: draft.doc.total.amount, currency: "USD" });
+    const year = Number(today.slice(0, 4));
+    const one = (await api(app, manager).post(`/ledger/parties/factory/${factoryId}/statement`, { year }).expect(201)).body;
+    const two = (await api(app, manager).post(`/ledger/parties/factory/${factoryId}/statement`, { year }).expect(201)).body;
+    expect(two.no).toBe(one.no + 1);
+    expect(two.number).toBe(`ST-F-${year}-${String(two.no).padStart(4, "0")}`);
+    const issued = (await api(app, manager).get(`/ledger/parties/factory/${factoryId}/statement?no=${two.no}`).expect(200)).body;
+    expect(issued.doc.number).toBe(two.number);
+    expect(issued.share.message).toContain(two.number);
+    // A number never issued is refused; another company or no permission reaches none of it.
+    await api(app, manager).get(`/ledger/parties/factory/${factoryId}/statement?no=${two.no + 50}`).expect(400);
+    await api(app, bilal).post(`/ledger/parties/factory/${factoryId}/statement`, { year }).expect(403);
+    await api(app, manager).post(`/ledger/parties/factory/${customerId}/statement`, { year }).expect(404);
+    const staff = (await api(app, manager).get(`/ledger/parties/staff/${me}/statement`).expect(200)).body;
+    expect(staff.doc.columns.map((c: { label: string }) => c.label)).toContain("Paid from own money");
+  });
+
   it("who may read it: ledger.view (managers, the super admin, who records payments or expenses)", async () => {
     for (const path of [
       "/ledger/entries",
@@ -765,6 +788,8 @@ describe("the ledger", () => {
     await api(app, boss).get(`/ledger/entries/${one.id}`).expect(404);
     await api(app, boss).get(`/ledger/parties/customer/${customerId}`).expect(404);
     await api(app, boss).get(`/ledger/parties/factory/${factoryId}`).expect(404);
+    await api(app, boss).get(`/ledger/parties/factory/${factoryId}/statement`).expect(404);
+    await api(app, boss).post(`/ledger/parties/factory/${factoryId}/statement`, { year: 2026 }).expect(404);
     expect((await api(app, boss).get("/ledger/accounts").expect(200)).body.groups).toEqual([]);
     expect((await api(app, boss).get("/ledger/check").expect(200)).body.differences).toEqual([]);
     // Their connection cannot point a row at our records.

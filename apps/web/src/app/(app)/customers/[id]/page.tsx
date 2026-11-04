@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Star } from "lucide-react";
+import { BookOpen, Plus, Star } from "lucide-react";
 import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
 import { Banner, ButtonLink, PageHeader, StageBadge, StatusBadge, type StatusMeaning } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
@@ -130,7 +130,9 @@ export default async function CustomerPage({ params, searchParams }: { params: P
     { label: "Copy link", copy: `/inquiries/${d.id}` },
   ];
 
+  const ledger = can(me, "ledger.view") ? `/finance/ledger/customers/${c.id}` : null;
   const more: MenuEntry[] = [
+    ...(ledger ? [{ label: "Ledger and statement", href: ledger }] : []),
     { label: "Their inquiries", href: `/inquiries?customer=${c.id}&stage=all` },
     { label: "Copy link", copy: `/customers/${c.id}` },
     ...(can(me, "customers.delete")
@@ -168,6 +170,13 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             {` · customer since ${monthOf(c.createdAt)}`}
             {handledBy && <span className="max-sm:hidden"> · handled by {handledBy}</span>}
           </>
+        }
+        papers={
+          ledger && (
+            <ButtonLink href={ledger} variant="secondary">
+              <BookOpen aria-hidden /> Ledger
+            </ButtonLink>
+          )
         }
         primary={
           canAsk && (

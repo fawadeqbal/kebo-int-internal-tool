@@ -100,9 +100,16 @@ describe("every read endpoint answers for every record", () => {
     for (const c of (await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]) {
       await ok(manager, `/ledger/parties/customer/${c.id}`);
       await ok(manager, `/ledger/parties/customer/${c.id}?onlyOpen=true&removed=true&from=2020-01-01`);
+      await ok(manager, `/ledger/parties/customer/${c.id}/statement`);
     }
-    for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) await ok(manager, `/ledger/parties/factory/${f.id}`);
-    for (const u of (await ok(admin, "/users")) as { id: string }[]) await ok(manager, `/ledger/parties/staff/${u.id}`);
+    for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) {
+      await ok(manager, `/ledger/parties/factory/${f.id}`);
+      await ok(manager, `/ledger/parties/factory/${f.id}/statement?currency=CNY`);
+    }
+    for (const u of (await ok(admin, "/users")) as { id: string }[]) {
+      await ok(manager, `/ledger/parties/staff/${u.id}`);
+      await ok(manager, `/ledger/parties/staff/${u.id}/statement`);
+    }
     for (const side of ["receivable", "payable", "staff"]) await ok(manager, `/ledger/ageing?side=${side}`);
     await ok(manager, "/ledger/accounts");
     await ok(manager, `/ledger/accounts?to=${today}`);

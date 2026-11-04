@@ -72,6 +72,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   );
 
   const more: MenuEntry[] = [
+    ...(can(me, "ledger.view") ? [{ label: "Ledger (to repay)", href: `/finance/ledger/staff/${u.id}` }] : []),
     ...(can(me, "security.manage")
       ? [
           { label: "Where they are signed in", href: `/access/sessions?person=${u.id}` },

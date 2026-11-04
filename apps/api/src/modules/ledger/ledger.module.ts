@@ -1,4 +1,4 @@
-import { Controller, Get, Module, Param, ParseEnumPipe, ParseUUIDPipe, Query } from "@nestjs/common";
+import { Body, Controller, Get, Module, Param, ParseEnumPipe, ParseUUIDPipe, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { CURRENCIES, isoDate, LEDGER_ENTRY_TYPES, LEDGER_PARTY_KINDS, type LedgerPartyKind } from "@kebo/shared";
@@ -30,6 +30,13 @@ const entriesQuery = z.object({
 });
 
 const partyQuery = z.object({ from: day.optional(), to: day.optional(), onlyOpen: flag(false), removed: flag(false) });
+const statementQuery = z.object({
+  from: day.optional(),
+  to: day.optional(),
+  currency: z.enum(CURRENCIES).optional(),
+  no: z.coerce.number().int().min(1).max(99999).optional(),
+});
+const issueInput = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
 const ageingQuery = z.object({ side: z.enum(["receivable", "payable", "staff"]).default("receivable") });
 const accountsQuery = z.object({ to: day.optional() });
 
@@ -67,6 +74,29 @@ class LedgerController {
     @Query(Validate(partyQuery)) q: z.infer<typeof partyQuery>,
   ) {
     return this.ledger.party(kind, id, q);
+  }
+
+  /**
+   * A party's statement of account as a paper (KeboDoc): ?from&to&currency&no (no: an issued number; without it, a
+   * preview marked "Draft") → { doc, party, from, to, currency, currencies, issued, share: { fileName, message } }.
+   */
+  @Get("parties/:kind/:id/statement")
+  statement(
+    @Param("kind", new ParseEnumPipe(LEDGER_PARTY_KINDS)) kind: LedgerPartyKind,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query(Validate(statementQuery)) q: z.infer<typeof statementQuery>,
+  ) {
+    return this.ledger.statement(kind, id, q);
+  }
+
+  /** { year } → the next statement number for the party in that year: { no, number } (ST-F-2026-0012). */
+  @Post("parties/:kind/:id/statement")
+  issue(
+    @Param("kind", new ParseEnumPipe(LEDGER_PARTY_KINDS)) kind: LedgerPartyKind,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body(Validate(issueInput)) input: z.infer<typeof issueInput>,
+  ) {
+    return this.ledger.issueStatement(kind, id, input.year);
   }
 
   /** ?side=receivable|payable|staff → each party's open amounts by how late (not due, 1–30, 31–60, 61–90, 90+). */

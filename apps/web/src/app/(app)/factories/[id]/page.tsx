@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { can, EXPENSE_CATEGORY_LABEL } from "@kebo/shared";
 import { ButtonLink, Card, PageHeader, StatusBadge, type StatusMeaning } from "@kebo/ui";
-import { Search } from "lucide-react";
+import { BookOpen, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { load, requirePermission, hasFeature } from "@/lib/session";
 import { date, money } from "@/lib/format";
@@ -65,7 +65,9 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
       ? { meaning: "info", label: "Making for us" }
       : { meaning: "neutral", label: f.quotes.length ? "No open order" : "Not quoted yet" };
 
+  const ledger = can(me, "ledger.view") ? `/finance/ledger/factories/${f.id}` : null;
   const more: MenuEntry[] = [
+    ...(ledger ? [{ label: "Ledger and statement", href: ledger }] : []),
     { label: "Copy link", copy: `/factories/${f.id}` },
     ...(canRemove
       ? [
@@ -100,6 +102,13 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
           .filter(Boolean)
           .join(" · ")
           .replace(/^./, (x) => x.toUpperCase())}
+        papers={
+          ledger && (
+            <ButtonLink href={ledger} variant="secondary">
+              <BookOpen aria-hidden /> Ledger
+            </ButtonLink>
+          )
+        }
         primary={
           <ButtonLink href="/inquiries?stage=sourcing" variant="primary" title="Inquiries waiting for factory prices: open one to ask this factory">
             <Search aria-hidden /> Ask for prices

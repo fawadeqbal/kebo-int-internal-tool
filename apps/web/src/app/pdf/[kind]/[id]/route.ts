@@ -3,7 +3,8 @@ import { apiFetch, ApiError, SESSION_COOKIE } from "@/lib/api";
 import type { ReportView } from "@/lib/types-deals";
 import type { OrderDocument, RevisionDoc } from "@/lib/types-orders";
 import type { PaperDocView } from "@/lib/types-papers";
-import { PAPER_KINDS, type PaperKind } from "@kebo/shared";
+import { LEDGER_PARTY_KINDS, PAPER_KINDS, type PaperKind } from "@kebo/shared";
+import type { LedgerStatement } from "@/lib/types-ledger";
 import { attachmentHeaders, pdfName, withChromium } from "../../render";
 
 /**
@@ -16,6 +17,7 @@ import { attachmentHeaders, pdfName, withChromium } from "../../render";
  *   /pdf/proforma|invoice|packing-list/<order id> the order's documents
  *   /pdf/<paper>/<order id>?v=&ref=              a paper the app makes (sales-contract, commercial-invoice…)
  *   /pdf/report/summary?from&to&staff            the Reports page (any UUID works in place of "summary")
+ *   /pdf/ledger-customer|factory|staff/<id>?from&to&cur&no   a statement of account (Finance › Ledger)
  *
  * The session is the kebo_session cookie, or `Authorization: Bearer <token>`
  * (the phone app), which is then used as the session cookie while rendering.
@@ -69,7 +71,27 @@ const paper =
     };
   };
 
+/** A party's statement of account: the period, the currency, the number it was issued with. */
+const statement =
+  (kind: string): Kind =>
+  async (id, token, url) => {
+    const q: Record<string, string> = {};
+    for (const [k, ok] of [
+      ["from", DAY],
+      ["to", DAY],
+      ["cur", /^[A-Z]{3}$/],
+      ["no", /^\d{1,5}$/],
+    ] as const) {
+      const v = url.searchParams.get(k);
+      if (v && ok.test(v)) q[k] = v;
+    }
+    const s = await ask<LedgerStatement>(token, `/ledger/parties/${kind}/${id}/statement`, { from: q.from, to: q.to, currency: q.cur, no: q.no });
+    const qs = new URLSearchParams(q);
+    return { name: s.share.fileName, path: `/print/ledger/${kind}/${id}${qs.size ? `?${qs}` : ""}` };
+  };
+
 const KINDS: Record<string, { id: (id: string) => boolean; target: Kind }> = {
+  ...Object.fromEntries(LEDGER_PARTY_KINDS.map((k) => [`ledger-${k}`, { id: (id: string) => UUID.test(id), target: statement(k) }])),
   ...Object.fromEntries(PAPER_KINDS.map((k) => [k, { id: (id: string) => UUID.test(id), target: paper(k) }])),
   revisions: {
     id: (id) => UUID.test(id),
