@@ -10,7 +10,9 @@ import { date, money } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import type { CustomerDetail } from "@/lib/types-people";
 import type { CustomerPayments } from "@/lib/types-money";
-import type { HistoryEntry } from "@/lib/types";
+import type { HistoryEntry, Person } from "@/lib/types";
+import type { FollowUpList, Note } from "@/lib/types-notes";
+import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { HistoryList } from "@/components/common/history-list";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
@@ -56,13 +58,16 @@ export default async function CustomerPage({ params, searchParams }: { params: P
   const canEdit = can(me, "customers.manage");
   const canAsk = can(me, "inquiries.create");
   const editing = canEdit && sp.panel === "edit-customer";
-  const [c, history, pay, managers, board, settings] = await Promise.all([
+  const [c, history, pay, managers, board, settings, notes, followUps, people] = await Promise.all([
     load(() => api.get<CustomerDetail>(`/customers/${id}`)),
     api.get<HistoryEntry[]>("/history", { type: "customer", id }).catch(() => [] as HistoryEntry[]),
     api.get<CustomerPayments>("/payments", { customerId: id }).catch(() => null),
     can(me, "expenses.manage") ? hasFeature("expenses") : false,
     hasFeature("orders_board"),
     editing ? api.get<SalesCurrencies>("/settings") : null,
+    api.get<Note[]>(`/customers/${id}/notes`).catch(() => [] as Note[]),
+    api.get<FollowUpList>("/follow-ups", { customerId: id }).catch(() => null),
+    api.get<Person[]>("/users/people").catch(() => [] as Person[]),
   ]);
   const moneyView = sp.view === "profit" || sp.tab === "account" ? "profit" : "payments";
   const openOrders = c.orders.filter((o) => o.status === "open").length;
@@ -184,6 +189,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
               { id: "overview", label: "Overview" },
               { id: "orders", label: "Orders", count: c.orders.length },
               { id: "inquiries", label: "Inquiries", count: c.inquiries.length },
+              { id: "notes", label: "Notes", count: notes.length },
               { id: "money", label: "Money" },
               { id: "contacts", label: "Contacts", count: c.contacts.length },
               { id: "changes", label: "Changes", count: changes.length },
@@ -325,6 +331,16 @@ export default async function CustomerPage({ params, searchParams }: { params: P
                   />
                 ))}
               </RecordListCard>
+            </RecordSection>
+
+            <RecordSection id="notes-and-follow-ups" className="grid items-start gap-5 xl:grid-cols-2">
+              <NotesCard
+                on={{ key: "customerId", id: c.id }}
+                notes={notes}
+                canAdd={canEdit}
+                contacts={c.contacts.map((p) => ({ id: p.id, name: p.name }))}
+              />
+              <FollowUpsCard on={{ key: "customerId", id: c.id }} label={c.name} rows={followUps?.rows ?? []} people={people} meId={me.id} />
             </RecordSection>
 
             <RecordSection id="money" className="flex flex-col gap-3">

@@ -169,16 +169,6 @@ export async function issueProformaAction(orderId: string, _prev: ActionState, f
 }
 
 /** Notes and files live on the deal; the order page shows them and adds to them. */
-export async function orderNoteAction(orderId: string, dealId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/inquiries/${dealId}/notes`, { body: v.body }));
-  if (r.ok) {
-    revalidatePath(`/orders/${orderId}`, "layout");
-    revalidatePath(`/inquiries/${dealId}`);
-  }
-  return r;
-}
-
 export async function orderRemoveFileAction(
   orderId: string,
   dealId: string,

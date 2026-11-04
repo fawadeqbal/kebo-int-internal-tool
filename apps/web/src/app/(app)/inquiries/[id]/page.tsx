@@ -7,6 +7,8 @@ import { hasFeature, requireUser } from "@/lib/session";
 import { date } from "@/lib/format";
 import { dealHistoryOf, dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { Person } from "@/lib/types";
+import type { FollowUpList } from "@/lib/types-notes";
+import { FollowUpsCard } from "@/components/notes/cards";
 import type { CustomerDetail } from "@/lib/types-people";
 import type { FactoryRequests } from "@/lib/types-flow";
 import { optional } from "@/components/print/data";
@@ -30,12 +32,13 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
   const me = await requireUser();
   const sourcing = can(me, "sourcing.manage");
   const d = await dealOf(id);
-  const [people, history, q, s, cust] = await Promise.all([
+  const [people, history, q, s, cust, followUps] = await Promise.all([
     api.get<Person[]>("/users/people"),
     optional(() => dealHistoryOf(id)),
     optional(() => quotationOf(id)),
     sourcing ? optional(() => sourcingOf(id)) : null,
     optional(() => api.get<CustomerDetail>(`/customers/${d.customerId}`)),
+    optional(() => api.get<FollowUpList>("/follow-ups", { inquiryId: id })),
   ]);
   const requests = sourcing && (await hasFeature("factory_requests")) ? await optional(() => api.get<FactoryRequests>(`/inquiries/${d.id}/factory-requests`)) : null;
   const name = (uid: string | null) => (uid ? (d.people[uid] ?? "Someone") : "System");
@@ -147,6 +150,8 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
               />
             )}
           </div>
+
+          <FollowUpsCard on={{ key: "inquiryId", id: d.id }} label={`${d.refNo} · ${d.customer.name}`} rows={followUps?.rows ?? []} people={people} meId={me.id} />
 
           <Card id="notes">
             <CardHeader title="Notes" />

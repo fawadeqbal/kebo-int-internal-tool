@@ -44,6 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/dashboard", label: "Home", icon: "dashboard" },
     { href: "/inquiries", label: "Inquiries", icon: "deals" },
     { href: "/orders", label: "Orders", icon: "orders" },
+    { href: "/follow-ups", label: "Follow-ups", icon: "followUps" },
     ...(approvals !== null ? [{ href: "/approvals", label: "Approvals", icon: "approvals", badge: approvals, badgeLabel: approves ? "waiting" : "sent back" } as NavItem] : []),
     { href: "/customers", label: "Customers", icon: "customers" },
     { href: "/notifications", label: "Notifications", icon: "notifications", badge: unread },

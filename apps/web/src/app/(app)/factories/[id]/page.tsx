@@ -8,6 +8,8 @@ import { date, money } from "@/lib/format";
 import type { ExpenseList } from "@/lib/types-money";
 import type { FactoryDetail } from "@/lib/types-people";
 import type { HistoryEntry, Person } from "@/lib/types";
+import type { FollowUpList, Note } from "@/lib/types-notes";
+import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { HistoryList } from "@/components/common/history-list";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
@@ -44,11 +46,13 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
   if (sp.tab === "history") redirect(`/factories/${id}?panel=history`);
   const me = await requirePermission("sourcing.manage");
   const editing = sp.panel === "edit-factory";
-  const [f, history, managers, people] = await Promise.all([
+  const [f, history, managers, people, notes, followUps] = await Promise.all([
     load(() => api.get<FactoryDetail>(`/factories/${id}`)),
     api.get<HistoryEntry[]>("/history", { type: "factory", id }).catch(() => [] as HistoryEntry[]),
     can(me, "expenses.manage") ? hasFeature("expenses") : false,
-    editing ? api.get<Person[]>("/users/people") : null,
+    api.get<Person[]>("/users/people").catch(() => [] as Person[]),
+    api.get<Note[]>(`/factories/${id}/notes`).catch(() => [] as Note[]),
+    api.get<FollowUpList>("/follow-ups", { factoryId: id }).catch(() => null),
   ]);
   const costs = managers ? await api.get<ExpenseList>("/expenses", { factoryId: id }).catch(() => null) : null;
   const canRemove = can(me, "inquiries.updateAny");
@@ -114,6 +118,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
               { id: "overview", label: "Overview" },
               { id: "making", label: "Making", count: r.openOrders.length },
               { id: "offers", label: "Price offers", count: f.quotes.length },
+              { id: "notes", label: "Notes", count: notes.length },
               ...(costs ? [{ id: "costs", label: "Costs", count: costs.rows.length }] : []),
               { id: "changes", label: "Changes", count: changes.length },
             ]}
@@ -208,6 +213,11 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
               </RecordListCard>
             </RecordSection>
 
+            <RecordSection id="notes-and-follow-ups" className="grid items-start gap-5 xl:grid-cols-2">
+              <NotesCard on={{ key: "factoryId", id: f.id }} notes={notes} canAdd />
+              <FollowUpsCard on={{ key: "factoryId", id: f.id }} label={f.name} rows={followUps?.rows ?? []} people={people} meId={me.id} />
+            </RecordSection>
+
             <RecordSection id="offers">
               <RecordListCard
                 title="Price offers"
@@ -299,7 +309,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
         }
       />
 
-      {editing && people && <FactoryPanel action={saveFactoryAction.bind(null, f.id)} factory={f} people={people} meId={me.id} onRecord />}
+      {editing && <FactoryPanel action={saveFactoryAction.bind(null, f.id)} factory={f} people={people} meId={me.id} onRecord />}
       {sp.panel === "history" && (
         <HistoryPanel title={`History · ${f.name}`}>
           <HistoryList entries={history} />

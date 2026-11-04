@@ -719,5 +719,40 @@ export async function seedDemoData(
     data: { accountId: cny.id },
   });
   await db.expense.updateMany({ where: { currency: "USD", category: { in: ["inspection", "travel"] } }, data: { accountId: usd.id } });
+
+  // Notes, call logs and follow-ups (Home's "Follow-ups today"): Sana's shipped order and its customer, a
+  // factory visit, an inquiry waiting for an answer; one call from yesterday not done yet.
+  const shipped = await db.order.findFirst({ where: { stage: "shipped" }, select: { id: true, customerId: true } });
+  const quoted = await db.inquiry.findFirst({ where: { stage: "quoted" }, orderBy: { createdAt: "asc" }, select: { id: true, customerId: true } });
+  const contactOf = (customerId: string) => customers.find((c) => c.id === customerId)?.contacts[0] ?? null;
+  const at = (daysBack: number, time: string) => new Date(`${addDays(today, -daysBack)}T${time}:00Z`);
+  if (shipped) {
+    const contact = contactOf(shipped.customerId);
+    await db.recordNote.create({
+      data: { orderId: shipped.id, kind: "call", contactId: contact?.id, body: "Says the bank will pay the balance on Thursday.", at: at(1, "04:02"), authorId: sana.id },
+    });
+    await db.recordNote.create({
+      data: { customerId: shipped.customerId, kind: "visit", contactId: contact?.id, body: "Asked for a second line next year.", at: at(6, "07:30"), authorId: sana.id },
+    });
+    await db.followUp.create({
+      data: { title: `Call ${contact?.name.split(" ")[0] ?? "them"} about the balance`, kind: "call", dueOn: toDbDate(today), dueAt: "11:00", orderId: shipped.id, assigneeId: sana.id, createdById: sana.id },
+    });
+    await db.followUp.create({
+      data: { title: "Send the B/L copy to the bank", kind: "other", dueOn: toDbDate(addDays(today, -1)), orderId: shipped.id, assigneeId: sana.id, createdById: people.manager.id },
+    });
+  }
+  await db.recordNote.create({
+    data: { factoryId: factories[1].id, kind: "visit", body: "Saw the valves on the test bench; packing starts next week.", at: at(3, "02:00"), authorId: people.manager.id },
+  });
+  await db.followUp.create({
+    data: { title: "Factory visit: final check before packing", kind: "visit", dueOn: toDbDate(today), dueAt: "14:00", place: "Wenzhou", factoryId: factories[1].id, assigneeId: sana.id, createdById: people.manager.id },
+  });
+  if (quoted)
+    await db.followUp.create({
+      data: { title: "Ask if they decided on the quotation", kind: "call", dueOn: toDbDate(addDays(today, 2)), inquiryId: quoted.id, assigneeId: bilal.id, createdById: bilal.id },
+    });
+  await db.followUp.create({
+    data: { title: "Plan next month's factory visits", kind: "meeting", dueOn: toDbDate(addDays(today, -3)), assigneeId: people.manager.id, createdById: people.manager.id, doneAt: new Date(), doneById: people.manager.id, doneNote: "Two visits, both in Wenzhou." },
+  });
   log("demo data created: 4 customers, 3 factories, 10 inquiries (orders: 1 confirmed, 1 in production, 1 shipped, 1 done)");
 }

@@ -24,6 +24,7 @@ describe("every read endpoint answers for every record", () => {
     await app?.close();
   });
 
+  const today = new Date().toISOString().slice(0, 10);
   const ok = async (who: string, path: string) => {
     const res = await api(app, who).get(path);
     expect(res.status, `${path} → ${res.status} ${JSON.stringify(res.body).slice(0, 200)}`).toBeLessThan(500);
@@ -32,7 +33,7 @@ describe("every read endpoint answers for every record", () => {
 
   it("lists and pages", async () => {
     for (const who of [manager, staff]) {
-      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true", "/orders/page", "/orders/page?status=late&q=a", "/orders/page?status=all&mine=true&page=2", "/money/payables", "/submissions?mine=true&status=all"]) await ok(who, path);
+      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true", "/orders/page", "/orders/page?status=late&q=a", "/orders/page?status=all&mine=true&page=2", "/money/payables", "/submissions?mine=true&status=all", "/me/today", "/follow-ups", "/follow-ups?mine=true&open=true", "/follow-ups?open=false&page=2", `/follow-ups?on=${today}`, `/follow-ups?from=${today}&to=${today}`]) await ok(who, path);
     }
     for (const path of ["/reports", "/audit", "/users", "/settings", "/settings/checklist", "/submissions", "/submissions?status=all"]) await ok(admin, path);
   });
@@ -56,6 +57,27 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/payments?customerId=${c.id}`);
     }
     for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) await ok(manager, `/factories/${f.id}`);
+  });
+
+  it("every record's notes and follow-ups, and every follow-up", async () => {
+    const records: [string, string][] = [
+      ...((await ok(manager, "/inquiries?pageSize=100")).rows as { id: string }[]).map((r) => ["inquiries", r.id] as [string, string]),
+      ...((await ok(manager, "/orders")) as { id: string }[]).map((r) => ["orders", r.id] as [string, string]),
+      ...((await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]).map((r) => ["customers", r.id] as [string, string]),
+      ...((await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]).map((r) => ["factories", r.id] as [string, string]),
+    ];
+    const key = { inquiries: "inquiryId", orders: "orderId", customers: "customerId", factories: "factoryId" } as Record<string, string>;
+    for (const [kind, id] of records) {
+      for (const who of [manager, staff]) {
+        await ok(who, `/${kind}/${id}/notes`);
+        await ok(who, `/follow-ups?${key[kind]}=${id}`);
+      }
+    }
+    const all = (await ok(manager, "/follow-ups?pageSize=200")) as { rows: { id: string }[] };
+    for (const f of all.rows) {
+      await ok(manager, `/follow-ups/${f.id}`);
+      await ok(staff, `/follow-ups/${f.id}`);
+    }
   });
 
   it("every money submission and its photo", async () => {
