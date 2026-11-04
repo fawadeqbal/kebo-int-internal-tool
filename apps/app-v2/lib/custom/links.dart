@@ -13,7 +13,7 @@ String? appPathFor(String? href) {
   if (href == null || !href.startsWith('/')) return null;
   final path = Uri.parse(href).path;
   // Pages of the app that are not records (alerts link to them).
-  if (const {'/approvals', '/alerts', '/needs'}.contains(path)) return path;
+  if (const {'/approvals', '/alerts', '/needs', '/follow-ups'}.contains(path)) return path;
   for (final r in routeTabs.keys) {
     final m = RegExp('^${RegExp.escape(r)}/(${_uuid.pattern})').firstMatch(path);
     if (m != null) return '$r/${m.group(1)}';

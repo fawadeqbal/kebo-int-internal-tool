@@ -29,4 +29,9 @@ sections:
     empty: No offers yet
   - title: Details
     fields: [address, bankDetails, notes]
+  - { title: Notes, custom: RecordNotes }             # lib/custom/record_notes.dart: calls, visits and notes
+  - { title: Follow-ups, custom: RecordFollowUps }     # lib/custom/record_follow_ups.dart: planned calls and visits
   - { title: Changes, history: factory }
+more:
+  - { label: Note after a call, run: record_notes.addNote, perm: sourcing.manage }
+  - { label: New follow-up, run: record_follow_ups.addFollowUp }

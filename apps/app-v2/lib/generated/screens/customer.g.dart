@@ -11,6 +11,8 @@ import '../models.g.dart';
 import '../repos.g.dart';
 import 'customer_form.g.dart';
 import '../../custom/customer_overview.dart';
+import '../../custom/record_follow_ups.dart';
+import '../../custom/record_notes.dart';
 
 class CustomerScreen extends StatelessWidget {
   const CustomerScreen({super.key, required this.id});
@@ -23,6 +25,8 @@ class CustomerScreen extends StatelessWidget {
     sub: (x) => [countryName(x.country), CustomerTypeEnum.label(x.type), CurrencyEnum.label(x.defaultCurrency)],
     primary: RecordAction(label: 'New inquiry', perm: 'inquiries.create', run: newInquiryFor),
     more: [
+      RecordAction(label: 'Note after a call', perm: 'customers.manage', run: addNote),
+      RecordAction(label: 'New follow-up', perm: null, run: addFollowUp),
       RecordAction(label: 'Edit details', perm: 'customers.manage', run: CustomerFormSheet.edit),
       RecordAction.delete(
         label: 'Delete customer',
@@ -68,6 +72,8 @@ class CustomerScreen extends StatelessWidget {
         ('Letters on papers', x.initials),
         ('Notes', x.notes),
       ]),
+      CustomSection('Notes', RecordNotes(x, title: 'Notes')),
+      CustomSection('Follow-ups', RecordFollowUps(x, title: 'Follow-ups')),
       CustomSection('Changes', HistorySection(type: 'customer', id: x.id, title: 'Changes')),
     ],
   );

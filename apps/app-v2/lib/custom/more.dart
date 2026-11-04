@@ -23,6 +23,7 @@ class MoreScreen extends StatelessWidget {
           SectionCard(
             title: 'Work',
             child: Column(children: [
+              PhoneRow(RowData(title: 'Follow-ups', sub: const ['calls and visits to make'], onTap: () => openPage(context, '/follow-ups'))),
               PhoneRow(RowData(title: 'Customers', sub: const ['contacts, inquiries and orders'], onTap: () => openPage(context, '/customers')),
                   divider: context.can('sourcing.manage') || seesApprovals(context) || canAddExpense(context)),
               if (context.can('sourcing.manage'))

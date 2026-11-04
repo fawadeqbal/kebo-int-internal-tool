@@ -5,6 +5,7 @@ import 'core/scope.dart';
 import 'core/session.dart';
 import 'custom/alerts.dart';
 import 'custom/approvals.dart';
+import 'custom/record_follow_ups.dart';
 import 'custom/home.dart';
 import 'custom/more.dart';
 import 'custom/search.dart';
@@ -63,6 +64,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           GoRoute(path: '/search', builder: (c, s) => const SearchScreen()),
           GoRoute(path: '/more', builder: (c, s) => const MoreScreen()),
           GoRoute(path: '/approvals', builder: (c, s) => const ApprovalsScreen()),
+          GoRoute(path: '/follow-ups', builder: (c, s) => const FollowUpsScreen()),
           GoRoute(path: '/waiting', builder: (c, s) => const WaitingScreen()),
           ...generatedRoutes,
         ],

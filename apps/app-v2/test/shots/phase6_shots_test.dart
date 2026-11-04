@@ -8,9 +8,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kebo_app/custom/factory_visit.dart';
 import 'package:kebo_app/custom/home.dart';
+import 'package:kebo_app/custom/record_follow_ups.dart';
+import 'package:kebo_app/custom/record_notes.dart';
 import 'package:kebo_app/custom/waiting.dart';
+import 'package:kebo_app/generated/screens/order.g.dart';
 
 import '../custom/home_alerts_search_test.dart' show homeServer;
+import '../custom/notes_follow_ups_test.dart' show notesServer;
 import '../custom/phase5_test.dart' show phase5Order, visitServer;
 import '../support/harness.dart';
 import 'fonts.dart';
@@ -89,5 +93,34 @@ void main() {
     await tester.tap(find.text('Choose…'));
     await shot(tester, 'p6-4-conflict');
     lastSession.api.net.stop();
+  });
+
+  const order = RecordRef('order', 'o1', 'SO-2026-0447 · Lahore Pharma', customerId: 'c1');
+
+  testWidgets('home with today\'s follow-ups', (tester) async {
+    await pumpScreen(tester, const HomeScreen(), {...homeServer, ...notesServer()});
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -420));
+    await shot(tester, 'p6-5-home-today');
+  });
+
+  testWidgets('note after a call', (tester) async {
+    await pumpSheet(tester, (c) => openNote(c, order), answers: notesServer());
+    await tester.enterText(find.byType(TextField).first, 'Ali says the bank pays the balance on Thursday');
+    await tester.tap(find.text('Ali Raza'));
+    await shot(tester, 'p6-6-note');
+  });
+
+  testWidgets('new follow-up', (tester) async {
+    await pumpSheet(tester, (c) => openFollowUp(c, on: order), answers: notesServer());
+    await tester.enterText(find.byType(TextField).first, 'Call Ali about the LC balance');
+    await tester.enterText(find.byType(TextField).at(1), '11:00');
+    await shot(tester, 'p6-7-follow-up');
+  });
+
+  testWidgets('order notes and follow-ups', (tester) async {
+    await pumpScreen(tester, const OrderScreen(id: 'o1'), notesServer());
+    await tester.scrollUntilVisible(find.text('Notes · 2'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -60));
+    await shot(tester, 'p6-8-order-notes');
   });
 }

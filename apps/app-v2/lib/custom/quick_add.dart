@@ -9,6 +9,8 @@ import '../generated/repos.g.dart';
 import 'factory_visit.dart';
 import 'money.dart';
 import 'order_files.dart';
+import 'record_follow_ups.dart';
+import 'record_notes.dart';
 
 /// One way to start something from the + button.
 class _Action {
@@ -24,6 +26,8 @@ final _actions = <_Action>[
   _Action(Icons.photo_camera_outlined, 'Snap & attach', 'a photo or file to an order', _snap),
   _Action(Icons.payments_outlined, 'Money received', 'with the bank slip', _money, show: canAddMoney),
   _Action(Icons.receipt_long_outlined, 'Expense', 'with the receipt', addExpense, show: canAddExpense),
+  _Action(Icons.call_outlined, 'Note after a call', 'what was said, on an order', _note),
+  _Action(Icons.event_outlined, 'Follow-up', 'a call or visit to plan', (c) => openFollowUp(c)),
   _Action(Icons.factory_outlined, 'Factory visit', 'ready date, FAT, photos', _visit, perm: 'orders.update'),
   _Action(Icons.person_add_alt, 'New customer', 'with their contacts', (c) async {
     if (await CustomerFormSheet.create(c) && c.mounted) toast(c, 'Customer saved');
@@ -151,3 +155,10 @@ Future<Json?> pickOrder(BuildContext context, {String? none}) => showModalBottom
         ]),
       ),
     );
+
+/// Which order the call was about, then the note.
+Future<void> _note(BuildContext context) async {
+  final o = await pickOrder(context);
+  if (o == null || !context.mounted) return;
+  await openNote(context, RecordRef('order', o.str('id'), joinParts([o.str('refNo'), o.at('customer.name')]), customerId: o.at('customer.id')));
+}

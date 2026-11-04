@@ -98,6 +98,9 @@ enums:
     with_factory: { label: With the factory, tone: info }
     resolved: { label: Resolved, tone: ok }
     rejected: { label: Rejected, tone: neutral }
+  # Notes and follow-ups (packages/shared/src/schemas/notes.ts).
+  NoteKind: { call: Call, visit: Visit, whatsapp: WhatsApp, email: Email, note: Note }
+  FollowUpKind: { call: Call, visit: Visit, meeting: Meeting, other: Other }
   OrderStage:
     confirmed: { label: Confirmed, tone: info }
     in_production: { label: In production, tone: info }

@@ -12,9 +12,10 @@ import '../repos.g.dart';
 import 'inquiry_form.g.dart';
 import '../../custom/inquiry_files.dart';
 import '../../custom/inquiry_next.dart';
-import '../../custom/inquiry_notes.dart';
 import '../../custom/inquiry_prices.dart';
 import '../../custom/inquiry_quote.dart';
+import '../../custom/record_follow_ups.dart';
+import '../../custom/record_notes.dart';
 
 class InquiryScreen extends StatelessWidget {
   const InquiryScreen({super.key, required this.id});
@@ -31,6 +32,8 @@ class InquiryScreen extends StatelessWidget {
       x.overdue == true ? const Badge('Late', Tone.bad) : null,
     ],
     more: [
+      RecordAction(label: 'Note after a call', perm: null, run: addNote),
+      RecordAction(label: 'New follow-up', perm: null, run: addFollowUp),
       RecordAction(label: 'Edit', perm: 'inquiries.create', run: InquiryFormSheet.edit),
       RecordAction(
         label: 'Take it',
@@ -164,7 +167,8 @@ class InquiryScreen extends StatelessWidget {
             actions: [ContactAction.phone(y.phone), ContactAction.whatsapp(y.whatsapp), ContactAction.email(y.email)],
           ),
       ], empty: 'No contacts'),
-      CustomSection('Notes', InquiryNotes(x, title: 'Notes')),
+      CustomSection('Notes', RecordNotes(x, title: 'Notes')),
+      CustomSection('Follow-ups', RecordFollowUps(x, title: 'Follow-ups')),
       CustomSection('Files', InquiryFiles(x, title: 'Files')),
       ListSection('Changes', [
         for (final y in x.stageChanges)

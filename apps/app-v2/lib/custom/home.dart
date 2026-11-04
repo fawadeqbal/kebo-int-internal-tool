@@ -7,6 +7,7 @@ import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart' hide Badge;
 import 'links.dart';
+import 'record_follow_ups.dart';
 import 'waiting.dart';
 
 const _level = {'bad': Tone.bad, 'warn': Tone.warn, 'info': Tone.info};
@@ -29,7 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (needs == null && error == null) _load();
   }
 
+  /// Bumped on each load, so the follow-ups card reads again on pull to refresh.
+  int _loads = 0;
+
   Future<void> _load() async {
+    _loads++;
     final api = context.api;
     try {
       final r = await Future.wait([
@@ -131,6 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Padding(padding: EdgeInsets.all(Gap.xl), child: LoadingView())
               else ...[
                 _needs(context),
+                const SizedBox(height: Gap.md),
+                TodayCard(key: ValueKey(_loads)),
                 const SizedBox(height: Gap.md),
                 _numbers(context),
               ],

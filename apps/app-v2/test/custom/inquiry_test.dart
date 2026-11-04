@@ -26,6 +26,18 @@ Map<String, Object?> _server({String stage = 'quoted'}) => {
         'attachments': [],
         'stageChanges': [],
       },
+      '/api/inquiries/i1/notes': [
+        {
+          'id': 'n1',
+          'kind': 'call',
+          'body': 'They compare with a Turkish offer',
+          'at': '2026-11-03T10:12:00.000Z',
+          'author': {'id': 'u1', 'name': 'Sana'},
+          'contact': null,
+          'can': {'edit': true, 'delete': true},
+        },
+      ],
+      '/api/follow-ups': {'rows': <Object>[]},
       '/api/inquiries/i1/quotation': {
         'revisions': [
           {

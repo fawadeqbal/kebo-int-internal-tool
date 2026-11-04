@@ -29,7 +29,11 @@ sections:
     custom: OrderFiles         # lib/custom/order_files.dart: every file of the order
   - title: Details
     fields: [orderedOn, inquiry.refNo, inquiry.assignee.name, incoterm, incotermPlace, portOfDischarge, shipBy, readyOn, shippedOn, blNo]
+  - { title: Notes, custom: RecordNotes }             # lib/custom/record_notes.dart: calls, visits and notes
+  - { title: Follow-ups, custom: RecordFollowUps }     # lib/custom/record_follow_ups.dart: planned calls and visits
   - { title: Changes, history: order }
 more:
+  - { label: Note after a call, run: record_notes.addNote, perm: orders.update }
+  - { label: New follow-up, run: record_follow_ups.addFollowUp }
   - { label: Factory visit, run: factory_visit.openFactoryVisit, perm: orders.update, when: { status: open } }
   - { label: Delivery & SAT, run: delivery.openDelivery, when: { stage: [shipped, done] } }

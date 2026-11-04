@@ -155,7 +155,7 @@ class Session extends ChangeNotifier {
     }
 
     try {
-      for (final p in ['/api/auth/me', '/api/reminders', '/api/me/todo', '/api/settings', '/api/users/people', '/api/customers/names']) {
+      for (final p in ['/api/auth/me', '/api/reminders', '/api/me/todo', '/api/me/today', '/api/settings', '/api/users/people', '/api/customers/names']) {
         await read(p);
       }
       if (can('payments.record')) await read('/api/money/accounts');
@@ -163,9 +163,10 @@ class Session extends ChangeNotifier {
       final orders = await api.getList('/api/orders/page', query: {'status': 'open', 'mine': 'true'});
       for (final o in orders.take(30)) {
         final id = o.str('id');
-        for (final p in ['', '/steps', '/flow', '/money', '/payments', '/papers', '/files']) {
+        for (final p in ['', '/steps', '/flow', '/money', '/payments', '/papers', '/files', '/notes']) {
           await read('/api/orders/$id$p');
         }
+        await read('/api/follow-ups', {'orderId': id});
       }
     } on ApiException {
       // no signal: next time
