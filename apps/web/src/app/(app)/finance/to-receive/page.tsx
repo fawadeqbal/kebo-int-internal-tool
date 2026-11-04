@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { can } from "@kebo/shared";
 import { PageHeader } from "@kebo/ui";
+import { AgeingStrip } from "@/components/ledger/ageing-strip";
 import { crumbsFor } from "@/lib/nav";
 import { requirePermission } from "@/lib/session";
 import { moneyAccess, ReceiveBody } from "../sections";
@@ -13,6 +15,7 @@ export default async function ToReceivePage() {
   return (
     <div>
       <PageHeader crumbs={crumbsFor("/finance/to-receive")} title="To receive" description="What customers still owe us, order by order. Overdue first." />
+      {can(me, "ledger.view") && <AgeingStrip side="receivable" />}
       <ReceiveBody />
     </div>
   );

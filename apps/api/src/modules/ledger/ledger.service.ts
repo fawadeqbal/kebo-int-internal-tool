@@ -14,7 +14,7 @@ import {
   type LedgerEntryType,
   type LedgerPartyKind,
 } from "@kebo/shared";
-import { addDays, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
+import { addDays, DomainError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { LimitsService } from "../../common/company/limits.service";
 import { Clock } from "../../common/time/clock.service";
@@ -28,8 +28,24 @@ import { livePlansOf } from "../money/plan-live";
 import { factoryPlansOf } from "../money/factory-plan";
 import { LedgerPosting } from "./posting.service";
 import { ledgerCheck, type LedgerCheck } from "./check";
+import { companySnapshot } from "../quotations/quotations.service";
 
 type Row = Prisma.LedgerEntryGetPayload<object>;
+
+/** "By account" in the order of the board: money, who owes us and whom we owe, then sales, costs and the rest. */
+const GROUP_ORDER = [
+  "Money",
+  "Customers",
+  "Customer credit",
+  "Factories",
+  "Staff (to repay)",
+  "Sales",
+  "Goods cost",
+  "Expenses",
+  "Expenses recovered",
+  "Exchange difference",
+  "Opening balances",
+];
 
 export interface EntriesQuery {
   from?: ISODate;
@@ -169,7 +185,10 @@ export class LedgerService {
     const byId = new Map(rows.map((r) => [r.id, r]));
     const ordered = ids.map((r) => byId.get(r.id)!).filter(Boolean);
     // The other side of each row: the biggest row of its posting on the other side.
-    const groups = await db.ledgerEntry.findMany({ where: { groupId: { in: [...new Set(ordered.map((r) => r.groupId))] } } });
+    const groups = await db.ledgerEntry.findMany({
+      where: { groupId: { in: [...new Set(ordered.map((r) => r.groupId))] } },
+      orderBy: [{ groupId: "asc" }, { line: "asc" }],
+    });
     const reversed = new Set(
       (await db.ledgerEntry.findMany({ where: { reversesId: { in: ordered.map((r) => r.id) } }, select: { reversesId: true } })).map(
         (r) => r.reversesId!,
@@ -187,14 +206,16 @@ export class LedgerService {
     const label = (account: string) => ledgerAccountLabel(account, n);
     const view = ordered.map((r) => {
       const side = minor(r.debit) > 0 || minor(r.debitBase) > 0 ? "debit" : "credit";
-      const others = groups.filter(
-        (g) =>
-          g.groupId === r.groupId &&
-          g.id !== r.id &&
-          (side === "debit" ? minor(g.credit) > 0 || minor(g.creditBase) > 0 : minor(g.debit) > 0 || minor(g.debitBase) > 0),
-      );
+      // The other side: with as many lines on each side, the one in the same place (an expense charged to the customer:
+      // the cost against the account, the customer against what is recovered); else the biggest.
+      const isDebit = (g: Row) => minor(g.debit) > 0 || minor(g.debitBase) > 0;
+      const mine = groups.filter((g) => g.groupId === r.groupId);
+      const same = mine.filter((g) => isDebit(g) === (side === "debit"));
+      const others = mine.filter((g) => isDebit(g) !== (side === "debit"));
       const counter =
-        others.sort((a, b) => minor(b.debitBase) + minor(b.creditBase) - (minor(a.debitBase) + minor(a.creditBase)))[0] ?? null;
+        others.length === same.length && others.length > 1
+          ? (others[same.findIndex((g) => g.id === r.id)] ?? null)
+          : ([...others].sort((a, b) => minor(b.debitBase) + minor(b.creditBase) - (minor(a.debitBase) + minor(a.creditBase)))[0] ?? null);
       return {
         ...this.rowView(r, n),
         side,
@@ -642,6 +663,153 @@ export class LedgerService {
     };
   }
 
+  /* ---------------------------------------------------------------- statements */
+
+  /**
+   * A party's statement of account between two days, in one currency, as a paper in Kebo's one document template
+   * (KeboDoc): the balance before, every row with the balance after it, the balance at the end, and what is open.
+   * Numbered per party and year (ST-C-2026-0003 for a customer, ST-F-… a factory, ST-S-… a person) when issued
+   * (issueStatement); a preview without a number says so.
+   */
+  async statement(kind: LedgerPartyKind, id: string, q: { from?: ISODate; to?: ISODate; currency?: string; no?: number }) {
+    const p = await this.party(kind, id, { from: q.from, to: q.to, onlyOpen: false, removed: false });
+    const s = await this.settings.get();
+    const db = this.prisma.db;
+    const withRows = p.currencies.filter((c) => Number(c.closing) !== 0 || p.rows.some((r) => r.currency === c.currency));
+    const currency =
+      q.currency && p.currencies.some((c) => c.currency === q.currency)
+        ? q.currency
+        : (withRows[0]?.currency ?? p.currencies[0]?.currency ?? s.sales.currency);
+    const cur = p.currencies.find((c) => c.currency === currency) ?? { currency, opening: "0.00", closing: "0.00" };
+    const details =
+      kind === "customer"
+        ? await db.customer.findUnique({ where: { id }, select: { name: true, country: true, address: true, taxNo: true, regNo: true } })
+        : kind === "factory"
+          ? await db.factory.findUnique({ where: { id }, select: { name: true, address: true } })
+          : await db.user.findUnique({ where: { id }, select: { name: true } });
+    const letter = kind === "customer" ? "C" : kind === "factory" ? "F" : "S";
+    const year = Number(p.to.slice(0, 4));
+    if (q.no && q.no > (await this.statementIssued(kind, id, year))) throw new DomainError(`Statement ${q.no} of ${year} was not issued.`);
+    const number = q.no ? `ST-${letter}-${year}-${String(q.no).padStart(4, "0")}` : "Draft";
+    const head =
+      kind === "customer"
+        ? { debit: "Invoiced", credit: "Paid", total: "Balance due", box: "Open items" }
+        : kind === "factory"
+          ? { debit: "Paid / taken off", credit: "Ordered", total: "Closing balance · we owe you", box: "Next payments" }
+          : { debit: "Repaid", credit: "Paid from own money", total: "Closing balance · we owe you", box: "Not repaid yet" };
+    const cell = (v: string) => (Number(v) === 0 ? "" : { money: v, currency });
+    const rows = p.rows
+      .filter((r) => r.currency === currency)
+      .map((r) => ({
+        date: { date: r.date },
+        // The document's own number when it has one (RC-, FP-, PO-, EX-…), then what it was.
+        item: [/^(RC|FP|PO|EX|TR|CR)-/.test(r.ref) ? r.ref : null, r.memo].filter(Boolean).join(" · "),
+        debit: cell(r.debit),
+        credit: cell(r.credit),
+        balance: { money: r.balance, currency },
+      }));
+    const ageing = p.ageing.buckets.flatMap((b) => b.items.filter((i) => i.currency === currency).map((i) => ({ ...i, bucket: b.label })));
+    const bullets: (string | { label: string; value: string })[] = ageing
+      .slice(0, 8)
+      .map((i) => ({
+        label: `${i.refNo ? `${i.refNo} · ` : ""}${i.label}${i.dueOn ? `, due ${i.dueOn}` : ""}:`,
+        value: `${currency} ${Number(i.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      }));
+    if (!bullets.length) bullets.push(kind === "customer" ? "Nothing is open." : "Nothing to pay.");
+    bullets.push("Please check this statement and tell us of any difference within 7 days.");
+    const doc = {
+      kind: "statement" as const,
+      title: "STATEMENT OF ACCOUNT",
+      numberLabel: "Statement No.",
+      number,
+      date: this.clock.today(),
+      company: { ...companySnapshot(s), stamp: null },
+      party: {
+        name: details?.name ?? p.party.name,
+        country: details && "country" in details ? details.country : null,
+        address: details && "address" in details ? details.address : null,
+        taxNo: details && "taxNo" in details ? details.taxNo : null,
+        regNo: details && "regNo" in details ? details.regNo : null,
+      },
+      meta: [
+        { label: "Period", value: `${p.from} – ${p.to}` },
+        { label: "Currency", value: currency },
+      ],
+      heading: null,
+      columns: [
+        { key: "date", label: "Date", width: 70 },
+        { key: "item", label: "Details", wrap: true },
+        { key: "debit", label: head.debit, width: 92, align: "right" as const },
+        { key: "credit", label: head.credit, width: 92, align: "right" as const },
+        { key: "balance", label: "Balance", width: 96, align: "right" as const },
+      ],
+      rows: [
+        { date: { date: p.from }, item: "Opening balance", debit: "", credit: "", balance: { money: cur.opening, currency } },
+        ...rows,
+        {
+          date: { date: p.to },
+          item: kind === "customer" ? "Closing balance" : "Closing balance · we owe you",
+          debit: "",
+          credit: "",
+          balance: { money: cur.closing, currency },
+        },
+      ],
+      sums: [],
+      total: { label: head.total, amount: cur.closing, currency },
+      foot: null,
+      boxTitle: head.box,
+      bullets,
+      bank: kind === "customer" ? s.company.bankDetails || null : null,
+      signatures: null,
+    };
+    const amount = `${currency} ${Number(cur.closing).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    return {
+      doc,
+      party: p.party,
+      from: p.from,
+      to: p.to,
+      currency,
+      currencies: p.currencies.map((c) => c.currency),
+      issued: !!q.no,
+      share: {
+        fileName: `Statement ${number} ${p.party.name}`.replace(/[^\w.() -]+/g, "-"),
+        message:
+          kind === "customer"
+            ? `Dear ${p.party.name}, please find your statement of account for ${p.from} – ${p.to} (${number}): balance due ${amount}. Please tell us of any difference within 7 days.`
+            : kind === "factory"
+              ? `Dear ${p.party.name}, please find our statement of account for ${p.from} – ${p.to} (${number}): we owe you ${amount}. Please check it and tell us of any difference within 7 days.`
+              : `${p.party.name}, your "to repay" statement for ${p.from} – ${p.to} (${number}): we owe you ${amount}.`,
+      },
+    };
+  }
+
+  /** Gives a statement its number: the next for the party in the year (ST-F-2026-0012). */
+  async issueStatement(kind: LedgerPartyKind, id: string, year: number) {
+    const exists =
+      kind === "customer"
+        ? await this.prisma.db.customer.count({ where: { id } })
+        : kind === "factory"
+          ? await this.prisma.db.factory.count({ where: { id } })
+          : await this.prisma.db.user.count({ where: { id } });
+    if (!exists) throw new NotFoundError(kind === "customer" ? "Customer" : kind === "factory" ? "Factory" : "Person");
+    const rows = await this.prisma.db.$queryRaw<{ value: number }[]>`
+      insert into counters (key, value) values (${`statement-${kind}-${id}-${year}`.slice(0, 50)}, 1)
+      on conflict (company_id, key) do update set value = counters.value + 1
+      returning value`;
+    const no = rows[0]!.value;
+    const letter = kind === "customer" ? "C" : kind === "factory" ? "F" : "S";
+    return { no, number: `ST-${letter}-${year}-${String(no).padStart(4, "0")}` };
+  }
+
+  /** The highest statement number given to a party in a year (a number asked for must have been given). */
+  async statementIssued(kind: LedgerPartyKind, id: string, year: number) {
+    const c = await this.prisma.db.counter.findFirst({
+      where: { key: `statement-${kind}-${id}-${year}`.slice(0, 50) },
+      select: { value: true },
+    });
+    return c?.value ?? 0;
+  }
+
   /* ---------------------------------------------------------------- ageing */
 
   private emptyBuckets() {
@@ -928,7 +1096,9 @@ export class LedgerService {
     const state = await db.ledgerState.findFirst();
     return {
       mainCurrency: (await this.settings.get()).sales.currency,
-      groups: [...groups.values()].map((g) => ({ ...g, base: money(g.base) })),
+      groups: [...groups.values()]
+        .sort((x, y) => GROUP_ORDER.indexOf(x.group) - GROUP_ORDER.indexOf(y.group))
+        .map((g) => ({ ...g, base: money(g.base) })),
       totals: { debit: money(debit), credit: money(credit), balanced: debit === credit },
       check: state ? { checkedAt: state.checkedAt, differences: state.differences } : null,
     };

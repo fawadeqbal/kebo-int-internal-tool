@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { FLOW_STEP_LABEL, type FlowStep } from "@kebo/shared";
+import { can, FLOW_STEP_LABEL, type FlowStep } from "@kebo/shared";
+import { requireUser } from "@/lib/session";
 import { PROFIT_LABEL } from "@kebo/money";
 import { Alert, buttonClass, Card, CardHeader, cn, Segmented } from "@kebo/ui";
 import { orderHistoryOf, orderOf } from "@/lib/order-data";
@@ -39,6 +40,7 @@ export default async function OrderCostsPage({
   const sp = await searchParams;
   const o = await orderOf(id);
   const data = await orderCostsSetup(id);
+  const canLedger = can(await requireUser(), "ledger.view");
   const base = `/orders/${o.id}`;
   if (!data)
     return (
@@ -209,6 +211,13 @@ export default async function OrderCostsPage({
                     </span>
                   ))}
               </p>
+              {canLedger && (
+                <p className="border-t border-line px-4 py-2.5 text-sm">
+                  <Link href={`/finance/ledger?view=orders&order=${o.id}`} className="font-medium text-primary hover:underline">
+                    Ledger: this order&rsquo;s entries
+                  </Link>
+                </p>
+              )}
             </Card>
           )}
 

@@ -18,6 +18,7 @@ import type { OrderRow, RevisionDoc } from "./types-orders";
 import type { AuditRow, CustomerRow, FactoryRow } from "./types-people";
 import type { CashBook, ExpenseList, Payable } from "./types-money";
 import type { Receivables } from "./types-insights";
+import type { LedgerListRow, LedgerParty } from "./types-ledger";
 import { insightsSheets } from "./insights-data";
 
 /**
@@ -289,6 +290,81 @@ async function payables(q: Q): Promise<SheetSpec> {
       num(p.toPay),
       p.orders.map((o) => `${o.refNo} (${o.customer}): ${o.toPay}`).join("; ") || null,
     ]),
+  };
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const okDay = (v: string | undefined) => (v && DAY_RE.test(v) ? v : undefined);
+
+/** Finance › Ledger: every row the filters keep (both sides of each entry), in the entry's currency and the main one. */
+async function ledger(q: Q): Promise<SheetSpec> {
+  const rows = await allPages<LedgerListRow>("/ledger/entries", {
+    from: okDay(q.from),
+    to: okDay(q.to),
+    type: q.type,
+    currency: q.cur,
+    removed: q.removed === "0" ? "false" : undefined,
+    account: q.account,
+    orderId: q.order && UUID_RE.test(q.order) ? q.order : undefined,
+  });
+  return {
+    name: `Ledger ${okDay(q.from) ?? ""} ${okDay(q.to) ?? stamp()}`.trim(),
+    title: "Ledger",
+    columns: [
+      count("Entry"),
+      text("Day", 12),
+      text("Type", 14),
+      text("Reference", 18),
+      text("Account", 28),
+      text("With", 24),
+      text("Order", 14),
+      money("Debit"),
+      money("Credit"),
+      text("Currency", 9),
+      { header: "Rate", kind: "number", width: 12 },
+      money("Debit (main)"),
+      money("Credit (main)"),
+      text("What", 40),
+      text("Removed on", 12),
+      text("Reason", 28),
+    ],
+    rows: rows.map((r): Cell[] => [
+      r.entryNo,
+      r.date,
+      r.typeLabel,
+      r.ref,
+      r.accountLabel,
+      r.with?.name ?? null,
+      r.order?.refNo ?? null,
+      num(r.debit) || null,
+      num(r.credit) || null,
+      r.currency,
+      r.rate,
+      num(r.debitBase) || null,
+      num(r.creditBase) || null,
+      r.memo,
+      r.removed?.on ?? null,
+      r.reason,
+    ]),
+  };
+}
+
+/** One customer's, factory's or person's ledger: opening, every row with the balance after it, closing. */
+async function ledgerParty(q: Q): Promise<SheetSpec> {
+  const kind = q.kind === "customer" || q.kind === "factory" || q.kind === "staff" ? q.kind : null;
+  if (!kind || !q.id || !UUID_RE.test(q.id)) throw new ExportNotFound();
+  const p = await api.get<LedgerParty>(`/ledger/parties/${kind}/${q.id}`, { from: okDay(q.from), to: okDay(q.to), onlyOpen: q.open === "1" ? "true" : undefined });
+  const multi = p.currencies.length > 1;
+  return {
+    name: `Ledger ${p.party.name} ${p.from} ${p.to}`,
+    title: `${p.party.name} (${p.from} – ${p.to})`,
+    columns: [text("Day", 12), text("What", 44), text("Type", 14), text("Reference", 18), text("Order", 14), text("Currency", 9), money(kind === "customer" ? "They owe" : "Paid / taken off"), money(kind === "customer" ? "Paid" : "Owed"), money("Balance")],
+    rows: [
+      ...p.currencies.map((c): Cell[] => [p.from, `Opening balance${multi ? ` (${c.currency})` : ""}`, null, null, null, c.currency, null, null, num(c.opening)]),
+      ...p.rows.map((r): Cell[] => [r.date, r.memo, r.typeLabel, r.ref, r.order?.refNo ?? null, r.currency, num(r.debit) || null, num(r.credit) || null, num(r.balance)]),
+      ...p.currencies.map((c): Cell[] => [p.to, `Closing balance${multi ? ` (${c.currency})` : ""}`, null, null, null, c.currency, null, null, num(c.closing)]),
+    ],
   };
 }
 
@@ -616,6 +692,8 @@ export const EXPORTS = {
   insights: insightsSheets,
   quotation,
   "factory-list": factoryList,
+  ledger,
+  "ledger-party": ledgerParty,
 } satisfies Record<string, (q: Q) => Promise<SheetSpec | SheetSpec[]>>;
 
 export type ExportKind = keyof typeof EXPORTS;

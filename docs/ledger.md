@@ -136,6 +136,25 @@ expenses (granted by the migration).
   31–60, 61–90, 90+ days (from the plans' due dates; charges from the day spent; own money from the day paid).
 - `GET /api/ledger/accounts?to` — every account's balance, grouped, and whether debits equal credits.
 - `GET /api/ledger/check` — the check, now.
+- `GET /api/ledger/parties/:kind/:id/statement?from&to&currency&no` — the statement of account as a paper (KeboDoc
+  `PaperDoc`: opening, every row with the balance, closing, what is open), with the message and file name to share
+  it; without `no` it is a preview marked "Draft". `POST` the same address with `{ year }` gives it the party's next
+  number for the year: ST-C-2026-0001 (customer), ST-F-… (factory), ST-S-… (person).
+
+## The pages
+
+- **Finance › Ledger** (`/finance/ledger`, after To receive; `ledger.view`): views All entries · By account ·
+  Customers · Factories · Staff · Orders; the period, type and currency, Show removed; one line per posting side
+  (Day, Type, Reference, With, Order, Debit → credit, the main-currency amount, as recorded), removed lines struck
+  through, corrections saying what they reverse and why; the totals show debits equal credits; Excel
+  (`/sheets/export/ledger`). A row opens the entry in the side panel (`?panel=entry&id=<posting>`).
+- **A party's ledger** (`/finance/ledger/customers|factories|staff/<id>`): what they owe or we owe, ageing tiles,
+  opening, rows with the running balance, closing, Only open items; Excel (`/sheets/export/ledger-party`);
+  **Statement PDF** (numbers it and opens `/print/ledger/<kind>/<id>`, PDF at `/pdf/ledger-<kind>/<id>`) and
+  **Share statement** (the share sheet on a phone; on a computer the PDF downloads and the message is copied).
+- Links: the customer's and factory's pages (Ledger, and in ⋯), a person's page (⋯ Ledger), an order's Costs (this
+  order's entries). To receive and To pay factories show ageing from the ledger above their lists.
+- `apps/web/test/a11y/ledger.mjs`: axe at 1440 and 390, the keyboard, the statement, Excel, staff refused.
 
 ## Not in it (yet)
 

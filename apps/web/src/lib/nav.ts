@@ -80,6 +80,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     icon: "finance",
     pages: [
       { href: "/finance/to-receive", label: "To receive" },
+      { href: "/finance/ledger", label: "Ledger" },
       { href: "/finance/cash-book", label: "Cash book" },
       { href: "/finance/expenses", label: "Expenses" },
       { href: "/finance/profit", label: "Profit & loss" },
@@ -200,6 +201,7 @@ export function buildModules({
     "/factories": sourcing,
     "/purchasing/to-pay": sourcing,
     "/finance/to-receive": sourcing && (managers || can("payments.record")),
+    "/finance/ledger": can("ledger.view"),
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
     "/finance/expenses": sourcing && managers && feature("expenses"),
     "/finance/profit": reports && managers,

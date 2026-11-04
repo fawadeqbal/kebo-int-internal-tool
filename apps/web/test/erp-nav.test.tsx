@@ -59,7 +59,7 @@ describe("the modules", () => {
     expect(pages(m, "sales")).toEqual(["Inquiries", "Customers"]);
     expect(pages(m, "orders")).toEqual(["Orders", "Order board"]);
     expect(pages(m, "purchasing")).toEqual(["Factories", "To pay factories"]);
-    expect(pages(m, "finance")).toEqual(["To receive", "Cash book", "Expenses", "Profit & loss", "Leaks"]);
+    expect(pages(m, "finance")).toEqual(["To receive", "Ledger", "Cash book", "Expenses", "Profit & loss", "Leaks"]);
     expect(pages(m, "reports")).toEqual(["Overview", "Customers", "Factories", "People & targets", "Sales funnel", "Printable reports"]);
     expect(pages(m, "settings")).toEqual(["Company", "Sales & quotations", "Reminders", "Emails", "Order checklist", "Papers", "Website form"]);
     expect(pages(m, "access")).toEqual(["Users", "Roles", "Sessions", "Sign-ins", "Audit log"]);
@@ -75,6 +75,7 @@ describe("the modules", () => {
         "/finance/cash-book",
         "/finance/expenses",
         "/finance/to-receive",
+        "/finance/ledger",
         "/finance/profit",
         "/finance/leaks",
         "/purchasing/to-pay",
@@ -109,7 +110,7 @@ describe("the modules", () => {
 
   it("follow the plan: no cash book, expenses, reports or audit log when the plan leaves them out", () => {
     const m = buildModules({ can: () => true, feature: (f) => !["cash_book", "expenses", "insights", "audit_log"].includes(f), approvals: 0, approves: true, unread: 0, companyAddresses: false });
-    expect(pages(m, "finance")).toEqual(["To receive"]);
+    expect(pages(m, "finance")).toEqual(["To receive", "Ledger"]);
     expect(titles(m)).not.toContain("Reports");
     expect(pages(m, "access")).toEqual(["Users", "Roles", "Sessions", "Sign-ins"]);
   });
@@ -269,16 +270,16 @@ describe("the rail's menus", () => {
     const menu = screen.getByRole("menu", { name: "Finance" });
     expect(finance.getAttribute("aria-controls")).toBe(menu.id);
     const items = within(menu).getAllByRole("menuitem");
-    expect(items.map((a) => a.textContent)).toEqual(["To receive", "Cash book", "Expenses", "Profit & loss", "Leaks"]);
-    expect(items[1]!.getAttribute("aria-current")).toBe("page");
+    expect(items.map((a) => a.textContent)).toEqual(["To receive", "Ledger", "Cash book", "Expenses", "Profit & loss", "Leaks"]);
+    expect(items[2]!.getAttribute("aria-current")).toBe("page");
     fireEvent.keyDown(finance, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(items[0]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(items[1]!, { key: "ArrowUp" });
     fireEvent.keyDown(items[0]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(items[4]);
-    fireEvent.keyDown(items[4]!, { key: "Home" });
+    expect(document.activeElement).toBe(items[5]);
+    fireEvent.keyDown(items[5]!, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
