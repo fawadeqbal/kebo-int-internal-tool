@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  BadgeCheck,
   Banknote,
   BarChart3,
   Bell,
@@ -35,6 +36,8 @@ export interface NavItem {
   label: string;
   icon: keyof typeof ICONS;
   badge?: number;
+  /** What the badge counts, for screen readers ("3 waiting"); default "unread". */
+  badgeLabel?: string;
 }
 
 export interface NavGroup {
@@ -51,6 +54,7 @@ const ICONS = {
   quotations: FileText,
   reports: BarChart3,
   money: Banknote,
+  approvals: BadgeCheck,
   notifications: Bell,
   users: Users,
   settings: Settings,
@@ -255,7 +259,7 @@ function SidebarContent({ groups, companyName, roleLabel, logo }: { groups: NavG
                       {!!item.badge && (
                         <span
                           className="rounded-full bg-warn-soft px-1.5 text-[11px] font-semibold text-warn tabular"
-                          aria-label={`${item.badge} unread`}
+                          aria-label={`${item.badge} ${item.badgeLabel ?? "unread"}`}
                         >
                           {item.badge > 99 ? "99+" : item.badge}
                         </span>

@@ -318,7 +318,7 @@ export class PaymentsService {
   }
 
   /** The other orders a transfer also pays: the same customer, the same currency, open, each part no more than is due. Locked. */
-  private async otherParts(tx: Tx, user: SessionUser, customerId: string, currency: string, parts: { orderId: string; amount: number }[], skip: string | null) {
+  private async otherParts(tx: Tx | PrismaService["db"], user: SessionUser, customerId: string, currency: string, parts: { orderId: string; amount: number }[], skip: string | null) {
     const seen = new Set<string>(skip ? [skip] : []);
     const out: Part[] = [];
     for (const p of [...parts].sort((a, b) => a.orderId.localeCompare(b.orderId))) {
@@ -435,51 +435,11 @@ export class PaymentsService {
    */
   async record(user: SessionUser, orderId: string, input: PaymentInput) {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
-    this.checkDate(input.paidOn);
-    if (input.method === "credit") throw new DomainError("To pay from the customer's credit, use “Use credit”.");
-    const cashBook = await this.limits.allows("cash_book");
-    if (input.bankStep) await this.limits.require("bank_documents");
+    const cashBook = await this.checkInput(input);
     let createdId = "";
     const event = await this.prisma.tx(async (tx) => {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
-      const o = await this.orders.load(user, orderId, tx);
-      if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
-      // Older clients: `currency` and `amount` are what arrived (the order's currency, or another with a rate).
-      const receivedCurrency = input.receivedCurrency ?? input.currency;
-      const same = receivedCurrency === o.currency;
-      const receivedMinor = toMinor(input.receivedAmount ?? input.amount);
-      if (receivedMinor <= 0) throw new DomainError("Enter the amount received.");
-      const rate = await this.rateFor(receivedCurrency, o.currency, input.rate);
-      const countsMinor = countsAsMinor(receivedMinor, rate, same);
-      if (countsMinor <= 0) throw new DomainError("At that rate the payment counts as nothing. Check the rate.");
-      const chargesMinor = toMinor(input.bankCharges);
-      const before = settledOf(o, o.payments, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
-      // This order's part: as sent (money v2), else what it counts as up to what is still due.
-      const explicit = input.receivedAmount !== null && input.amount !== null ? toMinor(input.amount) : null;
-      const thisMinor = explicit ?? Math.min(countsMinor, Math.max(before.dueMinor - chargesMinor, 0));
-      if (thisMinor + chargesMinor > before.dueMinor)
-        throw new DomainError(`That is more than is still due (${formatMinor(before.dueMinor, o.currency)}). The rest becomes the customer's credit: lower this order's part.`);
-      if (thisMinor <= 0 && !input.parts.length)
-        throw new DomainError(`Nothing is due on ${o.refNo}. Record the money on the customer's page: it becomes their credit.`);
-      const others = await this.otherParts(tx, user, o.customerId, o.currency, input.parts, o.id);
-      const leftMinor = countsMinor - thisMinor - others.reduce((t, p) => t + p.amountMinor, 0);
-      if (leftMinor < 0)
-        throw new DomainError(`The parts add up to more than the payment counts as (${formatMinor(countsMinor, o.currency)}).`);
-      // What the money pays (the deposit while it is open, else the balance); only "other" is taken as sent.
-      const kind: PaymentKind = input.kind === "other" ? "other" : before.depositOutstandingMinor > 0 ? "deposit" : "balance";
-      const parts: Part[] = [...(thisMinor > 0 ? [{ order: o, kind, amountMinor: thisMinor, bankChargesMinor: chargesMinor }] : []), ...others];
-      const a: Arrived = {
-        receivedMinor,
-        receivedCurrency,
-        currency: o.currency,
-        rate,
-        accountId: await checkAccount(tx, input.accountId, receivedCurrency, null, cashBook),
-        paidOn: input.paidOn,
-        method: input.method,
-        reference: input.reference,
-        paidByName: input.paidByName,
-        note: input.note,
-      };
+      const { o, a, parts, leftMinor, thisMinor } = await this.prepare(tx, user, orderId, input, cashBook);
       const ids = await this.save(tx, user, o.customerId, a, parts, leftMinor);
       createdId = ids[0] ?? "";
       if (input.bankStep && thisMinor > 0) await this.moneyReachedUs(tx, user, o, createdId, input.paidOn, input.reference);
@@ -488,6 +448,70 @@ export class PaymentsService {
     await this.events.publish(event);
     /** `createdId`: the new payment, so its proof can follow. */
     return { ...(await this.forOrder(user, orderId)), createdId };
+  }
+
+  /**
+   * The checks recording runs, without recording anything (a payment sent for approval): the same refusals
+   * the person would get from record() now, apart from the permission to record. Things may still change
+   * before it is approved; approving runs record() itself.
+   */
+  async check(user: SessionUser, orderId: string, input: PaymentInput) {
+    const cashBook = await this.checkInput(input);
+    const { o, thisMinor } = await this.prepare(this.prisma.db, user, orderId, input, cashBook);
+    if (input.bankStep && thisMinor > 0 && !bankStepsFor(o.paymentRoute as never).includes("bank_paid_us"))
+      throw new DomainError("Money reaches us through the banks only on a bank contract or LC.");
+    return { id: o.id, refNo: o.refNo };
+  }
+
+  /** What is checked before the order is opened: the date, the method, the plan. Returns whether the cash book is on. */
+  private async checkInput(input: PaymentInput) {
+    this.checkDate(input.paidOn);
+    if (input.method === "credit") throw new DomainError("To pay from the customer's credit, use “Use credit”.");
+    if (input.bankStep) await this.limits.require("bank_documents");
+    return this.limits.allows("cash_book");
+  }
+
+  /** The order (locked by the caller when recording), what arrived, and how it splits over the orders and credit. */
+  private async prepare(db: Tx | PrismaService["db"], user: SessionUser, orderId: string, input: PaymentInput, cashBook: boolean) {
+    const o = await this.orders.load(user, orderId, db);
+    if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+    // Older clients: `currency` and `amount` are what arrived (the order's currency, or another with a rate).
+    const receivedCurrency = input.receivedCurrency ?? input.currency;
+    const same = receivedCurrency === o.currency;
+    const receivedMinor = toMinor(input.receivedAmount ?? input.amount);
+    if (receivedMinor <= 0) throw new DomainError("Enter the amount received.");
+    const rate = await this.rateFor(receivedCurrency, o.currency, input.rate);
+    const countsMinor = countsAsMinor(receivedMinor, rate, same);
+    if (countsMinor <= 0) throw new DomainError("At that rate the payment counts as nothing. Check the rate.");
+    const chargesMinor = toMinor(input.bankCharges);
+    const before = settledOf(o, o.payments, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
+    // This order's part: as sent (money v2), else what it counts as up to what is still due.
+    const explicit = input.receivedAmount !== null && input.amount !== null ? toMinor(input.amount) : null;
+    const thisMinor = explicit ?? Math.min(countsMinor, Math.max(before.dueMinor - chargesMinor, 0));
+    if (thisMinor + chargesMinor > before.dueMinor)
+      throw new DomainError(`That is more than is still due (${formatMinor(before.dueMinor, o.currency)}). The rest becomes the customer's credit: lower this order's part.`);
+    if (thisMinor <= 0 && !input.parts.length)
+      throw new DomainError(`Nothing is due on ${o.refNo}. Record the money on the customer's page: it becomes their credit.`);
+    const others = await this.otherParts(db, user, o.customerId, o.currency, input.parts, o.id);
+    const leftMinor = countsMinor - thisMinor - others.reduce((t, p) => t + p.amountMinor, 0);
+    if (leftMinor < 0)
+      throw new DomainError(`The parts add up to more than the payment counts as (${formatMinor(countsMinor, o.currency)}).`);
+    // What the money pays (the deposit while it is open, else the balance); only "other" is taken as sent.
+    const kind: PaymentKind = input.kind === "other" ? "other" : before.depositOutstandingMinor > 0 ? "deposit" : "balance";
+    const parts: Part[] = [...(thisMinor > 0 ? [{ order: o, kind, amountMinor: thisMinor, bankChargesMinor: chargesMinor }] : []), ...others];
+    const a: Arrived = {
+      receivedMinor,
+      receivedCurrency,
+      currency: o.currency,
+      rate,
+      accountId: await checkAccount(db, input.accountId, receivedCurrency, null, cashBook),
+      paidOn: input.paidOn,
+      method: input.method,
+      reference: input.reference,
+      paidByName: input.paidByName,
+      note: input.note,
+    };
+    return { o, a, parts, leftMinor, thisMinor };
   }
 
   /** "Money reached us" ticked by the payment that recorded it (bank routes only). */

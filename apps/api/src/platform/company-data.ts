@@ -15,6 +15,7 @@ const FILE_COLUMNS = [
   { table: "payments", key: "file_key", name: "file_name" },
   { table: "factory_payments", key: "file_key", name: "file_name" },
   { table: "expenses", key: "receipt_key", name: "receipt_name" },
+  { table: "money_submissions", key: "file_key", name: "file_name" },
 ] as const;
 
 /** Sample people a demo is filled with (removed when a demo becomes real without its data). */
@@ -208,7 +209,8 @@ export class CompanyDataService {
           select company_id, size::bigint as b from attachments
           union all select company_id, file_size::bigint from payments where file_size is not null
           union all select company_id, file_size::bigint from factory_payments where file_size is not null
-          union all select company_id, receipt_size::bigint from expenses where receipt_size is not null) f group by 1`,
+          union all select company_id, receipt_size::bigint from expenses where receipt_size is not null
+          union all select company_id, file_size::bigint from money_submissions where file_size is not null) f group by 1`,
     ]);
     const out = new Map<string, { users: number; inquiries: number; storageMb: number }>();
     const of = (id: string) => out.get(id) ?? (out.set(id, { users: 0, inquiries: 0, storageMb: 0 }), out.get(id)!);

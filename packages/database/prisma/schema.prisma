@@ -354,6 +354,8 @@ model User {
   relPapersMade             OrderPaper[]         @relation("PaperMadeBy")
   relOrderFacts             OrderFact[]          @relation("OrderFactHandledBy")
   relInquiryFacts           InquiryFact[]        @relation("InquiryFactHandledBy")
+  relSubmissionsSent        MoneySubmission[]    @relation("SubmissionSubmittedBy")
+  relSubmissionsDecided     MoneySubmission[]    @relation("SubmissionDecidedBy")
 
   @@unique([companyId, email])
   @@map("users")
@@ -1148,6 +1150,7 @@ model Order {
   checklist    OrderChecklistItem[]
   files        Attachment[]
   factoryPlan  FactoryPaymentPlan[]
+  submissions  MoneySubmission[]
   /// Each factory's ready date (the order's ready date is the latest of them).
   factories    OrderFactory[]
   credits      CustomerCredit[]
@@ -2186,6 +2189,7 @@ model Company {
   inquiryFacts        InquiryFact[]
   factoryOrderFacts   FactoryOrderFact[]
   factsQueue          FactsQueue[]
+  moneySubmissions    MoneySubmission[]
 
   @@map("companies")
 }
@@ -2563,4 +2567,44 @@ model FactsQueue {
 
   @@id([companyId, kind, entityId])
   @@map("facts_queue")
+}
+
+/// Money received or an expense a person added for a manager to approve. Nothing here counts: no payment, expense
+/// or money figure changes until it is approved, which records it through the usual endpoint's code as the approver.
+model MoneySubmission {
+  id            String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId     String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company       Company   @relation(fields: [companyId], references: [id])
+  /// payment (money received from the customer) | expense
+  kind          String    @db.VarChar(10)
+  /// The order it is on (always for a payment; for an expense when it is on one).
+  orderId       String?   @map("order_id") @db.Uuid
+  order         Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Exactly what the usual endpoint takes (paymentInput / expenseInput), as checked when it was sent.
+  body          Json
+  /// The bank slip or receipt photo, until it moves to the payment or expense made on approval.
+  fileKey       String?   @map("file_key")
+  fileName      String?   @map("file_name") @db.VarChar(255)
+  fileType      String?   @map("file_type") @db.VarChar(150)
+  fileSize      Int?      @map("file_size")
+  /// pending | approved | sent_back | withdrawn
+  status        String    @default("pending") @db.VarChar(10)
+  submittedById String    @map("submitted_by") @db.Uuid
+  submittedBy   User      @relation("SubmissionSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt   DateTime  @default(now()) @map("submitted_at") @db.Timestamptz
+  decidedById   String?   @map("decided_by") @db.Uuid
+  decidedBy     User?     @relation("SubmissionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt     DateTime? @map("decided_at") @db.Timestamptz
+  /// Why it was sent back.
+  reason        String?   @db.VarChar(500)
+  /// The payment or expense made when it was approved.
+  createdId     String?   @map("created_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([companyId, status])
+  @@index([orderId])
+  @@index([submittedById])
+  @@map("money_submissions")
 }
