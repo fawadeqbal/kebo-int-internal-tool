@@ -2,6 +2,7 @@
 // ignore_for_file: unused_import
 import 'package:flutter/material.dart' hide Badge;
 
+import '../../core/api.dart';
 import '../../core/json.dart';
 import '../../core/scope.dart';
 import '../../ds/ds.dart';
@@ -48,11 +49,23 @@ abstract final class CustomerFormSheet {
   ];
 
   /// Opens the empty form ([prefill]: values already known, e.g. the customer); true when something was saved.
-  static Future<bool> create(BuildContext context, {Json? prefill}) => FormSheet.open(
+  /// [extra]: more under the fields (e.g. files to attach). [then]: runs with the new record before the
+  /// sheet closes (e.g. sends those files); it must not throw, the record is already saved.
+  static Future<bool> create(
+    BuildContext context, {
+    Json? prefill,
+    Widget Function(StateSetter setState)? extra,
+    Future<void> Function(Api api, Customer saved)? then,
+  }) => FormSheet.open(
     context,
     title: 'New customer',
     initial: {...CustomerFields.blank(), ...?prefill},
-    send: (api, body) => CustomerRepo(api).create(body),
+    send: (api, body) async {
+      final saved = await CustomerRepo(api).create(body);
+      await then?.call(api, saved);
+      return saved;
+    },
+    extra: extra,
     save: 'Save customer',
     groups: _groups,
     rules: CustomerFields.rules,
