@@ -133,7 +133,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         }
         papers={
           live && (
-            <a href={`/platform/companies/${id}/export`} className={buttonClass("secondary", "sm")}>
+            <a href={`/platform/companies/${id}/export`} download className={buttonClass("secondary", "sm")}>
               <Download aria-hidden /> Export
             </a>
           )

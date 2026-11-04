@@ -147,6 +147,21 @@ export type CompanyLogKind = keyof typeof COMPANY_LOG_KINDS;
 export const companyLogKind = (action: string): CompanyLogKind | "other" =>
   (Object.keys(COMPANY_LOG_KINDS) as CompanyLogKind[]).find((k) => (COMPANY_LOG_KINDS[k].actions as readonly string[]).includes(action)) ?? "other";
 
+/** The kinds of things in the platform log (its list's filter chips): each kind and the log actions it holds. */
+export const PLATFORM_LOG_KINDS = {
+  companies: {
+    label: "Companies",
+    actions: ["create", "update", "status", "extend", "end", "ending_notice", "make_real", "delete", "export", "open", "password_link", "payment", "payment_removed"],
+  },
+  inquiries: { label: "Client inquiries", actions: ["lead", "lead_update", "lead_delete"] },
+  plans: { label: "Plans and website", actions: ["plan", "site"] },
+  admins: { label: "Platform admins", actions: ["sign_in", "password_change", "password_set", "two_step_on"] },
+  server: { label: "Server", actions: ["server_warning"] },
+} as const;
+export type PlatformLogKind = keyof typeof PLATFORM_LOG_KINDS;
+export const platformLogKind = (action: string): PlatformLogKind | "other" =>
+  (Object.keys(PLATFORM_LOG_KINDS) as PlatformLogKind[]).find((k) => (PLATFORM_LOG_KINDS[k].actions as readonly string[]).includes(action)) ?? "other";
+
 export const COMPANY_KIND_LABEL = { client: "Client", demo: "Demo", trial: "Trial" } as const;
 export const COMPANY_STATUS_LABEL = { active: "Active", read_only: "Read-only", off: "Switched off", deleted: "Deleted" } as const;
 export const LEAD_STATUS_LABEL = { new: "New", contacted: "Contacted", demo: "Demo given", client: "Client", lost: "Lost" } as const;
@@ -396,15 +411,23 @@ export const demoRequestInput = z.object({
 export type DemoRequestInput = z.infer<typeof demoRequestInput>;
 
 export const leadInput = demoRequestInput.omit({ botToken: true, website: true, origin: true });
+/** A change to a lead: only the fields sent change (a field left out stays as it is; sent empty, it is cleared). */
 export const leadUpdateInput = z.object({
   status: z.enum(LEAD_STATUSES).optional(),
-  lostReason: optionalText(300),
-  followUpOn: optionalDate,
+  lostReason: optionalText(300).optional(),
+  followUpOn: optionalDate.optional(),
   companyName: text(160).optional(),
   name: text(120).optional(),
   email: email.optional(),
-  phone: optionalText(40),
-  country: optionalText(80),
+  phone: optionalText(40).optional(),
+  country: optionalText(80).optional(),
+  teamSize: z
+    .enum(["1-5", "6-20", "21-50", "51+"])
+    .or(z.literal(""))
+    .nullish()
+    .transform((v) => v || null)
+    .optional(),
+  message: optionalText(2000).optional(),
 });
 export const leadNoteInput = z.object({ text: text(4000, "Write the note") });
 

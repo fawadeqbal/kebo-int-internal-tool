@@ -137,7 +137,9 @@ export interface LeadRow {
   createdAt: string;
 }
 
-export interface LeadDetail extends Omit<LeadRow, "notes"> {
+export interface LeadDetail extends Omit<LeadRow, "notes" | "company"> {
+  /** Their demo or company, and how often its people signed in (null once deleted). */
+  company: (NonNullable<LeadRow["company"]> & { signIns: number | null }) | null;
   notes: { id: string; text: string; byName: string | null; createdAt: string }[];
   log: LogEntry[];
 }
@@ -149,6 +151,68 @@ export interface Overview {
   ending: { id: string; name: string; slug: string; kind: CompanyKind; status: CompanyStatus; endsAt: string }[];
   renewals: { id: string; name: string; slug: string; status: CompanyStatus; renewsOn: string }[];
   recent: LogEntry[];
+  dashboard: Dashboard;
+}
+
+export interface Money {
+  currency: string;
+  amountMinor: number;
+}
+
+export interface ServerWarningEntry {
+  id: string;
+  title: string;
+  detail: string | null;
+  at: string;
+}
+
+/** The overview's figures (dashboard frame). */
+export interface Dashboard {
+  paying: number;
+  payingNewThisMonth: number;
+  incomeThisMonth: Money[];
+  incomeLastMonth: Money[];
+  renewals: number;
+  renewalsDue: Money[];
+  trials: number;
+  trialsEndingThisWeek: number;
+  newLeads: number;
+  newLeadsDemoRequests: number;
+  leadsThisWeek: number;
+  serverWarnings: ServerWarningEntry[];
+  watch: { id: string; name: string; kind: CompanyKind; status: CompanyStatus; plan: string | null; date: string | null; people: number; reason: "overdue" | "ending" | "renews" }[];
+  overdue: { id: string; name: string; days: number }[];
+  ending: { id: string; name: string; endsAt: string | null }[];
+}
+
+/** How the platform is set up (Platform settings). */
+export interface PlatformSettings {
+  signUpOpen: boolean;
+  emailOn: boolean;
+  platformEmail: string[] | null;
+  botCheck: boolean;
+  inquiriesPerHour: number;
+  baseDomain: string | null;
+  appUrl: string;
+  timeZone: string;
+  admins: { id: string; name: string; email: string; active: boolean; twoStepOn: boolean; lastLoginAt: string | null; createdAt: string }[];
+  serverWarnings: ServerWarningEntry[];
+}
+
+/** One page of the platform log, with the count of each kind. */
+export interface LogPage {
+  rows: LogEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  kind: string | null;
+  counts: Record<string, number>;
+}
+
+export interface PlatformCounts {
+  companies: number;
+  newLeads: number;
+  plans: number;
 }
 
 export interface CompanyHistory {

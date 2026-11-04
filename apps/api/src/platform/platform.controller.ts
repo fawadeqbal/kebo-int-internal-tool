@@ -29,6 +29,9 @@ import {
   type SignUpInput,
   type SiteContactInput,
   type SiteContent,
+  PLATFORM_LOG_KINDS,
+  platformLogKind,
+  type PlatformLogKind,
 } from "@kebo/shared";
 import { DomainError, NotFoundError } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
@@ -324,14 +327,74 @@ export class PlatformController {
     return this.companies.overview();
   }
 
+  /** The numbers beside the platform's menu: companies (not deleted), new client inquiries, plans. */
+  @PlatformRoute()
+  @Get("counts")
+  async counts() {
+    const db = this.prisma.platform;
+    const [companies, newLeads, plans] = await Promise.all([
+      db.company.count({ where: { status: { not: "deleted" } } }),
+      db.lead.count({ where: { status: "new" } }),
+      db.plan.count(),
+    ]);
+    return { companies, newLeads, plans };
+  }
+
+  /** How the platform is set up (Platform settings): the server's settings (read-only), the platform admins, the server's warnings. */
+  @PlatformRoute()
+  @Get("settings")
+  settings() {
+    return this.companies.settings(this.leads.signUpOpen);
+  }
+
+  /**
+   * The platform log (its list page): newest first, 25 a page (?page=), searched (?q= in what and who)
+   * and filtered by kind (?kind=companies|inquiries|plans|admins|server|other), with the count of each kind;
+   * or one company's or lead's entries (?companyId=, ?leadId=).
+   */
   @PlatformRoute()
   @Get("log")
-  log(@Query("companyId") companyId?: string, @Query("leadId") leadId?: string) {
-    return this.prisma.platform.platformLog.findMany({
-      where: { companyId: companyId || undefined, leadId: leadId || undefined },
-      orderBy: { at: "desc" },
-      take: 200,
-    });
+  async log(
+    @Query("companyId") companyId?: string,
+    @Query("leadId") leadId?: string,
+    @Query("q") q?: string,
+    @Query("kind") kind?: string,
+    @Query("page") page?: string,
+  ) {
+    const db = this.prisma.platform.platformLog;
+    const text = q?.trim().slice(0, 100);
+    const base = {
+      companyId: companyId || undefined,
+      leadId: leadId || undefined,
+      ...(text
+        ? {
+            OR: [
+              { summary: { contains: text, mode: "insensitive" as const } },
+              { adminName: { contains: text, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
+    const all = Object.values(PLATFORM_LOG_KINDS).flatMap((k) => [...k.actions]);
+    const known = kind && kind in PLATFORM_LOG_KINDS ? (kind as PlatformLogKind) : null;
+    const where = {
+      ...base,
+      ...(known ? { action: { in: [...PLATFORM_LOG_KINDS[known].actions] } } : kind === "other" ? { action: { notIn: all } } : {}),
+    };
+    const size = 25;
+    const p = Math.max(1, Math.min(10_000, Number(page) || 1));
+    const [rows, total, byAction] = await Promise.all([
+      db.findMany({ where, orderBy: { at: "desc" }, take: size, skip: (p - 1) * size }),
+      db.count({ where }),
+      db.groupBy({ by: ["action"], where: base, _count: true }),
+    ]);
+    const counts: Record<string, number> = { all: 0 };
+    for (const r of byAction) {
+      const k = platformLogKind(r.action);
+      counts[k] = (counts[k] ?? 0) + r._count;
+      counts.all! += r._count;
+    }
+    return { rows, total, page: p, pageSize: size, kind: known ?? (kind === "other" ? "other" : null), counts };
   }
 
   /* ---------------------------------------------------------------- companies */

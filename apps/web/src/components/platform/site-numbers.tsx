@@ -20,7 +20,15 @@ function Change({ now, before }: { now: number; before: number }) {
  * reached a demo or trial and how many pay; this month against the last, and
  * per channel (where they came from).
  */
-export function SiteNumbersCard({ n }: { n: SiteNumbers }) {
+export function SiteNumbersCard({
+  n,
+  title = "Website",
+  edit = "/platform/settings?section=website",
+}: {
+  n: SiteNumbers;
+  title?: string;
+  edit?: string | null;
+}) {
   const steps: {
     label: string;
     key: keyof Pick<SiteFigures, "visitors" | "leads" | "demos" | "clients">;
@@ -36,12 +44,14 @@ export function SiteNumbersCard({ n }: { n: SiteNumbers }) {
   return (
     <Card id="website" className="scroll-mt-20">
       <CardHeader
-        title="Website"
+        title={title}
         description={`${monthName(n.now.month)} so far, against ${monthName(n.before.month)}. Leads are counted in the month they came in.`}
         actions={
-          <Link href="/platform/website" className="text-sm font-medium text-primary hover:underline">
-            Edit the page
-          </Link>
+          edit ? (
+            <Link href={edit} className="text-sm font-medium text-primary hover:underline">
+              Edit the page
+            </Link>
+          ) : undefined
         }
       />
       <CardBody className="flex flex-col gap-6">

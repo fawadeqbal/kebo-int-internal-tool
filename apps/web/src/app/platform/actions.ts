@@ -296,8 +296,14 @@ export async function updateLeadAction(id: string, _prev: ActionState, form: For
         ...(v.status ? { status: v.status } : {}),
         ...("lostReason" in v ? { lostReason: v.lostReason } : {}),
         ...("followUpOn" in v ? { followUpOn: v.followUpOn || null } : {}),
+        // Who they are and what they need (each side panel sends its own fields).
+        ...Object.fromEntries(
+          (["companyName", "name", "email", "phone", "country", "teamSize", "message"] as const)
+            .filter((k) => k in v)
+            .map((k) => [k, v[k]]),
+        ),
       }),
-    "Saved.",
+    String(form.get("_saved") || "Saved."),
   );
   revalidatePath(`/platform/leads/${id}`);
   return r;
