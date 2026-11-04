@@ -215,6 +215,8 @@ export class PaymentsService {
         soon,
       );
       const next = plan.find((p) => p.status !== "paid") ?? null;
+      // Past their due date and not paid: what is overdue on the order, and since when.
+      const late = o.status === "cancelled" ? [] : plan.filter((p) => p.status === "late");
       return {
         id: o.id,
         refNo: o.refNo,
@@ -231,6 +233,8 @@ export class PaymentsService {
         lastPaidOn: live.length ? fromDbDate(live.reduce((a, b) => (a.paidOn > b.paidOn ? a : b)).paidOn) : null,
         /** The next unpaid instalment (what a transfer pays first). */
         next: next && o.status !== "cancelled" ? { label: next.label, dueOn: next.dueOn, open: fromMinor(next.openMinor) } : null,
+        overdue: fromMinor(late.reduce((t, p) => t + p.openMinor, 0)),
+        overdueSince: late[0]?.dueOn ?? null,
       };
     });
     return {

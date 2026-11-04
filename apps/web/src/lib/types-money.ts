@@ -390,7 +390,13 @@ export interface CustomerAccount {
       revenue: string;
       uncostedRevenue: string;
       goodsCost: string;
+      orderedOn: string;
+      currency: string;
+      total: string;
       costs: string;
+      /** What the quotation promised. */
+      quotedProfit: string;
+      /** Gross profit: quoted profit less unplanned costs and bank charges. */
       profit: string;
       net: string;
     } | null;
@@ -520,6 +526,9 @@ export interface CustomerPayments {
     lastPaidOn: string | null;
     /** The next unpaid instalment (a transfer pays the oldest due first). */
     next: { label: string; dueOn: string | null; open: string } | null;
+    /** Instalments past their due date, still open; and the earliest due date among them. */
+    overdue: string;
+    overdueSince: string | null;
   }[];
   /** The money we hold for the customer. */
   credit: CustomerCreditView;

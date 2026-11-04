@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ComponentProps } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Info, Loader2 } from "lucide-react";
 import { buttonClass, Select, type ButtonSize, type ButtonVariant } from "./primitives";
+import { cn } from "./cn";
 
 /** Submit button that shows progress and blocks double submits. */
 export function SubmitButton({
@@ -147,4 +148,57 @@ export function Toast() {
 /** A filter select that applies itself as soon as it changes. */
 export function AutoSelect(props: ComponentProps<typeof Select>) {
   return <Select compact {...props} onChange={(e) => e.currentTarget.form?.requestSubmit()} />;
+}
+
+/**
+ * ⓘ next to a title or a column header: one short sentence that says what the figure is (writing rule 7),
+ * shown on hover, on keyboard focus and on a tap; Escape or a tap elsewhere hides it. The text is the button's
+ * description for screen readers. `align`: which edge of the ⓘ the bubble lines up with.
+ */
+export function InfoTip({ children, label = "What is this?", align = "center", className }: { children: ReactNode; label?: string; align?: "start" | "center" | "end"; className?: string }) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+  return (
+    <span ref={box} className={cn("group/tip relative inline-flex align-middle", className)}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-describedby={id}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setOpen(false);
+            (e.currentTarget as HTMLButtonElement).blur();
+          }
+        }}
+        onBlur={() => setOpen(false)}
+        className="inline-flex size-4 items-center justify-center rounded-full text-muted outline-none hover:text-text focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Info aria-hidden className="size-3.5" />
+      </button>
+      <span
+        role="tooltip"
+        id={id}
+        className={cn(
+          // Hidden (not just invisible) so it never widens the page on a phone.
+          "pointer-events-none absolute top-full z-40 mt-1.5 hidden w-max max-w-60 rounded-md bg-text px-2.5 py-1.5 text-left text-xs leading-snug font-normal tracking-normal whitespace-normal text-surface normal-case shadow-lg",
+          "group-hover/tip:block group-has-[:focus-visible]/tip:block",
+          align === "start" ? "left-0" : align === "end" ? "right-0" : "left-1/2 -translate-x-1/2",
+          open && "block",
+        )}
+      >
+        {children}
+      </span>
+    </span>
+  );
 }

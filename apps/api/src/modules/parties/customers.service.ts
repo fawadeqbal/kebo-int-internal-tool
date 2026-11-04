@@ -1,11 +1,12 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma } from "@kebo/database";
+import { fromDbDate, type Prisma } from "@kebo/database";
 import { can, type CustomerImport, type CustomerInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { DomainError, DuplicateError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
+import { readyOnOf, readySelect } from "../orders/ready";
 
 /** Staff see the customers on deals they handle or created, and customers they added; managers see all. */
 export function customerAccess(user: SessionUser): Prisma.CustomerWhereInput {
@@ -84,16 +85,39 @@ export class CustomersService {
         contacts: { where: { deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
         inquiries: {
           where: { deletedAt: null, ...(mine ?? {}) },
-          select: { id: true, refNo: true, title: true, stage: true, onHold: true, createdAt: true, assignee: { select: { id: true, name: true } } },
+          select: {
+            id: true,
+            refNo: true,
+            title: true,
+            stage: true,
+            onHold: true,
+            createdAt: true,
+            assignee: { select: { id: true, name: true } },
+            // Revisions sent to them, for their activity.
+            quotation: { select: { revisions: { where: { deletedAt: null, sentOn: { not: null } }, select: { number: true, sentOn: true, createdBy: { select: { id: true, name: true } } }, orderBy: { number: "desc" } } } },
+          },
           orderBy: { createdAt: "desc" },
           take: 100,
         },
         // Staff see only the orders of deals they handle or created, like everywhere else.
-        orders: { where: mine ? { inquiry: mine } : {}, select: { id: true, refNo: true, status: true, total: true, currency: true, orderedOn: true }, orderBy: { orderedOn: "desc" }, take: 100 },
+        orders: {
+          where: mine ? { inquiry: mine } : {},
+          select: { id: true, refNo: true, status: true, stage: true, total: true, currency: true, orderedOn: true, ...readySelect, lines: { select: { factoryId: true } } },
+          orderBy: { orderedOn: "desc" },
+          take: 100,
+        },
       },
     });
     if (!c) throw new NotFoundError("Customer");
-    return c;
+    // Each order with its ready date (the latest of its factories'), not the rows it is worked out from.
+    return {
+      ...c,
+      inquiries: c.inquiries.map(({ quotation, ...d }) => ({
+        ...d,
+        sent: (quotation?.revisions ?? []).map((r) => ({ number: r.number, sentOn: fromDbDate(r.sentOn!), by: r.createdBy })),
+      })),
+      orders: c.orders.map(({ factories: _f, lines: _l, ...o }) => ({ ...o, orderedOn: fromDbDate(o.orderedOn), readyOn: readyOnOf({ factories: _f, lines: _l }) })),
+    };
   }
 
   /**

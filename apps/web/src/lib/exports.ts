@@ -15,7 +15,7 @@ import type { SheetCol, SheetSpec } from "./sheet-spec";
 import type { DealDetail, DealRow, Paged } from "./types";
 import type { ReportView } from "./types-deals";
 import type { OrderRow, RevisionDoc } from "./types-orders";
-import type { AuditRow, CustomerRow, FactoryRow } from "./types-people";
+import type { AuditRow, CustomerRow, FactoryPurchases, FactoryRow } from "./types-people";
 import type { CashBook, ExpenseList, Payable } from "./types-money";
 import type { Receivables } from "./types-insights";
 import type { LedgerListRow, LedgerParty } from "./types-ledger";
@@ -694,6 +694,37 @@ export const EXPORTS = {
   "factory-list": factoryList,
   ledger,
   "ledger-party": ledgerParty,
+  "factory-orders": factoryOrders,
 } satisfies Record<string, (q: Q) => Promise<SheetSpec | SheetSpec[]>>;
 
 export type ExportKind = keyof typeof EXPORTS;
+
+const PRODUCTION_LABEL: Record<FactoryPurchases["orders"][number]["production"], string> = {
+  on_track: "On track",
+  overdue_step: "Overdue step",
+  ready: "Ready",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+/** A factory's purchase orders (its page's Purchase orders tab): total, paid and balance due each. */
+async function factoryOrders(q: Q): Promise<SheetSpec> {
+  if (!q.id || !UUID_RE.test(q.id)) throw new ExportNotFound();
+  const [f, p] = await Promise.all([api.get<{ name: string }>(`/factories/${q.id}`), api.get<FactoryPurchases>(`/factories/${q.id}/purchases`)]);
+  return {
+    name: `Purchase orders ${f.name} ${stamp()}`,
+    title: `Purchase orders · ${f.name}`,
+    columns: [text("Purchase order", 14), text("Customer", 28), text("Production", 14), text("Order date", 12), text("Ready date", 12), text("Currency", 9), money("Total"), money("Paid"), money("Balance due")],
+    rows: p.orders.map((o): Cell[] => [
+      o.refNo,
+      o.customer.name,
+      PRODUCTION_LABEL[o.production],
+      o.orderedOn,
+      o.readyOn,
+      o.currency ?? o.mainCurrency,
+      num(o.currency ? o.total : o.totalMain),
+      num(o.currency ? o.paid : o.paidMain),
+      num(o.currency ? o.balanceDue : o.balanceDueMain),
+    ]),
+  };
+}

@@ -83,13 +83,44 @@ export const customerInput = z.object({
 });
 export type CustomerInput = z.infer<typeof customerInput>;
 
+/** A person at a factory: like a customer's contact, with WeChat instead of WhatsApp. */
+export const factoryContactInput = z
+  .object({
+    id: optionalId,
+    name: text(120, "Enter the contact's name"),
+    position: optionalText(80),
+    email,
+    phone,
+    wechat: optionalText(80),
+    isPrimary: bool.default(false),
+  })
+  .refine((c) => c.email || c.phone || c.wechat, { message: "Give at least one way to reach this contact", path: ["phone"] });
+export type FactoryContactInput = z.infer<typeof factoryContactInput>;
+
 export const factoryInput = z.object({
   name: text(200, "Enter the factory's name"),
+  /** The factory's people. Without the list (imports, older forms): one contact from the four fields below. */
+  contacts: z.array(factoryContactInput).max(20).optional(),
+  /** The primary contact's name, phone, WeChat and email (kept in step with `contacts`). */
   contactPerson: optionalText(120),
   phone,
   wechat: optionalText(80),
   email,
   address: optionalText(500),
+  bankBeneficiary: optionalText(200),
+  bankName: optionalText(200),
+  bankAccount: optionalText(60),
+  bankSwift: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+    z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9]{8}([A-Z0-9]{3})?$/, "A SWIFT code has 8 or 11 letters and digits")
+      .nullable()
+      .default(null),
+  ),
+  /** Other bank details (free text, from before the fields above). */
   bankDetails: optionalText(1000),
   notes: optionalText(5000),
   /** The person in our team who looks after this factory. */
