@@ -411,6 +411,7 @@ export function SectionList({
   items,
   children,
   wide,
+  boxed,
   className,
 }: {
   label: string;
@@ -418,11 +419,13 @@ export function SectionList({
   children: ReactNode;
   /** Sections with tables: the cards take the whole width (otherwise a readable column). */
   wide?: boolean;
+  /** The list down the left sits in a card (a record's sections, beside cards). */
+  boxed?: boolean;
   className?: string;
 }) {
   return (
     <div className={cn("grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-6", className)}>
-      <nav aria-label={label} className="no-print lg:sticky lg:top-20">
+      <nav aria-label={label} className={cn("no-print lg:sticky lg:top-20", boxed && "lg:rounded-xl lg:border lg:border-line lg:bg-surface lg:p-2 lg:shadow-card")}>
         <ul className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
           {items.map((l) => (
             <li key={l.href} className="shrink-0">

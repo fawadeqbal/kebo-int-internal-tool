@@ -220,35 +220,60 @@ export class CompanyDataService {
     return out;
   }
 
-  /** What happened in a company lately (the platform admin's view of a demo or client). */
+  /** What happened in a company lately (the platform admin's view of a demo or client). The platform admin's own visits do not count. */
   async activity(companyId: string) {
     const db = this.prisma.platform;
     const since = new Date(Date.now() - 30 * 86_400_000);
-    const [signIns, lastSignIn, created, orders, people] = await Promise.all([
-      db.$queryRaw<
-        { n: bigint }[]
-      >`select count(*) as n from sign_ins where company_id = ${companyId}::uuid and result = 'signed_in' and at >= ${since}`,
-      db.$queryRaw<
-        { at: Date | null; email: string | null }[]
-      >`select at, email from sign_ins where company_id = ${companyId}::uuid and result = 'signed_in' order by at desc limit 1`,
+    const week = new Date(Date.now() - 7 * 86_400_000);
+    const [signIns, lastSignIn, created, orders, records, people] = await Promise.all([
+      db.$queryRaw<{ n: bigint; week: bigint }[]>`
+        select count(*) as n, count(distinct s.user_id) filter (where s.at >= ${week}) as week
+          from sign_ins s join users u on u.company_id = s.company_id and u.id = s.user_id
+         where s.company_id = ${companyId}::uuid and s.result = 'signed_in' and s.at >= ${since} and u.platform_admin_id is null`,
+      db.$queryRaw<{ at: Date | null; email: string | null; name: string | null }[]>`
+        select s.at, s.email, u.name from sign_ins s left join users u on u.company_id = s.company_id and u.id = s.user_id
+         where s.company_id = ${companyId}::uuid and s.result = 'signed_in' and (u.platform_admin_id is null)
+         order by s.at desc limit 1`,
       db.$queryRaw<
         { total: bigint; recent: bigint }[]
       >`select count(*) as total, count(*) filter (where created_at >= ${since}) as recent from inquiries where company_id = ${companyId}::uuid and deleted_at is null`,
-      db.$queryRaw<{ n: bigint }[]>`select count(*) as n from orders where company_id = ${companyId}::uuid and status <> 'cancelled'`,
+      db.$queryRaw<{ n: bigint; open: bigint }[]>`
+        select count(*) as n, count(*) filter (where status = 'open') as open from orders where company_id = ${companyId}::uuid and status <> 'cancelled'`,
+      db.$queryRaw<{ customers: bigint; factories: bigint }[]>`
+        select (select count(*) from customers where company_id = ${companyId}::uuid and deleted_at is null) as customers,
+               (select count(*) from factories where company_id = ${companyId}::uuid and deleted_at is null) as factories`,
       db.$queryRaw<
-        { id: string; name: string; email: string; is_active: boolean; last_login_at: Date | null; role: string; super_admin: boolean }[]
+        {
+          id: string;
+          name: string;
+          email: string;
+          is_active: boolean;
+          last_login_at: Date | null;
+          role: string;
+          super_admin: boolean;
+          two_step: boolean;
+          locked: boolean;
+        }[]
       >`
-        select u.id, u.name, u.email, u.is_active, u.last_login_at, r.name as role, r.super_admin
+        select u.id, u.name, u.email, u.is_active, u.last_login_at, r.name as role, r.super_admin,
+               u.totp_enabled_at is not null as two_step, coalesce(u.locked_until > now(), false) as locked
           from users u join roles r on r.company_id = u.company_id and r.key = u.role
          where u.company_id = ${companyId}::uuid and not u.is_system and u.platform_admin_id is null
          order by r.super_admin desc, u.name`,
     ]);
     return {
       signInsLast30Days: Number(signIns[0]?.n ?? 0),
+      /** People who signed in during the last 7 days. */
+      signedInThisWeek: Number(signIns[0]?.week ?? 0),
       lastSignIn: lastSignIn[0] ?? null,
       inquiries: Number(created[0]?.total ?? 0),
       inquiriesLast30Days: Number(created[0]?.recent ?? 0),
       orders: Number(orders[0]?.n ?? 0),
+      openOrders: Number(orders[0]?.open ?? 0),
+      customers: Number(records[0]?.customers ?? 0),
+      factories: Number(records[0]?.factories ?? 0),
+      /** People who can sign in without two-step sign-in. */
+      twoStepOff: people.filter((p) => p.is_active && !p.two_step).length,
       people: people.map((p) => ({
         id: p.id,
         name: p.name,
@@ -257,7 +282,25 @@ export class CompanyDataService {
         lastLoginAt: p.last_login_at,
         role: p.role,
         tenantAdmin: p.super_admin,
+        twoStep: p.two_step,
+        locked: p.locked,
       })),
+    };
+  }
+
+  /** The company's own details from its Settings → Company (legal name, address, tax number), read-only here. */
+  async profile(companyId: string) {
+    const rows = await this.prisma.platform.$queryRaw<{ value: Record<string, unknown> }[]>`
+      select value from settings where company_id = ${companyId}::uuid and key = 'company'`;
+    const v = rows[0]?.value ?? {};
+    const text = (k: string) => (typeof v[k] === "string" && (v[k] as string).trim() ? (v[k] as string).trim() : null);
+    return {
+      legalName: text("name"),
+      address: text("address"),
+      taxNo: text("taxNo"),
+      phone: text("phone"),
+      email: text("email"),
+      website: text("website"),
     };
   }
 }

@@ -14,12 +14,13 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
 /**
  * One entry of a ⋯ menu, as plain data (a server page can pass it): a link,
- * a URL side panel to open ("Edit"), a link to copy, or an action after a
- * confirm (Switch on…); a removal is `danger` — always last, in red.
+ * a URL side panel to open ("Edit", or a removal that asks for more than a
+ * yes in its own panel), a link to copy, or an action after a confirm (Switch
+ * on…); a removal is `danger` — always last, in red.
  */
 export type MenuEntry =
   | { label: string; href: string; newTab?: boolean; download?: boolean }
-  | { label: string; panel: string; id?: string }
+  | { label: string; panel: string; id?: string; danger?: true }
   | { label: string; copy: string }
   | { label: string; danger?: true; confirm: { title: string; body?: string; confirmLabel: string }; action: Action }
   | { separator: true };

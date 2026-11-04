@@ -132,6 +132,21 @@ export const LIFECYCLE = {
   endingNoticeHours: 24,
 } as const;
 
+/**
+ * The kinds of things in a company's history (the platform log), for the History filter
+ * and its Excel file: each kind and the log actions it holds.
+ */
+export const COMPANY_LOG_KINDS = {
+  payments: { label: "Payments", actions: ["payment", "payment_removed"] },
+  changes: { label: "Changes", actions: ["create", "update", "make_real"] },
+  status: { label: "On, off and dates", actions: ["status", "extend", "end", "ending_notice", "delete"] },
+  access: { label: "Visits and links", actions: ["open", "password_link", "export"] },
+} as const;
+export type CompanyLogKind = keyof typeof COMPANY_LOG_KINDS;
+/** The kind of a log entry ("other" for an action no kind holds). */
+export const companyLogKind = (action: string): CompanyLogKind | "other" =>
+  (Object.keys(COMPANY_LOG_KINDS) as CompanyLogKind[]).find((k) => (COMPANY_LOG_KINDS[k].actions as readonly string[]).includes(action)) ?? "other";
+
 export const COMPANY_KIND_LABEL = { client: "Client", demo: "Demo", trial: "Trial" } as const;
 export const COMPANY_STATUS_LABEL = { active: "Active", read_only: "Read-only", off: "Switched off", deleted: "Deleted" } as const;
 export const LEAD_STATUS_LABEL = { new: "New", contacted: "Contacted", demo: "Demo given", client: "Client", lost: "Lost" } as const;
@@ -452,6 +467,8 @@ export const companyUpdateInput = z.object({
     .or(z.literal(""))
     .transform((v) => v || null)
     .optional(),
+  /** The main contact's phone or WhatsApp, with the country code. */
+  contactPhone: optionalText(40).optional(),
   notes: optionalText(2000).optional(),
   /** Modules switched off for this company, whatever its plan includes. */
   featuresOff: z.array(z.enum(Object.keys(PLAN_FEATURES) as [PlanFeature, ...PlanFeature[]])).max(40).optional(),

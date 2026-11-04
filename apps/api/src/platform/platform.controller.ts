@@ -354,6 +354,13 @@ export class PlatformController {
     return this.companies.get(id);
   }
 
+  /** The company's whole history, newest first (?kind=payments|changes|status|access|other), with counts per kind. */
+  @PlatformRoute()
+  @Get("companies/:id/history")
+  history(@Param("id", ParseUUIDPipe) id: string, @Query("kind") kind?: string) {
+    return this.companies.history(id, kind || undefined);
+  }
+
   @PlatformRoute()
   @Patch("companies/:id")
   update(

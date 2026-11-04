@@ -11,7 +11,12 @@ import {
   type companyUpdateInput,
   type makeRealInput,
   type subscriptionPaymentInput,
+  PLAN_FEATURE_KEYS,
   planFeatureName,
+  companyOrigin,
+  companyLogKind,
+  COMPANY_LOG_KINDS,
+  type CompanyLogKind,
 } from "@kebo/shared";
 import { addDays, ConflictError, DomainError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
@@ -26,6 +31,36 @@ import type { PlatformAdminUser } from "./platform-auth";
 
 type Actor = Pick<PlatformAdminUser, "id" | "name"> | null;
 const DAY = 86_400_000;
+
+/**
+ * When each module now off was switched off, and by whom, from the company's log (newest first): the
+ * oldest entry of the latest unbroken run of entries in which it is off. Entries since this change say
+ * which modules they switched (details.modules); older ones list every module off in their summary.
+ */
+export function modulesOffSince(
+  off: readonly string[],
+  log: { at: Date; adminName: string | null; summary: string; details: unknown }[],
+): { feature: string; at: Date | null; by: string | null }[] {
+  const offIn = (e: (typeof log)[number]): string[] | null => {
+    const d = (e.details as { modules?: { now?: string[] } } | null)?.modules;
+    if (d?.now) return d.now;
+    if (/every module of the plan switched on/.test(e.summary)) return [];
+    const m = e.summary.match(/modules switched off: ([^;]*)/);
+    if (!m) return null;
+    const list = `, ${m[1]!.trim()}, `;
+    return PLAN_FEATURE_KEYS.filter((f) => list.includes(`, ${planFeatureName(f).toLowerCase()}, `));
+  };
+  return off.map((feature) => {
+    let since: (typeof log)[number] | null = null;
+    for (const e of log) {
+      const now = offIn(e);
+      if (now === null) continue;
+      if (!now.includes(feature)) break;
+      since = e;
+    }
+    return { feature, at: since?.at ?? null, by: since?.adminName ?? null };
+  });
+}
 
 /**
  * The companies, as the platform admin runs them: make one (a client or a demo)
@@ -134,6 +169,7 @@ export class PlatformCompaniesService {
       billing: billingState({ kind: c.kind, status: c.status, renewsOn }, today),
       contactName: c.contactName,
       contactEmail: c.contactEmail,
+      contactPhone: c.contactPhone,
       notes: c.notes,
       lastActiveAt: c.lastActiveAt,
       createdAt: c.createdAt,
@@ -145,25 +181,46 @@ export class PlatformCompaniesService {
   async get(id: string) {
     const c = await this.db.company.findUnique({
       where: { id },
-      include: { plan: { select: { id: true, name: true, maxUsers: true, maxStorageMb: true, features: true } } },
+      include: {
+        plan: {
+          select: { id: true, name: true, maxUsers: true, maxStorageMb: true, features: true, priceMinor: true, currency: true, period: true },
+        },
+      },
     });
     if (!c) throw new NotFoundError("Company");
     const live = c.status !== "deleted";
-    const [summary, activity, payments, log, leads] = await Promise.all([
+    const [summary, activity, profile, payments, log, logCount, moduleLog, leads] = await Promise.all([
       live ? this.limits.summary(toInfo(c)) : null,
       live ? this.data.activity(c.id) : null,
+      live ? this.data.profile(c.id) : null,
       this.db.subscriptionPayment.findMany({ where: { companyId: id }, orderBy: { paidOn: "desc" } }),
       this.db.platformLog.findMany({ where: { companyId: id }, orderBy: { at: "desc" }, take: 50 }),
+      this.db.platformLog.count({ where: { companyId: id } }),
+      c.featuresOff.length
+        ? this.db.platformLog.findMany({
+            where: { companyId: id, action: "update", summary: { contains: "module" } },
+            orderBy: { at: "desc" },
+            take: 200,
+            select: { at: true, adminName: true, summary: true, details: true },
+          })
+        : [],
       this.db.lead.findMany({ where: { companyId: id }, select: { id: true, name: true, companyName: true, status: true } }),
     ]);
     return {
       ...this.view(c, this.today()),
       usage: summary?.usage ?? null,
       warnings: summary?.warnings ?? [],
+      /** Where its people sign in. */
+      address: companyOrigin(c.slug, this.env.BASE_DOMAIN, this.env.APP_URL),
+      /** The company's own details (its Settings → Company), read-only here. */
+      profile,
       /** Modules: what the plan includes (null: no plan, every one) and what is switched off for this company. */
       planFeatures: c.plan ? c.plan.features : null,
       featuresOff: c.featuresOff,
+      /** When and by whom each module now off was switched off (from the platform log). */
+      modulesOff: modulesOffSince(c.featuresOff, moduleLog),
       activity,
+      logCount,
       payments: payments.map((p) => ({
         id: p.id,
         amountMinor: p.amountMinor,
@@ -176,6 +233,31 @@ export class PlatformCompaniesService {
       log,
       leads,
     };
+  }
+
+  /** The company's whole history (the platform log), newest first, optionally of one kind; with the count of each kind. */
+  async history(id: string, kind?: string) {
+    if (!(await this.db.company.findUnique({ where: { id }, select: { id: true } }))) throw new NotFoundError("Company");
+    const byAction = await this.db.platformLog.groupBy({ by: ["action"], where: { companyId: id }, _count: true });
+    const counts: Record<string, number> = { all: 0 };
+    for (const r of byAction) {
+      const k = companyLogKind(r.action);
+      counts[k] = (counts[k] ?? 0) + r._count;
+      counts.all! += r._count;
+    }
+    const known = kind && kind in COMPANY_LOG_KINDS ? (kind as CompanyLogKind) : null;
+    const other = kind === "other";
+    const all = Object.values(COMPANY_LOG_KINDS).flatMap((k) => [...k.actions]);
+    const rows = await this.db.platformLog.findMany({
+      where: {
+        companyId: id,
+        action: known ? { in: [...COMPANY_LOG_KINDS[known].actions] } : other ? { notIn: all } : undefined,
+      },
+      orderBy: { at: "desc" },
+      take: 5000,
+      select: { id: true, adminName: true, action: true, companyId: true, leadId: true, summary: true, at: true },
+    });
+    return { kind: known ?? (other ? "other" : null), counts, rows };
   }
 
   /* ---------------------------------------------------------------- making one */
@@ -273,6 +355,7 @@ export class PlatformCompaniesService {
     const c = await this.one(id);
     const data: Prisma.CompanyUpdateInput = {};
     const said: string[] = [];
+    let modules: { off: string[]; on: string[]; now: string[] } | null = null;
     if (input.name !== undefined && input.name !== c.name) {
       data.name = input.name;
       said.push(`name to ${input.name}`);
@@ -295,6 +378,7 @@ export class PlatformCompaniesService {
     }
     if (input.contactName !== undefined) data.contactName = input.contactName;
     if (input.contactEmail !== undefined) data.contactEmail = input.contactEmail;
+    if (input.contactPhone !== undefined) data.contactPhone = input.contactPhone;
     if (input.notes !== undefined) data.notes = input.notes;
     if (input.featuresOff !== undefined) {
       const before = c.featuresOff ?? [];
@@ -302,11 +386,12 @@ export class PlatformCompaniesService {
       const changed = off.length !== before.length || off.some((f) => !before.includes(f));
       if (changed) {
         data.featuresOff = off;
+        modules = { off: off.filter((f) => !before.includes(f)), on: before.filter((f) => !(off as string[]).includes(f)), now: off };
         said.push(off.length ? `modules switched off: ${off.map((f) => planFeatureName(f).toLowerCase()).join(", ")}` : "every module of the plan switched on");
       }
     }
     await this.db.company.update({ where: { id }, data });
-    if (said.length) await this.log(actor, "update", `Changed ${c.name}: ${said.join("; ")}`, { companyId: id });
+    if (said.length) await this.log(actor, "update", `Changed ${c.name}: ${said.join("; ")}`, { companyId: id, details: modules ? { modules } : undefined });
     this.companies.forget(id);
     if (input.renewsOn !== undefined) await this.applyRules(id);
     return this.get(id);
