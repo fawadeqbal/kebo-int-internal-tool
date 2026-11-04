@@ -9,6 +9,7 @@ import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { checkAccount } from "./account-check";
 import { LimitsService } from "../../common/company/limits.service";
+import { LedgerPosting } from "../ledger/posting.service";
 
 type Kind = "in" | "factory" | "expense" | "transfer_out" | "transfer_in" | "refund";
 
@@ -42,6 +43,7 @@ export class CashService {
     private readonly audit: AuditService,
     private readonly clock: Clock,
     private readonly limits: LimitsService,
+    private readonly ledger: LedgerPosting,
   ) {}
 
   private assertManager(user: SessionUser) {
@@ -147,6 +149,7 @@ export class CashService {
           oldValues: { name: a.name, openingBalance: a.openingBalance.toFixed(2), openingOn: fromDbDate(a.openingOn), closed: Boolean(a.archivedAt) },
           newValues: { name: row.name, openingBalance: row.openingBalance.toFixed(2), openingOn: input.openingOn, closed: Boolean(row.archivedAt) },
         });
+        await this.ledger.post(tx, [{ type: "account", id }], { userId: user.id });
         return row;
       }
       const row = await tx.moneyAccount.create({
@@ -159,6 +162,7 @@ export class CashService {
         entityId: row.id,
         summary: `Added the account ${row.name} (${row.currency}, ${row.openingBalance.toFixed(2)} on ${input.openingOn})`,
       });
+      await this.ledger.post(tx, [{ type: "account", id: row.id }], { userId: user.id });
       return row;
     });
   }
@@ -196,6 +200,7 @@ export class CashService {
         entityId: from.id,
         summary: `Moved ${from.currency} ${fromMinor(toMinor(input.amountOut))} from ${from.name} to ${to.name}${from.currency !== to.currency ? ` (${to.currency} ${fromMinor(toMinor(amountIn!))} arrived)` : ""}`,
       });
+      await this.ledger.post(tx, [{ type: "transfer", id: row.id }], { userId: user.id });
       return { id: row.id };
     });
   }
@@ -215,6 +220,7 @@ export class CashService {
         summary: `Removed the move of ${t.fromAccount.currency} ${t.amountOut.toFixed(2)} from ${t.fromAccount.name} to ${t.toAccount.name}`,
         reason,
       });
+      await this.ledger.post(tx, [{ type: "transfer", id }], { userId: user.id, reason });
     });
     return { ok: true };
   }
@@ -496,6 +502,7 @@ export class CashService {
         await tx.customerReceipt.update({ where: { id }, data: { accountId: next } });
         await tx.payment.updateMany({ where: { receiptId: id }, data: { accountId: next } });
         await this.audit.record(tx, { userId: user.id, action: "account_set", entityType: "payment", entityId: id, summary: next ? "Put an amount on an account" : "Took an amount off its account" });
+        await this.ledger.post(tx, [{ type: "receipt", id }], { userId: user.id });
       });
       return { ok: true };
     }
@@ -523,6 +530,7 @@ export class CashService {
         entityId: id,
         summary: next ? "Put an amount on an account" : "Took an amount off its account",
       });
+      await this.ledger.post(tx, [{ type: kind === "in" ? "payment" : kind === "factory" ? "factory_payment" : "expense", id }], { userId: user.id });
     });
     return { ok: true };
   }

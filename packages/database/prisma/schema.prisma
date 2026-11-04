@@ -360,6 +360,8 @@ model User {
   relFollowUpsAssigned      FollowUp[]           @relation("FollowUpAssignee")
   relFollowUpsCreated       FollowUp[]           @relation("FollowUpCreatedBy")
   relFollowUpsDone          FollowUp[]           @relation("FollowUpDoneBy")
+  relLedgerStaff            LedgerEntry[]        @relation("LedgerStaff")
+  relLedgerPostedBy         LedgerEntry[]        @relation("LedgerPostedBy")
 
   @@unique([companyId, email])
   @@map("users")
@@ -544,6 +546,7 @@ model Customer {
   inquiryFacts InquiryFact[]
   recordNotes  RecordNote[]
   followUps    FollowUp[]
+  ledger       LedgerEntry[]
 
   @@index([name])
   @@index([country])
@@ -615,6 +618,7 @@ model Factory {
   orderFacts     FactoryOrderFact[]
   recordNotes    RecordNote[]
   followUps      FollowUp[]
+  ledger         LedgerEntry[]
 
   @@index([name])
   @@index([ownerId])
@@ -1179,6 +1183,7 @@ model Order {
   factoryFacts FactoryOrderFact[]
   recordNotes  RecordNote[]
   followUps    FollowUp[]
+  ledger       LedgerEntry[]
 
   @@unique([companyId, refNo])
   @@unique([companyId, proformaNo])
@@ -1841,6 +1846,7 @@ model MoneyAccount {
   transfersIn     MoneyTransfer[]   @relation("TransferTo")
   receipts        CustomerReceipt[]
   credits         CustomerCredit[]
+  ledger          LedgerEntry[]
 
   @@unique([companyId, name])
   @@map("money_accounts")
@@ -2213,6 +2219,8 @@ model Company {
   inquiryFacts        InquiryFact[]
   factoryOrderFacts   FactoryOrderFact[]
   factsQueue          FactsQueue[]
+  ledgerEntries       LedgerEntry[]
+  ledgerState         LedgerState?
   moneySubmissions    MoneySubmission[]
   recordNotes         RecordNote[]
   followUps           FollowUp[]
@@ -2714,4 +2722,94 @@ model FollowUp {
   @@index([factoryId])
   @@index([createdById])
   @@map("follow_ups")
+}
+
+/// The ledger: every money record posted from its document (an order, a factory's part of it, money in and out,
+/// a transfer, an expense, credit), never typed and never changed or deleted (a database trigger refuses it):
+/// a change is a correction (the old rows reversed, the new ones posted; or the difference, for an order and a
+/// factory's part), a removal a reversal. Rows of one posting share group_id and entry_no; their debits equal
+/// their credits in the company's main currency. See docs/ledger.md.
+model LedgerEntry {
+  id             String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId      String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company        Company       @relation(fields: [companyId], references: [id])
+  /// The posting's number, one after the other per company (every row of a posting has it).
+  entryNo        Int           @map("entry_no")
+  groupId        String        @map("group_id") @db.Uuid
+  /// Its place in the posting (the order its lines were written in).
+  line           Int           @default(0) @db.SmallInt
+  postedAt       DateTime      @default(now()) @map("posted_at") @db.Timestamptz
+  /// The day it counts on: the document's (paid on, spent on, ordered on); a correction's: the day it was made.
+  date           DateTime      @db.Date
+  /// @kebo/shared LEDGER_ENTRY_TYPES: order | purchase_order | money_in | money_out | transfer | expense | credit | correction | opening | fx
+  type           String        @db.VarChar(20)
+  /// The document (@kebo/shared LEDGER_SOURCES) and its id (an order's factory part: "orderId:factoryId").
+  sourceType     String        @map("source_type") @db.VarChar(20)
+  sourceId       String        @map("source_id") @db.VarChar(120)
+  /// A document posting more than once on different days (an expense, and its repayment: "repaid").
+  part           String        @default("") @db.VarChar(10)
+  /// The document's number: RC-…, FP-…, PO-…, SO-…, EX-…, TR-…
+  ref            String        @db.VarChar(60)
+  orderId        String?       @map("order_id") @db.Uuid
+  order          Order?        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customerId     String?       @map("customer_id") @db.Uuid
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  factoryId      String?       @map("factory_id") @db.Uuid
+  factory        Factory?      @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  /// The person whose own money it was (staff, to repay).
+  userId         String?       @map("user_id") @db.Uuid
+  user           User?         @relation("LedgerStaff", fields: [userId], references: [id], onDelete: Restrict)
+  moneyAccountId String?       @map("money_account_id") @db.Uuid
+  moneyAccount   MoneyAccount? @relation(fields: [moneyAccountId], references: [id], onDelete: Restrict)
+  /// The fixed account: money:<id> | money:none:<CUR> | customer:<id> | credit:<customerId> | factory:<id> | staff:<userId> |
+  /// expense:<category> | sales | goods_cost | bank_charges | fx_diff | expenses_recovered | opening
+  account        String        @db.VarChar(80)
+  /// In the entry's currency.
+  debit          Decimal       @default(0) @db.Decimal(16, 2)
+  credit         Decimal       @default(0) @db.Decimal(16, 2)
+  currency       String        @db.Char(3)
+  /// Units of `currency` per one unit of the main currency (empty: no rate known; the main amounts are 0).
+  rate           Decimal?      @db.Decimal(24, 14)
+  /// In the main currency.
+  debitBase      Decimal       @default(0) @map("debit_base") @db.Decimal(16, 2)
+  creditBase     Decimal       @default(0) @map("credit_base") @db.Decimal(16, 2)
+  memo           String        @default("") @db.VarChar(300)
+  /// The row this one reverses (a correction or a removal); a row is reversed at most once.
+  reversesId     String?       @unique @map("reverses_id") @db.Uuid
+  reverses       LedgerEntry?  @relation("LedgerReversal", fields: [reversesId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reversedBy     LedgerEntry?  @relation("LedgerReversal")
+  /// Why it was changed or removed, as the person said.
+  reason         String?       @db.VarChar(500)
+  /// Who saved the document (empty: posted by the system, e.g. the rebuild).
+  createdById    String?       @map("created_by") @db.Uuid
+  createdBy      User?         @relation("LedgerPostedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([companyId, date, entryNo])
+  @@index([companyId, account, date])
+  @@index([sourceType, sourceId])
+  @@index([groupId])
+  @@index([orderId])
+  @@index([customerId])
+  @@index([factoryId])
+  @@index([userId])
+  @@index([moneyAccountId])
+  @@index([createdById])
+  @@map("ledger_entries")
+}
+
+/// Whether a company's ledger has been posted from its records (the API posts it on start or first use), and
+/// the last check of its balances against today's figures (nightly).
+model LedgerState {
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String    @id @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  builtAt     DateTime? @map("built_at") @db.Timestamptz
+  checkedAt   DateTime? @map("checked_at") @db.Timestamptz
+  /// Differences the last check found (0: the ledger agrees with every figure).
+  differences Int       @default(0)
+  /// What the last check compared and the first differences.
+  report      Json?
+
+  @@map("ledger_state")
 }

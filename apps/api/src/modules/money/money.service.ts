@@ -43,6 +43,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { livePlanOf } from "./plan-live";
+import { LedgerPosting } from "../ledger/posting.service";
 
 const person = { select: { id: true, name: true } } as const;
 
@@ -84,6 +85,7 @@ export class MoneyService {
     private readonly orders: OrdersService,
     private readonly storage: StorageService,
     private readonly limits: LimitsService,
+    private readonly ledger: LedgerPosting,
   ) {}
 
   private assertExpenses(user: SessionUser) {
@@ -512,6 +514,7 @@ export class MoneyService {
         entityId: orderId,
         summary: `${o.refNo}: paid ${factoryName} ${input.currency} ${data.amount}${input.reference ? ` (${input.reference})` : ""}`,
       });
+      await this.ledger.post(tx, [{ type: "factory_payment", id: created.id }], { userId: user.id });
       return created.id;
     });
     /** `createdId`: the new payment, so its proof can follow. */
@@ -562,6 +565,7 @@ export class MoneyService {
         },
         reason,
       });
+      await this.ledger.post(tx, [{ type: "factory_payment", id }], { userId: user.id, reason });
     });
     return this.forOrder(user, o.id);
   }
@@ -579,6 +583,7 @@ export class MoneyService {
         summary: `${o.refNo}: removed the payment of ${p.currency} ${p.amount.toFixed(2)} to ${p.factory.name}`,
         reason,
       });
+      await this.ledger.post(tx, [{ type: "factory_payment", id }], { userId: user.id, reason });
     });
     return this.forOrder(user, o.id);
   }
@@ -930,6 +935,7 @@ export class MoneyService {
       await this.expenseAudit(tx, user, row.id, order, `added ${input.description} ${formatMinor(toMinor(data.amount), input.currency)}`, "expense", {
         newValues: { step: data.step, borneBy: data.borneBy, ...(data.ownMoney ? { ownMoney: true } : {}) },
       });
+      await this.ledger.post(tx, [{ type: "expense", id: row.id }], { userId: user.id });
       return row;
     });
     return this.expenseView(e);
@@ -1000,6 +1006,7 @@ export class MoneyService {
           description: data.description,
         },
       });
+      await this.ledger.post(tx, [{ type: "expense", id }], { userId: user.id, reason });
       return updated;
     });
     return this.expenseView(row);
@@ -1018,6 +1025,7 @@ export class MoneyService {
         "expense_void",
         { reason, newValues: { step: e.step } },
       );
+      await this.ledger.post(tx, [{ type: "expense", id }], { userId: user.id, reason });
     });
     return { ok: true };
   }
@@ -1048,6 +1056,7 @@ export class MoneyService {
         "expense_repay",
         { newValues: { step: e.step, repaidOn: input.repaidOn, account: updated.repaidAccount?.name ?? null } },
       );
+      await this.ledger.post(tx, [{ type: "expense", id }], { userId: user.id });
       return updated;
     });
     return this.expenseView(row);

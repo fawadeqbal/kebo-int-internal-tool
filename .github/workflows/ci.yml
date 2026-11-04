@@ -32,6 +32,12 @@ jobs:
       - run: pnpm turbo run build
       - name: Migrations apply cleanly and the demo seed runs
         run: pnpm db:deploy && pnpm db:seed --demo
+      - name: The ledger posts the demo and agrees with its figures
+        run: |
+          node apps/api/dist/cli/ledger.js rebuild --all --dry-run
+          node apps/api/dist/cli/ledger.js rebuild --all
+          node apps/api/dist/cli/ledger.js rebuild --all
+          node apps/api/dist/cli/ledger.js check --all
       - run: pnpm turbo run typecheck lint test
 
   # The migrations on a database with data in it, as in production: the base (main, or the
@@ -94,6 +100,10 @@ jobs:
           pnpm db:deploy
           pnpm --filter @kebo/database exec prisma migrate status
           pnpm db:seed --demo
+          if [ -f apps/api/dist/cli/ledger.js ]; then
+            node apps/api/dist/cli/ledger.js rebuild --all
+            node apps/api/dist/cli/ledger.js check --all
+          fi
       - name: The API tests on the upgraded database
         run: pnpm turbo run test --filter=@kebo/api
 

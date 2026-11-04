@@ -91,6 +91,26 @@ describe("every read endpoint answers for every record", () => {
     for (const s of mine.rows) await ok(staff, `/submissions/${s.id}`);
   });
 
+  it("the ledger: lists, every entry, every party's ledger, ageing, accounts", async () => {
+    for (const q of ["", "?lead=true", "?removed=false", "?type=correction", "?account=sales", "?account=money:", "?currency=USD&page=2&pageSize=5", `?from=2020-01-01&to=${today}`])
+      await ok(manager, `/ledger/entries${q}`);
+    const all = (await ok(manager, "/ledger/entries?pageSize=500")) as { rows: { id: string; groupId: string }[] };
+    expect(all.rows.length).toBeGreaterThan(0);
+    for (const g of [...new Set(all.rows.map((r) => r.groupId))]) await ok(manager, `/ledger/entries/${g}`);
+    for (const c of (await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]) {
+      await ok(manager, `/ledger/parties/customer/${c.id}`);
+      await ok(manager, `/ledger/parties/customer/${c.id}?onlyOpen=true&removed=true&from=2020-01-01`);
+    }
+    for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) await ok(manager, `/ledger/parties/factory/${f.id}`);
+    for (const u of (await ok(admin, "/users")) as { id: string }[]) await ok(manager, `/ledger/parties/staff/${u.id}`);
+    for (const side of ["receivable", "payable", "staff"]) await ok(manager, `/ledger/ageing?side=${side}`);
+    await ok(manager, "/ledger/accounts");
+    await ok(manager, `/ledger/accounts?to=${today}`);
+    await ok(manager, "/ledger/check");
+    // Staff without ledger.view: refused, never a 500.
+    for (const path of ["/ledger/entries", "/ledger/accounts", "/ledger/ageing"]) expect((await api(app, staff).get(path)).status).toBe(403);
+  }, 120_000);
+
   it("an order's money (plan, factory plans, credit) for the latest orders", async () => {
     const orders = [...(await ok(manager, "/orders")), ...(await ok(manager, "/orders?status=cancelled"))] as { id: string }[];
     for (const o of orders.slice(0, 25)) await ok(manager, `/orders/${o.id}/money`);

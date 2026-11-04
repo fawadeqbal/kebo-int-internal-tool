@@ -20,6 +20,9 @@ import { LifecycleService } from "./platform/lifecycle.service";
 import { ServerHealthService } from "./platform/server-health";
 import { FactsService } from "./modules/insights/facts/facts.service";
 import { Clock } from "./common/time/clock.service";
+import { LedgerPostingModule } from "./modules/ledger/posting.service";
+import { LedgerJobsModule } from "./modules/ledger/ledger.module";
+import { LedgerService } from "./modules/ledger/ledger.service";
 
 /**
  * The background worker, on a schedule (REMINDER_INTERVAL_MINUTES, default 60):
@@ -27,7 +30,8 @@ import { Clock } from "./common/time/clock.service";
  * the server check (backups, disk: emails the platform admins), then each active
  * company's reminders, one company at a time and each inside its own company; and Insights' calculated tables:
  * caught up on every tick, and once a day (the first tick of the day, so at start too) worked out again in
- * full, compared, and every difference logged and fixed. Follow-ups' reminders (the day's, and 30 minutes
+ * full, compared, and every difference logged and fixed; and the ledger (once a day: what a save did not post is posted, then
+ * it is checked against today's figures; a difference goes to the platform log). Follow-ups' reminders (the day's, and 30 minutes
  * before a set time) also run on their own, shorter schedule (FOLLOW_UP_INTERVAL_MINUTES, default 5).
  */
 @Module({
@@ -38,6 +42,7 @@ import { Clock } from "./common/time/clock.service";
     LimitsModule,
     CommonModule,
     EventsModule,
+    LedgerPostingModule,
     SettingsModule,
     NotificationsModule,
     // The figures in the morning and monthly emails (RemindersService reads them from InsightsService).
@@ -45,6 +50,8 @@ import { Clock } from "./common/time/clock.service";
     // Follow-ups' reminders (RemindersService reads them from FollowUpsService).
     NotesModule,
     PlatformJobsModule,
+    // The ledger's nightly run: post what a save did not, then check it against today's figures.
+    LedgerJobsModule,
   ],
 })
 class WorkerModule {}
@@ -58,6 +65,7 @@ async function main() {
   const server = app.get(ServerHealthService);
   const facts = app.get(FactsService);
   const clock = app.get(Clock);
+  const ledger = app.get(LedgerService);
   let checkedOn: string | null = null;
   const minutes = Math.max(Number(process.env.REMINDER_INTERVAL_MINUTES) || 60, 1);
   const log = new Logger("Worker");
@@ -72,6 +80,7 @@ async function main() {
       const today = clock.today();
       if (checkedOn !== today) {
         await facts.nightly().catch((e) => log.error(`Insights check failed: ${(e as Error).stack ?? e}`));
+        await ledger.nightly().catch((e) => log.error(`ledger check failed: ${(e as Error).stack ?? e}`));
         checkedOn = today;
       } else await facts.eachCompany("catching up the Insights tables", () => facts.drain());
       const companies = await prisma.platform.company.findMany({ where: { status: "active" }, orderBy: { createdAt: "asc" } });

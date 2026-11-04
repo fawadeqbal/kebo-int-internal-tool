@@ -8,6 +8,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
 import { CompanyContext } from "../../common/company/company-context";
 import { DomainError } from "@kebo/utils";
+import { LedgerPosting } from "../ledger/posting.service";
 
 const SETTING_LABEL = {
   exchangeRates: "exchange rates",
@@ -27,6 +28,7 @@ export class SettingsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly clock: Clock,
+    private readonly ledger: LedgerPosting,
   ) {}
 
   async get(): Promise<Settings> {
@@ -117,6 +119,11 @@ export class SettingsService {
         newValues: value as never,
         reason,
       });
+      // What a factory bears in another currency is taken off at today's rate (factoryPosition): the ledger follows.
+      if (changed.includes("exchangeRates" as never)) {
+        const borne = await tx.expense.findMany({ where: { borneBy: "factory", voidedAt: null, orderId: { not: null } }, select: { id: true } });
+        await this.ledger.post(tx, borne.map((e) => ({ type: "expense" as const, id: e.id })), { userId: user.id, reason: reason ?? "Exchange rates changed" });
+      }
     });
     this.cache.delete(user.companyId);
     return value;
