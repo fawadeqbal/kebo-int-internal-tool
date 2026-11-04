@@ -284,7 +284,7 @@ export class RemindersService {
         ["To receive now", m(i.toReceive)],
       ],
       body: top ? `Best customers this month\n${top}` : null,
-      link: `/insights?period=custom&from=${month}-01&to=${to}`,
+      link: `/reports?period=custom&from=${month}-01&to=${to}`,
       linkLabel: "See the full month",
     });
   }

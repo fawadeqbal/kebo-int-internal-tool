@@ -116,7 +116,7 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
     <>
       <PrintToolbar
         title={`Sales report ${date(r.range.from)} – ${date(r.range.to)}`}
-        backHref={`/reports?${query}`}
+        backHref={`/reports/print?period=custom&${query}`}
         pdfHref={`/pdf/report/summary?${query}`}
       />
       <Sheet>

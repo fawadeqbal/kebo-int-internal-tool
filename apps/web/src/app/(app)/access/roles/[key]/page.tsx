@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Pencil, ShieldCheck } from "lucide-react";
 import { PERMISSION_GROUPS } from "@kebo/shared";
-import { Avatar, Badge, Card, CardBody, CardHeader, cn, StatusBadge } from "@kebo/ui";
+import { Avatar, Badge, Card, CardBody, CardHeader, cn, PageHeader, StatusBadge } from "@kebo/ui";
+import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import { hasFeature, load, requireUser } from "@/lib/session";
 import { timeAgo } from "@/lib/format";
@@ -14,7 +15,7 @@ import { RolePanel } from "../../role-form";
 export async function generateMetadata({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
   const r = await load(() => api.get<RoleDetail>(`/roles/${encodeURIComponent(key)}`));
-  return { title: `${r.name} · Security` };
+  return { title: `${r.name} · Roles` };
 }
 
 const editClass = "h-8 px-2.5 text-[13px] [&_svg]:size-3.5";
@@ -36,13 +37,15 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
     </OpenPanelButton>
   );
   return (
+    <div>
+    <PageHeader crumbs={[...crumbsFor("/access/roles").slice(0, 1), { label: "Roles", href: "/access/roles" }, { label: r.name }]} title="Roles" />
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-4">
         <Card>
           <CardHeader
             title={
               <span className="flex flex-wrap items-center gap-2">
-                <Link href="/security" className="font-normal text-muted hover:text-text">
+                <Link href="/access/roles" className="font-normal text-muted hover:text-text">
                   Roles ›
                 </Link>
                 {r.name}
@@ -177,6 +180,7 @@ export default async function RolePage({ params }: { params: Promise<{ key: stri
         locked={!custom}
         submitLabel="Save the role"
       />
+    </div>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { date, dateTime, money, timeAgo } from "@/lib/format";
 import type { Submission, SubmissionList, SubmissionStatus } from "@/lib/types-approvals";
 import { ApproveButtons, WithdrawButton } from "@/components/money/approval-actions";
 import { approveAction, sendBackAction, withdrawAction } from "./actions";
+import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Approvals" };
 
@@ -74,12 +75,13 @@ export default async function ApprovalsPage({
   return (
     <div className="max-w-4xl">
       <PageHeader
-        title={mine ? "Sent for approval" : "To approve"}
+        crumbs={crumbsFor("/approvals")}
+        title="Approvals"
         summary={
           mine
-            ? "Money received and expenses you added. Each counts once a manager approves it."
+            ? "Sent for approval: money received and expenses you added. Each counts once a manager approves it."
             : list.counts.pending
-              ? `${list.counts.pending} waiting · approving records it as the usual payment or expense, with its photo`
+              ? `To approve: ${list.counts.pending} waiting · approving records it as the usual payment or expense, with its photo`
               : "Nothing is waiting for you"
         }
       />

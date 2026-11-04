@@ -47,7 +47,8 @@ const NOT_VISITED = {
   "/login/set-up-two-step": "needs a role that requires two-step (the platform's set-up page is checked on the way in)",
   "/platform/two-step": "needs a pending two-step sign-in; when the platform admin signs in again it is checked",
   "/notifications/open": "a redirect to the notification's record",
-  "/security/roles/new": "opens the New role panel on /security (checked there); without custom roles in the plan it shows the plan's note",
+  "/settings/address": "only when companies have their own addresses (BASE_DOMAIN); without it the page is not there",
+  "/access/roles/new": "opens the New role panel on /access/roles (checked there); without custom roles in the plan it shows the plan's note",
 };
 
 let failures = 0;
@@ -421,7 +422,7 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 function templateOf(path) {
   const u = new URL(path, BASE);
   let t = u.pathname.replace(UUID, ":id");
-  t = t.replace(/^\/security\/roles\/(?!new$)[^/]+$/, "/security/roles/:key").replace(/^\/orders\/:id\/papers\/[^/]+$/, "/orders/:id/papers/:kind");
+  t = t.replace(/^\/access\/roles\/(?!new$)[^/]+$/, "/access/roles/:key").replace(/^\/orders\/:id\/papers\/[^/]+$/, "/orders/:id/papers/:kind");
   const keep = ["tab", "section", "view", "panel"].filter((k) => u.searchParams.has(k)).map((k) => `${k}=${u.searchParams.get(k)}`);
   return keep.length ? `${t}?${keep.join("&")}` : t;
 }
@@ -563,20 +564,38 @@ async function run(page, list, title) {
     ...orders.flatMap((o) => steps.map((s) => o + s)),
     ...inquiries.flatMap((d) => ["", "/needs", "/sourcing", "/quotation", "/costs", "/files", "/history"].map((s) => d + s)),
     ...(orders[0] ? ["/goods", "/money", "/packing", "/papers/sales-contract", "/papers/commercial-invoice", "/papers/payment-request"].map((s) => orders.at(-1) + s) : []),
-    "/settings?tab=sales",
-    "/settings?tab=reminders",
-    "/settings?tab=notifications",
-    "/settings?tab=order-checklist",
-    "/settings?tab=papers",
-    "/settings?tab=website-form",
-    "/security/roles/manager",
-    "/security/roles/new",
+    // Every page of the sidebar's modules (design page 33), each its own address.
+    "/settings/company",
+    "/settings/sales",
+    "/settings/reminders",
+    "/settings/emails",
+    "/settings/order-checklist",
+    "/settings/papers",
+    "/settings/website-form",
+    "/access/roles",
+    "/access/sessions",
+    "/access/sign-ins",
+    "/access/roles/manager",
+    "/access/roles/new",
+    "/finance/to-receive",
+    "/finance/cash-book",
+    "/finance/expenses",
+    "/finance/profit",
+    "/finance/leaks",
+    "/purchasing/to-pay",
+    "/orders/board",
+    "/reports",
+    "/reports/customers",
+    "/reports/factories",
+    "/reports/people",
+    "/reports/people/targets",
+    "/reports/funnel",
+    "/reports/print",
     "/customers/new",
     "/factories/new",
     "/users/new",
     "/inquiries/new",
     "/notifications",
-    "/reports/money",
     ...(inquiries[0] ? [`${inquiries[0]}/edit`] : []),
   ];
   for (const [list, re] of [
@@ -587,7 +606,7 @@ async function run(page, list, title) {
     const [first] = await hrefs(page, list, re, 1);
     if (first) extra.push(first, `${first}/edit`);
   }
-  const lists = ["/customers", "/factories", "/users", "/security", "/account", "/reports", "/insights"];
+  const lists = ["/customers", "/factories", "/users", "/access/roles", "/account", "/reports"];
   const list = (await crawl(page, ["/dashboard", ...lists], extra.filter((p) => !/^\/users\/[^/]+\/edit$/.test(p)))).filter((p) => !p.startsWith("/platform"));
   await run(page, list, "company app");
   await context.close();

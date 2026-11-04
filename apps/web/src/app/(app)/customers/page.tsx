@@ -15,6 +15,7 @@ import type { Paged } from "@/lib/types";
 import type { CustomerDetail, CustomerRow } from "@/lib/types-people";
 import { CustomerPanel } from "./customer-panel";
 import { currenciesFrom, type SalesCurrencies } from "./currencies";
+import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Customers" };
 
@@ -84,6 +85,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
+        crumbs={crumbsFor("/customers")}
         title="Customers"
         summary={
           <>
@@ -101,7 +103,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             </OpenPanelButton>
           )
         }
-        more={insights ? <MoreMenu items={[{ label: "Customers in Insights", href: "/insights?tab=customers" }]} /> : undefined}
+        more={insights ? <MoreMenu items={[{ label: "Customers in Reports", href: "/reports/customers" }]} /> : undefined}
       />
 
       <ListToolbar

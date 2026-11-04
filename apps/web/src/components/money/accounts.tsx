@@ -58,7 +58,7 @@ export function AccountSelect({
         fits.length === 0 ? (
           <>
             No {currency} account yet.{" "}
-            <Link href="/money?tab=cash" className="underline">
+            <Link href="/finance/cash-book" className="underline">
               Add one
             </Link>
           </>

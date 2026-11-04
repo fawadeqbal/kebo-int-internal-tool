@@ -6,8 +6,8 @@ import { saveTargetRowAction } from "@/app/(app)/money/actions";
 import { TargetsGrid, type TargetRow } from "./targets-grid";
 
 /**
- * Insights › People › Set targets: the company's and each person's monthly sales targets for a year, and how
- * each month went (sales from the Insights tables). Home and Insights measure against these.
+ * Reports › People & targets › Set targets: the company's and each person's monthly sales targets for a year, and how
+ * each month went (sales from the Insights tables). Home and Reports measure against these.
  */
 export async function TargetsView({ year, today, back }: { year: number; today: string; back: string }) {
   const [company, people, sold] = await Promise.all([
@@ -41,17 +41,17 @@ export async function TargetsView({ year, today, back }: { year: number; today: 
     <Card>
       <CardHeader
         title={`Targets ${year}`}
-        description={`Monthly sales targets in ${currency}, for the company and each person. Home and Insights measure against these.`}
+        description={`Monthly sales targets in ${currency}, for the company and each person. Home and Reports measure against these.`}
         actions={
           <span className="flex items-center gap-1">
             <Link
-              href={buildHref("/insights", {}, { section: "people", view: "targets", year: String(year - 1) })}
+              href={buildHref("/reports/people/targets", {}, { year: String(year - 1) })}
               className="rounded-md px-2 py-1 text-xs text-text-2 hover:bg-surface-2"
             >
               ← {year - 1}
             </Link>
             <Link
-              href={buildHref("/insights", {}, { section: "people", view: "targets", year: String(year + 1) })}
+              href={buildHref("/reports/people/targets", {}, { year: String(year + 1) })}
               className="rounded-md px-2 py-1 text-xs text-text-2 hover:bg-surface-2"
             >
               {year + 1} →

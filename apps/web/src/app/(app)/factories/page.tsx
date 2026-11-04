@@ -12,6 +12,7 @@ import { FactoryPanel } from "./factory-form";
 import { requirePermission } from "@/lib/session";
 import type { Paged, Person } from "@/lib/types";
 import type { FactoryDetail, FactoryRow } from "@/lib/types-people";
+import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Factories" };
 
@@ -67,6 +68,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <PageHeader
+        crumbs={crumbsFor("/factories")}
         title="Factories"
         summary={
           <>

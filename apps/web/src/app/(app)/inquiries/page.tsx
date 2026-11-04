@@ -10,6 +10,7 @@ import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu
 import { hasFeature, requireUser } from "@/lib/session";
 import { date, money, timeAgo } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
+import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Inquiries" };
 
@@ -105,6 +106,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
+        crumbs={crumbsFor("/inquiries")}
         title="Inquiries"
         summary={
           <>
@@ -121,7 +123,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
             </ButtonLink>
           )
         }
-        more={insights ? <MoreMenu items={[{ label: "Sales in Insights", href: "/insights?tab=sales" }]} /> : undefined}
+        more={insights ? <MoreMenu items={[{ label: "Sales funnel in Reports", href: "/reports/funnel" }]} /> : undefined}
       />
 
       <ListToolbar

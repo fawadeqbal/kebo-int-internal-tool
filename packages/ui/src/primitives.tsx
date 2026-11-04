@@ -189,10 +189,13 @@ export function PageHeader({
   actions,
   backHref,
   backLabel,
+  crumbs,
   phoneStack,
   children,
 }: {
   title: ReactNode;
+  /** Where the page is in the sidebar, above the title: "Finance › Cash book" (the last is this page). */
+  crumbs?: { label: string; href?: string }[];
   /** On a phone, the buttons go under the title (record pages, whose names are long). */
   phoneStack?: boolean;
   /** The record's status (StatusBadge). */
@@ -217,6 +220,7 @@ export function PageHeader({
   const right = actions || papers || views || primary || more;
   return (
     <header className="mb-5">
+      {crumbs && crumbs.length > 0 && <Breadcrumb items={crumbs} />}
       {backHref && (
         <Link href={backHref} className="mb-1 inline-flex min-h-7 items-center gap-1 text-xs font-medium text-muted hover:text-text">
           ← {backLabel ?? "Back"}
@@ -248,6 +252,37 @@ export function PageHeader({
       </div>
       {children}
     </header>
+  );
+}
+
+/** "Finance › Cash book" above a page's title: where it is in the sidebar. The last part is this page. */
+export function Breadcrumb({ items, className }: { items: { label: string; href?: string }[]; className?: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className={cn("mb-1 text-xs text-muted", className)}>
+      <ol className="flex flex-wrap items-center gap-1.5">
+        {items.map((c, i) => {
+          const last = i === items.length - 1;
+          return (
+            <li key={`${c.label}-${i}`} className="flex items-center gap-1.5">
+              {i > 0 && (
+                <span aria-hidden="true" className="text-muted">
+                  ›
+                </span>
+              )}
+              {c.href && !last ? (
+                <Link href={c.href} className="hover:text-text">
+                  {c.label}
+                </Link>
+              ) : (
+                <span className={cn(last && "text-text-2")} aria-current={last ? "page" : undefined}>
+                  {c.label}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 

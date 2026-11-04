@@ -19,7 +19,12 @@ type RoleFormProps = Parameters<typeof RoleForm>[0];
  * "Edit role · name" over the role (?panel=edit-role). A new role opens its
  * own page when made; an edit closes the panel with "Saved".
  */
-export function RolePanel({ name, title, description, ...form }: Omit<RoleFormProps, "onSaved"> & { name: string; title: string; description?: string }) {
+export function RolePanel({
+  name,
+  title,
+  description,
+  ...form
+}: Omit<RoleFormProps, "onSaved"> & { name: string; title: string; description?: string }) {
   const panel = useSidePanel(name);
   if (!panel.open) return null;
   return (
@@ -84,11 +89,28 @@ export function RoleForm({
       {(s) => (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name" htmlFor="name" error={s.errors?.name} hint={superAdmin ? "The Super Admin role keeps its name." : locked ? "Renaming roles is part of custom roles." : "What people will see, e.g. Accounts or Sales (China)."}>
+            <Field
+              label="Name"
+              htmlFor="name"
+              error={s.errors?.name}
+              hint={
+                superAdmin
+                  ? "The Super Admin role keeps its name."
+                  : locked
+                    ? "Renaming roles is part of custom roles."
+                    : "What people will see, e.g. Accounts or Sales (China)."
+              }
+            >
               <Input id="name" name="name" defaultValue={s.values?.name ?? role?.name} readOnly={fixed} aria-invalid={!!s.errors?.name} />
             </Field>
             <Field label="What it is for" htmlFor="description" error={s.errors?.description} hint="Shown when someone is given the role.">
-              <Textarea id="description" name="description" rows={2} defaultValue={s.values?.description ?? role?.description ?? ""} maxLength={300} />
+              <Textarea
+                id="description"
+                name="description"
+                rows={2}
+                defaultValue={s.values?.description ?? role?.description ?? ""}
+                maxLength={300}
+              />
             </Field>
           </div>
 
@@ -99,17 +121,25 @@ export function RoleForm({
                 <ShieldCheck className="size-4 text-ok" aria-hidden /> Needs two-step sign-in
               </span>
               <span className="block text-text-2">
-                Everyone in this role must use a code from their phone as well as their password. Anyone who has not set it up yet must do so at their next click; nothing
-                else opens until they have, and they cannot turn it off.
+                Everyone in this role must use a code from their phone as well as their password. Anyone who has not set it up yet must do
+                so at their next click; nothing else opens until they have, and they cannot turn it off.
               </span>
             </span>
           </label>
 
           <fieldset className="flex flex-col gap-4">
             <legend className="mb-1 text-sm font-semibold">What people in this role may do</legend>
-            {superAdmin && <Alert tone="info">The Super Admin always has every permission, including any added later. Only the description and the two-step rule change here.</Alert>}
+            {superAdmin && (
+              <Alert tone="info">
+                The Super Admin always has every permission, including any added later. Only the description and the two-step rule change
+                here.
+              </Alert>
+            )}
             {locked && !superAdmin && (
-              <Alert tone="info">Changing what a role allows is part of custom roles, which your company&apos;s plan does not include. The description and the two-step rule still change here.</Alert>
+              <Alert tone="info">
+                Changing what a role allows is part of custom roles, which your company&apos;s plan does not include. The description and
+                the two-step rule still change here.
+              </Alert>
             )}
             {s.errors?.permissions && <p className="text-sm text-bad">{s.errors.permissions[0]}</p>}
             <div className="grid gap-4">
@@ -139,7 +169,10 @@ export function RoleForm({
                         const keep = !fixed && isMine && i.permission === "security.manage";
                         return (
                           <li key={i.permission} className="border-b border-line last:border-b-0">
-                            <label htmlFor={id} className={cn("flex items-start gap-3 px-3 py-2", (blocked || fixed || keep || off) && "cursor-not-allowed")}>
+                            <label
+                              htmlFor={id}
+                              className={cn("flex items-start gap-3 px-3 py-2", (blocked || fixed || keep || off) && "cursor-not-allowed")}
+                            >
                               <Checkbox
                                 id={id}
                                 name="permissions"
@@ -155,10 +188,14 @@ export function RoleForm({
                                 {off && (
                                   <span className="block text-xs text-warn">
                                     Not in your plan ({planFeatureName(PERMISSION_FEATURE[i.permission] ?? "")}).{" "}
-                                    {superAdmin || picked.has(i.permission) ? "Kept for when the plan includes it." : "Comes with a bigger plan."}
+                                    {superAdmin || picked.has(i.permission)
+                                      ? "Kept for when the plan includes it."
+                                      : "Comes with a bigger plan."}
                                   </span>
                                 )}
-                                {blocked && <span className="block text-xs text-muted">Your own role does not have this, so you cannot give it.</span>}
+                                {blocked && (
+                                  <span className="block text-xs text-muted">Your own role does not have this, so you cannot give it.</span>
+                                )}
                                 {keep && <span className="block text-xs text-muted">Stays: this is your own role.</span>}
                               </span>
                             </label>

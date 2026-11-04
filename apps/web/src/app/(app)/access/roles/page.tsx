@@ -2,18 +2,19 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Banner, Badge, Card, CardHeader, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Banner, Badge, Card, CardHeader, PageHeader, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
 import { Stat } from "@/components/common/stat";
 import { OpenPanelButton } from "@/components/common/panel";
-import { createRoleAction } from "./actions";
-import { RolePanel } from "./role-form";
+import { createRoleAction } from "../actions";
+import { RolePanel } from "../role-form";
 
-export const metadata = { title: "Security · Roles" };
+export const metadata = { title: "Roles" };
 
 /** How people stand (signed in, two-step sign-in, failed attempts) and the roles: what each allows and whether it needs two-step sign-in. */
-export default async function SecurityPage() {
+export default async function RolesPage() {
   const [o, roles, company, me, custom] = await Promise.all([
     api.get<SecurityOverview>("/security/overview"),
     api.get<RoleRow[]>("/roles"),
@@ -26,17 +27,19 @@ export default async function SecurityPage() {
   const available = PERMISSIONS.filter((p) => permissionInPlan(p, company?.features ?? null)).length;
   const frozen = roles.filter((r) => r.frozen);
   return (
-    <div className="flex flex-col gap-5">
+    <div>
+      <PageHeader crumbs={crumbsFor("/access/roles")} title="Roles" description="Who may do what, who must use two-step sign-in, and how people stand." />
+      <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Signed in now" value={o.liveSessions} hint="Browsers and phones" href="/security/sessions" />
+        <Stat label="Signed in now" value={o.liveSessions} hint="Browsers and phones" href="/access/sessions" />
         <Stat
           label="Two-step sign-in"
           value={`${o.withTwoStep} of ${o.people}`}
           hint="Active people using it"
           tone={o.people && o.withTwoStep === o.people ? "ok" : undefined}
         />
-        <Stat label="Failed sign-ins" value={o.failedLastDay} hint="In the last 24 hours" tone={o.failedLastDay >= 10 ? "bad" : o.failedLastDay ? "warn" : undefined} href="/security/sign-ins?failed=1" />
-        <Stat label="Blocked addresses" value={o.blockedIpsLastDay} hint="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} href="/security/sign-ins?failed=1" />
+        <Stat label="Failed sign-ins" value={o.failedLastDay} hint="In the last 24 hours" tone={o.failedLastDay >= 10 ? "bad" : o.failedLastDay ? "warn" : undefined} href="/access/sign-ins?failed=1" />
+        <Stat label="Blocked addresses" value={o.blockedIpsLastDay} hint="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} href="/access/sign-ins?failed=1" />
       </div>
 
       {o.mustSetUp.length > 0 && (
@@ -99,7 +102,7 @@ export default async function SecurityPage() {
             {roles.map((r) => (
               <Tr key={r.key} className="hover:bg-surface-2/50">
                 <Td className="max-w-md">
-                  <Link href={`/security/roles/${r.key}`} className="group block">
+                  <Link href={`/access/roles/${r.key}`} className="group block">
                     <span className="flex items-center gap-2 font-medium group-hover:text-primary">
                       {r.name}
                       {r.superAdmin ? <Badge tone="primary">Everything</Badge> : r.preset ? <Badge tone="outline">Built in</Badge> : null}
@@ -141,6 +144,7 @@ export default async function SecurityPage() {
           submitLabel="Make the role"
         />
       )}
+      </div>
     </div>
   );
 }

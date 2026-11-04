@@ -11,6 +11,7 @@ import { PlanOff } from "@/components/common/plan-off";
 import { dateTime, timeAgo } from "@/lib/format";
 import type { Paged, Person } from "@/lib/types";
 import type { AuditRow } from "@/lib/types-people";
+import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Audit log" };
 
@@ -113,7 +114,7 @@ function Changes({ r }: { r: AuditRow }) {
  */
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const me = await requirePermission("audit.view");
-  if (!(await hasFeature("audit_log"))) return <PlanOff title="Audit log" what="The audit log" />;
+  if (!(await hasFeature("audit_log"))) return <PlanOff title="Audit log" what="The audit log" crumbs={crumbsFor("/audit")} />;
   const sp = await searchParams;
   const [data, people] = await Promise.all([
     api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, page: toPage(sp.page), pageSize: PAGE_SIZE }),
@@ -145,6 +146,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
+        crumbs={crumbsFor("/audit")}
         title="Audit log"
         summary={
           <>

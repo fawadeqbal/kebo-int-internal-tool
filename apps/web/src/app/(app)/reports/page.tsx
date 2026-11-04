@@ -1,8 +1,13 @@
 import { redirect } from "next/navigation";
 import { buildHref } from "@kebo/ui";
+import { ReportPage, type ReportSearch } from "@/components/insights/report-page";
+import { reportsOverviewQuery } from "@/lib/old-addresses";
 
-/** Reports moved to Insights → Sales (old links and bookmarks keep working). */
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const sp = await searchParams;
-  redirect(buildHref("/insights", {}, { tab: "sales", from: sp.from, to: sp.to }));
+export const metadata = { title: "Reports" };
+
+/** Reports › Overview: how the business is doing. (Old links with only ?from&to open that period.) */
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<ReportSearch> }) {
+  const old = reportsOverviewQuery(await searchParams);
+  if (old) redirect(buildHref("/reports", {}, old));
+  return <ReportPage kind="overview" searchParams={searchParams} />;
 }

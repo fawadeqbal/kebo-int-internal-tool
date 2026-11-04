@@ -12,6 +12,7 @@ import { RoleBadge } from "@/components/people/role-badge";
 import { TwoStepRemind } from "@/components/people/two-step-remind";
 import { createUserAction, remindTwoStepAction, setActiveAction } from "./actions";
 import { NewUserPanel } from "./forms";
+import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Users" };
 
@@ -82,6 +83,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <PageHeader
+        crumbs={crumbsFor("/users")}
         title="Users"
         summary={
           <>

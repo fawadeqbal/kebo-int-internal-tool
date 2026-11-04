@@ -39,10 +39,10 @@ export async function PerformanceCard({
   const [year, all] = both;
   const description =
     kind === "customer"
-      ? "what they ordered, earned us and how they pay · from Insights"
+      ? "what they ordered, earned us and how they pay · from Reports"
       : kind === "factory"
-        ? "what we bought, how they deliver and win our orders · from Insights"
-        : "the inquiries they handle, how fast and how well they sell · from Insights";
+        ? "what we bought, how they deliver and win our orders · from Reports"
+        : "the inquiries they handle, how fast and how well they sell · from Reports";
   return (
     <PerformanceView
       title={name ? `Performance · ${name}` : "Performance"}

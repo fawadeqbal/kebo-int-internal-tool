@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { buildHref } from "@kebo/ui";
+import { reportsMoneyTarget } from "@/lib/old-addresses";
 
-/** "Where we lose money" moved to Insights → Profit. */
+/** "Where we lose money" is Finance › Leaks now (old links and bookmarks keep working). */
 export default async function MoneyReportPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const sp = await searchParams;
-  redirect(buildHref("/insights", {}, { tab: "profit", sub: sp.view ?? "attention", from: sp.from, to: sp.to }));
+  redirect(reportsMoneyTarget(await searchParams));
 }
