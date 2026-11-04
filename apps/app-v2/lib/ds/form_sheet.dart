@@ -56,7 +56,11 @@ class FormSheet extends StatefulWidget {
     this.extra,
     this.live,
     this.onChange,
+    this.keeps = false,
   });
+
+  /// Kept on the phone when there is no signal: Save then says "Save · sends when online".
+  final bool keeps;
 
   /// A summary under the fields that follows what is typed (e.g. "Left due USD 0.00").
   final Widget Function(Json values)? live;
@@ -98,6 +102,7 @@ class FormSheet extends StatefulWidget {
     Widget Function(StateSetter setState)? extra,
     Widget Function(Json values)? live,
     FutureOr<void> Function(Json values, String key)? onChange,
+    bool keeps = false,
   }) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -118,6 +123,7 @@ class FormSheet extends StatefulWidget {
         extra: extra,
         live: live,
         onChange: onChange,
+        keeps: keeps,
       ),
     );
     return saved ?? false;
@@ -275,7 +281,10 @@ class _FormSheetState extends State<FormSheet> {
                 onPressed: busy ? null : _save,
                 child: busy
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(widget.save),
+                    : ListenableBuilder(
+                        listenable: context.net,
+                        builder: (context, _) => Text(widget.keeps && context.net.offline ? 'Save · sends when online' : widget.save),
+                      ),
               ),
             ),
           ),

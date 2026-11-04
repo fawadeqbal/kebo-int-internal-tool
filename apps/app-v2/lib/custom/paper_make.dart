@@ -5,10 +5,13 @@ import '../core/files.dart';
 import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
+import 'waiting.dart';
 
 /// Making a paper the app writes (sales contract, commercial invoice…): what it takes from the
 /// order and what is missing (typed here when it can be), its options, then final. True when made.
 Future<bool> openMakePaper(BuildContext context, {required String orderId, required String kind, required String label, String? ref}) async {
+  // A paper is made and numbered by the server: it can't wait on the phone.
+  if (!needsConnection(context)) return false;
   final made = await showModalBottomSheet<Json>(
     context: context,
     isScrollControlled: true,

@@ -5,11 +5,13 @@ import 'core/scope.dart';
 import 'core/session.dart';
 import 'custom/alerts.dart';
 import 'custom/approvals.dart';
+import 'custom/record_follow_ups.dart';
 import 'custom/home.dart';
 import 'custom/more.dart';
 import 'custom/search.dart';
 import 'custom/shell.dart';
 import 'custom/sign_in.dart';
+import 'custom/waiting.dart';
 import 'ds/ds.dart';
 import 'generated/routes.g.dart';
 
@@ -23,7 +25,19 @@ class App extends StatefulWidget {
   State<App> createState() => _AppState();
 }
 
-class _AppState extends State<App> {
+class _AppState extends State<App> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Back to the front: is there signal now? (Sends what waits when there is.)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.session.api.net.offline) widget.session.api.net.check().ignore();
+  }
+
   late final GoRouter router = GoRouter(
     initialLocation: widget.initialLocation,
     refreshListenable: widget.session,
@@ -50,6 +64,8 @@ class _AppState extends State<App> {
           GoRoute(path: '/search', builder: (c, s) => const SearchScreen()),
           GoRoute(path: '/more', builder: (c, s) => const MoreScreen()),
           GoRoute(path: '/approvals', builder: (c, s) => const ApprovalsScreen()),
+          GoRoute(path: '/follow-ups', builder: (c, s) => const FollowUpsScreen()),
+          GoRoute(path: '/waiting', builder: (c, s) => const WaitingScreen()),
           ...generatedRoutes,
         ],
       ),
@@ -58,6 +74,8 @@ class _AppState extends State<App> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.session.api.net.stop();
     router.dispose();
     super.dispose();
   }

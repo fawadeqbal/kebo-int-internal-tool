@@ -10,6 +10,8 @@ import '../enums.g.dart';
 import '../models.g.dart';
 import '../repos.g.dart';
 import '../../custom/factory_overview.dart';
+import '../../custom/record_follow_ups.dart';
+import '../../custom/record_notes.dart';
 
 class FactoryScreen extends StatelessWidget {
   const FactoryScreen({super.key, required this.id});
@@ -20,6 +22,10 @@ class FactoryScreen extends StatelessWidget {
     load: (api) => FactoryRepo(api).get(id),
     title: (x) => x.name,
     sub: (x) => [x.contactPerson, x.owner?.name],
+    more: [
+      RecordAction(label: 'Note after a call', perm: 'sourcing.manage', run: addNote),
+      RecordAction(label: 'New follow-up', perm: null, run: addFollowUp),
+    ],
     sections: (x) => [
       CustomSection('Overview', FactoryOverview(x, title: 'Overview')),
       ListSection('Open orders', [
@@ -39,6 +45,8 @@ class FactoryScreen extends StatelessWidget {
           ),
       ], empty: 'No offers yet'),
       KvSection('Details', [('Address', x.address), ('Bank details', x.bankDetails), ('Notes', x.notes)]),
+      CustomSection('Notes', RecordNotes(x, title: 'Notes')),
+      CustomSection('Follow-ups', RecordFollowUps(x, title: 'Follow-ups')),
       CustomSection('Changes', HistorySection(type: 'factory', id: x.id, title: 'Changes')),
     ],
   );

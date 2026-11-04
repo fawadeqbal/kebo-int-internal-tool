@@ -10,7 +10,7 @@ import '../support/harness.dart';
 
 final _now = DateTime.now().toUtc().toIso8601String();
 
-final _server = <String, Object?>{
+final homeServer = <String, Object?>{
   '/api/reminders': {
     'items': [
       {'key': 'a', 'kind': 'money', 'level': 'bad', 'title': 'SO-2026-0043: Get the balance (USD 33,140.01)', 'detail': 'Harbour Pharma · 58 days late', 'href': '/orders/5e258e2e-7869-4225-a99e-4ad5cf0afc68'},
@@ -45,7 +45,7 @@ final _server = <String, Object?>{
 
 void main() {
   testWidgets('Home shows what needs me and this month, and passes the accessibility checks', (tester) async {
-    await pumpScreen(tester, const HomeScreen(), _server);
+    await pumpScreen(tester, const HomeScreen(), homeServer);
     expect(find.textContaining('Good '), findsOneWidget);
     expect(find.textContaining('2 things need you'), findsOneWidget);
     expect(find.text('SO-2026-0043: Get the balance (USD 33,140.01)'), findsOneWidget);
@@ -55,7 +55,7 @@ void main() {
   });
 
   testWidgets('Alerts are grouped by day, unread first in bold, and pass the accessibility checks', (tester) async {
-    await pumpScreen(tester, const AlertsScreen(), _server);
+    await pumpScreen(tester, const AlertsScreen(), homeServer);
     expect(find.text('TODAY'), findsOneWidget);
     expect(find.text('Balance late'), findsOneWidget);
     expect(find.text('Unread 1'), findsOneWidget);
@@ -64,7 +64,7 @@ void main() {
   });
 
   testWidgets('Search finds orders and customers, grouped, and passes the accessibility checks', (tester) async {
-    await pumpScreen(tester, const SearchScreen(), _server);
+    await pumpScreen(tester, const SearchScreen(), homeServer);
     await tester.enterText(find.byType(TextField), 'lahore');
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();

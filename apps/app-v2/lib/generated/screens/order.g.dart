@@ -16,6 +16,8 @@ import '../../custom/order_flow.dart';
 import '../../custom/order_lines.dart';
 import '../../custom/order_money_section.dart';
 import '../../custom/order_papers.dart';
+import '../../custom/record_follow_ups.dart';
+import '../../custom/record_notes.dart';
 
 class OrderScreen extends StatelessWidget {
   const OrderScreen({super.key, required this.id});
@@ -28,6 +30,8 @@ class OrderScreen extends StatelessWidget {
     sub: (x) => [x.customer?.name, x.inquiry?.assignee?.name, fmtMoney(x.total, x.currency)],
     badges: (x) => [OrderStageEnum.badge(x.stage)],
     more: [
+      RecordAction(label: 'Note after a call', perm: 'orders.update', run: addNote),
+      RecordAction(label: 'New follow-up', perm: null, run: addFollowUp),
       RecordAction(
         label: 'Factory visit',
         perm: 'orders.update',
@@ -59,6 +63,8 @@ class OrderScreen extends StatelessWidget {
         ('Shipped', fmtDate(x.shippedOn)),
         ('Bill of lading', x.blNo),
       ]),
+      CustomSection('Notes', RecordNotes(x, title: 'Notes')),
+      CustomSection('Follow-ups', RecordFollowUps(x, title: 'Follow-ups')),
       CustomSection('Changes', HistorySection(type: 'order', id: x.id, title: 'Changes')),
     ],
   );

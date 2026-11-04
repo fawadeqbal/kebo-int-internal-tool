@@ -2,10 +2,12 @@ import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
 import '../core/json.dart';
+import '../core/outbox.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
 import '../generated/models.g.dart';
 import 'money.dart' show canAddExpense, openExpense;
+import 'waiting.dart';
 
 String _today() => isoDay(DateTime.now())!;
 
@@ -38,11 +40,14 @@ Future<bool> openFactoryVisit(BuildContext context, Order order) async {
   final first = factories.keys.firstOrNull;
   final fatDone = fat?.boolean('done') ?? false;
   PickedFile? photo;
+  Sent? sent;
+  final box = context.outbox;
 
   final ok = await FormSheet.open(
     context,
     title: 'Factory visit',
     save: 'Save the visit',
+    keeps: true,
     intro: joinParts([order.refNo, order.customer?.name, if (fatDone) 'FAT already recorded']),
     initial: {'factoryId': first, 'readyOn': readyOf(first), 'result': null, 'note': fat?.strOrNull('note') ?? ''},
     groups: [
@@ -79,35 +84,43 @@ Future<bool> openFactoryVisit(BuildContext context, Order order) async {
       ],
     ]),
     send: (api, body) async {
+      // One chain: sent now, or kept on the phone with no signal and sent in this order later.
       final factoryId = body['factoryId'] as String? ?? first;
+      final ch = box.chain(joinParts(['Factory visit', order.refNo, factories[factoryId]]));
       // The ready date first: it may ask why it moved (the form asks and sends again).
-      if (factoryId != null && body['readyOn'] != null && body['readyOn'] != readyOf(factoryId)) {
-        await api.patch('/api/orders/${order.id}/details', {
-          'readyBy': [
-            {'factoryId': factoryId, 'readyOn': body['readyOn']},
-          ],
-          if (body['reason'] != null) 'reason': body['reason'],
-        });
+      final was = readyOf(factoryId);
+      if (factoryId != null && body['readyOn'] != null && body['readyOn'] != was) {
+        ch.patch(
+          '/api/orders/${order.id}/details',
+          {
+            'readyBy': [
+              {'factoryId': factoryId, 'readyOn': body['readyOn']},
+            ],
+            if (body['reason'] != null) 'reason': body['reason'],
+          },
+          // Sent later: first check nobody moved it meanwhile ("Changed by someone else").
+          guard: {'get': '/api/orders/${order.id}/flow', 'list': 'factory.readyBy', 'where': {'factoryId': factoryId}, 'field': 'readyOn', 'was': was, 'yours': body['readyOn']},
+        );
       }
-      String? attachmentId;
+      OutStep? up;
       if (photo != null) {
-        final up = await api.upload('/api/orders/${order.id}/files',
-            bytes: photo!.bytes, fileName: photo!.name, fields: {'step': 'production', 'kind': 'photo', 'note': 'Factory visit ${factories[factoryId] ?? ''}'.trim()});
-        attachmentId = up.strOrNull('sourceId');
-        photo = null; // sent: not again if the form sends a second time
+        up = ch.upload('/api/orders/${order.id}/files', photo!.bytes, photo!.name,
+            fields: {'step': 'production', 'kind': 'photo', 'note': 'Factory visit ${factories[factoryId] ?? ''}'.trim()}, idAt: 'sourceId');
       }
       if (fat != null && !fatDone && body['result'] != null) {
-        await api.post('/api/checklist/${fat.str('id')}/tick', {
+        ch.post('/api/checklist/${fat.str('id')}/tick', {
           'data': {'date': _today(), 'result': body['result']},
-          'attachmentId': ?attachmentId,
+          if (up != null) 'attachmentId': Chain.ref(up),
         });
       }
       if (fat != null && '${body['note'] ?? ''}'.trim() != (fat.strOrNull('note') ?? '')) {
-        await api.patch('/api/checklist/${fat.str('id')}', {'note': '${body['note']}'.trim()});
+        ch.patch('/api/checklist/${fat.str('id')}', {'note': '${body['note']}'.trim()});
       }
+      sent = await ch.send();
+      photo = null; // sent or kept: not again if the form sends a second time
       return null;
     },
   );
-  if (ok && context.mounted) toast(context, 'Visit saved');
+  if (ok && context.mounted) savedToast(context, sent ?? const Sent(queued: false), 'Visit saved');
   return ok;
 }

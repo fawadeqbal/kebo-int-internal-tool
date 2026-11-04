@@ -7,6 +7,8 @@ import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart' hide Badge;
 import 'links.dart';
+import 'record_follow_ups.dart';
+import 'waiting.dart';
 
 const _level = {'bad': Tone.bad, 'warn': Tone.warn, 'info': Tone.info};
 
@@ -28,7 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (needs == null && error == null) _load();
   }
 
+  /// Bumped on each load, so the follow-ups card reads again on pull to refresh.
+  int _loads = 0;
+
   Future<void> _load() async {
+    _loads++;
     final api = context.api;
     try {
       final r = await Future.wait([
@@ -131,8 +137,17 @@ class _HomeScreenState extends State<HomeScreen> {
               else ...[
                 _needs(context),
                 const SizedBox(height: Gap.md),
+                TodayCard(key: ValueKey(_loads)),
+                const SizedBox(height: Gap.md),
                 _numbers(context),
               ],
+              // What was added with no signal and is not sent yet (shown only then).
+              ListenableBuilder(
+                listenable: Listenable.merge([s.outbox, s.api.net]),
+                builder: (context, _) => s.outbox.waiting == 0 && !s.api.net.offline
+                    ? const SizedBox.shrink()
+                    : const Padding(padding: EdgeInsets.only(top: Gap.md), child: SectionCard(title: 'On this phone', child: WaitingRow(divider: false))),
+              ),
             ],
           ),
         ),

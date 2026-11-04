@@ -277,7 +277,16 @@ void main() {
       '/api/history': <Object?>[],
     });
     expect(find.text('Customer name'), findsWidgets);
-    for (final t in <String>['Performance · all time', 'Contacts', 'Orders', 'Inquiries', 'Details', 'Changes']) {
+    for (final t in <String>[
+      'Performance · all time',
+      'Contacts',
+      'Orders',
+      'Inquiries',
+      'Details',
+      'Notes',
+      'Follow-ups',
+      'Changes',
+    ]) {
       final section = find.byKey(ValueKey('section:$t'));
       await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
       expect(section, findsOneWidget);
@@ -310,7 +319,7 @@ void main() {
       '/api/history': <Object?>[],
     });
     expect(find.text('Factory name'), findsWidgets);
-    for (final t in <String>['Overview', 'Open orders', 'Their offers', 'Details', 'Changes']) {
+    for (final t in <String>['Overview', 'Open orders', 'Their offers', 'Details', 'Notes', 'Follow-ups', 'Changes']) {
       final section = find.byKey(ValueKey('section:$t'));
       await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
       expect(section, findsOneWidget);
@@ -342,6 +351,7 @@ void main() {
       'Quotation',
       'Contacts',
       'Notes',
+      'Follow-ups',
       'Files',
       'Changes',
     ]) {
@@ -377,7 +387,17 @@ void main() {
       '/api/history': <Object?>[],
     });
     expect(find.text('Order number'), findsWidgets);
-    for (final t in <String>['Steps', 'Goods', 'Money', 'Papers', 'Files', 'Details', 'Changes']) {
+    for (final t in <String>[
+      'Steps',
+      'Goods',
+      'Money',
+      'Papers',
+      'Files',
+      'Details',
+      'Notes',
+      'Follow-ups',
+      'Changes',
+    ]) {
       final section = find.byKey(ValueKey('section:$t'));
       await tester.scrollUntilVisible(section, 200, scrollable: find.byType(Scrollable).first);
       expect(section, findsOneWidget);

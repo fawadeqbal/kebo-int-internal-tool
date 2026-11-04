@@ -4,10 +4,12 @@ import 'package:intl/intl.dart';
 import '../core/api.dart';
 import '../core/files.dart';
 import '../core/json.dart';
+import '../core/outbox.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
 import '../generated/enums.g.dart';
 import '../generated/models.g.dart';
+import 'waiting.dart';
 
 // Who may do what with money (the server checks the same).
 const permRecord = 'payments.record';
@@ -91,26 +93,26 @@ Future<Map<String, String>> paperNumbers(Api api, String orderId) async {
 
 // ---------------------------------------------------------------- send now or for approval
 
-/// Records it (people who may) or sends it to a manager; then the photo follows.
-/// Returns the server's reply, or null when it went for approval.
-Future<Json?> _recordOrSubmit(
-  Api api, {
+/// Records it (people who may) or sends it to a manager; then the photo follows. With no signal
+/// both wait on the phone and go in order later (the photo follows the new id).
+Future<Sent> _recordOrSubmit(
+  Outbox box, {
+  required String label,
   required bool direct,
   required String kind,
   required String? orderId,
   required String path,
+  required String idAt,
   required Json body,
   required PickedFile? file,
-  required String Function(Json reply) fileTo,
-}) async {
-  if (direct) {
-    final reply = await api.post(path, body);
-    if (file != null) await api.upload(fileTo(reply), bytes: file.bytes, fileName: file.name);
-    return reply;
-  }
-  final s = await api.post('/api/submissions', {'kind': kind, 'orderId': ?orderId, 'body': body});
-  if (file != null) await api.upload('/api/submissions/${s.str('id')}/file', bytes: file.bytes, fileName: file.name);
-  return null;
+  required String Function(String id) fileTo,
+}) {
+  final ch = box.chain(label);
+  final made = direct
+      ? ch.post(path, body, idAt: idAt)
+      : ch.post('/api/submissions', {'kind': kind, 'orderId': ?orderId, 'body': body}, idAt: 'id');
+  if (file != null) ch.upload(direct ? fileTo(Chain.ref(made)) : '/api/submissions/${Chain.ref(made)}/file', file.bytes, file.name);
+  return ch.send();
 }
 
 const _approvalNote = 'You add it; a manager approves it. It counts once approved.';
@@ -146,7 +148,8 @@ Future<bool> openMoneyReceived(
   final settingsRate = <String, double?>{};
   final isLc = money.at('route.route') == 'letter_of_credit';
   PickedFile? slip;
-  Json? reply;
+  Sent? sent;
+  final box = context.outbox;
 
   final fields = <FieldDef>[
     FieldDef(
@@ -192,6 +195,7 @@ Future<bool> openMoneyReceived(
     context,
     title: 'Money received',
     save: direct ? 'Record · a receipt is made' : 'Send for approval',
+    keeps: true,
     intro: joinParts([
       refNo,
       customer,
@@ -255,21 +259,27 @@ Future<bool> openMoneyReceived(
       for (final k in ['bankCharges', 'reference', 'paidByName', 'note', 'accountId']) {
         if ('${b[k] ?? ''}'.isEmpty) b.remove(k);
       }
-      reply = await _recordOrSubmit(
-        api,
+      sent = await _recordOrSubmit(
+        box,
+        label: joinParts(['Money received', refNo, fmtMoney('${b['receivedAmount']}', '${b['receivedCurrency']}')]),
         direct: direct,
         kind: 'payment',
         orderId: orderId,
         path: '/api/orders/$orderId/payments',
+        idAt: 'createdId',
         body: b,
         file: slip,
-        fileTo: (r) => '/api/payments/${r.str('createdId')}/file',
+        fileTo: (id) => '/api/payments/$id/file',
       );
-      return reply;
+      return sent!.first;
     },
   );
   if (!ok || !context.mounted) return ok;
-  final r = reply;
+  if (sent!.queued) {
+    savedToast(context, sent!, '');
+    return true;
+  }
+  final r = direct ? sent!.first : null;
   if (r == null) {
     toast(context, 'Sent for approval · a manager is told');
     return true;
@@ -344,12 +354,14 @@ Future<bool> openExpense(
   if (!context.mounted) return false;
   final factoryNames = {for (final f in factories) f.at('factory.id')!: f.at('factory.name')!};
   PickedFile? receipt;
-  Json? reply;
+  Sent? sent;
+  final box = context.outbox;
 
   final ok = await FormSheet.open(
     context,
     title: 'Expense',
     save: direct ? 'Save the expense' : 'Send for approval',
+    keeps: true,
     intro: joinParts([
       if (orderId == null) 'For the company (no order)' else refNo,
       customer,
@@ -436,20 +448,22 @@ Future<bool> openExpense(
       for (final k in ['reference', 'note', 'accountId']) {
         if ('${b[k] ?? ''}'.isEmpty) b.remove(k);
       }
-      reply = await _recordOrSubmit(
-        api,
+      sent = await _recordOrSubmit(
+        box,
+        label: joinParts(['Expense', refNo, fmtMoney('${b['amount']}', '${b['currency']}')]),
         direct: direct,
         kind: 'expense',
         orderId: orderId,
         path: '/api/expenses',
+        idAt: 'id',
         body: b,
         file: receipt,
-        fileTo: (r) => '/api/expenses/${r.str('id')}/receipt',
+        fileTo: (id) => '/api/expenses/$id/receipt',
       );
-      return reply;
+      return sent!.first;
     },
   );
-  if (ok && context.mounted) toast(context, reply == null ? 'Sent for approval · a manager is told' : 'Expense saved');
+  if (ok && context.mounted) savedToast(context, sent!, direct ? 'Expense saved' : 'Sent for approval · a manager is told');
   return ok;
 }
 
@@ -474,11 +488,14 @@ Future<bool> openFactoryPayment(
   String kindOf(Json p) => (p.at('next.label') ?? '').toLowerCase().startsWith('balance') ? 'balance' : 'deposit';
   String openOf(Json p) => p.at('next.open') ?? p.str('toPay');
   PickedFile? slip;
+  Sent? sent;
+  final box = context.outbox;
 
   final ok = await FormSheet.open(
     context,
     title: 'Paid the factory',
     save: 'Record the payment',
+    keeps: true,
     intro: joinParts([refNo, 'what we owe goes down; the plan follows']),
     initial: {
       'factoryId': plan.at('factory.id'),
@@ -549,14 +566,14 @@ Future<bool> openFactoryPayment(
       for (final k in ['reference', 'note', 'accountId', 'rate']) {
         if ('${b[k] ?? ''}'.isEmpty) b.remove(k);
       }
-      final r = await api.post('/api/orders/$orderId/factory-payments', b);
-      if (slip != null) {
-        await api.upload('/api/factory-payments/${r.str('createdId')}/file', bytes: slip!.bytes, fileName: slip!.name);
-      }
-      return r;
+      final ch = box.chain(joinParts(['Paid the factory', refNo, fmtMoney('${b['amount']}', '${b['currency']}')]));
+      final made = ch.post('/api/orders/$orderId/factory-payments', b, idAt: 'createdId');
+      if (slip != null) ch.upload('/api/factory-payments/${Chain.ref(made)}/file', slip!.bytes, slip!.name);
+      sent = await ch.send();
+      return sent!.first;
     },
   );
-  if (ok && context.mounted) toast(context, 'Payment to the factory recorded');
+  if (ok && context.mounted) savedToast(context, sent!, 'Payment to the factory recorded');
   return ok;
 }
 
@@ -1017,6 +1034,7 @@ class _ApprovalSheetState extends State<_ApprovalSheet> {
   Json get s => widget.s;
 
   Future<void> _approve() async {
+    if (!needsConnection(context)) return;
     setState(() {
       busy = true;
       problem = null;
@@ -1037,6 +1055,7 @@ class _ApprovalSheetState extends State<_ApprovalSheet> {
   }
 
   Future<void> _sendBack() async {
+    if (!needsConnection(context)) return;
     final why = await askText(
       context,
       title: 'Send it back',

@@ -47,12 +47,15 @@ sections:
     row: { title: name, sub: [position, phone, email] }
     actions: [phone, whatsapp, email]
     empty: No contacts
-  - { title: Notes, custom: InquiryNotes }
+  - { title: Notes, custom: RecordNotes }             # calls, visits and notes (GET /inquiries/:id/notes)
+  - { title: Follow-ups, custom: RecordFollowUps }
   - { title: Files, custom: InquiryFiles }
   - title: Changes
     list: stageChanges
     row: { title: toStage, sub: [changedAt, note] }
 more:
+  - { label: Note after a call, run: record_notes.addNote }
+  - { label: New follow-up, run: record_follow_ups.addFollowUp }
   - label: Edit
     sheet: InquiryForm
     perm: inquiries.create

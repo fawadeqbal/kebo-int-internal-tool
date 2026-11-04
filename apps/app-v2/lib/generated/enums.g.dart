@@ -372,6 +372,39 @@ abstract final class ClaimStatusEnum {
   static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
 }
 
+abstract final class NoteKindEnum {
+  static const values = <String>['call', 'visit', 'whatsapp', 'email', 'note'];
+  static const labels = <String, String>{
+    'call': 'Call',
+    'visit': 'Visit',
+    'whatsapp': 'WhatsApp',
+    'email': 'Email',
+    'note': 'Note',
+  };
+  static const tones = <String, Tone>{
+    'call': Tone.neutral,
+    'visit': Tone.neutral,
+    'whatsapp': Tone.neutral,
+    'email': Tone.neutral,
+    'note': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
+abstract final class FollowUpKindEnum {
+  static const values = <String>['call', 'visit', 'meeting', 'other'];
+  static const labels = <String, String>{'call': 'Call', 'visit': 'Visit', 'meeting': 'Meeting', 'other': 'Other'};
+  static const tones = <String, Tone>{
+    'call': Tone.neutral,
+    'visit': Tone.neutral,
+    'meeting': Tone.neutral,
+    'other': Tone.neutral,
+  };
+  static String? label(String? v) => v == null ? null : labels[v] ?? v;
+  static Badge? badge(String? v) => v == null ? null : Badge(labels[v] ?? v, tones[v] ?? Tone.neutral);
+}
+
 abstract final class OrderStageEnum {
   static const values = <String>['confirmed', 'in_production', 'shipped', 'done'];
   static const labels = <String, String>{
