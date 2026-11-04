@@ -4,6 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api.dart';
 import 'files.dart';
 import 'json.dart';
+import 'keep.dart';
+import 'outbox.dart';
 
 enum SessionStatus { starting, signedOut, needsCode, signedIn }
 
@@ -27,9 +29,17 @@ class Me {
 
 /// Sign-in state for the whole app. Screens read it through `context.session`.
 class Session extends ChangeNotifier {
-  Session(this.api, {FlutterSecureStorage? storage}) : _storage = storage ?? const FlutterSecureStorage() {
+  /// [kept] and [waiting]: where answers and unsent writes live (folders on the phone; memory in tests).
+  Session(this.api, {FlutterSecureStorage? storage, KeepStore? kept, KeepStore? waiting})
+      : _storage = storage ?? const FlutterSecureStorage(),
+        outbox = Outbox(api, waiting ?? KeepStore.folder('waiting')) {
     api.onSignedOut = _expired;
+    api.cache = ReadCache(kept ?? KeepStore.folder('kept'));
+    api.net.onBack = _back;
   }
+
+  /// Writes made with no signal, sent when the server is back.
+  final Outbox outbox;
 
   final Api api;
   final FlutterSecureStorage _storage;
@@ -59,7 +69,7 @@ class Session extends ChangeNotifier {
     if (api.token == null) return _set(SessionStatus.signedOut);
     try {
       me = Me.fromJson(await api.get('/api/auth/me'));
-      _set(SessionStatus.signedIn);
+      _signedIn();
     } on ApiException catch (e) {
       if (e.unauthorized) api.token = null;
       notice = e.unauthorized ? null : e.message;
@@ -102,6 +112,8 @@ class Session extends ChangeNotifier {
     } on ApiException {
       // Signed out on this phone either way.
     }
+    // On purpose: nothing of theirs stays on the phone.
+    await outbox.clear();
     await _clear();
   }
 
@@ -109,7 +121,55 @@ class Session extends ChangeNotifier {
     me = Me.fromJson(await api.get('/api/auth/me'));
     await _write(_tokenKey, api.token!);
     notice = null;
+    _signedIn();
+  }
+
+  void _signedIn() {
+    outbox.owner = me!.id;
     _set(SessionStatus.signedIn);
+    // What waits from last time goes now; the day's work is kept for when there is no signal.
+    outbox.flush().ignore();
+    precache().ignore();
+  }
+
+  void _back() {
+    if (status != SessionStatus.signedIn) return;
+    outbox.flush().ignore();
+    precache().ignore();
+  }
+
+  DateTime? _precached;
+
+  /// Reads (and so keeps) what is needed out of signal: my open orders with their steps, my open
+  /// inquiries, and the lists the forms choose from. At most every ten minutes.
+  Future<void> precache({bool force = false}) async {
+    final last = _precached;
+    if (!force && last != null && DateTime.now().difference(last) < const Duration(minutes: 10)) return;
+    _precached = DateTime.now();
+    Future<void> read(String path, [Map<String, Object?>? q]) async {
+      try {
+        await api.get(path, query: q);
+      } on ApiException {
+        // best effort: what fails is read again next time
+      }
+    }
+
+    try {
+      for (final p in ['/api/auth/me', '/api/reminders', '/api/me/todo', '/api/settings', '/api/users/people', '/api/customers/names']) {
+        await read(p);
+      }
+      if (can('payments.record')) await read('/api/money/accounts');
+      await read('/api/inquiries', {'stage': 'open', 'assignee': 'me'});
+      final orders = await api.getList('/api/orders/page', query: {'status': 'open', 'mine': 'true'});
+      for (final o in orders.take(30)) {
+        final id = o.str('id');
+        for (final p in ['', '/steps', '/flow', '/money', '/payments', '/papers', '/files']) {
+          await read('/api/orders/$id$p');
+        }
+      }
+    } on ApiException {
+      // no signal: next time
+    }
   }
 
   void _expired() {
@@ -118,6 +178,8 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> _clear() async {
+    await api.cache?.clear().catchError((_) {});
+    _precached = null;
     api.token = null;
     me = null;
     await _storage.delete(key: _tokenKey).catchError((_) {});

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../ds/ds.dart';
 import '../generated/routes.g.dart';
 import 'quick_add.dart';
+import 'waiting.dart';
 
 /// The bottom bar around every signed-in screen, with + in the middle for quick add.
 class Shell extends StatelessWidget {
@@ -29,7 +30,7 @@ class Shell extends StatelessWidget {
     final c = context.colors;
     final tab = _tab;
     return Scaffold(
-      body: child,
+      body: OfflineBanner(child: child),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab < _plus ? tab : tab + 1,
         onDestinationSelected: (i) {

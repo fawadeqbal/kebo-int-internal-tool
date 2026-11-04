@@ -5,8 +5,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../core/api.dart';
 import '../core/files.dart';
+import '../core/outbox.dart';
 import '../core/scope.dart';
 import 'fields.dart';
+import 'format.dart';
 import 'theme.dart';
 import 'tone.dart';
 import 'widgets.dart';
@@ -48,11 +50,12 @@ Future<PickedFile?> pickFile(BuildContext context) async {
 }
 
 /// Picks a file, asks the [fields] (e.g. which step, what it is, a note), sends it to
-/// [endpoint] with a progress bar. True when uploaded.
+/// [endpoint] with a progress bar. True when uploaded; with no signal it is kept on the phone
+/// (and said so), sent later, and this answers false.
 Future<bool> pickAndUpload(BuildContext context, {required String endpoint, required String title, List<FieldDef> fields = const [], Map<String, String> initial = const {}}) async {
   final picked = await pickFile(context);
   if (picked == null || !context.mounted) return false;
-  final done = await showModalBottomSheet<bool>(
+  final done = await showModalBottomSheet<Object>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -60,7 +63,10 @@ Future<bool> pickAndUpload(BuildContext context, {required String endpoint, requ
     isDismissible: false,
     builder: (_) => _UploadSheet(picked: picked, endpoint: endpoint, title: title, fields: fields, initial: initial),
   );
-  return done ?? false;
+  if (done is Sent && context.mounted) {
+    toast(context, 'Saved on the phone · ${count(done.waiting, '1 thing', '{} things')} will send when online');
+  }
+  return done == true;
 }
 
 class _UploadSheet extends StatefulWidget {
@@ -79,7 +85,16 @@ class _UploadSheetState extends State<_UploadSheet> {
   double? progress;
   String? problem;
 
+  /// No signal: the file waits on the phone and goes when the server is back.
+  Future<void> _keep() async {
+    final sent = await (context.outbox.chain('${widget.title} · ${widget.picked.name}')
+          ..upload(widget.endpoint, widget.picked.bytes, widget.picked.name, fields: {for (final e in values.entries) e.key: e.value?.toString()}))
+        .send();
+    if (mounted) Navigator.pop(context, sent.queued ? sent : true);
+  }
+
   Future<void> _send() async {
+    if (context.net.offline) return _keep();
     setState(() {
       progress = 0;
       problem = null;
@@ -96,6 +111,7 @@ class _UploadSheetState extends State<_UploadSheet> {
       );
       if (mounted) Navigator.pop(context, true);
     } on ApiException catch (e) {
+      if (e.offline && mounted) return _keep();
       if (mounted) {
         setState(() {
           progress = null;
@@ -142,7 +158,7 @@ class _UploadSheetState extends State<_UploadSheet> {
           Row(children: [
             Expanded(child: OutlinedButton(onPressed: busy ? null : () => Navigator.pop(context, false), child: const Text('Cancel'))),
             const SizedBox(width: Gap.md),
-            Expanded(child: FilledButton(onPressed: busy ? null : _send, child: const Text('Upload'))),
+            Expanded(child: FilledButton(onPressed: busy ? null : _send, child: Text(context.net.offline ? 'Save · sends when online' : 'Upload'))),
           ]),
         ]),
       ),

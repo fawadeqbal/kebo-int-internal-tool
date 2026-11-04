@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
 import '../core/json.dart';
+import '../core/outbox.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
 import '../generated/models.g.dart';
@@ -9,6 +10,7 @@ import '../generated/ticks.g.dart';
 import 'delivery.dart';
 import 'links.dart';
 import 'money.dart';
+import 'waiting.dart';
 import 'order_lines.dart';
 
 const _stepTone = {'done': Tone.ok, 'late': Tone.bad, 'now': Tone.info};
@@ -328,7 +330,7 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
   if (key == null && id != null) {
     final tool = item.strOrNull('tool') ?? 'done';
     if (tool == 'done') {
-      return _post(context, '/api/checklist/$id/tick', {'data': <String, String>{}}, 'Ticked · $title');
+      return _post(context, '/api/checklist/$id/tick', {'data': <String, String>{}}, 'Ticked · $title', label: '$title · ${order.refNo}');
     }
     if (tool == 'fill') {
       final fields = [
@@ -337,28 +339,36 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
             FieldDef(f.str('key'), f.str('label'), f.str('type') == 'date' ? FieldKind.date : f.str('type') == 'number' ? FieldKind.decimal : FieldKind.text,
                 required: true, max: 500),
       ];
+      Sent? sent;
       final ok = await FormSheet.open(
         context,
         title: title,
         save: 'Tick it',
+    keeps: true,
         intro: order.refNo,
         initial: {
           for (final f in item.list('fields', (m) => m))
             f.str('key'): (item['values'] as Map?)?[f.str('key')] ?? (f.str('type') == 'date' ? _today() : null),
         },
         groups: [FormGroup(fields: fields)],
-        send: (api, body) => api.post('/api/checklist/$id/tick', {'data': {for (final e in body.entries) if (e.value != null) e.key: '${e.value}'}}),
+        send: (api, body) async {
+          final ch = context.outbox.chain('$title · ${order.refNo}')
+            ..post('/api/checklist/$id/tick', {'data': {for (final e in body.entries) if (e.value != null) e.key: '${e.value}'}});
+          sent = await ch.send();
+          return sent!.first;
+        },
       );
-      return ok ? 'Ticked · $title' : null;
+      return ok ? savedMessage(sent!, 'Ticked · $title') : null;
     }
     if (tool == 'upload') {
       final picked = await pickFile(context);
       if (picked == null || !context.mounted) return null;
       try {
-        final up = await context.api.upload('/api/orders/${order.id}/files',
-            bytes: picked.bytes, fileName: picked.name, fields: {'step': item.str('step'), 'attachTo': 'checklist:$id'});
-        if (!context.mounted) return null;
-        return await _post(context, '/api/checklist/$id/tick', {'data': <String, String>{}, 'attachmentId': up.str('sourceId')}, 'Ticked · $title');
+        // The file, then the tick with its id: sent now, or kept and sent in order later.
+        final ch = context.outbox.chain('$title · ${order.refNo}');
+        final up = ch.upload('/api/orders/${order.id}/files', picked.bytes, picked.name, fields: {'step': item.str('step'), 'attachTo': 'checklist:$id'}, idAt: 'sourceId');
+        ch.post('/api/checklist/$id/tick', {'data': <String, String>{}, 'attachmentId': Chain.ref(up)});
+        return savedMessage(await ch.send(), 'Ticked · $title');
       } on ApiException catch (e) {
         if (context.mounted) toast(context, e.message);
         return null;
@@ -383,11 +393,13 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
   String fill(String s) => s.replaceAll('{order}', order.id).replaceAll('{kind}', kind ?? '').replaceAll('{step}', bank ?? '');
   final send = {for (final e in form.send.entries) e.key: e.value is String ? fill(e.value as String) : e.value};
   PickedFile? pages;
+  Sent? sent;
 
   final ok = await FormSheet.open(
     context,
     title: title,
     save: 'Tick it',
+    keeps: true,
     intro: joinParts([order.refNo, form.hint]),
     initial: initial,
     groups: [
@@ -402,13 +414,12 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
               onPicked: (p) => setState(() => pages = p)),
     send: (api, body) async {
       final answers = {...send, ...body};
+      final ch = context.outbox.chain('$title · ${order.refNo}');
       // The file goes up first: its id may be part of the answer.
       if (pages != null) {
-        final up = await api.upload('/api/orders/${order.id}/files',
-            bytes: pages!.bytes,
-            fileName: pages!.name,
-            fields: {'step': form.file!.step, 'kind': form.file!.kind, if (form.file!.asField == null) 'attachTo': 'checklist:$key'});
-        if (form.file!.asField != null) answers[form.file!.asField!] = up.str('sourceId');
+        final up = ch.upload('/api/orders/${order.id}/files', pages!.bytes, pages!.name,
+            fields: {'step': form.file!.step, 'kind': form.file!.kind, if (form.file!.asField == null) 'attachTo': 'checklist:$key'}, idAt: 'sourceId');
+        if (form.file!.asField != null) answers[form.file!.asField!] = Chain.ref(up);
       }
       var path = fill(form.path);
       var method = form.method;
@@ -424,16 +435,23 @@ Future<String?> tickItem(BuildContext context, Order order, Json item,
       }
       if (key == 'ready_date') {
         // One date for every factory of the order.
-        return api.patch(path, {'readyOn': answers['readyOn']});
+        ch.patch(path, {'readyOn': answers['readyOn']});
+      } else {
+        switch (method) {
+          case 'PUT':
+            ch.put(path, answers);
+          case 'PATCH':
+            ch.patch(path, answers);
+          default:
+            ch.post(path, answers);
+        }
       }
-      return switch (method) {
-        'PUT' => api.put(path, answers),
-        'PATCH' => api.patch(path, answers),
-        _ => api.post(path, answers),
-      };
+      sent = await ch.send();
+      pages = null;
+      return sent!.first;
     },
   );
-  return ok ? 'Ticked · $title' : null;
+  return ok ? savedMessage(sent!, 'Ticked · $title') : null;
 }
 
 Object? _first(List<String> sources, Map<String, Json> from) {
@@ -448,10 +466,9 @@ Object? _first(List<String> sources, Map<String, Json> from) {
 
 String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
-Future<String?> _post(BuildContext context, String path, Json body, String done) async {
+Future<String?> _post(BuildContext context, String path, Json body, String done, {String? label}) async {
   try {
-    await context.api.post(path, body);
-    return done;
+    return savedMessage(await (context.outbox.chain(label ?? done)..post(path, body)).send(), done);
   } on ApiException catch (e) {
     if (context.mounted) toast(context, e.message);
     return null;

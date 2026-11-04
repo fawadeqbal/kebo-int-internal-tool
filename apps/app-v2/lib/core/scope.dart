@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import 'api.dart';
 import 'files.dart';
+import 'outbox.dart';
 import 'session.dart';
 
 /// Gives every screen the API and the session: `context.api`, `context.session`.
@@ -19,6 +20,12 @@ extension ScopeContext on BuildContext {
   Session get session => AppScope.of(this);
   Api get api => AppScope.of(this).api;
   FileStore get files => AppScope.of(this).files;
+
+  /// Writes waiting to send (no signal).
+  Outbox get outbox => AppScope.of(this).outbox;
+
+  /// Online or not.
+  NetState get net => AppScope.of(this).api.net;
 
   /// Whether the signed-in person may [perm]; null means everyone may.
   bool can(String? perm) => AppScope.of(this).can(perm);

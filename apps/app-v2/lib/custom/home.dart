@@ -7,6 +7,7 @@ import '../core/json.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart' hide Badge;
 import 'links.dart';
+import 'waiting.dart';
 
 const _level = {'bad': Tone.bad, 'warn': Tone.warn, 'info': Tone.info};
 
@@ -133,6 +134,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: Gap.md),
                 _numbers(context),
               ],
+              // What was added with no signal and is not sent yet (shown only then).
+              ListenableBuilder(
+                listenable: Listenable.merge([s.outbox, s.api.net]),
+                builder: (context, _) => s.outbox.waiting == 0 && !s.api.net.offline
+                    ? const SizedBox.shrink()
+                    : const Padding(padding: EdgeInsets.only(top: Gap.md), child: SectionCard(title: 'On this phone', child: WaitingRow(divider: false))),
+              ),
             ],
           ),
         ),

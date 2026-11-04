@@ -2,11 +2,13 @@ import 'package:flutter/material.dart' hide Badge;
 
 import '../core/api.dart';
 import '../core/json.dart';
+import '../core/outbox.dart';
 import '../core/scope.dart';
 import '../ds/ds.dart';
 import '../generated/enums.g.dart';
 import '../generated/models.g.dart';
 import 'order_lines.dart';
+import 'waiting.dart';
 
 const permDelivery = 'delivery.manage';
 
@@ -78,16 +80,18 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         context,
         title: 'Everything arrived in good condition',
         save: 'Confirm delivery',
+    keeps: true,
         intro: 'Every line is marked delivered in full and in good condition.',
         initial: {'deliveredOn': _today()},
         groups: const [FormGroup(fields: [FieldDef('deliveredOn', 'Delivered on', FieldKind.date, required: true)])],
-        send: (api, body) => api.post('/api/orders/${o.id}/delivery/all-good', body),
+        send: (api, body) => sendOrKeep(context, 'Delivered in full · ${o.refNo}', 'POST', '/api/orders/${o.id}/delivery/all-good', body),
       );
 
   Future<bool> _details() => FormSheet.open(
         context,
         title: 'Delivered',
         save: 'Save',
+    keeps: true,
         initial: {'deliveredOn': d?.strOrNull('deliveredOn') ?? _today(), 'deliveryReceivedBy': d?.strOrNull('receivedBy') ?? '', 'deliveryNote': d?.strOrNull('note') ?? ''},
         groups: const [
           FormGroup(fields: [
@@ -96,13 +100,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             FieldDef('deliveryNote', 'Note', FieldKind.multiline, max: 2000),
           ]),
         ],
-        send: (api, body) => api.patch('/api/orders/${o.id}/delivery', body),
+        send: (api, body) => sendOrKeep(context, 'Delivery details · ${o.refNo}', 'PATCH', '/api/orders/${o.id}/delivery', body),
       );
 
   Future<bool> _satDetails() => FormSheet.open(
         context,
         title: 'SAT',
         save: 'Save',
+    keeps: true,
         initial: {
           'satPlannedOn': d?.strOrNull('satPlannedOn'),
           'satEngineerId': d?.at('satEngineer.id'),
@@ -117,7 +122,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             FieldDef('satSignedBy', 'Signed by (the customer)', FieldKind.text, max: 120),
           ]),
         ],
-        send: (api, body) => api.patch('/api/orders/${o.id}/delivery', body),
+        send: (api, body) => sendOrKeep(context, 'SAT details · ${o.refNo}', 'PATCH', '/api/orders/${o.id}/delivery', body),
       );
 
   Future<bool> _satChecks() {
@@ -129,6 +134,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
       context,
       title: 'SAT checks',
       save: 'Save the checks',
+    keeps: true,
       intro: 'What is checked at the customer\'s site, and how it went.',
       initial: {'checks': seed},
       groups: [
@@ -144,7 +150,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
               blank: () => {'item': '', 'result': 'pending', 'note': ''}),
         ),
       ],
-      send: (api, body) => api.put('/api/orders/${o.id}/sat', {
+      send: (api, body) => sendOrKeep(context, 'SAT checks · ${o.refNo}', 'PUT', '/api/orders/${o.id}/sat', {
         'checks': [
           for (final c in (body['checks'] as List<dynamic>).cast<Json>())
             {if ('${c['id'] ?? ''}'.isNotEmpty) 'id': c['id'], 'item': '${c['item']}'.trim(), 'result': c['result'] ?? 'pending', if ('${c['note'] ?? ''}'.trim().isNotEmpty) 'note': '${c['note']}'.trim()},
@@ -157,6 +163,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
         context,
         title: 'SAT passed',
         save: 'Every check passed',
+    keeps: true,
         intro: 'Every open check is marked passed and the SAT is signed off.',
         initial: {'satDoneOn': _today(), 'satSignedBy': d?.strOrNull('satSignedBy') ?? ''},
         groups: const [
@@ -165,7 +172,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             FieldDef('satSignedBy', 'Signed by (the customer)', FieldKind.text, max: 120),
           ]),
         ],
-        send: (api, body) => api.post('/api/orders/${o.id}/sat/all-passed', body),
+        send: (api, body) => sendOrKeep(context, 'SAT passed · ${o.refNo}', 'POST', '/api/orders/${o.id}/sat/all-passed', body),
       );
 
   Future<bool> _claim({String? title}) => openClaim(context, orderId: o.id, title: title);
@@ -362,12 +369,14 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
 /// something is wrong. Saved at once; answers the line's new values (null when closed).
 Future<Json?> openDeliveredLine(BuildContext context, {required String orderId, required LineRow row, required Json value}) async {
   PickedFile? photo;
+  Sent? sent;
   Json? answer;
   final what = '${row.no} · ${row.title}';
   final ok = await FormSheet.open(
     context,
     title: 'Line $what',
     save: 'Save the line',
+    keeps: true,
     intro: joinParts(['ordered ${row.sub ?? ''}'.trim()]),
     initial: {
       'deliveredQty': _fmt(_n(value['deliveredQty'])) == '0' || _fmt(_n(value['deliveredQty'])).isEmpty ? _fmt(_n(value['quantity'])) : _fmt(_n(value['deliveredQty'])),
@@ -397,19 +406,24 @@ Future<Json?> openDeliveredLine(BuildContext context, {required String orderId, 
     send: (api, body) async {
       final cond = body['condition'] as String?;
       final line = {'set': 'delivered', 'deliveredQty': _n(body['deliveredQty']) ?? 0, 'condition': cond, 'note': '${body['note'] ?? ''}'.trim()};
-      final r = await api.patch('/api/order-lines/${row.key}', line);
+      // The line, its photo and the claim: sent now, or kept on the phone and sent in order later.
+      final ch = context.outbox.chain('Delivery line ${row.no} · ${LineConditionEnum.label(cond) ?? ''}'.trim());
+      ch.patch('/api/order-lines/${row.key}', line);
       if (photo != null) {
-        await api.upload('/api/orders/$orderId/files', bytes: photo!.bytes, fileName: photo!.name, fields: {'step': 'delivery', 'kind': 'photo', 'note': 'Line ${row.no}'});
+        ch.upload('/api/orders/$orderId/files', photo!.bytes, photo!.name, fields: {'step': 'delivery', 'kind': 'photo', 'note': 'Line ${row.no}'});
       }
       if (body['openClaim'] == true) {
-        await api.post('/api/orders/$orderId/claims', {'title': '${body['claimTitle']}'.trim(), 'detail': '${body['claimDetail'] ?? ''}'.trim(), 'openedOn': _today()});
+        ch.post('/api/orders/$orderId/claims', {'title': '${body['claimTitle']}'.trim(), 'detail': '${body['claimDetail'] ?? ''}'.trim(), 'openedOn': _today()});
       }
-      final dl = r.objAt('line.delivered');
+      sent = await ch.send();
+      photo = null;
+      // With no answer yet, the line shows what was typed.
+      final dl = sent!.first?.objAt('line.delivered');
       answer = {'deliveredQty': dl?.strOrNull('qty') ?? '${line['deliveredQty']}', 'condition': dl?.strOrNull('condition') ?? cond, 'note': dl?.strOrNull('note') ?? line['note']};
-      return r;
+      return sent!.first;
     },
   );
-  if (ok && context.mounted) toast(context, 'Line ${row.no} saved');
+  if (ok && context.mounted) savedToast(context, sent!, 'Line ${row.no} saved');
   return ok ? answer : null;
 }
 
@@ -418,6 +432,7 @@ Future<bool> openClaim(BuildContext context, {required String orderId, String? t
       context,
       title: 'New claim',
       save: 'Open the claim',
+    keeps: true,
       initial: {'title': title ?? '', 'detail': '', 'openedOn': _today()},
       groups: const [
         FormGroup(fields: [
@@ -426,5 +441,5 @@ Future<bool> openClaim(BuildContext context, {required String orderId, String? t
           FieldDef('openedOn', 'Opened on', FieldKind.date, required: true),
         ]),
       ],
-      send: (api, body) => api.post('/api/orders/$orderId/claims', body),
+      send: (api, body) => sendOrKeep(context, 'New claim · ${body['title']}', 'POST', '/api/orders/$orderId/claims', body),
     );

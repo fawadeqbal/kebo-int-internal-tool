@@ -5,6 +5,7 @@ import '../ds/ds.dart';
 import 'approvals.dart';
 import 'money.dart';
 import 'quick_add.dart';
+import 'waiting.dart';
 
 /// More: the screens that are not tabs, and the account.
 class MoreScreen extends StatelessWidget {
@@ -41,6 +42,8 @@ class MoreScreen extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: Gap.md),
+          const SectionCard(title: 'On this phone', child: WaitingRow(divider: false)),
+          const SizedBox(height: Gap.md),
           SectionCard(
             title: 'Me',
             child: Column(children: [
@@ -51,7 +54,11 @@ class MoreScreen extends StatelessWidget {
           const SizedBox(height: Gap.xl),
           OutlinedButton(
             onPressed: () async {
-              if (await confirmDialog(context, title: 'Sign out?', text: 'You will need your password to sign in again.', yes: 'Sign out')) {
+              final n = s.outbox.waiting;
+              final text = n == 0
+                  ? 'You will need your password to sign in again.'
+                  : '${count(n, '1 thing', '{} things')} you added with no signal ${n == 1 ? 'has' : 'have'} not been sent yet. Signing out removes ${n == 1 ? 'it' : 'them'}.';
+              if (await confirmDialog(context, title: 'Sign out?', text: text, yes: 'Sign out', danger: n > 0)) {
                 await s.signOut();
               }
             },

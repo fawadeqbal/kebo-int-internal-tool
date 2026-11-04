@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kebo_app/core/api.dart';
+import 'package:kebo_app/core/keep.dart';
 import 'package:kebo_app/core/scope.dart';
 import 'package:kebo_app/core/session.dart';
 import 'package:kebo_app/ds/ds.dart';
@@ -15,6 +16,9 @@ class FakeServer implements HttpClientAdapter {
   FakeServer(this.answers);
   final Map<String, Object?> answers;
   final calls = <RequestOptions>[];
+
+  /// No signal: every call fails the way a phone with no connection does.
+  bool offline = false;
 
   /// The JSON body of the last [method] call to [path].
   Map<String, dynamic>? sent(String method, String path) {
@@ -26,6 +30,7 @@ class FakeServer implements HttpClientAdapter {
 
   @override
   Future<ResponseBody> fetch(RequestOptions o, Stream<Uint8List>? body, Future<void>? cancel) async {
+    if (offline) throw DioException.connectionError(requestOptions: o, reason: 'No signal');
     calls.add(o);
     final hit = answers.containsKey(o.path);
     // A file (a PDF, a photo): its bytes as they are.
@@ -46,6 +51,9 @@ class FakeServer implements HttpClientAdapter {
 /// The fake server of the last screen pumped: what the app asked and sent.
 late FakeServer lastServer;
 
+/// The session of the last screen pumped (its outbox, its network state).
+late Session lastSession;
+
 /// Signed in as someone who may do everything.
 Session fakeSession(Map<String, Object?> answers, {Set<String> permissions = const {'*'}}) {
   lastServer = FakeServer(answers);
@@ -53,11 +61,13 @@ Session fakeSession(Map<String, Object?> answers, {Set<String> permissions = con
   final s = _AllowAll(Api(server: 'https://test.example', dio: dio), permissions);
   s.status = SessionStatus.signedIn;
   s.me = Me(id: 'me', name: 'Sana', email: 'sana@example.com', permissions: permissions);
+  s.outbox.owner = 'me';
+  lastSession = s;
   return s;
 }
 
 class _AllowAll extends Session {
-  _AllowAll(super.api, this.perms);
+  _AllowAll(super.api, this.perms) : super(kept: MemoryKeepStore(), waiting: MemoryKeepStore());
   final Set<String> perms;
 
   @override
