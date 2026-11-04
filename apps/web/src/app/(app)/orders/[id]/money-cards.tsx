@@ -59,7 +59,7 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
                   return (
                     <tr key={`${r.factory.id}:${r.currency}`} className="border-t border-line">
                       <td className="px-3 py-2.5 align-top">
-                        <Link href={`/factories/${r.factory.id}`} className="font-medium hover:text-primary">
+                        <Link href={`/factories/${r.factory.id}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                           {r.factory.name}
                         </Link>
                         <span className="block text-xs text-muted sm:hidden tabular">

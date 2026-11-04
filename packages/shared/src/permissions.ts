@@ -29,6 +29,11 @@ export const PERMISSIONS = [
   /** Move an order to its next stage (or back) and fill in its dates, on deals the person handles. */
   "orders.update",
   "payments.record",
+  /**
+   * Add money received (with the bank slip) and expenses (with the receipt) for a manager to approve: they
+   * count once approved. Those who record payments or expenses themselves need no approval.
+   */
+  "money.submit",
   /** Shipments: booking, packing, bill of lading, shipping costs. */
   "shipping.manage",
   /** The document set and its steps through the banks. */
@@ -98,6 +103,11 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
       },
       { permission: "orders.manage", label: "Cancel orders, remove payments, ship with money due" },
       { permission: "payments.record", label: "Record customer payments" },
+      {
+        permission: "money.submit",
+        label: "Add money received and expenses for a manager to approve",
+        hint: "With the bank slip or receipt photo. It counts once a manager approves it. Who records payments or expenses approves them.",
+      },
       { permission: "shipping.manage", label: "Shipping", hint: "Book shipments, packing, bill of lading or air waybill, shipping costs." },
       { permission: "documents.manage", label: "Papers, documents and bank", hint: "Make the papers (contract, invoices, reports), the document set and its steps through the banks." },
       { permission: "delivery.manage", label: "Delivery and SAT", hint: "Arrival, customs, delivery, site acceptance and claims." },
@@ -133,6 +143,7 @@ const STAFF: readonly Permission[] = [
   "quotations.manage",
   "sourcing.manage",
   "orders.update",
+  "money.submit",
   "shipping.manage",
   "documents.manage",
   "delivery.manage",

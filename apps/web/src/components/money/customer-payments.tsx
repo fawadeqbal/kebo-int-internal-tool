@@ -103,7 +103,7 @@ export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
                 return (
                   <tr key={o.id} className={cn("border-t border-line", cancelled && "text-muted")}>
                     <td className={td}>
-                      <Link href={`/orders/${o.id}/payment`} className="font-medium hover:text-primary">
+                      <Link href={`/orders/${o.id}/payment`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {o.refNo}
                       </Link>
                       <span className="block sm:hidden">

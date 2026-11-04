@@ -55,6 +55,7 @@ export function ScrolledBar({ children, bar }: { children: ReactNode; bar: React
       <div className="no-print sticky top-14 z-10 h-0">
         <div
           aria-hidden={!away}
+          inert={!away}
           className={cn(
             "absolute inset-x-0 top-0 -mx-4 border-b border-line bg-bg/95 px-4 py-2 backdrop-blur-md transition-all sm:-mx-6 sm:px-6",
             away ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0",

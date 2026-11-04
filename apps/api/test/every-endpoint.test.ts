@@ -32,9 +32,9 @@ describe("every read endpoint answers for every record", () => {
 
   it("lists and pages", async () => {
     for (const who of [manager, staff]) {
-      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true", "/orders/page", "/orders/page?status=late&q=a", "/orders/page?status=all&mine=true&page=2", "/money/payables"]) await ok(who, path);
+      for (const path of ["/auth/me", "/dashboard", "/notifications", "/me/todo", "/me/two-step", "/users/people", "/inquiries", "/customers", "/factories", "/orders", "/orders?status=closed", "/orders?status=cancelled", "/orders?mine=true&late=true", "/orders/page", "/orders/page?status=late&q=a", "/orders/page?status=all&mine=true&page=2", "/money/payables", "/submissions?mine=true&status=all"]) await ok(who, path);
     }
-    for (const path of ["/reports", "/audit", "/users", "/settings", "/settings/checklist"]) await ok(admin, path);
+    for (const path of ["/reports", "/audit", "/users", "/settings", "/settings/checklist", "/submissions", "/submissions?status=all"]) await ok(admin, path);
   });
 
   it("every deal, with its sourcing and quotation", async () => {
@@ -56,6 +56,17 @@ describe("every read endpoint answers for every record", () => {
       await ok(manager, `/payments?customerId=${c.id}`);
     }
     for (const f of (await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]) await ok(manager, `/factories/${f.id}`);
+  });
+
+  it("every money submission and its photo", async () => {
+    const all = (await ok(manager, "/submissions?status=all&pageSize=200")) as { rows: { id: string }[] };
+    const mine = (await ok(staff, "/submissions?status=all&mine=true&pageSize=200")) as { rows: { id: string }[] };
+    for (const s of all.rows) {
+      await ok(manager, `/submissions/${s.id}`);
+      await ok(manager, `/submissions/${s.id}/file`);
+      await ok(staff, `/submissions/${s.id}`);
+    }
+    for (const s of mine.rows) await ok(staff, `/submissions/${s.id}`);
   });
 
   it("an order's money (plan, factory plans, credit) for the latest orders", async () => {

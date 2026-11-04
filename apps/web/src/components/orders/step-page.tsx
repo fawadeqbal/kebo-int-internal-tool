@@ -127,7 +127,7 @@ export function StepFrame({
       {side ? (
         <div className={cn("grid gap-5", SIDE_COLUMNS)}>
           <div className="flex min-w-0 flex-col gap-5">{children}</div>
-          <aside className="flex min-w-0 flex-col gap-5">{side}</aside>
+          <aside aria-label="Beside the step" className="flex min-w-0 flex-col gap-5">{side}</aside>
         </div>
       ) : (
         <div className="flex min-w-0 flex-col gap-5">{children}</div>

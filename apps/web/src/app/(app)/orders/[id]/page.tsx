@@ -115,7 +115,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
           <MoneyCard f={f} costs={costs} base={base} />
           <WhatTheyBought o={o} f={f} />
         </div>
-        <aside className="flex min-w-0 flex-col gap-5">
+        <aside aria-label="Beside the order" className="flex min-w-0 flex-col gap-5">
           <DetailsCard
             action={detailsAction.bind(null, o.id)}
             canEdit={can(me, "orders.update") && open}

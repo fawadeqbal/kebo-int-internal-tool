@@ -17,7 +17,7 @@ const ROWS = 5;
  * The step side panel's card: sticky under the order's top bar on a wide
  * screen while it fits the window (taller, it scrolls with the page).
  */
-export function SidePanelCard({ children, label }: { children: ReactNode; label: string }) {
+export function SidePanelCard({ children, label }: { children: ReactNode; /** Its name as a region; left out when a labelled <aside> already holds it. */ label?: string }) {
   const ref = useRef<HTMLElement>(null);
   const [fits, setFits] = useState(true);
   useEffect(() => {

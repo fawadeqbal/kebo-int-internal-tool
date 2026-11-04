@@ -327,7 +327,7 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
                       return (
                         <Tr key={o.id} className="hover:bg-surface-2/50">
                           <Td>
-                            <Link href={`/orders/${o.id}/payment`} className="font-medium hover:text-primary">
+                            <Link href={`/orders/${o.id}/payment`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                               {o.refNo}
                             </Link>
                             <span className="block max-w-48 truncate text-xs text-muted">

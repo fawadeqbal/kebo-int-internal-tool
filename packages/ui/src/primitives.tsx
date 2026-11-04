@@ -335,7 +335,9 @@ export function THead({ className, ...props }: ComponentProps<"thead">) {
   return <thead className={cn("bg-surface-2/60", className)} {...props} />;
 }
 export function Th({ className, ...props }: ComponentProps<"th">) {
-  return <th scope="col" className={cn("h-9 border-b border-line px-3 text-left text-xs font-medium whitespace-nowrap text-muted first:pl-4 last:pr-4", className)} {...props} />;
+  // relative: a hidden (sr-only) name inside is placed in its cell, so a table that scrolls
+  // sideways keeps it in its box instead of widening the page.
+  return <th scope="col" className={cn("relative h-9 border-b border-line px-3 text-left text-xs font-medium whitespace-nowrap text-muted first:pl-4 last:pr-4", className)} {...props} />;
 }
 export function Td({ className, ...props }: ComponentProps<"td">) {
   return <td className={cn("h-12 border-b border-line px-3 align-middle text-text first:pl-4 last:pr-4", className)} {...props} />;
@@ -461,12 +463,13 @@ export function Avatar({ name, size = 32, className }: { name: string; size?: nu
     .toUpperCase();
   return (
     <span
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-primary-soft font-medium text-primary", className)}
+      className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-primary-soft font-medium text-primary before:content-[attr(data-initials)]", className)}
       style={{ width: size, height: size, fontSize: Math.max(10, size * 0.38) }}
+      // Drawn by CSS, not as text: inside a named button ("Account") the letters would be words
+      // in its name that are not part of the name.
+      data-initials={initials || "?"}
       aria-hidden
-    >
-      {initials || "?"}
-    </span>
+    />
   );
 }
 
@@ -576,7 +579,7 @@ export function ListToolbar({
   return (
     <div className={cn("mb-3 flex flex-wrap items-center gap-2", className)}>
       {search && (
-        <form role="search" className="w-full sm:w-auto">
+        <form role="search" aria-label={search.label ?? "Search this list"} className="w-full sm:w-auto">
           {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
           <SearchField defaultValue={search.value} placeholder={search.placeholder} clearHref={search.clearHref} label={search.label} className="h-9 sm:w-72 [&_input]:h-9" />
           <button className="sr-only">Search</button>

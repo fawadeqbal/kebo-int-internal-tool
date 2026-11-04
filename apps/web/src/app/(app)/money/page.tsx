@@ -721,7 +721,7 @@ async function ReceiveTab() {
                 {r.rows.map((o) => (
                   <Tr key={o.id} className="hover:bg-surface-2/50">
                     <Td>
-                      <Link href={`/orders/${o.id}/payment`} className="font-medium hover:text-primary">
+                      <Link href={`/orders/${o.id}/payment`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                         {o.refNo}
                       </Link>
                       <span className="block text-xs text-muted">
@@ -808,7 +808,7 @@ async function OweTab({ mine }: { mine: boolean }) {
               {r.orders.map((o) => (
                 <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                   <span className="min-w-0">
-                    <Link href={`/orders/${o.id}`} className="font-medium hover:text-primary">
+                    <Link href={`/orders/${o.id}`} className="-my-1 inline-block py-1 font-medium hover:text-primary">
                       {o.refNo}
                     </Link>{" "}
                     <span className="text-text-2">{o.customer}</span>{" "}
