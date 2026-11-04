@@ -50,6 +50,7 @@ import { factoryPlansOf } from "../money/factory-plan";
 import { termsOf } from "../money/route-plan";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
+import { LedgerPosting } from "../ledger/posting.service";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
 import { readyByOf, readyOnOf, readySelect, readyWords, setReadyAll, setReadyDates } from "./ready";
 
@@ -230,6 +231,7 @@ export class OrdersService {
     private readonly events: EventBus,
     private readonly stages: StagesService,
     private readonly limits: LimitsService,
+    private readonly ledger: LedgerPosting,
   ) {}
 
   /* ---------------------------------------------------------------- creating and cancelling */
@@ -345,6 +347,8 @@ export class OrdersService {
       entityId: order.id,
       summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} Option ${option.letter} (${rev.currency} ${option.total.toString()})`,
     });
+    // The ledger: the customer owes the order total, and we owe each factory its part, from today.
+    await this.ledger.post(tx, [{ type: "order_all", id: order.id }], { userId: actorId });
     const event: DomainEvent = {
       type: "order.created",
       orderId: order.id,
@@ -449,6 +453,8 @@ export class OrdersService {
         oldValues: { status: o.status },
         newValues: { status: "cancelled", customerMoney, factoryMoney },
       });
+      // The ledger: the order and its factories' parts reversed; the money in kept as credit, refunded or a fee.
+      await this.ledger.post(tx, [{ type: "order_all", id }], { userId: user.id, reason });
       const inquiry = await tx.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId } });
       const moved = await this.stages.after(tx, inquiry, "order_cancelled", user.id);
       return moved ? [moved] : [];

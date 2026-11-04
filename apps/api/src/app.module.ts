@@ -21,6 +21,8 @@ import { ReportsModule } from "./modules/reports/reports.module";
 import { HistoryModule } from "./modules/history/history.module";
 import { MoneyModule } from "./modules/money/money.module";
 import { ApprovalsModule } from "./modules/approvals/approvals.module";
+import { LedgerPostingModule } from "./modules/ledger/posting.service";
+import { LedgerModule } from "./modules/ledger/ledger.module";
 import { NotesModule } from "./modules/notes/notes.module";
 import { SecurityModule } from "./modules/security/security.module";
 import { StorageModule } from "./common/storage/storage.service";
@@ -37,6 +39,6 @@ import { PlatformModule } from "./platform/platform.module";
  */import { InsightsModule } from "./modules/insights/insights.module";
 
 @Module({
-  imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, StorageModule, EventsModule, AuthCoreModule, HealthModule, AuthModule, ChecklistModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, ApprovalsModule, NotesModule, SecurityModule, InsightsModule, FlowModule, PapersModule, OrderFilesModule, CompanyModule, PlatformModule],
+  imports: [EnvModule, PrismaModule, CompaniesModule, LimitsModule, CommonModule, StorageModule, EventsModule, LedgerPostingModule, AuthCoreModule, HealthModule, AuthModule, ChecklistModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, ApprovalsModule, LedgerModule, NotesModule, SecurityModule, InsightsModule, FlowModule, PapersModule, OrderFilesModule, CompanyModule, PlatformModule],
 })
 export class AppModule {}

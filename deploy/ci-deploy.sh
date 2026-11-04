@@ -19,6 +19,7 @@
 #      the old containers running, and print how to recover
 #   5. start the new containers and wait until they are healthy. If they are not: start the
 #      :previous images again, and fail
+#   6. post the ledger (what is not posted yet) and check it; printed, never fails the deploy
 # The API also applies migrations when it starts (a no-op after step 4; for a deploy by hand).
 set -euo pipefail
 
@@ -201,7 +202,23 @@ main() {
   echo "$TARGET" >"$STATE"
   echo "$(date -Is) deployed $(short "$TARGET")" >>"$LOG"
   say "deployed $(short "$TARGET")"
+  ledger_step
   server_setup
+}
+
+# 6. The ledger (docs/ledger.md): every record not posted as it stands is posted (the first deploy with the ledger
+# posts everything, later ones nothing), then it is checked against today's figures. Printed here; never fails the
+# deploy (the API also posts a ledger never posted when it starts, and the worker checks it every night).
+ledger_step() {
+  [ -f apps/api/src/cli/ledger.ts ] || return 0
+  say "the ledger: posting what is not posted yet"
+  if ! timeout 1200 sudo docker compose exec -T api node apps/api/dist/cli/ledger.js rebuild --all; then
+    say "WARNING: the ledger was not posted completely; it is posted again on the next start or deploy (docs/ledger.md)"
+    return 0
+  fi
+  say "the ledger against today's figures"
+  timeout 600 sudo docker compose exec -T api node apps/api/dist/cli/ledger.js check --all ||
+    say "WARNING: the ledger differs from today's figures (above): see docs/ledger.md"
 }
 
 # The server's own pieces (deploy/server: the nightly Docker cleanup and its timer), installed or

@@ -30,6 +30,7 @@ import { fileView } from "../money/payment-file-view";
 import { SettingsService } from "../settings/settings.service";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
 import { livePlansOf } from "../money/plan-live";
+import { LedgerPosting } from "../ledger/posting.service";
 
 type Live = { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; currency: string };
 /** Where the order stands with these payments (orderPosition: what was charged to the customer can be paid too). */
@@ -79,6 +80,7 @@ export class PaymentsService {
     private readonly orders: OrdersService,
     private readonly limits: LimitsService,
     private readonly settings: SettingsService,
+    private readonly ledger: LedgerPosting,
   ) {}
 
   /* ---------------------------------------------------------------- reading */
@@ -424,6 +426,8 @@ export class PaymentsService {
         summary: `Credit ${a.currency} ${fromMinor(leftMinor)} left over from ${a.receivedCurrency} ${fromMinor(a.receivedMinor)}`,
       });
     }
+    // The ledger: the money in, off each order, the rest to the customer's credit.
+    await this.ledger.post(tx, [...parts.map((p) => ({ type: "order_all" as const, id: p.order.id })), ...(receiptId ? [{ type: "receipt" as const, id: receiptId }] : [])], { userId: user.id });
     return ids;
   }
 
@@ -622,6 +626,7 @@ export class PaymentsService {
         entityId: orderId,
         summary: `${o.refNo}: paid ${o.currency} ${fromMinor(amountMinor)} from the customer's credit`,
       });
+      await this.ledger.post(tx, [{ type: "order_all", id: orderId }], { userId: user.id });
     });
     return this.forOrder(user, orderId);
   }
@@ -644,7 +649,8 @@ export class PaymentsService {
     await tx.$queryRaw`select id from customers where id = ${customerId}::uuid for update`;
     const balance = (await this.creditOf(customerId, tx))[currency] ?? 0;
     if (amountMinor > balance) throw new DomainError(`The customer has ${formatMinor(balance, currency)} of credit to refund.`);
-    await tx.customerCredit.create({ data: { customerId, kind: "refund", amount: fromMinor(amountMinor), currency, accountId, orderId, on: toDbDate(on), note, recordedById: user.id } });
+    const refund = await tx.customerCredit.create({ data: { customerId, kind: "refund", amount: fromMinor(amountMinor), currency, accountId, orderId, on: toDbDate(on), note, recordedById: user.id } });
+    await this.ledger.post(tx, [{ type: "credit", id: refund.id }], { userId: user.id });
     await this.audit.record(tx, {
       userId: user.id,
       action: "credit_refund",
@@ -664,6 +670,7 @@ export class PaymentsService {
     await this.prisma.tx(async (tx) => {
       await tx.customerCredit.update({ where: { id }, data: { voidedAt: new Date(), voidReason: reason } });
       await this.audit.record(tx, { userId: user.id, action: "credit_refund_void", entityType: "customer", entityId: c.customerId, summary: `Removed the refund of ${c.currency} ${c.amount.toFixed(2)}`, reason });
+      await this.ledger.post(tx, [{ type: "credit", id }], { userId: user.id, reason });
     });
     return this.creditView(user, c.customerId);
   }
@@ -686,6 +693,7 @@ export class PaymentsService {
       if ((left[r.currency] ?? 0) < 0) throw new DomainError("Part of this transfer's credit was already used or refunded. Remove that first.");
       for (const p of r.payments.filter((x) => !x.voidedAt))
         await this.audit.record(tx, { userId: user.id, action: "payment_void", entityType: "order", entityId: p.orderId, summary: `Removed payment of ${p.currency} ${p.amount.toFixed(2)} (one transfer)`, reason });
+      await this.ledger.post(tx, [{ type: "receipt", id }, ...r.payments.map((p) => ({ type: "order_all" as const, id: p.orderId }))], { userId: user.id, reason });
     });
     return this.forCustomer(user, r.customerId);
   }
@@ -755,6 +763,7 @@ export class PaymentsService {
         newValues: { amount: fromMinor(amountMinor), received: `${receivedCurrency} ${fromMinor(receivedMinor)}`, rate, bankCharges: fromMinor(toMinor(input.bankCharges)), paidOn: input.paidOn, reference: input.reference },
         reason,
       });
+      await this.ledger.post(tx, [{ type: "order_all", id: o.id }], { userId: user.id, reason });
     });
     return this.forOrder(user, p.orderId);
   }
@@ -779,6 +788,7 @@ export class PaymentsService {
         summary: `${o.refNo}: removed payment of ${p.currency} ${p.amount.toFixed(2)}${p.method === "credit" ? " (the credit is back)" : ""}${steps.count ? " (Money reached us undone)" : ""}`,
         reason,
       });
+      await this.ledger.post(tx, [{ type: "order_all", id: o.id }], { userId: user.id, reason });
     });
     return this.forOrder(user, o.id);
   }

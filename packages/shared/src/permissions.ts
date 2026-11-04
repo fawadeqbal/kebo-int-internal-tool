@@ -44,6 +44,8 @@ export const PERMISSIONS = [
   "delivery.manage",
   /** Expenses, what factories were paid and profit & loss (managers and the super admin). */
   "expenses.manage",
+  /** Finance › Ledger: every money record as posted, each customer's, factory's and person's ledger, statements, ageing. */
+  "ledger.view",
   "users.manage",
   "settings.manage",
   "audit.view",
@@ -124,6 +126,11 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
       { permission: "documents.manage", label: "Papers, documents and bank", hint: "Make the papers (contract, invoices, reports), the document set and its steps through the banks." },
       { permission: "delivery.manage", label: "Delivery and SAT", hint: "Arrival, customs, delivery, site acceptance and claims." },
       { permission: "expenses.manage", label: "Expenses, factory payments and profit & loss" },
+      {
+        permission: "ledger.view",
+        label: "Ledger",
+        hint: "Every money record as posted from its document, each customer's, factory's and person's ledger, statements and ageing.",
+      },
     ],
   },
   {
