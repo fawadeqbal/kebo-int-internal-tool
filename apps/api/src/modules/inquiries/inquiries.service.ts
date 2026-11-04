@@ -609,13 +609,6 @@ export class InquiriesService {
     return this.get(user, id);
   }
 
-  async addNote(user: SessionUser, id: string, body: string) {
-    await this.find(user, id);
-    const note = await this.prisma.db.inquiryNote.create({ data: { inquiryId: id, authorId: user.id, body } });
-    await this.prisma.db.inquiry.update({ where: { id }, data: { updatedAt: new Date() } });
-    return note;
-  }
-
   /** Soft delete; never for a deal that has an order. */
   async remove(user: SessionUser, id: string) {
     if (!can(user, "inquiries.delete")) throw new ForbiddenError();

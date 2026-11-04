@@ -16,6 +16,7 @@ import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../money/position
 import { LimitsService } from "../../common/company/limits.service";
 import { readyOnOf, readySelect } from "../orders/ready";
 import { livePlansOf } from "../money/plan-live";
+import { FollowUpsService } from "../notes/follow-ups.service";
 
 /**
  * The safety net, run every hour by the worker. Every reminder carries a
@@ -183,12 +184,15 @@ export class RemindersService {
       }
     }
 
-    // 7. The morning summary email, once a day (the counter row is the "already sent" mark). Email reports are a plan feature.
+    // 7. Follow-ups due today: on the day and before their time (the worker also runs these every few minutes).
+    sent += await this.followUps();
+
+    // 8. The morning summary email, once a day (the counter row is the "already sent" mark). Email reports are a plan feature.
     const reports = await this.limits.allows("email_reports");
     const claimed = reports && (await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`summary-${today}`}, 1) on conflict do nothing`);
     if (claimed) await this.summary(today);
 
-    // 8. On the 1st, last month's report, once.
+    // 9. On the 1st, last month's report, once.
     if (reports && today.endsWith("-01")) {
       const last = addDays(today, -1).slice(0, 7);
       const monthly = await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`monthly-${last}`}, 1) on conflict do nothing`;
@@ -197,6 +201,19 @@ export class RemindersService {
 
     this.log.log(`reminders sent: ${sent}`);
     return { sent };
+  }
+
+  /**
+   * Follow-ups' reminders (followUp.due), for the current company. The notes module holds them; it is
+   * looked up here (as Insights is below) since it sends through this module's notifications.
+   */
+  async followUps(): Promise<number> {
+    try {
+      return await this.modules.get(FollowUpsService, { strict: false }).remind();
+    } catch (e) {
+      this.log.warn(`follow-up reminders failed: ${(e as Error).message}`);
+      return 0;
+    }
   }
 
   /** The numbers for a period, read as the system (every permission): the insights service lives in another module. */

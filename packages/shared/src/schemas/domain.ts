@@ -183,7 +183,6 @@ export const attachmentInput = z.object({
   factoryQuoteId: optionalId,
 });
 export type AttachmentInput = z.infer<typeof attachmentInput>;
-export const noteInput = z.object({ body: text(5000, "Write a note first") });
 
 export const inquiryListQuery = listQuery.extend({
   stage: z.union([z.enum(INQUIRY_STAGES), z.enum(["open", "overdue", "on_hold"])]).optional(),

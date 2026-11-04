@@ -18,6 +18,8 @@ export const PERMISSIONS = [
   "inquiries.assign",
   "inquiries.reopen",
   "inquiries.delete",
+  /** See everyone's follow-ups (planned calls and visits); everyone sees their own and those on records they see. */
+  "followups.viewAll",
   "customers.manage",
   "customers.delete",
   "customers.export",
@@ -72,6 +74,16 @@ export const PERMISSION_GROUPS: { title: string; items: { permission: Permission
       },
       { permission: "inquiries.reopen", label: "Reopen lost inquiries" },
       { permission: "inquiries.delete", label: "Delete inquiries" },
+    ],
+  },
+  {
+    title: "Follow-ups",
+    items: [
+      {
+        permission: "followups.viewAll",
+        label: "See everyone's follow-ups",
+        hint: "Without it, they see the follow-ups for them or made by them, and those on the records they see. Everyone can add follow-ups and give them to anyone.",
+      },
     ],
   },
   {

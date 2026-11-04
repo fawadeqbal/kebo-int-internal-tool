@@ -33,6 +33,7 @@ import {
   stageMoveInput,
   type AttachmentInput,
   type InquiryInput,
+  type NoteInput,
   type InquiryListQuery,
   type SplitItemInput,
   type StageMoveInput,
@@ -46,13 +47,17 @@ import { LimitsService } from "../../common/company/limits.service";
 import { CompaniesService } from "../../common/company/companies.service";
 import { InquiriesService } from "./inquiries.service";
 import { normalizeFields, websiteInquiry, WebsiteService } from "./website.service";
+import { NotesService } from "../notes/notes.service";
 
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
 
 @ApiTags("inquiries")
 @Controller("inquiries")
 export class InquiriesController {
-  constructor(private readonly inquiries: InquiriesService) {}
+  constructor(
+    private readonly inquiries: InquiriesService,
+    private readonly notes: NotesService,
+  ) {}
 
   /** ?stage=open|overdue|on_hold|new|sourcing|quoted|won|lost&assignee=me|unassigned|<id>&q&customerId&priority&channel&sort&page */
   @Get()
@@ -115,13 +120,16 @@ export class InquiriesController {
     return this.inquiries.split(user, id, itemId, body);
   }
 
+  /**
+   * { body (1–5000), kind?: note | call | visit | whatsapp | email, contactId?, at? } → the note as stored
+   * ({ id, inquiryId, body, kind, contactId, at, authorId, createdAt, editedAt, … }), as it always answered.
+   * GET /inquiries/:id/notes, PATCH and DELETE /notes/:id: see the notes module.
+   */
   @Post(":id/notes")
-  note(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(noteInput)) body: z.infer<typeof noteInput>,
-  ) {
-    return this.inquiries.addNote(user, id, body.body);
+  async note(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(noteInput)) body: NoteInput) {
+    const { row } = await this.notes.create(user, "inquiry", id, body);
+    const { author: _author, contact: _contact, ...note } = row;
+    return note;
   }
 
   @Delete(":id")

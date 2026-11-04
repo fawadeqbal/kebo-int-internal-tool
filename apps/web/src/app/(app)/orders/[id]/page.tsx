@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { can, shipByVsLc, STEP_PATH } from "@kebo/shared";
-import { buttonClass, Card, CardBody, CardHeader, cn } from "@kebo/ui";
+import { buttonClass, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderFlowOf, orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
-import { date, dateTime } from "@/lib/format";
-import type { DealDetail } from "@/lib/types";
+import { date } from "@/lib/format";
+import type { DealDetail, Person } from "@/lib/types";
+import type { FollowUpList, Note } from "@/lib/types-notes";
+import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { orderCostsSetup } from "@/components/orders/costs-data";
@@ -24,8 +26,7 @@ import {
   WhatTheyBought,
   WhoIsInvolved,
 } from "@/components/orders/overview";
-import { NoteForm } from "../../inquiries/[id]/panels";
-import { detailsAction, orderNoteAction } from "../actions";
+import { detailsAction } from "../actions";
 import { DetailsCard } from "./forms";
 import { incotermOf, termsOf } from "./shared";
 
@@ -48,18 +49,20 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const [steps, m, flow, recent, deal, costs] = await Promise.all([
+  const [steps, m, flow, recent, deal, costs, notes, followUps, people] = await Promise.all([
     orderStepsOf(id),
     optional(() => orderMoneyOf(id)),
     optional(() => orderFlowOf(id)),
     optional(() => orderHistoryOf(id, undefined, CHANGES)),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
     orderCostsSetup(id).then((x) => x?.costs ?? null),
+    optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
+    optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id })),
+    optional(() => api.get<Person[]>("/users/people")),
   ]);
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const now = today();
-  const name = (uid: string | null) => (uid ? (deal?.people[uid] ?? "Someone") : "System");
   const doNow = steps.doNow;
   const finished = o.status === "closed" && !doNow;
   const f = overviewFacts({ o, steps, flow, m, costs, deal, now });
@@ -158,28 +161,31 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
         </aside>
       </div>
 
-      {deal && (
-        <Card>
-          <CardHeader title="Notes" description={`Shared with inquiry ${deal.refNo}`} />
-          <CardBody className="flex flex-col gap-4">
-            {open && <NoteForm action={orderNoteAction.bind(null, o.id, deal.id)} />}
-            {deal.notes.length > 0 ? (
-              <ul className="flex flex-col gap-3">
-                {deal.notes.map((n) => (
-                  <li key={n.id} className="rounded-lg border border-line p-3">
-                    <p className="text-sm whitespace-pre-line">{n.body}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {name(n.authorId)} · {dateTime(n.createdAt)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted">No notes yet.</p>
-            )}
-          </CardBody>
-        </Card>
-      )}
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <NotesCard
+          on={{ key: "orderId", id: o.id }}
+          notes={notes ?? []}
+          canAdd={can(me, "orders.update")}
+          contacts={deal?.customer.contacts.map((c) => ({ id: c.id, name: c.name }))}
+          footer={
+            deal && deal.notes.length > 0 ? (
+              <p className="text-xs text-text-2">
+                The inquiry has {deal.notes.length} note{deal.notes.length === 1 ? "" : "s"} too ·{" "}
+                <Link href={`/inquiries/${deal.id}#notes`} className="font-medium text-primary hover:underline">
+                  Read them on {deal.refNo}
+                </Link>
+              </p>
+            ) : null
+          }
+        />
+        <FollowUpsCard
+          on={{ key: "orderId", id: o.id }}
+          label={`${o.refNo} · ${o.customer.name}`}
+          rows={followUps?.rows ?? []}
+          people={people ?? []}
+          meId={me.id}
+        />
+      </div>
 
       <RecentChanges lines={compactChanges(recent ?? [])} more={(recent?.length ?? 0) >= CHANGES} historyHref={`${base}/history`} />
     </div>

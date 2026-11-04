@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BadgeCheck,
+  CalendarClock,
   Banknote,
   BarChart3,
   Bell,
@@ -55,6 +56,7 @@ const ICONS = {
   reports: BarChart3,
   money: Banknote,
   approvals: BadgeCheck,
+  followUps: CalendarClock,
   notifications: Bell,
   users: Users,
   settings: Settings,

@@ -16,6 +16,8 @@ import { ChartCard } from "@/components/insights/chart-card";
 import { SalesProfitChart } from "@/components/insights/facts-charts";
 import { ReminderList } from "@/components/insights/reminder-list";
 import { readableDates } from "@/components/insights/readable-dates";
+import type { Today } from "@/lib/types-notes";
+import { FollowUpRow } from "@/components/notes/cards";
 
 export const metadata = { title: "Home" };
 
@@ -104,6 +106,9 @@ export default async function DashboardPage() {
         </Suspense>
 
         <div className="flex flex-col gap-5">
+          <Suspense fallback={<div className="h-[140px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
+            <FollowUpsToday />
+          </Suspense>
           {insights && (
             <Suspense fallback={<div className="h-[300px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
               <SalesChart today={d.today} />
@@ -346,6 +351,41 @@ async function MyOrders() {
           </Link>
         ))}
       </CardBody>
+    </Card>
+  );
+}
+
+/** My calls and visits for today and the ones still open from before (late, in the bad tone with the word). */
+async function FollowUpsToday() {
+  const t = await api.get<Today>("/me/today").catch(() => null);
+  if (!t) return null;
+  return (
+    <Card className="overflow-clip rounded-2xl">
+      <CardHeader
+        title={`Follow-ups today${t.total ? ` · ${t.total}` : ""}`}
+        description={t.late ? <span className="font-medium text-bad">{t.late} late</span> : t.total ? "Your calls and visits" : undefined}
+        actions={
+          <Link href="/follow-ups" className="text-sm text-primary hover:underline">
+            All follow-ups
+          </Link>
+        }
+      />
+      {t.rows.length ? (
+        <ul aria-label="Follow-ups today" className="divide-y divide-line">
+          {t.rows.slice(0, 8).map((f) => (
+            <FollowUpRow key={f.id} f={f} showRecord today={t.today} />
+          ))}
+        </ul>
+      ) : (
+        <p className="px-4 py-3 text-sm text-muted">Nothing planned for today. Add a follow-up on an order, a customer or a factory and it shows here on its day.</p>
+      )}
+      {t.rows.length > 8 && (
+        <p className="border-t border-line px-4 py-2 text-xs text-text-2">
+          <Link href="/follow-ups?mine=true" className="font-medium text-primary hover:underline">
+            {t.rows.length - 8} more
+          </Link>
+        </p>
+      )}
     </Card>
   );
 }
