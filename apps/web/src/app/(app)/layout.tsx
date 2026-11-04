@@ -30,11 +30,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const has = (p: Parameters<typeof can>[1]) => can(me, p);
   // Our money accounts, for every form that records money (payments, factory payments, expenses).
   const accounts = has("payments.record") || has("expenses.manage") ? await api.get<AccountOption[]>("/money/accounts").catch(() => []) : [];
+  // Money received and expenses sent for approval: approvers see how many wait for them; those who add them, how many were sent back.
+  const approves = has("payments.record") || (has("expenses.manage") && feature("expenses"));
+  const approvals =
+    approves || has("money.submit")
+      ? await api
+          .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approves ? undefined : "true", pageSize: 1 })
+          .then((r) => (approves ? r.counts.pending : r.counts.sent_back))
+          .catch(() => 0)
+      : null;
 
   const work: NavItem[] = [
     { href: "/dashboard", label: "Home", icon: "dashboard" },
     { href: "/inquiries", label: "Inquiries", icon: "deals" },
     { href: "/orders", label: "Orders", icon: "orders" },
+    ...(approvals !== null ? [{ href: "/approvals", label: "Approvals", icon: "approvals", badge: approvals, badgeLabel: approves ? "waiting" : "sent back" } as NavItem] : []),
     { href: "/customers", label: "Customers", icon: "customers" },
     { href: "/notifications", label: "Notifications", icon: "notifications", badge: unread },
   ];

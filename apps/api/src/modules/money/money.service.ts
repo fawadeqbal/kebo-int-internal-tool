@@ -910,6 +910,15 @@ export class MoneyService {
     };
   }
 
+  /**
+   * The checks adding an expense runs, without adding it (an expense sent for approval): the date, the order
+   * (seen by this person, not cancelled), the inquiry, customer, factory, person and account named, the rate.
+   * Returns the order it is on. Approving runs createExpense() itself.
+   */
+  async checkExpense(user: SessionUser, input: ExpenseInput) {
+    return (await this.expenseData(user, input)).order;
+  }
+
   async createExpense(user: SessionUser, input: ExpenseInput) {
     this.assertExpenses(user);
     const { order, data } = await this.expenseData(user, input);

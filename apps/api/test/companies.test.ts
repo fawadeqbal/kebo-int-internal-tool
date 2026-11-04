@@ -152,6 +152,7 @@ describe("companies: isolation and the platform", () => {
       ["post", `/inquiries/${kInquiries[0].id}/notes`, { body: "from B" }],
       ["patch", `/customers/${kCustomers[0].id}`, { name: "Taken over" }],
       ["post", `/orders/${kOrders[0].id}/payments`, { kind: "deposit", amount: "10", paidOn: "2026-01-01" }],
+      ["post", "/submissions", { kind: "payment", orderId: kOrders[0].id, body: { amount: "10", currency: "USD", paidOn: "2026-01-01" } }],
       ["delete", `/inquiries/${kInquiries[0].id}`, undefined],
     ] as const) {
       const res = await (method === "delete" ? mine.delete(path) : mine[method](path, body));
