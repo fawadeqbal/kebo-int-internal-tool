@@ -1,0 +1,75 @@
+entity: Order
+api: /api/orders
+paged: false            # the API answers with every open order at once; search runs on the phone
+fields:
+  id: id
+  refNo: { type: text, label: Number }
+  status: { enum: OrderStatus }
+  stage: { enum: OrderStage }
+  customer: { obj: CustomerRef }
+  inquiry: { obj: InquiryRef }
+  orderedOn: { type: date, label: Ordered }
+  readyOn: { type: date, label: Goods ready }
+  shippedOn: { type: date, label: Shipped }
+  shipBy: { type: date, label: Ship by }
+  incoterm: text
+  incotermPlace: { type: text, label: Incoterm place }
+  portOfDischarge: { type: text, label: Port of discharge }
+  blNo: { type: text, label: Bill of lading }
+  currency: text
+  total: { type: money, currency: currency }
+  received: { type: money, currency: currency }
+  due: { type: money, currency: currency, label: Still due }
+  money: { obj: OrderMoney }
+  needs: { obj: OrderNeeds }
+  next: { obj: OrderNext }
+  documents: { list: OrderDocumentRef, readonly: true }
+  lines: { type: raw }               # goods and charges: lib/custom/order_lines.dart
+
+---
+entity: CustomerRef
+fields:
+  id: id
+  name: text
+  country: country
+
+---
+entity: InquiryRef
+fields:
+  id: id
+  refNo: { type: text, label: Inquiry }
+  title: text
+  assignee: { obj: Person, label: Handled by }
+
+---
+# Money of one order. Amounts are in the order's currency (Order.currency).
+entity: OrderMoney
+fields:
+  total: { type: money, currency: currency }
+  charged: { type: money, currency: currency, label: Charged to the customer }
+  deposit: { type: money, currency: currency }
+  depositPercent: { type: int, label: Deposit % }
+  received: { type: money, currency: currency }
+  bankCharges: { type: money, currency: currency }
+  due: { type: money, currency: currency, label: Still due }
+
+---
+entity: OrderNeeds
+fields:
+  title: { type: text, label: Needs }
+  due: { type: date, label: By }
+  late: bool
+
+---
+entity: OrderNext
+fields:
+  label: { type: text, label: Next step }
+  hint: { type: text, label: Why }
+
+---
+# What the order shows under Papers: the accepted quotation, proforma, packing list.
+entity: OrderDocumentRef
+fields:
+  kind: text
+  label: text
+  revisionId: text

@@ -1,0 +1,67 @@
+# Field forms:  name: type    name: type!  (! = required)    name: { type: …, label: …, … }
+# Types: id text multiline email phone country int bool date datetime money
+#        { enum: Name }  { obj: Entity }  { list: Entity }
+# Labels come from the name ("taxNo" → "Tax no") unless given.
+entity: Customer
+api: /api/customers
+paged: true
+duplicate_flag: allowDuplicate   # 409 "duplicate" → show the matches, "Save anyway" resends with this flag
+permissions: { create: customers.manage, edit: customers.manage, delete: customers.delete }
+fields:
+  id: id
+  type: { enum: CustomerType, default: company }
+  name: { type: text!, max: 200 }
+  country: country!
+  defaultCurrency: { enum: Currency, default: USD, label: Currency }
+  address: { type: multiline, max: 500 }
+  taxNo: { type: text, max: 60, label: Tax number }
+  regNo: { type: text, max: 60, label: Registration number }
+  initials: { type: text, max: 6, upper: true, label: Letters on papers, hint: "1 to 6 letters, e.g. TN. Empty: taken from the name." }
+  notes: { type: multiline, max: 5000 }
+  contacts: { list: Contact, min: 1 }
+  primaryContact: { obj: Contact, readonly: true, label: Main contact }
+  openDeals: { type: int, readonly: true, label: Open inquiries }
+  openOrders: { type: int, readonly: true }
+  inquiries: { list: InquiryRow, readonly: true }
+  orders: { list: OrderRow, readonly: true }
+
+---
+entity: Contact
+fields:
+  id: id
+  name: { type: text!, max: 120 }
+  position: { type: text, max: 80, label: Role }
+  phone: phone
+  whatsapp: { type: phone, label: WhatsApp }
+  email: email
+  wechat: { type: text, max: 80, label: WeChat }
+  isPrimary: { type: bool, label: Main contact }
+rules:
+  - { any: [phone, whatsapp, email, wechat], message: Give at least one way to reach this contact }
+
+---
+entity: Person
+fields:
+  id: id
+  name: text!
+
+---
+entity: InquiryRow
+fields:
+  id: id
+  refNo: { type: text, label: Number }
+  title: text
+  stage: { enum: InquiryStage }
+  onHold: bool
+  createdAt: { type: datetime, label: Received }
+  assignee: { obj: Person, label: Handled by }
+
+---
+entity: OrderRow
+fields:
+  id: id
+  refNo: { type: text, label: Number }
+  status: { enum: OrderStatus }
+  total: { type: money, currency: currency }
+  currency: text
+  orderedOn: date

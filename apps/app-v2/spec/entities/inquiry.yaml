@@ -1,0 +1,85 @@
+entity: Inquiry
+api: /api/inquiries
+paged: true
+permissions: { create: inquiries.create, delete: inquiries.delete }
+fields:
+  id: id
+  refNo: { type: text, readonly: true, label: Number }
+  customerId: { pick: /api/customers/names, required: true, label: Customer }
+  contactId: text                     # kept as it is when editing
+  channel: { enum: InquiryChannel, default: email }
+  category: { pick: "settings:sales.categories", required: true }
+  title: { type: text, max: 200, hint: "Short name, e.g. Bottling line 6000 bph" }
+  requirements: { type: multiline, max: 20000, label: Their message, hint: "Paste their message. Or add their items below." }
+  priority: { enum: Priority, default: normal }
+  requiredBy: { type: date, label: Needed by }
+  assigneeId: { pick: /api/users/people, label: Handled by }
+  items: { list: RequestedItem }
+  stage: { enum: InquiryStage, readonly: true }
+  onHold: { type: bool, readonly: true, label: On hold }
+  overdue: { type: bool, readonly: true, label: Late }
+  lostReason: { enum: LostReason, readonly: true, label: Why lost }
+  lostNote: { type: text, readonly: true, label: Note }
+  customer: { obj: InquiryCustomer }
+  contact: { obj: Contact }
+  assignee: { obj: Person, label: Handled by }
+  quotation: { obj: QuotationRef }
+  notes: { list: Note, readonly: true }
+  attachments: { type: raw }          # files: shown by lib/custom/inquiry_files.dart
+  stageChanges: { list: StageChange, readonly: true }
+  orders: { type: raw }
+  createdAt: { type: datetime, label: Received }
+rules:
+  - { any: [requirements, items], message: "Write what the customer needs, or add their list of items" }
+
+---
+entity: InquiryCustomer
+fields:
+  id: id
+  name: text
+  country: country
+  contacts: { list: Contact, readonly: true }
+
+---
+entity: RequestedItem
+fields:
+  id: id
+  no: { type: text, readonly: true }
+  parentId: text
+  description: { type: text!, max: 2000, label: What }
+  model: { type: text, max: 120 }
+  quantity: { type: number!, label: Qty }
+  unit: { type: text, max: 20, default: pcs }
+  targetPrice: { type: number, label: Target price }
+
+---
+entity: QuotationRef
+fields:
+  refNo: { type: text, label: Quotation }
+  latest: { obj: RevisionRef }
+
+---
+entity: RevisionRef
+fields:
+  number: int
+  status: { enum: RevisionStatus }
+  currency: text
+  total: { type: money, currency: currency }
+
+---
+entity: Note
+fields:
+  id: id
+  body: text
+  authorId: text
+  createdAt: datetime
+
+---
+entity: StageChange
+fields:
+  id: id
+  fromStage: { enum: InquiryStage }
+  toStage: { enum: InquiryStage, label: Moved to }
+  cause: text
+  note: text
+  changedAt: { type: datetime, label: On }

@@ -1,0 +1,31 @@
+screen: Orders
+frame: list
+entity: Order
+path: /orders
+tab: Orders
+title: Orders
+search: Order, customer or product
+row:
+  title: refNo
+  sub: [customer.name, inquiry.title, needs.title]
+  badge: stage
+  value: { of: due, text: "{} due" }
+open: Order
+
+---
+screen: Order
+frame: record
+entity: Order
+path: /orders/:id
+tab: Orders
+header: { title: refNo, sub: [customer.name, inquiry.assignee.name, total], badge: stage }
+sections:
+  - { title: Steps, custom: OrderFlow }       # do now, step chips, the step's checklist; tap a row to tick it
+  - { title: Goods, custom: OrderLines }      # the first lines, See all, goods received, packing list
+  - { title: Money, custom: OrderMoneySection }  # lib/custom/money.dart: the plan, payments and receipts, approvals, factories
+  - title: Papers
+    custom: OrderPapers        # lib/custom/order_papers.dart: every paper as a PDF, the internal copy too
+  - title: Files
+    custom: OrderFiles         # lib/custom/order_files.dart: every file of the order
+  - title: Details
+    fields: [orderedOn, inquiry.refNo, inquiry.assignee.name, incoterm, incotermPlace, portOfDischarge, shipBy, readyOn, shippedOn, blNo]

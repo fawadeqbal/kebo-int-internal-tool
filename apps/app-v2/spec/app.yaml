@@ -1,0 +1,93 @@
+# The phone app: name, tabs and the shared lists of values.
+# Everything under lib/generated comes from the files in this folder:
+#   python3 -m gen          write the generated code
+#   python3 -m gen --check  CI: fail when the generated code is out of date
+app: RFQ Desk
+tabs:
+  - { label: Home, icon: home, path: /home }
+  - { label: Inquiries, icon: inbox, path: /inquiries }
+  - { label: Orders, icon: orders, path: /orders }
+  - { label: More, icon: more, path: /more }
+
+# Quick reasons offered as chips (the person may also write their own words).
+reasons:
+  reassign: [Workload, Person is away, Better fit for this product]
+  hold: [Customer is deciding, Waiting for the factory, Waiting for documents]
+  reopen: [Customer came back, Marked lost by mistake]
+  skip: [Not needed for this order, Customer does it, Done another way]
+  quoteAnswer: [Price too high, Customer bought elsewhere, No reply from the customer, Project cancelled]
+
+# Lists of values. A tone is one of the five status meanings shared with the web:
+# neutral, info, ok, warn, bad.
+enums:
+  CustomerType: { company: Company, individual: Person }
+  Currency: { USD: USD, CNY: CNY, PKR: PKR }
+  PaymentRoute: { informal: Informal, bank_contract: Bank contract, letter_of_credit: Letter of credit (LC) }
+  BalanceWhen: { before_shipment: Before shipment, against_bl_copy: Against the B/L copy }
+  LcTerms: { at_sight: At sight, deferred: Deferred }
+  Incoterm: { EXW: EXW, FCA: FCA, FAS: FAS, FOB: FOB, CFR: CFR, CIF: CIF, CPT: CPT, CIP: CIP, DAP: DAP, DPU: DPU, DDP: DDP }
+  InquiryStage:
+    new: { label: New, tone: neutral }
+    sourcing: { label: Getting prices, tone: warn }
+    quoted: { label: Quoted, tone: info }
+    won: { label: Won, tone: ok }
+    lost: { label: Lost, tone: neutral }
+  Priority: { low: Low, normal: Normal, high: High, urgent: { label: Urgent, tone: bad } }
+  InquiryChannel: { website: Website form, whatsapp: WhatsApp, wechat: WeChat, email: Email, phone: Phone, visit: Visit, other: Other }
+  LostReason:
+    price_too_high: Price too high
+    no_reply: No reply from customer
+    factory_cannot_supply: Factory can't make it or meet the date
+    bought_elsewhere: Customer bought elsewhere
+    customer_cancelled: Customer cancelled
+    duplicate_or_spam: Duplicate or spam
+    other: Other
+  RevisionStatus:
+    draft: { label: Draft, tone: neutral }
+    sent: { label: Sent, tone: info }
+    accepted: { label: Accepted, tone: ok }
+    rejected: { label: Rejected, tone: bad }
+    expired: { label: Expired, tone: warn }
+    superseded: { label: Replaced, tone: neutral }
+    void: { label: Void, tone: neutral }
+  # Money (labels as on the web: packages/shared/src/labels.ts). "credit" is not offered: the web's "Use credit" does that.
+  PaymentMethod: { bank_transfer: Bank transfer (T/T), letter_of_credit: Letter of credit (L/C), cash: Cash, cheque: Cheque, online: Online payment, other: Other }
+  ExpenseCategory:
+    inland_transport: Inland transport
+    travel: Travel & tickets
+    hotel: Hotels
+    meals: Meals & entertainment
+    inspection: Inspection
+    courier: Courier
+    freight: Sea / air freight
+    samples: Samples
+    gifts: Gifts
+    customs: Customs & documents
+    insurance: Insurance
+    bank_charges: Bank charges
+    commission: Commission
+    office: Office
+    utilities: Electricity, internet & phone
+    rent: Rent
+    salaries: Salaries
+    other: Other
+  ExpenseBearer: { us: Us, customer: The customer, factory: The factory }
+  # A payment plan row: the customer's plan and the factory's plan share these.
+  PlanStatus:
+    paid: { label: Paid, tone: ok }
+    part_paid: { label: Part paid, tone: info }
+    part: { label: Part paid, tone: info }
+    late: { label: Late, tone: bad }
+    due_soon: { label: Due soon, tone: warn }
+    due: { label: Due, tone: warn }
+    open: { label: Not due yet, tone: neutral }
+    later: { label: Not due yet, tone: neutral }
+  OrderStage:
+    confirmed: { label: Confirmed, tone: info }
+    in_production: { label: In production, tone: info }
+    shipped: { label: Shipped, tone: info }
+    done: { label: Done, tone: ok }
+  OrderStatus:
+    open: { label: Open, tone: info }
+    closed: { label: Done, tone: ok }
+    cancelled: { label: Cancelled, tone: neutral }

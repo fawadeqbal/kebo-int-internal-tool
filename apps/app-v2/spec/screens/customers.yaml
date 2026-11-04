@@ -1,0 +1,54 @@
+# Frames: list · record · sheet (every screen is one of these; home is hand-written).
+# Rules the generator enforces: at most one primary action per screen, every field
+# exists on its entity, every screen it points to exists.
+screen: Customers
+frame: list
+entity: Customer
+path: /customers
+title: Customers
+search: Name, contact, email or phone
+row:
+  title: name
+  sub: [country, primaryContact.name]
+  value: { of: openOrders, text: "{} open order|orders", hide_zero: true }
+open: Customer
+add: CustomerForm
+
+---
+screen: Customer
+frame: record
+entity: Customer
+path: /customers/:id
+header: { title: name, sub: [country, type, defaultCurrency] }
+primary: { label: Edit, sheet: CustomerForm, perm: customers.manage }
+sections:
+  - title: Contacts
+    list: contacts
+    row: { title: name, sub: [position, phone, email] }
+    actions: [phone, whatsapp, email]
+    empty: No contacts yet
+  - title: Details
+    fields: [address, taxNo, regNo, defaultCurrency, initials]
+  - title: Inquiries
+    list: inquiries
+    row: { title: title, sub: [refNo, assignee.name, createdAt], badge: stage }
+    empty: No inquiries yet
+  - title: Orders
+    list: orders
+    row: { title: refNo, sub: [orderedOn], badge: status, value: total }
+    empty: No orders yet
+  - title: Notes
+    fields: [notes]
+more:
+  - { label: Delete customer, delete: true, perm: customers.delete, confirm: "Delete this customer? Their inquiries and orders stay." }
+
+---
+screen: CustomerForm
+frame: sheet
+entity: Customer
+title: { create: New customer, edit: Edit customer }
+save: Save customer
+groups:
+  - fields: [name, type, country]
+  - { title: Contacts, list: contacts, add: Add contact, fields: [name, position, phone, whatsapp, email, wechat, isPrimary] }
+  - { title: More details, folded: true, fields: [defaultCurrency, address, taxNo, regNo, initials, notes] }

@@ -1,0 +1,4 @@
+# test/shots draws pictures for review; it runs only when asked: flutter test --tags shots --update-goldens
+tags:
+  shots:
+    skip: "pictures for review: flutter test --tags shots --update-goldens"

@@ -1,0 +1,47 @@
+name: kebo_app
+description: "RFQ Desk on the phone: inquiries, orders, money and papers for the staff of Shandong Kebo International Trade."
+publish_to: 'none'
+
+# versionName+versionCode; override with --build-name / --build-number.
+version: 2.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.11.1
+  go_router: ^18.1.1
+  flutter_secure_storage: ^11.2.0
+  intl: ^0.20.3
+  url_launcher: ^6.3.3
+  pdfrx: 2.6.5
+  share_plus: ^13.3.1
+  file_picker: ^13.2.0
+  path_provider: ^2.1.6
+  open_filex: ^5.0.0
+  video_player: ^2.14.1
+  image_picker: ^1.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # The web's Inter, cut into static weights by `python3 -m gen.fonts`.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-ExtraBold.ttf
+          weight: 800

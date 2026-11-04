@@ -1,0 +1,26 @@
+# A factory's offer for an inquiry, as typed from WeChat or WhatsApp
+# (POST /api/inquiries/:id/factory-quotes; the form is lib/custom/offer_sheet.dart).
+entity: FactoryQuote
+fields:
+  factoryId: { pick: "/api/factories?pageSize=100", required: true, label: Factory }
+  receivedOn: { type: date!, label: Received on }
+  currency: { enum: Currency, default: CNY }
+  basis: { enum: Incoterm, label: Price basis }
+  basisPlace: { type: text, max: 60, label: Place, hint: "e.g. Ningbo" }
+  taxIncluded: { type: bool, label: Tax is in their prices }
+  taxRate: { type: number, label: Tax %, hint: "0 when they add none" }
+  validUntil: { type: date, label: Valid until }
+  leadTime: { type: text, max: 120, label: Lead time, hint: "e.g. 45 days" }
+  advancePercent: { type: number, label: Advance %, hint: "What they ask when we order" }
+  reference: { type: text, max: 80, label: Their reference }
+  notes: { type: multiline, max: 5000 }
+  lines: { list: FactoryLine }
+
+---
+entity: FactoryLine
+fields:
+  requestedItemId: text
+  description: { type: text!, max: 2000, label: Item }
+  quantity: { type: number!, label: Qty }
+  unit: { type: text, max: 20, default: pcs }
+  unitPrice: { type: number, label: Their price }
