@@ -10,15 +10,15 @@ import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/ste
 import { PaymentEdit } from "@/components/orders/view-panels";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { PaymentPlan } from "@/components/money/forms";
-import { LcChecks, PlanLines, ReceivedForm, UseCredit } from "@/components/money/money-v2";
+import { LcChecks, PlanLines, UseCredit } from "@/components/money/money-v2";
+import { RecordPaymentLink, ViewPaymentsLink } from "@/components/money/pay-links";
 import { savePlanAction } from "../../../money/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
 import { fieldsAction, lightAction } from "../../light-actions";
-import { paymentAction, useCreditAction } from "../../actions";
-import { CustomerSummary, MoneySection, PaymentsReceived } from "../money-sections";
+import { useCreditAction } from "../../actions";
+import { CustomerSummary, MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
 import { termsOf } from "../shared";
-import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Order · payment" };
 
@@ -38,12 +38,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const d = await stepData(id, "payment");
   const { me, o, flow, now, defaults } = d;
-  const [p, m, settings] = await Promise.all([
-    orderPaymentsOf(id),
-    orderMoneyOf(id),
-    getSettings(),
-  ]);
-  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
+  const [p, m] = await Promise.all([orderPaymentsOf(id), orderMoneyOf(id)]);
   const c = o.currency;
   const canPay = can(me, "payments.record") && d.open;
   const canRoute = can(me, "orders.update") && d.open && !!flow;
@@ -52,23 +47,9 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const bankRoute = (route === "bank_contract" || lc) && !!flow?.modules.bankContracts;
   const contract = flow?.payment.bankContract ?? null;
   const terms = flow ? { balanceWhen: flow.payment.balanceWhen, lcTerms: flow.payment.lcTerms, lcDays: flow.payment.lcDays } : undefined;
-  // Money in, in any currency: what arrived, the rate, what it counts as here; the rest is the customer's credit.
+  // Money in is recorded on Treasury › Payments (one form); here it is a link with the order filled in.
   const pay = (label: string, quiet = true) =>
-    canPay ? (
-      <ReceivedForm
-        quiet={quiet}
-        label={label}
-        action={paymentAction.bind(null, o.id, c)}
-        currency={c}
-        customer={o.customer.name}
-        refNo={o.refNo}
-        depositDue={p.depositDue}
-        due={p.due}
-        forWhat={m.plan.next?.label ?? null}
-        fx={fx}
-        today={now}
-      />
-    ) : null;
+    canPay ? <RecordPaymentLink kind="in" order={o.id} back={`/orders/${o.id}/payment`} label={label} quiet={quiet} /> : null;
 
   const tools: Record<string, AutoTool> = {};
   if (canRoute)
@@ -253,7 +234,10 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
             ))}
           </ul>
         )}
-        <PaymentsReceived o={o} p={p} me={me} now={now} />
+        <div className="flex flex-wrap items-center gap-3">
+          <ViewPaymentsLink order={o.id} />
+          {pay("Record payment")}
+        </div>
       </MoneySection>
     </StepPage>
   );

@@ -1,25 +1,17 @@
 import Link from "next/link";
-import { PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
+import { CheckCircle2 } from "lucide-react";
 import { Badge, cn } from "@kebo/ui";
-import { date, dateTime, money } from "@/lib/format";
-import type { Person } from "@/lib/types";
+import { money } from "@/lib/format";
 import type { OrderMoney } from "@/lib/types-money";
-import { EditFactoryPayment, VoidForm } from "@/components/money/forms";
-import type { Fx } from "@/lib/fx";
-import { CheckCircle2, Paperclip } from "lucide-react";
-import { RecordTable } from "@/components/money/payment-record";
-import { factoryPaymentAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../money/actions";
-import { AttachedFile } from "@/components/money/attachment";
+import { ViewPaymentsLink } from "@/components/money/pay-links";
 
 /**
  * What we owe each factory for this order (their prices plus tax × the
- * quantities ordered) and what we paid them, as two tables. For people who
- * see costs; "Pay a factory" is at the top of the tab.
+ * quantities ordered), what we paid and what is left. The payments themselves
+ * are on Treasury › Payments (View payments); for people who see costs.
  */
-export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people: Person[]; today: string; fx: Fx }) {
+export function FactoriesView({ m, pay }: { m: OrderMoney; pay?: React.ReactNode }) {
   const f = m.factories!;
-  const currencies = [...new Set(f.payments.filter((p) => !p.voided).map((p) => p.currency))];
-  const paidTotal = f.payments.filter((p) => !p.voided).reduce((t, p) => t + Number(p.amount), 0);
   return (
     <div className="flex flex-col gap-5">
       <section aria-label="What we owe each factory" className="flex flex-col gap-2">
@@ -114,164 +106,10 @@ export function FactoriesView({ m, people, today, fx }: { m: OrderMoney; people:
         )}
       </section>
 
-      <section aria-label="Payments made to the factory" className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Payments made</h3>
-        {f.payments.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">
-            Nothing paid to a factory for this order yet.
-          </p>
-        ) : (
-          <RecordTable
-            label="Payments made to the factory"
-            columns={[
-              { label: "Date", width: "w-28" },
-              { label: "Factory" },
-              { label: "For", hideBelow: "sm" },
-              { label: "Method · reference", hideBelow: "md" },
-              { label: "Paid by", hideBelow: "md" },
-              { label: "Amount", align: "right" },
-              { label: "Bank slip", hideBelow: "sm", width: "w-20" },
-            ]}
-            rows={f.payments.map((p) => {
-              const owedRow = f.rows.find((r) => r.factory.id === p.factory.id && r.currency === p.currency);
-              return {
-                key: p.id,
-                label: `Payment of ${money(p.amount, p.currency)} to ${p.factory.name} on ${date(p.paidOn)}`,
-                removed: !!p.voided,
-                cells: [
-                  <span key="d" className="whitespace-nowrap">
-                    {date(p.paidOn)}
-                  </span>,
-                  <span key="f">
-                    {p.factory.name} {p.voided && <Badge tone="bad">Removed</Badge>}
-                  </span>,
-                  PAYMENT_KIND_LABEL[p.kind],
-                  <span key="m" className="text-text-2">
-                    {PAYMENT_METHOD_LABEL[p.method]}
-                    {p.reference && ` · ${p.reference}`}
-                  </span>,
-                  <span key="b" className={p.paidBy ? "text-text-2" : "text-muted"}>
-                    {p.paidBy?.name ?? "—"}
-                  </span>,
-                  <span key="a" className="font-semibold whitespace-nowrap">
-                    {money(p.amount, p.currency)}
-                  </span>,
-                  p.file ? (
-                    <Paperclip key="p" className="size-4 text-text-2" aria-label="Bank slip" />
-                  ) : (
-                    <span key="p" className="text-muted">
-                      —
-                    </span>
-                  ),
-                ],
-                fields: [
-                  {
-                    label: "Factory",
-                    value: (
-                      <Link href={`/factories/${p.factory.id}`} className="hover:text-primary">
-                        {p.factory.name}
-                      </Link>
-                    ),
-                  },
-                  { label: "Amount paid", value: <span className="font-medium tabular">{money(p.amount, p.currency)}</span> },
-                  {
-                    label: `In the order's currency (${m.currency})`,
-                    value:
-                      p.currency === m.currency ? (
-                        "Same currency"
-                      ) : (
-                        <span className="tabular">
-                          ≈ {money(p.inOrderCurrency, m.currency)}{" "}
-                          <span className="text-xs text-muted">
-                            at {p.rate} {p.currency} per {m.currency}
-                          </span>
-                        </span>
-                      ),
-                  },
-                  { label: "What for", value: PAYMENT_KIND_LABEL[p.kind] },
-                  { label: "Paid on", value: date(p.paidOn) },
-                  { label: "Method", value: PAYMENT_METHOD_LABEL[p.method] },
-                  { label: "Paid by", value: p.paidBy?.name ?? "Not said" },
-                  { label: "Bank reference", value: p.reference ?? "—" },
-                  { label: "Account", value: p.account?.name ?? <span className="text-muted">Not said</span> },
-                  {
-                    label: "Recorded by",
-                    value: `${p.recordedBy?.name ?? "Someone"} · ${dateTime(p.recordedAt)}${p.changedAt ? ` (changed ${dateTime(p.changedAt)})` : ""}`,
-                  },
-                  {
-                    label: "After this payment",
-                    value: p.after ? (
-                      <span className="tabular">
-                        {money(p.after.paid, p.currency)} paid{owedRow ? ` of ${money(owedRow.owed, p.currency)}` : ""} ·{" "}
-                        {Number(p.after.toPay) > 0 ? `${money(p.after.toPay, p.currency)} left to pay` : "paid in full"}
-                      </span>
-                    ) : (
-                      "Not counted"
-                    ),
-                    wide: true,
-                  },
-                  ...(p.note ? [{ label: "Note", value: <span className="whitespace-pre-line">{p.note}</span>, wide: true }] : []),
-                  {
-                    label: "Bank slip",
-                    value: (
-                      <AttachedFile
-                        src={`/files/factory-payments/${p.id}`}
-                        file={p.file}
-                        what="Bank slip"
-                        canChange={f.canRecord && !p.voided}
-                        remove={removePaymentFileAction.bind(null, "out", p.id, m.orderId)}
-                        empty="No bank slip"
-                      />
-                    ),
-                    wide: true,
-                  },
-                  ...(p.voided
-                    ? [
-                        {
-                          label: "Removed",
-                          value: (
-                            <span className="text-bad">{`${dateTime(p.voided.at)}${p.voided.reason ? `: ${p.voided.reason}` : ""}`}</span>
-                          ),
-                          wide: true,
-                        },
-                      ]
-                    : []),
-                ],
-                actions:
-                  f.canRecord && !p.voided ? (
-                    <>
-                      <EditFactoryPayment
-                        action={factoryPaymentAction.bind(null, m.orderId, p.id)}
-                        factories={f.rows}
-                        people={people}
-                        orderCurrency={m.currency}
-                        fx={fx}
-                        today={today}
-                        payment={p}
-                      />
-                      <VoidForm action={voidFactoryPaymentAction.bind(null, m.orderId, p.id)} label="the payment" />
-                    </>
-                  ) : undefined,
-              };
-            })}
-            foot={[
-              "Total paid",
-              "",
-              "",
-              "",
-              "",
-              currencies.length === 1 ? (
-                <span key="t" className="whitespace-nowrap">
-                  {money(paidTotal, currencies[0]!)}
-                </span>
-              ) : (
-                ""
-              ),
-              "",
-            ]}
-          />
-        )}
-      </section>
+      <div className="flex flex-wrap items-center gap-3">
+        <ViewPaymentsLink order={m.orderId} />
+        {pay}
+      </div>
     </div>
   );
 }

@@ -49,6 +49,9 @@ const LEDGER_SOURCE: Partial<Record<PaymentRecordKind, string>> = {
 const name = { select: { id: true, name: true } } as const;
 const orderRef = { select: { id: true, refNo: true } } as const;
 const money = (d: Prisma.Decimal) => d.toFixed(2);
+/** "USD 14,692.15": an amount as a page shows it. */
+const amount = (currency: string, d: Prisma.Decimal) =>
+  `${currency} ${Number(d).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const statusOf = (voidedAt: Date | null): PaymentStatus => (voidedAt ? "void" : "recorded");
 const customerLink = (c: { id: string; name: string } | null) => (c ? { label: c.name, href: `/customers/${c.id}` } : null);
 const supplierLink = (f: { id: string; name: string }) => ({ label: f.name, href: `/factories/${f.id}` });
@@ -143,7 +146,12 @@ export class TreasuryService {
       );
     const page = shown.slice((q.page - 1) * q.pageSize, q.page * q.pageSize);
     await this.numberRows(page);
-    return { rows: page, total: shown.length, page: q.page, pageSize: q.pageSize, counts, canRecord: this.canRecord(user, s) };
+    const scope = q.order
+      ? ((await this.prisma.db.order.findFirst({ where: { id: q.order, ...(s.all ? {} : orderAccess(user)) }, select: { refNo: true } }))?.refNo ?? null)
+      : q.party
+        ? ((await this.prisma.db.party.findFirst({ where: { id: q.party }, select: { name: true } }))?.name ?? null)
+        : null;
+    return { rows: page, total: shown.length, page: q.page, pageSize: q.pageSize, counts, scope, canRecord: this.canRecord(user, s) };
   }
 
   /** Every row this person sees in the period and filters (numbers are added for the page shown); `only`: one record. */
@@ -427,9 +435,9 @@ export class TreasuryService {
         return {
           fields: [
             { label: "For", value: `${PAYMENT_KIND_LABEL[p.kind as PaymentKind]} on ${p.order.refNo}`, href: `/orders/${p.orderId}` },
-            { label: "Received", value: `${p.receivedCurrency} ${money(p.receivedAmount)}` },
-            ...(counted ? [{ label: "Counts on the order as", value: `${p.currency} ${money(p.amount)} at ${Number(p.rate)}` }] : []),
-            ...(Number(p.bankCharges) ? [{ label: "Bank charges", value: `${p.currency} ${money(p.bankCharges)}` }] : []),
+            { label: "Received", value: amount(p.receivedCurrency, p.receivedAmount) },
+            ...(counted ? [{ label: "Counts on the order as", value: `${amount(p.currency, p.amount)} at ${Number(p.rate)}` }] : []),
+            ...(Number(p.bankCharges) ? [{ label: "Bank charges", value: amount(p.currency, p.bankCharges) }] : []),
             { label: "Paid on", value: fromDbDate(p.paidOn) },
             { label: "Method", value: method(p.method) },
             ...(p.paidByName ? [{ label: "Paid by", value: p.paidByName }] : []),
@@ -439,6 +447,7 @@ export class TreasuryService {
           recordedBy: p.recordedBy.name,
           recordedAt: p.createdAt.toISOString(),
           voided: voidOf(p.voidedAt, p.voidReason),
+          orderId: p.orderId,
           voidPath: !p.voidedAt && !p.receiptId && can(user, "orders.manage") ? `/payments/${p.id}/void` : null,
         };
       }
@@ -449,11 +458,11 @@ export class TreasuryService {
         });
         return {
           fields: [
-            { label: "Received", value: `${r.receivedCurrency} ${money(r.receivedAmount)}` },
+            { label: "Received", value: amount(r.receivedCurrency, r.receivedAmount) },
             ...(r.receivedCurrency !== r.currency ? [{ label: "Rate", value: `${Number(r.rate)} per ${r.currency}` }] : []),
             ...r.payments.map((p) => ({
               label: `On ${p.order.refNo}`,
-              value: `${r.currency} ${money(p.amount)}`,
+              value: amount(r.currency, p.amount),
               href: `/orders/${p.order.id}`,
             })),
             { label: "Paid on", value: fromDbDate(r.paidOn) },
@@ -465,6 +474,7 @@ export class TreasuryService {
           recordedBy: r.recordedBy.name,
           recordedAt: r.createdAt.toISOString(),
           voided: voidOf(r.voidedAt, r.voidReason),
+          orderId: null,
           voidPath: !r.voidedAt && can(user, "orders.manage") ? `/customer-receipts/${r.id}/void` : null,
         };
       }
@@ -476,6 +486,7 @@ export class TreasuryService {
           recordedBy: c.recordedBy.name,
           recordedAt: c.createdAt.toISOString(),
           voided: voidOf(c.voidedAt, c.voidReason),
+          orderId: c.orderId,
           voidPath: !c.voidedAt && can(user, "orders.manage") ? `/customer-credits/${c.id}/void` : null,
         };
       }
@@ -496,6 +507,7 @@ export class TreasuryService {
           recordedBy: p.recordedBy.name,
           recordedAt: p.createdAt.toISOString(),
           voided: voidOf(p.voidedAt, p.voidReason),
+          orderId: p.orderId,
           voidPath: !p.voidedAt && can(user, "payments.record") ? `/factory-payments/${p.id}/void` : null,
         };
       }
@@ -527,6 +539,7 @@ export class TreasuryService {
           recordedBy: e.recordedBy.name,
           recordedAt: e.createdAt.toISOString(),
           voided: voidOf(e.voidedAt, e.voidReason),
+          orderId: e.orderId,
           voidPath: !e.voidedAt && can(user, "expenses.manage") ? `/expenses/${e.id}/void` : null,
         };
       }
@@ -537,8 +550,8 @@ export class TreasuryService {
         });
         return {
           fields: [
-            { label: "From", value: `${t.fromAccount.name} · ${t.fromAccount.currency} ${money(t.amountOut)}` },
-            { label: "To", value: `${t.toAccount.name} · ${t.toAccount.currency} ${money(t.amountIn)}` },
+            { label: "From", value: `${t.fromAccount.name} · ${amount(t.fromAccount.currency, t.amountOut)}` },
+            { label: "To", value: `${t.toAccount.name} · ${amount(t.toAccount.currency, t.amountIn)}` },
             { label: "Moved on", value: fromDbDate(t.transferredOn) },
             ...(t.note ? [{ label: "Note", value: t.note }] : []),
           ],
@@ -546,6 +559,7 @@ export class TreasuryService {
           recordedBy: t.recordedBy.name,
           recordedAt: t.createdAt.toISOString(),
           voided: voidOf(t.voidedAt, t.voidReason),
+          orderId: null,
           voidPath: !t.voidedAt && can(user, "expenses.manage") ? `/money/transfers/${t.id}/void` : null,
         };
       }
@@ -563,6 +577,7 @@ export class TreasuryService {
           recordedBy: m.submittedBy.name,
           recordedAt: m.submittedAt.toISOString(),
           voided: null,
+          orderId: m.orderId,
           voidPath: null,
         };
       }

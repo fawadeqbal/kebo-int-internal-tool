@@ -9,14 +9,13 @@ import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools } from "@/components/orders/costs-card";
-import { NewFactoryPayment } from "@/components/money/forms";
+import { RecordPaymentLink } from "@/components/money/pay-links";
 import { FactoryPlanCard } from "@/components/money/money-v2";
-import { factoryPaymentAction, factoryPlanAction } from "../../../money/actions";
+import { factoryPlanAction } from "../../../money/actions";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { FactoriesView } from "../money-cards";
 import { MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
-import { getSettings, getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Order · factory order" };
 
@@ -29,26 +28,21 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const d = await stepData(id, "factory");
   const { me, o, flow, now, defaults } = d;
-  const [m, people, settings] = await Promise.all([
-    orderMoneyOf(id),
-    getPeople(),
-    getSettings(),
-  ]);
-  const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
+  const m = await orderMoneyOf(id);
   const canEdit = can(me, "orders.update") && d.open;
   const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
+  // Money out is recorded on Treasury › Payments (one form); here it is a link, with the plan's part filled in.
   const payFactory = (label: string, quiet = true, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
     m.factories?.canRecord && owing.length && d.open ? (
-      <NewFactoryPayment
-        quiet={quiet}
+      <RecordPaymentLink
+        kind="out"
+        order={o.id}
+        factory={prefill?.factoryId}
+        amount={prefill?.amount}
+        part={prefill?.kind}
+        back={`/orders/${o.id}/factory`}
         label={label}
-        prefill={prefill}
-        action={factoryPaymentAction.bind(null, m.orderId, null)}
-        factories={owing}
-        people={people}
-        orderCurrency={o.currency}
-        fx={fx}
-        today={now}
+        quiet={quiet}
       />
     ) : null;
 
@@ -210,7 +204,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           tag="Internal"
           sub={factories.length ? `We pay ${names} for the goods` : "What we owe the factories for this order"}
         >
-          <FactoriesView m={m} people={people} today={now} fx={fx} />
+          <FactoriesView m={m} pay={payFactory("Record payment")} />
         </MoneySection>
       )}
     </StepPage>

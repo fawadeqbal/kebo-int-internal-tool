@@ -9,14 +9,12 @@ import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools } from "@/components/orders/costs-card";
-import { NewFactoryPayment } from "@/components/money/forms";
+import { RecordPaymentLink } from "@/components/money/pay-links";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
-import { factoryPaymentAction } from "../../../money/actions";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { GoodsExcel } from "../goods";
 import { goodsOf } from "../shared";
 import { stepData } from "../step-data";
-import { getSettings, getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Order · production" };
 
@@ -40,26 +38,21 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
   const d = await stepData(id, "production");
   const { me, o, flow, now, defaults } = d;
   const canEdit = can(me, "orders.update") && d.open;
-  const [m, people, settings] = await Promise.all([
-    optional(() => orderMoneyOf(id)),
-    optional(() => getPeople()),
-    optional(() => getSettings()),
-  ]);
+  const m = await optional(() => orderMoneyOf(id));
   const owing = m?.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
-  // "Balance paid to the factory": the factory payment form filled in with the plan's next part.
+  // "Balance paid to the factory": Record payment with the plan's next part filled in.
   const nextPart = m?.factories?.plans.find((p) => p.next && Number(p.next.open) > 0) ?? null;
+  // Money out is recorded on Treasury › Payments (one form); here it is a link, with the plan's part filled in.
   const payFactory = (label: string, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" }) =>
-    m?.factories?.canRecord && owing.length && d.open && settings ? (
-      <NewFactoryPayment
-        quiet
+    m?.factories?.canRecord && owing.length && d.open ? (
+      <RecordPaymentLink
+        kind="out"
+        order={o.id}
+        factory={prefill?.factoryId}
+        amount={prefill?.amount}
+        part={prefill?.kind}
+        back={`/orders/${o.id}/production`}
         label={label}
-        prefill={prefill}
-        action={factoryPaymentAction.bind(null, m.orderId, null)}
-        factories={owing}
-        people={people ?? []}
-        orderCurrency={o.currency}
-        fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
-        today={now}
       />
     ) : null;
   const goods = goodsOf(o);

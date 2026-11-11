@@ -10,8 +10,9 @@ import { ViewSwitch } from "@/components/common/view-switch";
 import { NewExpense } from "./forms";
 import { ExpenseRecord } from "./expense-record";
 import { CustomerPaymentsBody } from "./customer-payments";
-import { CustomerCredit, ReceiptForm } from "./money-v2";
-import { customerReceiptAction, refundCreditAction, useCreditAction, voidCreditAction } from "@/app/(app)/orders/actions";
+import { RecordPaymentLink, ViewPaymentsLink } from "./pay-links";
+import { CustomerCredit } from "./money-v2";
+import { refundCreditAction, useCreditAction, voidCreditAction } from "@/app/(app)/orders/actions";
 import { lostReasonLabel } from "./customer-account";
 import { getSettings, getPeople } from "@/lib/loaders";
 
@@ -27,11 +28,14 @@ export async function CustomerMoney({
   customerName,
   view,
   managers,
+  records = false,
 }: {
   customerId: string;
   customerName: string;
   view: CustomerMoneyView;
   managers: boolean;
+  /** May record payments (payments.record). */
+  records?: boolean;
 }) {
   const shown: CustomerMoneyView = managers ? view : "payments";
   const [pay, a] = await Promise.all([
@@ -73,7 +77,10 @@ export async function CustomerMoney({
           <h2 className="text-base font-semibold">Payments</h2>
         )}
         {shown === "payments" ? (
-          <span className="text-xs text-muted">Payments are recorded on each order.</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <ViewPaymentsLink party={customerId} />
+            {records && <RecordPaymentLink kind="in" customer={customerId} back={`/customers/${customerId}`} />}
+          </div>
         ) : (
           profit && (
             <div className="has-[form]:basis-full">
@@ -350,26 +357,10 @@ async function CreditAndReceipts({ customerId, customerName, pay }: { customerId
   const canRecord = pay.credit.canRecord;
   const hasCredit = pay.credit.entries.length > 0;
   if (!canRecord && !hasCredit) return null;
-  const settings = await getSettings();
   const today = todayIn(TZ);
   const open = pay.orders.filter((o) => o.status !== "cancelled" && Number(o.due) > 0);
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {canRecord && (
-        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
-          <div>
-            <h3 className="font-semibold">Money received</h3>
-            <p className="text-xs text-text-2">One transfer can pay several orders: the oldest due first is filled in for you; the rest is kept as credit.</p>
-          </div>
-          <ReceiptForm
-            action={customerReceiptAction.bind(null, customerId)}
-            customer={customerName}
-            orders={open.map((o) => ({ id: o.id, refNo: o.refNo, currency: o.currency, orderedOn: o.orderedOn, due: o.due, next: o.next }))}
-            fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
-            today={today}
-          />
-        </section>
-      )}
+    <div className="grid gap-4">
       {(hasCredit || canRecord) && (
         <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
           <div>

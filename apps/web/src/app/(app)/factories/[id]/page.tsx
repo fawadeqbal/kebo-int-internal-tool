@@ -90,7 +90,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
     <div>
       <PageHeader
         backHref="/factories"
-        backLabel="Factories"
+        backLabel="Suppliers"
         phoneStack
         title={f.name}
         badge={<StatusBadge meaning={status.meaning}>{status.label}</StatusBadge>}
@@ -103,11 +103,16 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
           .join(" · ")
           .replace(/^./, (x) => x.toUpperCase())}
         papers={
-          ledger && (
-            <ButtonLink href={ledger} variant="secondary">
-              <BookOpen aria-hidden /> Ledger
+          <>
+            <ButtonLink href={`/payments?party=${f.id}`} variant="secondary">
+              Payments
             </ButtonLink>
-          )
+            {ledger && (
+              <ButtonLink href={ledger} variant="secondary">
+                <BookOpen aria-hidden /> Ledger
+              </ButtonLink>
+            )}
+          </>
         }
         primary={
           <ButtonLink href="/inquiries?stage=sourcing" variant="primary" title="Inquiries waiting for factory prices: open one to ask this factory">

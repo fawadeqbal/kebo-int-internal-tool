@@ -1,17 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, Plus } from "lucide-react";
-import { PAYMENT_KIND_LABEL, PAYMENT_KINDS, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type PaymentKind } from "@kebo/shared";
-import { Alert, Button, Card, CardBody, CardHeader, cn, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
+import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
+import { Button, Card, CardBody, CardHeader, cn, DetailList, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
-import { MoneyInput } from "@/components/common/money-input";
 import type { ActionState } from "@/lib/actions";
 import type { OrderNext } from "@/lib/types-orders";
 import { AccountSelect } from "@/components/money/accounts";
-import { FilePicker, useSaveThenSend } from "@/components/money/attachment";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -341,148 +338,6 @@ export function DetailsCard({
 }
 
 /* ---------------------------------------------------------------- payments */
-
-/** "Record a payment" (managers): suggests the deposit still missing, else what is still due. */
-export function PaymentForm({
-  action,
-  currency,
-  depositDue,
-  due,
-  today,
-  label = "Record a payment",
-  quiet,
-}: {
-  action: Action;
-  currency: string;
-  depositDue: string;
-  due: string;
-  today: string;
-  /** The button's words, and a plain (not violet) button. */
-  label?: string;
-  quiet?: boolean;
-}) {
-  const first: PaymentKind = Number(depositDue) > 0 ? "deposit" : "balance";
-  const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<PaymentKind>(first);
-  const [file, setFile] = useState<File | null>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
-  // The slip goes with the save itself, so it is kept even when the page re-draws without this form.
-  const save = useSaveThenSend(action, file, (id) => `/files/payments/${id}`, "The payment is recorded", setFileError);
-  const done = () => {
-    setFile(null);
-    setOpen(false);
-  };
-  if (Number(due) <= 0) return <p className="text-sm text-muted">Paid in full: nothing more to record.</p>;
-  if (!open)
-    return (
-      <div className="flex flex-col gap-2">
-        {fileError && <Alert tone="error">{fileError}</Alert>}
-        <Button
-          className="w-fit"
-          variant={quiet ? "secondary" : "primary"}
-          size="sm"
-          onClick={() => {
-            setKind(first);
-            setFileError(null);
-            setOpen(true);
-          }}
-        >
-          {quiet && <Plus aria-hidden />} {label}
-        </Button>
-      </div>
-    );
-  const amount = kind === "deposit" && Number(depositDue) > 0 ? depositDue : kind === "other" ? "" : due;
-  return (
-    <ActionForm action={save} onDone={done} className={framed}>
-      {(s) => (
-        <>
-          <p className="text-sm font-medium">Payment from the customer</p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="What for" htmlFor="p-kind" error={s.errors?.kind}>
-              <Select id="p-kind" name="kind" value={kind} onChange={(e) => setKind(e.target.value as PaymentKind)}>
-                {PAYMENT_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {PAYMENT_KIND_LABEL[k]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Amount received" htmlFor="p-amount" hint={`What reached our bank, in ${currency} (the order's currency)`} error={s.errors?.amount}>
-              <MoneyInput key={kind} id="p-amount" name="amount" currency={currency} defaultValue={s.values?.amount ?? amount} />
-            </Field>
-            <Field label="Bank charges" htmlFor="p-charges" optional hint="Deducted by the banks; counts as paid" error={s.errors?.bankCharges}>
-              <MoneyInput id="p-charges" name="bankCharges" currency={currency} placeholder="0.00" defaultValue={s.values?.bankCharges ?? ""} />
-            </Field>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Paid on" htmlFor="p-paidOn" error={s.errors?.paidOn}>
-              <Input id="p-paidOn" name="paidOn" type="date" max={today} defaultValue={s.values?.paidOn ?? today} />
-            </Field>
-            <Field label="Method" htmlFor="p-method" error={s.errors?.method}>
-              <Select id="p-method" name="method" defaultValue={s.values?.method ?? "bank_transfer"}>
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {PAYMENT_METHOD_LABEL[m]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Bank reference" htmlFor="p-reference" optional hint="e.g. the T/T or SWIFT reference" error={s.errors?.reference}>
-              <Input id="p-reference" name="reference" maxLength={120} defaultValue={s.values?.reference ?? ""} />
-            </Field>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <AccountSelect id="p-account" label="Into account" currency={currency} defaultValue={s.values?.accountId} error={s.errors?.accountId} />
-            <FilePicker id="p-file" label="Proof of payment" hint="Bank slip or transfer screenshot (photo or PDF)" file={file} onChange={setFile} className="sm:col-span-2" />
-          </div>
-          <Field label="Note" htmlFor="p-note" optional error={s.errors?.note}>
-            <Textarea id="p-note" name="note" rows={2} className="min-h-0" defaultValue={s.values?.note} />
-          </Field>
-          <div className="flex gap-2">
-            <SubmitButton size="sm" pendingText={file ? "Recording, sending the file…" : "Recording…"}>
-              Record the payment
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-          </div>
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
-/** Remove a payment recorded by mistake (managers), with a reason. */
-export function VoidPayment({ action }: { action: Action }) {
-  const [open, setOpen] = useState(false);
-  if (!open)
-    return (
-      <Button size="xs" variant="danger-ghost" onClick={() => setOpen(true)}>
-        Remove
-      </Button>
-    );
-  return (
-    <ActionForm action={action} onDone={() => setOpen(false)} className={`${framed} mt-2 w-full`}>
-      {(s) => (
-        <>
-          <Field label="Why remove it?" htmlFor="void-reason" error={s.errors?.reason} hint="It stays listed, crossed out">
-            <Textarea id="void-reason" name="reason" rows={2} className="min-h-0" placeholder="e.g. recorded twice" defaultValue={s.values?.reason} />
-          </Field>
-          <div className="flex gap-2">
-            <SubmitButton size="sm" variant="danger" pendingText="Removing…">
-              Remove the payment
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-              Keep it
-            </Button>
-          </div>
-        </>
-      )}
-    </ActionForm>
-  );
-}
-
-/* ---------------------------------------------------------------- cancelling */
 
 /**
  * Cancel an order (MoneyV2Cancel). Money is never left hanging: with money
