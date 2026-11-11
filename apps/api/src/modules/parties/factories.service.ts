@@ -4,12 +4,31 @@ import { Injectable } from "@nestjs/common";
 import { fromDbDateOrNull, type Prisma, isSupplier, newSupplier } from "@kebo/database";
 import { can, type FactoryImport, type FactoryInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
-import { PrismaService } from "../../database/prisma.service";
+import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
 
 const ownerSelect = { select: { id: true, name: true } } as const;
+
+/** A supplier's main contact: its primary person (contacts for every party), shown as before on the supplier. */
+const mainContact = {
+  where: { deletedAt: null },
+  orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+  take: 1,
+  select: { id: true, name: true, phone: true, wechat: true, email: true },
+} satisfies Prisma.Party$contactsArgs;
+
+type MainContactRow = { name: string; phone: string | null; wechat: string | null; email: string | null };
+
+/** The supplier with its main contact's name, phone, WeChat and email beside its own fields (the view stays as it was). */
+function withContact<T extends { contacts: MainContactRow[] }>(f: T) {
+  const { contacts, ...rest } = f;
+  const c = contacts[0];
+  return { ...rest, contactPerson: c?.name ?? null, phone: c?.phone ?? null, wechat: c?.wechat ?? null, email: c?.email ?? null };
+}
+
+type ContactFields = Pick<FactoryInput, "contactPerson" | "phone" | "wechat" | "email">;
 
 /**
  * Factories are shared by the whole team (staff source from them); only
@@ -28,20 +47,22 @@ export class FactoriesService {
       ...isSupplier,
       deletedAt: null,
       ...(q.mine ? { ownerId: user.id } : {}),
-      ...(q.q ? { OR: [{ name: { contains: q.q, mode: "insensitive" } }, { contactPerson: { contains: q.q, mode: "insensitive" } }] } : {}),
+      ...(q.q
+        ? { OR: [{ name: { contains: q.q, mode: "insensitive" } }, { contacts: { some: { deletedAt: null, name: { contains: q.q, mode: "insensitive" } } } }] }
+        : {}),
     };
     const [rows, total] = await Promise.all([
       this.prisma.db.party.findMany({
         where,
         omit: customerOnly,
-        include: { owner: ownerSelect, _count: { select: { quotes: { where: { deletedAt: null } } } } },
+        include: { owner: ownerSelect, contacts: mainContact, _count: { select: { quotes: { where: { deletedAt: null } } } } },
         orderBy: { name: "asc" },
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
       }),
       this.prisma.db.party.count({ where }),
     ]);
-    return { total, page: q.page, pageSize: q.pageSize, rows };
+    return { total, page: q.page, pageSize: q.pageSize, rows: rows.map(withContact) };
   }
 
   async get(id: string, user?: SessionUser) {
@@ -50,6 +71,7 @@ export class FactoriesService {
       omit: customerOnly,
       include: {
         owner: ownerSelect,
+        contacts: mainContact,
         quotes: {
           where: { deletedAt: null },
           select: { id: true, receivedOn: true, currency: true, inquiry: { select: { id: true, refNo: true, title: true } }, _count: { select: { lines: true } } },
@@ -59,7 +81,7 @@ export class FactoriesService {
       },
     });
     if (!f) throw new NotFoundError("Factory");
-    return { ...f, record: await this.record(id, user) };
+    return { ...withContact(f), record: await this.record(id, user) };
   }
 
   /**
@@ -105,17 +127,30 @@ export class FactoriesService {
   }
 
   private fields(input: FactoryInput) {
-    const { reason: _reason, ...fields } = input;
+    const { reason: _reason, contactPerson: _person, phone: _phone, wechat: _wechat, email: _email, ...fields } = input;
     return { ...fields, ownerId: input.ownerId ?? null };
+  }
+
+  /**
+   * The supplier's main contact from the form: its primary person is updated, or made when something is typed
+   * (named after the supplier when only a number or an address is given).
+   */
+  private async setMainContact(tx: Tx, partyId: string, partyName: string, c: ContactFields) {
+    const data = { phone: c.phone ?? null, wechat: c.wechat ?? null, email: c.email ?? null };
+    const main = await tx.contact.findFirst({ where: { partyId, deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] });
+    if (main) await tx.contact.update({ where: { id: main.id }, data: { ...data, name: c.contactPerson || main.name, isPrimary: true } });
+    else if (c.contactPerson || c.phone || c.wechat || c.email)
+      await tx.contact.create({ data: { ...data, partyId, name: c.contactPerson || partyName, isPrimary: true } });
   }
 
   async create(user: SessionUser, input: FactoryInput) {
     await this.assertUniqueName(input.name);
     await this.assertOwner(input.ownerId);
     return this.prisma.tx(async (tx) => {
-      const f = await tx.party.create({ data: newSupplier({ ...this.fields(input), createdById: user.id }), omit: customerOnly });
-      await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: f.id, summary: `Added factory ${f.name}` });
-      return f;
+      const made = await tx.party.create({ data: newSupplier({ ...this.fields(input), createdById: user.id }), omit: customerOnly });
+      await this.setMainContact(tx, made.id, made.name, input);
+      await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: made.id, summary: `Added factory ${made.name}` });
+      return withContact(await tx.party.findUniqueOrThrow({ where: { id: made.id }, omit: customerOnly, include: { contacts: mainContact } }));
     });
   }
 
@@ -139,6 +174,7 @@ export class FactoriesService {
     await this.prisma.tx(async (tx) => {
       for (const f of fresh) {
         const row = await tx.party.create({ data: newSupplier({ ...this.fields(f), createdById: user.id }) });
+        await this.setMainContact(tx, row.id, row.name, f);
         await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: row.id, summary: `Added factory ${row.name}${from}` });
       }
     });
@@ -155,7 +191,9 @@ export class FactoriesService {
     const handedOver = before.ownerId !== null && before.ownerId !== ownerId;
     const reason = renamed || handedOver ? requireReason(input.reason, "factoryDetails", renamed ? "the factory's name changes" : "another person looks after this factory") : input.reason;
     return this.prisma.tx(async (tx) => {
-      const f = await tx.party.update({ where: { ...isSupplier, id }, data: this.fields(input), omit: customerOnly, include: { owner: ownerSelect } });
+      const saved = await tx.party.update({ where: { ...isSupplier, id }, data: this.fields(input), omit: customerOnly, include: { owner: ownerSelect } });
+      await this.setMainContact(tx, id, saved.name, input);
+      const f = withContact(await tx.party.findUniqueOrThrow({ where: { id }, omit: customerOnly, include: { owner: ownerSelect, contacts: mainContact } }));
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",

@@ -53,7 +53,7 @@ export async function freezeOrderBuyer(db: Db, orderIds: string[], takenOn: stri
              'name', c.name, 'country', c.country, 'address', c.address, 'taxNo', c.tax_no, 'regNo', c.reg_no,
              'contact', (select jsonb_build_object('name', ct.name, 'email', ct.email, 'phone', coalesce(ct.phone, ct.whatsapp))
                            from contacts ct
-                          where ct.customer_id = c.id and ct.deleted_at is null
+                          where ct.party_id = c.id and ct.deleted_at is null
                           order by (ct.id = i.contact_id) desc nulls last, ct.is_primary desc, ct.created_at, ct.id
                           limit 1))
            || coalesce((select jsonb_object_agg(e.key, e.value)

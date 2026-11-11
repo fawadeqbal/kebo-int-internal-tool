@@ -533,11 +533,6 @@ model Party {
   defaultCurrency String?   @map("default_currency") @db.Char(3)
   /// Short letters for the party on documents, e.g. "TN" in proforma KEB260916TN07. Empty: taken from the name.
   initials        String?   @db.VarChar(6)
-  /// The main contact as typed on a supplier (moves to contacts with the rest of the contacts).
-  contactPerson   String?   @map("contact_person") @db.VarChar(120)
-  phone           String?   @db.VarChar(40)
-  wechat          String?   @db.VarChar(80)
-  email           String?   @db.VarChar(254)
   bankDetails     String?   @map("bank_details")
   notes           String?
   /// The person in our team who looks after this party.
@@ -551,8 +546,9 @@ model Party {
 
   roles PartyRole[]
 
+  /// Its people (customers and suppliers alike); the primary one is the main contact.
+  contacts     Contact[]       @relation("PartyContacts")
   // As a customer
-  contacts     Contact[]       @relation("ContactCustomer")
   inquiries    Inquiry[]       @relation("InquiryCustomer")
   orders       Order[]         @relation("OrderCustomer")
   movements    MoneyMovement[] @relation("MovementParty")
@@ -604,8 +600,9 @@ model Contact {
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId  String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company   @relation(fields: [companyId], references: [id])
-  customerId String    @map("customer_id") @db.Uuid
-  customer   Party     @relation("ContactCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  /// The customer or supplier this person works for (contacts for every party).
+  partyId    String    @map("party_id") @db.Uuid
+  party      Party     @relation("PartyContacts", fields: [partyId], references: [id], onDelete: Cascade)
   name       String    @db.VarChar(120)
   position   String?   @db.VarChar(80)
   email      String?   @db.VarChar(254)
@@ -620,7 +617,7 @@ model Contact {
   inquiries Inquiry[]
   notes     Note[]
 
-  @@index([customerId])
+  @@index([partyId])
   @@index([email])
   @@index([phone])
   @@index([whatsapp])

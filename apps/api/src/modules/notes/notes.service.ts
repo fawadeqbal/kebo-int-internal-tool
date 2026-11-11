@@ -100,7 +100,7 @@ export class NotesService {
     if (!contactId) return;
     const bad = (message: string) => new z.ZodError([{ code: "custom", path: ["contactId"], message, input: contactId }]);
     if (!target.customerId) throw bad("Factories have no contacts to choose; say who it was with in the note.");
-    const found = await this.prisma.db.contact.count({ where: { id: contactId, customerId: target.customerId, deletedAt: null } });
+    const found = await this.prisma.db.contact.count({ where: { id: contactId, partyId: target.customerId, deletedAt: null } });
     if (!found) throw bad("Choose one of the customer's contacts.");
   }
 
