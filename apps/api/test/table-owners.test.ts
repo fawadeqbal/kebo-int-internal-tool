@@ -14,6 +14,8 @@ const OWNERS: Record<string, string> = {
   orderDelivery: "flow",
   orderCancellation: "cancellation",
   orderPaymentTerms: "orders",
+  orderPaper: "documents",
+  orderDocument: "documents",
 };
 
 const MODULES = resolve(__dirname, "../src/modules");

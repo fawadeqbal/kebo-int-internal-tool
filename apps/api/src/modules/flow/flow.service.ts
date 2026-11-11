@@ -62,6 +62,7 @@ import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../billing/api";
 import { seedFactoryPlans } from "../billing/api";
 import { onPrimaryShipment, SHIPMENT_ORDER } from "../orders/shipment-facts";
+import { addDocument, changeDocument, removeDocument } from "../documents/api";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 
@@ -922,8 +923,7 @@ export class FlowService {
       await this.checkDocumentLinks(tx, o, input.shipmentId, input.attachmentId);
       const bl = input.kind === "bill_of_lading" || input.kind === "airway_bill";
       await this.blOnShipment(tx, o, input.kind, input.shipmentId ?? null, input.number);
-      await tx.orderDocument.create({
-        data: {
+      await addDocument(tx, {
           orderId: id,
           kind: input.kind,
           title: input.title,
@@ -934,7 +934,6 @@ export class FlowService {
           attachmentId: input.attachmentId,
           note: input.note,
           keptWhere: input.status === "elsewhere" ? input.keptWhere : null,
-        },
       });
       await this.log(
         tx,
@@ -977,7 +976,7 @@ export class FlowService {
         data.number = null;
       }
       if (input.issuedOn !== undefined) data.issuedOn = toDbDateOrNull(input.issuedOn);
-      await tx.orderDocument.update({ where: { id: docId }, data });
+      await changeDocument(tx, docId, data);
       await this.log(
         tx,
         user,
@@ -997,7 +996,7 @@ export class FlowService {
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, orderId);
       const before = await tx.orderDocument.findUniqueOrThrow({ where: { id: docId } });
-      await tx.orderDocument.delete({ where: { id: docId } });
+      await removeDocument(tx, docId);
       await this.log(tx, user, orderId, "document", `${o.refNo}: ${ORDER_DOCUMENT_LABEL[before.kind]} removed`, before, undefined);
     });
     return this.get(user, orderId);

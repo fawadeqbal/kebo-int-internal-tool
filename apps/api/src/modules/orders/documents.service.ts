@@ -12,6 +12,7 @@ import { SettingsService } from "../settings/settings.service";
 import { fxOf } from "../billing/api";
 import { OrdersService } from "./orders.service";
 import { buyerOf } from "./buyer";
+import { deleteDraft, makeAgain } from "../documents/api";
 import {
   buildOrderDoc,
   docNumber,
@@ -147,9 +148,7 @@ export class DocumentsService {
       const latest = rows.at(-1);
       if (!latest) throw new DomainError(kind === "proforma" ? "Issue the proforma first." : "The packing list is final once the order is shipped.");
       if (latest.status !== "final") throw new DomainError(`Version ${latest.version} is still a draft: issue it or delete it.`);
-      await tx.orderPaper.create({
-        data: { orderId, kind, ref: "", number: latest.number, version: latest.version + 1, status: "draft", options: {}, madeById: user.id },
-      });
+      await makeAgain(tx, { ...latest, options: {} }, user.id);
       await this.audit.record(tx, {
         userId: user.id,
         action: "paper.again",
@@ -195,7 +194,7 @@ export class DocumentsService {
       const o = await this.orders.load(user, orderId, tx);
       const latest = await tx.orderPaper.findFirst({ where: { orderId, kind }, orderBy: { version: "desc" } });
       if (!latest || latest.status !== "draft") throw new DomainError("There is no draft to delete.");
-      await tx.orderPaper.delete({ where: { id: latest.id } });
+      await deleteDraft(tx, latest);
       await this.audit.record(tx, {
         userId: user.id,
         action: "paper.delete",

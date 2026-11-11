@@ -59,6 +59,7 @@ import { SettingsService } from "../settings/settings.service";
 import { companySnapshot } from "../quotations/quotations.service";
 import { buyerOf, partyOf } from "../orders/buyer";
 import { quotedTermsPrinted } from "../orders/order-docs";
+import { deleteDraft, makeAgain, makeFinal, paperReady, saveDraft, startDraft } from "../documents/api";
 import { termsOf } from "../billing/api";
 import { orderAccess } from "../../common/auth/order-access";
 import { OrdersService } from "../orders/orders.service";
@@ -743,7 +744,7 @@ export class PapersService {
       if (latest?.status === "final") throw new DomainError(`Version ${latest.version} is final. Use Make again for a new version.`);
       const options = this.optionsOf(kind, o, latest ? asOptions(latest.options) : null, input.options);
       if (latest) {
-        await tx.orderPaper.update({ where: { id: latest.id }, data: { options } });
+        await saveDraft(tx, latest, options);
         await this.log(tx, user, o, "draft", kind, `${PAPER_LABEL[kind]} ${latest.number} draft saved`, {
           number: latest.number,
           version: latest.version,
@@ -751,9 +752,7 @@ export class PapersService {
         });
       } else {
         const { doc } = this.build(kind, await this.ctx(user, o, kind, options, ref));
-        await tx.orderPaper.create({
-          data: { orderId, kind, ref, number: doc.number, version: 1, status: "draft", options, madeById: user.id },
-        });
+        await startDraft(tx, { orderId, kind, ref, number: doc.number, options, byId: user.id });
         await this.log(tx, user, o, "draft", kind, `${PAPER_LABEL[kind]} ${doc.number} started as a draft`, {
           number: doc.number,
           version: 1,
@@ -787,21 +786,12 @@ export class PapersService {
       if (missing.length) throw new DomainError(`Still needed before it is final: ${missing.map((x) => inSentence(x.label)).join(", ")}.`);
       const now = new Date();
       const snapshot = { ...doc, number: row.number } as unknown as Prisma.InputJsonValue;
-      await tx.orderPaper.update({ where: { id: row.id }, data: { status: "final", options, snapshot, finalAt: now } });
+      await makeFinal(tx, row, { orderId: o.id, kind, ref: row.ref, number: row.number, byId: user.id, snapshot, options });
       // The document set's paper is ready, made by the app.
       const docKind = PAPER_DOCUMENT[kind];
       if (docKind) {
-        const today = this.clock.today();
         const existing = o.documents.find((d) => d.kind === docKind && (d.paperId !== null || !documentDone(d.status))) ?? null;
-        const data = {
-          status: "ready" as const,
-          number: row.number,
-          issuedOn: new Date(`${today}T00:00:00Z`),
-          paperId: row.id,
-          keptWhere: null,
-        };
-        if (existing) await tx.orderDocument.update({ where: { id: existing.id }, data });
-        else await tx.orderDocument.create({ data: { orderId: o.id, kind: docKind, ...data } });
+        await paperReady(tx, { orderId: o.id, kind: docKind, rowId: existing?.id ?? null, paperId: row.id, number: row.number, today: this.clock.today() });
       }
       // Own items that make this paper tick themselves.
       await tx.orderChecklistItem.updateMany({
@@ -826,18 +816,7 @@ export class PapersService {
       const latest = this.rowsOf(o, kind, ref).at(-1);
       if (!latest) throw new DomainError("Make the paper first.");
       if (latest.status !== "final") throw new DomainError(`Version ${latest.version} is still a draft: change it and make it final.`);
-      await tx.orderPaper.create({
-        data: {
-          orderId,
-          kind,
-          ref,
-          number: latest.number,
-          version: latest.version + 1,
-          status: "draft",
-          options: (latest.options ?? {}) as Prisma.InputJsonValue,
-          madeById: user.id,
-        },
-      });
+      await makeAgain(tx, latest, user.id);
       await this.log(tx, user, o, "again", kind, `${PAPER_LABEL[kind]} ${latest.number} made again (version ${latest.version + 1})`, {
         number: latest.number,
         version: latest.version + 1,
@@ -859,7 +838,7 @@ export class PapersService {
       if (!row) throw new NotFoundError("Paper");
       if (row.status !== "draft")
         throw new DomainError(`Version ${row.version} is final: it stays as it was printed. Make it again for a new version.`);
-      await tx.orderPaper.delete({ where: { id: row.id } });
+      await deleteDraft(tx, row);
       await this.log(tx, user, o, "delete", kind, `${PAPER_LABEL[kind]} ${row.number} draft deleted (version ${row.version})`, {
         number: row.number,
         version: row.version,
