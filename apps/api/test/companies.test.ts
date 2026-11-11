@@ -189,11 +189,13 @@ describe("companies: isolation and the platform", () => {
       >`select relname as t from pg_class where relrowsecurity and relkind = 'r' and relnamespace = current_schema()::regnamespace`
     ).map((r) => r.t);
     expect(tables.length).toBeGreaterThanOrEqual(36);
-    // Every table with a company column is under row-level security, except the platform's own.
+    // Every table with a company column is under row-level security, except the platform's own (views read
+    // through the tables' security: security_invoker).
     const withCompany = (
       await prisma.platform.$queryRaw<
         { t: string }[]
-      >`select table_name as t from information_schema.columns where table_schema = current_schema() and column_name = 'company_id'`
+      >`select c.table_name as t from information_schema.columns c join information_schema.tables x on x.table_name = c.table_name and x.table_schema = c.table_schema
+         where c.table_schema = current_schema() and c.column_name = 'company_id' and x.table_type = 'BASE TABLE'`
     ).map((r) => r.t);
     expect(withCompany.filter((t) => !tables.includes(t)).sort()).toEqual(["leads", "platform_log", "sign_ups", "subscription_payments"]);
     const db = prisma.company(b.id);

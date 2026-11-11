@@ -1,4 +1,4 @@
-import { decimalToMinor, type Prisma } from "@kebo/database";
+import { decimalToMinor, livePart, type Prisma } from "@kebo/database";
 import { expenseIn, factoryPosition, orderPosition, type FactoryOwing, type Fx, type Minor, type OrderPosition } from "@kebo/money";
 import type { Settings } from "@kebo/shared";
 import { orderRate } from "./order-money";
@@ -31,9 +31,9 @@ export const chargedExpenses = {
   select: { amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, description: true, spentOn: true, id: true },
 } satisfies Prisma.Order$expensesArgs;
 
-/** The relations positionOf reads (payments and the plan as most screens load them). */
+/** The relations positionOf reads (what pays the order, and the plan, as most screens load them). */
 export const positionRelations = {
-  payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, voidedAt: true } },
+  allocations: { where: livePart, select: { amount: true, bankCharges: true, voidedAt: true } },
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
 } satisfies Prisma.OrderInclude;
@@ -44,7 +44,8 @@ export interface PositionFacts {
   depositPercent: Decimalish;
   mainCurrency: string | null;
   mainRate: Decimalish | null;
-  payments: { amount: Decimalish; bankCharges: Decimalish; voidedAt?: Date | null }[];
+  /** What pays it (its live allocations; removed ones are left out). */
+  allocations: { amount: Decimalish; bankCharges: Decimalish; voidedAt?: Date | null }[];
   planItems: { amount: Decimalish; part: string | null }[];
   /** At least the expenses charged to the customer (others are left out here). */
   expenses: { amount: Decimalish; currency: string; rate: Decimalish; borneBy?: string; voidedAt?: Date | null }[];
@@ -69,7 +70,7 @@ export function positionOf(o: PositionFacts, fx: MoneyCtx, toleranceMinor = 0): 
   const charged = chargedOf(o, fx).reduce((t, c) => t + (c.minor ?? 0), 0);
   return orderPosition({
     totalMinor: minor(o.total),
-    payments: o.payments
+    payments: o.allocations
       .filter((p) => !p.voidedAt)
       .map((p) => ({ amountMinor: minor(p.amount), bankChargesMinor: minor(p.bankCharges) })),
     plan: o.planItems.map((p) => ({ amountMinor: minor(p.amount), part: p.part })),

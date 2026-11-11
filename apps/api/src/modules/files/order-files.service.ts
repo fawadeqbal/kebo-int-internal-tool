@@ -1,3 +1,4 @@
+import { livePart } from "@kebo/database";
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { zipSync } from "fflate";
@@ -99,6 +100,9 @@ const MAX_ZIP = 300 * 1024 * 1024;
  * the deal (its handler, a manager, or whoever uploaded it). Every change is
  * noted in the order's history as file.* (with its step).
  */
+/** The payment entry a proof of money in is kept on: asked for by the payment on the order, or by the entry. */
+const entryOf = (id: string) => ({ OR: [{ id }, { allocations: { some: { id } } }] });
+
 @Injectable()
 export class OrderFilesService {
   constructor(
@@ -139,11 +143,15 @@ export class OrderFilesService {
             select: { id: true, factory: { select: { name: true } } },
           })
         : Promise.resolve([]),
-      db.payment.findMany({
-        where: { orderId, voidedAt: null, fileKey: { not: null } },
-        include: { recordedBy: { select: { id: true, name: true } } },
-        orderBy: { paidOn: "asc" },
-      }),
+      // Proof of money in is kept on its payment entry (one per transfer, shown on each order it pays).
+      db.allocation
+        .findMany({
+          where: { orderId, ...livePart, later: false, movement: { fileKey: { not: null } } },
+          include: { movement: { include: { recordedBy: { select: { id: true, name: true } } } } },
+          orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+        })
+        // Listed as the payment on this order (its id), the file kept on the entry.
+        .then((parts) => parts.map((a) => ({ ...a.movement, id: a.id, kind: a.kind, paidOn: a.on }))),
       seeCosts
         ? db.factoryPayment.findMany({
             where: { orderId, voidedAt: null, fileKey: { not: null } },
@@ -477,7 +485,7 @@ export class OrderFilesService {
             ...(input.note !== undefined && { note: input.note }),
           },
         });
-      else if (source === "payment") await tx.payment.update({ where: { id: fileId }, data: { fileName: name } });
+      else if (source === "payment") await tx.moneyMovement.updateMany({ where: entryOf(fileId), data: { fileName: name } });
       else if (source === "factory_payment") await tx.factoryPayment.update({ where: { id: fileId }, data: { fileName: name } });
       else await tx.expense.update({ where: { id: fileId }, data: { receiptName: name } });
       if (name !== undefined && name !== f.name)
@@ -700,7 +708,7 @@ export class OrderFilesService {
     if (f.source === "attachment")
       return (await db.attachment.findUnique({ where: { id: f.sourceId }, select: { storageKey: true } }))?.storageKey ?? null;
     if (f.source === "payment")
-      return (await db.payment.findUnique({ where: { id: f.sourceId }, select: { fileKey: true } }))?.fileKey ?? null;
+      return (await db.moneyMovement.findFirst({ where: entryOf(f.sourceId), select: { fileKey: true } }))?.fileKey ?? null;
     if (f.source === "factory_payment")
       return (await db.factoryPayment.findUnique({ where: { id: f.sourceId }, select: { fileKey: true } }))?.fileKey ?? null;
     return (await db.expense.findUnique({ where: { id: f.sourceId }, select: { receiptKey: true } }))?.receiptKey ?? null;

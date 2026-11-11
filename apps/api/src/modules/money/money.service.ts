@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   balanceTermsOf,
@@ -133,7 +133,7 @@ export class MoneyService {
         lines: linesWithFactory,
         costs: true,
         planItems: { orderBy: { sortOrder: "asc" } },
-        payments: { where: { voidedAt: null } },
+        allocations: { where: livePart },
         factoryPaid: {
           orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
           include: { factory: { select: { id: true, name: true } }, paidBy: person, account: { select: { id: true, name: true } } },
@@ -428,7 +428,7 @@ export class MoneyService {
       );
       const now = describe(rows.map((r) => ({ ...r, amount: fromMinor(toMinor(r.amount)) })));
       if (was === now) return;
-      const paid = o.payments.length > 0;
+      const paid = o.allocations.length > 0;
       const reason = paid
         ? requireReason(input.reason, "plan", "the payment plan changes after the customer has paid")
         : (input.reason ?? null);
@@ -1161,13 +1161,16 @@ export class MoneyService {
           customer: { select: { name: true } },
           // Only those borne by us: the customer pays the others back, or they come off what we owe a factory.
           expenses: { where: { voidedAt: null, borneBy: "us" }, select: { amount: true, rate: true, category: true } },
-          payments: { where: { voidedAt: null }, select: { bankCharges: true } },
+          allocations: { where: livePart, select: { bankCharges: true } },
         },
       }),
-      this.prisma.db.payment.findMany({
-        where: { voidedAt: null, paidOn: { gte: from, lte: to } },
-        select: { amount: true, bankCharges: true, currency: true, paidOn: true, order: { select: { status: true, ...rated } } },
-      }),
+      // What paid orders when it arrived (from credit later: no cash moved).
+      this.prisma.db.allocation
+        .findMany({
+          where: { ...livePart, later: false, on: { gte: from, lte: to } },
+          select: { amount: true, bankCharges: true, on: true, order: { select: { status: true, ...rated } } },
+        })
+        .then((rows) => rows.map((a) => ({ ...a, paidOn: a.on, order: a.order! }))),
       this.prisma.db.factoryPayment.findMany({
         where: { voidedAt: null, paidOn: { gte: from, lte: to } },
         select: { amount: true, rate: true, paidOn: true, order: { select: rated } },
@@ -1223,7 +1226,7 @@ export class MoneyService {
       const basisPaid = o.expenses
         .filter((e) => paysBasis(e.category))
         .reduce((t, e) => t + convert(decimalToMinor(e.amount), Number(e.rate)), 0);
-      const bank = inMain(o.payments.reduce((t, p) => t + decimalToMinor(p.bankCharges), 0));
+      const bank = inMain(o.allocations.reduce((t, p) => t + decimalToMinor(p.bankCharges), 0));
       const revenue = inMain(c.revenueMinor);
       const costedRevenue = inMain(c.costedRevenueMinor);
       const goodsCost = inMain(c.goodsCostMinor);

@@ -21,7 +21,7 @@ import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
 import { portsOf, type BalanceTerms, type Incoterm, type InquiryStage } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
-import { freezeOrderBuyer, freezeOrderMoney, isCustomer, isSupplier, nextReference, openCompany, roleRows, toDbDate, type Prisma } from "../src";
+import { paymentIn, freezeOrderBuyer, freezeOrderMoney, isCustomer, isSupplier, nextReference, openCompany, roleRows, toDbDate, type Prisma } from "../src";
 import * as map from "./import-legacy/map";
 
 /* ---------------------------------------------------------------- arguments */
@@ -1066,7 +1066,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     old.payments.map((p) => ({ p, inv: invoiceById.get(p.invoice_id)! })),
     ({ inv }) => orderForInvoice(inv),
   );
-  const paymentRows: Prisma.PaymentCreateManyInput[] = [];
+  // Each old payment: a payment entry that pays its order in full (both keep the old payment's id).
+  const paymentRows: { id: string; data: Prisma.MoneyMovementUncheckedCreateInput }[] = [];
   for (const [orderId, list] of paymentsOfOrder) {
     const o = [...orderOfInquiry.values()].find((x) => x.id === orderId)!;
     list
@@ -1078,25 +1079,25 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         // has no rate to turn one in another currency into it.
         if (inv.currency !== o.currency)
           throw new Error(`Payment against invoice ${inv.invoice_no} is in ${inv.currency}, its order in ${o.currency}: record it in the order's currency.`);
-        paymentRows.push({
-          id: p.id,
+        const entry = paymentIn({
           kind: map.paymentKind(i),
           orderId,
-          customerId: o.customerId,
+          partyId: o.customerId,
           amount: p.amount,
           currency: inv.currency,
-          receivedAmount: p.amount,
-          receivedCurrency: inv.currency,
           paidOn: toDbDate(p.paid_at),
           method: map.mapPaymentMethod(p.method),
           reference: p.reference,
           note: `Paid against invoice ${inv.invoice_no} (old app).`,
           recordedById: p.recorded_by,
-          createdAt: p.created_at,
+        });
+        paymentRows.push({
+          id: p.id,
+          data: { ...entry, id: p.id, createdAt: p.created_at, allocations: { create: { ...entry.allocations.create, id: p.id, createdAt: p.created_at } } },
         });
       });
   }
-  await tx.payment.createMany({ data: paymentRows });
+  for (const r of paymentRows) await tx.moneyMovement.create({ data: r.data });
   report.judge(
     "Payments",
     'customer payments → payments "in" on the order, oldest first: the first is "deposit" (even when it paid everything), later ones "balance"; the invoice they were recorded against is kept in the note; bank charges 0',
@@ -1167,7 +1168,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     orders: await tx.order.count(),
     orderLines: await tx.orderLine.count(),
     orderStageChanges: await tx.orderStageChange.count(),
-    payments: await tx.payment.count(),
+    payments: await tx.allocation.count(),
     packedOrders: await tx.order.count({ where: { packedAt: { not: null } } }),
     audit: await tx.auditLog.count(),
     settings: await tx.setting.count(),
@@ -1217,7 +1218,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "device_tokens (skipped: phones sign in again)", old: Number(old.skipped.device_tokens), new: 0 },
   );
 
-  const newPay = await tx.payment.findMany({ select: { amount: true } });
+  const newPay = await tx.allocation.findMany({ select: { amount: true } });
   // One option per old version: its figures are the version's.
   const newRev = await tx.quotationOption.findMany({ select: { total: true } });
   const newOrders = await tx.order.findMany({ select: { total: true } });

@@ -216,229 +216,194 @@ export function purchasePlan(
 export const moneyLine = (accountId: string | null, currency: string): Pick<Line, "account" | "moneyAccountId"> =>
   accountId ? { account: acc.money(accountId), moneyAccountId: accountId } : { account: acc.noAccount(currency), moneyAccountId: null };
 
-export interface PaymentDoc {
+/** One order's part of a payment entry, as the ledger needs it. */
+export interface AllocationLine {
   id: string;
+  /** Its receipt's number (RC-…-n). */
   ref: string;
   kind: PaymentKind;
   order: { id: string; refNo: string; customerId: string; currency: string; rate: number | null };
   amountMinor: Minor;
   bankChargesMinor: Minor;
+  /** Removed (when the movement stands: released, its order cancelled). */
+  voided: boolean;
+}
+
+export interface MovementDoc {
+  id: string;
+  /** Its receipts' numbers (the first, "+n" for more); "" for money that pays no order (numbered CR-…). */
+  ref: string;
+  direction: "in" | "out";
+  partyId: string;
+  amountMinor: Minor;
   currency: string;
-  receivedMinor: Minor;
-  receivedCurrency: string;
+  allocCurrency: string;
+  /** Units of `currency` per one of `allocCurrency`. */
   rate: number;
+  /** What it counts as in allocCurrency. */
+  allocatableMinor: Minor;
   accountId: string | null;
-  paidOn: ISODate;
-  method: string;
-  /** Part of one transfer over several orders: the transfer posts it. */
-  inReceipt: boolean;
+  valueDate: ISODate;
+  /** The orders' own rate (the first order's), for the credit and the orders' lines. */
+  orderRate: number | null;
+  /** What it paid when it was recorded (not later, from credit), removed or not. */
+  parts: AllocationLine[];
   voided: { on: ISODate; reason: string | null } | null;
 }
 
 /**
- * Money in on one order: into the account (what arrived, in its currency), the bank charges the customer paid on
- * the way, and off what the customer owes (amount + bank charges, in the order's currency). Paid from the
- * customer's credit: off their credit instead of into an account.
+ * A payment entry. Money in: into the account (what arrived, in its currency), the bank charges the customer
+ * paid on the way, off each order it paid when recorded (amount + bank charges, in the orders' currency), the
+ * rest to the customer's credit. Money out (a refund): off their credit, out of the account.
  */
-export function paymentPlan(p: PaymentDoc, ctx: RuleCtx): DocPlan {
-  const d = dims({ orderId: p.order.id, customerId: p.order.customerId });
-  const base = { sourceType: "payment" as const, sourceId: p.id, mode: "full" as const, voided: p.voided };
-  if (p.inReceipt) return { ...base, voided: null, parts: [] };
-  const counted = p.amountMinor + p.bankChargesMinor;
-  const customer: Line = { account: acc.customer(p.order.customerId), side: "credit", minor: counted, currency: p.currency, rate: null };
-  if (p.method === "credit") {
-    const rate = p.order.rate;
+export function movementPlan(m: MovementDoc, ctx: RuleCtx): DocPlan {
+  const base = { sourceType: "movement" as const, sourceId: m.id, mode: "full" as const, voided: m.voided };
+  const allocRef = m.ref ? undefined : { prefix: "CR", year: Number(m.valueDate.slice(0, 4)) };
+  if (m.direction === "out") {
+    const rate = liveRate(ctx, m.currency);
     return {
       ...base,
+      allocRef,
       parts: [
         {
           part: "",
-          date: p.paidOn,
-          type: "credit",
-          ref: p.ref,
-          memo: `Paid from the customer's credit for ${p.order.refNo}`,
-          dims: d,
+          date: m.valueDate,
+          type: "money_out",
+          ref: m.ref,
+          memo: "Credit refunded",
+          dims: dims({ customerId: m.partyId }),
           lines: [
-            { account: acc.credit(p.order.customerId), side: "debit", minor: p.amountMinor, currency: p.currency, rate },
-            { ...customer, rate },
+            { account: acc.credit(m.partyId), side: "debit", minor: m.amountMinor, currency: m.currency, rate },
+            { ...moneyLine(m.accountId, m.currency), side: "credit", minor: m.amountMinor, currency: m.currency, rate },
           ],
         },
       ],
     };
   }
-  const rates = pairRates(ctx.main, p.receivedCurrency, p.currency, p.rate, p.order.rate);
-  const lines: Line[] = [
-    {
-      ...moneyLine(p.accountId, p.receivedCurrency),
-      side: "debit",
-      minor: p.receivedMinor,
-      currency: p.receivedCurrency,
-      rate: rates.arrived,
-    },
-  ];
-  if (p.bankChargesMinor > 0)
-    lines.push({ account: "bank_charges", side: "debit", minor: p.bankChargesMinor, currency: p.currency, rate: rates.counted });
-  lines.push({ ...customer, rate: rates.counted, takesRest: p.receivedCurrency === ctx.main || p.currency === ctx.main });
-  return {
-    ...base,
-    parts: [
-      {
-        part: "",
-        date: p.paidOn,
-        type: "money_in",
-        ref: p.ref,
-        memo: `${PAYMENT_KIND_LABEL[p.kind] ?? "Payment"} for ${p.order.refNo}${p.bankChargesMinor ? " (with bank charges)" : ""}`,
-        dims: d,
-        lines,
-      },
-    ],
-  };
-}
-
-export interface ReceiptDoc {
-  id: string;
-  ref: string;
-  customerId: string;
-  receivedMinor: Minor;
-  receivedCurrency: string;
-  currency: string;
-  rate: number;
-  accountId: string | null;
-  paidOn: ISODate;
-  /** The orders' own rate (the first order's), for the credit and the orders' lines. */
-  orderRate: number | null;
-  payments: { orderId: string; refNo: string; amountMinor: Minor; bankChargesMinor: Minor; voided: boolean }[];
-  credits: { amountMinor: Minor; voided: boolean }[];
-  voided: { on: ISODate; reason: string | null } | null;
-}
-
-/** One transfer from a customer over several orders: into the account once, off each order, the rest to their credit. */
-export function receiptPlan(r: ReceiptDoc, ctx: RuleCtx): DocPlan {
-  const rates = pairRates(ctx.main, r.receivedCurrency, r.currency, r.rate, r.orderRate ?? liveRate(ctx, r.currency));
-  // A removed transfer: its payments and credit were removed with it, so the posting is as it stood.
-  const removed = !!r.voided;
-  const payments = r.payments.filter((p) => removed || !p.voided);
-  const credits = r.credits.filter((c) => removed || !c.voided);
-  const lines: Line[] = [
-    {
-      ...moneyLine(r.accountId, r.receivedCurrency),
-      side: "debit",
-      minor: r.receivedMinor,
-      currency: r.receivedCurrency,
-      rate: rates.arrived,
-    },
-  ];
-  for (const p of payments) {
+  const rates = pairRates(ctx.main, m.currency, m.allocCurrency, m.rate, m.orderRate ?? liveRate(ctx, m.allocCurrency));
+  const lines: Line[] = [{ ...moneyLine(m.accountId, m.currency), side: "debit", minor: m.amountMinor, currency: m.currency, rate: rates.arrived }];
+  // A part released later (its order cancelled) still paid the order on this day: the release posts its own.
+  for (const p of m.parts) {
     if (p.bankChargesMinor > 0)
-      lines.push({
-        account: "bank_charges",
-        side: "debit",
-        minor: p.bankChargesMinor,
-        currency: r.currency,
-        rate: rates.counted,
-        orderId: p.orderId,
-      });
+      lines.push({ account: "bank_charges", side: "debit", minor: p.bankChargesMinor, currency: m.allocCurrency, rate: rates.counted, orderId: p.order.id });
     lines.push({
-      account: acc.customer(r.customerId),
+      account: acc.customer(m.partyId),
       side: "credit",
       minor: p.amountMinor + p.bankChargesMinor,
-      currency: r.currency,
+      currency: m.allocCurrency,
       rate: rates.counted,
-      orderId: p.orderId,
+      orderId: p.order.id,
     });
   }
-  const creditMinor = credits.reduce((t, c) => t + c.amountMinor, 0);
+  const creditMinor = m.allocatableMinor - m.parts.reduce((t, p) => t + p.amountMinor, 0);
   if (creditMinor > 0)
-    lines.push({ account: acc.credit(r.customerId), side: "credit", minor: creditMinor, currency: r.currency, rate: rates.counted });
-  const refs = [...new Set(payments.map((p) => p.refNo))];
+    lines.push({ account: acc.credit(m.partyId), side: "credit", minor: creditMinor, currency: m.allocCurrency, rate: rates.counted });
+  // One conversion (the money arrived in, or counts in, the main currency): the customer's side takes the rest.
+  if (m.parts.length === 1 && creditMinor <= 0 && (m.currency === ctx.main || m.allocCurrency === ctx.main))
+    lines[lines.length - 1] = { ...lines[lines.length - 1]!, takesRest: true };
+  const refs = [...new Set(m.parts.map((p) => p.order.refNo))];
+  const one = m.parts.length === 1 ? m.parts[0]! : null;
   return {
-    sourceType: "receipt",
-    sourceId: r.id,
-    mode: "full",
-    voided: r.voided,
+    ...base,
+    allocRef,
     parts: [
       {
         part: "",
-        date: r.paidOn,
+        date: m.valueDate,
         type: "money_in",
-        ref: r.ref,
-        memo: refs.length
-          ? `One transfer for ${refs.join(", ")}${creditMinor ? ", the rest to credit" : ""}`
-          : "Money in, kept as the customer's credit",
-        dims: dims({ customerId: r.customerId, orderId: refs.length === 1 ? payments[0]!.orderId : null }),
+        ref: m.ref,
+        memo: one
+          ? `${PAYMENT_KIND_LABEL[one.kind] ?? "Payment"} for ${one.order.refNo}${one.bankChargesMinor ? " (with bank charges)" : ""}${creditMinor > 0 ? ", the rest to credit" : ""}`
+          : refs.length
+            ? `One transfer for ${refs.join(", ")}${creditMinor > 0 ? ", the rest to credit" : ""}`
+            : "Money in, kept as the customer's credit",
+        dims: dims({ customerId: m.partyId, orderId: refs.length === 1 ? m.parts[0]!.order.id : null }),
         lines,
       },
     ],
   };
 }
 
-export interface CreditDoc {
+export interface AllocationDoc {
   id: string;
-  kind: string;
-  customerId: string;
+  ref: string;
+  target: "order" | "refund" | "fee";
+  partyId: string;
+  /** Made after its movement, from the customer's credit. */
+  later: boolean;
+  /** In the movement's alloc currency. */
   amountMinor: Minor;
+  bankChargesMinor: Minor;
   currency: string;
-  order: { id: string; refNo: string; rate: number | null; currency: string } | null;
-  accountId: string | null;
+  order: { id: string; refNo: string; rate: number | null } | null;
   on: ISODate;
   note: string | null;
-  /** Posted by its transfer (credit left over) or its payment (credit used). */
-  postedElsewhere: boolean;
+  /** Its movement was removed: everything is reversed by the movement. */
+  movementVoided: boolean;
   voided: { on: ISODate; reason: string | null } | null;
 }
 
 /**
- * The customer's credit outside a transfer or a payment: kept from a cancelled order (off what they owed on it,
- * onto their credit), refunded (off their credit, out of an account), or kept as a cancellation fee (income).
+ * What an allocation posts by itself (the rest is its movement's):
+ * - paid from the customer's credit later: off their credit, off what they owe on the order;
+ * - kept as a fee later: off their credit, into sales;
+ * - made with its movement and released (its order cancelled, the movement stands): back off what the order
+ *   settled (amount + bank charges) onto their credit, the bank charges no longer ours;
+ * - a refund's part: posted by its money out.
  */
-export function creditPlan(c: CreditDoc, ctx: RuleCtx): DocPlan {
-  const base = {
-    sourceType: "credit" as const,
-    sourceId: c.id,
-    mode: "full" as const,
-    voided: c.voided,
-    allocRef: { prefix: "CR", year: Number(c.on.slice(0, 4)) },
-  };
-  if (c.postedElsewhere || !["in", "refund", "fee"].includes(c.kind)) return { ...base, voided: null, parts: [] };
-  const rate = c.order && c.order.currency === c.currency ? c.order.rate : liveRate(ctx, c.currency);
-  const d = dims({ customerId: c.customerId, orderId: c.order?.id ?? null });
-  const customer: Line = { account: acc.customer(c.customerId), side: "debit", minor: c.amountMinor, currency: c.currency, rate };
-  const part = (type: LedgerEntryType, memo: string, lines: Line[]): Part => ({
-    part: "",
-    date: c.on,
-    type,
-    ref: "",
-    memo,
-    dims: d,
-    lines,
-  });
-  if (c.kind === "in")
+export function allocationPlan(a: AllocationDoc, ctx: RuleCtx): DocPlan {
+  const base = { sourceType: "allocation" as const, sourceId: a.id, mode: "full" as const, voided: a.voided };
+  const none = { ...base, voided: null, parts: [] };
+  if (a.movementVoided || a.target === "refund") return none;
+  const rate = a.order?.rate ?? liveRate(ctx, a.currency);
+  const d = dims({ customerId: a.partyId, orderId: a.order?.id ?? null });
+  const credit = acc.credit(a.partyId);
+  if (!a.later) {
+    if (!a.voided || !a.order) return none;
+    const lines: Line[] = [
+      { account: acc.customer(a.partyId), side: "debit", minor: a.amountMinor + a.bankChargesMinor, currency: a.currency, rate },
+      { account: credit, side: "credit", minor: a.amountMinor, currency: a.currency, rate },
+    ];
+    if (a.bankChargesMinor > 0) lines.push({ account: "bank_charges", side: "credit", minor: a.bankChargesMinor, currency: a.currency, rate });
     return {
-      ...base,
-      parts: [
-        part("credit", c.order ? `Kept from cancelled ${c.order.refNo} as credit` : (c.note ?? "Credit"), [
-          customer,
-          { account: acc.credit(c.customerId), side: "credit", minor: c.amountMinor, currency: c.currency, rate },
-        ]),
-      ],
+      ...none,
+      parts: [{ part: "", date: a.voided.on, type: "credit", ref: a.ref, memo: `Kept from cancelled ${a.order.refNo} as credit`, dims: d, lines }],
     };
-  if (c.kind === "fee")
+  }
+  if (a.target === "fee")
     return {
       ...base,
+      allocRef: { prefix: "CR", year: Number(a.on.slice(0, 4)) },
       parts: [
-        part("credit", c.order ? `Cancellation fee kept on ${c.order.refNo}` : "Cancellation fee kept", [
-          customer,
-          { account: "sales", side: "credit", minor: c.amountMinor, currency: c.currency, rate },
-        ]),
+        {
+          part: "",
+          date: a.on,
+          type: "credit",
+          ref: "",
+          memo: a.note ?? "Cancellation fee kept",
+          dims: d,
+          lines: [
+            { account: credit, side: "debit", minor: a.amountMinor, currency: a.currency, rate },
+            { account: "sales", side: "credit", minor: a.amountMinor, currency: a.currency, rate },
+          ],
+        },
       ],
     };
   return {
     ...base,
     parts: [
-      part("money_out", c.note ?? "Credit refunded", [
-        { account: acc.credit(c.customerId), side: "debit", minor: c.amountMinor, currency: c.currency, rate },
-        { ...moneyLine(c.accountId, c.currency), side: "credit", minor: c.amountMinor, currency: c.currency, rate },
-      ]),
+      {
+        part: "",
+        date: a.on,
+        type: "credit",
+        ref: a.ref,
+        memo: `Paid from the customer's credit for ${a.order?.refNo ?? ""}`,
+        dims: d,
+        lines: [
+          { account: credit, side: "debit", minor: a.amountMinor, currency: a.currency, rate },
+          { account: acc.customer(a.partyId), side: "credit", minor: a.amountMinor, currency: a.currency, rate },
+        ],
+      },
     ],
   };
 }

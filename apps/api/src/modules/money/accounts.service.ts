@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, orderMoney, roundHalfAway } from "@kebo/money";
 import { can, shippedOnOf, type LostReason } from "@kebo/shared";
 import { addDays, dateIn, ForbiddenError, NotFoundError } from "@kebo/utils";
@@ -115,7 +115,7 @@ export class AccountsService {
               stage: true,
               status: true,
               factoryPaid: { where: { voidedAt: null }, select: { amount: true, rate: true } },
-              payments: { where: { voidedAt: null }, select: { bankCharges: true } },
+              allocations: { where: livePart, select: { bankCharges: true } },
             },
           },
         },
@@ -136,12 +136,11 @@ export class AccountsService {
           borneBy: true,
         },
       }),
-      this.prisma.db.payment.findMany({
-        where: { customerId, voidedAt: null, order: { status: { not: "cancelled" } } },
+      this.prisma.db.allocation.findMany({
+        where: { ...livePart, order: { customerId, status: { not: "cancelled" } } },
         select: {
           amount: true,
-          currency: true,
-          paidOn: true,
+          on: true,
           kind: true,
           order: { select: { id: true, refNo: true, currency: true, mainCurrency: true, mainRate: true } },
         },
@@ -201,7 +200,7 @@ export class AccountsService {
         const costedRevenue = inMain(c.costedRevenueMinor);
         const goodsCost = inMain(c.goodsCostMinor) + inMain(c.basisCostMinor);
         const bank = inMain(
-          order.payments.reduce((s, p) => s + decimalToMinor(p.bankCharges), 0),
+          order.allocations.reduce((s, p) => s + decimalToMinor(p.bankCharges), 0),
         );
         // Profit now expected, as on the order's Costs page (freight paid for the planned basis costs counted there once).
         const p = orderMoney({
@@ -265,7 +264,7 @@ export class AccountsService {
       };
     });
     for (const p of payments)
-      t.received += fx.order(decimalToMinor(p.amount), p.order);
+      t.received += fx.order(decimalToMinor(p.amount), p.order!);
 
     const won = deals.filter((d) => d.orders.length > 0).length;
     const lostCount = deals.filter((d) => d.orders.length === 0 && d.stage === "lost").length;
@@ -299,12 +298,12 @@ export class AccountsService {
     }
     for (const p of payments)
       events.push({
-        on: fromDbDate(p.paidOn),
+        on: fromDbDate(p.on),
         kind: "payment",
-        text: `Payment for ${p.order.refNo}`,
+        text: `Payment for ${p.order!.refNo}`,
         amount: p.amount.toFixed(2),
-        currency: p.currency,
-        href: `/orders/${p.order.id}/payment`,
+        currency: p.order!.currency,
+        href: `/orders/${p.order!.id}/payment`,
       });
     for (const e of expenses)
       events.push({ on: fromDbDate(e.spentOn), kind: "expense", text: e.description, amount: e.amount.toFixed(2), currency: e.currency });

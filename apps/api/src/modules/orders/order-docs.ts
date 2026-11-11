@@ -1,4 +1,4 @@
-import { fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
 import { documentTotals, fromMinor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
@@ -58,7 +58,7 @@ export const orderDocInclude = {
   },
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
-  payments: { where: { voidedAt: null }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] },
+  allocations: livePartsWithEntry,
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
   inquiry: { select: { contactId: true } },
@@ -207,13 +207,13 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
     /** The internal copy: every payment received (the customer's copy shows only the total). */
     payments: goodsOnly
       ? []
-      : o.payments.map((p) => ({
-          paidOn: fromDbDate(p.paidOn),
+      : o.allocations.map((p) => ({
+          paidOn: fromDbDate(p.on),
           kind: p.kind,
           amount: p.amount.toFixed(2),
           bankCharges: p.bankCharges.toFixed(2),
-          currency: p.currency,
-          reference: p.reference,
+          currency: p.movement.allocCurrency,
+          reference: p.later ? null : p.movement.reference,
         })),
     notes: kind === "packing-list" ? null : rev.notes,
     footer: c.settings.company.invoiceFooter || null,

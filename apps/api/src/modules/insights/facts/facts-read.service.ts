@@ -451,9 +451,9 @@ export class FactsReadService {
     const db = this.prisma.db;
     const [payments, factoryPaid, expenses] = await Promise.all([
       db.$queryRaw<{ m: string; minor: string; currency: string; mainCurrency: string | null; mainRate: string | null }[]>`
-        select to_char(p.paid_on, 'YYYY-MM') as m, (p.amount * 100)::text as minor, o.currency, o.main_currency as "mainCurrency", o.main_rate::text as "mainRate"
-        from payments p join orders o on o.id = p.order_id
-        where p.voided_at is null and p.paid_on between ${from}::date and ${to}::date`,
+        select to_char(p."on", 'YYYY-MM') as m, (p.amount * 100)::text as minor, o.currency, o.main_currency as "mainCurrency", o.main_rate::text as "mainRate"
+        from allocations p join orders o on o.id = p.order_id
+        where p.target = 'order' and p.voided_at is null and p."on" between ${from}::date and ${to}::date`,
       seeMoney
         ? db.$queryRaw<{ m: string; minor: string; rate: string; currency: string; mainCurrency: string | null; mainRate: string | null }[]>`
             select to_char(fp.paid_on, 'YYYY-MM') as m, (fp.amount * 100)::text as minor, fp.rate::text as rate, o.currency, o.main_currency as "mainCurrency", o.main_rate::text as "mainRate"

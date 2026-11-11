@@ -152,7 +152,7 @@ describe("money sent for approval", () => {
   it("money received waits without counting, then counts exactly as if the manager had recorded it", async () => {
     const before = await payments();
     expect(Number(before.due)).toBeGreaterThan(100);
-    const paymentRows = await prisma.company(FIRST_COMPANY_ID).payment.count({ where: { orderId } });
+    const paymentRows = await prisma.company(FIRST_COMPANY_ID).allocation.count({ where: { orderId } });
 
     // The same checks as recording: the date, the order, the body.
     await pay({ amount: 100, paidOn: later }).expect(400, { error: "The payment date cannot be in the future." });
@@ -185,7 +185,7 @@ describe("money sent for approval", () => {
     expect(sent.body).toMatchObject({ amount: 100, currency: "USD", paidOn: today, reference: `SLIP-${tag}` });
 
     // Nothing counts yet.
-    expect(await prisma.company(FIRST_COMPANY_ID).payment.count({ where: { orderId } })).toBe(paymentRows);
+    expect(await prisma.company(FIRST_COMPANY_ID).allocation.count({ where: { orderId } })).toBe(paymentRows);
     const waiting = await payments();
     expect([waiting.due, waiting.received]).toEqual([before.due, before.received]);
 

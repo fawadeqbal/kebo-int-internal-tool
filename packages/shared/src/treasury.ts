@@ -6,8 +6,11 @@
 
 const values = <const T extends readonly string[]>(...v: T) => v;
 
-/** The record a payment row comes from. */
-export const PAYMENT_RECORD_KINDS = values("customer", "receipt", "refund", "supplier", "expense", "transfer", "submission");
+/**
+ * The record a payment row comes from. customer: a payment entry from a customer (one transfer, whatever it
+ * pays); credit: an order paid later from the customer's credit (no money moved); refund: money paid back.
+ */
+export const PAYMENT_RECORD_KINDS = values("customer", "credit", "refund", "supplier", "expense", "transfer", "submission");
 export type PaymentRecordKind = (typeof PAYMENT_RECORD_KINDS)[number];
 
 /** Money in (from customers), out (to suppliers, expenses, refunds) or moved between our accounts. */
@@ -23,7 +26,7 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const PAYMENT_RECORD_LABEL: Record<PaymentRecordKind, string> = {
   customer: "Customer payment",
-  receipt: "Customer payment",
+  credit: "Paid from credit",
   refund: "Refund to a customer",
   supplier: "Supplier payment",
   expense: "Expense",
@@ -90,6 +93,8 @@ export interface PaymentView extends PaymentRow {
   file: { name: string; href: string } | null;
   /** The order it is on (its page changes the payment and its proof there). */
   orderId: string | null;
+  /** A customer payment that pays one order in full: that payment on the order (changed as it). */
+  partId?: string | null;
   /** Its posting in the general ledger. */
   ledgerHref: string | null;
   recordedBy: string | null;

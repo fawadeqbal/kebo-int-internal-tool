@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, isCustomer, toDbDate, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, isCustomer, orderPart, toDbDate, type Prisma } from "@kebo/database";
 import {
   can,
   EXPENSE_CATEGORY_LABEL,
@@ -38,9 +38,9 @@ export interface PaymentsQuery {
 
 /** The ledger's name for each record (ledger_entries.source_type). */
 const LEDGER_SOURCE: Partial<Record<PaymentRecordKind, string>> = {
-  customer: "payment",
-  receipt: "receipt",
-  refund: "credit",
+  customer: "movement",
+  credit: "allocation",
+  refund: "movement",
   supplier: "factory_payment",
   expense: "expense",
   transfer: "transfer",
@@ -72,7 +72,7 @@ interface Scope {
 
 /**
  * Treasury › Payments (read only): every payment in and out, from the records that hold them
- * today: customer payments, one transfer over several orders, refunds of credit, supplier
+ * today: customer payment entries (one per transfer, whatever it pays), orders paid from credit, refunds, supplier
  * payments, expenses, moves between our accounts, and what staff sent for approval. Recording
  * and removing stay with those records; this only lists them and shows one.
  */
@@ -170,42 +170,52 @@ export class TreasuryService {
     const party = q.party;
     const out: PaymentRow[] = [];
 
-    const [payments, receipts, refunds, supplierPaid, expenses, transfers, submissions] = await Promise.all([
-      // A customer's payment on one order; one transfer over several orders is listed once, as its receipt.
+    // Customer money this person sees: on the orders of the deals they handle, or of the customers they handle.
+    const seen: Prisma.MoneyMovementWhereInput = s.all ? {} : { OR: [{ allocations: { some: { order: access } } }, { party: parties }] };
+    const [entries, fromCredit, refunds, supplierPaid, expenses, transfers, submissions] = await Promise.all([
+      // A customer's payment entry: one transfer, listed once whatever it pays.
       s.customer && pick("customer")
-        ? this.prisma.db.payment.findMany({
+        ? this.prisma.db.moneyMovement.findMany({
             where: {
               ...pick("customer"),
-              receiptId: null,
-              order: onOrder,
-              ...(range ? { paidOn: range } : {}),
-              ...(party ? { customerId: party } : {}),
+              direction: "in",
+              party: isCustomer,
+              ...seen,
+              ...(range ? { valueDate: range } : {}),
+              ...(party ? { partyId: party } : {}),
+              ...(q.order ? { allocations: { some: { orderId: q.order, order: access } } } : {}),
             },
-            include: { order: orderRef, customer: name, account: name },
+            include: {
+              party: name,
+              account: name,
+              allocations: { where: { later: false, ...orderPart }, select: { kind: true, amount: true, voidedAt: true, order: orderRef } },
+            },
           })
         : [],
-      s.customer && pick("receipt")
-        ? this.prisma.db.customerReceipt.findMany({
+      // An order paid later from the customer's credit (no money moved).
+      s.customer && pick("credit")
+        ? this.prisma.db.allocation.findMany({
             where: {
-              ...pick("receipt"),
-              customer: { ...isCustomer, ...parties },
-              ...(range ? { paidOn: range } : {}),
-              ...(party ? { customerId: party } : {}),
-              ...(q.order ? { payments: { some: { orderId: q.order } } } : {}),
+              ...pick("credit"),
+              ...orderPart,
+              later: true,
+              order: onOrder,
+              ...(range ? { on: range } : {}),
+              ...(party ? { movement: { partyId: party } } : {}),
             },
-            include: { customer: name, account: name, payments: { select: { order: orderRef } } },
+            include: { order: orderRef, movement: { select: { allocCurrency: true, party: name } } },
           })
         : [],
       s.customer && !q.order && pick("refund")
-        ? this.prisma.db.customerCredit.findMany({
+        ? this.prisma.db.moneyMovement.findMany({
             where: {
               ...pick("refund"),
-              kind: "refund",
-              customer: { ...isCustomer, ...parties },
-              ...(range ? { on: range } : {}),
-              ...(party ? { customerId: party } : {}),
+              direction: "out",
+              party: { ...isCustomer, ...parties },
+              ...(range ? { valueDate: range } : {}),
+              ...(party ? { partyId: party } : {}),
             },
-            include: { customer: name, account: name },
+            include: { party: name, account: name },
           })
         : [],
       s.supplier && pick("supplier")
@@ -247,61 +257,64 @@ export class TreasuryService {
         : [],
     ]);
 
-    for (const p of payments)
+    for (const m of entries) {
+      const parts = m.allocations.filter((a) => a.order);
+      const orders = [...new Map(parts.map((p) => [p.order!.id, p.order!])).values()];
+      const one = parts.length === 1 ? parts[0]! : null;
       out.push({
         kind: "customer",
-        id: p.id,
-        number: p.receiptNo ? paperNumber(p.order.refNo, "payment-receipt", p.receiptNo) : null,
-        on: fromDbDate(p.paidOn),
-        direction: "in",
-        what:
-          p.method === "credit"
-            ? `${PAYMENT_KIND_LABEL[p.kind]} from the customer's credit`
-            : `${PAYMENT_KIND_LABEL[p.kind]} for ${p.order.refNo}`,
-        // What arrived, in the currency it arrived in (the bank statement's figure).
-        amount: money(p.receivedAmount),
-        currency: p.receivedCurrency,
-        party: customerLink(p.customer),
-        for: [orderLink(p.order)],
-        account: p.account?.name ?? null,
-        reference: p.reference,
-        status: statusOf(p.voidedAt),
-        fromCredit: p.method === "credit",
-      });
-    for (const r of receipts) {
-      const orders = [...new Map(r.payments.map((p) => [p.order.id, p.order])).values()];
-      out.push({
-        kind: "receipt",
-        id: r.id,
+        id: m.id,
         number: null,
-        on: fromDbDate(r.paidOn),
+        on: fromDbDate(m.valueDate),
         direction: "in",
-        what: orders.length ? `One transfer for ${orders.map((o) => o.refNo).join(", ")}` : "Into the customer's credit",
-        amount: money(r.receivedAmount),
-        currency: r.receivedCurrency,
-        party: customerLink(r.customer),
+        what: one
+          ? `${PAYMENT_KIND_LABEL[one.kind as PaymentKind]} for ${one.order!.refNo}${decimalToMinor(m.allocatable) > decimalToMinor(one.amount) ? ", the rest to credit" : ""}`
+          : orders.length
+            ? `One transfer for ${orders.map((o) => o.refNo).join(", ")}`
+            : "Into the customer's credit",
+        // What arrived, in the currency it arrived in (the bank statement's figure).
+        amount: money(m.amount),
+        currency: m.currency,
+        party: customerLink(m.party),
         for: orders.map(orderLink),
-        account: r.account?.name ?? null,
-        reference: r.reference,
-        status: statusOf(r.voidedAt),
+        account: m.account?.name ?? null,
+        reference: m.reference,
+        status: statusOf(m.voidedAt),
         fromCredit: false,
       });
     }
-    for (const c of refunds)
+    for (const a of fromCredit)
+      out.push({
+        kind: "credit",
+        id: a.id,
+        number: a.receiptNo ? paperNumber(a.order!.refNo, "payment-receipt", a.receiptNo) : null,
+        on: fromDbDate(a.on),
+        direction: "in",
+        what: `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} from the customer's credit`,
+        amount: money(a.amount),
+        currency: a.movement.allocCurrency,
+        party: customerLink(a.movement.party),
+        for: [orderLink(a.order!)],
+        account: null,
+        reference: null,
+        status: statusOf(a.voidedAt),
+        fromCredit: true,
+      });
+    for (const m of refunds)
       out.push({
         kind: "refund",
-        id: c.id,
+        id: m.id,
         number: null,
-        on: fromDbDate(c.on),
+        on: fromDbDate(m.valueDate),
         direction: "out",
-        what: `Credit refunded${c.note ? `: ${c.note}` : ""}`,
-        amount: money(c.amount),
-        currency: c.currency,
-        party: customerLink(c.customer),
+        what: `Credit refunded${m.note ? `: ${m.note}` : ""}`,
+        amount: money(m.amount),
+        currency: m.currency,
+        party: customerLink(m.party),
         for: [],
-        account: c.account?.name ?? null,
+        account: m.account?.name ?? null,
         reference: null,
-        status: statusOf(c.voidedAt),
+        status: statusOf(m.voidedAt),
         fromCredit: false,
       });
     for (const p of supplierPaid)
@@ -427,67 +440,65 @@ export class TreasuryService {
     const method = (m: string) => PAYMENT_METHOD_LABEL[m as PaymentMethod] ?? m;
     switch (kind) {
       case "customer": {
-        const p = await db.payment.findUniqueOrThrow({
+        const m = await db.moneyMovement.findUniqueOrThrow({
           where: { id },
-          include: { order: { select: { refNo: true, currency: true } }, recordedBy: name, receipt: false },
+          include: { recordedBy: name, allocations: { where: { later: false, ...orderPart }, include: { order: { select: { id: true, refNo: true } } } } },
         });
-        const counted = p.receivedCurrency !== p.currency;
+        const live = m.allocations.filter((a) => !a.voidedAt || m.voidedAt);
+        const one = m.allocations.length === 1 && decimalToMinor(m.allocatable) === decimalToMinor(m.allocations[0]!.amount) ? m.allocations[0]! : null;
+        const leftMinor = decimalToMinor(m.allocatable) - m.allocations.reduce((t, a) => t + decimalToMinor(a.amount), 0);
+        const charges = live.reduce((t, a) => t + decimalToMinor(a.bankCharges), 0);
         return {
           fields: [
-            { label: "For", value: `${PAYMENT_KIND_LABEL[p.kind as PaymentKind]} on ${p.order.refNo}`, href: `/orders/${p.orderId}` },
-            { label: "Received", value: amount(p.receivedCurrency, p.receivedAmount) },
-            ...(counted ? [{ label: "Counts on the order as", value: `${amount(p.currency, p.amount)} at ${Number(p.rate)}` }] : []),
-            ...(Number(p.bankCharges) ? [{ label: "Bank charges", value: amount(p.currency, p.bankCharges) }] : []),
-            { label: "Paid on", value: fromDbDate(p.paidOn) },
-            { label: "Method", value: method(p.method) },
-            ...(p.paidByName ? [{ label: "Paid by", value: p.paidByName }] : []),
-            ...(p.note ? [{ label: "Note", value: p.note }] : []),
+            { label: "Received", value: amount(m.currency, m.amount) },
+            ...(m.currency !== m.allocCurrency ? [{ label: "Rate", value: `${Number(m.rate)} per ${m.allocCurrency}` }] : []),
+            ...m.allocations.map((a) => ({
+              label: `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} on ${a.order!.refNo}`,
+              value: `${amount(m.allocCurrency, a.amount)}${a.voidedAt && !m.voidedAt ? ` · released: ${a.voidReason ?? "order cancelled"}` : ""}`,
+              href: `/orders/${a.order!.id}`,
+            })),
+            ...(leftMinor > 0 ? [{ label: "Kept as the customer's credit", value: `${m.allocCurrency} ${(leftMinor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`, href: `/customers/${m.partyId}` }] : []),
+            ...(charges ? [{ label: "Bank charges", value: `${m.allocCurrency} ${(charges / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}` }] : []),
+            { label: "Paid on", value: fromDbDate(m.valueDate) },
+            { label: "Method", value: method(m.method) },
+            ...(m.paidByName ? [{ label: "Paid by", value: m.paidByName }] : []),
+            ...(m.note ? [{ label: "Note", value: m.note }] : []),
           ],
-          file: p.fileKey ? { name: p.fileName ?? "Proof", href: `/files/payments/${p.id}` } : null,
-          recordedBy: p.recordedBy.name,
-          recordedAt: p.createdAt.toISOString(),
-          voided: voidOf(p.voidedAt, p.voidReason),
-          orderId: p.orderId,
-          voidPath: !p.voidedAt && !p.receiptId && can(user, "orders.manage") ? `/payments/${p.id}/void` : null,
+          file: m.fileKey ? { name: m.fileName ?? "Proof", href: `/files/payments/${m.id}` } : null,
+          recordedBy: m.recordedBy.name,
+          recordedAt: m.createdAt.toISOString(),
+          voided: voidOf(m.voidedAt, m.voidReason),
+          orderId: one?.orderId ?? null,
+          partId: one?.id ?? null,
+          voidPath: !m.voidedAt && can(user, "orders.manage") ? (one ? `/payments/${one.id}/void` : `/customer-receipts/${m.id}/void`) : null,
         };
       }
-      case "receipt": {
-        const r = await db.customerReceipt.findUniqueOrThrow({
-          where: { id },
-          include: { recordedBy: name, payments: { where: { voidedAt: null }, select: { amount: true, order: orderRef } } },
-        });
+      case "credit": {
+        const a = await db.allocation.findUniqueOrThrow({ where: { id }, include: { order: orderRef, recordedBy: name } });
         return {
           fields: [
-            { label: "Received", value: amount(r.receivedCurrency, r.receivedAmount) },
-            ...(r.receivedCurrency !== r.currency ? [{ label: "Rate", value: `${Number(r.rate)} per ${r.currency}` }] : []),
-            ...r.payments.map((p) => ({
-              label: `On ${p.order.refNo}`,
-              value: amount(r.currency, p.amount),
-              href: `/orders/${p.order.id}`,
-            })),
-            { label: "Paid on", value: fromDbDate(r.paidOn) },
-            { label: "Method", value: method(r.method) },
-            ...(r.paidByName ? [{ label: "Paid by", value: r.paidByName }] : []),
-            ...(r.note ? [{ label: "Note", value: r.note }] : []),
+            { label: "For", value: `${PAYMENT_KIND_LABEL[a.kind as PaymentKind]} on ${a.order!.refNo}`, href: `/orders/${a.order!.id}` },
+            { label: "Paid on", value: fromDbDate(a.on) },
+            { label: "Method", value: "From the customer's credit (no money moved)" },
           ],
           file: null,
-          recordedBy: r.recordedBy.name,
-          recordedAt: r.createdAt.toISOString(),
-          voided: voidOf(r.voidedAt, r.voidReason),
-          orderId: null,
-          voidPath: !r.voidedAt && can(user, "orders.manage") ? `/customer-receipts/${r.id}/void` : null,
+          recordedBy: a.recordedBy.name,
+          recordedAt: a.createdAt.toISOString(),
+          voided: voidOf(a.voidedAt, a.voidReason),
+          orderId: a.orderId,
+          voidPath: !a.voidedAt && can(user, "orders.manage") ? `/payments/${a.id}/void` : null,
         };
       }
       case "refund": {
-        const c = await db.customerCredit.findUniqueOrThrow({ where: { id }, include: { recordedBy: name } });
+        const m = await db.moneyMovement.findUniqueOrThrow({ where: { id }, include: { recordedBy: name } });
         return {
-          fields: [{ label: "Refunded on", value: fromDbDate(c.on) }, ...(c.note ? [{ label: "Note", value: c.note }] : [])],
+          fields: [{ label: "Refunded on", value: fromDbDate(m.valueDate) }, ...(m.note ? [{ label: "Note", value: m.note }] : [])],
           file: null,
-          recordedBy: c.recordedBy.name,
-          recordedAt: c.createdAt.toISOString(),
-          voided: voidOf(c.voidedAt, c.voidReason),
-          orderId: c.orderId,
-          voidPath: !c.voidedAt && can(user, "orders.manage") ? `/customer-credits/${c.id}/void` : null,
+          recordedBy: m.recordedBy.name,
+          recordedAt: m.createdAt.toISOString(),
+          voided: voidOf(m.voidedAt, m.voidReason),
+          orderId: null,
+          voidPath: !m.voidedAt && can(user, "orders.manage") ? `/customer-credits/${m.id}/void` : null,
         };
       }
       case "supplier": {

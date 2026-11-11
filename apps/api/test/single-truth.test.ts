@@ -373,7 +373,7 @@ describe("one money truth", () => {
         if (r.expenses.length || (planDeposit && planDeposit !== accepted)) continue;
         const old = settle(
           total,
-          r.payments.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
+          r.allocations.map((p) => ({ amountMinor: decimalToMinor(p.amount), bankChargesMinor: decimalToMinor(p.bankCharges) })),
           Number(r.depositPercent),
         );
         const p = positionOf(r, f);

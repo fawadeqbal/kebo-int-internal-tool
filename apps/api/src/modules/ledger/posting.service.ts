@@ -11,15 +11,14 @@ import { CompanyContext } from "../../common/company/company-context";
 import { orderRate } from "../money/order-money";
 import {
   baseOf,
-  creditPlan,
+  allocationPlan,
   expensePlan,
   factoryPaymentPlan,
   fxPlan,
   openingPlan,
   orderPlan,
-  paymentPlan,
+  movementPlan,
   purchasePlan,
-  receiptPlan,
   transferPlan,
   type DocPlan,
   type Line,
@@ -103,9 +102,8 @@ const primary = (sourceType: string, account: string) => isFx(sourceType) || acc
 const SOURCE_ORDER: Record<LedgerSource, number> = {
   order: 0,
   purchase_order: 1,
-  payment: 2,
-  receipt: 2,
-  credit: 3,
+  movement: 2,
+  allocation: 3,
   factory_payment: 4,
   expense: 5,
   transfer: 6,
@@ -191,14 +189,15 @@ export class LedgerPosting {
       for (const l of lines) add("purchase_order", `${l.orderId}:${l.factoryId}`);
       for (const p of posted) add("purchase_order", p.sourceId);
       if (all.length) {
-        const [payments, credits, factoryPaid, expenses] = await Promise.all([
-          tx.payment.findMany({ where: { orderId: { in: all } }, select: { id: true, receiptId: true } }),
-          tx.customerCredit.findMany({ where: { orderId: { in: all } }, select: { id: true } }),
+        const [parts, factoryPaid, expenses] = await Promise.all([
+          tx.allocation.findMany({ where: { orderId: { in: all } }, select: { id: true, movementId: true } }),
           tx.factoryPayment.findMany({ where: { orderId: { in: all } }, select: { id: true } }),
           tx.expense.findMany({ where: { orderId: { in: all } }, select: { id: true } }),
         ]);
-        for (const p of payments) add(p.receiptId ? "receipt" : "payment", p.receiptId ?? p.id);
-        for (const c of credits) add("credit", c.id);
+        for (const p of parts) {
+          add("movement", p.movementId);
+          add("allocation", p.id);
+        }
         for (const p of factoryPaid) add("factory_payment", p.id);
         for (const e of expenses) add("expense", e.id);
       }
@@ -313,91 +312,77 @@ export class LedgerPosting {
       rate: rateOf(o),
     });
 
-    if (ids("payment").length) {
-      const rows = await tx.payment.findMany({ where: { id: { in: ids("payment") } }, include: { order: orderSel } });
-      for (const p of rows)
+    const numberOf = (a: { receiptNo: number | null; order: { refNo: string } | null }) =>
+      a.order ? paperNumber(a.order.refNo, "payment-receipt", a.receiptNo) : "";
+
+    if (ids("movement").length) {
+      const rows = await tx.moneyMovement.findMany({
+        where: { id: { in: ids("movement") } },
+        include: { allocations: { where: { later: false }, include: { order: orderSel }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+      });
+      for (const m of rows) {
+        const numbers = m.allocations.map(numberOf);
+        const first = m.allocations[0]?.order;
         out.push(
-          paymentPlan(
+          movementPlan(
             {
-              id: p.id,
-              ref: paperNumber(p.order.refNo, "payment-receipt", p.receiptNo),
-              kind: p.kind as PaymentKind,
-              order: orderOf(p.order),
-              amountMinor: decimalToMinor(p.amount),
-              bankChargesMinor: decimalToMinor(p.bankCharges),
-              currency: p.currency,
-              receivedMinor: decimalToMinor(p.receivedAmount),
-              receivedCurrency: p.receivedCurrency,
-              rate: Number(p.rate),
-              accountId: p.accountId,
-              paidOn: fromDbDate(p.paidOn),
-              method: p.method,
-              inReceipt: !!p.receiptId,
-              voided: this.voidOf(p.voidedAt, p.voidReason),
+              id: m.id,
+              ref: numbers.length ? `${numbers[0]}${numbers.length > 1 ? ` +${numbers.length - 1}` : ""}` : "",
+              direction: m.direction as "in" | "out",
+              partyId: m.partyId,
+              amountMinor: decimalToMinor(m.amount),
+              currency: m.currency,
+              allocCurrency: m.allocCurrency,
+              rate: Number(m.rate),
+              allocatableMinor: decimalToMinor(m.allocatable),
+              accountId: m.accountId,
+              valueDate: fromDbDate(m.valueDate),
+              orderRate: first ? rateOf(first) : null,
+              parts: m.allocations.flatMap((a) =>
+                a.order
+                  ? [
+                      {
+                        id: a.id,
+                        ref: numberOf(a),
+                        kind: a.kind as PaymentKind,
+                        order: orderOf(a.order),
+                        amountMinor: decimalToMinor(a.amount),
+                        bankChargesMinor: decimalToMinor(a.bankCharges),
+                        voided: !!a.voidedAt,
+                      },
+                    ]
+                  : [],
+              ),
+              voided: this.voidOf(m.voidedAt, m.voidReason),
             },
             ctx,
           ),
         );
-    }
-
-    if (ids("receipt").length) {
-      const rows = await tx.customerReceipt.findMany({
-        where: { id: { in: ids("receipt") } },
-        include: {
-          payments: { include: { order: orderSel }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
-          credits: { where: { kind: "in" }, select: { amount: true, voidedAt: true } },
-        },
-      });
-      for (const r of rows) {
-        const numbers = r.payments.map((p) => paperNumber(p.order.refNo, "payment-receipt", p.receiptNo));
-        const first = r.payments[0]?.order;
-        out.push({
-          ...receiptPlan(
-            {
-              id: r.id,
-              ref: numbers.length ? `${numbers[0]}${numbers.length > 1 ? ` +${numbers.length - 1}` : ""}` : "",
-              customerId: r.customerId,
-              receivedMinor: decimalToMinor(r.receivedAmount),
-              receivedCurrency: r.receivedCurrency,
-              currency: r.currency,
-              rate: Number(r.rate),
-              accountId: r.accountId,
-              paidOn: fromDbDate(r.paidOn),
-              orderRate: first ? rateOf(first) : null,
-              payments: r.payments.map((p) => ({
-                orderId: p.orderId,
-                refNo: p.order.refNo,
-                amountMinor: decimalToMinor(p.amount),
-                bankChargesMinor: decimalToMinor(p.bankCharges),
-                voided: !!p.voidedAt,
-              })),
-              credits: r.credits.map((c) => ({ amountMinor: decimalToMinor(c.amount), voided: !!c.voidedAt })),
-              voided: this.voidOf(r.voidedAt, r.voidReason),
-            },
-            ctx,
-          ),
-          ...(numbers.length ? {} : { allocRef: { prefix: "CR", year: Number(fromDbDate(r.paidOn).slice(0, 4)) } }),
-        });
       }
     }
 
-    if (ids("credit").length) {
-      const rows = await tx.customerCredit.findMany({ where: { id: { in: ids("credit") } }, include: { order: orderSel } });
-      for (const c of rows)
+    if (ids("allocation").length) {
+      const rows = await tx.allocation.findMany({
+        where: { id: { in: ids("allocation") } },
+        include: { order: orderSel, movement: { select: { partyId: true, allocCurrency: true, voidedAt: true } } },
+      });
+      for (const a of rows)
         out.push(
-          creditPlan(
+          allocationPlan(
             {
-              id: c.id,
-              kind: c.kind,
-              customerId: c.customerId,
-              amountMinor: decimalToMinor(c.amount),
-              currency: c.currency,
-              order: c.order ? orderOf(c.order) : null,
-              accountId: c.accountId,
-              on: fromDbDate(c.on),
-              note: c.note,
-              postedElsewhere: (c.kind === "in" && !!c.receiptId) || c.kind === "used",
-              voided: this.voidOf(c.voidedAt, c.voidReason),
+              id: a.id,
+              ref: numberOf(a),
+              target: a.target as "order" | "refund" | "fee",
+              partyId: a.movement.partyId,
+              later: a.later,
+              amountMinor: decimalToMinor(a.amount),
+              bankChargesMinor: decimalToMinor(a.bankCharges),
+              currency: a.movement.allocCurrency,
+              order: a.order ? { id: a.order.id, refNo: a.order.refNo, rate: rateOf(a.order) } : null,
+              on: fromDbDate(a.on),
+              note: a.note,
+              movementVoided: !!a.movement.voidedAt,
+              voided: this.voidOf(a.voidedAt, a.voidReason),
             },
             ctx,
           ),
@@ -969,9 +954,9 @@ export class LedgerPosting {
     const rows = await db.$queryRaw<{ type: LedgerSource; id: string; day: Date }[]>`
       select 'order' as type, id::text, ordered_on as day from orders
       union all select 'purchase_order', o.id::text || ':' || l.factory_id::text, min(o.ordered_on) from orders o join order_lines l on l.order_id = o.id where l.factory_id is not null group by 1, 2
-      union all select 'payment', id::text, paid_on from payments where receipt_id is null
-      union all select 'receipt', id::text, paid_on from customer_receipts
-      union all select 'credit', id::text, "on" from customer_credits where kind in ('refund', 'fee') or (kind = 'in' and receipt_id is null)
+      union all select 'movement', id::text, value_date from money_movements
+      union all select 'allocation', a.id::text, a."on" from allocations a join money_movements m on m.id = a.movement_id
+       where a.later or (a.voided_at is not null and m.voided_at is null)
       union all select 'factory_payment', id::text, paid_on from factory_payments
       union all select 'expense', id::text, spent_on from expenses
       union all select 'transfer', id::text, transferred_on from money_transfers
