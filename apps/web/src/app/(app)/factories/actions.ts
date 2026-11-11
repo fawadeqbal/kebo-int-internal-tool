@@ -13,7 +13,7 @@ export async function saveFactoryAction(id: string | null, _prev: ActionState, f
   if (!r.ok) return r;
   const savedId = id ?? (r.data as { id: string }).id;
   revalidatePath("/factories");
-  revalidatePath(`/factories/${savedId}`);
+  revalidatePath(`/factories/${savedId}`, "layout");
   return { ok: true, data: { id: savedId, name: (body.name ?? "").trim() } };
 }
 

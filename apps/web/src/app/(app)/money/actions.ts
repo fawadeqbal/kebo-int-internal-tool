@@ -7,7 +7,7 @@ import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib
 /** Money changes show on the order, the customer and the Money page. */
 const refresh = (orderId?: string | null, customerId?: string | null) => {
   if (orderId) revalidatePath(`/orders/${orderId}`, "layout");
-  if (customerId) revalidatePath(`/customers/${customerId}`);
+  if (customerId) revalidatePath(`/customers/${customerId}`, "layout");
   revalidatePath("/finance", "layout");
   revalidatePath("/purchasing", "layout");
   revalidatePath("/payments", "layout");

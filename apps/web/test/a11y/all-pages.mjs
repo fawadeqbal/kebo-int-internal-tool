@@ -605,6 +605,9 @@ async function run(page, list, title) {
   ]) {
     const [first] = await hrefs(page, list, re, 1);
     if (first) extra.push(first, `${first}/edit`);
+    // A customer's and a supplier's tabs (step 6b).
+    const tabs = { "/customers": ["orders", "inquiries", "money", "contacts", "notes"], "/factories": ["orders", "offers", "costs", "notes"] }[list] ?? [];
+    if (first) extra.push(...tabs.map((t) => `${first}/${t}`));
   }
   const lists = ["/customers", "/factories", "/users", "/access/roles", "/account", "/reports"];
   const list = (await crawl(page, ["/dashboard", ...lists], extra.filter((p) => !/^\/users\/[^/]+\/edit$/.test(p)))).filter((p) => !p.startsWith("/platform"));

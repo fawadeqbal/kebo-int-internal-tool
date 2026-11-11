@@ -22,11 +22,14 @@ export async function PerformanceCard({
   id,
   me,
   name,
+  balances = true,
 }: {
   kind: Kind;
   id: string;
   me: { permissions: Permission[] };
   name?: string;
+  /** Show what is owed now (Still owed, To pay); off where the record's header already tells it. */
+  balances?: boolean;
 }) {
   if (!can(me, "reports.view") || !(await hasFeature("insights"))) return null;
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
@@ -34,7 +37,7 @@ export async function PerformanceCard({
   // Insights unreachable: the page works without it.
   const both = await Promise.all([figures(kind, id, { from: yearFrom, to: today }, today), figures(kind, id, {}, today)]).catch(() => null);
   if (!both) return null;
-  const [year, all] = both;
+  const [year, all] = balances ? both : both.map((f) => f.filter((t) => !t.now));
   const description =
     kind === "customer"
       ? "what they ordered, earned us and how they pay · from Reports"
