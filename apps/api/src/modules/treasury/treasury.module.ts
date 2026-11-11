@@ -1,7 +1,24 @@
 import { Module } from "@nestjs/common";
+import { OrdersModule } from "../orders/orders.module";
+import { MoneyModule } from "../money/money.module";
 import { TreasuryService } from "./treasury.service";
 import { TreasuryController } from "./treasury.controller";
+import { CustomerPaymentsService } from "./customer-payments.service";
+import { SupplierPaymentsService } from "./supplier-payments.service";
+import { CashService } from "./cash.service";
+import { PaymentFilesService } from "./payment-files.service";
+import { CreditController, CustomerPaymentsController, OrderPaymentsController } from "./customer-payments.controller";
+import { CashController } from "./cash.controller";
 
-/** Treasury: every payment in and out (Treasury › Payments). Reads the money records; recording stays with them for now. */
-@Module({ controllers: [TreasuryController], providers: [TreasuryService], exports: [TreasuryService] })
+/**
+ * Treasury owns money accounts, payment entries (money_movements) and what they pay (allocations): every write to
+ * them is here (architecture review §7.1). Customer money (in, credit, refunds), supplier payments, moves between
+ * accounts, the cash book, proofs, and Treasury › Payments. Other modules use `api.ts` or the services exported here.
+ */
+@Module({
+  imports: [OrdersModule, MoneyModule],
+  controllers: [TreasuryController, OrderPaymentsController, CustomerPaymentsController, CreditController, CashController],
+  providers: [TreasuryService, CustomerPaymentsService, SupplierPaymentsService, CashService, PaymentFilesService],
+  exports: [TreasuryService, CustomerPaymentsService, CashService, PaymentFilesService],
+})
 export class TreasuryModule {}

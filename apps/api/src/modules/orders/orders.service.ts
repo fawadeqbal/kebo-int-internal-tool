@@ -45,13 +45,13 @@ import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../money/due";
 import { chargedExpenses, fxOf, moneyFacts, positionOf, type MoneyCtx } from "../money/position";
 import { LimitsService } from "../../common/company/limits.service";
-import { checkAccount } from "../money/account-check";
+import { checkAccount } from "../treasury/api";
 import { factoryPlansOf } from "../money/factory-plan";
 import { termsOf } from "../money/route-plan";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
 import { LedgerPosting, type LedgerRef } from "../ledger/posting.service";
-import { fromCredit, refund, releaseOrder } from "../treasury/customer-money";
+import { fromCredit, refund, releaseOrder } from "../treasury/api";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
 import { readyByOf, readyOnOf, readySelect, readyWords, setReadyAll, setReadyDates } from "./ready";
 

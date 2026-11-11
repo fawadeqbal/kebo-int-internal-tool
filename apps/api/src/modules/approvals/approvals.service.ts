@@ -14,7 +14,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess } from "../orders/orders.service";
-import { PaymentsService } from "../orders/payments.service";
+import { CustomerPaymentsService } from "../treasury/customer-payments.service";
 import { MoneyService } from "../money/money.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
@@ -56,7 +56,7 @@ const parseBody = <S extends z.ZodType>(schema: S, body: unknown): z.infer<S> =>
 /**
  * Money received and expenses a person adds for a manager to approve (money.submit). While waiting they
  * are only a row here: no payment, expense, credit or money figure changes. Approving records it with the
- * usual code (PaymentsService.record, MoneyService.createExpense) as the approver, so plan allocation,
+ * usual code (CustomerPaymentsService.record, MoneyService.createExpense) as the approver, so plan allocation,
  * receipt numbers, credit and the history behave exactly as if the approver had recorded it; then the
  * photo moves to what was made. Who may approve: payments.record for money received, expenses.manage
  * (with the expenses feature) for expenses — the people who may record them directly.
@@ -70,7 +70,7 @@ export class ApprovalsService {
     private readonly audit: AuditService,
     private readonly limits: LimitsService,
     private readonly storage: StorageService,
-    private readonly payments: PaymentsService,
+    private readonly payments: CustomerPaymentsService,
     private readonly money: MoneyService,
     private readonly notifications: NotificationsService,
   ) {}

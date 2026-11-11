@@ -5,12 +5,13 @@ import { PapersModule } from "../papers/papers.module";
 import { ChecklistModule } from "../checklist/checklist.module";
 import { FlowModule } from "../flow/flow.module";
 import { MoneyModule } from "../money/money.module";
+import { TreasuryModule } from "../treasury/treasury.module";
 import { OrderFilesController } from "./order-files.controller";
 import { OrderFilesService } from "./order-files.service";
 
 /** Documents v3: every file of an order in one list, with the same tools everywhere. */
 @Module({
-  imports: [InquiriesModule, OrdersModule, PapersModule, ChecklistModule, FlowModule, MoneyModule],
+  imports: [InquiriesModule, OrdersModule, PapersModule, ChecklistModule, FlowModule, MoneyModule, TreasuryModule],
   controllers: [OrderFilesController],
   providers: [OrderFilesService],
 })
