@@ -44,6 +44,8 @@ export interface OrderMoney {
   plan: {
     items: {
       id: string;
+      /** Its payment request's number (PR-2026-0031-2). */
+      number: string;
       label: string;
       amount: string;
       dueOn: string | null;

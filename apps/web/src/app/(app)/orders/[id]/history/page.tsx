@@ -5,12 +5,21 @@ import { orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order
 import { today } from "@/components/orders/today";
 import { HistoryList } from "@/components/common/history-list";
 import { optional } from "@/components/print/data";
+import { api } from "@/lib/api";
+import type { DealDetail } from "@/lib/types";
+import type { FollowUpList, Note } from "@/lib/types-notes";
+import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
+import { getPeople } from "@/lib/loaders";
+import Link from "next/link";
 import { cancelOrderAction } from "../../actions";
 import { CancelOrderForm } from "../forms";
 
-export const metadata = { title: "Order history" };
+export const metadata = { title: "Order notes and history" };
 
-/** Every change to the order with its reason, or one step's; cancelling sits here, away from the everyday buttons. */
+/**
+ * The order's Notes tab (the record's activity): notes and follow-ups, then every change with its reason (or
+ * one step's). Cancelling sits here, away from the everyday buttons.
+ */
 export default async function OrderHistory({
   params,
   searchParams,
@@ -24,10 +33,14 @@ export default async function OrderHistory({
   const me = await requireUser();
   const o = await orderOf(id);
   const manage = can(me, "orders.manage") && o.status !== "cancelled";
-  const [history, steps, m] = await Promise.all([
+  const [history, steps, m, notes, followUps, people, deal] = await Promise.all([
     orderHistoryOf(id, step),
     optional(() => orderStepsOf(id)),
     manage ? optional(() => orderMoneyOf(id)) : Promise.resolve(null),
+    optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
+    optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id })),
+    optional(() => getPeople()),
+    optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
   ]);
   const factoryPaid = (m?.factories?.rows ?? [])
     .filter((r) => Number(r.paid) > 0)
@@ -36,6 +49,31 @@ export default async function OrderHistory({
   const shown = steps?.steps.map((s) => s.key) ?? [...FLOW_STEPS];
   return (
     <div className="flex flex-col gap-5">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <NotesCard
+          on={{ key: "orderId", id: o.id }}
+          notes={notes ?? []}
+          canAdd={can(me, "orders.update")}
+          contacts={deal?.customer.contacts.map((c) => ({ id: c.id, name: c.name }))}
+          footer={
+            deal && deal.notes.length > 0 ? (
+              <p className="text-xs text-text-2">
+                The inquiry has {deal.notes.length} note{deal.notes.length === 1 ? "" : "s"} too ·{" "}
+                <Link href={`/inquiries/${deal.id}#notes`} className="font-medium text-primary hover:underline">
+                  Read them on {deal.refNo}
+                </Link>
+              </p>
+            ) : null
+          }
+        />
+        <FollowUpsCard
+          on={{ key: "orderId", id: o.id }}
+          label={`${o.refNo} · ${o.customer.name}`}
+          rows={followUps?.rows ?? []}
+          people={people ?? []}
+          meId={me.id}
+        />
+      </div>
       <Card>
         <CardHeader
           title="History"

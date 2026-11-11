@@ -5,31 +5,17 @@ import { can, shipByVsLc, STEP_PATH } from "@kebo/shared";
 import { buttonClass, cn } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
-import { date } from "@/lib/format";
+import { orderFlowOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
+import { date, money } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
-import type { FollowUpList, Note } from "@/lib/types-notes";
-import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { orderCostsSetup } from "@/components/orders/costs-data";
-import { compactChanges } from "@/components/orders/side-panel";
-import {
-  KeepAnEye,
-  KeyDates,
-  MoneyCard,
-  OrderFigures,
-  OrderStory,
-  overviewFacts,
-  RecentChanges,
-  WhatNext,
-  WhatTheyBought,
-  WhoIsInvolved,
-} from "@/components/orders/overview";
+import { KeepAnEye, OrderFigures, overviewFacts, WhatNext, WhoIsInvolved } from "@/components/orders/overview";
+import { LinkedDocuments, OrderStatusBar, PlanBlock } from "@/components/orders/overview-record";
 import { detailsAction } from "../actions";
 import { DetailsCard } from "./forms";
 import { incotermOf, termsOf } from "./shared";
-import { getPeople } from "@/lib/loaders";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -37,29 +23,22 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: `Order ${o.refNo}` };
 }
 
-/** How many changes Recent changes loads (five show, the rest scroll). */
-const CHANGES = 100;
-
 /**
- * The order for a manager, top to bottom: what to do now; the order in one
- * sentence and its journey; six figures; what happens next and what to watch,
- * the money and what they bought beside Details, who's involved and the key
- * dates; the notes; and the recent changes of every step.
+ * The order's Overview (ERP record, step 5): the one thing to do now and the status bar; the figures (the
+ * margin for those who see profit, linked to its breakdown); what happens next and what to watch; the
+ * payment plan, read-only, with one Record payment; Details, who's involved and the linked documents.
+ * Lines are on Items; notes, follow-ups and every change on Notes.
  */
 export default async function OrderOverview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const [steps, m, flow, recent, deal, costs, notes, followUps, people] = await Promise.all([
+  const [steps, m, flow, deal, costs] = await Promise.all([
     orderStepsOf(id),
     optional(() => orderMoneyOf(id)),
     optional(() => orderFlowOf(id)),
-    optional(() => orderHistoryOf(id, undefined, CHANGES)),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
     orderCostsSetup(id).then((x) => x?.costs ?? null),
-    optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
-    optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id })),
-    optional(() => getPeople()),
   ]);
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
@@ -70,6 +49,13 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   // Shipped on, the B/L and the container are Shipment 1's: edited on Shipping when the company has the module.
   const onShipping = flow?.modules.shipping ?? true;
   const lcLatest = flow?.payment.route === "letter_of_credit" ? (flow.payment.bankContract?.latestShipOn ?? null) : null;
+
+  const linked = [
+    { kind: "Inquiry", label: o.inquiry.refNo, href: `/inquiries/${o.inquiry.id}` },
+    ...(f.accepted ? [{ kind: "Quotation", label: `${deal?.quotation?.refNo ?? "Quotation"} R${f.accepted.number}`, href: `/inquiries/${o.inquiry.id}/quotation` }] : []),
+    ...(f.factoryOrder.no || flow?.factory.orderedOn ? [{ kind: "Purchase order", label: f.factoryOrder.no ?? "Sent", href: `${base}/factory` }] : []),
+    { kind: "Payments", label: m ? `${money(m.received, m.currency)} in` : "View", href: `/payments?order=${o.id}` },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
@@ -105,9 +91,8 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
           <span className="font-medium">Done: every step is ticked and the order is closed.</span>
         </p>
       ) : null}
+      <OrderStatusBar stage={o.stage} status={o.status} />
 
-
-      <OrderStory o={o} f={f} />
       <OrderFigures o={o} f={f} steps={steps} />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -116,8 +101,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             {o.status === "open" && <WhatNext f={f} base={base} />}
             <KeepAnEye f={f} />
           </div>
-          <MoneyCard f={f} costs={costs} base={base} />
-          <WhatTheyBought o={o} f={f} />
+          {m && <PlanBlock m={m} base={base} canRecord={can(me, "payments.record") && open} />}
         </div>
         <aside aria-label="Beside the order" className="flex min-w-0 flex-col gap-5">
           <DetailsCard
@@ -158,37 +142,9 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             suggestShipBy={o.shipBySuggested ? { on: o.shipBySuggested, shown: date(o.shipBySuggested) } : null}
           />
           <WhoIsInvolved o={o} f={f} deal={deal} />
-          <KeyDates o={o} f={f} deal={deal} />
+          <LinkedDocuments links={linked} />
         </aside>
       </div>
-
-      <div className="grid items-start gap-5 lg:grid-cols-2">
-        <NotesCard
-          on={{ key: "orderId", id: o.id }}
-          notes={notes ?? []}
-          canAdd={can(me, "orders.update")}
-          contacts={deal?.customer.contacts.map((c) => ({ id: c.id, name: c.name }))}
-          footer={
-            deal && deal.notes.length > 0 ? (
-              <p className="text-xs text-text-2">
-                The inquiry has {deal.notes.length} note{deal.notes.length === 1 ? "" : "s"} too ·{" "}
-                <Link href={`/inquiries/${deal.id}#notes`} className="font-medium text-primary hover:underline">
-                  Read them on {deal.refNo}
-                </Link>
-              </p>
-            ) : null
-          }
-        />
-        <FollowUpsCard
-          on={{ key: "orderId", id: o.id }}
-          label={`${o.refNo} · ${o.customer.name}`}
-          rows={followUps?.rows ?? []}
-          people={people ?? []}
-          meId={me.id}
-        />
-      </div>
-
-      <RecentChanges lines={compactChanges(recent ?? [])} more={(recent?.length ?? 0) >= CHANGES} historyHref={`${base}/history`} />
     </div>
   );
 }

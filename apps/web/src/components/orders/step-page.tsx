@@ -145,7 +145,7 @@ function PrevNext({ base, steps, here }: { base: string; steps: StepView[]; here
   const next =
     at < steps.length - 1
       ? { href: `${base}/${STEP_PATH[steps[at + 1]!.key]}`, label: steps[at + 1]!.label }
-      : { href: `${base}/history`, label: "History" };
+      : { href: `${base}/history`, label: "Notes" };
   return <StepPrevNext prev={prev} next={next} />;
 }
 

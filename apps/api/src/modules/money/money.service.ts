@@ -4,6 +4,7 @@ import { liveFile, livePurchase, asSupplierPayment, purchasePart, livePart, deci
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   balanceTermsOf,
+  paperNumber,
   BALANCE_TERMS_LABEL,
   can,
   planHow,
@@ -280,6 +281,8 @@ export class MoneyService {
       plan: {
         items: plan.map((p) => ({
           id: p.id,
+          /** Its payment request's number (PR-2026-0031-2): the invoice's number (Billing). */
+          number: paperNumber(o.refNo, "payment-request", p.requestNo),
           label: p.label,
           amount: fromMinor(p.amountMinor),
           dueOn: p.dueOn,
