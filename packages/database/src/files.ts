@@ -13,12 +13,13 @@ export const liveFile = {
   select: { id: true, storageKey: true, fileName: true, mimeType: true, size: true },
 } as const satisfies Prisma.MoneyMovement$filesArgs;
 
-type LiveFile = { storageKey: string; fileName: string; mimeType: string; size: number };
+type LiveFile = { id: string; storageKey: string; fileName: string; mimeType: string; size: number };
 
-/** A record's proof as its key, name, type and size (all null when it has none). */
+/** A record's proof as its id (opened at /files/<id>), key, name, type and size (all null when it has none). */
 export function fileOf(files: readonly LiveFile[] | undefined) {
   const f = files?.[0];
   return {
+    fileId: f?.id ?? null,
     fileKey: f?.storageKey ?? null,
     fileName: f?.fileName ?? null,
     fileType: f?.mimeType ?? null,

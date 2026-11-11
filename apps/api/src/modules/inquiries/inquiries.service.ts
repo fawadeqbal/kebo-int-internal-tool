@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import type { Readable } from "node:stream";
 import { zipSync } from "fflate";
 import { fromDbDateOrNull, nextReference, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
 import {
@@ -687,11 +686,10 @@ export class InquiriesService {
     return { ...a, inquiryId: a.inquiryId! };
   }
 
-  /** Streams a file after checking the person may see its deal. */
-  async download(user: SessionUser, attachmentId: string): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
+  /** Whether the person may open a deal's file: they see the deal (a factory offer's file: those who see costs). */
+  async mayOpenFile(user: SessionUser, attachmentId: string) {
     const a = await this.fileFor(user, attachmentId);
     await this.find(user, a.inquiryId);
-    return { stream: await this.storage.get(a.storageKey), fileName: a.fileName, mimeType: a.mimeType, size: a.size };
   }
 
   /** A file's type (URS, drawing…) and note. The uploader, the deal's handler or a manager may change them. */

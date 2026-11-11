@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Global, Injectable, Logger, Module } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, type Prisma, isSupplier } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextCount, toDbDate, type Prisma, isSupplier } from "@kebo/database";
 import { fromMinor, type Minor } from "@kebo/money";
 import { ledgerAccount, paperNumber, parseLedgerAccount, readSettings, type LedgerSource, type PaymentKind } from "@kebo/shared";
 import { todayIn, type ISODate } from "@kebo/utils";
@@ -899,21 +899,13 @@ export class LedgerPosting {
 
   /** The next number of a document that has none (EX-2026-0001), from the company's counters. */
   private async allocate(tx: Tx, prefix: string, year: number) {
-    const rows = await tx.$queryRaw<{ value: number }[]>`
-      insert into counters (key, value) values (${`ledger-${prefix}-${year}`}, 1)
-      on conflict (company_id, key) do update set value = counters.value + 1
-      returning value`;
-    return `${prefix}-${year}-${String(rows[0]!.value).padStart(4, "0")}`;
+    return `${prefix}-${year}-${String(await nextCount(tx, `ledger-${prefix}-${year}`)).padStart(4, "0")}`;
   }
 
   private async write(tx: Tx, postings: Posting[], userId: string | null) {
     const list = postings.filter((p) => p.rows.length);
     if (!list.length) return;
-    const got = await tx.$queryRaw<{ value: number }[]>`
-      insert into counters (key, value) values ('ledger-entry', ${list.length})
-      on conflict (company_id, key) do update set value = counters.value + ${list.length}
-      returning value`;
-    let entryNo = got[0]!.value - list.length;
+    let entryNo = (await nextCount(tx, "ledger-entry", list.length)) - list.length;
     const data: Prisma.LedgerEntryCreateManyInput[] = [];
     for (const p of list) {
       entryNo += 1;

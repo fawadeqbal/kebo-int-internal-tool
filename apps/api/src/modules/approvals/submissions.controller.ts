@@ -9,13 +9,10 @@ import {
   Patch,
   Post,
   Query,
-  Res,
-  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import type { Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { Validate } from "../../common/http/zod.pipe";
@@ -115,19 +112,6 @@ export class SubmissionsController {
         { code: "custom", path: ["file"], message: "Choose a photo or PDF of the bank slip or receipt", input: undefined },
       ]);
     return this.approvals.attach(user, id, file);
-  }
-
-  @Get(":id/file")
-  async file(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
-    const f = await this.approvals.open(user, id);
-    res.set({
-      "Content-Type": f.mimeType,
-      "Content-Length": String(f.size),
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-    });
-    return new StreamableFile(f.stream);
   }
 
   @Delete(":id/file")

@@ -17,8 +17,9 @@ import type {
 } from "@kebo/shared";
 import type { Person } from "./types";
 
-/** A file kept with a record (an expense's receipt, a payment's bank slip). */
+/** A file kept with a record (an expense's receipt, a payment's bank slip), opened at /files/<id>. */
 export interface AttachedFileInfo {
+  id: string;
   name: string;
   type: string;
   size: number;
@@ -170,7 +171,7 @@ export interface ExpenseView {
   paidBy: Person | null;
   reference: string | null;
   note: string | null;
-  receipt: { name: string; type: string; size: number } | null;
+  receipt: AttachedFileInfo | null;
   /** On an order: its step, who bears it, and whether someone paid it from their own money. */
   step: FlowStep | null;
   borneBy: ExpenseBearer;

@@ -54,23 +54,26 @@ describe("payment files", () => {
     const saved = (
       await upload(manager, `/payments/${id}/file`).attach("file", png, { filename: "slip.png", contentType: "image/png" }).expect(201)
     ).body;
-    expect(saved.file).toEqual({ name: "slip.png", type: "image/png", size: png.length });
+    expect(saved.file).toEqual({ id: expect.stringMatching(/^[0-9a-f-]{36}$/), name: "slip.png", type: "image/png", size: png.length });
 
-    const got = await api(app, manager).get(`/payments/${id}/file`).buffer(true).expect(200);
+    // Opened at the one address for every stored file, by its id.
+    const got = await api(app, manager).get(`/files/${saved.file.id}`).buffer(true).expect(200);
     expect(got.headers["content-type"]).toMatch(/^image\/png/);
     expect(Buffer.from(got.body).equals(png)).toBe(true);
     const list = (await api(app, manager).get(`/orders/${order.id}/payments`).expect(200)).body.payments as Pay[];
-    expect(list.find((p) => p.id === id)!.file).toEqual({ name: "slip.png", type: "image/png", size: png.length });
+    expect(list.find((p) => p.id === id)!.file).toEqual(saved.file);
 
-    await upload(manager, `/payments/${id}/file`)
-      .attach("file", Buffer.from("%PDF-1.4 slip"), { filename: "advice.pdf", contentType: "application/pdf" })
-      .expect(201);
-    expect((await api(app, manager).get(`/payments/${id}/file`).buffer(true).expect(200)).headers["content-type"]).toMatch(
-      /^application\/pdf/,
-    );
+    const pdf = (
+      await upload(manager, `/payments/${id}/file`)
+        .attach("file", Buffer.from("%PDF-1.4 slip"), { filename: "advice.pdf", contentType: "application/pdf" })
+        .expect(201)
+    ).body.file as { id: string };
+    expect((await api(app, manager).get(`/files/${pdf.id}`).buffer(true).expect(200)).headers["content-type"]).toMatch(/^application\/pdf/);
+    // The one it replaced is gone.
+    await api(app, manager).get(`/files/${saved.file.id}`).expect(404);
     await api(app, sana).delete(`/payments/${id}/file`).expect(403);
     await api(app, manager).delete(`/payments/${id}/file`).expect(200);
-    await api(app, manager).get(`/payments/${id}/file`).expect(404);
+    await api(app, manager).get(`/files/${pdf.id}`).expect(404);
 
     const audit = (await api(app, manager).get(`/audit?entityType=order&entityId=${order.id}&pageSize=20`).expect(200)).body.rows as {
       summary: string;
@@ -109,8 +112,8 @@ describe("payment files", () => {
     expect(files.files.find((f) => f.id === `payment:${id}`)).toMatchObject({
       name: "bank slip.png",
       kindLabel: "Proof of payment",
-      href: `/files/payments/${id}`,
-      viewHref: `/files/payments/${id}?view=1`,
+      href: expect.stringMatching(/^\/files\/[0-9a-f-]{36}$/),
+      viewHref: expect.stringMatching(/^\/files\/[0-9a-f-]{36}\?view=1$/),
       can: { rename: true, replace: true, remove: true },
     });
   });
@@ -139,11 +142,11 @@ describe("payment files", () => {
       name: "tt-copy.pdf",
       type: "application/pdf",
     });
-    await api(app, manager).get(`/factory-payments/${pay.id}/file`).expect(200);
+    await api(app, manager).get(`/files/${saved.file.id}`).expect(200);
     // Opening it follows the order's money page: whoever sees the factory payments there.
     const seen = (await api(app, sana).get(`/orders/${orderId}/money`)).body?.factories?.payments as Pay[] | undefined;
     await api(app, sana)
-      .get(`/factory-payments/${pay.id}/file`)
+      .get(`/files/${saved.file.id}`)
       .expect(seen?.some((p) => p.id === pay.id) ? 200 : 404);
     await upload(sana, `/factory-payments/${pay.id}/file`).attach("file", png, { filename: "x.png", contentType: "image/png" }).expect(403);
     await api(app, manager).delete(`/factory-payments/${pay.id}/file`).expect(200);

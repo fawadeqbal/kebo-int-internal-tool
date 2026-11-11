@@ -124,19 +124,21 @@ describe("expenses", () => {
       .expect(400)
       .expect((r) => expect(r.body.error).toMatch(/photo .* or a PDF/));
     const withReceipt = (await receipt(manager, e.id).attach("file", png, { filename: "hotel.png", contentType: "image/png" }).expect(201)).body;
-    expect(withReceipt.receipt).toEqual({ name: "hotel.png", type: "image/png", size: png.length });
+    expect(withReceipt.receipt).toEqual({ id: expect.stringMatching(/^[0-9a-f-]{36}$/), name: "hotel.png", type: "image/png", size: png.length });
 
-    const got = await api(app, manager).get(`/expenses/${e.id}/receipt`).buffer(true).expect(200);
+    const got = await api(app, manager).get(`/files/${withReceipt.receipt.id}`).buffer(true).expect(200);
     expect(got.headers["content-type"]).toMatch(/^image\/png/);
     expect(Buffer.from(got.body).equals(png)).toBe(true);
-    await api(app, sana).get(`/expenses/${e.id}/receipt`).expect(403);
+    // Those who don't see expenses are told it is not there.
+    await api(app, sana).get(`/files/${withReceipt.receipt.id}`).expect(404);
 
     // A new one replaces it; removing leaves none.
     const pdf = (await receipt(manager, e.id).attach("file", Buffer.from("%PDF-1.4 bill"), { filename: "bill.pdf", contentType: "application/pdf" }).expect(201))
       .body;
     expect(pdf.receipt.name).toBe("bill.pdf");
+    await api(app, manager).get(`/files/${withReceipt.receipt.id}`).expect(404);
     await api(app, manager).delete(`/expenses/${e.id}/receipt`).expect(200);
-    await api(app, manager).get(`/expenses/${e.id}/receipt`).expect(404);
+    await api(app, manager).get(`/files/${pdf.receipt.id}`).expect(404);
     const row = (await list(`customerId=${customerId}&category=hotel`)).rows[0];
     expect(row.receipt).toBeNull();
   });

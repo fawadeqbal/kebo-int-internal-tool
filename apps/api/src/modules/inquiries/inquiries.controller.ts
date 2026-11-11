@@ -8,7 +8,6 @@ import {
   Options,
   Param,
   ParseUUIDPipe,
-  Patch,
   Post,
   Put,
   Query,
@@ -164,42 +163,6 @@ export class InquiriesController {
       "Cache-Control": "private, no-store",
     });
     return new StreamableFile(Buffer.from(z.data));
-  }
-}
-
-@ApiTags("files")
-@Controller("files")
-export class FilesController {
-  constructor(private readonly inquiries: InquiriesService) {}
-
-  @Get(":id")
-  async download(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
-    const f = await this.inquiries.download(user, id);
-    res.set({
-      "Content-Type": f.mimeType,
-      "Content-Length": String(f.size),
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-    });
-    return new StreamableFile(f.stream);
-  }
-
-  /** { kind, note } — what the file is (URS, drawing…) and a note. */
-  @Patch(":id")
-  describe(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(attachmentInput)) body: AttachmentInput,
-  ) {
-    return this.inquiries.describeFile(user, id, body);
-  }
-
-  @Delete(":id")
-  @HttpCode(200)
-  async remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
-    await this.inquiries.removeFile(user, id);
-    return { ok: true };
   }
 }
 

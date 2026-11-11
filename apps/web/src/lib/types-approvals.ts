@@ -18,7 +18,7 @@ export interface Submission {
   submittedBy: { id: string; name: string };
   submittedAt: string;
   hasFile: boolean;
-  file: { name: string; type: string; size: number } | null;
+  file: { id: string; name: string; type: string; size: number } | null;
   reason: string | null;
   decidedBy: { id: string; name: string } | null;
   decidedAt: string | null;

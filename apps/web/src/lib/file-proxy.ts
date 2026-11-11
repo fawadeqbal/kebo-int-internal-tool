@@ -1,34 +1,13 @@
 import { apiFetch } from "@/lib/api";
 import { UUID } from "@/lib/ids";
 
-/** Types a browser can show safely in a tab (no SVG or HTML: they could run scripts). */
-const VIEWABLE = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]);
-
 /**
- * GET and POST for a file kept with a record (an expense's receipt, a payment's
- * proof), passed through to the API, which checks who may see or change it.
- * GET ?view=1 opens a PDF or a photo in the browser. POST takes one `file` from
- * this site's own pages (server actions cap bodies at 1 MB, so files come here).
+ * Uploading the file kept with a record (an expense's receipt, a payment's
+ * proof), passed through to the API, which checks who may change it. It takes
+ * one `file` from this site's own pages (server actions cap bodies at 1 MB, so
+ * files come here). Every stored file opens at /files/<id>.
  */
-export function fileRoutes(apiPath: (id: string) => string, choose: string) {
-  async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
-    if (!UUID.test(id)) return new Response("Not found", { status: 404 });
-    const res = await apiFetch(apiPath(id));
-    if (!res.ok) return new Response(res.status === 404 ? "Not found" : "Not allowed", { status: res.status });
-    const headers = new Headers();
-    for (const h of ["content-type", "content-length", "content-disposition", "x-content-type-options", "cache-control"]) {
-      const v = res.headers.get(h);
-      if (v) headers.set(h, v);
-    }
-    const type = (res.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
-    if (new URL(req.url).searchParams.get("view") === "1" && VIEWABLE.has(type)) {
-      headers.set("content-disposition", (headers.get("content-disposition") ?? "").replace(/^attachment/, "inline") || "inline");
-      headers.set("content-security-policy", "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'");
-    }
-    return new Response(res.body, { status: 200, headers });
-  }
-
+export function uploadRoute(apiPath: (id: string) => string, choose: string) {
   async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     if (!UUID.test(id)) return Response.json({ error: "Not found" }, { status: 404 });
@@ -50,7 +29,7 @@ export function fileRoutes(apiPath: (id: string) => string, choose: string) {
     return Response.json(json, { status: res.status });
   }
 
-  return { GET, POST };
+  return { POST };
 }
 
 /** Same site only: a form post from another site cannot add or change files. */

@@ -175,7 +175,7 @@ describe("the entry in the side panel", () => {
       factoryId: null,
       userId: null,
       label: "Payment on SO-2026-0447",
-      file: { kind: "payment", id: "p1", name: "bank-slip-0447.jpg" },
+      file: { id: "f1", name: "bank-slip-0447.jpg" },
       recordedBy: "Bilal · sent for approval 2026-11-03",
       approvedBy: "Fawad",
       settles: "Balance (plan row 2) on SO-2026-0447 · now paid",
@@ -190,7 +190,7 @@ describe("the entry in the side panel", () => {
     expect(table.getAllByText("24,247.72")).toHaveLength(3);
     expect(screen.getByText("Balance (plan row 2) on SO-2026-0447 · now paid")).toBeTruthy();
     expect(screen.getByText("Bilal · sent for approval 2026-11-03")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "bank-slip-0447.jpg" }).getAttribute("href")).toBe("/files/payments/p1");
+    expect(screen.getByRole("link", { name: "bank-slip-0447.jpg" }).getAttribute("href")).toBe("/files/f1");
     expect(screen.getByRole("link", { name: "Open the payment" }).getAttribute("href")).toBe("/orders/o1/payment");
     expect(screen.getByRole("link", { name: "Receipt PDF" }).getAttribute("href")).toContain("/print/orders/o1/payment-receipt?ref=p1");
     expect(screen.getByText(/can.t be edited/)).toBeTruthy();

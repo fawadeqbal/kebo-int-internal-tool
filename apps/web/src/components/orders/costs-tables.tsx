@@ -127,7 +127,7 @@ function expenseColumns(c: string, setup: ExpenseSetup | null, byId: Map<string,
             {e.voided ? (
               <Badge tone="neutral">Removed</Badge>
             ) : v.receipt === "yes" ? (
-              <a href={`/files/expenses/${r.key}?view=1`} target="_blank" rel="noreferrer">
+              <a href={`/files/${e.receipt?.id}?view=1`} target="_blank" rel="noreferrer">
                 <Badge tone="ok">Receipt</Badge>
               </a>
             ) : (

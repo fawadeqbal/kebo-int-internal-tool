@@ -11,6 +11,7 @@
   "checklist -> orders",
   "checklist -> settings",
   "company -> settings",
+  "files -> approvals",
   "files -> checklist",
   "files -> flow",
   "files -> inquiries",

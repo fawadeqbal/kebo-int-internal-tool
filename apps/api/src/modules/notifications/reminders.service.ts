@@ -1,7 +1,7 @@
 import { PROFIT_LABEL } from "@kebo/money";
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
-import { livePart, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
+import { claimOnce, livePart, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
 import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus, shippedOnOf } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -189,13 +189,13 @@ export class RemindersService {
 
     // 8. The morning summary email, once a day (the counter row is the "already sent" mark). Email reports are a plan feature.
     const reports = await this.limits.allows("email_reports");
-    const claimed = reports && (await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`summary-${today}`}, 1) on conflict do nothing`);
+    const claimed = reports && (await claimOnce(this.prisma.db, `summary-${today}`));
     if (claimed) await this.summary(today);
 
     // 9. On the 1st, last month's report, once.
     if (reports && today.endsWith("-01")) {
       const last = addDays(today, -1).slice(0, 7);
-      const monthly = await this.prisma.db.$executeRaw`insert into counters (key, value) values (${`monthly-${last}`}, 1) on conflict do nothing`;
+      const monthly = await claimOnce(this.prisma.db, `monthly-${last}`);
       if (monthly) await this.monthly(last);
     }
 
