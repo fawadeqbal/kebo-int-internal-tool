@@ -4,14 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
-  Banknote,
-  BarChart3,
   Bell,
+  BookOpen,
   Building2,
   ChevronRight,
   ClipboardList,
-  Factory,
-  FileText,
+  Globe,
   House,
   LayoutDashboard,
   LogOut,
@@ -24,10 +22,11 @@ import {
   Plus,
   Search,
   Settings,
-  SquareCheckBig,
   Sun,
+  TrendingUp,
   User,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
@@ -38,14 +37,14 @@ export type { NavModule, NavPage } from "@/lib/nav";
 
 const ICONS: Record<NavIcon, typeof House> = {
   home: House,
-  work: SquareCheckBig,
-  sales: FileText,
-  orders: Package,
-  purchasing: Factory,
-  finance: Banknote,
-  reports: BarChart3,
-  settings: Settings,
-  access: Users,
+  overview: LayoutDashboard,
+  public: Globe,
+  partners: Users,
+  operations: Package,
+  revenue: TrendingUp,
+  treasury: Wallet,
+  finance: BookOpen,
+  admin: Settings,
 };
 
 const isActive = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -206,7 +205,7 @@ function AccountMenu({ user }: { user: { name: string; email: string; role: stri
 
 /* ------------------------------------------------------------------ Sidebar */
 
-/** A count on a page or a closed module: what waits for this person. */
+/** A count on a page or a closed module: what waits for this person (payments to verify). */
 function Count({ n, label, tone = "warn" }: { n: number; label: string; tone?: "warn" | "neutral" }) {
   return (
     <span
@@ -248,7 +247,7 @@ function PageLink({ page, active, big }: { page: NavPage; active: boolean; big?:
   );
 }
 
-/** Home, then each module: a button that opens and closes its pages (aria-expanded); a closed one shows its total. */
+/** Dashboard, then each module: a button that opens and closes its pages (aria-expanded); a closed one shows its total. */
 function ModuleTree({
   modules,
   pathname,
@@ -281,7 +280,7 @@ function ModuleTree({
         >
           {home && <span className="absolute inset-y-1.5 -left-3 w-[3px] rounded-full bg-primary-solid" aria-hidden />}
           <House className="size-4 shrink-0" aria-hidden />
-          <span className="flex-1 truncate">Home</span>
+          <span className="flex-1 truncate">Dashboard</span>
         </Link>
       </li>
       {modules.map((m) => {
@@ -559,7 +558,7 @@ function SidebarContent({
   );
 }
 
-/** The collapsed sidebar: the logo, the button that opens it again, Home and one icon per module. */
+/** The collapsed sidebar: the logo, the button that opens it again, Dashboard and one icon per module. */
 function RailContent({ modules, companyName, logo, onExpand }: { modules: NavModule[]; companyName: string; logo?: string; onExpand: () => void }) {
   const pathname = usePathname();
   const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
@@ -585,9 +584,9 @@ function RailContent({ modules, companyName, logo, onExpand }: { modules: NavMod
         <Link
           href={HOME_HREF}
           data-rail-item
-          aria-label="Home"
+          aria-label="Dashboard"
           aria-current={home ? "page" : undefined}
-          title="Home"
+          title="Dashboard"
           className={cn(
             "grid size-10 place-items-center rounded-[10px] text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
             home && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",
@@ -790,7 +789,7 @@ export function AppShell({
         aria-label="Quick"
         className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
-        {tab("/dashboard", "Home", LayoutDashboard)}
+        {tab("/dashboard", "Dashboard", LayoutDashboard)}
         {tab("/inquiries", "Inquiries", ClipboardList)}
         {canCreate ? (
           <div className="flex flex-1 items-start justify-center">

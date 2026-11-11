@@ -63,14 +63,14 @@ function Line({ r }: { r: LedgerListRow }) {
 }
 
 describe("the sidebar", () => {
-  it("has Ledger after To receive, for those with ledger.view only", () => {
+  it("has General ledger after Receivables and Payables, for those with ledger.view only", () => {
     const pages = (can: (p: string) => boolean) =>
-      buildModules({ can, feature: () => true, approvals: null, approves: false, unread: 0, companyAddresses: false })
+      buildModules({ can, feature: () => true, approvals: null, approves: false, companyAddresses: false })
         .find((m) => m.key === "finance")
         ?.pages.map((p) => p.label);
-    expect(pages(() => true)?.slice(0, 3)).toEqual(["To receive", "Ledger", "Cash book"]);
-    expect(pages((p) => p === "ledger.view")).toEqual(["Ledger"]);
-    expect(pages((p) => p !== "ledger.view")).not.toContain("Ledger");
+    expect(pages(() => true)).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
+    expect(pages((p) => p === "ledger.view")).toEqual(["General ledger"]);
+    expect(pages((p) => p !== "ledger.view")).not.toContain("General ledger");
   });
 });
 

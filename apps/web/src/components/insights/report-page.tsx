@@ -1,7 +1,7 @@
 import { Suspense, type ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { can } from "@kebo/shared";
-import { Alert, buildHref, buttonClass, Card, CardHeader, Input, PageHeader, Segmented } from "@kebo/ui";
+import { Alert, buildHref, buttonClass, Card, CardHeader, Input, LinkTabs, PageHeader, Segmented } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { hasFeature, requirePermission } from "@/lib/session";
@@ -59,8 +59,46 @@ const PATH_OF: Record<ReportKind, string> = {
   profit: "/finance/profit",
   leaks: "/finance/leaks",
 };
-/** The sidebar item each page is under. */
-const ITEM_OF: Record<ReportKind, string> = { ...PATH_OF, targets: "/reports/people" };
+/** The sidebar item each page is under: the reports share Overview › Analytics & reports; the money ones have their own. */
+const ITEM_OF: Record<ReportKind, string> = {
+  overview: "/reports",
+  customers: "/reports",
+  factories: "/reports",
+  people: "/reports",
+  targets: "/reports",
+  funnel: "/reports",
+  profit: "/finance/profit",
+  leaks: "/finance/leaks",
+};
+/** A report's own title (the overview and the money pages take their sidebar item's name). */
+const REPORT_TITLE: Partial<Record<ReportKind, string>> = {
+  customers: "Customers",
+  factories: "Suppliers",
+  people: "People & targets",
+  targets: "Targets",
+  funnel: "Sales funnel",
+};
+/** The reports as tabs under the title (they were sidebar items): the same period goes with you. */
+const REPORT_TABS: { key: ReportKind | "print"; href: string; label: string }[] = [
+  { key: "overview", href: "/reports", label: "Overview" },
+  { key: "customers", href: "/reports/customers", label: "Customers" },
+  { key: "factories", href: "/reports/factories", label: "Suppliers" },
+  { key: "people", href: "/reports/people", label: "People & targets" },
+  { key: "funnel", href: "/reports/funnel", label: "Sales funnel" },
+  { key: "print", href: "/reports/print", label: "Printable reports" },
+];
+const REPORTS_CRUMBS = [...crumbsFor("/reports").slice(0, 1), { label: labelFor("/reports"), href: "/reports" }];
+
+function ReportTabs({ current, keep }: { current: ReportKind | "print"; keep: Record<string, string | undefined> }) {
+  const active = current === "targets" ? "people" : current;
+  return (
+    <LinkTabs
+      label="Reports"
+      className="no-print mt-3"
+      tabs={REPORT_TABS.map((t) => ({ href: buildHref(t.href, keep, {}), label: t.label, active: t.key === active }))}
+    />
+  );
+}
 const DESCRIPTION: Record<ReportKind, string> = {
   overview: "How the business is doing · every figure is from the orders and money themselves",
   customers: "Who buys, how much, how well they pay",
@@ -76,13 +114,15 @@ const DESCRIPTION: Record<ReportKind, string> = {
  * One of the reports (Dashboard frame, without its section list: the sidebar has the pages now):
  * one period for every figure in the header with the period before to compare, tiles, one chart
  * per question, short lists. All figures come from the Insights tables (GET /insights/facts/*).
- * Reports › Overview, Customers, Factories, People & targets, Sales funnel; Finance › Profit & loss, Leaks.
+ * Overview › Analytics & reports (tabs: Overview, Customers, Suppliers, People & targets, Sales funnel, Printable reports);
+ * Revenue & profitability › Profit & loss, Variance analysis.
  */
 export async function ReportPage({ kind, searchParams }: { kind: ReportKind; searchParams: Promise<ReportSearch> }) {
   const me = await requirePermission("reports.view");
   const item = ITEM_OF[kind];
-  const crumbs = crumbsFor(item);
-  const title = kind === "targets" ? "Targets" : labelFor(item);
+  const tabbed = item === "/reports";
+  const crumbs = tabbed && kind !== "overview" ? REPORTS_CRUMBS : crumbsFor(item);
+  const title = REPORT_TITLE[kind] ?? labelFor(item);
   if (!(await hasFeature("insights"))) return <PlanOff title={title} what="Insights (sales, profit and team reports)" crumbs={crumbs} />;
   const seeMoney = can(me, "expenses.manage");
   // Money (profit, leaks) and setting targets: for people who may see money, as on Insights.
@@ -152,7 +192,9 @@ export async function ReportPage({ kind, searchParams }: { kind: ReportKind; sea
             </div>
           ) : undefined
         }
-      />
+      >
+        {tabbed && <ReportTabs current={kind} keep={keep} />}
+      </PageHeader>
       {periodic && (
         <div className="mb-4 md:hidden">
           {periodPicker}
@@ -280,10 +322,10 @@ function SectionSkeleton() {
   );
 }
 
-/** Reports › Printable reports: the sales report as a paper (view, print, PDF) and each report's tables as Excel, for a period. */
+/** Overview › Analytics & reports › Printable reports: the sales report as a paper (view, print, PDF) and each report's tables as Excel, for a period. */
 export async function PrintableReports({ searchParams }: { searchParams: Promise<ReportSearch & { staff?: string }> }) {
   await requirePermission("reports.view");
-  const crumbs = crumbsFor("/reports/print");
+  const crumbs = REPORTS_CRUMBS;
   if (!(await hasFeature("insights"))) return <PlanOff title="Printable reports" what="Insights (sales, profit and team reports)" crumbs={crumbs} />;
   const sp = await searchParams;
   const today = todayIn(TZ);
@@ -300,7 +342,9 @@ export async function PrintableReports({ searchParams }: { searchParams: Promise
   ];
   return (
     <div>
-      <PageHeader crumbs={crumbs} title="Printable reports" description="The sales report as a paper to print or send, and each report's tables as Excel, for the period you choose." />
+      <PageHeader crumbs={crumbs} title="Printable reports" description="The sales report as a paper to print or send, and each report's tables as Excel, for the period you choose.">
+        <ReportTabs current="print" keep={{ period: p.kind === "quarter" ? undefined : p.kind, from: p.kind === "custom" ? p.from : undefined, to: p.kind === "custom" ? p.to : undefined }} />
+      </PageHeader>
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
         <Segmented
           label="Period"

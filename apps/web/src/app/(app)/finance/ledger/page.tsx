@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, Pager, Segmented, Table, Td, Th, THead, Tr, toPage } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { PageHeader } from "@kebo/ui";
-import { crumbsFor } from "@/lib/nav";
+import { crumbsFor, labelFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
 import { money } from "@/lib/format";
@@ -15,7 +15,7 @@ import type { LedgerAccounts, LedgerAgeing, LedgerEntries, LedgerEntry } from "@
 import type { OrderRow } from "@/lib/types-orders";
 import { TZ } from "../sections";
 
-export const metadata = { title: "Ledger" };
+export const metadata = { title: "General ledger" };
 
 type Search = {
   view?: string;
@@ -66,7 +66,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
     <div>
       <PageHeader
         crumbs={crumbsFor(PATH)}
-        title="Ledger"
+        title={labelFor(PATH)}
         description={`Every money record, posted from its document · ${main} at each entry's rate`}
         actions={
           <>

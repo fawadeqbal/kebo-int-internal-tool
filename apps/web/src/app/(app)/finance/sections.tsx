@@ -662,7 +662,7 @@ export async function ReceiveBody() {
       </div>
       <Card className="overflow-hidden">
         <CardHeader
-          title="To receive"
+          title="Receivables"
           description="Open orders with money still due. Overdue first: remind those customers today."
           actions={r.rows.length > 0 ? <ExportLink what="receivables" /> : undefined}
         />

@@ -12,9 +12,9 @@ import { FactoryPanel } from "./factory-form";
 import { requirePermission } from "@/lib/session";
 import type { Paged, Person } from "@/lib/types";
 import type { FactoryDetail, FactoryRow } from "@/lib/types-people";
-import { crumbsFor } from "@/lib/nav";
+import { crumbsFor, labelFor } from "@/lib/nav";
 
-export const metadata = { title: "Factories" };
+export const metadata = { title: "Suppliers" };
 
 type Params = Record<string, string | undefined>;
 
@@ -69,7 +69,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
     <div>
       <PageHeader
         crumbs={crumbsFor("/factories")}
-        title="Factories"
+        title={labelFor("/factories")}
         summary={
           <>
             {plural(all, "factory", "factories")}

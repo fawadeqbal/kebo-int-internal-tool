@@ -103,7 +103,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           />
         )}
         <Tile
-          label="To receive"
+          label="Receivable"
           value={bigMoney(recvTotal, c)}
           meter={
             recvTotal > 0
@@ -120,7 +120,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
         {d.payable ? (
           <Tile
             className="max-sm:hidden"
-            label="To pay factories"
+            label="Payable"
             value={bigMoney(Number(d.payable.total), c)}
             sub={[
               ...d.payOwn
