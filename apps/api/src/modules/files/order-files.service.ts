@@ -39,6 +39,7 @@ import { ChecklistService } from "../checklist/checklist.service";
 import { FlowService } from "../flow/flow.service";
 import { PaymentFilesService } from "../treasury/payment-files.service";
 import { MoneyService } from "../money/money.service";
+import { fileRemoved, fileReplaced } from "../documents/api";
 
 type Upload = { originalname: string; mimetype: string; size: number; buffer: Buffer };
 
@@ -634,7 +635,7 @@ export class OrderFilesService {
         });
         await tx.attachment.update({ where: { id: old.id }, data: { replacedById: row.id } });
         // Whatever the old file was attached to now has the new one.
-        await tx.orderDocument.updateMany({ where: { attachmentId: old.id }, data: { attachmentId: row.id } });
+        await fileReplaced(tx, old.id, row.id);
         await tx.orderChecklistItem.updateMany({ where: { attachmentId: old.id }, data: { attachmentId: row.id } });
         const items = await tx.orderChecklistItem.findMany({ where: { orderId, key: null } });
         for (const i of items) {
@@ -671,8 +672,7 @@ export class OrderFilesService {
     await this.prisma.tx(async (tx) => {
       await tx.attachment.update({ where: { id: fileId }, data: { deletedAt: new Date() } });
       // A paper that was only its upload is missing again; a made paper keeps its own state.
-      await tx.orderDocument.updateMany({ where: { attachmentId: fileId, paperId: null, status: "ready" }, data: { status: "missing" } });
-      await tx.orderDocument.updateMany({ where: { attachmentId: fileId }, data: { attachmentId: null } });
+      await fileRemoved(tx, fileId);
       await tx.orderChecklistItem.updateMany({ where: { attachmentId: fileId }, data: { attachmentId: null } });
       await this.log(
         tx,

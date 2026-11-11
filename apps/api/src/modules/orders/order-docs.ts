@@ -16,6 +16,7 @@ import type { PrismaService, Tx } from "../../database/prisma.service";
 import { chargedExpenses, positionOf, type MoneyCtx } from "../billing/api";
 import { termsOf } from "../billing/api";
 import { buyerOf } from "./buyer";
+import { makeFinal } from "../documents/api";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
 import { readyOnOf, readySelect } from "@kebo/database";
@@ -281,9 +282,7 @@ export async function freezeOrderDoc(
     payments: [],
     rebuiltOn: ctx.rebuilt ? ctx.today : null,
   };
-  const data = { status: "final", snapshot: snapshot as unknown as Prisma.InputJsonValue, finalAt: new Date() };
-  if (latest) await tx.orderPaper.update({ where: { id: latest.id }, data });
-  else await tx.orderPaper.create({ data: { orderId, kind, ref: "", number, version: 1, madeById: ctx.byId, options: {}, ...data } });
+  await makeFinal(tx, latest ?? null, { orderId, kind, number, byId: ctx.byId, snapshot: snapshot as unknown as Prisma.InputJsonValue });
   return version;
 }
 
