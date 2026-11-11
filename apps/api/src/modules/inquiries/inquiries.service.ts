@@ -293,7 +293,7 @@ export class InquiriesService {
 
   private async assertContact(customerId: string, contactId: string | null | undefined) {
     if (!contactId) return;
-    const c = await this.prisma.db.contact.findFirst({ where: { id: contactId, customerId, deletedAt: null } });
+    const c = await this.prisma.db.contact.findFirst({ where: { id: contactId, partyId: customerId, deletedAt: null } });
     if (!c) throw new DomainError("That contact does not belong to this customer.");
   }
 

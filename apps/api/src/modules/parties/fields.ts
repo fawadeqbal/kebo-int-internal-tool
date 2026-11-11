@@ -4,7 +4,7 @@
  */
 
 /** Left out of a customer: what only a supplier has. */
-export const supplierOnly = { contactPerson: true, phone: true, wechat: true, email: true, bankDetails: true, ownerId: true } as const;
+export const supplierOnly = { bankDetails: true, ownerId: true } as const;
 
 /** Left out of a supplier: what only a customer has. */
 export const customerOnly = { type: true, country: true, taxNo: true, regNo: true, defaultCurrency: true, initials: true } as const;

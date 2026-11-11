@@ -104,8 +104,8 @@ export class WebsiteService {
       const [match] = await tx.$queryRaw<
         { customer_id: string; contact_id: string; name: string; email: string | null; phone: string | null }[]
       >`
-        select ct.customer_id, ct.id as contact_id, ct.name, ct.email, ct.phone
-          from contacts ct join parties c on c.id = ct.customer_id
+        select ct.party_id as customer_id, ct.id as contact_id, ct.name, ct.email, ct.phone
+          from contacts ct join parties c on c.id = ct.party_id
          where ct.deleted_at is null and c.deleted_at is null
            and (lower(ct.email) = ${input.email}
                 or (length(${phone}) >= 7 and (regexp_replace(coalesce(ct.phone,''), '\\D', '', 'g') = ${phone} or regexp_replace(coalesce(ct.whatsapp,''), '\\D', '', 'g') = ${phone})))
