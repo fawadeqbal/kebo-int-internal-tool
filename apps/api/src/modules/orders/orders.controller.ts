@@ -6,8 +6,6 @@ import {
   quotedTermsInput,
   type BuyerRefreshInput,
   type QuotedTermsInput,
-  cancelOrderInput,
-  type CancelOrderInput,
   moveStageInput,
   ORDER_STAGES,
   orderDetailsInput,
@@ -21,7 +19,7 @@ import {
   type ReceiptInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
-import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
+import { CurrentUser } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "./orders.service";
 import { DocumentsService, ORDER_DOCUMENTS, type OrderDocumentKind } from "./documents.service";
@@ -129,18 +127,6 @@ export class OrdersController {
   @HttpCode(200)
   quotedTerms(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(quotedTermsInput)) body: QuotedTermsInput) {
     return this.orders.setQuotedTerms(user, id, body.print);
-  }
-
-  /**
-   * { reason, customerMoney?: credit | refund | fee, refundNow?, refundAccountId?, refundOn?, factoryMoney?: refund_due | loss }
-   * — managers only; the deal becomes lost (customer cancelled) and can be reopened. Money received is kept as
-   * credit unless told otherwise; money paid to the factory must be said (refund expected or a loss).
-   */
-  @Post(":id/cancel")
-  @HttpCode(200)
-  @RequirePermissions("orders.manage")
-  cancel(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(cancelOrderInput)) body: CancelOrderInput) {
-    return this.orders.cancel(user, id, body.reason, body);
   }
 
   /** proforma | packing-list — the data to print (the web turns it into a page and a PDF): a final version as it was made (?v=), else from the order now. */

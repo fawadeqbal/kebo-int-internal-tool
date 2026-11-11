@@ -1,6 +1,5 @@
 import { Module } from "@nestjs/common";
 import { OrdersModule } from "../orders/orders.module";
-import { MoneyModule } from "../money/money.module";
 import { TreasuryService } from "./treasury.service";
 import { TreasuryController } from "./treasury.controller";
 import { CustomerPaymentsService } from "./customer-payments.service";
@@ -16,9 +15,9 @@ import { CashController } from "./cash.controller";
  * accounts, the cash book, proofs, and Treasury › Payments. Other modules use `api.ts` or the services exported here.
  */
 @Module({
-  imports: [OrdersModule, MoneyModule],
+  imports: [OrdersModule],
   controllers: [TreasuryController, OrderPaymentsController, CustomerPaymentsController, CreditController, CashController],
   providers: [TreasuryService, CustomerPaymentsService, SupplierPaymentsService, CashService, PaymentFilesService],
-  exports: [TreasuryService, CustomerPaymentsService, CashService, PaymentFilesService],
+  exports: [TreasuryService, CustomerPaymentsService, SupplierPaymentsService, CashService, PaymentFilesService],
 })
 export class TreasuryModule {}

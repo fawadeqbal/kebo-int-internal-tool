@@ -18,11 +18,9 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
   CURRENCIES,
-  factoryPaymentInput,
   moneyAccountInput,
   transferInput,
   voidInput,
-  type FactoryPaymentInput,
   type MoneyAccountInput,
   type TransferInput,
 } from "@kebo/shared";
@@ -110,35 +108,6 @@ class CashController {
   ) {
     const k = z.enum(["in", "factory", "expense"]).parse(kind);
     return this.cash.setAccount(user, k, id, body.accountId);
-  }
-
-  @Post("orders/:id/factory-payments")
-  payFactory(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput,
-  ) {
-    return this.supplierPayments.recordFactoryPayment(user, id, body);
-  }
-
-  /** Same body as recording, plus reason (always asked). */
-  @Patch("factory-payments/:id")
-  editFactoryPayment(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput,
-  ) {
-    return this.supplierPayments.editFactoryPayment(user, id, body);
-  }
-
-  @Post("factory-payments/:id/void")
-  @HttpCode(200)
-  voidFactoryPayment(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(voidInput)) body: z.infer<typeof voidInput>,
-  ) {
-    return this.supplierPayments.voidFactoryPayment(user, id, body.reason);
   }
 
   /**

@@ -6,7 +6,7 @@ import { formatMinor, fromMinor, toMinor } from "@kebo/money";
 import { can, expenseInput, paymentInput, type ExpenseInput, type PaymentInput } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { z } from "zod";
-import { removeProof, setProof } from "../files/proofs";
+import { removeProof, setProof } from "../../common/storage/proofs";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { LimitsService } from "../../common/company/limits.service";
