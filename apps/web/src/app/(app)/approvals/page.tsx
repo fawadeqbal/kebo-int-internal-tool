@@ -21,9 +21,9 @@ import { date, dateTime, money, timeAgo } from "@/lib/format";
 import type { Submission, SubmissionList, SubmissionStatus } from "@/lib/types-approvals";
 import { ApproveButtons, WithdrawButton } from "@/components/money/approval-actions";
 import { approveAction, sendBackAction, withdrawAction } from "./actions";
-import { crumbsFor } from "@/lib/nav";
+import { crumbsFor, labelFor } from "@/lib/nav";
 
-export const metadata = { title: "Approvals" };
+export const metadata = { title: "Verification queue" };
 
 const PAGE_SIZE = 25;
 const STATUS_LABEL: Record<SubmissionStatus, string> = {
@@ -76,7 +76,7 @@ export default async function ApprovalsPage({
     <div className="max-w-4xl">
       <PageHeader
         crumbs={crumbsFor("/approvals")}
-        title="Approvals"
+        title={labelFor("/approvals")}
         summary={
           mine
             ? "Sent for approval: money received and expenses you added. Each counts once a manager approves it."

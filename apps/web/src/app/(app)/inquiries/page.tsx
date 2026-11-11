@@ -10,9 +10,9 @@ import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu
 import { hasFeature, requireUser } from "@/lib/session";
 import { date, money, timeAgo } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
-import { crumbsFor } from "@/lib/nav";
+import { crumbsFor, labelFor } from "@/lib/nav";
 
-export const metadata = { title: "Inquiries" };
+export const metadata = { title: "Inquiries (RFQs)" };
 
 type Params = Record<string, string | undefined>;
 
@@ -107,7 +107,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
     <div>
       <PageHeader
         crumbs={crumbsFor("/inquiries")}
-        title="Inquiries"
+        title={labelFor("/inquiries")}
         summary={
           <>
             {plural(open, "open inquiry", "open inquiries")}

@@ -163,8 +163,8 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
             <THead>
               <tr>
                 <Th>Currency</Th>
-                <Th className="text-right">To receive</Th>
-                <Th className="text-right">To pay</Th>
+                <Th className="text-right">Receivable</Th>
+                <Th className="text-right">Payable</Th>
                 <Th className="text-right">In hand</Th>
               </tr>
             </THead>

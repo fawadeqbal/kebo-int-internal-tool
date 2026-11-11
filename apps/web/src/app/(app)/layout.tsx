@@ -42,13 +42,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           .catch(() => 0)
       : null;
 
-  // The sidebar's modules (design page 33): each page only for those who may open it, with the same checks as the page itself.
+  // The sidebar's modules (nine, ERP redesign): each page only for those who may open it, with the same checks as the page itself.
   const modules = buildModules({
     can: (p) => has(p as Parameters<typeof can>[1]),
     feature,
     approvals,
     approves,
-    unread,
     companyAddresses: !!process.env.BASE_DOMAIN,
   });
   const jar = await cookies();

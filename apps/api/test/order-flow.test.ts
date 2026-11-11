@@ -25,6 +25,8 @@ describe("order flow: from asking factories to SAT", () => {
   let wuxi: string;
   const tag = Date.now().toString(36);
   const password = "Person@12345";
+  /** A reply-by date that is still ahead whenever the test runs (a fixed date fails once it has passed). */
+  const nextWeek = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
   const flow = async (who = sana) => (await api(app, who).get(`/orders/${orderId}/flow`).expect(200)).body;
   const stepState = (f: { steps: { key: string; state: string }[] }) => Object.fromEntries(f.steps.map((s) => [s.key, s.state]));
   const modulesOff = async (off: string[]) => {
@@ -56,7 +58,7 @@ describe("order flow: from asking factories to SAT", () => {
     const before = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
     expect(before.items).toEqual([]);
     expect(before.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ name: `Henan Pack ${tag}`, askedHere: false, lastAskedOn: null });
-    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan, wuxi], replyBy: "2026-11-05", channel: "wechat" }).expect(201)).body;
+    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan, wuxi], replyBy: nextWeek, channel: "wechat" }).expect(201)).body;
     expect(asked.counts).toEqual({ asked: 2, quoted: 0, waiting: 2, late: 0 });
     expect(asked.items[0]).toMatchObject({ channel: "wechat", waitingDays: 0 });
     expect(asked.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ askedHere: true, lastAskedOn: expect.any(String) });

@@ -1,28 +1,20 @@
 /**
- * The sidebar's modules and their pages (design page 33): one address per page, the module's
- * name in the breadcrumb above the title. The layout keeps only the pages a person may open
- * (each page's own permission and plan checks); a module whose pages are all hidden is hidden.
- * Lists stay where they were (/inquiries, /orders, /users…); what used to be a tab has its own
- * address under its module (/finance/cash-book, /reports/customers, /settings/company, /access/roles).
+ * The sidebar's modules and their pages (ERP redesign, 11 Nov 2026: nine modules, standard names).
+ * One address per page, the module's name in the breadcrumb above the title, the item's name as the
+ * title. The layout keeps only the pages a person may open (each page's own permission and plan
+ * checks); a module whose pages are all hidden is hidden. Addresses did not move: only the grouping
+ * and the names changed. The reports share one item (Analytics & reports) and switch with tabs on
+ * the page; notifications open from the bell. Currency & FX has no page yet, so it is not listed.
  */
 
-export type ModuleKey = "work" | "sales" | "orders" | "purchasing" | "finance" | "reports" | "settings" | "access";
+export type ModuleKey = "overview" | "public" | "partners" | "operations" | "revenue" | "treasury" | "finance" | "admin";
 
-export type NavIcon =
-  | "home"
-  | "work"
-  | "sales"
-  | "orders"
-  | "purchasing"
-  | "finance"
-  | "reports"
-  | "settings"
-  | "access";
+export type NavIcon = "home" | ModuleKey;
 
 export interface NavPage {
   href: string;
   label: string;
-  /** What needs looking at (approvals waiting, unread notifications); 0 or none: no count. */
+  /** What needs looking at (payments waiting to be verified); 0 or none: no count. */
   badge?: number;
   /** What the count is, for screen readers ("3 waiting"); default "unread". */
   badgeLabel?: string;
@@ -38,93 +30,85 @@ export interface NavModule {
 /** Every page of every module, in sidebar order (before anyone's permissions). */
 export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages: { href: string; label: string }[] }[] = [
   {
-    key: "work",
-    title: "My work",
-    icon: "work",
+    key: "overview",
+    title: "Overview",
+    icon: "overview",
     pages: [
       { href: "/follow-ups", label: "Follow-ups" },
-      { href: "/approvals", label: "Approvals" },
-      { href: "/notifications", label: "Notifications" },
+      { href: "/orders/board", label: "Pipelines" },
+      { href: "/reports", label: "Analytics & reports" },
+      { href: "/audit", label: "Audit log" },
     ],
   },
   {
-    key: "sales",
-    title: "Sales",
-    icon: "sales",
+    key: "public",
+    title: "Public landing page",
+    icon: "public",
+    pages: [{ href: "/settings/website-form", label: "Website form" }],
+  },
+  {
+    key: "partners",
+    title: "Partners & CRM",
+    icon: "partners",
     pages: [
-      { href: "/inquiries", label: "Inquiries" },
       { href: "/customers", label: "Customers" },
+      { href: "/factories", label: "Suppliers" },
     ],
   },
   {
-    key: "orders",
-    title: "Orders",
-    icon: "orders",
+    key: "operations",
+    title: "Operations & trading",
+    icon: "operations",
     pages: [
+      { href: "/inquiries", label: "Inquiries (RFQs)" },
       { href: "/orders", label: "Orders" },
-      { href: "/orders/board", label: "Order board" },
     ],
   },
   {
-    key: "purchasing",
-    title: "Purchasing",
-    icon: "purchasing",
+    key: "revenue",
+    title: "Revenue & profitability",
+    icon: "revenue",
     pages: [
-      { href: "/factories", label: "Factories" },
-      { href: "/purchasing/to-pay", label: "To pay factories" },
+      { href: "/finance/profit", label: "Profit & loss" },
+      { href: "/finance/expenses", label: "Cost & expense allocation" },
+      { href: "/finance/leaks", label: "Variance analysis" },
+    ],
+  },
+  {
+    key: "treasury",
+    title: "Treasury & payments",
+    icon: "treasury",
+    pages: [
+      { href: "/approvals", label: "Verification queue" },
+      { href: "/finance/cash-book", label: "Multi-currency vault" },
     ],
   },
   {
     key: "finance",
-    title: "Finance",
+    title: "Finance & general ledger",
     icon: "finance",
     pages: [
-      { href: "/finance/to-receive", label: "To receive" },
-      { href: "/finance/ledger", label: "Ledger" },
-      { href: "/finance/cash-book", label: "Cash book" },
-      { href: "/finance/expenses", label: "Expenses" },
-      { href: "/finance/profit", label: "Profit & loss" },
-      { href: "/finance/leaks", label: "Leaks" },
+      { href: "/finance/to-receive", label: "Receivables (AR)" },
+      { href: "/purchasing/to-pay", label: "Payables (AP)" },
+      { href: "/finance/ledger", label: "General ledger" },
     ],
   },
   {
-    key: "reports",
-    title: "Reports",
-    icon: "reports",
+    key: "admin",
+    title: "System & admin",
+    icon: "admin",
     pages: [
-      { href: "/reports", label: "Overview" },
-      { href: "/reports/customers", label: "Customers" },
-      { href: "/reports/factories", label: "Factories" },
-      { href: "/reports/people", label: "People & targets" },
-      { href: "/reports/funnel", label: "Sales funnel" },
-      { href: "/reports/print", label: "Printable reports" },
-    ],
-  },
-  {
-    key: "settings",
-    title: "Settings",
-    icon: "settings",
-    pages: [
-      { href: "/settings/company", label: "Company" },
+      { href: "/settings/company", label: "Company settings" },
       { href: "/settings/sales", label: "Sales & quotations" },
       { href: "/settings/reminders", label: "Reminders" },
       { href: "/settings/emails", label: "Emails" },
       { href: "/settings/order-checklist", label: "Order checklist" },
-      { href: "/settings/papers", label: "Papers" },
-      { href: "/settings/website-form", label: "Website form" },
+      { href: "/settings/papers", label: "Document templates" },
       { href: "/settings/address", label: "Company address" },
-    ],
-  },
-  {
-    key: "access",
-    title: "People & access",
-    icon: "access",
-    pages: [
       { href: "/users", label: "Users" },
       { href: "/access/roles", label: "Roles" },
       { href: "/access/sessions", label: "Sessions" },
       { href: "/access/sign-ins", label: "Sign-ins" },
-      { href: "/audit", label: "Audit log" },
     ],
   },
 ];
@@ -136,7 +120,7 @@ const ALL_PAGES = MODULE_PAGES.flatMap((m) => m.pages.map((p) => ({ ...p, module
 
 /**
  * The page of the sidebar an address belongs to: the longest page address it is or is under
- * (/orders/board is Order board, /orders/123 is Orders, /reports/people/targets is People & targets).
+ * (/orders/board is Pipelines, /orders/123 is Orders, /reports/people/targets is Analytics & reports).
  */
 export function pageOf<T extends { href: string }>(pathname: string, pages: T[]): T | undefined {
   let best: T | undefined;
@@ -154,7 +138,7 @@ export function moduleOf(pathname: string, modules: { key: ModuleKey; pages: { h
   return pageOf(pathname, all)?.key;
 }
 
-/** "Finance › Cash book": the breadcrumb above a module page's title (its title is the item's name). */
+/** "Treasury & payments › Multi-currency vault": the breadcrumb above a module page's title (its title is the item's name). */
 export function crumbsFor(href: string): { label: string; href?: string }[] {
   const p = ALL_PAGES.find((x) => x.href === href);
   if (!p) return [];
@@ -171,24 +155,22 @@ export const moduleTotal = (m: { pages: { badge?: number }[] }) => m.pages.reduc
 
 /**
  * The modules this person sees: each page with the same permission and plan checks as the page
- * itself; a module with no page left is left out. Counts: approvals waiting (or sent back) and
- * unread notifications.
+ * itself; a module with no page left is left out. Count: payments waiting to be verified (or sent
+ * back to the person who sent them). Unread notifications show on the bell, not here.
  */
 export function buildModules({
   can,
   feature,
   approvals,
   approves,
-  unread,
   companyAddresses,
 }: {
   can: (permission: string) => boolean;
   feature: (feature: string) => boolean;
-  /** Approvals waiting for an approver (or sent back to someone who sends them); null: not theirs. */
+  /** Payments waiting for an approver (or sent back to someone who sends them); null: not theirs. */
   approvals: number | null;
   approves: boolean;
-  unread: number;
-  /** Companies have their own addresses (BASE_DOMAIN): Settings › Company address. */
+  /** Companies have their own addresses (BASE_DOMAIN): System & admin › Company address. */
   companyAddresses: boolean;
 }): NavModule[] {
   const managers = can("expenses.manage");
@@ -196,33 +178,40 @@ export function buildModules({
   const reports = can("reports.view") && feature("insights");
   const settings = can("settings.manage");
   const security = can("security.manage");
+  /** Who may open each page; a page not listed is open to everyone signed in. */
   const show: Record<string, boolean> = {
-    "/approvals": approvals !== null,
+    "/reports": reports,
+    "/audit": can("audit.view") && feature("audit_log"),
+    "/settings/website-form": settings,
     "/factories": sourcing,
-    "/purchasing/to-pay": sourcing,
-    "/finance/to-receive": sourcing && (managers || can("payments.record")),
-    "/finance/ledger": can("ledger.view"),
-    "/finance/cash-book": sourcing && managers && feature("cash_book"),
-    "/finance/expenses": sourcing && managers && feature("expenses"),
     "/finance/profit": reports && managers,
+    "/finance/expenses": sourcing && managers && feature("expenses"),
     "/finance/leaks": reports && managers,
+    "/approvals": approvals !== null,
+    "/finance/cash-book": sourcing && managers && feature("cash_book"),
+    "/finance/to-receive": sourcing && (managers || can("payments.record")),
+    "/purchasing/to-pay": sourcing,
+    "/finance/ledger": can("ledger.view"),
+    "/settings/company": settings,
+    "/settings/sales": settings,
+    "/settings/reminders": settings,
+    "/settings/emails": settings,
+    "/settings/order-checklist": settings,
+    "/settings/papers": settings,
+    "/settings/address": settings && companyAddresses,
     "/users": can("users.manage"),
     "/access/roles": security,
     "/access/sessions": security,
     "/access/sign-ins": security,
-    "/audit": can("audit.view") && feature("audit_log"),
-    "/settings/address": settings && companyAddresses,
   };
   const badges: Record<string, Pick<NavPage, "badge" | "badgeLabel">> = {
     "/approvals": { badge: approvals ?? 0, badgeLabel: approves ? "waiting" : "sent back" },
-    "/notifications": { badge: unread },
   };
-  const allowed = (key: ModuleKey, href: string) => show[href] ?? (key === "settings" ? settings : key === "reports" ? reports : true);
   return MODULE_PAGES.map((m) => ({
     key: m.key,
     title: m.title,
     icon: m.icon,
-    pages: m.pages.filter((p) => allowed(m.key, p.href)).map((p) => ({ ...p, ...badges[p.href] })),
+    pages: m.pages.filter((p) => show[p.href] ?? true).map((p) => ({ ...p, ...badges[p.href] })),
   })).filter((m) => m.pages.length > 0);
 }
 

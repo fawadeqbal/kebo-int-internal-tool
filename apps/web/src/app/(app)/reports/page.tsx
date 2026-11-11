@@ -3,9 +3,9 @@ import { buildHref } from "@kebo/ui";
 import { ReportPage, type ReportSearch } from "@/components/insights/report-page";
 import { reportsOverviewQuery } from "@/lib/old-addresses";
 
-export const metadata = { title: "Reports" };
+export const metadata = { title: "Analytics & reports" };
 
-/** Reports › Overview: how the business is doing. (Old links with only ?from&to open that period.) */
+/** Overview › Analytics & reports: how the business is doing. (Old links with only ?from&to open that period.) */
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<ReportSearch> }) {
   const old = reportsOverviewQuery(await searchParams);
   if (old) redirect(buildHref("/reports", {}, old));

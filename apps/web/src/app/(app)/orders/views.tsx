@@ -28,7 +28,7 @@ import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { hasFeature } from "@/lib/session";
 import { optional } from "@/components/print/data";
-import { crumbsFor } from "@/lib/nav";
+import { crumbsFor, labelFor } from "@/lib/nav";
 import { date, money } from "@/lib/format";
 import type { Paged } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
@@ -241,7 +241,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
     <>
       <PageHeader
         crumbs={crumbsFor("/orders/board")}
-        title="Order board"
+        title={labelFor("/orders/board")}
         summary={
           <>
             {plural(openRows.length, "open order")}

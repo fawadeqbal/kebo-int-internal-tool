@@ -236,7 +236,7 @@ async function MonthStrip({ today }: { today: string }) {
             href="/reports?period=month"
           />
           <Tile
-            label="To receive"
+            label="Receivable"
             value={bigMoney(owed, c)}
             meter={owed > 0 ? { percent: (Number(overdue.amount) / owed) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` } : undefined}
             sub={
