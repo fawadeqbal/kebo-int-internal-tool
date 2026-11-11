@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextCount, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextCount, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer, routeOf, termsSelect } from "@kebo/database";
 import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
@@ -48,6 +48,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import { factoryPlansOf } from "../billing/api";
 import { createPlan, termsOf } from "../billing/api";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
+import { setPaymentTerms } from "./payment-terms";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
 import { LedgerPosting } from "../ledger/posting.service";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
@@ -71,6 +72,7 @@ function orderSearch(term: string | undefined): Prisma.OrderWhereInput {
 
 const orderInclude = {
   cancellation: true,
+  paymentTerms: true,
   allocations: { where: livePart, orderBy: [{ on: "asc" }, { createdAt: "asc" }] },
   // With what pays it, what the position needs: the plan's deposit and what was charged to the customer.
   receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
@@ -320,11 +322,8 @@ export class OrdersService {
         : implied;
     const plan = routePlan(decimalToMinor(option.total), Number(rev.depositPercent), route, acceptedOn, days.depositDays, days.balanceDays);
     await createPlan(tx, order.id, plan);
-    if (route.route || route.balanceWhen)
-      await tx.order.update({
-        where: { id: order.id },
-        data: { paymentRoute: route.route, balanceWhen: route.balanceWhen, lcTerms: route.lcTerms, lcDays: route.lcDays },
-      });
+    // How the customer pays: its own row (order_payment_terms), made with every order.
+    await setPaymentTerms(tx, order.id, { route: route.route, balanceWhen: route.balanceWhen, lcTerms: route.lcTerms, lcDays: route.lcDays });
     await this.audit.record(tx, {
       userId: actorId,
       action: "create",
@@ -701,11 +700,11 @@ export class OrdersService {
         dueOn: { lte: toDbDate(addDays(today, soon)) },
         orderId: { in: all.filter((i) => i.status === "open").map((i) => i.id) },
       },
-      select: { orderId: true, title: true, dueOn: true, route: true, order: { select: { paymentRoute: true } } },
+      select: { orderId: true, title: true, dueOn: true, route: true, order: { select: termsSelect } },
       orderBy: { dueOn: "asc" },
     });
     for (const i of all) {
-      const c = dated.find((d) => d.orderId === i.id && (!d.route || d.route === d.order.paymentRoute));
+      const c = dated.find((d) => d.orderId === i.id && (!d.route || d.route === routeOf(d.order)));
       if (!c) continue;
       const on = fromDbDate(c.dueOn!);
       if (!i.needs || on < i.needs.due) i.needs = { title: c.title ?? "Checklist item", due: on, late: on < today };

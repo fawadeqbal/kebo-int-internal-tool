@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { livePart, fromDbDate } from "@kebo/database";
+import { livePart, fromDbDate, routeOf, termsOf, termsSelect } from "@kebo/database";
 import { fromMinor, toMinor } from "@kebo/money";
-import { can, PAYMENT_ROUTE_SHORT, planStatus, planWhen, type BalanceWhen, type LcTerms } from "@kebo/shared";
+import { can, PAYMENT_ROUTE_SHORT, planStatus, planWhen } from "@kebo/shared";
 import { daysBetween, DomainError, ForbiddenError, type ISODate } from "@kebo/utils";
 import { creditsAll } from "../treasury/api";
 import { CashService } from "../treasury/cash.service";
@@ -229,10 +229,7 @@ export class InsightsService {
         total: true,
         stage: true,
         status: true,
-        paymentRoute: true,
-        balanceWhen: true,
-        lcTerms: true,
-        lcDays: true,
+        ...termsSelect,
         customer: { select: { id: true, name: true } },
         inquiry: { select: { assignee: { select: { id: true, name: true } } } },
         allocations: { where: livePart, select: { amount: true, bankCharges: true, on: true } },
@@ -247,7 +244,7 @@ export class InsightsService {
         // Dated from each instalment's rule and the order's dates as they are now.
         const plan = planStatus(livePlans.get(o.id)?.items ?? [], settled.settledMinor, today, 7);
         const next = plan.find((p) => p.openMinor > 0) ?? null;
-        const terms = { route: o.paymentRoute, balanceWhen: o.balanceWhen as BalanceWhen | null, lcTerms: o.lcTerms as LcTerms | null, lcDays: o.lcDays };
+        const terms = termsOf(o);
         const late = plan.filter((p) => p.status === "late");
         const lastPaid =
           o.allocations
@@ -278,7 +275,7 @@ export class InsightsService {
             when: next.dueOn ? null : planWhen(next, terms) || null,
           },
           /** How it comes: the route ("LC", "Informal", "Bank contract"). */
-          how: o.paymentRoute ? PAYMENT_ROUTE_SHORT[o.paymentRoute] : null,
+          how: routeOf(o) ? PAYMENT_ROUTE_SHORT[routeOf(o)!] : null,
           lastPaid,
         };
       })

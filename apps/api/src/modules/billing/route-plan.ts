@@ -1,16 +1,11 @@
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, routeOf, termsOf, toDbDateOrNull, type Prisma, type WithTerms } from "@kebo/database";
 import { fromMinor, planDeposit, type Minor } from "@kebo/money";
-import { lcChecks, planItemLabel, primaryShipment, rebuildPlan, routePlan, type BalanceWhen, type LcCheck, type LcTerms, type RouteTerms } from "@kebo/shared";
+import { lcChecks, planItemLabel, primaryShipment, rebuildPlan, routePlan, type LcCheck, type RouteTerms } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { Tx } from "../../database/prisma.service";
 
-/** The route's terms as stored on an order. */
-export const termsOf = (o: { paymentRoute: RouteTerms["route"]; balanceWhen: string | null; lcTerms: string | null; lcDays: number | null }): RouteTerms => ({
-  route: o.paymentRoute,
-  balanceWhen: (o.balanceWhen as BalanceWhen | null) ?? null,
-  lcTerms: (o.lcTerms as LcTerms | null) ?? null,
-  lcDays: o.lcDays,
-});
+/** The route's terms as stored with an order (order_payment_terms; no row: nothing chosen). */
+export { termsOf };
 
 type PlanOrder = {
   id: string;
@@ -18,11 +13,7 @@ type PlanOrder = {
   currency: string;
   depositPercent: Prisma.Decimal;
   orderedOn: Date;
-  paymentRoute: RouteTerms["route"];
-  balanceWhen: string | null;
-  lcTerms: string | null;
-  lcDays: number | null;
-};
+} & WithTerms;
 
 /** A new order's plan: the instalments its route builds (routePlan), in order; each gets its payment request number. */
 export async function createPlan(tx: Tx, orderId: string, plan: ReturnType<typeof routePlan>) {
@@ -108,8 +99,7 @@ export function lcBalanceMinor(o: {
 
 /** The LC checked against the order (null: not an LC order). */
 export function lcChecksOf(
-  o: {
-    paymentRoute: string | null;
+  o: WithTerms & {
     currency: string;
     total: Prisma.Decimal;
     depositPercent: Prisma.Decimal;
@@ -123,7 +113,7 @@ export function lcChecksOf(
   },
   courierDays: number,
 ): LcCheck[] | null {
-  if (o.paymentRoute !== "letter_of_credit") return null;
+  if (routeOf(o) !== "letter_of_credit") return null;
   const b = o.bankContract;
   return lcChecks({
     currency: o.currency,

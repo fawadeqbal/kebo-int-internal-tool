@@ -1,4 +1,4 @@
-import { asSupplierPayment, purchasesWithEntry, asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
+import { asSupplierPayment, purchasesWithEntry, asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf } from "@kebo/database";
 import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
@@ -46,6 +46,7 @@ import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
+  paymentTerms: true,
   lines: {
     orderBy: { sortOrder: "asc" },
     include: {
@@ -171,8 +172,8 @@ const COL = {
   amount: { key: "amount", label: "Amount", width: 80, align: "right" } satisfies PaperColumn,
 };
 
-const BANK_ROUTE = (c: PaperCtx) => c.o.paymentRoute === "letter_of_credit" || c.o.paymentRoute === "bank_contract";
-const LC = (c: PaperCtx) => c.o.paymentRoute === "letter_of_credit";
+const BANK_ROUTE = (c: PaperCtx) => routeOf(c.o) === "letter_of_credit" || routeOf(c.o) === "bank_contract";
+const LC = (c: PaperCtx) => routeOf(c.o) === "letter_of_credit";
 const lcWord = (c: PaperCtx) => (LC(c) ? "LC" : "Contract");
 
 /** The order's lines with their numbers ("1", "1.1", "2") and totals in the order's currency. */
@@ -281,7 +282,7 @@ function totalsOf(c: PaperCtx) {
 function salesContract(c: PaperCtx): Built {
   const hs = hsOf(c);
   const { pol, pod } = portsOf(c);
-  const route = c.o.paymentRoute;
+  const route = routeOf(c.o);
   const b = c.o.bankContract;
   const rev = c.o.revision;
   // The accepted option's lead time (the revision keeps none of its own).
@@ -768,7 +769,7 @@ function paymentRequest(c: PaperCtx): Built {
  * the inspection), whatever its title; one for another payment route does not count.
  */
 export function reportItem(c: { o: PaperOrder }, kind: "fat-report" | "inspection-report") {
-  return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === c.o.paymentRoute)) ?? null;
+  return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === routeOf(c.o))) ?? null;
 }
 
 function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
@@ -1090,7 +1091,7 @@ function coverLetter(c: PaperCtx): Built {
   const b = c.o.bankContract;
   const mode = shipOf(c).primary?.mode ?? "sea";
   // The papers enclosed: the set the shipment needs that the company uses (Settings › Papers we use), and any already in.
-  const set = documentsInUse(c.o.paymentRoute, mode, c.settings.papers.off, (k) =>
+  const set = documentsInUse(routeOf(c.o), mode, c.settings.papers.off, (k) =>
     k === "proforma_invoice" ? !!c.o.proformaNo : k === "packing_list" ? !!c.o.packedAt : c.o.documents.some((d) => d.kind === k && documentDone(d.status)),
   );
   const numberOf = (kind: OrderDocumentKind) => {

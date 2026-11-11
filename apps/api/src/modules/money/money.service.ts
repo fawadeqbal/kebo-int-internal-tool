@@ -145,6 +145,7 @@ export class MoneyService {
           },
         },
         expenses: { orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }], include: expenseInclude },
+        paymentTerms: true,
       },
     });
     const s = await this.settings.get();

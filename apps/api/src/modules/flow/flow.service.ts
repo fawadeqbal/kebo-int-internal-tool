@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { livePart, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { livePart, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, routeOf, termsSelect, type WithTerms } from "@kebo/database";
 import {
   bankStepsFor,
   BANK_STEP_LABEL,
@@ -25,7 +25,6 @@ import {
   type ClaimStatus,
   type FlowFacts,
   type OrderStage,
-  type PaymentRoute,
   type SatResult,
   type ShipMode,
   type ShipmentStatus,
@@ -49,6 +48,7 @@ import {
 } from "@kebo/shared";
 import { addDays, dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
+import { setPaymentTerms } from "../orders/payment-terms";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
@@ -75,7 +75,7 @@ const productionWhere = { step: "production", key: null } as const;
 interface FlowRows {
   stage: OrderStage;
   status: string;
-  paymentRoute: PaymentRoute | null;
+  paymentTerms: WithTerms["paymentTerms"];
   factoryOrderedOn: Date | null;
   /** Each factory's ready date, and the factories on the lines (the order's ready date is the latest). */
   factories: { factoryId: string | null; readyOn: Date | null }[];
@@ -113,7 +113,7 @@ function documentIn(o: Pick<FlowRows, "documents" | "proformaNo" | "packedAt">, 
 
 /** `papersOff`: Settings › Papers we use (switched-off papers are not counted unless already in). */
 export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly string[] = []): FlowFacts {
-  const route = o.paymentRoute;
+  const route = routeOf(o);
   // The shipments come in their order (SHIPMENT_ORDER): Shipment 1 first.
   const required = documentsInUse(route, o.shipments[0]?.mode ?? "sea", papersOff, (k) => documentIn(o, k));
   const ready = required.filter((kind) => documentIn(o, kind)).length;
@@ -204,7 +204,7 @@ export class FlowService {
   /** The order, locked for the change, if the person may see it and it is not cancelled. */
   private async lockOrder(tx: Tx, user: SessionUser, id: string) {
     await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
-    const o = await tx.order.findFirst({ where: { id, ...orderAccess(user) } });
+    const o = await tx.order.findFirst({ where: { id, ...orderAccess(user) }, include: { paymentTerms: true } });
     if (!o) throw new NotFoundError("Order");
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     return o;
@@ -257,6 +257,7 @@ export class FlowService {
         satChecks: { orderBy: { sortOrder: "asc" } },
         claims: { orderBy: { openedOn: "desc" } },
         delivery: { include: { satEngineer: { select: { id: true, name: true } } } },
+        paymentTerms: true,
         // Their factories (ready dates) and, for the goods, what arrived (the delivery's condition is theirs).
         lines: {
           select: {
@@ -278,7 +279,7 @@ export class FlowService {
     const settings = await this.settings.get();
     const depositIn = depositInOf(o, fxOf(settings, await this.limits.allows("expenses")));
 
-    const route = o.paymentRoute;
+    const route = routeOf(o);
     const mode = o.shipments[0]?.mode ?? "sea";
     const required = documentsInUse(route, mode, settings.papers.off, (k) => documentIn(o, k));
     const documents = this.documentSet(o, required);
@@ -505,7 +506,7 @@ export class FlowService {
         id: true,
         stage: true,
         status: true,
-        paymentRoute: true,
+        ...termsSelect,
         factoryOrderedOn: true,
         ...readySelect,
         lines: { select: { factoryId: true } },
@@ -564,11 +565,9 @@ export class FlowService {
       };
       if (lc && t.lcTerms === "deferred" && !t.lcDays) throw new DomainError("Say after how many days the deferred LC pays (counted from the day the papers reach their bank).");
       if (was.route === t.route && was.balanceWhen === t.balanceWhen && was.lcTerms === t.lcTerms && was.lcDays === t.lcDays) return;
-      await tx.order.update({
-        where: { id },
-        // The balance terms stay as accepted: the papers word the terms from the route itself.
-        data: { paymentRoute: t.route, balanceWhen: t.balanceWhen, lcTerms: t.lcTerms, lcDays: t.lcDays },
-      });
+      // The balance terms stay on the order as accepted: the papers word the terms from the route itself.
+      const terms = { route: t.route, balanceWhen: t.balanceWhen, lcTerms: t.lcTerms, lcDays: t.lcDays };
+      await setPaymentTerms(tx, id, terms);
       const plan = await rebuildRoutePlan(tx, o, was, t, reminders);
       await this.log(
         tx,
@@ -576,7 +575,7 @@ export class FlowService {
         id,
         "route",
         `${o.refNo}: payment route ${t.route ? (routeSummary(t) ?? PAYMENT_ROUTE_SHORT[t.route]) : "cleared"}${plan.was !== plan.now ? " · plan rebuilt" : ""}`,
-        { route: o.paymentRoute, terms: routeSummary(was), plan: plan.was },
+        { route: routeOf(o), terms: routeSummary(was), plan: plan.was },
         { route: t.route, terms: routeSummary(t), plan: plan.now },
       );
     });
@@ -590,7 +589,7 @@ export class FlowService {
       throw new DomainError("The contract cannot expire before it opens.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      if (o.paymentRoute !== "bank_contract" && o.paymentRoute !== "letter_of_credit")
+      if (routeOf(o) !== "bank_contract" && routeOf(o) !== "letter_of_credit")
         throw new DomainError("Set the payment route to a bank contract or LC first.");
       const data = {
         number: input.number,
@@ -611,7 +610,7 @@ export class FlowService {
         user,
         id,
         "bank_contract",
-        `${o.refNo}: ${o.paymentRoute === "letter_of_credit" ? "LC" : "bank contract"} ${before ? "changed" : "added"}`,
+        `${o.refNo}: ${routeOf(o) === "letter_of_credit" ? "LC" : "bank contract"} ${before ? "changed" : "added"}`,
         before ?? undefined,
         input,
       );
@@ -1011,7 +1010,7 @@ export class FlowService {
     if (step === "bank_paid_us") throw new DomainError("Record the payment for “Money reached us”: recording it ticks the step.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      if (!bankStepsFor(o.paymentRoute).includes(step)) throw new DomainError("That step is not part of this order's payment route.");
+      if (!bankStepsFor(routeOf(o)).includes(step)) throw new DomainError("That step is not part of this order's payment route.");
       const data = { doneOn: toDbDate(input.doneOn), courier: input.courier, reference: input.reference, note: input.note };
       await tx.orderBankStep.upsert({
         where: { orderId_step: { orderId: id, step } },

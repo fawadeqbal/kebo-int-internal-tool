@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { asPayment, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
+import { asPayment, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf, type WithTerms } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
 import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../billing/api";
 import {
@@ -164,15 +164,16 @@ export class PapersService {
   }
 
   /** Whether the order can have this paper at all (module, payment route). */
-  private applies(kind: PaperKind, o: { paymentRoute: string | null }, features: readonly string[] | null) {
+  private applies(kind: PaperKind, o: WithTerms, features: readonly string[] | null) {
     const f = PAPER_FEATURE[kind];
     if (f && features && !features.includes(f)) return false;
     const routes = PAPER_ROUTES[kind];
-    return !routes || (o.paymentRoute !== null && (routes as readonly string[]).includes(o.paymentRoute));
+    const route = routeOf(o);
+    return !routes || (route !== null && (routes as readonly string[]).includes(route));
   }
 
   /** The paper may be read: its module is on, it fits the route, and the purchase order only for people who see factory prices. */
-  private async mayRead(user: SessionUser, kind: PaperKind, o: { paymentRoute: string | null }) {
+  private async mayRead(user: SessionUser, kind: PaperKind, o: WithTerms) {
     const f = PAPER_FEATURE[kind];
     if (f) await this.limits.require(f as PlanFeature);
     if (FACTORY_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory prices.");
@@ -182,7 +183,7 @@ export class PapersService {
       );
   }
 
-  private async mayMake(user: SessionUser, kind: PaperKind, o: { paymentRoute: string | null; status: string }) {
+  private async mayMake(user: SessionUser, kind: PaperKind, o: WithTerms & { status: string }) {
     await this.mayRead(user, kind, o);
     if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make papers.");
     if (LIVE_PAPERS.includes(kind))
@@ -234,7 +235,7 @@ export class PapersService {
     const defaults: PaperOptions = {
       prices: true,
       showHs: true,
-      lcStatement: o.paymentRoute === "letter_of_credit" || o.paymentRoute === "bank_contract",
+      lcStatement: routeOf(o) === "letter_of_credit" || routeOf(o) === "bank_contract",
       stamp: true,
     };
     const keys = paperOptionsOf(kind);
@@ -413,7 +414,7 @@ export class PapersService {
     const recordedDone = (kind: OrderDocumentKind) =>
       o.documents.some((d) => d.kind === kind && documentDone(d.status)) ||
       (kind === "proforma_invoice" ? !!o.proformaNo : kind === "packing_list" ? !!o.packedAt : false);
-    const set = has("bank_documents") ? documentsInUse(o.paymentRoute, mode, off, recordedDone) : [];
+    const set = has("bank_documents") ? documentsInUse(routeOf(o), mode, off, recordedDone) : [];
     const docFile = (d: PaperOrder["documents"][number]) =>
       d.attachment && !d.attachment.deletedAt ? { id: d.attachment.id, name: d.attachment.fileName } : null;
     const docView = (d: PaperOrder["documents"][number] | undefined) =>

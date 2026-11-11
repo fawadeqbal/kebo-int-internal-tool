@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, toDbDate, routeOf, termsSelect } from "@kebo/database";
 import {
   BANK_STEP_LABEL,
   bankStepsFor,
@@ -441,7 +441,7 @@ export class RemindersListService {
         select: {
           id: true,
           refNo: true,
-          paymentRoute: true,
+          ...termsSelect,
           proformaNo: true,
           packedAt: true,
           customer: { select: { name: true } },
@@ -455,7 +455,7 @@ export class RemindersListService {
       });
       for (const o of sailed) {
         // Settings › Papers we use: a switched-off paper is never "missing".
-        const missing = documentsInUse(o.paymentRoute, o.shipments[0]?.mode ?? "sea", papersOff).filter((k) => {
+        const missing = documentsInUse(routeOf(o), o.shipments[0]?.mode ?? "sea", papersOff).filter((k) => {
           const rows = o.documents.filter((d) => d.kind === k);
           if (rows.length) return !rows.some((d) => documentDone(d.status));
           return k === "proforma_invoice" ? !o.proformaNo : k === "packing_list" ? !o.packedAt : true;
@@ -474,7 +474,7 @@ export class RemindersListService {
             who: nameOf(o.inquiry.assignee),
           });
         else {
-          const next = bankStepsFor(o.paymentRoute).find((st) => !o.bankSteps.some((b) => b.step === st));
+          const next = bankStepsFor(routeOf(o)).find((st) => !o.bankSteps.some((b) => b.step === st));
           if (next && next !== "customer_paid_bank" && next !== "bank_paid_us")
             out.push({
               key: `bank:${o.id}:${next}`,

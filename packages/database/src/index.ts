@@ -13,3 +13,4 @@ export * from "./parties";
 export * from "./allocations";
 export * from "./files";
 export * from "./ready";
+export * from "./terms";

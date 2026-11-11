@@ -1111,13 +1111,6 @@ model Order {
   /// so changing the rates in Settings never moves past months. Empty: not known (Settings is used).
   mainCurrency        String?           @map("main_currency") @db.Char(3)
   mainRate            Decimal?          @map("main_rate") @db.Decimal(24, 14)
-  /// How the customer pays (informal, bank contract, LC); empty until chosen.
-  paymentRoute        PaymentRoute?     @map("payment_route")
-  /// Informal route: the balance before shipment or against the B/L copy (before_shipment | against_bl_copy).
-  balanceWhen         String?           @map("balance_when") @db.VarChar(20)
-  /// LC route: at_sight | deferred, and the deferred days counted from "papers reached their bank".
-  lcTerms             String?           @map("lc_terms") @db.VarChar(10)
-  lcDays              Int?              @map("lc_days")
   /// When we placed the order with the factory.
   factoryOrderedOn    DateTime?         @map("factory_ordered_on") @db.Date
   /// The factory's own number for our order ("their order no.").
@@ -1150,6 +1143,8 @@ model Order {
   /// What its suppliers invoice: each supplier's instalments on the order.
   payables     Invoice[]            @relation("OrderPayables")
   submissions  MoneySubmission[]
+  /// How the customer pays: the payment route and its terms (one row, made with the order).
+  paymentTerms OrderPaymentTerms?
   /// Delivery and the site acceptance test (one row, once there is something to keep).
   delivery     OrderDelivery?
   /// Why and how it was cancelled (one row when it was).
@@ -1308,6 +1303,30 @@ model FactoryRequest {
 }
 
 /// The bank contract or letter of credit an order is paid on (one per order).
+/// How the customer pays for an order (architecture review §6.6, order_payment_route): the payment route and
+/// its terms, one row per order made with it. The terms accepted on the quotation (deposit %, balance terms)
+/// stay on the order: they are what was sold; this is how it is paid, and it can change.
+model OrderPaymentTerms {
+  id          String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company     Company       @relation(fields: [companyId], references: [id])
+  orderId     String        @unique @map("order_id") @db.Uuid
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// informal | bank_contract | letter_of_credit; empty until chosen.
+  route       PaymentRoute?
+  /// Informal route: the balance before shipment or against the B/L copy (before_shipment | against_bl_copy).
+  balanceWhen String?       @map("balance_when") @db.VarChar(20)
+  /// LC route: at_sight | deferred, and the deferred days counted from "papers reached their bank".
+  lcTerms     String?       @map("lc_terms") @db.VarChar(10)
+  lcDays      Int?          @map("lc_days")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([companyId])
+  @@map("order_payment_terms")
+}
+
 /// An order's delivery at the customer's and its site acceptance test (SAT): one row per order, made when
 /// something is first recorded. The condition the goods arrived in is the goods lines' (the worst of them,
 /// @kebo/shared deliveryConditionOf); this keeps only a note.
@@ -2118,6 +2137,7 @@ model Company {
   factoryRequests     FactoryRequest[]
   orderBankContracts  OrderBankContract[]
   orderDeliveries     OrderDelivery[]
+  orderPaymentTerms   OrderPaymentTerms[]
   orderCancellations  OrderCancellation[]
   shipments           Shipment[]
   orderDocuments      OrderDocument[]
