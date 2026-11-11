@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, isSupplier, newSupplier } from "@kebo/database";
 import { convertAmount, convertMinor, factoryTaxMinor, factoryUnitCostMinor, fxRate, fromMinor, multiplyMinor } from "@kebo/money";
 import {
   can,
@@ -220,14 +220,14 @@ export class SourcingService {
   /** An existing factory, a known one with the same name, or a new one. */
   private async factoryFor(tx: Tx, user: SessionUser, input: FactoryQuoteInput) {
     if (input.factoryId) {
-      const f = await tx.factory.findFirst({ where: { id: input.factoryId, deletedAt: null } });
+      const f = await tx.party.findFirst({ where: { ...isSupplier, id: input.factoryId, deletedAt: null } });
       if (!f) throw new DomainError("That factory was removed. Choose another one.");
       return f;
     }
     const name = input.newFactoryName!.trim().replace(/\s+/g, " ");
-    const known = await tx.factory.findFirst({ where: { deletedAt: null, name: { equals: name, mode: "insensitive" } } });
+    const known = await tx.party.findFirst({ where: { ...isSupplier, deletedAt: null, name: { equals: name, mode: "insensitive" } } });
     if (known) return known;
-    const f = await tx.factory.create({ data: { name, createdById: user.id, ownerId: user.id } });
+    const f = await tx.party.create({ data: newSupplier({ name, createdById: user.id, ownerId: user.id }) });
     await this.audit.record(tx, {
       userId: user.id,
       action: "create",

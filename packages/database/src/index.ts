@@ -9,3 +9,4 @@ export * from "./errors";
 export * from "./seed";
 export * from "./companies";
 export * from "./order-freeze";
+export * from "./parties";

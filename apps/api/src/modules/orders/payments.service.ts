@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, toDbDate, type Prisma, isCustomer } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, toMinor, type Minor } from "@kebo/money";
 import {
   bankStepsFor,
@@ -541,7 +541,7 @@ export class PaymentsService {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
     this.checkDate(input.paidOn);
     if (input.method === "credit") throw new DomainError("Choose how the money came in.");
-    const customer = await this.prisma.db.customer.findFirst({ where: { id: customerId, deletedAt: null } });
+    const customer = await this.prisma.db.party.findFirst({ where: { ...isCustomer, id: customerId, deletedAt: null } });
     if (!customer) throw new NotFoundError("Customer");
     const cashBook = await this.limits.allows("cash_book");
     const rate = await this.rateFor(input.receivedCurrency, input.currency, input.rate);
@@ -594,7 +594,7 @@ export class PaymentsService {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
       const o = await this.orders.load(user, orderId, tx);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
-      await tx.$queryRaw`select id from customers where id = ${o.customerId}::uuid for update`;
+      await tx.$queryRaw`select id from parties where id = ${o.customerId}::uuid for update`;
       const balance = (await this.creditOf(o.customerId, tx))[o.currency] ?? 0;
       const amountMinor = toMinor(input.amount);
       if (amountMinor > balance) throw new DomainError(`The customer has ${formatMinor(balance, o.currency)} of credit.`);
@@ -635,7 +635,7 @@ export class PaymentsService {
   async refundCredit(user: SessionUser, customerId: string, input: CreditRefundInput) {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
     this.checkDate(input.on);
-    const customer = await this.prisma.db.customer.findFirst({ where: { id: customerId } });
+    const customer = await this.prisma.db.party.findFirst({ where: { ...isCustomer, id: customerId } });
     if (!customer) throw new NotFoundError("Customer");
     const cashBook = await this.limits.allows("cash_book");
     await this.prisma.tx(async (tx) => {
@@ -646,7 +646,7 @@ export class PaymentsService {
 
   /** A refund row, after checking the credit covers it (inside the caller's transaction). */
   async refundIn(tx: Tx, user: SessionUser, customerId: string, amountMinor: Minor, currency: string, on: ISODate, accountId: string | null, note: string | null, orderId: string | null) {
-    await tx.$queryRaw`select id from customers where id = ${customerId}::uuid for update`;
+    await tx.$queryRaw`select id from parties where id = ${customerId}::uuid for update`;
     const balance = (await this.creditOf(customerId, tx))[currency] ?? 0;
     if (amountMinor > balance) throw new DomainError(`The customer has ${formatMinor(balance, currency)} of credit to refund.`);
     const refund = await tx.customerCredit.create({ data: { customerId, kind: "refund", amount: fromMinor(amountMinor), currency, accountId, orderId, on: toDbDate(on), note, recordedById: user.id } });
@@ -683,7 +683,7 @@ export class PaymentsService {
     if (r.voidedAt) throw new DomainError("This payment was already removed.");
     for (const p of r.payments) await this.orders.load(user, p.orderId);
     await this.prisma.tx(async (tx) => {
-      await tx.$queryRaw`select id from customers where id = ${r.customerId}::uuid for update`;
+      await tx.$queryRaw`select id from parties where id = ${r.customerId}::uuid for update`;
       const now = new Date();
       await tx.customerReceipt.update({ where: { id }, data: { voidedAt: now, voidReason: reason } });
       await tx.payment.updateMany({ where: { receiptId: id, voidedAt: null }, data: { voidedAt: now, voidReason: reason } });

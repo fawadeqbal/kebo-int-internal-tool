@@ -58,8 +58,13 @@ export type LostReason = (typeof LOST_REASONS)[number];
 
 /* ---------------------------------------------------------------- parties */
 
-export const CUSTOMER_TYPES = values("company", "individual");
-export type CustomerType = (typeof CUSTOMER_TYPES)[number];
+/** What a party (a customer or a supplier) is. */
+export const PARTY_TYPES = values("company", "individual");
+export type PartyType = (typeof PARTY_TYPES)[number];
+
+/** The roles a party can hold; one party can hold both. */
+export const PARTY_ROLES = values("customer", "supplier");
+export type PartyRole = (typeof PARTY_ROLES)[number];
 
 /* ---------------------------------------------------------------- quotations */
 
@@ -206,7 +211,8 @@ export const ENUMS = {
   InquiryChannel: INQUIRY_CHANNELS,
   Priority: PRIORITIES,
   LostReason: LOST_REASONS,
-  CustomerType: CUSTOMER_TYPES,
+  PartyType: PARTY_TYPES,
+  PartyRoleKind: PARTY_ROLES,
   RevisionStatus: REVISION_STATUSES,
   LineType: LINE_TYPES,
   Incoterm: INCOTERMS,

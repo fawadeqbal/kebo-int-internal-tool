@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, isSupplier } from "@kebo/database";
 import { can, FACTORY_REQUEST_STATUS_LABEL, type FactoryRequestsInput, type FactoryRequestUpdateInput, type RequestChannel } from "@kebo/shared";
 import { daysBetween, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -46,7 +46,7 @@ export class FactoryRequestsService {
         include: { factory: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
       }),
       this.prisma.db.factoryQuote.findMany({ where: { inquiryId, deletedAt: null }, select: { id: true, factoryId: true }, orderBy: { createdAt: "asc" } }),
-      this.prisma.db.factory.findMany({ where: { deletedAt: null }, select: { id: true, name: true, wechat: true, email: true, phone: true }, orderBy: { name: "asc" }, take: 500 }),
+      this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { id: true, name: true, wechat: true, email: true, phone: true }, orderBy: { name: "asc" }, take: 500 }),
       this.prisma.db.factoryRequest.groupBy({ by: ["factoryId"], _max: { sentOn: true } }),
       this.prisma.db.factoryQuote.groupBy({ by: ["factoryId"], where: { deletedAt: null }, _count: { _all: true } }),
     ]);
@@ -107,7 +107,7 @@ export class FactoryRequestsService {
       const i = await tx.inquiry.findFirst({ where: { id: inquiryId, deletedAt: null, ...inquiryAccess(user) }, select: { id: true, refNo: true, stage: true } });
       if (!i) throw new NotFoundError("Inquiry");
       if (i.stage === "won" || i.stage === "lost") throw new DomainError("This deal is closed.");
-      const factories = await tx.factory.findMany({ where: { id: { in: ids }, deletedAt: null }, select: { id: true, name: true } });
+      const factories = await tx.party.findMany({ where: { ...isSupplier, id: { in: ids }, deletedAt: null }, select: { id: true, name: true } });
       if (factories.length !== ids.length) throw new DomainError("One of the factories is not in your list any more.");
       const already = new Set((await tx.factoryRequest.findMany({ where: { inquiryId, factoryId: { in: ids } }, select: { factoryId: true } })).map((r) => r.factoryId));
       const fresh = factories.filter((f) => !already.has(f.id));

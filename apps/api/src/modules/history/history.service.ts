@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { isSupplier } from "@kebo/database";
 import { z } from "zod";
 import { can, FLOW_STEPS, STEP_OF_ACTION } from "@kebo/shared";
 import { ForbiddenError, NotFoundError } from "@kebo/utils";
@@ -66,7 +67,7 @@ export class HistoryService {
       return [{ entityType: "customer", ids: [q.id] }];
     }
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factories.");
-    const f = await db.factory.findFirst({ where: { id: q.id }, select: { id: true } });
+    const f = await db.party.findFirst({ where: { ...isSupplier, id: q.id }, select: { id: true } });
     if (!f) throw new NotFoundError("Factory");
     return [{ entityType: "factory", ids: [f.id] }];
   }

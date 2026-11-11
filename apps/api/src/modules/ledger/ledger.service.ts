@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, payInstalments, type Minor } from "@kebo/money";
 import {
   AGEING_BUCKETS,
@@ -118,8 +118,8 @@ export class LedgerService {
     const db = this.prisma.db;
     const [money, customers, factories, users, orders] = await Promise.all([
       db.moneyAccount.findMany({ where: { id: { in: [...ids.money] } }, select: { id: true, name: true } }),
-      db.customer.findMany({ where: { id: { in: [...ids.customer] } }, select: { id: true, name: true } }),
-      db.factory.findMany({ where: { id: { in: [...ids.factory] } }, select: { id: true, name: true } }),
+      db.party.findMany({ where: { ...isCustomer, id: { in: [...ids.customer] } }, select: { id: true, name: true } }),
+      db.party.findMany({ where: { ...isSupplier, id: { in: [...ids.factory] } }, select: { id: true, name: true } }),
       db.user.findMany({ where: { id: { in: [...ids.user] } }, select: { id: true, name: true } }),
       db.order.findMany({ where: { id: { in: [...ids.order] } }, select: { id: true, refNo: true } }),
     ]);
@@ -570,9 +570,9 @@ export class LedgerService {
     const db = this.prisma.db;
     const party =
       kind === "customer"
-        ? await db.customer.findFirst({ where: { id }, select: { id: true, name: true, country: true } })
+        ? await db.party.findFirst({ where: { ...isCustomer, id }, select: { id: true, name: true, country: true } })
         : kind === "factory"
-          ? await db.factory.findFirst({ where: { id }, select: { id: true, name: true } })
+          ? await db.party.findFirst({ where: { ...isSupplier, id }, select: { id: true, name: true } })
           : await db.user.findFirst({ where: { id }, select: { id: true, name: true } });
     if (!party) throw new NotFoundError(kind === "customer" ? "Customer" : kind === "factory" ? "Factory" : "Person");
     const account = partyAccount(kind, id);
@@ -683,9 +683,9 @@ export class LedgerService {
     const cur = p.currencies.find((c) => c.currency === currency) ?? { currency, opening: "0.00", closing: "0.00" };
     const details =
       kind === "customer"
-        ? await db.customer.findUnique({ where: { id }, select: { name: true, country: true, address: true, taxNo: true, regNo: true } })
+        ? await db.party.findUnique({ where: { ...isCustomer, id }, select: { name: true, country: true, address: true, taxNo: true, regNo: true } })
         : kind === "factory"
-          ? await db.factory.findUnique({ where: { id }, select: { name: true, address: true } })
+          ? await db.party.findUnique({ where: { ...isSupplier, id }, select: { name: true, address: true } })
           : await db.user.findUnique({ where: { id }, select: { name: true } });
     const letter = kind === "customer" ? "C" : kind === "factory" ? "F" : "S";
     const year = Number(p.to.slice(0, 4));
@@ -787,9 +787,9 @@ export class LedgerService {
   async issueStatement(kind: LedgerPartyKind, id: string, year: number) {
     const exists =
       kind === "customer"
-        ? await this.prisma.db.customer.count({ where: { id } })
+        ? await this.prisma.db.party.count({ where: { ...isCustomer, id } })
         : kind === "factory"
-          ? await this.prisma.db.factory.count({ where: { id } })
+          ? await this.prisma.db.party.count({ where: { ...isSupplier, id } })
           : await this.prisma.db.user.count({ where: { id } });
     if (!exists) throw new NotFoundError(kind === "customer" ? "Customer" : kind === "factory" ? "Factory" : "Person");
     const rows = await this.prisma.db.$queryRaw<{ value: number }[]>`

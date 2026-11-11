@@ -69,7 +69,13 @@ enum LostReason {
   other
 }
 
-enum CustomerType {
+/// What a party is to us. One party can hold several roles (a customer that is also a supplier).
+enum PartyRoleKind {
+  customer
+  supplier
+}
+
+enum PartyType {
   company
   individual
 }
@@ -319,15 +325,14 @@ model User {
   assignedDeals Inquiry[]          @relation("InquiryAssignee")
   createdDeals  Inquiry[]          @relation("InquiryCreator")
   orderMoves    OrderStageChange[]
-  factories     Factory[]          @relation("FactoryOwner")
+  factories     Party[]            @relation("FactoryOwner")
   factoryPaid   FactoryPayment[]   @relation("FactoryPaymentPaidBy")
   expensesPaid  Expense[]          @relation("ExpensePaidBy")
 
   reminderStates ReminderState[]
 
   /// What they made or did (kept when they are switched off; people are not deleted).
-  relCustomerCreator        Customer[]           @relation("CustomerCreator")
-  relFactoryCreator         Factory[]            @relation("FactoryCreator")
+  relPartyCreator           Party[]              @relation("PartyCreator")
   relInquiryStageChanger    InquiryStageChange[] @relation("InquiryStageChanger")
   relAssignmentAssignee     InquiryAssignment[]  @relation("AssignmentAssignee")
   relAssignmentAssigner     InquiryAssignment[]  @relation("AssignmentAssigner")
@@ -511,47 +516,94 @@ model Counter {
 // Parties: customers (with contacts) and factories
 // ============================================================================
 
-model Customer {
-  id              String       @id @default(uuid()) @db.Uuid
+/// A company or person we deal with: a customer, a supplier, or both (see PartyRole). One row per party;
+/// every other table points here, through a column named for the role the party plays in that row
+/// (customer_id, factory_id).
+model Party {
+  id              String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId       String       @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company         Company      @relation(fields: [companyId], references: [id])
-  type            CustomerType @default(company)
-  name            String       @db.VarChar(200)
-  /// ISO 3166-1 alpha-2 (e.g. NG, AE): where the goods go. China (CN) means a domestic sale with VAT.
-  country         String       @db.Char(2)
+  companyId       String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company   @relation(fields: [companyId], references: [id])
+  type            PartyType @default(company)
+  name            String    @db.VarChar(200)
+  /// ISO 3166-1 alpha-2 (e.g. NG, AE). For a customer: where the goods go; China (CN) means a domestic sale with VAT.
+  country         String?   @db.Char(2)
   address         String?
   /// Business license / tax number (shown on documents as "Business License Number").
-  taxNo           String?      @map("tax_no") @db.VarChar(60)
+  taxNo           String?   @map("tax_no") @db.VarChar(60)
   /// Registration number (shown on documents as "Reg. Number").
-  regNo           String?      @map("reg_no") @db.VarChar(60)
-  defaultCurrency String       @default("USD") @map("default_currency") @db.Char(3)
-  /// Short letters for the customer on documents, e.g. "TN" in proforma KEB260916TN07. Empty: taken from the name.
-  initials        String?      @db.VarChar(6)
+  regNo           String?   @map("reg_no") @db.VarChar(60)
+  /// The currency we usually deal in with this party.
+  defaultCurrency String?   @map("default_currency") @db.Char(3)
+  /// Short letters for the party on documents, e.g. "TN" in proforma KEB260916TN07. Empty: taken from the name.
+  initials        String?   @db.VarChar(6)
+  /// The main contact as typed on a supplier (moves to contacts with the rest of the contacts).
+  contactPerson   String?   @map("contact_person") @db.VarChar(120)
+  phone           String?   @db.VarChar(40)
+  wechat          String?   @db.VarChar(80)
+  email           String?   @db.VarChar(254)
+  bankDetails     String?   @map("bank_details")
   notes           String?
-  createdById     String?      @map("created_by") @db.Uuid
-  createdBy       User?        @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  /// The person in our team who looks after this party.
+  ownerId         String?   @map("owner_id") @db.Uuid
+  owner           User?     @relation("FactoryOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById     String?   @map("created_by") @db.Uuid
+  createdBy       User?     @relation("PartyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  contacts     Contact[]
-  inquiries    Inquiry[]
-  orders       Order[]
-  payments     Payment[]
-  expenses     Expense[]
-  receipts     CustomerReceipt[]
-  credits      CustomerCredit[]
-  orderFacts   OrderFact[]
-  inquiryFacts InquiryFact[]
-  recordNotes  RecordNote[]
-  followUps    FollowUp[]
-  ledger       LedgerEntry[]
+  roles PartyRole[]
+
+  // As a customer
+  contacts     Contact[]         @relation("ContactCustomer")
+  inquiries    Inquiry[]         @relation("InquiryCustomer")
+  orders       Order[]           @relation("OrderCustomer")
+  payments     Payment[]         @relation("PaymentCustomer")
+  expenses     Expense[]         @relation("ExpenseCustomer")
+  receipts     CustomerReceipt[] @relation("CustomerReceiptCustomer")
+  credits      CustomerCredit[]  @relation("CustomerCreditCustomer")
+  orderFacts   OrderFact[]       @relation("OrderFactCustomer")
+  inquiryFacts InquiryFact[]     @relation("InquiryFactCustomer")
+  recordNotes  RecordNote[]      @relation("RecordNoteCustomer")
+  followUps    FollowUp[]        @relation("FollowUpCustomer")
+  ledger       LedgerEntry[]     @relation("LedgerEntryCustomer")
+
+  // As a supplier
+  quotes             FactoryQuote[]       @relation("FactoryQuoteFactory")
+  factoryPayments    FactoryPayment[]     @relation("FactoryPaymentFactory")
+  factoryExpenses    Expense[]            @relation("ExpenseFactory")
+  orderLines         OrderLine[]          @relation("OrderLineFactory")
+  requests           FactoryRequest[]     @relation("FactoryRequestFactory")
+  checklistItems     OrderChecklistItem[] @relation("OrderChecklistItemFactory")
+  paymentPlans       FactoryPaymentPlan[] @relation("FactoryPaymentPlanFactory")
+  orderParts         OrderFactory[]       @relation("OrderFactoryFactory")
+  factoryOrderFacts  FactoryOrderFact[]   @relation("FactoryOrderFactFactory")
+  factoryRecordNotes RecordNote[]         @relation("RecordNoteFactory")
+  factoryFollowUps   FollowUp[]           @relation("FollowUpFactory")
+  factoryLedger      LedgerEntry[]        @relation("LedgerEntryFactory")
 
   @@index([name])
   @@index([country])
+  @@index([ownerId])
   @@index([companyId])
-  @@map("customers")
+  @@map("parties")
+}
+
+/// The roles a party holds. A row here is what puts a party on the Customers or the Suppliers list.
+model PartyRole {
+  partyId   String        @map("party_id") @db.Uuid
+  party     Party         @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  role      PartyRoleKind
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company   Company       @relation(fields: [companyId], references: [id])
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  @@id([partyId, role])
+  @@index([role])
+  @@index([companyId])
+  @@map("party_roles")
 }
 
 model Contact {
@@ -560,7 +612,7 @@ model Contact {
   companyId  String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company   @relation(fields: [companyId], references: [id])
   customerId String    @map("customer_id") @db.Uuid
-  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Party     @relation("ContactCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   name       String    @db.VarChar(120)
   position   String?   @db.VarChar(80)
   email      String?   @db.VarChar(254)
@@ -584,48 +636,6 @@ model Contact {
   @@map("contacts")
 }
 
-model Factory {
-  id            String    @id @default(uuid()) @db.Uuid
-  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId     String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company       Company   @relation(fields: [companyId], references: [id])
-  name          String    @db.VarChar(200)
-  contactPerson String?   @map("contact_person") @db.VarChar(120)
-  phone         String?   @db.VarChar(40)
-  wechat        String?   @db.VarChar(80)
-  email         String?   @db.VarChar(254)
-  address       String?
-  bankDetails   String?   @map("bank_details")
-  notes         String?
-  /// The person in our team who looks after this factory.
-  ownerId       String?   @map("owner_id") @db.Uuid
-  owner         User?     @relation("FactoryOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  createdById   String?   @map("created_by") @db.Uuid
-  createdBy     User?     @relation("FactoryCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-
-  quotes     FactoryQuote[]
-  payments   FactoryPayment[]
-  expenses   Expense[]
-  orderLines OrderLine[]
-
-  requests       FactoryRequest[]
-  checklistItems OrderChecklistItem[]
-  paymentPlans   FactoryPaymentPlan[]
-  orderParts     OrderFactory[]
-  orderFacts     FactoryOrderFact[]
-  recordNotes    RecordNote[]
-  followUps      FollowUp[]
-  ledger         LedgerEntry[]
-
-  @@index([name])
-  @@index([ownerId])
-  @@index([companyId])
-  @@map("factories")
-}
-
 // ============================================================================
 // Sales: the inquiry (deal) and what the customer asked for
 // ============================================================================
@@ -638,7 +648,7 @@ model Inquiry {
   /// RFQ-2026-0001
   refNo        String         @map("ref_no") @db.VarChar(30)
   customerId   String         @map("customer_id") @db.Uuid
-  customer     Customer       @relation(fields: [customerId], references: [id])
+  customer     Party          @relation("InquiryCustomer", fields: [customerId], references: [id])
   contactId    String?        @map("contact_id") @db.Uuid
   contact      Contact?       @relation(fields: [contactId], references: [id])
   channel      InquiryChannel @default(email)
@@ -837,7 +847,7 @@ model FactoryQuote {
   inquiryId      String    @map("inquiry_id") @db.Uuid
   inquiry        Inquiry   @relation(fields: [inquiryId], references: [id])
   factoryId      String    @map("factory_id") @db.Uuid
-  factory        Factory   @relation(fields: [factoryId], references: [id])
+  factory        Party     @relation("FactoryQuoteFactory", fields: [factoryId], references: [id])
   /// The factory's own quotation number.
   reference      String?   @db.VarChar(80)
   receivedOn     DateTime  @map("received_on") @db.Date
@@ -1080,7 +1090,7 @@ model Order {
   revisionId          String            @unique @map("revision_id") @db.Uuid
   revision            QuotationRevision @relation(fields: [revisionId], references: [id])
   customerId          String            @map("customer_id") @db.Uuid
-  customer            Customer          @relation(fields: [customerId], references: [id])
+  customer            Party             @relation("OrderCustomer", fields: [customerId], references: [id])
   status              OrderStatus       @default(open)
   stage               OrderStage        @default(confirmed)
   /// When the order entered its current stage.
@@ -1219,7 +1229,7 @@ model OrderLine {
   /// The factory's price this line was bought at, frozen when the order was made: what we owe the
   /// factory is worked out from these, so changing or removing the offer later never changes it.
   factoryId          String?  @map("factory_id") @db.Uuid
-  factory            Factory? @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  factory            Party?   @relation("OrderLineFactory", fields: [factoryId], references: [id], onDelete: Restrict)
   factoryUnitPrice   Decimal? @map("factory_unit_price") @db.Decimal(14, 2)
   factoryTaxRate     Decimal? @map("factory_tax_rate") @db.Decimal(5, 2)
   /// The factory's price already had the tax in it (its offer said so): the tax is not added again.
@@ -1307,7 +1317,7 @@ model FactoryRequest {
   inquiryId      String               @map("inquiry_id") @db.Uuid
   inquiry        Inquiry              @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   factoryId      String               @map("factory_id") @db.Uuid
-  factory        Factory              @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  factory        Party                @relation("FactoryRequestFactory", fields: [factoryId], references: [id], onDelete: Restrict)
   status         FactoryRequestStatus @default(sent)
   sentOn         DateTime             @map("sent_on") @db.Date
   /// How the list was sent: wechat | email | whatsapp | phone | visit | other.
@@ -1384,7 +1394,7 @@ model OrderChecklistItem {
   route        PaymentRoute?
   /// The factory a production item is about (from the old production timeline).
   factoryId    String?       @map("factory_id") @db.Uuid
-  factory      Factory?      @relation(fields: [factoryId], references: [id], onDelete: SetNull)
+  factory      Party?        @relation("OrderChecklistItemFactory", fields: [factoryId], references: [id], onDelete: SetNull)
   dueOn        DateTime?     @map("due_on") @db.Date
   assigneeId   String?       @map("assignee_id") @db.Uuid
   assignee     User?         @relation("ChecklistAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
@@ -1649,7 +1659,7 @@ model FactoryPayment {
   orderId      String        @map("order_id") @db.Uuid
   order        Order         @relation(fields: [orderId], references: [id])
   factoryId    String        @map("factory_id") @db.Uuid
-  factory      Factory       @relation(fields: [factoryId], references: [id])
+  factory      Party         @relation("FactoryPaymentFactory", fields: [factoryId], references: [id])
   kind         PaymentKind   @default(deposit)
   amount       Decimal       @db.Decimal(14, 2)
   currency     String        @db.Char(3)
@@ -1696,13 +1706,13 @@ model Expense {
   order           Order?        @relation(fields: [orderId], references: [id])
   /// Who it was spent on (a dinner, a ticket to visit them…); for a deal or an order always its customer. Empty: the company's own cost.
   customerId      String?       @map("customer_id") @db.Uuid
-  customer        Customer?     @relation(fields: [customerId], references: [id])
+  customer        Party?        @relation("ExpenseCustomer", fields: [customerId], references: [id])
   /// The deal it was spent on (a trip to check products, samples…), won or lost; for an order always its deal.
   inquiryId       String?       @map("inquiry_id") @db.Uuid
   inquiry         Inquiry?      @relation(fields: [inquiryId], references: [id])
   /// The factory visited or paid for (a trip to check its products, an inspection there).
   factoryId       String?       @map("factory_id") @db.Uuid
-  factory         Factory?      @relation(fields: [factoryId], references: [id])
+  factory         Party?        @relation("ExpenseFactory", fields: [factoryId], references: [id])
   /// See EXPENSE_CATEGORIES in @kebo/shared.
   category        String        @db.VarChar(30)
   description     String        @db.VarChar(200)
@@ -1762,7 +1772,7 @@ model Payment {
   order            Order            @relation(fields: [orderId], references: [id])
   /// Incoming: the customer who paid.
   customerId       String?          @map("customer_id") @db.Uuid
-  customer         Customer?        @relation(fields: [customerId], references: [id])
+  customer         Party?           @relation("PaymentCustomer", fields: [customerId], references: [id])
   /// What it counts as on the order, in the order's currency (received ÷ rate, to the cent).
   amount           Decimal          @db.Decimal(14, 2)
   /// Taken by banks on the way; still counts towards settling the amount due.
@@ -1894,7 +1904,7 @@ model CustomerReceipt {
   companyId        String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company          Company       @relation(fields: [companyId], references: [id])
   customerId       String        @map("customer_id") @db.Uuid
-  customer         Customer      @relation(fields: [customerId], references: [id])
+  customer         Party         @relation("CustomerReceiptCustomer", fields: [customerId], references: [id])
   /// What arrived, in the currency it arrived in, and the rate to the orders' currency (units per 1).
   receivedAmount   Decimal       @map("received_amount") @db.Decimal(14, 2)
   receivedCurrency String        @map("received_currency") @db.Char(3)
@@ -1936,7 +1946,7 @@ model CustomerCredit {
   companyId    String           @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company      Company          @relation(fields: [companyId], references: [id])
   customerId   String           @map("customer_id") @db.Uuid
-  customer     Customer         @relation(fields: [customerId], references: [id])
+  customer     Party            @relation("CustomerCreditCustomer", fields: [customerId], references: [id])
   /// in | used | refund | fee
   kind         String           @db.VarChar(10)
   amount       Decimal          @db.Decimal(14, 2)
@@ -1981,7 +1991,7 @@ model FactoryPaymentPlan {
   orderId   String    @map("order_id") @db.Uuid
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   factoryId String    @map("factory_id") @db.Uuid
-  factory   Factory   @relation(fields: [factoryId], references: [id])
+  factory   Party     @relation("FactoryPaymentPlanFactory", fields: [factoryId], references: [id])
   label     String    @db.VarChar(80)
   percent   Decimal?  @db.Decimal(5, 2)
   amount    Decimal   @db.Decimal(14, 2)
@@ -2009,7 +2019,7 @@ model OrderFactory {
   orderId   String    @map("order_id") @db.Uuid
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   factoryId String?   @map("factory_id") @db.Uuid
-  factory   Factory?  @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  factory   Party?    @relation("OrderFactoryFactory", fields: [factoryId], references: [id], onDelete: Restrict)
   readyOn   DateTime? @map("ready_on") @db.Date
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -2172,9 +2182,9 @@ model Company {
   auditLogs           AuditLog[]
   settings            Setting[]
   counters            Counter[]
-  customers           Customer[]
+  parties             Party[]
+  partyRoles          PartyRole[]
   contacts            Contact[]
-  factories           Factory[]
   inquiries           Inquiry[]
   requestedItems      RequestedItem[]
   inquiryStageChanges InquiryStageChange[]
@@ -2453,7 +2463,7 @@ model OrderFact {
   inquiryId          String         @map("inquiry_id") @db.Uuid
   inquiry            Inquiry        @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   customerId         String         @map("customer_id") @db.Uuid
-  customer           Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer           Party          @relation("OrderFactCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   handledBy          String?        @map("handled_by") @db.Uuid
   handler            User?          @relation("OrderFactHandledBy", fields: [handledBy], references: [id], onDelete: SetNull)
   country            String         @db.Char(2)
@@ -2515,7 +2525,7 @@ model InquiryFact {
   companyId        String         @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customerId       String         @map("customer_id") @db.Uuid
-  customer         Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer         Party          @relation("InquiryFactCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   handledBy        String?        @map("handled_by") @db.Uuid
   handler          User?          @relation("InquiryFactHandledBy", fields: [handledBy], references: [id], onDelete: SetNull)
   channel          InquiryChannel
@@ -2551,7 +2561,7 @@ model FactoryOrderFact {
   orderId       String      @map("order_id") @db.Uuid
   order         Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   factoryId     String      @map("factory_id") @db.Uuid
-  factory       Factory     @relation(fields: [factoryId], references: [id], onDelete: Cascade)
+  factory       Party       @relation("FactoryOrderFactFactory", fields: [factoryId], references: [id], onDelete: Cascade)
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId     String      @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -2653,9 +2663,9 @@ model RecordNote {
   orderId    String?   @map("order_id") @db.Uuid
   order      Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId String?   @map("customer_id") @db.Uuid
-  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Party?    @relation("RecordNoteCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   factoryId  String?   @map("factory_id") @db.Uuid
-  factory    Factory?  @relation(fields: [factoryId], references: [id], onDelete: Cascade)
+  factory    Party?    @relation("RecordNoteFactory", fields: [factoryId], references: [id], onDelete: Cascade)
   /// note | call | visit | whatsapp | email (see NOTE_KINDS)
   kind       String    @default("note") @db.VarChar(10)
   body       String
@@ -2699,9 +2709,9 @@ model FollowUp {
   orderId     String?   @map("order_id") @db.Uuid
   order       Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId  String?   @map("customer_id") @db.Uuid
-  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer    Party?    @relation("FollowUpCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   factoryId   String?   @map("factory_id") @db.Uuid
-  factory     Factory?  @relation(fields: [factoryId], references: [id], onDelete: Cascade)
+  factory     Party?    @relation("FollowUpFactory", fields: [factoryId], references: [id], onDelete: Cascade)
   assigneeId  String    @map("assignee_id") @db.Uuid
   assignee    User      @relation("FollowUpAssignee", fields: [assigneeId], references: [id])
   createdById String    @map("created_by") @db.Uuid
@@ -2754,9 +2764,9 @@ model LedgerEntry {
   orderId        String?       @map("order_id") @db.Uuid
   order          Order?        @relation(fields: [orderId], references: [id], onDelete: Restrict)
   customerId     String?       @map("customer_id") @db.Uuid
-  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customer       Party?        @relation("LedgerEntryCustomer", fields: [customerId], references: [id], onDelete: Restrict)
   factoryId      String?       @map("factory_id") @db.Uuid
-  factory        Factory?      @relation(fields: [factoryId], references: [id], onDelete: Restrict)
+  factory        Party?        @relation("LedgerEntryFactory", fields: [factoryId], references: [id], onDelete: Restrict)
   /// The person whose own money it was (staff, to repay).
   userId         String?       @map("user_id") @db.Uuid
   user           User?         @relation("LedgerStaff", fields: [userId], references: [id], onDelete: Restrict)

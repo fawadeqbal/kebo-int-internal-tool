@@ -22,7 +22,7 @@ import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, priceForMargin, splitDeposit, toMinor, withTaxMinor } from "@kebo/money";
 import { defaultPlan, type OrderStage } from "@kebo/shared";
 import { addDays, daysBetween, todayIn, type ISODate } from "@kebo/utils";
-import { freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, toDbDate, type PrismaClient } from "../src";
+import { freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, roleRows, toDbDate, type PrismaClient } from "../src";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -190,7 +190,11 @@ async function main() {
     used.add(name);
     return { id: randomUUID(), name, country, createdById: lead.id, createdAt: new Date(`${addDays(today, -int(0, DAYS))}T06:00:00Z`) };
   });
-  for (let i = 0; i < customers.length; i += 1000) await db.customer.createMany({ data: customers.slice(i, i + 1000) });
+  for (let i = 0; i < customers.length; i += 1000) {
+    const batch = customers.slice(i, i + 1000);
+    await db.party.createMany({ data: batch.map((c) => ({ ...c, defaultCurrency: "USD" })) });
+    await db.partyRole.createMany({ data: roleRows("customer", batch) });
+  }
   const contacts = customers.map((c) => ({
     id: randomUUID(),
     customerId: c.id,
@@ -208,7 +212,8 @@ async function main() {
     fnames.add(name);
     return { id: randomUUID(), name, createdById: lead.id, ownerId: pick(team) };
   });
-  await db.factory.createMany({ data: factories });
+  await db.party.createMany({ data: factories });
+  await db.partyRole.createMany({ data: roleRows("supplier", factories) });
   console.log(
     `[load] ${YEARS} year${YEARS === 1 ? "" : "s"}: ${customers.length} customers, ${factories.length} factories, ${team.length} people`,
   );

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Global, Injectable, Logger, Module } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, type Prisma, isSupplier } from "@kebo/database";
 import { fromMinor, type Minor } from "@kebo/money";
 import { ledgerAccount, paperNumber, parseLedgerAccount, readSettings, type LedgerSource, type PaymentKind } from "@kebo/shared";
 import { todayIn, type ISODate } from "@kebo/utils";
@@ -252,7 +252,7 @@ export class LedgerPosting {
       });
       const factoryIds = [...new Set(poIds.map((s) => s.split(":")[1]!))];
       const factories = new Map(
-        (await tx.factory.findMany({ where: { id: { in: factoryIds } }, select: { id: true, name: true } })).map((f) => [f.id, f]),
+        (await tx.party.findMany({ where: { ...isSupplier, id: { in: factoryIds } }, select: { id: true, name: true } })).map((f) => [f.id, f]),
       );
       const byId = new Map(orders.map((o) => [o.id, o]));
       const docOf = (o: (typeof orders)[number]): OrderDoc => ({

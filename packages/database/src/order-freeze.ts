@@ -60,7 +60,7 @@ export async function freezeOrderBuyer(db: Db, orderIds: string[], takenOn: stri
                           from jsonb_each(case when jsonb_typeof(r.customer_snapshot) = 'object' then r.customer_snapshot else '{}'::jsonb end) e
                          where e.value not in ('null'::jsonb, '""'::jsonb)), '{}'::jsonb)
            || jsonb_build_object('takenOn', ${takenOn}::text, 'from', 'order')
-      from customers c, inquiries i, quotation_revisions r
+      from parties c, inquiries i, quotation_revisions r
      where c.id = o.customer_id and i.id = o.inquiry_id and r.id = o.revision_id
        and o.buyer_snapshot is null and o.id = any(${orderIds}::uuid[])`;
 }

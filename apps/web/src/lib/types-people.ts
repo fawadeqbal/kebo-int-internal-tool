@@ -1,4 +1,4 @@
-import type { CustomerType, InquiryStage, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
+import type { PartyType, InquiryStage, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
@@ -17,7 +17,7 @@ export interface Contact {
 export interface CustomerRow {
   id: string;
   name: string;
-  type: CustomerType;
+  type: PartyType;
   country: string;
   primaryContact: Contact | null;
   openDeals: number;
@@ -26,7 +26,7 @@ export interface CustomerRow {
 
 export interface CustomerDetail {
   id: string;
-  type: CustomerType;
+  type: PartyType;
   name: string;
   country: string;
   address: string | null;

@@ -1,4 +1,5 @@
 import { can, type NoteTarget } from "@kebo/shared";
+import { isCustomer, isSupplier } from "@kebo/database";
 import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import type { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -50,12 +51,12 @@ export async function seeRecord(db: Db, user: SessionUser, type: RecordType, id:
     return ref(`${o.refNo} · ${o.customer.name}`, o.customerId);
   }
   if (type === "customer") {
-    const c = await db.customer.findFirst({ where: { id, deletedAt: null, ...customerAccess(user) }, select: { name: true } });
+    const c = await db.party.findFirst({ where: { ...isCustomer, id, deletedAt: null, ...customerAccess(user) }, select: { name: true } });
     if (!c) throw new NotFoundError(NAMES[type]);
     return ref(c.name, id);
   }
   if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factories.");
-  const f = await db.factory.findFirst({ where: { id, deletedAt: null }, select: { name: true } });
+  const f = await db.party.findFirst({ where: { ...isSupplier, id, deletedAt: null }, select: { name: true } });
   if (!f) throw new NotFoundError(NAMES[type]);
   return ref(f.name, null);
 }
@@ -99,8 +100,8 @@ export async function recordLabels(db: Db, refs: { type: RecordType; id: string 
           select: { id: true, refNo: true, customerId: true, customer: { select: { name: true } } },
         })
       : [],
-    ids("customer").length ? db.customer.findMany({ where: { id: { in: ids("customer") } }, select: { id: true, name: true } }) : [],
-    ids("factory").length ? db.factory.findMany({ where: { id: { in: ids("factory") } }, select: { id: true, name: true } }) : [],
+    ids("customer").length ? db.party.findMany({ where: { ...isCustomer, id: { in: ids("customer") } }, select: { id: true, name: true } }) : [],
+    ids("factory").length ? db.party.findMany({ where: { ...isSupplier, id: { in: ids("factory") } }, select: { id: true, name: true } }) : [],
   ]);
   for (const i of inquiries) put("inquiry", i.id, `${i.refNo} · ${i.customer.name}`, i.customerId);
   for (const o of orders) put("order", o.id, `${o.refNo} · ${o.customer.name}`, o.customerId);

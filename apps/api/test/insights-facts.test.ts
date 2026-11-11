@@ -1,6 +1,6 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { FIRST_COMPANY_ID, fromDbDate, fromDbDateOrNull } from "@kebo/database";
+import { FIRST_COMPANY_ID, fromDbDate, fromDbDateOrNull, isCustomer } from "@kebo/database";
 import { toMinor } from "@kebo/money";
 import { readSettings, shippedOnOf, type Permission } from "@kebo/shared";
 import { dateIn, todayIn } from "@kebo/utils";
@@ -277,7 +277,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
     });
 
     it("a change made straight in the database is followed too (the triggers queue it)", async () => {
-      await prisma.platform.$executeRaw`update customers set country = 'TZ' where id = ${o.customerId}::uuid`;
+      await prisma.platform.$executeRaw`update parties set country = 'TZ' where id = ${o.customerId}::uuid`;
       expect((await row(o.orderId)).country).toBe("TZ");
     });
 
@@ -445,7 +445,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
     it("names each customer's country when grouped by customer", async () => {
       const r = (await api(app, manager).get("/insights/facts/orders/groups?period=all&by=customer").expect(200)).body;
       const c = r.rows[0];
-      expect(c.country).toBe((await db().customer.findUniqueOrThrow({ where: { id: c.key } })).country);
+      expect(c.country).toBe((await db().party.findUniqueOrThrow({ where: { ...isCustomer, id: c.key } })).country);
       expect((await api(app, manager).get("/insights/facts/orders/groups?period=all").expect(200)).body.rows[0].country).toBeUndefined();
     });
 

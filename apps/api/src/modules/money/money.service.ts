@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   balanceTermsOf,
@@ -182,7 +182,7 @@ export class MoneyService {
     const factoryOf = new Map<string, FactoryRow>(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
     for (const r of factoryRows)
       if (!factoryOf.has(r.factoryId))
-        factoryOf.set(r.factoryId, await this.prisma.db.factory.findUniqueOrThrow({ where: { id: r.factoryId }, select: { id: true, name: true, owner: person } }));
+        factoryOf.set(r.factoryId, await this.prisma.db.party.findUniqueOrThrow({ where: { ...isSupplier, id: r.factoryId }, select: { id: true, name: true, owner: person } }));
     const owed = new Map(factoryRows.map((r) => [r.key, r]));
     // For each counted factory payment: paid so far to that factory (same currency) and what is left after it.
     const factoryAfter = new Map<string, { paid: string; toPay: string }>();
@@ -480,7 +480,7 @@ export class MoneyService {
     keepAccount?: string | null,
   ) {
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
-    const f = await this.prisma.db.factory.findFirst({ where: { id: input.factoryId, deletedAt: null } });
+    const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.factoryId, deletedAt: null } });
     if (!f) throw new DomainError("That factory was removed. Choose another one.");
     await this.checkFactoryCurrency(o.id, f, input.currency, keepCurrency);
     return {
@@ -599,7 +599,7 @@ export class MoneyService {
       await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
       const o = await this.orders.load(user, orderId, tx);
       if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
-      const f = await tx.factory.findFirst({ where: { id: input.factoryId } });
+      const f = await tx.party.findFirst({ where: { ...isSupplier, id: input.factoryId } });
       if (!f) throw new DomainError("Choose a factory of this order.");
       const lines = await tx.orderLine.findMany({ where: { orderId, factoryId: f.id }, include: { factory: { select: { id: true, name: true } } } });
       const owed = [...owedByFactory(lines).values()][0];
@@ -868,11 +868,11 @@ export class MoneyService {
       if (customerId && customerId !== d.customerId) throw new DomainError(`Inquiry ${d.refNo} is for another customer.`);
       customerId = d.customerId;
     } else if (customerId) {
-      const c = await this.prisma.db.customer.findFirst({ where: { id: customerId, deletedAt: null }, select: { id: true } });
+      const c = await this.prisma.db.party.findFirst({ where: { ...isCustomer, id: customerId, deletedAt: null }, select: { id: true } });
       if (!c) throw new DomainError("That customer is not in the system any more.");
     }
     if (input.factoryId) {
-      const f = await this.prisma.db.factory.findFirst({ where: { id: input.factoryId, deletedAt: null }, select: { id: true } });
+      const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.factoryId, deletedAt: null }, select: { id: true } });
       if (!f) throw new DomainError("That factory is not in the system any more.");
     }
     // On an order: its step (left out on a change: kept; on a new one: the usual step of its kind) and who bears it.

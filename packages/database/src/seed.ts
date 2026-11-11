@@ -11,6 +11,7 @@ import type { PrismaClient } from "./client";
 import { nextReference } from "./counters";
 import { freezeOrderBuyer, freezeOrderMoney } from "./order-freeze";
 import { toDbDate } from "./convert";
+import { newCustomer, newSupplier } from "./parties";
 
 /** A company connection (or a transaction on one). */
 export type SeedDb = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
@@ -140,20 +141,20 @@ export async function seedDemoData(
       { name: "Karachi Builders", country: "PK", contact: "Usman Tariq", phone: "+923001234567" },
       { name: "Nairobi Agro Supplies", country: "KE", contact: "Grace Wanjiru", phone: "+254712345678" },
     ].map((c) =>
-      db.customer.create({
-        data: {
+      db.party.create({
+        data: newCustomer({
           name: c.name,
           country: c.country,
           createdById: people.manager.id,
           contacts: { create: { name: c.contact, phone: c.phone, whatsapp: c.phone, isPrimary: true } },
-        },
+        }),
         include: { contacts: true },
       }),
     ),
   );
   const factories = await Promise.all(
     ["Jinan Pharma Machinery", "Wenzhou Valve Works", "Qingdao Packaging Co."].map((name) =>
-      db.factory.create({ data: { name, createdById: people.manager.id } }),
+      db.party.create({ data: newSupplier({ name, createdById: people.manager.id }) }),
     ),
   );
   const settings = readSettings({});

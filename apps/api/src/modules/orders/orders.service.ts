@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
 import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
@@ -493,7 +493,7 @@ export class OrdersService {
         });
         return;
       }
-      const customer = await tx.customer.findUniqueOrThrow({ where: { id: o.customerId }, select: { name: true, initials: true } });
+      const customer = await tx.party.findUniqueOrThrow({ where: { ...isCustomer, id: o.customerId }, select: { name: true, initials: true } });
       const letters = customer.initials || customerLetters(customer.name);
       // The count belongs to the person handling the deal (or whoever issues it when nobody does).
       const person = o.inquiry.assigneeId ?? user.id;

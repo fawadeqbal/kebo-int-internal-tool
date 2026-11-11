@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { FIRST_COMPANY_ID, seedCompanyBase } from "@kebo/database";
+import { FIRST_COMPANY_ID, seedCompanyBase, isSupplier } from "@kebo/database";
 import { addDays } from "@kebo/utils";
 import { api, signIn, startApp } from "./app";
 import { PrismaService } from "../src/database/prisma.service";
@@ -136,7 +136,7 @@ describe("notes and follow-ups", () => {
     const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
     orderId = deal.orders[0].id;
     refNo = deal.orders[0].refNo;
-    if (!factoryId) factoryId = (await db().factory.findFirstOrThrow({ where: { name: `Notes Valves ${tag}` } })).id;
+    if (!factoryId) factoryId = (await db().party.findFirstOrThrow({ where: { ...isSupplier, name: `Notes Valves ${tag}` } })).id;
   });
 
   afterEach(() => {

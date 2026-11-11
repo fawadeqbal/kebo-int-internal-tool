@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { newCustomer } from "@kebo/database";
 import { z } from "zod";
 import { UNKNOWN_COUNTRY } from "@kebo/shared";
 import { PrismaService } from "../../database/prisma.service";
@@ -104,7 +105,7 @@ export class WebsiteService {
         { customer_id: string; contact_id: string; name: string; email: string | null; phone: string | null }[]
       >`
         select ct.customer_id, ct.id as contact_id, ct.name, ct.email, ct.phone
-          from contacts ct join customers c on c.id = ct.customer_id
+          from contacts ct join parties c on c.id = ct.customer_id
          where ct.deleted_at is null and c.deleted_at is null
            and (lower(ct.email) = ${input.email}
                 or (length(${phone}) >= 7 and (regexp_replace(coalesce(ct.phone,''), '\\D', '', 'g') = ${phone} or regexp_replace(coalesce(ct.whatsapp,''), '\\D', '', 'g') = ${phone})))
@@ -124,8 +125,8 @@ export class WebsiteService {
         ].filter(Boolean);
         if (differs.length) note = `— Details on the website form (not saved to the customer; check before using):\n${differs.join("\n")}`;
       } else {
-        const c = await tx.customer.create({
-          data: {
+        const c = await tx.party.create({
+          data: newCustomer({
             type: input.company ? "company" : "individual",
             name: input.company || input.fullName,
             country: input.country ?? UNKNOWN_COUNTRY,
@@ -139,7 +140,7 @@ export class WebsiteService {
                 isPrimary: true,
               },
             },
-          },
+          }),
           include: { contacts: true },
         });
         customerId = c.id;

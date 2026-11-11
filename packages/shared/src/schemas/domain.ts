@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   ATTACHMENT_KINDS,
   BALANCE_TERMS,
-  CUSTOMER_TYPES,
+  PARTY_TYPES,
   EXPENSE_BEARERS,
   EXPENSE_CATEGORIES,
   INCOTERMS,
@@ -53,7 +53,7 @@ export const contactInput = z
   .refine((c) => c.email || c.phone || c.whatsapp || c.wechat, { message: "Give at least one way to reach this contact", path: ["phone"] });
 
 export const customerInput = z.object({
-  type: z.enum(CUSTOMER_TYPES).default("company"),
+  type: z.enum(PARTY_TYPES).default("company"),
   name: text(200, "Enter the company or person's name"),
   country: z
     .string()

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma } from "@kebo/database";
+import { Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, roundHalfAway, toMinor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
 import { ForbiddenError, type ISODate } from "@kebo/utils";
@@ -144,11 +144,11 @@ export class FactsReadService {
     const db = this.prisma.db;
     const rows =
       by === "customer"
-        ? await db.customer.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+        ? await db.party.findMany({ where: { ...isCustomer, id: { in: ids } }, select: { id: true, name: true } })
         : by === "person"
           ? await db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
           : by === "factory"
-            ? await db.factory.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+            ? await db.party.findMany({ where: { ...isSupplier, id: { in: ids } }, select: { id: true, name: true } })
             : [];
     return new Map([...rows.map((r) => [r.id, r.name] as [string, string]), ["nobody", "Nobody"]]);
   }
@@ -157,8 +157,8 @@ export class FactsReadService {
   private async countries(keys: string[]): Promise<Map<string, string>> {
     const ids = keys.filter((k) => /^[0-9a-f-]{36}$/.test(k));
     if (!ids.length) return new Map();
-    const rows = await this.prisma.db.customer.findMany({ where: { id: { in: ids } }, select: { id: true, country: true } });
-    return new Map(rows.map((r) => [r.id, r.country]));
+    const rows = await this.prisma.db.party.findMany({ where: { ...isCustomer, id: { in: ids } }, select: { id: true, country: true } });
+    return new Map(rows.flatMap((r) => (r.country ? [[r.id, r.country] as const] : [])));
   }
 
   /**
@@ -416,9 +416,9 @@ export class FactsReadService {
     if (q.bucket) {
       const list = await this.prisma.db.$queryRaw<{ orderId: string; refNo: string; customer: string; factory: string | null; amount: string }[]>`
         select f.order_id as "orderId", o.ref_no as "refNo", c.name as customer,
-               ${q.side === "payable" ? Prisma.sql`(select x.name from factories x where x.id = f.factory_id)` : Prisma.sql`null::text`} as factory,
+               ${q.side === "payable" ? Prisma.sql`(select x.name from parties x where x.id = f.factory_id)` : Prisma.sql`null::text`} as factory,
                ${buckets[q.bucket]}::text as amount
-        from ${table} f join orders o on o.id = f.order_id join customers c on c.id = o.customer_id
+        from ${table} f join orders o on o.id = f.order_id join parties c on c.id = o.customer_id
         where ${scope} and ${buckets[q.bucket]} > 0
         order by ${buckets[q.bucket]} desc, o.ref_no limit 200`;
       rows = list.map((r) => ({ ...r, amount: amount(r.amount) }));
@@ -537,12 +537,12 @@ export class FactsReadService {
                      (select max(${today}::date - (p ->> 'dueOn')::date) from jsonb_array_elements(f.open_parts) p
                       where (p ->> 'dueOn')::date < ${today}::date and (p ->> 'open')::numeric > 0) as days
               from order_facts f where f.status <> 'cancelled') x
-        join customers c on c.id = x.customer_id
+        join parties c on c.id = x.customer_id
         where x.overdue > 0 group by 1, 2 order by max(x.days) desc, 2`,
       // Goods not ready yet, past the date the factory promised (open orders).
       db.$queryRaw<{ factoryId: string; name: string; days: number; orders: number }[]>`
         select f.factory_id as "factoryId", x.name, max(${today}::date - f.ready_promised)::int as days, count(*)::int as orders
-        from factory_order_facts f join factories x on x.id = f.factory_id
+        from factory_order_facts f join parties x on x.id = f.factory_id
         where f.status = 'open' and f.ready_actual is null and f.ready_promised < ${today}::date
         group by 1, 2 order by 3 desc, 2`,
       db.$queryRaw<{ count: number; over: string }[]>`
@@ -632,7 +632,7 @@ export class FactsReadService {
              f.profit_expected_main::text as "profitExpected", f.costs_over_plan_main::text as "costsOverPlan", f.received_main::text as received,
              coalesce((select sum(x.owed_main) from factory_order_facts x where x.order_id = f.order_id), 0)::text as "factoryOwed",
              coalesce((select sum(x.paid_main) from factory_order_facts x where x.order_id = f.order_id), 0)::text as "factoryPaid"
-      from order_facts f join orders o on o.id = f.order_id join customers c on c.id = f.customer_id
+      from order_facts f join orders o on o.id = f.order_id join parties c on c.id = f.customer_id
       where f.status <> 'cancelled' and (f.ordered_on between ${q.from}::date and ${q.to}::date or f.status = 'open')
       order by f.ordered_on, o.ref_no`;
     return {
@@ -672,7 +672,7 @@ export class FactsReadService {
              f.received_main::text as received, f.due_main::text as due, ${openSql(today, 1, null)}::text as overdue,
              f.on_time as "onTime", f.days_to_ship as "daysToShip", f.days_quote_to_order as "daysQuoteToOrder",
              to_char(f.paid_in_full_on, 'YYYY-MM-DD') as "paidInFullOn", f.paid_on_time as "paidOnTime", f.computed_at as "computedAt"
-      from order_facts f join orders o on o.id = f.order_id join customers c on c.id = f.customer_id
+      from order_facts f join orders o on o.id = f.order_id join parties c on c.id = f.customer_id
       where true ${this.span(q, "f.ordered_on")} ${this.filter(q, "order")}
       order by f.ordered_on desc, o.ref_no desc limit ${Math.min(Math.max(q.limit ?? 200, 1), 1000)}`;
     return {

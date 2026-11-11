@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
+import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
@@ -187,7 +187,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                         </Link>
                         <span className="block text-xs text-text-2">
                           {pc ? [pc.name, reach].filter(Boolean).join(" · ") : "No contact"}
-                          {c.type === "individual" && ` · ${CUSTOMER_TYPE_LABEL.individual}`}
+                          {c.type === "individual" && ` · ${PARTY_TYPE_LABEL.individual}`}
                         </span>
                       </Td>
                       <Td className="whitespace-nowrap">

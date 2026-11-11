@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, orderMoney, roundHalfAway } from "@kebo/money";
 import { can, shippedOnOf, type LostReason } from "@kebo/shared";
 import { addDays, dateIn, ForbiddenError, NotFoundError } from "@kebo/utils";
@@ -46,7 +46,7 @@ export class AccountsService {
     // and a pick list of thousands is neither quick to send nor to use.
     const since = new Date(`${addDays(this.clock.today(), -365)}T00:00:00Z`);
     const [customers, deals, orders, factories] = await Promise.all([
-      this.prisma.db.customer.findMany({ where: { deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
       this.prisma.db.inquiry.findMany({
         where: { deletedAt: null, OR: [{ stage: { in: ["new", "sourcing", "quoted"] } }, { createdAt: { gte: since } }] },
         select: { id: true, refNo: true, title: true, stage: true, customer: { select: { id: true, name: true } } },
@@ -59,7 +59,7 @@ export class AccountsService {
         orderBy: { createdAt: "desc" },
         take: 400,
       }),
-      this.prisma.db.factory.findMany({ where: { deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ]);
     return {
       customers,
@@ -78,8 +78,8 @@ export class AccountsService {
 
   async customerAccount(user: SessionUser, customerId: string) {
     this.assertManager(user);
-    const customer = await this.prisma.db.customer.findFirst({
-      where: { id: customerId, deletedAt: null },
+    const customer = await this.prisma.db.party.findFirst({
+      where: { ...isCustomer, id: customerId, deletedAt: null },
       select: { id: true, name: true, createdAt: true },
     });
     if (!customer) throw new NotFoundError("Customer");

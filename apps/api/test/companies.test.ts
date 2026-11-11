@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { unzipSync } from "fflate";
 import bcrypt from "bcryptjs";
-import { FIRST_COMPANY_ID } from "@kebo/database";
+import { FIRST_COMPANY_ID, isCustomer } from "@kebo/database";
 import { ORDER_FLOW_FEATURES } from "@kebo/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { currentStep, sealSecret, totpAt, newTotpSecret } from "../src/common/auth/totp";
@@ -209,7 +209,7 @@ describe("companies: isolation and the platform", () => {
       db.$executeRawUnsafe(`insert into counters (company_id, key, value) values ($1::uuid, 'x', 1)`, FIRST_COMPANY_ID),
     ).rejects.toThrow(/row-level security/);
     // A link from one company's row to another company's row is refused too.
-    const keboCustomer = (await prisma.company(FIRST_COMPANY_ID).customer.findFirstOrThrow()).id;
+    const keboCustomer = (await prisma.company(FIRST_COMPANY_ID).party.findFirstOrThrow({ where: isCustomer })).id;
     await expect(
       db.$executeRawUnsafe(`update inquiries set customer_id = $1::uuid where id = (select id from inquiries limit 1)`, keboCustomer),
     ).rejects.toThrow(/another company/);
@@ -241,10 +241,10 @@ describe("companies: isolation and the platform", () => {
     const b = await prisma.platform.company.findFirstOrThrow({ where: { slug: `iso-${tag}` } });
     const db = prisma.company(b.id);
     const keboUser = (await prisma.company(FIRST_COMPANY_ID).user.findFirstOrThrow({ where: { email: "manager@example.com" } })).id;
-    const bCustomer = (await db.customer.findFirstOrThrow()).id;
+    const bCustomer = (await db.party.findFirstOrThrow({ where: isCustomer })).id;
     const bInquiry = (await db.inquiry.findFirstOrThrow()).id;
     for (const [sql, args] of [
-      [`update customers set created_by = $1::uuid where id = $2::uuid`, [keboUser, bCustomer]],
+      [`update parties set created_by = $1::uuid where id = $2::uuid`, [keboUser, bCustomer]],
       [
         `insert into inquiry_notes (id, inquiry_id, author_id, body) values (gen_random_uuid(), $2::uuid, $1::uuid, 'x')`,
         [keboUser, bInquiry],

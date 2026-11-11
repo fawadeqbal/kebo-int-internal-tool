@@ -99,12 +99,12 @@ export class LeaksService {
       >`
         select f.inquiry_id as id, i.ref_no as "refNo", i.title, f.outcome as stage, f.category, f.lost_reason::text as "lostReason",
                f.handled_by as "assigneeId", c.id as "customerId", c.name as "customerName"
-        from inquiry_facts f join inquiries i on i.id = f.inquiry_id join customers c on c.id = f.customer_id
+        from inquiry_facts f join inquiries i on i.id = f.inquiry_id join parties c on c.id = f.customer_id
         where f.outcome in ('won', 'lost') and f.closed_on between ${from}::date and ${to}::date`,
       // Deals still open that money was spent on, with their quotation's value (the Insights table's).
       this.prisma.db.$queryRaw<{ id: string; refNo: string; customer: string; value: string | null }[]>`
         select f.inquiry_id as id, i.ref_no as "refNo", c.name as customer, f.quoted_value_main::text as value
-        from inquiry_facts f join inquiries i on i.id = f.inquiry_id join customers c on c.id = f.customer_id
+        from inquiry_facts f join inquiries i on i.id = f.inquiry_id join parties c on c.id = f.customer_id
         where f.outcome = 'open' and exists (select 1 from expenses e where e.inquiry_id = f.inquiry_id and e.voided_at is null)`,
       this.prisma.db.expense.findMany({
         where: { voidedAt: null, spentOn: range },

@@ -1,4 +1,5 @@
 import type { Prisma } from "@kebo/database";
+import { isCustomer } from "@kebo/database";
 import type { BuyerSnapshot } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
@@ -7,8 +8,8 @@ type Db = Tx | PrismaService["db"];
 
 /** The customer as it is now, with the deal's contact (else the primary one). */
 export async function customerSnapshot(tx: Db, customerId: string, contactId: string | null) {
-  const c = await tx.customer.findUniqueOrThrow({
-    where: { id: customerId },
+  const c = await tx.party.findUniqueOrThrow({
+    where: { id: customerId, ...isCustomer },
     include: { contacts: { where: { deletedAt: null }, orderBy: { isPrimary: "desc" } } },
   });
   const contact = c.contacts.find((x) => x.id === contactId) ?? c.contacts[0] ?? null;

@@ -21,7 +21,7 @@ import { Client, types as pgTypes } from "pg";
 import { fromMinor, toMinor } from "@kebo/money";
 import { portsOf, type BalanceTerms, type Incoterm, type InquiryStage } from "@kebo/shared";
 import { dateIn, type ISODate } from "@kebo/utils";
-import { freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, toDbDate, type Prisma } from "../src";
+import { freezeOrderBuyer, freezeOrderMoney, isCustomer, isSupplier, nextReference, openCompany, roleRows, toDbDate, type Prisma } from "../src";
 import * as map from "./import-legacy/map";
 
 /* ---------------------------------------------------------------- arguments */
@@ -444,7 +444,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   /* ---- customers + one primary contact */
   const contactOf = new Map<string, string>();
   for (const c of old.customers) contactOf.set(c.id, randomUUID());
-  await tx.customer.createMany({
+  await tx.party.createMany({
     data: old.customers.map((c) => ({
       id: c.id,
       type: c.company_name?.trim() ? ("company" as const) : ("individual" as const),
@@ -460,6 +460,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       updatedAt: c.updated_at,
     })),
   });
+  await tx.partyRole.createMany({ data: roleRows("customer", old.customers) });
   await tx.contact.createMany({
     data: old.customers.map((c) => ({
       id: contactOf.get(c.id)!,
@@ -483,7 +484,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   for (const c of individuals) report.judge("Customers with no company name → type individual, named after the contact", c.contact_person);
 
   /* ---- factories */
-  await tx.factory.createMany({
+  await tx.party.createMany({
     data: old.suppliers.map((s) => ({
       id: s.id,
       name: s.name,
@@ -500,6 +501,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       updatedAt: s.updated_at,
     })),
   });
+  await tx.partyRole.createMany({ data: roleRows("supplier", old.suppliers) });
 
   /* ---- what each deal became */
   const versionsOf = groupBy(old.quotations, (q) => q.query_id);
@@ -1148,9 +1150,9 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   /* ---- report: counts and totals */
   const c = {
     users: await tx.user.count(),
-    customers: await tx.customer.count(),
+    customers: await tx.party.count({ where: isCustomer }),
     contacts: await tx.contact.count(),
-    factories: await tx.factory.count(),
+    factories: await tx.party.count({ where: isSupplier }),
     inquiries: await tx.inquiry.count(),
     requestedItems: await tx.requestedItem.count(),
     stageChanges: await tx.inquiryStageChange.count(),
