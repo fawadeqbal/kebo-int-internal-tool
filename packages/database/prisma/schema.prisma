@@ -1798,7 +1798,7 @@ model MoneyMovement {
   /// Whom with (ERPNext's party type): a customer (money in, a refund) or a supplier (paid); none for a move.
   partyRole     PartyRoleKind? @map("party_role")
   partyId       String?        @map("party_id") @db.Uuid
-  party         Party?         @relation("MovementParty", fields: [partyId], references: [id])
+  party         Party?         @relation("MovementParty", fields: [partyId], references: [id], onDelete: Restrict)
   /// What arrived or left, in that currency.
   amount        Decimal        @db.Decimal(14, 2)
   currency      String         @db.Char(3)
@@ -1840,6 +1840,7 @@ model MoneyMovement {
 
   @@index([partyId])
   @@index([accountId])
+  @@index([toAccountId])
   @@index([valueDate])
   @@index([companyId])
   @@map("money_movements")
