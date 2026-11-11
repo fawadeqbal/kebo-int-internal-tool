@@ -67,7 +67,7 @@ describe("the modules", () => {
     expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines", "Analytics & reports", "Audit log"]);
     expect(pages(m, "public")).toEqual(["Website form"]);
     expect(pages(m, "partners")).toEqual(["Customers", "Suppliers"]);
-    expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders"]);
+    expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders", "Purchase orders", "Fulfillment & logistics"]);
     expect(pages(m, "revenue")).toEqual(["Profit & loss", "Cost & expense allocation", "Variance analysis"]);
     expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue", "Multi-currency vault"]);
     expect(pages(m, "finance")).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
@@ -78,7 +78,7 @@ describe("the modules", () => {
     const hrefs = MODULE_PAGES.flatMap((m) => m.pages.map((p) => p.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
     const labels = MODULE_PAGES.flatMap((m) => m.pages.map((p) => p.label));
-    for (const later of ["Sourcing desk", "Quotations", "Work orders", "Fulfillment & logistics", "Documentation", "Currency registry", "Exchange rates", "Operating expenses"])
+    for (const later of ["Sourcing desk", "Quotations", "Work orders", "Documentation", "Currency registry", "Exchange rates", "Operating expenses"])
       expect(labels).not.toContain(later);
     expect(hrefs).toEqual(
       expect.arrayContaining([
@@ -93,6 +93,8 @@ describe("the modules", () => {
         "/finance/profit",
         "/finance/leaks",
         "/purchasing/to-pay",
+        "/operations/purchase-orders",
+        "/operations/shipments",
         "/approvals",
         "/settings/company",
         "/settings/papers",
