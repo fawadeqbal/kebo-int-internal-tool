@@ -3,6 +3,7 @@ import { INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
+import { customerPaymentsOf } from "@/lib/party-data";
 import { money, TZ } from "@/lib/format";
 import type { CustomerAccount, CustomerPayments, ExpenseList, ExpenseTargets } from "@/lib/types-money";
 import { expenseAction } from "@/app/(app)/money/actions";
@@ -39,10 +40,10 @@ export async function CustomerMoney({
 }) {
   const shown: CustomerMoneyView = managers ? view : "payments";
   const [pay, a] = await Promise.all([
-    api.get<CustomerPayments>("/payments", { customerId }),
+    customerPaymentsOf(customerId).then((p) => p ?? api.get<CustomerPayments>("/payments", { customerId })),
     managers ? api.get<CustomerAccount>(`/customers/${customerId}/account`) : Promise.resolve(null),
   ]);
-  const base = `/customers/${customerId}?tab=money`;
+  const base = `/customers/${customerId}/money`;
   const one = pay.totals.length === 1 ? pay.totals[0]! : null;
   const due = one ? Number(one.due) > 0.005 : false;
   const net = a ? Number(a.totals.net) : 0;
@@ -67,7 +68,7 @@ export async function CustomerMoney({
               {
                 key: "profit",
                 label: "Profit",
-                href: `${base}&view=profit`,
+                href: `${base}?view=profit`,
                 hint: a ? `${net >= 0 ? "+ " : ""}${money(a.totals.net, a.currency)}` : undefined,
                 tone: net < 0 ? "text-bad" : "text-ok",
               },

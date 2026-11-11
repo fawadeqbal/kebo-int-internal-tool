@@ -186,7 +186,7 @@ export async function useCreditAction(orderId: string, _prev: ActionState, form:
 }
 
 const refreshCustomer = (customerId: string) => {
-  revalidatePath(`/customers/${customerId}`);
+  revalidatePath(`/customers/${customerId}`, "layout");
   revalidatePath("/orders", "layout");
   revalidatePath("/finance", "layout");
   revalidatePath("/purchasing", "layout");
