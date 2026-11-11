@@ -20,7 +20,7 @@ const row = (over: Partial<LedgerListRow> = {}): LedgerListRow => ({
   postedAt: "2026-11-04T09:14:00Z",
   type: "money_in",
   typeLabel: "Money in",
-  source: { type: "payment", id: "p1" },
+  source: { type: "movement", id: "p1" },
   ref: "RC-2026-0447-2",
   account: "money:a1",
   accountLabel: "Bank Alfalah USD",
@@ -167,8 +167,9 @@ describe("the entry in the side panel", () => {
     reverses: null,
     related: [],
     source: {
-      type: "payment",
-      id: "p1",
+      type: "movement",
+      id: "m1",
+      partId: "p1",
       orderId: "o1",
       customerId: "c1",
       factoryId: null,
@@ -200,7 +201,7 @@ describe("the entry in the side panel", () => {
     expect(sourceHref({ ...s, type: "expense", orderId: null })?.href).toBe("/finance/expenses");
     expect(sourceHref({ ...s, type: "transfer" })?.href).toBe("/finance/cash-book");
     expect(sourceHref({ ...s, type: "purchase_order" })?.href).toBe("/orders/o1/factory");
-    expect(sourceHref({ ...s, type: "credit" })?.href).toBe("/customers/c1");
+    expect(sourceHref({ ...s, type: "allocation", orderId: null })?.href).toBe("/customers/c1");
   });
 });
 

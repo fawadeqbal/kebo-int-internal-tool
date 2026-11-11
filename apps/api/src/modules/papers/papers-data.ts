@@ -1,4 +1,4 @@
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
 import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
@@ -63,8 +63,8 @@ export const paperOrderInclude = {
   },
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
-  // Receipts are numbered when the payment is recorded (Payment.receiptNo); listed in date order.
-  payments: { where: { voidedAt: null }, orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }] },
+  // Receipts are numbered when the payment is recorded (its allocation's receiptNo); listed in date order.
+  allocations: livePartsWithEntry,
   planItems: { orderBy: { sortOrder: "asc" } },
   factoryPaid: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
   factoryPlan: { orderBy: { sortOrder: "asc" } },
@@ -641,7 +641,7 @@ function shippingAdvice(c: PaperCtx): Built {
 }
 
 function paymentReceipt(c: PaperCtx): Built {
-  const list = c.o.payments;
+  const list = c.o.allocations.map(asPayment);
   const p = c.ref ? list.find((x) => x.id === c.ref) : list.at(-1);
   const pos = positionOf(c);
   return {

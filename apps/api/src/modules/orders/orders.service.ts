@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
 import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
@@ -50,7 +50,8 @@ import { factoryPlansOf } from "../money/factory-plan";
 import { termsOf } from "../money/route-plan";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
-import { LedgerPosting } from "../ledger/posting.service";
+import { LedgerPosting, type LedgerRef } from "../ledger/posting.service";
+import { fromCredit, refund, releaseOrder } from "../treasury/customer-money";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
 import { readyByOf, readyOnOf, readySelect, readyWords, setReadyAll, setReadyDates } from "./ready";
 
@@ -75,8 +76,8 @@ export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
 }
 
 const orderInclude = {
-  payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
-  // With the payments, what the position needs: the plan's deposit and what was charged to the customer.
+  allocations: { where: livePart, orderBy: [{ on: "asc" }, { createdAt: "asc" }] },
+  // With what pays it, what the position needs: the plan's deposit and what was charged to the customer.
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
   lines: {
@@ -363,9 +364,10 @@ export class OrdersService {
   /**
    * The customer called it off. The accepted revision becomes "void" and the
    * deal "lost" (customer cancelled); it can be reopened and quoted again.
-   * Money already received stays recorded on the order; what happens to it is
-   * said: kept as the customer's credit (the default), refunded (now, or later
-   * from the credit), or kept as a cancellation fee. Money paid to the factory
+   * Money already received is released from the order (its payments crossed out,
+   * the transfers stand); what happens to it is said: kept as the customer's
+   * credit (the default), refunded (now, or later from the credit), or kept as a
+   * cancellation fee. Money paid to the factory
    * is a refund expected from the factory (the default) or a loss on the order
    * (an expense, borne by us).
    */
@@ -380,33 +382,30 @@ export class OrdersService {
       const o = await this.load(user, id, tx);
       if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
       // Money in from the customer (in the order's currency), and money out to the factories (per factory and currency).
-      const inMinor = o.payments.reduce((t, p) => t + decimalToMinor(p.amount), 0);
+      const inMinor = o.allocations.reduce((t, p) => t + decimalToMinor(p.amount), 0);
       const factoryPaid = await tx.factoryPayment.findMany({ where: { orderId: id, voidedAt: null }, include: { factory: { select: { id: true, name: true } } } });
       const customerMoney = inMinor > 0 ? (money.customerMoney ?? "credit") : null;
       const factoryMoney = factoryPaid.length ? (money.factoryMoney ?? "refund_due") : null;
-      const on = toDbDate(money.refundOn ?? today);
-      if (customerMoney === "credit" || customerMoney === "refund")
-        await tx.customerCredit.create({
-          data: { customerId: o.customerId, kind: "in", amount: fromMinor(inMinor), currency: o.currency, orderId: id, on: toDbDate(today), note: `Kept from cancelled ${o.refNo}`, recordedById: user.id },
-        });
-      if (customerMoney === "refund" && money.refundNow)
-        await tx.customerCredit.create({
-          data: {
-            customerId: o.customerId,
-            kind: "refund",
-            amount: fromMinor(inMinor),
-            currency: o.currency,
-            orderId: id,
-            accountId: await checkAccount(tx, money.refundAccountId, o.currency, null, cashBook),
-            on,
-            note: `Refund for cancelled ${o.refNo}`,
-            recordedById: user.id,
-          },
-        });
-      if (customerMoney === "fee")
-        await tx.customerCredit.create({
-          data: { customerId: o.customerId, kind: "fee", amount: fromMinor(inMinor), currency: o.currency, orderId: id, on: toDbDate(today), note: `Cancellation fee on ${o.refNo}`, recordedById: user.id },
-        });
+      const posted: LedgerRef[] = [{ type: "order_all", id }];
+      if (customerMoney) {
+        // What paid the order is released: the customer's credit again, then kept as a fee or paid back from it.
+        await tx.$queryRaw`select id from parties where id = ${o.customerId}::uuid for update`;
+        const released = await releaseOrder(tx, id, `${o.refNo} cancelled`);
+        const from = { partyId: o.customerId, currency: o.currency, amountMinor: released.minor, recordedById: user.id, prefer: released.movementIds, orderId: id };
+        if (customerMoney === "fee")
+          for (const f of await fromCredit(tx, { ...from, target: "fee", on: today, note: `Cancellation fee on ${o.refNo}` }))
+            posted.push({ type: "allocation", id: f });
+        if (customerMoney === "refund" && money.refundNow)
+          posted.push({
+            type: "movement",
+            id: await refund(tx, {
+              ...from,
+              accountId: await checkAccount(tx, money.refundAccountId, o.currency, null, cashBook),
+              on: money.refundOn ?? today,
+              note: `Refund for cancelled ${o.refNo}`,
+            }),
+          });
+      }
       if (factoryMoney === "loss") {
         // One expense per factory and currency, borne by us (no account: the money already left with the factory payment).
         const byKey = new Map<string, { factory: { id: string; name: string }; currency: string; minor: number }>();
@@ -454,7 +453,7 @@ export class OrdersService {
         newValues: { status: "cancelled", customerMoney, factoryMoney },
       });
       // The ledger: the order and its factories' parts reversed; the money in kept as credit, refunded or a fee.
-      await this.ledger.post(tx, [{ type: "order_all", id }], { userId: user.id, reason });
+      await this.ledger.post(tx, posted, { userId: user.id, reason });
       const inquiry = await tx.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId } });
       const moved = await this.stages.after(tx, inquiry, "order_cancelled", user.id);
       return moved ? [moved] : [];

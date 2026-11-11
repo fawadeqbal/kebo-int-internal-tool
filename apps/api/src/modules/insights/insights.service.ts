@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate } from "@kebo/database";
+import { livePart, fromDbDate } from "@kebo/database";
 import { fromMinor, toMinor } from "@kebo/money";
 import { can, PAYMENT_ROUTE_SHORT, planStatus, planWhen, type BalanceWhen, type LcTerms } from "@kebo/shared";
 import { daysBetween, DomainError, ForbiddenError, type ISODate } from "@kebo/utils";
+import { creditsAll } from "../treasury/customer-money";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
@@ -234,7 +235,7 @@ export class InsightsService {
         lcDays: true,
         customer: { select: { id: true, name: true } },
         inquiry: { select: { assignee: { select: { id: true, name: true } } } },
-        payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, currency: true, paidOn: true } },
+        allocations: { where: livePart, select: { amount: true, bankCharges: true, on: true } },
         planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true, dueRule: true, dueDays: true } },
       },
     });
@@ -249,8 +250,8 @@ export class InsightsService {
         const terms = { route: o.paymentRoute, balanceWhen: o.balanceWhen as BalanceWhen | null, lcTerms: o.lcTerms as LcTerms | null, lcDays: o.lcDays };
         const late = plan.filter((p) => p.status === "late");
         const lastPaid =
-          o.payments
-            .map((p) => fromDbDate(p.paidOn))
+          o.allocations
+            .map((p) => fromDbDate(p.on))
             .sort()
             .pop() ?? null;
         return {
@@ -291,13 +292,11 @@ export class InsightsService {
       totals.set(r.currency, t);
     }
     // Money we hold for customers (their credit): shown as a minus against what they owe.
-    const credits = await this.prisma.db.customerCredit.findMany({ where: { voidedAt: null }, select: { customerId: true, kind: true, amount: true, currency: true } });
     const byCustomer = new Map<string, Record<string, number>>();
-    for (const c of credits) {
-      const b = byCustomer.get(c.customerId) ?? {};
-      const sign = c.kind === "in" ? 1 : c.kind === "used" || c.kind === "refund" ? -1 : 0;
-      b[c.currency] = (b[c.currency] ?? 0) + sign * decimalToMinor(c.amount);
-      byCustomer.set(c.customerId, b);
+    for (const c of await creditsAll(this.prisma.db)) {
+      const b = byCustomer.get(c.partyId) ?? {};
+      b[c.currency] = (b[c.currency] ?? 0) + c.minor;
+      byCustomer.set(c.partyId, b);
     }
     const held = new Map<string, { minor: number; customers: number }>();
     for (const b of byCustomer.values())

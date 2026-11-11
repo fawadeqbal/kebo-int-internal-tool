@@ -23,16 +23,27 @@ describe("no mirrors, no dead weight", () => {
   });
 
   it("keeps a payment in its order's currency, and an order's currency under its payments", async () => {
-    const p = await db().payment.findFirstOrThrow({ where: { voidedAt: null }, include: { order: { select: { id: true, currency: true } } } });
-    const other = p.order.currency === "USD" ? "CNY" : "USD";
-    await expect(db().payment.update({ where: { id: p.id }, data: { currency: other } })).rejects.toThrow(/order's currency/);
-    await expect(db().payment.create({ data: { ...p, id: undefined, order: undefined, receiptNo: undefined, currency: other } as never })).rejects.toThrow(
-      /order's currency/,
-    );
-    await expect(db().order.update({ where: { id: p.order.id }, data: { currency: other } })).rejects.toThrow(/its currency stays/);
+    const p = await db().allocation.findFirstOrThrow({
+      where: { voidedAt: null, target: "order" },
+      include: { order: { select: { id: true, currency: true } }, movement: true },
+    });
+    const other = p.order!.currency === "USD" ? "CNY" : "USD";
+    // What pays an order counts in its currency: the entry's allocation currency.
+    await expect(db().moneyMovement.update({ where: { id: p.movementId }, data: { allocCurrency: other } })).rejects.toThrow(/order's currency/);
+    const elsewhere = await db().moneyMovement.create({
+      data: { ...p.movement, id: undefined, allocCurrency: other, currency: other, voidedAt: null, createdAt: undefined, updatedAt: undefined } as never,
+    });
+    await expect(
+      db().allocation.create({
+        data: { movementId: elsewhere.id, target: "order", orderId: p.order!.id, amount: 1, share: 1, on: p.on, recordedById: p.recordedById },
+      }),
+    ).rejects.toThrow(/order's currency/);
+    await db().moneyMovement.delete({ where: { id: elsewhere.id } });
+    await expect(db().order.update({ where: { id: p.order!.id }, data: { currency: other } })).rejects.toThrow(/its currency stays/);
     // Every payment there is agrees (the readers count them all, unfiltered).
     const [{ off }] = await prisma.platform.$queryRaw<{ off: bigint }[]>`
-      select count(*) as off from payments p join orders o on o.id = p.order_id where p.voided_at is null and p.currency <> o.currency`;
+      select count(*) as off from allocations a join money_movements m on m.id = a.movement_id join orders o on o.id = a.order_id
+       where a.voided_at is null and m.alloc_currency <> o.currency`;
     expect(Number(off)).toBe(0);
   });
 

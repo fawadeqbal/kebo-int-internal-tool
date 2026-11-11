@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
+import { livePart, decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
 import { fromMinor, orderCosting, orderMoney, roundHalfAway, type Minor } from "@kebo/money";
 import {
   can,
@@ -48,7 +48,7 @@ export class CostsService {
       include: {
         lines: { orderBy: { sortOrder: "asc" } },
         costs: true,
-        payments: { where: { voidedAt: null } },
+        allocations: { where: livePart },
         planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true } },
         expenses: {

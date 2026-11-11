@@ -1,7 +1,7 @@
 import { PROFIT_LABEL } from "@kebo/money";
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
-import { fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
+import { livePart, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
 import { instalmentSentence, orderNeeds, PERMISSIONS, planStatus, shippedOnOf } from "@kebo/shared";
 import { addDays, dateIn, daysBetween } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -108,7 +108,7 @@ export class RemindersService {
       // Closed ones only while money is still owed on them (found in the database, not by reading every order).
       where: { inquiry: { onHold: false }, OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, fxOf(s, await this.limits.allows("expenses"))) } }] },
       include: {
-        payments: { where: { voidedAt: null } },
+        allocations: { where: livePart },
         planItems: { orderBy: { sortOrder: "asc" } },
         expenses: chargedExpenses,
         inquiry: { select: { id: true, assigneeId: true } },

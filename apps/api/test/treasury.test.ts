@@ -174,8 +174,10 @@ describe("treasury: every payment in one list", () => {
       title: "Customer payment · USD 900.00",
       recordedBy: "Manager",
       voided: null,
-      voidPath: `/payments/${paymentId}/void`,
+      // It pays one order in full: removed (and changed) as the payment on that order.
+      voidPath: `/payments/${v.partId}/void`,
     });
+    expect(v.partId).toBeTruthy();
     expect(v.fields).toEqual(
       expect.arrayContaining([
         { label: "Received", value: "USD 900.00" },

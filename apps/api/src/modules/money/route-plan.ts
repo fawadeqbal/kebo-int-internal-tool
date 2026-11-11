@@ -1,4 +1,4 @@
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, toDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, planDeposit, type Minor } from "@kebo/money";
 import { lcChecks, planItemLabel, primaryShipment, rebuildPlan, routePlan, type BalanceWhen, type LcCheck, type LcTerms, type RouteTerms } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
@@ -33,7 +33,7 @@ type PlanOrder = {
 export async function rebuildRoutePlan(tx: Tx, o: PlanOrder, was: RouteTerms, t: RouteTerms, days: { depositDays: number; balanceDays: number }) {
   const [items, payments] = await Promise.all([
     tx.paymentPlanItem.findMany({ where: { orderId: o.id }, orderBy: { sortOrder: "asc" } }),
-    tx.payment.findMany({ where: { orderId: o.id, voidedAt: null }, select: { amount: true, bankCharges: true } }),
+    tx.allocation.findMany({ where: { orderId: o.id, ...livePart }, select: { amount: true, bankCharges: true } }),
   ]);
   const totalMinor = decimalToMinor(o.total);
   // What came in (with the bank charges): it pays the instalments oldest first.

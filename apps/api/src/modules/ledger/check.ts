@@ -95,9 +95,8 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
     select a.id, a.name, a.currency::text,
            (a.opening_balance + coalesce((
               select sum(x) from (
-                select received_amount as x from payments where account_id = a.id and voided_at is null and receipt_id is null and paid_on >= a.opening_on
-                union all select received_amount from customer_receipts where account_id = a.id and voided_at is null and paid_on >= a.opening_on
-                union all select -amount from customer_credits where account_id = a.id and kind = 'refund' and voided_at is null and "on" >= a.opening_on
+                select case direction when 'in' then amount else -amount end as x from money_movements
+                 where account_id = a.id and voided_at is null and value_date >= a.opening_on
                 union all select -amount from factory_payments where account_id = a.id and voided_at is null and paid_on >= a.opening_on
                 union all select -amount from expenses where account_id = a.id and voided_at is null and spent_on >= a.opening_on
                 union all select -amount from expenses where repaid_account_id = a.id and voided_at is null and repaid_on >= a.opening_on
@@ -122,11 +121,10 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
   const people = new Map((await db.user.findMany({ select: { id: true, name: true } })).map((u) => [u.id, u.name]));
   for (const s of staff) compare("staff", people.get(s.userId) ?? s.userId, s.currency, m(s.ledger), m(s.expected));
 
-  // Customers' credit: in − used − refunded (fees are not part of it), per currency.
+  // Customers' credit: what their money in still has unallocated, per currency.
   const credits = await db.$queryRaw<{ customerId: string; currency: string; ledger: string; expected: string }[]>`
     with held as (
-      select customer_id, currency, sum(case kind when 'in' then amount when 'used' then -amount when 'refund' then -amount else 0 end) as amount
-        from customer_credits where voided_at is null group by 1, 2),
+      select party_id as customer_id, currency, sum(unallocated) as amount from movement_unallocated group by 1, 2),
     posted as (
       select substr(account, 8)::uuid as customer_id, currency, sum(credit - debit) as amount from ledger_entries
        where account like 'credit:%' group by 1, 2)

@@ -1,4 +1,4 @@
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor, orderCosting, orderMoney, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   factoryReadyActual,
@@ -83,10 +83,10 @@ const orderSelect = {
   mainRate: true,
   customer: { select: { country: true } },
   inquiry: { select: { channel: true, category: true, assigneeId: true } },
-  payments: {
-    where: { voidedAt: null },
-    orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
-    select: { amount: true, bankCharges: true, voidedAt: true, paidOn: true },
+  allocations: {
+    where: livePart,
+    orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+    select: { amount: true, bankCharges: true, voidedAt: true, on: true },
   },
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: {
@@ -192,11 +192,11 @@ export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promis
     }
     const overdue = overdueOf(openParts, ctx.today);
     // Paid on time: once paid in full, each dated part was settled by its date.
-    const paidInFullOn = position.dueMinor === 0 && position.owedMinor > 0 ? reachedOn(o.payments, position.owedMinor) : null;
+    const paidInFullOn = position.dueMinor === 0 && position.owedMinor > 0 ? reachedOn(o.allocations, position.owedMinor) : null;
     let cumulative = 0;
     const partsOnTime = parts.map((p) => {
       cumulative += p.amountMinor;
-      const settledOn = reachedOn(o.payments, cumulative);
+      const settledOn = reachedOn(o.allocations, cumulative);
       return !p.dueOn || (!!settledOn && settledOn <= p.dueOn);
     });
     out.push({

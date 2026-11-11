@@ -22,7 +22,7 @@ import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, priceForMargin, splitDeposit, toMinor, withTaxMinor } from "@kebo/money";
 import { defaultPlan, type OrderStage } from "@kebo/shared";
 import { addDays, daysBetween, todayIn, type ISODate } from "@kebo/utils";
-import { freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, roleRows, toDbDate, type PrismaClient } from "../src";
+import { createPaymentIn, freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, roleRows, toDbDate, type PrismaClient } from "../src";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -534,35 +534,27 @@ async function main() {
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     // Most customers pay the deposit on time; a few are late, so "overdue" has something in it.
     if ((oStage !== "confirmed" || rnd() < 0.5) && pay(addDays(orderedOn, 4)) && rnd() < 0.95)
-      await db.payment.create({
-        data: {
-          kind: "deposit",
-          orderId: order.id,
-          customerId: customer.id,
-          amount: fromMinor(deposit - 2500),
-          bankCharges: "25.00",
-          currency: "USD",
-          receivedAmount: fromMinor(deposit - 2500),
-          receivedCurrency: "USD",
-          paidOn: toDbDate(addDays(orderedOn, 4)),
-          reference: `TT-${n}-1`,
-          recordedById: lead.id,
-        },
+      await createPaymentIn(db, {
+        kind: "deposit",
+        orderId: order.id,
+        partyId: customer.id,
+        amount: fromMinor(deposit - 2500),
+        bankCharges: "25.00",
+        currency: "USD",
+        paidOn: toDbDate(addDays(orderedOn, 4)),
+        reference: `TT-${n}-1`,
+        recordedById: lead.id,
       });
     if (shippedOn && (oStage === "done" ? rnd() < 0.96 : rnd() < 0.5) && pay(addDays(shippedOn, 5)))
-      await db.payment.create({
-        data: {
-          kind: "balance",
-          orderId: order.id,
-          customerId: customer.id,
-          amount: fromMinor(balance),
-          currency: "USD",
-          receivedAmount: fromMinor(balance),
-          receivedCurrency: "USD",
-          paidOn: toDbDate(addDays(shippedOn, 5)),
-          reference: `TT-${n}-2`,
-          recordedById: lead.id,
-        },
+      await createPaymentIn(db, {
+        kind: "balance",
+        orderId: order.id,
+        partyId: customer.id,
+        amount: fromMinor(balance),
+        currency: "USD",
+        paidOn: toDbDate(addDays(shippedOn, 5)),
+        reference: `TT-${n}-2`,
+        recordedById: lead.id,
       });
     if (shippedOn)
       await db.expense.createMany({
@@ -693,7 +685,7 @@ async function main() {
   const cnyAcct = await db.moneyAccount.findFirst({ where: { currency: "CNY", archivedAt: null }, orderBy: { createdAt: "asc" } });
   const mine = { createdAt: { gte: startedAt }, accountId: null };
   if (usd) {
-    await db.payment.updateMany({ where: { ...mine, currency: "USD" }, data: { accountId: usd.id } });
+    await db.moneyMovement.updateMany({ where: { ...mine, currency: "USD" }, data: { accountId: usd.id } });
     await db.expense.updateMany({ where: { ...mine, currency: "USD" }, data: { accountId: usd.id } });
   }
   if (cnyAcct) {

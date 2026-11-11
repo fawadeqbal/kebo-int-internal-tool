@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { livePart, decimalToMinor, fromDbDate, Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, payInstalments, type Minor } from "@kebo/money";
 import {
   AGEING_BUCKETS,
@@ -340,6 +340,8 @@ export class LedgerService {
       approvedBy: null as string | null,
       settles: null as string | null,
       removed: null as { at: Date; reason: string | null } | null,
+      /** The payment on an order it is (its receipt prints from it). */
+      partId: null as string | null,
     };
     const approval = async (id: string) => {
       const s = await db.moneySubmission.findFirst({
@@ -353,50 +355,48 @@ export class LedgerService {
           }
         : null;
     };
-    if (type === "payment") {
-      const p = await db.payment.findUnique({
+    if (type === "movement") {
+      const m = await db.moneyMovement.findUnique({
         where: { id: sourceId },
-        include: { order: { select: { id: true, refNo: true, customerId: true } }, recordedBy: { select: { name: true } } },
+        include: { allocations: { where: { later: false }, select: { id: true, orderId: true, amount: true, order: { select: { refNo: true } } } }, recordedBy: { select: { name: true } } },
       });
-      if (!p) return out;
-      const a = await approval(p.id);
+      if (!m) return out;
+      const parts = m.allocations.filter((a) => a.order);
+      const one = parts.length === 1 && decimalToMinor(m.allocatable) === decimalToMinor(parts[0]!.amount) ? parts[0]! : null;
+      const a = await approval(one?.id ?? m.id);
       return {
         ...out,
-        orderId: p.orderId,
-        customerId: p.order.customerId,
-        label: `Payment on ${p.order.refNo}`,
-        file: p.fileKey ? { kind: "payment" as const, id: p.id, name: p.fileName ?? "file" } : null,
-        recordedBy: a?.recordedBy ?? p.recordedBy.name,
+        orderId: one?.orderId ?? null,
+        partId: one?.id ?? null,
+        customerId: m.partyId,
+        label: m.direction === "out" ? "Credit refunded" : one ? `Payment on ${one.order!.refNo}` : "One transfer over several orders",
+        file: m.fileKey ? { kind: "payment" as const, id: m.id, name: m.fileName ?? "file" } : null,
+        recordedBy: a?.recordedBy ?? m.recordedBy.name,
         approvedBy: a?.approvedBy ?? null,
-        settles: await this.settlesOfPayment(p.id, p.orderId),
-        removed: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
+        settles:
+          m.direction === "out"
+            ? null
+            : one
+              ? await this.settlesOfPayment(one.id, one.orderId!)
+              : `Pays ${[...new Set(parts.map((p) => p.order!.refNo))].join(", ") || "the customer's credit"}`,
+        removed: m.voidedAt ? { at: m.voidedAt, reason: m.voidReason } : null,
       };
     }
-    if (type === "receipt") {
-      const r = await db.customerReceipt.findUnique({
+    if (type === "allocation") {
+      const x = await db.allocation.findUnique({
         where: { id: sourceId },
-        include: { payments: { select: { order: { select: { refNo: true } } } }, recordedBy: { select: { name: true } } },
+        include: { movement: { select: { partyId: true } }, order: { select: { refNo: true } }, recordedBy: { select: { name: true } } },
       });
-      if (!r) return out;
+      if (!x) return out;
       return {
         ...out,
-        customerId: r.customerId,
-        label: "One transfer over several orders",
-        recordedBy: r.recordedBy.name,
-        settles: `Pays ${[...new Set(r.payments.map((p) => p.order.refNo))].join(", ") || "the customer's credit"}`,
-        removed: r.voidedAt ? { at: r.voidedAt, reason: r.voidReason } : null,
-      };
-    }
-    if (type === "credit") {
-      const c = await db.customerCredit.findUnique({ where: { id: sourceId }, include: { recordedBy: { select: { name: true } } } });
-      if (!c) return out;
-      return {
-        ...out,
-        customerId: c.customerId,
-        orderId: c.orderId,
-        label: c.kind === "refund" ? "Credit refunded" : c.kind === "fee" ? "Cancellation fee" : "Customer credit",
-        recordedBy: c.recordedBy.name,
-        removed: c.voidedAt ? { at: c.voidedAt, reason: c.voidReason } : null,
+        customerId: x.movement.partyId,
+        orderId: x.orderId,
+        partId: x.later && x.target === "order" ? x.id : null,
+        label: x.target === "fee" ? "Cancellation fee" : !x.later ? `Kept from cancelled ${x.order?.refNo ?? ""} as credit` : `Paid from the customer's credit for ${x.order?.refNo ?? ""}`,
+        recordedBy: x.recordedBy.name,
+        settles: x.later && x.orderId ? await this.settlesOfPayment(x.id, x.orderId) : null,
+        removed: x.later && x.voidedAt ? { at: x.voidedAt, reason: x.voidReason } : null,
       };
     }
     if (type === "factory_payment") {
@@ -502,9 +502,9 @@ export class LedgerService {
   private async settlesOfPayment(paymentId: string, orderId: string) {
     const db = this.prisma.db;
     const [payments, plans] = await Promise.all([
-      db.payment.findMany({
-        where: { orderId, voidedAt: null },
-        orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
+      db.allocation.findMany({
+        where: { orderId, ...livePart },
+        orderBy: [{ on: "asc" }, { createdAt: "asc" }],
         select: { id: true, amount: true, bankCharges: true },
       }),
       livePlansOf(db, [orderId]),
@@ -847,7 +847,7 @@ export class LedgerService {
           mainCurrency: true,
           mainRate: true,
           customer: { select: { id: true, name: true } },
-          payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true, voidedAt: true } },
+          allocations: { where: livePart, select: { amount: true, bankCharges: true, voidedAt: true } },
           planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
           expenses: chargedExpenses,
         },

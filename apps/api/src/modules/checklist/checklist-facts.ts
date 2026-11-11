@@ -1,4 +1,4 @@
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
 import { routeFromQuotation, type ChecklistFacts } from "@kebo/shared";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
@@ -9,10 +9,10 @@ import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
 export const checklistOrderInclude = {
-  payments: {
-    where: { voidedAt: null },
-    orderBy: { paidOn: "asc" },
-    select: { amount: true, bankCharges: true, paidOn: true },
+  allocations: {
+    where: livePart,
+    orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+    select: { amount: true, bankCharges: true, on: true },
   },
   bankContract: true,
   planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
@@ -33,11 +33,11 @@ export const checklistOrderInclude = {
 export type ChecklistOrderRow = Prisma.OrderGetPayload<{ include: typeof checklistOrderInclude }>;
 
 /** The first payment date by which the money (with the bank charges) reached `targetMinor` (payments in date order). */
-export function reachedOn(payments: readonly { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; paidOn: Date }[], targetMinor: number): ISODate | null {
+export function reachedOn(payments: readonly { amount: Prisma.Decimal; bankCharges: Prisma.Decimal; on: Date }[], targetMinor: number): ISODate | null {
   let sum = 0;
   for (const p of payments) {
     sum += decimalToMinor(p.amount) + decimalToMinor(p.bankCharges);
-    if (sum >= targetMinor) return fromDbDate(p.paidOn);
+    if (sum >= targetMinor) return fromDbDate(p.on);
   }
   return null;
 }
@@ -74,10 +74,10 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
       : null,
     depositPercent: percent,
     depositIn,
-    depositOn: depositIn && deposit > 0 ? reachedOn(o.payments, deposit) : null,
+    depositOn: depositIn && deposit > 0 ? reachedOn(o.allocations, deposit) : null,
     deposit: fromMinor(deposit),
     due: fromMinor(position.dueMinor),
-    paidInFullOn: position.dueMinor === 0 ? reachedOn(o.payments, position.owedMinor) : null,
+    paidInFullOn: position.dueMinor === 0 ? reachedOn(o.allocations, position.owedMinor) : null,
     factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
     factoryOrderNo: o.factoryOrderNo,
     factories,

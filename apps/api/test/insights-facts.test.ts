@@ -217,7 +217,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
     it("a payment, and its void", async () => {
       const p = (await api(app, manager).post(`/orders/${o.orderId}/payments`, { kind: "deposit", amount: 2000, currency: "USD", paidOn: today }).expect(201)).body;
       expect(await row(o.orderId)).toMatchObject({ received: "3000.00", due: "7000.00" });
-      const id = p.id ?? p.payment?.id ?? (await db().payment.findFirstOrThrow({ where: { orderId: o.orderId, amount: 2000 } })).id;
+      const id = p.id ?? p.payment?.id ?? (await db().allocation.findFirstOrThrow({ where: { orderId: o.orderId, amount: 2000 } })).id;
       await api(app, manager).post(`/payments/${id}/void`, { reason: "Entered twice" }).expect(200);
       expect(await row(o.orderId)).toMatchObject({ received: "1000.00", due: "9000.00" });
     });

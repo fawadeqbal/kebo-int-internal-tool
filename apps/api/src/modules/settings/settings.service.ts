@@ -50,7 +50,7 @@ export class SettingsService {
     const db = this.prisma.db;
     const [orders, payments, factoryPayments, expenses] = await Promise.all([
       db.order.count({ take: 1 }),
-      db.payment.count({ take: 1 }),
+      db.moneyMovement.count({ take: 1 }),
       db.factoryPayment.count({ take: 1 }),
       db.expense.count({ take: 1 }),
     ]);

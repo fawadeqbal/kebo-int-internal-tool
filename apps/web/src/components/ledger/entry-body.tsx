@@ -7,11 +7,14 @@ import { amount, TypeBadge } from "./ledger-parts";
 /** Where a posting's document is in the app. */
 export function sourceHref(s: LedgerEntry["source"]): { href: string; label: string } | null {
   switch (s.type) {
-    case "payment":
-      return s.orderId ? { href: `/orders/${s.orderId}/payment`, label: "Open the payment" } : null;
-    case "receipt":
-    case "credit":
-      return s.customerId ? { href: `/customers/${s.customerId}`, label: "Open the customer's money" } : null;
+    // A customer's payment entry, or what it paid later from their credit: the order it pays, else the customer.
+    case "movement":
+    case "allocation":
+      return s.orderId
+        ? { href: `/orders/${s.orderId}/payment`, label: "Open the payment" }
+        : s.customerId
+          ? { href: `/customers/${s.customerId}`, label: "Open the customer's money" }
+          : null;
     case "factory_payment":
       return s.orderId ? { href: `/orders/${s.orderId}/money`, label: "Open the factory payment" } : null;
     case "expense":
@@ -44,8 +47,8 @@ export function EntryBody({ e, main, back }: { e: LedgerEntry; main: string; bac
   const cur = e.rows[0]?.currency ?? main;
   const src = sourceHref(e.source);
   const receipt =
-    e.source.type === "payment" && e.source.orderId
-      ? `/print/orders/${e.source.orderId}/payment-receipt?ref=${e.source.id}&back=${encodeURIComponent(back)}`
+    e.source.partId && e.source.orderId
+      ? `/print/orders/${e.source.orderId}/payment-receipt?ref=${e.source.partId}&back=${encodeURIComponent(back)}`
       : null;
   const details: [string, React.ReactNode][] = [
     ["Type", <TypeBadge key="t" type={e.type} />],

@@ -12,6 +12,7 @@ import { nextReference } from "./counters";
 import { freezeOrderBuyer, freezeOrderMoney } from "./order-freeze";
 import { toDbDate } from "./convert";
 import { newCustomer, newSupplier } from "./parties";
+import { createPaymentIn } from "./allocations";
 
 /** A company connection (or a transaction on one). */
 export type SeedDb = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
@@ -482,36 +483,28 @@ export async function seedDemoData(
     }
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     if (o.order.paid !== "none") {
-      await db.payment.create({
-        data: {
-          kind: "deposit",
-          orderId: order.id,
-          customerId: customer.id,
-          amount: fromMinor(deposit - 2500),
-          bankCharges: "25.00",
-          currency: "USD",
-          receivedAmount: fromMinor(deposit - 2500),
-          receivedCurrency: "USD",
-          paidOn: toDbDate(addDays(orderedOn, 4)),
-          reference: "TT-DEMO-1",
-          recordedById: people.manager.id,
-        },
+      await createPaymentIn(db, {
+        kind: "deposit",
+        orderId: order.id,
+        partyId: customer.id,
+        amount: fromMinor(deposit - 2500),
+        bankCharges: "25.00",
+        currency: "USD",
+        paidOn: toDbDate(addDays(orderedOn, 4)),
+        reference: "TT-DEMO-1",
+        recordedById: people.manager.id,
       });
     }
     if (o.order.paid === "full") {
-      await db.payment.create({
-        data: {
-          kind: "balance",
-          orderId: order.id,
-          customerId: customer.id,
-          amount: fromMinor(balance),
-          currency: "USD",
-          receivedAmount: fromMinor(balance),
-          receivedCurrency: "USD",
-          paidOn: toDbDate(addDays(shippedOn ?? orderedOn, 3)),
-          reference: "TT-DEMO-2",
-          recordedById: people.manager.id,
-        },
+      await createPaymentIn(db, {
+        kind: "balance",
+        orderId: order.id,
+        partyId: customer.id,
+        amount: fromMinor(balance),
+        currency: "USD",
+        paidOn: toDbDate(addDays(shippedOn ?? orderedOn, 3)),
+        reference: "TT-DEMO-2",
+        recordedById: people.manager.id,
       });
     }
   }
@@ -713,7 +706,7 @@ export async function seedDemoData(
   await db.moneyAccount.create({
     data: { name: "Office cash PKR", kind: "cash", currency: "PKR", openingBalance: "150000.00", openingOn: opened },
   });
-  await db.payment.updateMany({ where: { currency: "USD" }, data: { accountId: usd.id } });
+  await db.moneyMovement.updateMany({ where: { currency: "USD" }, data: { accountId: usd.id } });
   await db.factoryPayment.updateMany({ where: { currency: "CNY" }, data: { accountId: cny.id } });
   await db.expense.updateMany({
     where: { currency: "CNY", category: { in: ["rent", "utilities", "inland_transport", "travel"] } },

@@ -12,7 +12,7 @@ import { StorageService } from "../common/storage/storage.service";
 /** Every column that holds the storage key of a company file. */
 const FILE_COLUMNS = [
   { table: "attachments", key: "storage_key", name: "file_name" },
-  { table: "payments", key: "file_key", name: "file_name" },
+  { table: "money_movements", key: "file_key", name: "file_name" },
   { table: "factory_payments", key: "file_key", name: "file_name" },
   { table: "expenses", key: "receipt_key", name: "receipt_name" },
   { table: "money_submissions", key: "file_key", name: "file_name" },
@@ -207,7 +207,7 @@ export class CompanyDataService {
       db.$queryRaw<{ company_id: string; bytes: bigint }[]>`
         select company_id, sum(b)::bigint as bytes from (
           select company_id, size::bigint as b from attachments
-          union all select company_id, file_size::bigint from payments where file_size is not null
+          union all select company_id, file_size::bigint from money_movements where file_size is not null
           union all select company_id, file_size::bigint from factory_payments where file_size is not null
           union all select company_id, receipt_size::bigint from expenses where receipt_size is not null
           union all select company_id, file_size::bigint from money_submissions where file_size is not null) f group by 1`,

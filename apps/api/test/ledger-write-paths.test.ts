@@ -3,13 +3,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Every write of money (payments, transfers over several orders, credit, factory payments, expenses, transfers
+ * Every write of money (customer payment entries and what they pay, factory payments, expenses, transfers
  * between accounts, money accounts, orders made) posts to the ledger in the same method: a new write path that
- * does not fails here. Writes that touch only a file (a proof, a receipt, its name) are listed with why.
+ * does not fails here. The customer-money functions (treasury/customer-money.ts) are called inside such methods. Writes that touch only a file (a proof, a receipt, its name) are listed with why.
  */
 const SRC = path.join(__dirname, "../src");
 const MONEY =
-  /\b(?:tx|db|this\.prisma\.db)\.(payment|factoryPayment|expense|moneyTransfer|customerReceipt|customerCredit|moneyAccount|order)\.(create|createMany|update|updateMany|upsert|delete|deleteMany)\(/;
+  /\b(?:tx|db|this\.prisma\.db)\.(moneyMovement|allocation|factoryPayment|expense|moneyTransfer|moneyAccount|order)\.(create|createMany|update|updateMany|upsert|delete|deleteMany)\(/;
 const METHOD = /^ {2}(?:(?:async|private|protected|public|static)\s+)*([A-Za-z0-9_]+)\s*(?:<[^>]*>)?\(/;
 
 /** file:method → why it posts nothing. */

@@ -520,9 +520,10 @@ export class ApprovalsService {
           now.fileKey && createdId
             ? { key: now.fileKey, name: now.fileName ?? "file", type: now.fileType ?? "application/octet-stream", size: now.fileSize ?? 0 }
             : null;
+        // Money in keeps its proof on its payment entry (createdId: the payment on the order, or the entry).
         if (file && kind === "payment")
-          await tx.payment.update({
-            where: { id: createdId! },
+          await tx.moneyMovement.update({
+            where: { id: (await tx.allocation.findUnique({ where: { id: createdId! }, select: { movementId: true } }))?.movementId ?? createdId! },
             data: { fileKey: file.key, fileName: file.name, fileType: file.type, fileSize: file.size },
           });
         if (file && kind === "expense")

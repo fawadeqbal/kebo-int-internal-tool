@@ -75,6 +75,8 @@ export interface LedgerEntry {
     factoryId: string | null;
     userId: string | null;
     label: string;
+    /** The payment on an order it is (its receipt prints from it). */
+    partId?: string | null;
     file: { kind: "payment" | "factory_payment" | "expense"; id: string; name: string } | null;
     recordedBy: string | null;
     approvedBy: string | null;

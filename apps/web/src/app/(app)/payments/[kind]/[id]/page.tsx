@@ -162,7 +162,8 @@ async function recordTools(me: Me, p: PaymentView): Promise<{ change: ReactNode;
   const today = todayIn(TZ);
   if (p.kind === "customer") {
     const [pays, o] = await Promise.all([orderPaymentsOf(p.orderId), orderOf(p.orderId)]);
-    const x = pays.payments.find((y) => y.id === p.id);
+    // The payment on the order this entry is (it pays that one order in full).
+    const x = pays.payments.find((y) => y.id === p.partId);
     if (!x) return none;
     const records = can(me, "payments.record");
     return {

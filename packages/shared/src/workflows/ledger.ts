@@ -40,9 +40,10 @@ export const LEDGER_ENTRY_TYPE_LABEL: Record<LedgerEntryType, string> = {
 export const LEDGER_SOURCES = [
   "order",
   "purchase_order",
-  "payment",
-  "receipt",
-  "credit",
+  /** Money in or out with a customer (a payment entry): into or out of an account, off their orders, the rest their credit. */
+  "movement",
+  /** What a payment entry pays later, from the customer's credit: an order, a fee; or its order cancelled (released). */
+  "allocation",
   "factory_payment",
   "expense",
   "transfer",

@@ -273,7 +273,7 @@ describe("plans follow the dates", () => {
     await pay(deposit / 2);
     await pay(100);
     await pay(50, "other");
-    const kinds = (await prisma.platform.payment.findMany({ where: { orderId: o.id }, orderBy: { createdAt: "asc" }, select: { kind: true } })).map((x) => x.kind);
+    const kinds = (await prisma.platform.allocation.findMany({ where: { orderId: o.id }, orderBy: { createdAt: "asc" }, select: { kind: true } })).map((x) => x.kind);
     expect(kinds).toEqual(["deposit", "deposit", "balance", "other"]);
   });
 });

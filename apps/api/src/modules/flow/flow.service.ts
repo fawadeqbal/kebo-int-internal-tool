@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { livePart, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
 import {
   bankStepsFor,
   BANK_STEP_LABEL,
@@ -238,7 +238,7 @@ export class FlowService {
     const o = await this.prisma.db.order.findFirst({
       where: { id, ...orderAccess(user) },
       include: {
-        payments: { where: { voidedAt: null } },
+        allocations: { where: livePart },
         bankContract: true,
         planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
         expenses: chargedExpenses,
@@ -293,7 +293,7 @@ export class FlowService {
         reference: s?.reference ?? null,
         note: s?.note ?? null,
         /** "Money reached us": the payment that recorded it (the step is ticked by recording it). */
-        paymentId: s?.paymentId ?? null,
+        paymentId: s?.allocationId ?? null,
       };
     });
 
@@ -518,7 +518,7 @@ export class FlowService {
         depositPercent: true,
         mainCurrency: true,
         mainRate: true,
-        payments: { where: { voidedAt: null }, select: { amount: true, bankCharges: true } },
+        allocations: { where: livePart, select: { amount: true, bankCharges: true } },
         planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         expenses: chargedExpenses,
         checklist: { where: productionWhere, select: { doneAt: true, skippedAt: true } },
@@ -1037,7 +1037,7 @@ export class FlowService {
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       const row = await tx.orderBankStep.findFirst({ where: { orderId: id, step } });
-      if (row?.paymentId) throw new DomainError("This step was ticked by a payment. Remove the payment to undo it.");
+      if (row?.allocationId) throw new DomainError("This step was ticked by a payment. Remove the payment to undo it.");
       const n = await tx.orderBankStep.deleteMany({ where: { orderId: id, step } });
       if (n.count) await this.log(tx, user, id, "bank_step", `${o.refNo}: ${BANK_STEP_LABEL[step]} undone`, { step }, undefined);
     });

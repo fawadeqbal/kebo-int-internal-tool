@@ -214,7 +214,9 @@ describe("the ledger", () => {
         .expect(201)
     ).body;
     const id = paid.createdId as string;
-    let rows = await rowsOf("payment", id);
+    // Posted by its payment entry (the money in); changed and removed as the payment on the order.
+    const entry = (await db().allocation.findUniqueOrThrow({ where: { id } })).movementId;
+    let rows = await rowsOf("movement", entry);
     expect(rows.map((r) => [r.type, r.account, n(r.debit), n(r.credit)])).toEqual([
       ["money_in", `money:${usdAccount}`, 1000, 0],
       ["money_in", "bank_charges", 15, 0],
@@ -236,7 +238,7 @@ describe("the ledger", () => {
         reason: "Typed 1,000 for 1,200",
       })
       .expect(200);
-    rows = await rowsOf("payment", id);
+    rows = await rowsOf("movement", entry);
     const reversal = rows.filter((r) => r.reversesId);
     expect(reversal).toHaveLength(3);
     expect(reversal.every((r) => r.type === "correction" && r.reason === "Typed 1,000 for 1,200")).toBe(true);
@@ -259,10 +261,10 @@ describe("the ledger", () => {
         reason: "Same again",
       })
       .expect(200);
-    expect(await rowsOf("payment", id)).toHaveLength(before);
+    expect(await rowsOf("movement", entry)).toHaveLength(before);
 
     await api(app, manager).post(`/payments/${id}/void`, { reason: "Wrong order" }).expect(200);
-    rows = await rowsOf("payment", id);
+    rows = await rowsOf("movement", entry);
     expect(rows.filter((r) => r.reversesId && r.reason === "Wrong order")).toHaveLength(3);
     expect(rows.filter((r) => !r.reversesId && !rows.some((x) => x.reversesId === r.id))).toHaveLength(0);
     const o = await db().order.findUniqueOrThrow({ where: { id: orderId } });
@@ -286,23 +288,24 @@ describe("the ledger", () => {
         ],
       })
       .expect(201);
-    const receipt = await db().customerReceipt.findFirstOrThrow({ where: { customerId }, orderBy: { createdAt: "desc" } });
-    const rows = await rowsOf("receipt", receipt.id);
+    const receipt = await db().moneyMovement.findFirstOrThrow({ where: { partyId: customerId }, orderBy: { createdAt: "desc" } });
+    const rows = await rowsOf("movement", receipt.id);
     expect(rows.map((r) => [r.account, n(r.debit), n(r.credit), r.orderId])).toEqual([
       [`money:${usdAccount}`, 5000, 0, null],
       [`customer:${customerId}`, 0, 2000, a],
       [`customer:${customerId}`, 0, 1500, b],
       [`credit:${customerId}`, 0, 1500, null],
     ]);
-    // The payments of a transfer post nothing of their own.
-    for (const p of await db().payment.findMany({ where: { receiptId: receipt.id } })) expect(await rowsOf("payment", p.id)).toEqual([]);
+    // What a transfer pays when it arrives posts nothing of its own.
+    for (const p of await db().allocation.findMany({ where: { movementId: receipt.id } })) expect(await rowsOf("allocation", p.id)).toEqual([]);
     await agrees();
 
     // Credit used on another order: off the credit, off what the customer owes there; no money moved.
     const c = await newOrder(50000);
     await api(app, manager).post(`/orders/${c}/use-credit`, { amount: 500 }).expect(201);
-    const used = await db().payment.findFirstOrThrow({ where: { orderId: c, method: "credit" } });
-    expect((await rowsOf("payment", used.id)).map((r) => [r.type, r.account, n(r.debit), n(r.credit)])).toEqual([
+    const used = await db().allocation.findFirstOrThrow({ where: { orderId: c, later: true } });
+    expect(used.movementId).toBe(receipt.id);
+    expect((await rowsOf("allocation", used.id)).map((r) => [r.type, r.account, n(r.debit), n(r.credit)])).toEqual([
       ["credit", `credit:${customerId}`, 500, 0],
       ["credit", `customer:${customerId}`, 0, 500],
     ]);
@@ -310,8 +313,8 @@ describe("the ledger", () => {
     await api(app, manager)
       .post(`/customers/${customerId}/credit/refund`, { amount: 300, currency: "USD", on: today, accountId: usdAccount })
       .expect(201);
-    const refund = await db().customerCredit.findFirstOrThrow({ where: { customerId, kind: "refund" }, orderBy: { createdAt: "desc" } });
-    const r1 = await rowsOf("credit", refund.id);
+    const refund = await db().moneyMovement.findFirstOrThrow({ where: { partyId: customerId, direction: "out" }, orderBy: { createdAt: "desc" } });
+    const r1 = await rowsOf("movement", refund.id);
     expect(r1.map((r) => [r.type, r.account, n(r.debit), n(r.credit)])).toEqual([
       ["money_out", `credit:${customerId}`, 300, 0],
       ["money_out", `money:${usdAccount}`, 0, 300],
@@ -319,7 +322,7 @@ describe("the ledger", () => {
     expect(r1[0]!.ref).toMatch(/^CR-\d{4}-\d{4}$/);
     await agrees();
     await api(app, admin).post(`/customer-credits/${refund.id}/void`, { reason: "Not sent yet" }).expect(200);
-    expect((await rowsOf("credit", refund.id)).filter((r) => r.reversesId)).toHaveLength(2);
+    expect((await rowsOf("movement", refund.id)).filter((r) => r.reversesId)).toHaveLength(2);
     await agrees();
 
     // A transfer removed: all of it reversed at once (its payment and its credit too).
@@ -333,10 +336,10 @@ describe("the ledger", () => {
         parts: [{ orderId: c, amount: 100 }],
       })
       .expect(201);
-    const second = await db().customerReceipt.findFirstOrThrow({ where: { customerId }, orderBy: { createdAt: "desc" } });
-    expect(await rowsOf("receipt", second.id)).toHaveLength(3);
+    const second = await db().moneyMovement.findFirstOrThrow({ where: { partyId: customerId }, orderBy: { createdAt: "desc" } });
+    expect(await rowsOf("movement", second.id)).toHaveLength(3);
     await api(app, admin).post(`/customer-receipts/${second.id}/void`, { reason: "Bounced" }).expect(200);
-    const gone = await rowsOf("receipt", second.id);
+    const gone = await rowsOf("movement", second.id);
     expect(gone.filter((r) => r.reversesId && r.reason === "Bounced")).toHaveLength(3);
     await agrees();
   });
@@ -582,8 +585,9 @@ describe("the ledger", () => {
     expect(order.filter((r) => r.reversesId).map((r) => r.reason)).toEqual(["Customer called it off", "Customer called it off"]);
     const po = await rowsOf("purchase_order", `${orderId}:${factoryId}`);
     expect(po.filter((r) => r.reversesId)).toHaveLength(2);
-    const kept = await db().customerCredit.findFirstOrThrow({ where: { orderId, kind: "in" } });
-    expect((await rowsOf("credit", kept.id)).map((r) => [r.account, n(r.debit), n(r.credit)])).toEqual([
+    // What paid it is released (the transfer stands): back off the order, onto the customer's credit.
+    const kept = await db().allocation.findFirstOrThrow({ where: { orderId, target: "order", voidedAt: { not: null } } });
+    expect((await rowsOf("allocation", kept.id)).map((r) => [r.account, n(r.debit), n(r.credit)])).toEqual([
       [`customer:${customerId}`, 3000, 0],
       [`credit:${customerId}`, 0, 3000],
     ]);
@@ -599,16 +603,16 @@ describe("the ledger", () => {
 
   it("approvals: money sent for approval posts nothing until it is approved", async () => {
     const orderId = await newOrder(10000);
-    const before = await db().ledgerEntry.count({ where: { orderId, sourceType: "payment" } });
+    const before = await db().ledgerEntry.count({ where: { orderId, sourceType: "movement" } });
     const sent = (
       await api(app, sana)
         .post("/submissions", { kind: "payment", orderId, body: { amount: 250, currency: "USD", paidOn: today } })
         .expect(201)
     ).body;
-    expect(await db().ledgerEntry.count({ where: { orderId, sourceType: "payment" } })).toBe(before);
+    expect(await db().ledgerEntry.count({ where: { orderId, sourceType: "movement" } })).toBe(before);
     await api(app, manager).post(`/submissions/${sent.id}/approve`, {}).expect(200);
-    const p = await db().payment.findFirstOrThrow({ where: { orderId }, orderBy: { createdAt: "desc" } });
-    const rows = await rowsOf("payment", p.id);
+    const p = await db().allocation.findFirstOrThrow({ where: { orderId }, orderBy: { createdAt: "desc" } });
+    const rows = await rowsOf("movement", p.movementId);
     expect(rows.map((r) => n(r.debit) + n(r.credit))).toEqual([250, 250]);
     const entry = (await api(app, manager).get(`/ledger/entries/${rows[0]!.id}`).expect(200)).body;
     expect(entry.source.approvedBy).toBeTruthy();
@@ -686,7 +690,7 @@ describe("the ledger", () => {
     expect(list.totals.balanced).toBe(true);
     const payment = list.rows.find(
       (r: { type: string; removed: unknown; source: { type: string } }) =>
-        r.type === "money_in" && !r.removed && r.source.type === "payment",
+        r.type === "money_in" && !r.removed && r.source.type === "movement",
     );
     expect(payment.counter.label).toBeTruthy();
     expect(payment.with).toMatchObject({ kind: "customer", id: customerId });

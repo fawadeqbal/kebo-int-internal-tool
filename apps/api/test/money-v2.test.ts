@@ -114,7 +114,9 @@ describe("money v2", () => {
     expect((await payments(id)).payments.at(-1)).toMatchObject({ amount: "5357.14", rate: 280 });
     // The cash book has what really arrived, in the account's currency.
     const book = (await api(app, manager).get(`/money/cash-book?from=${today}&to=${today}&account=${pkr}`).expect(200)).body;
-    expect(book.rows.find((r: { id: string }) => r.id === paid.createdId)).toMatchObject({ amount: "1500000.00", currency: "PKR" });
+    // One row per payment entry (the transfer), whatever it pays.
+    const entry = (await prisma.platform.allocation.findUniqueOrThrow({ where: { id: paid.createdId } })).movementId;
+    expect(book.rows.find((r: { id: string }) => r.id === entry)).toMatchObject({ amount: "1500000.00", currency: "PKR" });
     expect(book.closing).toBe("1500000.00");
     // No rate given: Settings' rate (PKR 300 per USD now): PKR 3,000 → USD 10.00.
     const viaSettings = (await api(app, manager).post(`/orders/${id}/payments`, { kind: "balance", currency: "USD", receivedAmount: 3000, receivedCurrency: "PKR", paidOn: today }).expect(201)).body;
@@ -412,7 +414,7 @@ describe("money v2", () => {
     await api(app, bilal).get(`/orders/${id}/payments`).expect(404);
     await api(app, bilal).post(`/orders/${id}/use-credit`, { amount: 1 }).expect(403);
     await api(app, bilal).put(`/orders/${id}/factory-plan`, { factoryId, items: [{ label: "All", amount: 1, dueRule: "on_order" }] }).expect(404);
-    for (const t of ["customer_receipts", "customer_credits", "factory_payment_plans"]) {
+    for (const t of ["money_movements", "allocations", "factory_payment_plans"]) {
       const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean }[]>(`select relrowsecurity as rls from pg_class where relname = $1`, t);
       expect(row, t).toMatchObject({ rls: true });
     }

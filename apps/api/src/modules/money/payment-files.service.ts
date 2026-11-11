@@ -15,8 +15,10 @@ export type PaymentSide = "in" | "out";
 const EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "webp", "gif", "heic"]);
 
 type Row = {
+  /** The row the file is kept on: money in, its payment entry; money out, the factory payment. */
   id: string;
-  orderId: string;
+  /** The order it pays (money in that only became credit: none). */
+  orderId: string | null;
   fileKey: string | null;
   fileName: string | null;
   fileType: string | null;
@@ -27,6 +29,8 @@ type Row = {
 /**
  * A photo or PDF kept with a payment as proof: the bank slip, a transfer
  * screenshot, the factory's receipt. One per payment; a new one replaces it.
+ * Money in keeps it on its payment entry (the transfer): asked for by the
+ * payment on the order (its allocation) or by the entry itself.
  * Those who record payments add and remove it; whoever can see the payment
  * can open it (factory payments: those who see costs).
  */
@@ -40,18 +44,25 @@ export class PaymentFilesService {
   ) {}
 
   private async find(side: PaymentSide, id: string): Promise<Row> {
-    const row =
-      side === "in"
-        ? await this.prisma.db.payment.findUnique({ where: { id } })
-        : await this.prisma.db.factoryPayment.findUnique({ where: { id } });
-    if (!row) throw new NotFoundError("Payment");
-    return row;
+    if (side === "out") {
+      const row = await this.prisma.db.factoryPayment.findUnique({ where: { id } });
+      if (!row) throw new NotFoundError("Payment");
+      return row;
+    }
+    const part = await this.prisma.db.allocation.findUnique({ where: { id }, select: { movementId: true, orderId: true } });
+    const m = await this.prisma.db.moneyMovement.findUnique({
+      where: { id: part?.movementId ?? id },
+      include: { allocations: { where: { orderId: { not: null } }, select: { orderId: true }, take: 1 } },
+    });
+    if (!m) throw new NotFoundError("Payment");
+    return { ...m, orderId: part?.orderId ?? m.allocations[0]?.orderId ?? null };
   }
 
   /** Can this person see the payment? (Throws as if it were not there.) */
   private async canSee(user: SessionUser, side: PaymentSide, row: Row) {
     if (side === "out" && !can(user, "sourcing.manage")) throw new NotFoundError("Payment");
-    await this.orders.load(user, row.orderId);
+    if (row.orderId) await this.orders.load(user, row.orderId);
+    else if (!can(user, "payments.record") && !can(user, "ledger.view")) throw new NotFoundError("Payment");
   }
 
   private async canChange(user: SessionUser, side: PaymentSide, id: string) {
@@ -68,7 +79,7 @@ export class PaymentFilesService {
     data: { fileKey: string | null; fileName: string | null; fileType: string | null; fileSize: number | null },
     tx: Tx,
   ) {
-    return side === "in" ? tx.payment.update({ where: { id }, data }) : tx.factoryPayment.update({ where: { id }, data });
+    return side === "in" ? tx.moneyMovement.update({ where: { id }, data }) : tx.factoryPayment.update({ where: { id }, data });
   }
 
   async attach(
@@ -86,20 +97,20 @@ export class PaymentFilesService {
     const key = this.storage.keyFor(`payments/${side}/${id}/${randomUUID()}-${name}`);
     await this.storage.put(key, file.buffer, file.mimetype);
     try {
-      const o = await this.orders.load(user, row.orderId);
+      const ref = row.orderId ? (await this.orders.load(user, row.orderId)).refNo : "Credit";
       await this.prisma.tx(async (tx) => {
         await this.update(
           side,
-          id,
+          row.id,
           { fileKey: key, fileName: name, fileType: file.mimetype || "application/octet-stream", fileSize: file.size },
           tx,
         );
         await this.audit.record(tx, {
           userId: user.id,
           action: "payment_file",
-          entityType: "order",
-          entityId: row.orderId,
-          summary: `${o.refNo}: ${row.fileKey ? "replaced" : "added"} the proof of a payment ${side === "in" ? "from the customer" : "to a factory"} (${name})`,
+          entityType: row.orderId ? "order" : "payment",
+          entityId: row.orderId ?? row.id,
+          summary: `${ref}: ${row.fileKey ? "replaced" : "added"} the proof of a payment ${side === "in" ? "from the customer" : "to a factory"} (${name})`,
         });
       });
     } catch (error) {
@@ -129,15 +140,15 @@ export class PaymentFilesService {
   async remove(user: SessionUser, side: PaymentSide, id: string) {
     const row = await this.canChange(user, side, id);
     if (!row.fileKey) return { ok: true };
-    const o = await this.orders.load(user, row.orderId);
+    const ref = row.orderId ? (await this.orders.load(user, row.orderId)).refNo : "Credit";
     await this.prisma.tx(async (tx) => {
-      await this.update(side, id, { fileKey: null, fileName: null, fileType: null, fileSize: null }, tx);
+      await this.update(side, row.id, { fileKey: null, fileName: null, fileType: null, fileSize: null }, tx);
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_file",
-        entityType: "order",
-        entityId: row.orderId,
-        summary: `${o.refNo}: removed the proof of a payment ${side === "in" ? "from the customer" : "to a factory"} (${row.fileName})`,
+        entityType: row.orderId ? "order" : "payment",
+        entityId: row.orderId ?? row.id,
+        summary: `${ref}: removed the proof of a payment ${side === "in" ? "from the customer" : "to a factory"} (${row.fileName})`,
       });
     });
     await this.storage.delete(row.fileKey).catch(() => undefined);

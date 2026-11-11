@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { asPayment, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
 import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../money/position";
 import {
@@ -200,7 +200,7 @@ export class PapersService {
       where: { customerId, status: { not: "cancelled" }, ...orderAccess(user) },
       orderBy: { orderedOn: "asc" },
       include: {
-        payments: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
+        allocations: livePartsWithEntry,
         planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         expenses: chargedExpenses,
       },
@@ -222,7 +222,7 @@ export class PapersService {
       }),
       payments: rows
         .flatMap((o) =>
-          o.payments.map((p) => ({ paidOn: fromDbDate(p.paidOn), refNo: o.refNo, amount: p.amount.toFixed(2), currency: p.currency })),
+          o.allocations.map(asPayment).map((p) => ({ paidOn: fromDbDate(p.paidOn), refNo: o.refNo, amount: p.amount.toFixed(2), currency: p.currency })),
         )
         .sort((a, b) => a.paidOn.localeCompare(b.paidOn)),
     };
@@ -502,7 +502,7 @@ export class PapersService {
       if (!used(kind) && LIVE_PAPERS.includes(kind)) continue;
       const base = { kind, source: "app" as const, step: PAPER_STEP[kind], printable: true, live: LIVE_PAPERS.includes(kind) };
       if (kind === "payment-receipt") {
-        o.payments.forEach((p, i) =>
+        o.allocations.map(asPayment).forEach((p, i) =>
           out.push(
             row({
               ...base,
