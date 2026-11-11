@@ -464,7 +464,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   await tx.contact.createMany({
     data: old.customers.map((c) => ({
       id: contactOf.get(c.id)!,
-      customerId: c.id,
+      partyId: c.id,
       name: c.contact_person,
       email: c.email,
       phone: c.phone,
@@ -488,10 +488,6 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     data: old.suppliers.map((s) => ({
       id: s.id,
       name: s.name,
-      contactPerson: s.contact_person,
-      phone: s.phone,
-      wechat: s.wechat,
-      email: s.email,
       address: s.address,
       bankDetails: s.bank_details,
       notes: s.notes,
@@ -502,6 +498,12 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     })),
   });
   await tx.partyRole.createMany({ data: roleRows("supplier", old.suppliers) });
+  // A supplier's main contact (contacts for every party): its person, or its name when only a number was kept.
+  await tx.contact.createMany({
+    data: old.suppliers
+      .filter((s) => s.contact_person?.trim() || s.phone || s.wechat || s.email)
+      .map((s) => ({ partyId: s.id, name: s.contact_person?.trim() || s.name, phone: s.phone, wechat: s.wechat, email: s.email, isPrimary: true })),
+  });
 
   /* ---- what each deal became */
   const versionsOf = groupBy(old.quotations, (q) => q.query_id);
@@ -935,8 +937,16 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         incoterm: d.incoterm.incoterm,
         incotermPlace: d.incoterm.place,
         closedAt: status === "closed" ? (d.q.completed_at ?? now) : null,
-        cancelledAt: status === "cancelled" ? (d.q.completed_at ?? d.q.updated_at) : null,
-        cancelReason: status === "cancelled" ? (d.q.status_reason ?? "Closed as not completed in the old app.") : null,
+        ...(status === "cancelled"
+          ? {
+              cancellation: {
+                create: {
+                  cancelledAt: d.q.completed_at ?? d.q.updated_at,
+                  reason: d.q.status_reason ?? "Closed as not completed in the old app.",
+                },
+              },
+            }
+          : {}),
         createdById: rev.created_by,
         createdAt: toDbDate(d.orderedOn!),
         // Shipped: its shipment (the ship date lives there), with the ports the terms give.

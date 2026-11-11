@@ -60,6 +60,8 @@
   "notifications -> notes",
   "notifications -> orders",
   "notifications -> settings",
+  "operations -> billing",
+  "operations -> settings",
   "orders -> billing",
   "orders -> inquiries",
   "orders -> ledger",

@@ -122,16 +122,9 @@ export class CancelOrderService {
           });
         }
       }
-      await tx.order.update({
-        where: { id },
-        data: {
-          status: "cancelled",
-          cancelledAt: new Date(),
-          cancelReason: reason,
-          cancelCustomerMoney: customerMoney,
-          cancelFactoryMoney: factoryMoney,
-        },
-      });
+      await tx.order.update({ where: { id }, data: { status: "cancelled" } });
+      // Why and how: its own row (order_cancellations), written only here.
+      await tx.orderCancellation.create({ data: { orderId: id, reason, customerMoney, factoryMoney } });
       await tx.quotationRevision.update({ where: { id: o.revisionId }, data: { status: "void" } });
       await this.audit.record(tx, {
         userId: user.id,

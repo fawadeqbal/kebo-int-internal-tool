@@ -346,7 +346,7 @@ model User {
   relTargetUpdater         SalesTarget[]        @relation("TargetUpdater")
   relAuditUser             AuditLog[]           @relation("AuditUser")
   relFactoryRequestCreator FactoryRequest[]     @relation("FactoryRequestCreator")
-  relOrderSatEngineer      Order[]              @relation("OrderSatEngineer")
+  relOrderSatEngineer      OrderDelivery[]      @relation("OrderSatEngineer")
   relPersonTarget          PersonTarget[]       @relation("PersonTargetOwner")
   relPersonTargetUpdater   PersonTarget[]       @relation("PersonTargetUpdater")
   relChecklistAssignee     OrderChecklistItem[] @relation("ChecklistAssignee")
@@ -533,11 +533,6 @@ model Party {
   defaultCurrency String?   @map("default_currency") @db.Char(3)
   /// Short letters for the party on documents, e.g. "TN" in proforma KEB260916TN07. Empty: taken from the name.
   initials        String?   @db.VarChar(6)
-  /// The main contact as typed on a supplier (moves to contacts with the rest of the contacts).
-  contactPerson   String?   @map("contact_person") @db.VarChar(120)
-  phone           String?   @db.VarChar(40)
-  wechat          String?   @db.VarChar(80)
-  email           String?   @db.VarChar(254)
   bankDetails     String?   @map("bank_details")
   notes           String?
   /// The person in our team who looks after this party.
@@ -551,8 +546,9 @@ model Party {
 
   roles PartyRole[]
 
+  /// Its people (customers and suppliers alike); the primary one is the main contact.
+  contacts     Contact[]       @relation("PartyContacts")
   // As a customer
-  contacts     Contact[]       @relation("ContactCustomer")
   inquiries    Inquiry[]       @relation("InquiryCustomer")
   orders       Order[]         @relation("OrderCustomer")
   movements    MoneyMovement[] @relation("MovementParty")
@@ -604,8 +600,9 @@ model Contact {
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId  String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company   @relation(fields: [companyId], references: [id])
-  customerId String    @map("customer_id") @db.Uuid
-  customer   Party     @relation("ContactCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  /// The customer or supplier this person works for (contacts for every party).
+  partyId    String    @map("party_id") @db.Uuid
+  party      Party     @relation("PartyContacts", fields: [partyId], references: [id], onDelete: Cascade)
   name       String    @db.VarChar(120)
   position   String?   @db.VarChar(80)
   email      String?   @db.VarChar(254)
@@ -620,7 +617,7 @@ model Contact {
   inquiries Inquiry[]
   notes     Note[]
 
-  @@index([customerId])
+  @@index([partyId])
   @@index([email])
   @@index([phone])
   @@index([whatsapp])
@@ -1111,37 +1108,13 @@ model Order {
   /// so changing the rates in Settings never moves past months. Empty: not known (Settings is used).
   mainCurrency        String?           @map("main_currency") @db.Char(3)
   mainRate            Decimal?          @map("main_rate") @db.Decimal(24, 14)
-  /// How the customer pays (informal, bank contract, LC); empty until chosen.
-  paymentRoute        PaymentRoute?     @map("payment_route")
-  /// Informal route: the balance before shipment or against the B/L copy (before_shipment | against_bl_copy).
-  balanceWhen         String?           @map("balance_when") @db.VarChar(20)
-  /// LC route: at_sight | deferred, and the deferred days counted from "papers reached their bank".
-  lcTerms             String?           @map("lc_terms") @db.VarChar(10)
-  lcDays              Int?              @map("lc_days")
   /// When we placed the order with the factory.
   factoryOrderedOn    DateTime?         @map("factory_ordered_on") @db.Date
   /// The factory's own number for our order ("their order no.").
   factoryOrderNo      String?           @map("factory_order_no") @db.VarChar(60)
-  /// Delivery at the customer's. The condition the goods arrived in is the goods lines' (worked out: the worst
-  /// of them, @kebo/shared deliveryConditionOf); the order keeps only a note.
-  deliveredOn         DateTime?         @map("delivered_on") @db.Date
-  deliveryNote        String?           @map("delivery_note")
-  /// Who received the goods at the customer's.
-  deliveryReceivedBy  String?           @map("delivery_received_by") @db.VarChar(120)
-  /// The site acceptance test: our engineer, when, and who signed for the customer.
-  satEngineerId       String?           @map("sat_engineer") @db.Uuid
-  satEngineer         User?             @relation("OrderSatEngineer", fields: [satEngineerId], references: [id], onDelete: SetNull)
-  satPlannedOn        DateTime?         @map("sat_planned_on") @db.Date
-  satDoneOn           DateTime?         @map("sat_done_on") @db.Date
-  satSignedBy         String?           @map("sat_signed_by") @db.VarChar(120)
   closedAt            DateTime?         @map("closed_at") @db.Timestamptz
   /// When the company's checklist was copied into the order (null: not yet; it is copied on first read).
   checklistSeededAt   DateTime?         @map("checklist_seeded_at") @db.Timestamptz
-  cancelledAt         DateTime?         @map("cancelled_at") @db.Timestamptz
-  cancelReason        String?           @map("cancel_reason")
-  /// Money received when it was cancelled: credit | refund | fee; money paid to the factory: refund_due | loss.
-  cancelCustomerMoney String?           @map("cancel_customer_money") @db.VarChar(10)
-  cancelFactoryMoney  String?           @map("cancel_factory_money") @db.VarChar(12)
   createdById         String            @map("created_by") @db.Uuid
   createdBy           User              @relation("OrderCreator", fields: [createdById], references: [id])
   createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
@@ -1167,6 +1140,12 @@ model Order {
   /// What its suppliers invoice: each supplier's instalments on the order.
   payables     Invoice[]            @relation("OrderPayables")
   submissions  MoneySubmission[]
+  /// How the customer pays: the payment route and its terms (one row, made with the order).
+  paymentTerms OrderPaymentTerms?
+  /// Delivery and the site acceptance test (one row, once there is something to keep).
+  delivery     OrderDelivery?
+  /// Why and how it was cancelled (one row when it was).
+  cancellation OrderCancellation?
   /// Each factory's ready date (the order's ready date is the latest of them).
   factories    OrderFactory[]
   papers       OrderPaper[]
@@ -1321,6 +1300,77 @@ model FactoryRequest {
 }
 
 /// The bank contract or letter of credit an order is paid on (one per order).
+/// How the customer pays for an order (architecture review §6.6, order_payment_route): the payment route and
+/// its terms, one row per order made with it. The terms accepted on the quotation (deposit %, balance terms)
+/// stay on the order: they are what was sold; this is how it is paid, and it can change.
+model OrderPaymentTerms {
+  id          String        @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company     Company       @relation(fields: [companyId], references: [id])
+  orderId     String        @unique @map("order_id") @db.Uuid
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// informal | bank_contract | letter_of_credit; empty until chosen.
+  route       PaymentRoute?
+  /// Informal route: the balance before shipment or against the B/L copy (before_shipment | against_bl_copy).
+  balanceWhen String?       @map("balance_when") @db.VarChar(20)
+  /// LC route: at_sight | deferred, and the deferred days counted from "papers reached their bank".
+  lcTerms     String?       @map("lc_terms") @db.VarChar(10)
+  lcDays      Int?          @map("lc_days")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([companyId])
+  @@map("order_payment_terms")
+}
+
+/// An order's delivery at the customer's and its site acceptance test (SAT): one row per order, made when
+/// something is first recorded. The condition the goods arrived in is the goods lines' (the worst of them,
+/// @kebo/shared deliveryConditionOf); this keeps only a note.
+model OrderDelivery {
+  id            String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId     String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company       Company   @relation(fields: [companyId], references: [id])
+  orderId       String    @unique @map("order_id") @db.Uuid
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  deliveredOn   DateTime? @map("delivered_on") @db.Date
+  note          String?
+  /// Who received the goods at the customer's.
+  receivedBy    String?   @map("received_by") @db.VarChar(120)
+  /// The site acceptance test: our engineer, when, and who signed for the customer.
+  satEngineerId String?   @map("sat_engineer") @db.Uuid
+  satEngineer   User?     @relation("OrderSatEngineer", fields: [satEngineerId], references: [id], onDelete: SetNull)
+  satPlannedOn  DateTime? @map("sat_planned_on") @db.Date
+  satDoneOn     DateTime? @map("sat_done_on") @db.Date
+  satSignedBy   String?   @map("sat_signed_by") @db.VarChar(120)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([companyId])
+  @@map("order_deliveries")
+}
+
+/// Why and how an order was cancelled (one row; the order's status says cancelled). Written only by the
+/// cancellation command, with the money it released.
+model OrderCancellation {
+  id            String   @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId     String   @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company       Company  @relation(fields: [companyId], references: [id])
+  orderId       String   @unique @map("order_id") @db.Uuid
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cancelledAt   DateTime @default(now()) @map("cancelled_at") @db.Timestamptz
+  reason        String?
+  /// Money received when it was cancelled: credit | refund | fee (null: none had come in).
+  customerMoney String?  @map("customer_money") @db.VarChar(10)
+  /// Money paid to the factory: refund_due | loss (null: none had been paid).
+  factoryMoney  String?  @map("factory_money") @db.VarChar(12)
+
+  @@index([companyId])
+  @@map("order_cancellations")
+}
+
 model OrderBankContract {
   id           String             @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
@@ -2083,6 +2133,9 @@ model Company {
   personTargets       PersonTarget[]
   factoryRequests     FactoryRequest[]
   orderBankContracts  OrderBankContract[]
+  orderDeliveries     OrderDelivery[]
+  orderPaymentTerms   OrderPaymentTerms[]
+  orderCancellations  OrderCancellation[]
   shipments           Shipment[]
   orderDocuments      OrderDocument[]
   orderBankSteps      OrderBankStep[]

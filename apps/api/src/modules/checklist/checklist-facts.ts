@@ -1,4 +1,4 @@
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, type Prisma, routeOf } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
 import { routeFromQuotation, type ChecklistFacts } from "@kebo/shared";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
@@ -9,6 +9,7 @@ import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
 export const checklistOrderInclude = {
+  paymentTerms: true,
   allocations: {
     where: livePart,
     orderBy: [{ on: "asc" }, { createdAt: "asc" }],
@@ -22,6 +23,7 @@ export const checklistOrderInclude = {
   documents: { select: { kind: true, status: true, number: true, issuedOn: true, shipmentId: true } },
   bankSteps: true,
   satChecks: { select: { result: true } },
+  delivery: { select: { deliveredOn: true, satDoneOn: true, satSignedBy: true } },
   claims: { select: { status: true } },
   lines: {
     select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, factoryId: true, factory: { select: { name: true } } },
@@ -61,7 +63,7 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
   const blOf = (shipmentId: string | null) => (ship.list.find((s) => s.id === shipmentId) ?? ship.primary)?.blNo ?? null;
   return {
     currency: o.currency,
-    route: o.paymentRoute,
+    route: routeOf(o),
     shipMode: ship.primary?.mode ?? null,
     bankContract: b
       ? {
@@ -121,9 +123,9 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
       issuedOn: fromDbDateOrNull(d.issuedOn),
     })),
     bankSteps: o.bankSteps.map((s) => ({ step: s.step, doneOn: fromDbDate(s.doneOn), reference: s.reference })),
-    deliveredOn: fromDbDateOrNull(o.deliveredOn),
-    satDoneOn: fromDbDateOrNull(o.satDoneOn),
-    satSignedBy: o.satSignedBy,
+    deliveredOn: fromDbDateOrNull(o.delivery?.deliveredOn),
+    satDoneOn: fromDbDateOrNull(o.delivery?.satDoneOn),
+    satSignedBy: o.delivery?.satSignedBy ?? null,
     claims: { open: o.claims.filter((c) => c.status === "open" || c.status === "with_factory").length, total: o.claims.length },
     closedOn: o.status === "closed" ? (o.closedAt ? dateIn(o.closedAt, timeZone) : fromDbDate(o.orderedOn)) : null,
   };

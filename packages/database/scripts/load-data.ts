@@ -197,7 +197,7 @@ async function main() {
   }
   const contacts = customers.map((c) => ({
     id: randomUUID(),
-    customerId: c.id,
+    partyId: c.id,
     name: pick(BUYERS),
     phone: `+92300${int(1_000_000, 9_999_999)}`,
     isPrimary: true,

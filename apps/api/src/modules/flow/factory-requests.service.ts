@@ -46,7 +46,7 @@ export class FactoryRequestsService {
         include: { factory: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
       }),
       this.prisma.db.factoryQuote.findMany({ where: { inquiryId, deletedAt: null }, select: { id: true, factoryId: true }, orderBy: { createdAt: "asc" } }),
-      this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { id: true, name: true, wechat: true, email: true, phone: true }, orderBy: { name: "asc" }, take: 500 }),
+      this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { id: true, name: true, contacts: { where: { deletedAt: null }, select: { wechat: true, email: true, phone: true } } }, orderBy: { name: "asc" }, take: 500 }),
       this.prisma.db.factoryRequest.groupBy({ by: ["factoryId"], _max: { sentOn: true } }),
       this.prisma.db.factoryQuote.groupBy({ by: ["factoryId"], where: { deletedAt: null }, _count: { _all: true } }),
     ]);
@@ -79,7 +79,8 @@ export class FactoryRequestsService {
       .map((f) => ({
         id: f.id,
         name: f.name,
-        reach: [f.wechat && "WeChat", f.email && "email", f.phone && "phone"].filter(Boolean).join(", ") || null,
+        // How it can be reached: any of its people's WeChat, email or phone.
+        reach: [f.contacts.some((c) => c.wechat) && "WeChat", f.contacts.some((c) => c.email) && "email", f.contacts.some((c) => c.phone) && "phone"].filter(Boolean).join(", ") || null,
         lastAskedOn: last.get(f.id) ?? null,
         offers: offersBy.get(f.id) ?? 0,
         askedHere: asked.has(f.id),

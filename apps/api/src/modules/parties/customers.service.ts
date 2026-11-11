@@ -111,7 +111,7 @@ export class CustomersService {
     if (!emails.length && !numbers.length) return [];
     const rows = await this.prisma.db.$queryRaw<{ id: string; name: string; contact: string }[]>`
       select distinct c.id, c.name, ct.name as contact
-        from contacts ct join parties c on c.id = ct.customer_id
+        from contacts ct join parties c on c.id = ct.party_id
        where ct.deleted_at is null and c.deleted_at is null
          and (${exceptCustomerId ?? null}::uuid is null or c.id <> ${exceptCustomerId ?? null}::uuid)
          and (lower(ct.email) = any(${emails.map((e) => e.toLowerCase())})
@@ -216,12 +216,12 @@ export class CustomersService {
         : input.reason;
     return this.prisma.tx(async (tx) => {
       // Clear the primary flag first so the one-primary index never sees two at once.
-      await tx.contact.updateMany({ where: { customerId: id }, data: { isPrimary: false } });
+      await tx.contact.updateMany({ where: { partyId: id }, data: { isPrimary: false } });
       const keep = input.contacts.map((c) => c.id).filter((cid): cid is string => !!cid && known.has(cid));
-      await tx.contact.updateMany({ where: { customerId: id, deletedAt: null, id: { notIn: keep } }, data: { deletedAt: new Date() } });
+      await tx.contact.updateMany({ where: { partyId: id, deletedAt: null, id: { notIn: keep } }, data: { deletedAt: new Date() } });
       for (const [i, c] of input.contacts.entries()) {
         if (c.id && known.has(c.id)) await tx.contact.update({ where: { id: c.id }, data: rows[i] });
-        else await tx.contact.create({ data: { ...rows[i], customerId: id } });
+        else await tx.contact.create({ data: { ...rows[i], partyId: id } });
       }
       const updated = await tx.party.update({ where: { ...isCustomer, id }, data: this.fields(input), omit: supplierOnly, include: { contacts: { where: { deletedAt: null } } } });
       await this.audit.record(tx, {

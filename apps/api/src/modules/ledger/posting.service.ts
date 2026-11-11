@@ -230,8 +230,7 @@ export class LedgerPosting {
           total: true,
           orderedOn: true,
           status: true,
-          cancelledAt: true,
-          cancelReason: true,
+          cancellation: { select: { cancelledAt: true, reason: true } },
           mainCurrency: true,
           mainRate: true,
           lines: {
@@ -263,7 +262,7 @@ export class LedgerPosting {
         rate: rateOf(o),
         cancelled:
           o.status === "cancelled"
-            ? { on: o.cancelledAt ? this.day(o.cancelledAt) : fromDbDate(o.orderedOn), reason: o.cancelReason }
+            ? { on: o.cancellation ? this.day(o.cancellation.cancelledAt) : fromDbDate(o.orderedOn), reason: o.cancellation?.reason ?? null }
             : null,
       });
       for (const id of ids("order")) {
@@ -460,7 +459,7 @@ export class LedgerPosting {
             select: {
               ...orderSel.select,
               status: true,
-              cancelFactoryMoney: true,
+              cancellation: { select: { factoryMoney: true } },
               lines: {
                 where: { factoryId: { not: null }, factoryUnitPrice: { not: null }, factoryCurrency: { not: null } },
                 select: { factoryId: true, factoryCurrency: true },
@@ -497,7 +496,7 @@ export class LedgerPosting {
               order: e.order && {
                 ...orderOf(e.order),
                 cancelled: e.order.status === "cancelled",
-                lossOnCancel: e.order.cancelFactoryMoney === "loss",
+                lossOnCancel: e.order.cancellation?.factoryMoney === "loss",
                 factoryCurrencies: currencies,
               },
               step: e.step,

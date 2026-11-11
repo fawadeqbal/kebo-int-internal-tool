@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, toDbDate, routeOf, termsSelect } from "@kebo/database";
 import {
   BANK_STEP_LABEL,
   bankStepsFor,
@@ -441,7 +441,7 @@ export class RemindersListService {
         select: {
           id: true,
           refNo: true,
-          paymentRoute: true,
+          ...termsSelect,
           proformaNo: true,
           packedAt: true,
           customer: { select: { name: true } },
@@ -455,7 +455,7 @@ export class RemindersListService {
       });
       for (const o of sailed) {
         // Settings › Papers we use: a switched-off paper is never "missing".
-        const missing = documentsInUse(o.paymentRoute, o.shipments[0]?.mode ?? "sea", papersOff).filter((k) => {
+        const missing = documentsInUse(routeOf(o), o.shipments[0]?.mode ?? "sea", papersOff).filter((k) => {
           const rows = o.documents.filter((d) => d.kind === k);
           if (rows.length) return !rows.some((d) => documentDone(d.status));
           return k === "proforma_invoice" ? !o.proformaNo : k === "packing_list" ? !o.packedAt : true;
@@ -474,7 +474,7 @@ export class RemindersListService {
             who: nameOf(o.inquiry.assignee),
           });
         else {
-          const next = bankStepsFor(o.paymentRoute).find((st) => !o.bankSteps.some((b) => b.step === st));
+          const next = bankStepsFor(routeOf(o)).find((st) => !o.bankSteps.some((b) => b.step === st));
           if (next && next !== "customer_paid_bank" && next !== "bank_paid_us")
             out.push({
               key: `bank:${o.id}:${next}`,
@@ -494,24 +494,23 @@ export class RemindersListService {
     // The SAT coming up, and claims still open.
     if (await on("delivery_sat")) {
       const sats = await this.prisma.db.order.findMany({
-        where: { ...orders, satDoneOn: null, satPlannedOn: { lte: toDbDate(soon) } },
+        where: { ...orders, delivery: { is: { satDoneOn: null, satPlannedOn: { lte: toDbDate(soon) } } } },
         select: {
           id: true,
           refNo: true,
-          satPlannedOn: true,
+          delivery: { select: { satPlannedOn: true, satEngineer: { select: { name: true } } } },
           customer: { select: { name: true } },
-          satEngineer: { select: { name: true } },
           ...handler,
         },
       });
       for (const o of sats) {
-        const on = fromDbDate(o.satPlannedOn!);
+        const on = fromDbDate(o.delivery!.satPlannedOn!);
         out.push({
           key: `sat:${o.id}:${on}`,
           kind: "order",
           level: on < today ? "warn" : "info",
           title: `${o.refNo}: SAT at ${o.customer.name} ${on < today ? `was planned for ${on}: record the result` : on === today ? "today" : `on ${on}`}`,
-          detail: o.satEngineer ? `Engineer: ${o.satEngineer.name}` : "No engineer chosen yet",
+          detail: o.delivery?.satEngineer ? `Engineer: ${o.delivery.satEngineer.name}` : "No engineer chosen yet",
           due: on,
           href: `/orders/${o.id}/delivery`,
           action: "Delivery & SAT",

@@ -62,6 +62,8 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     pages: [
       { href: "/inquiries", label: "Inquiries (RFQs)" },
       { href: "/orders", label: "Orders" },
+      { href: "/operations/purchase-orders", label: "Purchase orders" },
+      { href: "/operations/shipments", label: "Fulfillment & logistics" },
     ],
   },
   {
@@ -193,6 +195,7 @@ export function buildModules({
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
     "/finance/to-receive": sourcing && (managers || can("payments.record")),
     "/purchasing/to-pay": sourcing,
+    "/operations/purchase-orders": sourcing,
     "/finance/ledger": can("ledger.view"),
     "/settings/company": settings,
     "/settings/sales": settings,
