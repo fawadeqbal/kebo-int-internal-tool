@@ -1,6 +1,7 @@
 import { orderAccess } from "../orders/orders.service";
+import { customerOnly } from "./fields";
 import { Injectable } from "@nestjs/common";
-import { fromDbDateOrNull, type Prisma } from "@kebo/database";
+import { fromDbDateOrNull, type Prisma, isSupplier, newSupplier } from "@kebo/database";
 import { can, type FactoryImport, type FactoryInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -23,27 +24,30 @@ export class FactoriesService {
   ) {}
 
   async list(user: SessionUser, q: ListQuery & { mine?: boolean }) {
-    const where: Prisma.FactoryWhereInput = {
+    const where: Prisma.PartyWhereInput = {
+      ...isSupplier,
       deletedAt: null,
       ...(q.mine ? { ownerId: user.id } : {}),
       ...(q.q ? { OR: [{ name: { contains: q.q, mode: "insensitive" } }, { contactPerson: { contains: q.q, mode: "insensitive" } }] } : {}),
     };
     const [rows, total] = await Promise.all([
-      this.prisma.db.factory.findMany({
+      this.prisma.db.party.findMany({
         where,
+        omit: customerOnly,
         include: { owner: ownerSelect, _count: { select: { quotes: { where: { deletedAt: null } } } } },
         orderBy: { name: "asc" },
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
       }),
-      this.prisma.db.factory.count({ where }),
+      this.prisma.db.party.count({ where }),
     ]);
     return { total, page: q.page, pageSize: q.pageSize, rows };
   }
 
   async get(id: string, user?: SessionUser) {
-    const f = await this.prisma.db.factory.findFirst({
-      where: { id, deletedAt: null },
+    const f = await this.prisma.db.party.findFirst({
+      where: { ...isSupplier, id, deletedAt: null },
+      omit: customerOnly,
       include: {
         owner: ownerSelect,
         quotes: {
@@ -89,7 +93,7 @@ export class FactoriesService {
   }
 
   private async assertUniqueName(name: string, exceptId?: string) {
-    const clash = await this.prisma.db.factory.findFirst({ where: { deletedAt: null, name: { equals: name, mode: "insensitive" }, ...(exceptId ? { id: { not: exceptId } } : {}) } });
+    const clash = await this.prisma.db.party.findFirst({ where: { ...isSupplier, deletedAt: null, name: { equals: name, mode: "insensitive" }, ...(exceptId ? { id: { not: exceptId } } : {}) } });
     if (clash) throw new ConflictError(`A factory called "${clash.name}" already exists.`);
   }
 
@@ -109,7 +113,7 @@ export class FactoriesService {
     await this.assertUniqueName(input.name);
     await this.assertOwner(input.ownerId);
     return this.prisma.tx(async (tx) => {
-      const f = await tx.factory.create({ data: { ...this.fields(input), createdById: user.id } });
+      const f = await tx.party.create({ data: newSupplier({ ...this.fields(input), createdById: user.id }), omit: customerOnly });
       await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: f.id, summary: `Added factory ${f.name}` });
       return f;
     });
@@ -118,7 +122,7 @@ export class FactoriesService {
   /** Factories from an uploaded file: a name already known is left out; the rest are added together, or none are. */
   async importMany(user: SessionUser, input: FactoryImport): Promise<ImportResult> {
     const known = new Set(
-      (await this.prisma.db.factory.findMany({ where: { deletedAt: null }, select: { name: true } })).map((f) => f.name.trim().toLowerCase()),
+      (await this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { name: true } })).map((f) => f.name.trim().toLowerCase()),
     );
     const skipped: ImportResult["skipped"] = [];
     const fresh: FactoryInput[] = [];
@@ -134,7 +138,7 @@ export class FactoriesService {
     const from = input.fileName ? ` from ${input.fileName}` : " from a file";
     await this.prisma.tx(async (tx) => {
       for (const f of fresh) {
-        const row = await tx.factory.create({ data: { ...this.fields(f), createdById: user.id } });
+        const row = await tx.party.create({ data: newSupplier({ ...this.fields(f), createdById: user.id }) });
         await this.audit.record(tx, { userId: user.id, action: "create", entityType: "factory", entityId: row.id, summary: `Added factory ${row.name}${from}` });
       }
     });
@@ -151,7 +155,7 @@ export class FactoriesService {
     const handedOver = before.ownerId !== null && before.ownerId !== ownerId;
     const reason = renamed || handedOver ? requireReason(input.reason, "factoryDetails", renamed ? "the factory's name changes" : "another person looks after this factory") : input.reason;
     return this.prisma.tx(async (tx) => {
-      const f = await tx.factory.update({ where: { id }, data: this.fields(input), include: { owner: ownerSelect } });
+      const f = await tx.party.update({ where: { ...isSupplier, id }, data: this.fields(input), omit: customerOnly, include: { owner: ownerSelect } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",
@@ -171,7 +175,7 @@ export class FactoriesService {
     if (!can(user, "inquiries.updateAny")) throw new ForbiddenError("Only a manager can remove a factory.");
     const f = await this.get(id);
     await this.prisma.tx(async (tx) => {
-      await tx.factory.update({ where: { id }, data: { deletedAt: new Date() } });
+      await tx.party.update({ where: { ...isSupplier, id }, data: { deletedAt: new Date() } });
       await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "factory", entityId: id, summary: `Removed factory ${f.name}` });
     });
   }

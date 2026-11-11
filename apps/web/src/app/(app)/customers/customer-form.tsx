@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Star, Trash2 } from "lucide-react";
-import { CUSTOMER_TYPE_LABEL, CUSTOMER_TYPES, customerLetters, UNKNOWN_COUNTRY, type CustomerType, CURRENCY_LABEL } from "@kebo/shared";
+import { PARTY_TYPE_LABEL, PARTY_TYPES, customerLetters, UNKNOWN_COUNTRY, type PartyType, CURRENCY_LABEL } from "@kebo/shared";
 import { Alert, Banner, Button, buttonClass, Card, CardBody, CardFooter, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -23,7 +23,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 const DRAFT = "customer-draft";
 
 type ContactDraft = { key: string; id: string | null; name: string; position: string; email: string; phone: string; whatsapp: string; wechat: string; isPrimary: boolean };
-type Draft = { type: CustomerType; name: string; country: string; address: string; taxNo: string; regNo: string; initials: string; defaultCurrency: string; notes: string };
+type Draft = { type: PartyType; name: string; country: string; address: string; taxNo: string; regNo: string; initials: string; defaultCurrency: string; notes: string };
 
 let seq = 0;
 const newKey = () => `new-${++seq}`;
@@ -125,10 +125,10 @@ export function CustomerForm({
             <Input form={DRAFT} id="name" value={draft.name} onChange={(e) => set("name", e.target.value)} autoComplete="organization" {...invalid("name", s.errors?.name)} />
           </Field>
           <Field label="Type" htmlFor="type" error={s.errors?.type}>
-            <Select form={DRAFT} id="type" value={draft.type} onChange={(e) => set("type", e.target.value as CustomerType)}>
-              {CUSTOMER_TYPES.map((t) => (
+            <Select form={DRAFT} id="type" value={draft.type} onChange={(e) => set("type", e.target.value as PartyType)}>
+              {PARTY_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {CUSTOMER_TYPE_LABEL[t]}
+                  {PARTY_TYPE_LABEL[t]}
                 </option>
               ))}
             </Select>

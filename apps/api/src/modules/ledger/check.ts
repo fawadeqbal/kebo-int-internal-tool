@@ -1,4 +1,4 @@
-import { decimalToMinor } from "@kebo/database";
+import { decimalToMinor, isCustomer } from "@kebo/database";
 import { fromMinor, type Minor } from "@kebo/money";
 import { factoryPositionsSql, positionsSql } from "../money/due";
 import type { MoneyCtx } from "../money/position";
@@ -133,7 +133,7 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
     select coalesce(h.customer_id, p.customer_id) as "customerId", coalesce(h.currency, p.currency)::text as currency,
            coalesce(p.amount, 0)::text as ledger, coalesce(h.amount, 0)::text as expected
       from held h full join posted p on p.customer_id = h.customer_id and p.currency = h.currency`;
-  const customers = new Map((await db.customer.findMany({ select: { id: true, name: true } })).map((c) => [c.id, c.name]));
+  const customers = new Map((await db.party.findMany({ where: isCustomer, select: { id: true, name: true } })).map((c) => [c.id, c.name]));
   for (const c of credits) compare("credit", customers.get(c.customerId) ?? c.customerId, c.currency, m(c.ledger), m(c.expected));
 
   // Every posting balanced in the main currency.

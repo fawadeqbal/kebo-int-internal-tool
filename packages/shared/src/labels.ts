@@ -2,7 +2,7 @@ import type {
   AttachmentKind,
   Currency,
   BalanceTerms,
-  CustomerType,
+  PartyType,
   ExpenseCategory,
   InquiryChannel,
   InquiryStage,
@@ -66,7 +66,7 @@ export const LOST_REASON_LABEL: Record<LostReason, string> = {
 /** Country "ZZ" means not known yet (e.g. a website inquiry): the screens ask for it. */
 export const UNKNOWN_COUNTRY = "ZZ";
 
-export const CUSTOMER_TYPE_LABEL: Record<CustomerType, string> = { company: "Company", individual: "Individual" };
+export const PARTY_TYPE_LABEL: Record<PartyType, string> = { company: "Company", individual: "Individual" };
 
 export const REVISION_STATUS_LABEL: Record<RevisionStatus, string> = {
   draft: "Draft",

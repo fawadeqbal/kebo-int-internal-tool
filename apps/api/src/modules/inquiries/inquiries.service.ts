@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { zipSync } from "fflate";
-import { fromDbDateOrNull, nextReference, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { fromDbDateOrNull, nextReference, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
 import {
   canHold,
   can,
@@ -402,7 +402,7 @@ export class InquiriesService {
   async create(user: SessionUser, input: InquiryInput) {
     if (!can(user, "inquiries.create")) throw new ForbiddenError();
     await this.assertAssignable(user, input.assigneeId);
-    const customer = await this.prisma.db.customer.findFirst({ where: { id: input.customerId, deletedAt: null } });
+    const customer = await this.prisma.db.party.findFirst({ where: { ...isCustomer, id: input.customerId, deletedAt: null } });
     if (!customer) throw new DomainError("The selected customer no longer exists.");
     await this.assertContact(input.customerId, input.contactId);
     const { inquiry, events } = await this.prisma.tx((tx) => this.createRecord(tx, user.id, input));

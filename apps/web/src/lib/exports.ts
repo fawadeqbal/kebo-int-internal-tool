@@ -1,7 +1,7 @@
 import "server-only";
 import {
   CHANNEL_LABEL,
-  CUSTOMER_TYPE_LABEL,
+  PARTY_TYPE_LABEL,
   EXPENSE_CATEGORY_LABEL,
   INQUIRY_STAGE_LABEL,
   ORDER_STAGE_LABEL,
@@ -182,7 +182,7 @@ async function customers(q: Q): Promise<SheetSpec> {
     ],
     rows: rows.map((c): Cell[] => [
       c.name,
-      CUSTOMER_TYPE_LABEL[c.type],
+      PARTY_TYPE_LABEL[c.type],
       countryName(c.country),
       c.primaryContact?.name ?? null,
       c.primaryContact?.position ?? null,

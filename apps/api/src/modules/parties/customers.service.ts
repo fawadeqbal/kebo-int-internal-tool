@@ -1,4 +1,6 @@
 import { Injectable } from "@nestjs/common";
+import { supplierOnly } from "./fields";
+import { isCustomer, newCustomer } from "@kebo/database";
 import type { Prisma } from "@kebo/database";
 import { can, type CustomerImport, type CustomerInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { DomainError, DuplicateError, NotFoundError } from "@kebo/utils";
@@ -8,7 +10,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { requireReason } from "../../common/audit/reason";
 
 /** Staff see the customers on deals they handle or created, and customers they added; managers see all. */
-export function customerAccess(user: SessionUser): Prisma.CustomerWhereInput {
+export function customerAccess(user: SessionUser): Prisma.PartyWhereInput {
   if (can(user, "inquiries.viewAll")) return {};
   return {
     OR: [{ createdById: user.id }, { inquiries: { some: { deletedAt: null, OR: [{ assigneeId: user.id }, { createdById: user.id }] } } }],
@@ -25,12 +27,13 @@ export class CustomersService {
   ) {}
 
   names(user: SessionUser) {
-    return this.prisma.db.customer.findMany({ where: { deletedAt: null, ...customerAccess(user) }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+    return this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null, ...customerAccess(user) }, select: { id: true, name: true }, orderBy: { name: "asc" } });
   }
 
   async list(user: SessionUser, q: ListQuery & { country?: string }) {
     const term = q.q?.trim();
-    const where: Prisma.CustomerWhereInput = {
+    const where: Prisma.PartyWhereInput = {
+      ...isCustomer,
       deletedAt: null,
       ...customerAccess(user),
       ...(q.country ? { country: q.country } : {}),
@@ -48,8 +51,9 @@ export class CustomersService {
         : {}),
     };
     const [rows, total] = await Promise.all([
-      this.prisma.db.customer.findMany({
+      this.prisma.db.party.findMany({
         where,
+        omit: supplierOnly,
         include: {
           contacts: { where: { deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }], take: 1 },
           _count: { select: { inquiries: { where: { deletedAt: null, stage: { in: ["new", "sourcing", "quoted"] } } }, orders: { where: { status: "open" } } } },
@@ -58,7 +62,7 @@ export class CustomersService {
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
       }),
-      this.prisma.db.customer.count({ where }),
+      this.prisma.db.party.count({ where }),
     ]);
     return {
       total,
@@ -78,8 +82,9 @@ export class CustomersService {
 
   async get(user: SessionUser, id: string) {
     const mine = can(user, "inquiries.viewAll") ? null : { OR: [{ assigneeId: user.id }, { createdById: user.id }] };
-    const c = await this.prisma.db.customer.findFirst({
-      where: { id, deletedAt: null, ...customerAccess(user) },
+    const c = await this.prisma.db.party.findFirst({
+      where: { ...isCustomer, id, deletedAt: null, ...customerAccess(user) },
+      omit: supplierOnly,
       include: {
         contacts: { where: { deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
         inquiries: {
@@ -106,7 +111,7 @@ export class CustomersService {
     if (!emails.length && !numbers.length) return [];
     const rows = await this.prisma.db.$queryRaw<{ id: string; name: string; contact: string }[]>`
       select distinct c.id, c.name, ct.name as contact
-        from contacts ct join customers c on c.id = ct.customer_id
+        from contacts ct join parties c on c.id = ct.customer_id
        where ct.deleted_at is null and c.deleted_at is null
          and (${exceptCustomerId ?? null}::uuid is null or c.id <> ${exceptCustomerId ?? null}::uuid)
          and (lower(ct.email) = any(${emails.map((e) => e.toLowerCase())})
@@ -150,8 +155,9 @@ export class CustomersService {
       if (matches.length) throw new DuplicateError("A customer with the same email or phone already exists. Use it, or save anyway.", matches);
     }
     return this.prisma.tx(async (tx) => {
-      const c = await tx.customer.create({
-        data: { ...this.fields(input), createdById: user.id, contacts: { create: this.contactRows(input) } },
+      const c = await tx.party.create({
+        data: newCustomer({ ...this.fields(input), createdById: user.id, contacts: { create: this.contactRows(input) } }),
+        omit: supplierOnly,
         include: { contacts: true },
       });
       await this.audit.record(tx, { userId: user.id, action: "create", entityType: "customer", entityId: c.id, summary: `Added customer ${c.name} (${c.country})` });
@@ -166,7 +172,7 @@ export class CustomersService {
    */
   async importMany(user: SessionUser, input: CustomerImport): Promise<ImportResult> {
     const known = new Set(
-      (await this.prisma.db.customer.findMany({ where: { deletedAt: null }, select: { name: true } })).map((c) => c.name.trim().toLowerCase()),
+      (await this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null }, select: { name: true } })).map((c) => c.name.trim().toLowerCase()),
     );
     const skipped: ImportResult["skipped"] = [];
     const fresh: CustomerInput[] = [];
@@ -187,7 +193,7 @@ export class CustomersService {
     const from = input.fileName ? ` from ${input.fileName}` : " from a file";
     await this.prisma.tx(async (tx) => {
       for (const c of fresh) {
-        const row = await tx.customer.create({ data: { ...this.fields(c), createdById: user.id, contacts: { create: this.contactRows(c) } } });
+        const row = await tx.party.create({ data: newCustomer({ ...this.fields(c), createdById: user.id, contacts: { create: this.contactRows(c) } }) });
         await this.audit.record(tx, { userId: user.id, action: "create", entityType: "customer", entityId: row.id, summary: `Added customer ${row.name} (${row.country})${from}` });
       }
     });
@@ -217,7 +223,7 @@ export class CustomersService {
         if (c.id && known.has(c.id)) await tx.contact.update({ where: { id: c.id }, data: rows[i] });
         else await tx.contact.create({ data: { ...rows[i], customerId: id } });
       }
-      const updated = await tx.customer.update({ where: { id }, data: this.fields(input), include: { contacts: { where: { deletedAt: null } } } });
+      const updated = await tx.party.update({ where: { ...isCustomer, id }, data: this.fields(input), omit: supplierOnly, include: { contacts: { where: { deletedAt: null } } } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "update",
@@ -237,7 +243,7 @@ export class CustomersService {
     const open = await this.prisma.db.order.count({ where: { customerId: id, status: "open" } });
     if (open) throw new DomainError("This customer has open orders, so they cannot be removed.");
     await this.prisma.tx(async (tx) => {
-      await tx.customer.update({ where: { id }, data: { deletedAt: new Date() } });
+      await tx.party.update({ where: { ...isCustomer, id }, data: { deletedAt: new Date() } });
       await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "customer", entityId: id, summary: `Removed customer ${c.name}` });
     });
   }

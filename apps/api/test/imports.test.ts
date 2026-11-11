@@ -1,4 +1,4 @@
-import { FIRST_COMPANY_ID } from "@kebo/database";
+import { FIRST_COMPANY_ID, isCustomer, isSupplier } from "@kebo/database";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaService } from "../src/database/prisma.service";
@@ -21,7 +21,7 @@ describe("customers and factories from an Excel file", () => {
   });
 
   it("adds only new customers, says why the others were left out, and logs each", async () => {
-    const existing = await prisma.company(FIRST_COMPANY_ID).customer.findFirstOrThrow({ where: { deletedAt: null }, include: { contacts: true } });
+    const existing = await prisma.company(FIRST_COMPANY_ID).party.findFirstOrThrow({ where: { ...isCustomer, deletedAt: null }, include: { contacts: true } });
     const known = existing.contacts.find((c) => c.email);
     const res = await api(app, manager)
       .post("/customers/import", {
@@ -35,7 +35,7 @@ describe("customers and factories from an Excel file", () => {
       .expect(200);
     expect(res.body.added).toBe(1);
     expect(res.body.skipped.map((s: { reason: string }) => s.reason)).toEqual(["already a customer", ...(known ? [`a contact's email or phone is on ${existing.name}`] : [])]);
-    const made = await prisma.company(FIRST_COMPANY_ID).customer.findFirstOrThrow({ where: { name: `Import Co ${tag}` }, include: { contacts: { orderBy: { name: "asc" } } } });
+    const made = await prisma.company(FIRST_COMPANY_ID).party.findFirstOrThrow({ where: { ...isCustomer, name: `Import Co ${tag}` }, include: { contacts: { orderBy: { name: "asc" } } } });
     expect(made.country).toBe("NG");
     expect(made.contacts.map((c) => [c.name, c.isPrimary])).toEqual([["Ada", true], ["Bayo", false]]);
     const log = await prisma.company(FIRST_COMPANY_ID).auditLog.findFirst({ where: { entityId: made.id } });
@@ -47,11 +47,11 @@ describe("customers and factories from an Excel file", () => {
       .post("/customers/import", { customers: [{ name: `Good ${tag}`, country: "NG", contacts: [{ name: "A", email: `g-${tag}@example.com` }] }, { name: `Bad ${tag}`, country: "Nigeria", contacts: [] }] })
       .expect(422);
     expect(JSON.stringify(res.body)).toContain("Choose a country");
-    expect(await prisma.company(FIRST_COMPANY_ID).customer.count({ where: { name: `Good ${tag}` } })).toBe(0);
+    expect(await prisma.company(FIRST_COMPANY_ID).party.count({ where: { ...isCustomer, name: `Good ${tag}` } })).toBe(0);
   });
 
   it("adds new factories and leaves out names already there", async () => {
-    const existing = await prisma.company(FIRST_COMPANY_ID).factory.findFirstOrThrow({ where: { deletedAt: null } });
+    const existing = await prisma.company(FIRST_COMPANY_ID).party.findFirstOrThrow({ where: { ...isSupplier, deletedAt: null } });
     const res = await api(app, manager)
       .post("/factories/import", {
         fileName: "factories.xlsx",
@@ -59,7 +59,7 @@ describe("customers and factories from an Excel file", () => {
       })
       .expect(200);
     expect(res.body).toEqual({ added: 1, skipped: [{ name: existing.name.toLowerCase(), reason: "already a factory" }] });
-    const f = await prisma.company(FIRST_COMPANY_ID).factory.findFirstOrThrow({ where: { name: `Ningbo Valves ${tag}` } });
+    const f = await prisma.company(FIRST_COMPANY_ID).party.findFirstOrThrow({ where: { ...isSupplier, name: `Ningbo Valves ${tag}` } });
     expect(f.ownerId).toBeNull();
   });
 });

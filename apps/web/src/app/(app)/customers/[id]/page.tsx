@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BookOpen, Plus, Star } from "lucide-react";
-import { can, CUSTOMER_TYPE_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
+import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY, type OrderStatus } from "@kebo/shared";
 import { Banner, ButtonLink, PageHeader, StageBadge, StatusBadge, type StatusMeaning } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
@@ -165,7 +165,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         summary={
           <>
             {countryKnown ? countryName(c.country) : <span className="text-warn">Country not set</span>}
-            {c.type === "individual" && ` · ${CUSTOMER_TYPE_LABEL.individual.toLowerCase()}`}
+            {c.type === "individual" && ` · ${PARTY_TYPE_LABEL.individual.toLowerCase()}`}
             {` · customer since ${monthOf(c.createdAt)}`}
             {handledBy && <span className="max-sm:hidden"> · handled by {handledBy}</span>}
           </>
@@ -245,7 +245,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
                   { label: "Address on papers", value: c.address && <span className="whitespace-pre-line">{c.address}</span> },
                   { label: "Business license number", value: c.taxNo },
                   { label: "Currency they pay in", value: c.defaultCurrency },
-                  { label: "Type", value: CUSTOMER_TYPE_LABEL[c.type] },
+                  { label: "Type", value: PARTY_TYPE_LABEL[c.type] },
                   { label: "WeChat", value: primary?.wechat, optional: true },
                   { label: "Reg. number", value: c.regNo, optional: true },
                   { label: "Letters on documents", value: c.initials, optional: true },

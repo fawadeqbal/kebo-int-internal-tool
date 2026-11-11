@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isCustomer } from "@kebo/database";
 import type { Readable } from "node:stream";
 import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
@@ -204,7 +205,7 @@ export class ApprovalsService {
     }
     const customers = new Map(
       ids.size
-        ? (await this.prisma.db.customer.findMany({ where: { id: { in: [...ids] } }, select: { id: true, name: true } })).map((c) => [
+        ? (await this.prisma.db.party.findMany({ where: { ...isCustomer, id: { in: [...ids] } }, select: { id: true, name: true } })).map((c) => [
             c.id,
             c,
           ])
@@ -329,7 +330,7 @@ export class ApprovalsService {
       if (!seen) throw new NotFoundError("Inquiry");
     }
     if (!body.orderId && body.customerId) {
-      const seen = await this.prisma.db.customer.count({ where: { id: body.customerId, deletedAt: null, ...customerAccess(user) } });
+      const seen = await this.prisma.db.party.count({ where: { ...isCustomer, id: body.customerId, deletedAt: null, ...customerAccess(user) } });
       if (!seen) throw new NotFoundError("Customer");
     }
     const order = await this.money.checkExpense(user, body);

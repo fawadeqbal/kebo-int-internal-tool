@@ -14,7 +14,9 @@
 # The site keeps running the previous version until step 5:
 #   1. tag the running images :previous
 #   2. build the new images (a failed build changes nothing)
-#   3. copy the database (backups/pre-deploy-*.sql.gz, the last 10 kept)
+#   3. copy the database (backups/pre-deploy-*.sql.gz, the last 10 kept), and try this deploy's new
+#      migrations on that copy (restored into a scratch database). If they fail there: stop, with
+#      the real database untouched
 #   4. apply the migrations with the new image, in a one-off container. If they fail: stop, leave
 #      the old containers running, and print how to recover
 #   5. start the new containers and wait until they are healthy. If they are not: start the
@@ -94,6 +96,30 @@ copy_database() {
   sudo sh -c 'ls -1t backups/pre-deploy-*.sql.gz | tail -n +11 | xargs -r rm -f'
 }
 
+# The new migrations tried on the copy before they touch the real database: the copy is restored into a
+# scratch database (kebo_rehearsal) and the new image migrates that. Skipped when no migration is new.
+# Each step is checked here: set -e does not apply inside a function called with ||.
+rehearse_migrations() {
+  local scratch=kebo_rehearsal applied new last
+  applied=$(dc exec -T db psql -U kebo -d kebo -Atc "select migration_name from _prisma_migrations where finished_at is not null" 2>/dev/null) || applied=""
+  new=$(comm -23 <(ls packages/database/prisma/migrations | grep -v '\.toml$' | sort) <(sort <<<"$applied")) || return 1
+  if [ -z "$applied" ] || [ -z "$new" ]; then
+    say "no new migration to try on the copy"
+    return 0
+  fi
+  say "trying on a copy of the database: $(tr '\n' ' ' <<<"$new")"
+  dc exec -T db psql -q -U kebo -d postgres -v ON_ERROR_STOP=1 \
+    -c "drop database if exists $scratch" -c "create database $scratch" -c "alter database $scratch set timezone to 'UTC'" || return 1
+  sudo gunzip -c "$COPY" | dc exec -T db psql -q -U kebo -d "$scratch" -v ON_ERROR_STOP=1 >/dev/null || return 1
+  dc run --rm --no-deps -T --name "kebo-desk-rehearse-$(date +%s)" api sh -c \
+    "cd /app/packages/database && DATABASE_URL=\"\${DATABASE_URL%/*}/$scratch\" npx prisma migrate deploy" || return 1
+  # They ran on the copy, not somewhere else: its newest migration is the newest one here.
+  last=$(dc exec -T db psql -U kebo -d "$scratch" -Atc "select migration_name from _prisma_migrations where finished_at is not null order by 1 desc limit 1") || return 1
+  [ "$last" = "$(tail -n 1 <<<"$new")" ] || return 1
+  dc exec -T db psql -q -U kebo -d postgres -c "drop database if exists $scratch" || true
+  say "the new migrations ran on the copy"
+}
+
 migration_failed() {
   local failed
   failed=$(dc exec -T db psql -U kebo -d kebo -Atc \
@@ -169,6 +195,12 @@ main() {
   copy_database || {
     restore_previous
     die "could not copy the database: nothing was changed"
+  }
+
+  # The new migrations on the copy first: one that cannot run on the real data stops the deploy here.
+  rehearse_migrations || {
+    restore_previous
+    die "the new migrations failed on a copy of the database (the error is above): the real database was not touched and nothing was restarted. The copy they failed on is the database kebo_rehearsal (dropped at the next deploy)."
   }
 
   # 4. Migrations with the new image while the old containers keep serving.
