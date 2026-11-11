@@ -935,8 +935,16 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
         incoterm: d.incoterm.incoterm,
         incotermPlace: d.incoterm.place,
         closedAt: status === "closed" ? (d.q.completed_at ?? now) : null,
-        cancelledAt: status === "cancelled" ? (d.q.completed_at ?? d.q.updated_at) : null,
-        cancelReason: status === "cancelled" ? (d.q.status_reason ?? "Closed as not completed in the old app.") : null,
+        ...(status === "cancelled"
+          ? {
+              cancellation: {
+                create: {
+                  cancelledAt: d.q.completed_at ?? d.q.updated_at,
+                  reason: d.q.status_reason ?? "Closed as not completed in the old app.",
+                },
+              },
+            }
+          : {}),
         createdById: rev.created_by,
         createdAt: toDbDate(d.orderedOn!),
         // Shipped: its shipment (the ship date lives there), with the ports the terms give.

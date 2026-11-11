@@ -88,7 +88,7 @@ export const paperOrderInclude = {
     include: { doneBy: { select: { name: true } }, attachment: { select: { fileName: true, deletedAt: true } } },
   },
   papers: { orderBy: [{ version: "asc" }] },
-  satEngineer: { select: { name: true } },
+  delivery: { include: { satEngineer: { select: { name: true } } } },
   inquiry: { select: { id: true, contactId: true } },
   // Each factory's ready date (its purchase order prints its own), and the papers' day at the customer's bank
   // (an LC's instalment is due from it): what the plan's dates are worked out from.
@@ -843,7 +843,7 @@ function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
 }
 
 function deliveryNote(c: PaperCtx): Built {
-  const on = fromDbDateOrNull(c.o.deliveredOn);
+  const on = fromDbDateOrNull(c.o.delivery?.deliveredOn);
   // Worked out from the goods lines (the worst of them): the only place a condition is recorded.
   const worked = deliveryConditionOf(c.o.lines.filter((l) => l.type === "goods"));
   const condition = worked ? DELIVERY_CONDITION_LABEL[worked] : null;
@@ -883,7 +883,7 @@ function deliveryNote(c: PaperCtx): Built {
       bullets: [
         ...(on ? [{ label: "Delivered on:", value: date(on) }] : []),
         ...(condition ? [{ label: "Condition:", value: condition }] : []),
-        ...bullets(c.o.deliveryNote),
+        ...bullets(c.o.delivery?.note ?? null),
         "Received the goods above in the condition stated.",
       ],
       bank: null,
@@ -896,7 +896,7 @@ function satCertificate(c: PaperCtx): Built {
   const checks = c.o.satChecks;
   const passed = checks.filter((x) => x.result === "pass" || x.result === "not_applicable").length;
   const failed = checks.filter((x) => x.result === "fail").length;
-  const on = fromDbDateOrNull(c.o.satDoneOn);
+  const on = fromDbDateOrNull(c.o.delivery?.satDoneOn);
   return {
     checks: [
       check(
@@ -910,7 +910,7 @@ function satCertificate(c: PaperCtx): Built {
         },
       ),
       check("done", "Signed off on", on ? paperDateText(on) : "not yet", !!on, { required: true, href: "delivery" }),
-      check("by", "Signed by", c.o.satSignedBy ?? "not recorded", !!c.o.satSignedBy, { href: "delivery" }),
+      check("by", "Signed by", c.o.delivery?.satSignedBy ?? "not recorded", !!c.o.delivery?.satSignedBy, { href: "delivery" }),
       check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {
         href: "/settings/sales",
       }),
@@ -934,8 +934,8 @@ function satCertificate(c: PaperCtx): Built {
         ...(on ? [`Machine accepted by the customer on ${paperDateText(on)}.`] : []),
         ...(on ? [{ label: "Warranty starts:", value: date(on) }] : []),
         ...bullets(c.settings.sales.warrantyTerms),
-        ...(c.o.satSignedBy ? [{ label: "Signed for the customer:", value: c.o.satSignedBy }] : []),
-        ...(c.o.satEngineer ? [{ label: "Our engineer:", value: c.o.satEngineer.name }] : []),
+        ...(c.o.delivery?.satSignedBy ? [{ label: "Signed for the customer:", value: c.o.delivery.satSignedBy }] : []),
+        ...(c.o.delivery?.satEngineer ? [{ label: "Our engineer:", value: c.o.delivery.satEngineer.name }] : []),
       ],
       bank: null,
       signatures: { left: `For the seller · ${c.company.name}`, right: `For the buyer · ${c.customer.name}` },

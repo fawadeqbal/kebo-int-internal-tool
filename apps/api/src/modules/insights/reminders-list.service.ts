@@ -494,24 +494,23 @@ export class RemindersListService {
     // The SAT coming up, and claims still open.
     if (await on("delivery_sat")) {
       const sats = await this.prisma.db.order.findMany({
-        where: { ...orders, satDoneOn: null, satPlannedOn: { lte: toDbDate(soon) } },
+        where: { ...orders, delivery: { is: { satDoneOn: null, satPlannedOn: { lte: toDbDate(soon) } } } },
         select: {
           id: true,
           refNo: true,
-          satPlannedOn: true,
+          delivery: { select: { satPlannedOn: true, satEngineer: { select: { name: true } } } },
           customer: { select: { name: true } },
-          satEngineer: { select: { name: true } },
           ...handler,
         },
       });
       for (const o of sats) {
-        const on = fromDbDate(o.satPlannedOn!);
+        const on = fromDbDate(o.delivery!.satPlannedOn!);
         out.push({
           key: `sat:${o.id}:${on}`,
           kind: "order",
           level: on < today ? "warn" : "info",
           title: `${o.refNo}: SAT at ${o.customer.name} ${on < today ? `was planned for ${on}: record the result` : on === today ? "today" : `on ${on}`}`,
-          detail: o.satEngineer ? `Engineer: ${o.satEngineer.name}` : "No engineer chosen yet",
+          detail: o.delivery?.satEngineer ? `Engineer: ${o.delivery.satEngineer.name}` : "No engineer chosen yet",
           due: on,
           href: `/orders/${o.id}/delivery`,
           action: "Delivery & SAT",

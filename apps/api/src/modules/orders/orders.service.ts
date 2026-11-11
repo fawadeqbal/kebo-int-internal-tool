@@ -70,6 +70,7 @@ function orderSearch(term: string | undefined): Prisma.OrderWhereInput {
 }
 
 const orderInclude = {
+  cancellation: true,
   allocations: { where: livePart, orderBy: [{ on: "asc" }, { createdAt: "asc" }] },
   // With what pays it, what the position needs: the plan's deposit and what was charged to the customer.
   receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
@@ -526,7 +527,12 @@ export class OrdersService {
       })),
       cancelled:
         o.status === "cancelled"
-          ? { at: o.cancelledAt, reason: o.cancelReason, customerMoney: o.cancelCustomerMoney, factoryMoney: o.cancelFactoryMoney }
+          ? {
+              at: o.cancellation?.cancelledAt ?? null,
+              reason: o.cancellation?.reason ?? null,
+              customerMoney: o.cancellation?.customerMoney ?? null,
+              factoryMoney: o.cancellation?.factoryMoney ?? null,
+            }
           : null,
       documents: this.documentsOf(o),
       /** null until issued (the proforma is a draft without a number until then). */

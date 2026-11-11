@@ -11,6 +11,8 @@ const OWNERS: Record<string, string> = {
   allocation: "treasury",
   moneyAccount: "treasury",
   invoice: "billing",
+  orderDelivery: "flow",
+  orderCancellation: "cancellation",
 };
 
 const MODULES = resolve(__dirname, "../src/modules");

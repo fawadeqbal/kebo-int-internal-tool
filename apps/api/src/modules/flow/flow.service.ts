@@ -82,8 +82,7 @@ interface FlowRows {
   lines: { factoryId: string | null }[];
   proformaNo: string | null;
   packedAt: Date | null;
-  deliveredOn: Date | null;
-  satDoneOn: Date | null;
+  delivery: { deliveredOn: Date | null; satDoneOn: Date | null } | null;
   /** The production items of the checklist (done or skipped). */
   checklist: { doneAt: Date | null; skippedAt: Date | null }[];
   shipments: { mode: ShipMode; status: ShipmentStatus }[];
@@ -134,12 +133,12 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
     },
     documents: { required: required.length, ready },
     bankSteps: { required: bankKinds.length, done: o.bankSteps.filter((b) => bankKinds.includes(b.step)).length },
-    deliveredOn: fromDbDateOrNull(o.deliveredOn),
+    deliveredOn: fromDbDateOrNull(o.delivery?.deliveredOn),
     sat: {
       total: o.satChecks.length,
       passed: o.satChecks.filter((c) => c.result === "pass").length,
       failed: o.satChecks.filter((c) => c.result === "fail").length,
-      doneOn: fromDbDateOrNull(o.satDoneOn),
+      doneOn: fromDbDateOrNull(o.delivery?.satDoneOn),
     },
     openClaims: o.claims.filter((c) => c.status === "open" || c.status === "with_factory").length,
   };
@@ -257,7 +256,7 @@ export class FlowService {
         bankSteps: true,
         satChecks: { orderBy: { sortOrder: "asc" } },
         claims: { orderBy: { openedOn: "desc" } },
-        satEngineer: { select: { id: true, name: true } },
+        delivery: { include: { satEngineer: { select: { id: true, name: true } } } },
         // Their factories (ready dates) and, for the goods, what arrived (the delivery's condition is theirs).
         lines: {
           select: {
@@ -406,15 +405,15 @@ export class FlowService {
       documents: has("bank_documents") ? { set: documents, bankSteps } : null,
       delivery: has("delivery_sat")
         ? {
-            deliveredOn: fromDbDateOrNull(o.deliveredOn),
+            deliveredOn: fromDbDateOrNull(o.delivery?.deliveredOn),
             /** Worked out from the goods lines: the worst of them (null until a line is checked). */
             condition: deliveryConditionOf(o.lines.filter((l) => l.type === "goods")),
-            note: o.deliveryNote,
-            receivedBy: o.deliveryReceivedBy,
-            satEngineer: o.satEngineer,
-            satPlannedOn: fromDbDateOrNull(o.satPlannedOn),
-            satDoneOn: fromDbDateOrNull(o.satDoneOn),
-            satSignedBy: o.satSignedBy,
+            note: o.delivery?.note ?? null,
+            receivedBy: o.delivery?.receivedBy ?? null,
+            satEngineer: o.delivery?.satEngineer ?? null,
+            satPlannedOn: fromDbDateOrNull(o.delivery?.satPlannedOn),
+            satDoneOn: fromDbDateOrNull(o.delivery?.satDoneOn),
+            satSignedBy: o.delivery?.satSignedBy ?? null,
             sat,
             suggestedSat: sat.length ? [] : [...DEFAULT_SAT_CHECKS],
             claims,
@@ -512,8 +511,7 @@ export class FlowService {
         lines: { select: { factoryId: true } },
         proformaNo: true,
         packedAt: true,
-        deliveredOn: true,
-        satDoneOn: true,
+        delivery: { select: { deliveredOn: true, satDoneOn: true } },
         total: true,
         currency: true,
         depositPercent: true,
@@ -1047,6 +1045,15 @@ export class FlowService {
 
   /* ---------------------------------------------------------------- delivery, SAT, claims */
 
+  /** The order's delivery row: made with the first thing recorded, then changed (order_deliveries, owned here). */
+  private async setDelivery(tx: Tx, orderId: string, data: Prisma.OrderDeliveryUncheckedUpdateInput) {
+    await tx.orderDelivery.upsert({
+      where: { orderId },
+      create: { ...(data as Prisma.OrderDeliveryUncheckedCreateInput), orderId },
+      update: data,
+    });
+  }
+
   async saveDelivery(user: SessionUser, id: string, input: DeliveryInput) {
     await this.must(user, "delivery.manage", "delivery_sat", "manage delivery and SAT");
     const today = this.clock.today();
@@ -1056,23 +1063,24 @@ export class FlowService {
       const o = await this.lockOrder(tx, user, id);
       if (input.satEngineerId && !(await tx.user.findFirst({ where: { id: input.satEngineerId, isActive: true } })))
         throw new DomainError("Choose an active person as the engineer.");
-      const delivered = input.deliveredOn !== undefined ? input.deliveredOn : fromDbDateOrNull(o.deliveredOn);
-      const satDone = input.satDoneOn !== undefined ? input.satDoneOn : fromDbDateOrNull(o.satDoneOn);
+      const was = await tx.orderDelivery.findUnique({ where: { orderId: id } });
+      const delivered = input.deliveredOn !== undefined ? input.deliveredOn : fromDbDateOrNull(was?.deliveredOn);
+      const satDone = input.satDoneOn !== undefined ? input.satDoneOn : fromDbDateOrNull(was?.satDoneOn);
       if (satDone && !delivered) throw new DomainError("Record the delivery before signing off the SAT.");
       if (satDone && delivered && satDone < delivered) throw new DomainError("The SAT cannot be signed off before the delivery.");
       if (satDone && input.satDoneOn) {
         const failed = await tx.satCheck.count({ where: { orderId: id, result: { in: ["fail", "pending"] } } });
         if (failed) throw new DomainError("Every SAT point must pass (or be N/A) before signing off.");
       }
-      const data: Prisma.OrderUncheckedUpdateInput = {};
+      const data: Prisma.OrderDeliveryUncheckedUpdateInput = {};
       if (input.deliveredOn !== undefined) data.deliveredOn = toDbDateOrNull(input.deliveredOn);
-      if (input.deliveryNote !== undefined) data.deliveryNote = input.deliveryNote;
-      if (input.deliveryReceivedBy !== undefined) data.deliveryReceivedBy = input.deliveryReceivedBy;
+      if (input.deliveryNote !== undefined) data.note = input.deliveryNote;
+      if (input.deliveryReceivedBy !== undefined) data.receivedBy = input.deliveryReceivedBy;
       if (input.satEngineerId !== undefined) data.satEngineerId = input.satEngineerId;
       if (input.satPlannedOn !== undefined) data.satPlannedOn = toDbDateOrNull(input.satPlannedOn);
       if (input.satDoneOn !== undefined) data.satDoneOn = toDbDateOrNull(input.satDoneOn);
       if (input.satSignedBy !== undefined) data.satSignedBy = input.satSignedBy;
-      await tx.order.update({ where: { id }, data });
+      await this.setDelivery(tx, id, data);
       const what = input.satDoneOn
         ? "SAT signed off"
         : input.deliveredOn
@@ -1084,7 +1092,7 @@ export class FlowService {
         id,
         "delivery",
         `${o.refNo}: ${what}`,
-        { deliveredOn: fromDbDateOrNull(o.deliveredOn), satDoneOn: fromDbDateOrNull(o.satDoneOn) },
+        { deliveredOn: fromDbDateOrNull(was?.deliveredOn), satDoneOn: fromDbDateOrNull(was?.satDoneOn) },
         input,
       );
     });
@@ -1095,7 +1103,8 @@ export class FlowService {
     await this.must(user, "delivery.manage", "delivery_sat", "manage delivery and SAT");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      if (o.satDoneOn && input.checks.some((c) => c.result === "fail" || c.result === "pending"))
+      const signed = (await tx.orderDelivery.findUnique({ where: { orderId: id }, select: { satDoneOn: true } }))?.satDoneOn;
+      if (signed && input.checks.some((c) => c.result === "fail" || c.result === "pending"))
         throw new DomainError("The SAT is signed off. Clear the sign-off date before reopening a point.");
       const existing = await tx.satCheck.findMany({ where: { orderId: id } });
       await this.replaceList(
@@ -1186,15 +1195,16 @@ export class FlowService {
       const lines = await tx.orderLine.findMany({ where: { orderId: id, type: "goods" }, select: { id: true, quantity: true } });
       for (const l of lines)
         await tx.orderLine.update({ where: { id: l.id }, data: { deliveredQty: l.quantity, deliveredCondition: "good" } });
-      const deliveredOn = fromDbDateOrNull(o.deliveredOn) ?? on;
-      await tx.order.update({ where: { id }, data: { deliveredOn: toDbDate(deliveredOn) } });
+      const was = await tx.orderDelivery.findUnique({ where: { orderId: id } });
+      const deliveredOn = fromDbDateOrNull(was?.deliveredOn) ?? on;
+      await this.setDelivery(tx, id, { deliveredOn: toDbDate(deliveredOn) });
       await this.log(
         tx,
         user,
         id,
         "delivery",
         `${o.refNo}: all delivered in good condition on ${deliveredOn} (${lines.length} line${lines.length === 1 ? "" : "s"})`,
-        { deliveredOn: fromDbDateOrNull(o.deliveredOn) },
+        { deliveredOn: fromDbDateOrNull(was?.deliveredOn) },
         { deliveredOn, condition: "good", lines: lines.length, allGood: true },
       );
     });
@@ -1212,7 +1222,8 @@ export class FlowService {
     if (on > this.clock.today()) throw new DomainError("A date that has happened cannot be in the future.");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      const delivered = fromDbDateOrNull(o.deliveredOn);
+      const was = await tx.orderDelivery.findUnique({ where: { orderId: id } });
+      const delivered = fromDbDateOrNull(was?.deliveredOn);
       if (!delivered) throw new DomainError("Record the delivery before signing off the SAT.");
       if (on < delivered) throw new DomainError("The SAT cannot be signed off before the delivery.");
       const checks = await tx.satCheck.findMany({ where: { orderId: id } });
@@ -1222,8 +1233,8 @@ export class FlowService {
         await tx.satCheck.createMany({
           data: DEFAULT_SAT_CHECKS.map((item, i) => ({ orderId: id, item, result: "pass" as const, sortOrder: i })),
         });
-      const signedBy = input.satSignedBy !== undefined ? input.satSignedBy : o.satSignedBy;
-      await tx.order.update({ where: { id }, data: { satDoneOn: toDbDate(on), satSignedBy: signedBy } });
+      const signedBy = input.satSignedBy !== undefined ? input.satSignedBy : (was?.satSignedBy ?? null);
+      await this.setDelivery(tx, id, { satDoneOn: toDbDate(on), satSignedBy: signedBy });
       const points = checks.length || DEFAULT_SAT_CHECKS.length;
       await this.log(
         tx,
@@ -1231,7 +1242,7 @@ export class FlowService {
         id,
         "sat",
         `${o.refNo}: SAT all passed (${points} point${points === 1 ? "" : "s"}), signed off on ${on}${signedBy ? ` by ${signedBy}` : ""}`,
-        { satDoneOn: fromDbDateOrNull(o.satDoneOn), satSignedBy: o.satSignedBy },
+        { satDoneOn: fromDbDateOrNull(was?.satDoneOn), satSignedBy: was?.satSignedBy ?? null },
         { satDoneOn: on, satSignedBy: signedBy, allPassed: true },
       );
     });

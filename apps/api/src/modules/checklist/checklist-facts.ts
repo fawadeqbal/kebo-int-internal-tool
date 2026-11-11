@@ -22,6 +22,7 @@ export const checklistOrderInclude = {
   documents: { select: { kind: true, status: true, number: true, issuedOn: true, shipmentId: true } },
   bankSteps: true,
   satChecks: { select: { result: true } },
+  delivery: { select: { deliveredOn: true, satDoneOn: true, satSignedBy: true } },
   claims: { select: { status: true } },
   lines: {
     select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, factoryId: true, factory: { select: { name: true } } },
@@ -121,9 +122,9 @@ export function checklistFactsOf(o: ChecklistOrderRow, factories: ChecklistFacts
       issuedOn: fromDbDateOrNull(d.issuedOn),
     })),
     bankSteps: o.bankSteps.map((s) => ({ step: s.step, doneOn: fromDbDate(s.doneOn), reference: s.reference })),
-    deliveredOn: fromDbDateOrNull(o.deliveredOn),
-    satDoneOn: fromDbDateOrNull(o.satDoneOn),
-    satSignedBy: o.satSignedBy,
+    deliveredOn: fromDbDateOrNull(o.delivery?.deliveredOn),
+    satDoneOn: fromDbDateOrNull(o.delivery?.satDoneOn),
+    satSignedBy: o.delivery?.satSignedBy ?? null,
     claims: { open: o.claims.filter((c) => c.status === "open" || c.status === "with_factory").length, total: o.claims.length },
     closedOn: o.status === "closed" ? (o.closedAt ? dateIn(o.closedAt, timeZone) : fromDbDate(o.orderedOn)) : null,
   };
