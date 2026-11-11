@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { Paperclip } from "lucide-react";
-import { PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL } from "@kebo/shared";
 import { Badge, cn, EmptyState } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import type { CustomerPayments } from "@/lib/types-money";
@@ -17,10 +15,9 @@ const th = "px-3 py-2 font-medium whitespace-nowrap";
 const td = "px-3 py-2.5 align-top";
 
 /**
- * A customer's payments, in the order page's layout: what they ordered, paid
- * and still owe (per currency), each order with its numbers, then every
- * payment they made. Each order opens on its Payments tab, where payments
- * are recorded and changed.
+ * A customer's money, in the order page's layout: what they ordered, paid
+ * and still owe (per currency) and each order with its numbers. The payments
+ * themselves are on Treasury › Payments (View payments).
  */
 export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
   if (d.orders.length === 0)
@@ -163,82 +160,6 @@ export function CustomerPaymentsBody({ d }: { d: CustomerPayments }) {
             )}
           </table>
         </div>
-      </section>
-
-      <section aria-label="Payments received" className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">
-          Payments received <span className="font-normal text-muted">· newest first; bank charges the banks kept count as paid</span>
-        </h2>
-        {d.payments.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-muted">No payments from them yet.</p>
-        ) : (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
-            <table data-fit="" className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-surface-2 text-left text-xs text-text-2">
-                  <th scope="col" className={th}>
-                    Date
-                  </th>
-                  <th scope="col" className={th}>
-                    Order
-                  </th>
-                  <th scope="col" className={cn(th, "hidden sm:table-cell")}>
-                    For
-                  </th>
-                  <th scope="col" className={cn(th, "hidden md:table-cell")}>
-                    Method · reference
-                  </th>
-                  <th scope="col" className={cn(th, "text-right")}>
-                    Amount
-                  </th>
-                  <th scope="col" className={cn(th, "hidden text-right sm:table-cell")}>
-                    Bank charges
-                  </th>
-                  <th scope="col" className={cn(th, "hidden w-16 sm:table-cell")}>
-                    Proof
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.payments.map((p) => (
-                  <tr key={p.id} className={cn("border-t border-line", p.voided && "text-muted [&_td]:line-through")}>
-                    <td className={cn(td, "whitespace-nowrap")}>{date(p.paidOn)}</td>
-                    <td className={td}>
-                      <Link href={`/orders/${p.order.id}/payment`} className="hover:text-primary">
-                        {p.order.refNo}
-                      </Link>
-                      <span className="block text-xs text-muted sm:hidden">{PAYMENT_KIND_LABEL[p.kind]}</span>
-                    </td>
-                    <td className={cn(td, "hidden sm:table-cell")}>
-                      {PAYMENT_KIND_LABEL[p.kind]} {p.voided && <Badge tone="bad">Removed</Badge>}
-                    </td>
-                    <td className={cn(td, "hidden text-text-2 md:table-cell")}>
-                      {PAYMENT_METHOD_LABEL[p.method]}
-                      {p.reference && ` · ${p.reference}`}
-                    </td>
-                    <td className={cn(td, "text-right font-semibold whitespace-nowrap tabular")}>{money(p.amount, p.currency)}</td>
-                    <td
-                      className={cn(
-                        td,
-                        "hidden text-right whitespace-nowrap tabular sm:table-cell",
-                        Number(p.bankCharges) > 0 ? "text-text-2" : "text-muted",
-                      )}
-                    >
-                      {Number(p.bankCharges) > 0 ? money(p.bankCharges, p.currency) : "—"}
-                    </td>
-                    <td className={cn(td, "hidden sm:table-cell")}>
-                      {p.hasFile ? (
-                        <Paperclip className="size-4 text-text-2" aria-label="Bank slip kept" />
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </section>
     </div>
   );

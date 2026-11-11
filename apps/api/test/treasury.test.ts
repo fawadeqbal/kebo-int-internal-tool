@@ -144,6 +144,8 @@ describe("treasury: every payment in one list", () => {
     expect(l.rows[0].status).toBe("to_verify");
     expect(l.counts).toMatchObject({ to_verify: 1 });
     expect(l.canRecord).toEqual({ in: true, out: true, expense: true, transfer: true });
+    expect(l.scope).toMatch(/^SO-/);
+    expect((await list(manager, `party=${customerId}`)).scope).toBe(`Treasury Co ${tag}`);
   });
 
   it("filters by direction, status and words; moves between accounts are their own direction", async () => {
@@ -181,6 +183,7 @@ describe("treasury: every payment in one list", () => {
       ]),
     );
     expect(v.ledgerHref).toMatch(/^\/finance\/ledger\?panel=entry&id=[0-9a-f-]{36}$/);
+    expect(v.orderId).toBe(orderId);
     const e = (await api(app, manager).get(`/treasury/payments/expense/${expenseId}`).expect(200)).body as PaymentView;
     expect(e).toMatchObject({ status: "void", voided: { reason: "Typed twice" }, voidPath: null });
     await api(app, manager).get(`/treasury/payments/supplier/${paymentId}`).expect(404);

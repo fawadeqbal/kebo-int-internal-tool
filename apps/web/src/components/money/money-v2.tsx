@@ -543,8 +543,22 @@ export interface OpenOrderRow {
  * open orders in that currency, oldest due first, each taking what it owes;
  * change any line. The rest is kept as the customer's credit.
  */
-export function ReceiptForm({ action, customer, orders, fx, today }: { action: Action; customer: string; orders: OpenOrderRow[]; fx: Fx; today: string }) {
-  const [open, setOpen] = useState(false);
+export function ReceiptForm({
+  action,
+  customer,
+  orders,
+  fx,
+  today,
+  startOpen = false,
+}: {
+  action: Action;
+  customer: string;
+  orders: OpenOrderRow[];
+  fx: Fx;
+  today: string;
+  startOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(startOpen);
   const currencies = [...new Set(orders.map((o) => o.currency))];
   const [currency, setCurrency] = useState(currencies[0] ?? fx.main);
   if (!open)

@@ -19,6 +19,7 @@ const partsOf = (json: string | undefined): unknown[] => {
 const refresh = (orderId: string) => {
   revalidatePath(`/orders/${orderId}`, "layout");
   revalidatePath("/orders");
+  revalidatePath("/payments", "layout");
 };
 
 /**
@@ -135,14 +136,6 @@ export async function paymentAction(orderId: string, currency: string, _prev: Ac
   return r;
 }
 
-/** A payment recorded by mistake (managers): it stays listed, crossed out. */
-export async function voidPaymentAction(orderId: string, paymentId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const v = formValues(form);
-  const r = await attempt(form, () => api.post(`/payments/${paymentId}/void`, { reason: v.reason }), "Payment removed.");
-  if (r.ok) refresh(orderId);
-  return r;
-}
-
 export async function cancelOrderAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const body = {
@@ -197,6 +190,7 @@ const refreshCustomer = (customerId: string) => {
   revalidatePath("/orders", "layout");
   revalidatePath("/finance", "layout");
   revalidatePath("/purchasing", "layout");
+  revalidatePath("/payments", "layout");
 };
 
 /** One transfer over several of the customer's orders; the rest becomes their credit. */

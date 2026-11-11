@@ -171,11 +171,16 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           </>
         }
         papers={
-          ledger && (
-            <ButtonLink href={ledger} variant="secondary">
-              <BookOpen aria-hidden /> Ledger
+          <>
+            <ButtonLink href={`/payments?party=${c.id}`} variant="secondary">
+              Payments
             </ButtonLink>
-          )
+            {ledger && (
+              <ButtonLink href={ledger} variant="secondary">
+                <BookOpen aria-hidden /> Ledger
+              </ButtonLink>
+            )}
+          </>
         }
         primary={
           canAsk && (
@@ -355,7 +360,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
               <h2 className="text-[15px] font-semibold">
                 Money <span className="text-xs font-normal text-muted">· what they paid and still owe{managers ? ", and what they earned us" : ""}</span>
               </h2>
-              <CustomerMoney customerId={c.id} customerName={c.name} view={moneyView} managers={managers} />
+              <CustomerMoney customerId={c.id} customerName={c.name} view={moneyView} managers={managers} records={can(me, "payments.record")} />
             </RecordSection>
           </>
         }

@@ -75,6 +75,8 @@ export interface PaymentList {
   pageSize: number;
   /** In the period and filters, before the direction and status chips. */
   counts: { all: number; in: number; out: number; move: number; to_verify: number };
+  /** The order or party the list is for (?order=, ?party=): its number or name. */
+  scope: string | null;
   /** What this person may record from the Record payment page. */
   canRecord: { in: boolean; out: boolean; expense: boolean; transfer: boolean };
 }
@@ -86,6 +88,8 @@ export interface PaymentView extends PaymentRow {
   fields: { label: string; value: string; href?: string | null }[];
   /** The bank slip, transfer screenshot or receipt photo. */
   file: { name: string; href: string } | null;
+  /** The order it is on (its page changes the payment and its proof there). */
+  orderId: string | null;
   /** Its posting in the general ledger. */
   ledgerHref: string | null;
   recordedBy: string | null;

@@ -1,18 +1,27 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { FileText } from "lucide-react";
-import { PAYMENT_RECORD_KINDS, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
+import { can, PAYMENT_RECORD_KINDS, PAYMENT_STATUS_LABEL, type PaymentRecordKind, type PaymentView } from "@kebo/shared";
 import { ButtonLink, Card, CardBody, CardHeader, DetailList, PageHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { date, dateTime } from "@/lib/format";
+import { date, dateTime, TZ } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
-import { VoidForm } from "@/components/money/forms";
+import type { ReactNode } from "react";
+import { todayIn } from "@kebo/utils";
+import { EditCustomerPayment, EditFactoryPayment, VoidForm } from "@/components/money/forms";
+import { AttachedFile } from "@/components/money/attachment";
+import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
+import { getPeople, getSettings } from "@/lib/loaders";
+import type { Me } from "@/lib/session";
+import { editPaymentAction, factoryPaymentAction, removePaymentFileAction } from "../../../money/actions";
 import { voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
 
 export const metadata = { title: "Payment" };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 
@@ -25,6 +34,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
   const p = await api.get<PaymentView>(`/treasury/payments/${kind as PaymentRecordKind}/${id}`).catch(() => null);
   if (!p) notFound();
   const order = p.for.find((f) => f.href?.startsWith("/orders/"));
+  const { change, proof } = await recordTools(me, p);
 
   return (
     <div className="flex max-w-4xl flex-col gap-4">
@@ -63,46 +73,58 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         </p>
       )}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Card>
-          <CardHeader title={p.what} />
-          <CardBody>
-            <DetailList
-              items={[
-                ...(p.party
-                  ? [
-                      {
-                        label: p.direction === "in" ? "From" : "To",
-                        value: p.party.href ? (
-                          <Link href={p.party.href} className="text-primary hover:underline">
-                            {p.party.label}
-                          </Link>
-                        ) : (
-                          p.party.label
-                        ),
-                      },
-                    ]
-                  : []),
-                ...p.fields.map((f) => ({
-                  label: f.label,
-                  value: f.href ? (
-                    <Link href={f.href} className="text-primary hover:underline">
-                      {f.value}
-                    </Link>
-                  ) : (
-                    f.value
-                  ),
-                })),
-                { label: "Account", value: p.account ?? "Not on an account yet" },
-                ...(p.reference ? [{ label: "Bank reference", value: p.reference }] : []),
-              ]}
-            />
-          </CardBody>
-        </Card>
+        <div className="flex min-w-0 flex-col gap-3">
+          <Card>
+            <CardHeader title={p.what} />
+            <CardBody>
+              <DetailList
+                items={[
+                  ...(p.party
+                    ? [
+                        {
+                          label: p.direction === "in" ? "From" : "To",
+                          value: p.party.href ? (
+                            <Link href={p.party.href} className="text-primary hover:underline">
+                              {p.party.label}
+                            </Link>
+                          ) : (
+                            p.party.label
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...p.fields
+                    .map((f) => ({ ...f, value: ISO_DATE.test(f.value) ? date(f.value) : f.value }))
+                    .map((f) => ({
+                      label: f.label,
+                      value: f.href ? (
+                        <Link href={f.href} className="text-primary hover:underline">
+                          {f.value}
+                        </Link>
+                      ) : (
+                        f.value
+                      ),
+                    })),
+                  { label: "Account", value: p.account ?? "Not on an account yet" },
+                  ...(p.reference ? [{ label: "Bank reference", value: p.reference }] : []),
+                ]}
+              />
+            </CardBody>
+          </Card>
+          {(change || p.voidPath) && (
+            <div className="flex flex-wrap items-start gap-2">
+              {change}
+              {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
+            </div>
+          )}
+        </div>
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader title="Proof" />
             <CardBody>
-              {p.file ? (
+              {proof ? (
+                proof
+              ) : p.file ? (
                 <a href={p.file.href} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
                   <FileText className="size-4" aria-hidden /> {p.file.name}
                 </a>
@@ -122,11 +144,77 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
                   View in the general ledger
                 </Link>
               )}
-              {p.voidPath && <VoidForm action={voidPaymentAction.bind(null, p.voidPath)} label="this payment" />}
             </CardBody>
           </Card>
         </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Change and Proof for a customer or supplier payment: the same forms the order used, with the
+ * same data, so a payment is changed in one place (here) whatever page it was recorded from.
+ */
+async function recordTools(me: Me, p: PaymentView): Promise<{ change: ReactNode; proof: ReactNode }> {
+  const none = { change: null, proof: null };
+  if (!p.orderId || p.voided) return none;
+  const today = todayIn(TZ);
+  if (p.kind === "customer") {
+    const [pays, o] = await Promise.all([orderPaymentsOf(p.orderId), orderOf(p.orderId)]);
+    const x = pays.payments.find((y) => y.id === p.id);
+    if (!x) return none;
+    const records = can(me, "payments.record");
+    return {
+      change:
+        records && !x.receiptId ? (
+          <EditCustomerPayment
+            action={editPaymentAction.bind(null, p.orderId, x.id, o.currency)}
+            payment={x}
+            currency={o.currency}
+            today={today}
+          />
+        ) : null,
+      proof: (
+        <AttachedFile
+          src={`/files/payments/${x.id}`}
+          file={x.file}
+          what="Bank slip"
+          canChange={records}
+          remove={removePaymentFileAction.bind(null, "in", x.id, p.orderId)}
+          empty="No bank slip"
+        />
+      ),
+    };
+  }
+  if (p.kind === "supplier") {
+    const [m, people, settings] = await Promise.all([orderMoneyOf(p.orderId), getPeople(), getSettings()]);
+    const f = m.factories;
+    const x = f?.payments.find((y) => y.id === p.id);
+    if (!f || !x) return none;
+    return {
+      change: f.canRecord ? (
+        <EditFactoryPayment
+          action={factoryPaymentAction.bind(null, m.orderId, x.id)}
+          factories={f.rows}
+          people={people}
+          orderCurrency={m.currency}
+          fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
+          today={today}
+          payment={x}
+        />
+      ) : null,
+      proof: (
+        <AttachedFile
+          src={`/files/factory-payments/${x.id}`}
+          file={x.file}
+          what="Bank slip"
+          canChange={f.canRecord}
+          remove={removePaymentFileAction.bind(null, "out", x.id, m.orderId)}
+          empty="No bank slip"
+        />
+      ),
+    };
+  }
+  return none;
 }

@@ -70,7 +70,6 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   });
   const keep = { p: sp.p, dir, status, q, order, party };
   const href = (change: Record<string, string | undefined>) => buildHref("/payments", keep, { page: undefined, ...change });
-  const scoped = list.rows[0]?.for.find((f) => f.href === `/orders/${order}`)?.label ?? list.rows[0]?.party?.label;
   const recordHref = order ? `/payments/new?kind=in&order=${order}` : "/payments/new";
   const canRecord = Object.values(list.canRecord).some(Boolean);
 
@@ -82,7 +81,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         summary={
           order || party ? (
             <>
-              For {scoped ?? "this record"} ·{" "}
+              For {list.scope ?? "this record"} ·{" "}
               <Link href={buildHref("/payments", {}, {})} className="font-medium text-primary hover:underline">
                 All payments
               </Link>

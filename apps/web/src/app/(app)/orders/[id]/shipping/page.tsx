@@ -8,9 +8,9 @@ import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, FieldsForm, PanelButton, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools } from "@/components/orders/costs-card";
-import { packingAction, packingMarksAction, paymentAction } from "../../actions";
+import { packingAction, packingMarksAction } from "../../actions";
 import { fieldsAction, lightAction } from "../../light-actions";
-import { PaymentForm } from "../forms";
+import { RecordPaymentLink } from "@/components/money/pay-links";
 import { PackingCard } from "../goods";
 import { docHref, goodsOf } from "../shared";
 import { stageTool } from "../close-tool";
@@ -205,15 +205,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
     tools.balance_in = {
       kind: "node",
       node: (
-        <PaymentForm
-          quiet
-          label="Record payment"
-          action={paymentAction.bind(null, o.id, o.currency)}
-          currency={o.currency}
-          depositDue={o.money.depositDue}
-          due={o.money.due}
-          today={now}
-        />
+        <RecordPaymentLink kind="in" order={o.id} back={`/orders/${o.id}/shipping`} />
       ),
     };
   const shipped = stageTool(me, o, "shipped", now);
