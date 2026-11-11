@@ -569,7 +569,7 @@ model Party {
   orderLines         OrderLine[]          @relation("OrderLineFactory")
   requests           FactoryRequest[]     @relation("FactoryRequestFactory")
   checklistItems     OrderChecklistItem[] @relation("OrderChecklistItemFactory")
-  paymentPlans       FactoryPaymentPlan[] @relation("FactoryPaymentPlanFactory")
+  payables           Invoice[]            @relation("SupplierInvoices")
   orderParts         OrderFactory[]       @relation("OrderFactoryFactory")
   factoryOrderFacts  FactoryOrderFact[]   @relation("FactoryOrderFactFactory")
   factoryRecordNotes Note[]               @relation("NoteFactory")
@@ -1152,7 +1152,8 @@ model Order {
   allocations  Allocation[]
   /// What we paid its suppliers (their payments' parts).
   supplierPaid Allocation[]         @relation("PurchaseParts")
-  planItems    PaymentPlanItem[]
+  /// What the customer is invoiced: the instalments of the order (deposit, balance…).
+  receivables  Invoice[]            @relation("OrderReceivables")
   expenses     Expense[]
   costs        OrderCost[]
   bankContract OrderBankContract?
@@ -1163,7 +1164,8 @@ model Order {
   claims       OrderClaim[]
   checklist    OrderChecklistItem[]
   files        Attachment[]
-  factoryPlan  FactoryPaymentPlan[]
+  /// What its suppliers invoice: each supplier's instalments on the order.
+  payables     Invoice[]            @relation("OrderPayables")
   submissions  MoneySubmission[]
   /// Each factory's ready date (the order's ready date is the latest of them).
   factories    OrderFactory[]
@@ -1596,37 +1598,57 @@ model OrderClaim {
 // Money: payments in (customer) and out (factory), invoices
 // ============================================================================
 
-/// The customer's instalments for an order (deposit, balance, or more). They add
-/// up to the order total; money received pays the earliest first.
-model PaymentPlanItem {
-  id        String    @id @default(uuid()) @db.Uuid
+/// An invoice (Billing): one instalment, of the customer (receivable: on `orderId`) or of a supplier
+/// (payable: on `purchaseOrderId`, from `supplierId`). Exactly one of the two links is set. The customer's
+/// add up to the order total; money received pays the earliest first. A supplier's split what we owe them
+/// on the order (an advance when we order, the balance when they say ready, or a fixed day). Paid, due
+/// and late are worked out from the order's payments, never stored (claude/billing-4-design.md).
+model Invoice {
+  id              String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company   Company   @relation(fields: [companyId], references: [id])
-  orderId   String    @map("order_id") @db.Uuid
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  label     String    @db.VarChar(80)
-  amount    Decimal   @db.Decimal(14, 2)
+  companyId       String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company   @relation(fields: [companyId], references: [id])
+  /// Receivable: the order the customer is invoiced on.
+  orderId         String?   @map("order_id") @db.Uuid
+  order           Order?    @relation("OrderReceivables", fields: [orderId], references: [id], onDelete: Cascade)
+  /// Payable: the order its supplier invoices us on.
+  purchaseOrderId String?   @map("purchase_order_id") @db.Uuid
+  purchaseOrder   Order?    @relation("OrderPayables", fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  /// Payable: the supplier.
+  supplierId      String?   @map("supplier_id") @db.Uuid
+  supplier        Party?    @relation("SupplierInvoices", fields: [supplierId], references: [id], onDelete: Restrict)
+  label           String    @db.VarChar(80)
+  amount          Decimal   @db.Decimal(14, 2)
+  /// Payable: the supplier's currency (a receivable is in the order's).
+  currency        String?   @db.Char(3)
+  /// Payable: its share of what we owe the supplier, when set as a percent.
+  percent         Decimal?  @db.Decimal(5, 2)
   /// The date of a `fixed` row (typed by hand, or the deposit's); rows with another rule have none stored:
   /// their date is worked out each time from the order's dates (@kebo/shared planItemDue).
-  dueOn     DateTime? @map("due_on") @db.Date
-  sortOrder Int       @default(0) @map("sort_order")
-  /// Built from the route: deposit | balance (null: typed by hand).
-  part      String?   @db.VarChar(10)
-  /// When it falls due: fixed (dueOn) | on_ready (the order's ready date, the latest factory's) |
-  /// on_ship_plus_days (`dueDays` after the goods left) | after_papers (`dueDays` after the papers reached
-  /// the customer's bank, LC); null: no date yet.
-  dueRule   String?   @map("due_rule") @db.VarChar(20)
-  dueDays   Int?      @map("due_days")
-  /// Its payment request's number (PR-2026-0031-n), given when the row is made and never changed or reused
-  /// (a rebuilt plan keeps the numbers of the rows it keeps; new rows get the next one). Set by the database.
-  requestNo Int?      @map("request_no")
+  dueOn           DateTime? @map("due_on") @db.Date
+  sortOrder       Int       @default(0) @map("sort_order")
+  /// Receivable, built from the route: deposit | balance (null: typed by hand).
+  part            String?   @db.VarChar(10)
+  /// When it falls due. Receivable: fixed (dueOn) | on_ready (the order's ready date, the latest factory's) |
+  /// on_ship_plus_days (`dueDays` after the goods left) | after_papers (`dueDays` after the papers reached the
+  /// customer's bank, LC); null: no date yet. Payable: on_order | on_ready (that supplier's) | fixed.
+  dueRule         String?   @map("due_rule") @db.VarChar(20)
+  dueDays         Int?      @map("due_days")
+  /// Receivable: its payment request's number (PR-2026-0031-n), given when the row is made and never changed
+  /// or reused (a rebuilt plan keeps the numbers of the rows it keeps; new rows get the next one). Set by the database.
+  requestNo       Int?      @map("request_no")
+  /// Payable: the supplier's own invoice number, if they sent one (we do not number their bills).
+  supplierRef     String?   @map("supplier_ref") @db.VarChar(60)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@unique([orderId, requestNo])
   @@index([orderId])
+  @@index([purchaseOrderId, supplierId])
+  @@index([supplierId])
   @@index([dueOn])
   @@index([companyId])
-  @@map("payment_plan_items")
+  @@map("invoices")
 }
 
 /// A cost: for one order (freight, inspection…) or for the company when orderId
@@ -1860,37 +1882,6 @@ model MoneyMovement {
  * not part of the balance). Balance = in − used − refund.
  */
 
-/**
- * What we agreed to pay one factory for an order, in parts: an advance when we
- * order, the balance when they say ready (its date follows the order's ready
- * date), or on a fixed day. Paid status comes from the factory payments.
- */
-model FactoryPaymentPlan {
-  id        String    @id @default(uuid()) @db.Uuid
-  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company   Company   @relation(fields: [companyId], references: [id])
-  orderId   String    @map("order_id") @db.Uuid
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  factoryId String    @map("factory_id") @db.Uuid
-  factory   Party     @relation("FactoryPaymentPlanFactory", fields: [factoryId], references: [id])
-  label     String    @db.VarChar(80)
-  percent   Decimal?  @db.Decimal(5, 2)
-  amount    Decimal   @db.Decimal(14, 2)
-  currency  String    @db.Char(3)
-  /// on_order | on_ready | fixed
-  dueRule   String    @map("due_rule") @db.VarChar(10)
-  dueOn     DateTime? @map("due_on") @db.Date
-  sortOrder Int       @default(0) @map("sort_order")
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-
-  @@index([orderId, factoryId])
-  @@index([factoryId])
-  @@index([companyId])
-  @@map("factory_payment_plans")
-}
-
 /// One factory's part of an order: the ready date it gave (one per factory; the order's ready date is the
 /// latest of them). factoryId null: the goods of an order whose lines name no factory.
 model OrderFactory {
@@ -2083,7 +2074,7 @@ model Company {
   orders              Order[]
   orderLines          OrderLine[]
   orderStageChanges   OrderStageChange[]
-  paymentPlanItems    PaymentPlanItem[]
+  invoices            Invoice[]
   expenses            Expense[]
   allocations         Allocation[]
   moneyAccounts       MoneyAccount[]
@@ -2100,7 +2091,6 @@ model Company {
   checklistItems      OrderChecklistItem[]
   checklistTemplates  ChecklistTemplate[]
   moneyMovements      MoneyMovement[]
-  factoryPaymentPlans FactoryPaymentPlan[]
   orderFactories      OrderFactory[]
   orderPapers         OrderPaper[]
   orderFacts          OrderFact[]

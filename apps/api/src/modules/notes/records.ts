@@ -4,7 +4,7 @@ import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import type { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
 import { customerAccess } from "../parties/customers.service";
 
 /** A record notes and follow-ups are on: an inquiry, an order, a customer or a factory. */

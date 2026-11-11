@@ -159,3 +159,23 @@ export function landedUnitCosts(lines: { unitCostMinor: Minor | null; quantity: 
     return qty > 0 ? l.unitCostMinor + roundHalfAway(shares[i]! / qty) : l.unitCostMinor;
   });
 }
+
+/** Amount ÷ rate (units of its currency per one unit of the target), rounded to cents. */
+export const convert = (minor: Minor, rate: number) => roundHalfAway(minor / rate);
+
+/** The order fields its rate needs. */
+export interface RatedOrder {
+  currency: string;
+  mainCurrency: string | null;
+  mainRate: { toString(): string } | number | string | null;
+}
+
+/**
+ * Units of the order's currency per one unit of the main currency: the rate
+ * stored on the order, else today's Settings rate; null when neither is known.
+ */
+export function orderRate(o: RatedOrder, main: string, rates: Rates): number | null {
+  if (o.currency === main) return 1;
+  if (o.mainRate !== null && o.mainCurrency === main && Number(o.mainRate) > 0) return Number(o.mainRate);
+  return fxRate(o.currency, main, main, rates);
+}

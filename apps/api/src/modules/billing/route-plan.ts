@@ -24,6 +24,22 @@ type PlanOrder = {
   lcDays: number | null;
 };
 
+/** A new order's plan: the instalments its route builds (routePlan), in order; each gets its payment request number. */
+export async function createPlan(tx: Tx, orderId: string, plan: ReturnType<typeof routePlan>) {
+  await tx.invoice.createMany({
+    data: plan.map((p, i) => ({
+      orderId,
+      label: p.label,
+      amount: fromMinor(p.amountMinor),
+      dueOn: toDbDateOrNull(p.dueOn),
+      part: p.part,
+      dueRule: p.dueRule,
+      dueDays: p.dueDays,
+      sortOrder: i,
+    })),
+  });
+}
+
 /**
  * The route changed (`was`: the terms before): the instalments paid in full stay, and so do the ones
  * changed by hand (a row no longer as the old route built it); the rest is rebuilt from the new route's
@@ -32,7 +48,7 @@ type PlanOrder = {
  */
 export async function rebuildRoutePlan(tx: Tx, o: PlanOrder, was: RouteTerms, t: RouteTerms, days: { depositDays: number; balanceDays: number }) {
   const [items, payments] = await Promise.all([
-    tx.paymentPlanItem.findMany({ where: { orderId: o.id }, orderBy: { sortOrder: "asc" } }),
+    tx.invoice.findMany({ where: { orderId: o.id }, orderBy: { sortOrder: "asc" } }),
     tx.allocation.findMany({ where: { orderId: o.id, ...livePart }, select: { amount: true, bankCharges: true } }),
   ]);
   const totalMinor = decimalToMinor(o.total);
@@ -51,11 +67,11 @@ export async function rebuildRoutePlan(tx: Tx, o: PlanOrder, was: RouteTerms, t:
   const built = routePlan(totalMinor, Number(o.depositPercent), was, orderedOn, days.depositDays, days.balanceDays);
   const fresh = routePlan(totalMinor, Number(o.depositPercent), t, orderedOn, days.depositDays, days.balanceDays);
   const { keep, add } = rebuildPlan(stored, settled, fresh, built);
-  await tx.paymentPlanItem.deleteMany({ where: { orderId: o.id, id: { notIn: keep.map((k) => k.id) } } });
+  await tx.invoice.deleteMany({ where: { orderId: o.id, id: { notIn: keep.map((k) => k.id) } } });
   // Kept rows first, in their order; then the new parts.
-  for (const [n, k] of keep.entries()) await tx.paymentPlanItem.update({ where: { id: k.id }, data: { sortOrder: n } });
+  for (const [n, k] of keep.entries()) await tx.invoice.update({ where: { id: k.id }, data: { sortOrder: n } });
   for (const [n, a] of add.entries())
-    await tx.paymentPlanItem.create({
+    await tx.invoice.create({
       data: {
         orderId: o.id,
         label: a.label,
@@ -81,9 +97,9 @@ export async function rebuildRoutePlan(tx: Tx, o: PlanOrder, was: RouteTerms, t:
 export function lcBalanceMinor(o: {
   total: Prisma.Decimal;
   depositPercent: Prisma.Decimal;
-  planItems?: { amount: Prisma.Decimal; dueRule: string | null; part?: string | null }[];
+  receivables?: { amount: Prisma.Decimal; dueRule: string | null; part?: string | null }[];
 }): Minor {
-  const plan = o.planItems ?? [];
+  const plan = o.receivables ?? [];
   const lcPart = plan.filter((p) => p.dueRule === "after_papers").reduce((t, p) => t + decimalToMinor(p.amount), 0);
   if (lcPart > 0) return lcPart;
   const total = decimalToMinor(o.total);
@@ -101,7 +117,7 @@ export function lcChecksOf(
     readyOn: ISODate | null;
     /** Our ship-by: checked against the LC's latest shipment date. */
     shipBy: Date | null;
-    planItems?: { amount: Prisma.Decimal; dueRule: string | null; part?: string | null }[];
+    receivables?: { amount: Prisma.Decimal; dueRule: string | null; part?: string | null }[];
     bankContract: { amount: Prisma.Decimal | null; currency: string | null; latestShipOn: Date | null; expiresOn: Date | null } | null;
     shipments: { id: string; createdAt: Date; eta: Date | null }[];
   },

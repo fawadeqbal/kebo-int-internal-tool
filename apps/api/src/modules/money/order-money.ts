@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@kebo/database";
-import { fxRate, orderCosting, roundHalfAway, toMinor, type Minor, type Rates } from "@kebo/money";
+import { convert, fxRate, orderCosting, orderRate, toMinor, type Minor, type Rates, type RatedOrder } from "@kebo/money";
 import { BASIS_COST_CATEGORIES } from "@kebo/shared";
 import type { Tx } from "../../database/prisma.service";
 
@@ -15,27 +15,8 @@ import type { Tx } from "../../database/prisma.service";
  */
 
 type Db = PrismaClient | Tx;
-type Decimalish = { toString(): string } | number | string | null;
 
-/** Amount ÷ rate (units of its currency per one unit of the target), rounded to cents. */
-export const convert = (minor: Minor, rate: number) => roundHalfAway(minor / rate);
-
-/** The order fields its rate needs. */
-export interface RatedOrder {
-  currency: string;
-  mainCurrency: string | null;
-  mainRate: Decimalish;
-}
-
-/**
- * Units of the order's currency per one unit of the main currency: the rate
- * stored on the order, else today's Settings rate; null when neither is known.
- */
-export function orderRate(o: RatedOrder, main: string, rates: Rates): number | null {
-  if (o.currency === main) return 1;
-  if (o.mainRate !== null && o.mainCurrency === main && Number(o.mainRate) > 0) return Number(o.mainRate);
-  return fxRate(o.currency, main, main, rates);
-}
+export { convert, orderRate, type RatedOrder };
 
 /** Turns amounts into the main currency and remembers the currencies without a rate (never silently 0). */
 export class MainMoney {

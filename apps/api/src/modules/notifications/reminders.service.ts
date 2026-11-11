@@ -11,11 +11,11 @@ import { SettingsService } from "../settings/settings.service";
 import { links, NotificationsService } from "./notifications.service";
 import { goodsOf } from "../orders/orders.service";
 import { InsightsService } from "../insights/insights.service";
-import { ordersWithMoneyDue } from "../money/due";
-import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../money/position";
+import { ordersWithMoneyDue } from "../billing/api";
+import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
-import { readyOnOf, readySelect } from "../orders/ready";
-import { livePlansOf } from "../money/plan-live";
+import { readyOnOf, readySelect } from "@kebo/database";
+import { livePlansOf } from "../billing/api";
 import { FollowUpsService } from "../notes/follow-ups.service";
 
 /**
@@ -109,7 +109,7 @@ export class RemindersService {
       where: { inquiry: { onHold: false }, OR: [{ status: "open" }, { status: "closed", id: { in: await ordersWithMoneyDue(this.prisma, fxOf(s, await this.limits.allows("expenses"))) } }] },
       include: {
         allocations: { where: livePart },
-        planItems: { orderBy: { sortOrder: "asc" } },
+        receivables: { orderBy: { sortOrder: "asc" } },
         expenses: chargedExpenses,
         inquiry: { select: { id: true, assigneeId: true } },
         lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true, factoryId: true } },

@@ -1,3 +1,4 @@
+import { PRESET_ROLES } from "@kebo/shared";
 import type { INestApplication } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -770,7 +771,8 @@ describe("the ledger", () => {
       await api(app, bilal).get(path).expect(403);
       await api(app, admin).get(path).expect(200);
     }
-    const roles = await db().role.findMany({ select: { key: true, permissions: true, superAdmin: true } });
+    // The roles the company starts with (a role someone makes, as the security test does, is theirs to choose).
+    const roles = await db().role.findMany({ where: { key: { in: Object.keys(PRESET_ROLES) } }, select: { key: true, permissions: true, superAdmin: true } });
     for (const r of roles)
       if (
         r.key === "manager" ||

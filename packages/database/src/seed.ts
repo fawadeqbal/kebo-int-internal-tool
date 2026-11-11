@@ -412,7 +412,7 @@ export async function seedDemoData(
     }
     // The customer's plan from the terms: the deposit on its date, the balance 14 days after the goods leave.
     for (const [k, p] of defaultPlan(accepted.total, 30, orderedOn, 7).entries()) {
-      await db.paymentPlanItem.create({
+      await db.invoice.create({
         data: {
           orderId: order.id,
           label: p.label,

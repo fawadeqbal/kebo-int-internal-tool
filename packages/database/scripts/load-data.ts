@@ -486,7 +486,7 @@ async function main() {
     // The factory's ready date (one per factory; this order has one).
     if (oStage !== "confirmed") await db.orderFactory.create({ data: { orderId: order.id, factoryId: factory.id, readyOn: toDbDate(addDays(orderedOn, int(15, 40))) } });
     // The deposit on its date, the balance 14 days after the goods leave (worked out from the ship date).
-    await db.paymentPlanItem.createMany({
+    await db.invoice.createMany({
       data: defaultPlan(accepted.total, 30, orderedOn, 7).map((p, k) => ({
         orderId: order.id,
         label: p.label,

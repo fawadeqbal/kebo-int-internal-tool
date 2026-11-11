@@ -1,7 +1,7 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { livePlan, shippedOnOf, type PlanDates } from "@kebo/shared";
 import type { PrismaService, Tx } from "../../database/prisma.service";
-import { readyOnOf, readySelect } from "../orders/ready";
+import { readyOnOf, readySelect } from "@kebo/database";
 import { termsOf } from "./route-plan";
 
 type Db = PrismaService["db"] | Tx;
@@ -43,7 +43,7 @@ const liveSelect = {
   balanceWhen: true,
   lcTerms: true,
   lcDays: true,
-  planItems: { orderBy: { sortOrder: "asc" } },
+  receivables: { orderBy: { sortOrder: "asc" } },
   lines: { select: { factoryId: true } },
   ...planDatesSelect,
 } satisfies Prisma.OrderSelect;
@@ -56,7 +56,7 @@ export function livePlanOfOrder(o: LiveOrder) {
   return {
     dates,
     items: livePlan(
-      o.planItems.map((p) => ({
+      o.receivables.map((p) => ({
         id: p.id,
         label: p.label,
         amountMinor: decimalToMinor(p.amount),

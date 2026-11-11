@@ -5,7 +5,7 @@ import { FIRST_COMPANY_ID, seedCompanyBase } from "@kebo/database";
 import { factoryUnitCostMinor, multiplyMinor, toMinor, withTaxMinor } from "@kebo/money";
 import { todayIn } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
-import { owedLineSql } from "../src/modules/money/due";
+import { owedLineSql } from "../src/modules/billing/api";
 import { Prisma } from "@kebo/database";
 import { api, signIn, startApp } from "./app";
 

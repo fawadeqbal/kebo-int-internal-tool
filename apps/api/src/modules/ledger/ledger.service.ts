@@ -21,11 +21,11 @@ import { Clock } from "../../common/time/clock.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { toInfo } from "../../common/company/companies.service";
 import { SettingsService } from "../settings/settings.service";
-import { factoryPositionsSql, positionsSql } from "../money/due";
+import { factoryPositionsSql, positionsSql } from "../billing/api";
 import { orderRate } from "../money/order-money";
-import { chargedExpenses, fxOf, positionOf, type MoneyCtx } from "../money/position";
-import { livePlansOf } from "../money/plan-live";
-import { factoryPlansOf } from "../money/factory-plan";
+import { chargedExpenses, fxOf, positionOf, type MoneyCtx } from "../billing/api";
+import { livePlansOf } from "../billing/api";
+import { factoryPlansOf } from "../billing/api";
 import { LedgerPosting } from "./posting.service";
 import { ledgerCheck, type LedgerCheck } from "./check";
 import { companySnapshot } from "../quotations/quotations.service";
@@ -537,8 +537,8 @@ export class LedgerService {
           select: { id: true, share: true },
         })
         .then((rows) => rows.map((x) => ({ id: x.id, amount: x.share }))),
-      db.factoryPaymentPlan.findMany({
-        where: { orderId: p.orderId, factoryId: p.factoryId, currency: p.currency },
+      db.invoice.findMany({
+        where: { purchaseOrderId: p.orderId, supplierId: p.factoryId, currency: p.currency },
         orderBy: { sortOrder: "asc" },
         select: { label: true, amount: true },
       }),
@@ -844,7 +844,7 @@ export class LedgerService {
           mainRate: true,
           customer: { select: { id: true, name: true } },
           allocations: { where: livePart, select: { amount: true, bankCharges: true, voidedAt: true } },
-          planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+          receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
           expenses: chargedExpenses,
         },
       });

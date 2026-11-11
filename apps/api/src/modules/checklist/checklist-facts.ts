@@ -2,9 +2,9 @@ import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, type Prisma } f
 import { fromMinor } from "@kebo/money";
 import { routeFromQuotation, type ChecklistFacts } from "@kebo/shared";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
-import { lcChecksOf, termsOf } from "../money/route-plan";
-import { readyByOf, readyOnOf, readySelect } from "../orders/ready";
-import { chargedExpenses, positionOf, type MoneyCtx } from "../money/position";
+import { lcChecksOf, termsOf } from "../billing/api";
+import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
+import { chargedExpenses, positionOf, type MoneyCtx } from "../billing/api";
 import { dateIn, type ISODate } from "@kebo/utils";
 
 /** What one order's checklist is worked out from, read in one query. */
@@ -15,7 +15,7 @@ export const checklistOrderInclude = {
     select: { amount: true, bankCharges: true, on: true },
   },
   bankContract: true,
-  planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
+  receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
   expenses: chargedExpenses,
   // Shipment 1 (the primary) first: the facts list them in their order.
   shipments: { orderBy: SHIPMENT_ORDER },

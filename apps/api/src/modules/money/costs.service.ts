@@ -17,7 +17,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { convert, orderRate } from "./order-money";
-import { factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "./position";
+import { factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "../billing/api";
 
 const person = { select: { id: true, name: true } } as const;
 
@@ -49,7 +49,7 @@ export class CostsService {
         lines: { orderBy: { sortOrder: "asc" } },
         costs: true,
         allocations: { where: livePart },
-        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         supplierPaid: supplierPaidRelation,
         expenses: {
           orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],

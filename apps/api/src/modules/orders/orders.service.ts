@@ -38,22 +38,24 @@ import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
+import { orderAccess } from "../../common/auth/order-access";
 import { SettingsService } from "../settings/settings.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
-import { ordersWithMoneyDue } from "../money/due";
-import { chargedExpenses, fxOf, moneyFacts, positionOf, type MoneyCtx } from "../money/position";
+import { ordersWithMoneyDue } from "../billing/api";
+import { chargedExpenses, fxOf, moneyFacts, positionOf, type MoneyCtx } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
 import { checkAccount } from "../treasury/api";
-import { factoryPlansOf } from "../money/factory-plan";
-import { termsOf } from "../money/route-plan";
+import { factoryPlansOf } from "../billing/api";
+import { createPlan, termsOf } from "../billing/api";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { freezeOrderDoc, packingFinalNow } from "./order-docs";
 import { LedgerPosting, type LedgerRef } from "../ledger/posting.service";
 import { fromCredit, refund, releaseOrder } from "../treasury/api";
 import { onPrimaryShipment, orderShipments, shipFacts } from "./shipment-facts";
-import { readyByOf, readyOnOf, readySelect, readyWords, setReadyAll, setReadyDates } from "./ready";
+import { readyWords, setReadyAll, setReadyDates } from "./ready";
+import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
 
 /** Staff work on the deals they handle or created; managers see every deal. */
 /** Orders whose number, customer or inquiry (number, title) has the words. */
@@ -70,15 +72,10 @@ function orderSearch(term: string | undefined): Prisma.OrderWhereInput {
   };
 }
 
-export function orderAccess(user: SessionUser): Prisma.OrderWhereInput {
-  if (can(user, "inquiries.viewAll")) return {};
-  return { inquiry: { OR: [{ assigneeId: user.id }, { createdById: user.id }] } };
-}
-
 const orderInclude = {
   allocations: { where: livePart, orderBy: [{ on: "asc" }, { createdAt: "asc" }] },
   // With what pays it, what the position needs: the plan's deposit and what was charged to the customer.
-  planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+  receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
   lines: {
     orderBy: { sortOrder: "asc" },
@@ -324,18 +321,7 @@ export class OrdersService {
         ? { route: null, balanceWhen: balanceWhenOf(rev.balanceTerms), lcTerms: null, lcDays: null }
         : implied;
     const plan = routePlan(decimalToMinor(option.total), Number(rev.depositPercent), route, acceptedOn, days.depositDays, days.balanceDays);
-    await tx.paymentPlanItem.createMany({
-      data: plan.map((p, i) => ({
-        orderId: order.id,
-        label: p.label,
-        amount: fromMinor(p.amountMinor),
-        dueOn: toDbDateOrNull(p.dueOn),
-        part: p.part,
-        dueRule: p.dueRule,
-        dueDays: p.dueDays,
-        sortOrder: i,
-      })),
-    });
+    await createPlan(tx, order.id, plan);
     if (route.route || route.balanceWhen)
       await tx.order.update({
         where: { id: order.id },

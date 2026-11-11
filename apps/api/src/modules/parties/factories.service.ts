@@ -1,4 +1,4 @@
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
 import { customerOnly } from "./fields";
 import { Injectable } from "@nestjs/common";
 import { fromDbDateOrNull, type Prisma, isSupplier, newSupplier } from "@kebo/database";

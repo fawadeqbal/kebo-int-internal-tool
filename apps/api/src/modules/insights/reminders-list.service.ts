@@ -20,7 +20,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
 import { SHIPMENT_ORDER } from "../orders/shipment-facts";
 import { LeaksService } from "../money/leaks.service";
 import { LimitsService } from "../../common/company/limits.service";

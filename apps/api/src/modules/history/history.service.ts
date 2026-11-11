@@ -6,7 +6,7 @@ import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
 import { CustomersService } from "../parties/customers.service";
 import { LimitsService } from "../../common/company/limits.service";
 

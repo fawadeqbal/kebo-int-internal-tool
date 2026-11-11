@@ -34,6 +34,7 @@ import { CurrentUser, RequireFeature, RequirePermissions } from "../../common/au
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { MoneyService } from "./money.service";
+import { BillingService } from "../billing/billing.service";
 import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
 import { LeaksService } from "./leaks.service";
@@ -52,10 +53,6 @@ const expenseQuery = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
 });
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
-const flag = z
-  .enum(["true", "false"])
-  .optional()
-  .transform((v) => v === "true");
 const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
 
 @ApiTags("money")
@@ -63,6 +60,7 @@ const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) }
 export class MoneyController {
   constructor(
     private readonly money: MoneyService,
+    private readonly billing: BillingService,
     private readonly costs: CostsService,
     private readonly accounts: AccountsService,
     private readonly leaks: LeaksService,
@@ -106,21 +104,17 @@ export class MoneyController {
 
   /** { items: [{ id?, label, amount, dueOn? }], reason? } — they must add up to the order total. */
   @Put("orders/:id/payment-plan")
-  plan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentPlanInput)) body: PaymentPlanInput) {
-    return this.money.setPlan(user, id, body);
+  async plan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(paymentPlanInput)) body: PaymentPlanInput) {
+    await this.billing.setPlan(user, id, body);
+    return this.money.forOrder(user, id);
   }
 
   /** { factoryId, items: [{ label, percent?, amount, dueRule: on_order | on_ready | fixed, dueOn? }] } — they add up to what we owe it. */
   @Put("orders/:id/factory-plan")
   @RequirePermissions("sourcing.manage")
-  factoryPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPlanInput)) body: FactoryPlanInput) {
-    return this.money.setFactoryPlan(user, id, body);
-  }
-
-  /** What we still owe each factory on orders not cancelled. ?mine=true: the factories I look after. */
-  @Get("money/payables")
-  payables(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ mine: flag }))) q: { mine: boolean }) {
-    return this.money.payables(user, q.mine);
+  async factoryPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPlanInput)) body: FactoryPlanInput) {
+    await this.billing.setFactoryPlan(user, id, body);
+    return this.money.forOrder(user, id);
   }
 
   /** Managers only. ?from&to (dates), ?orderId, ?customerId, ?category, ?kind=order|customer|general; with totals by kind and by customer. */

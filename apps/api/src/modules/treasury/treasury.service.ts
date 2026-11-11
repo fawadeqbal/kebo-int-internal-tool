@@ -21,7 +21,7 @@ import { ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { LimitsService } from "../../common/company/limits.service";
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
 import { customerAccess } from "../parties/customers.service";
 
 export interface PaymentsQuery {
