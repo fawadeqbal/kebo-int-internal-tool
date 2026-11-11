@@ -1,8 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDateOrNull, isSupplier, livePart, toDbDateOrNull, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
-import { can, dueRuleWords, type FactoryPlanInput, type PaymentPlanInput, type PlanDueRule } from "@kebo/shared";
-import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import {
+  can,
+  dueRuleWords,
+  paperNumber,
+  planStatus,
+  type FactoryPlanInput,
+  type InvoiceSide,
+  type PaymentPlanInput,
+  type PlanDueRule,
+} from "@kebo/shared";
+import { daysBetween, DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -11,10 +20,10 @@ import { orderAccess } from "../../common/auth/order-access";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
-import { ordersOwingFactories } from "./due";
+import { ordersOwingFactories, ordersWithMoneyDue } from "./due";
 import { factoryPlansOf, owedByFactory } from "./factory-plan";
-import { factoryBorneExpenses, factoryPositionOf, fxOf, supplierPaidRelation } from "./position";
-import { livePlanOf } from "./plan-live";
+import { chargedExpenses, factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "./position";
+import { livePlanOf, livePlansOf } from "./plan-live";
 
 const person = { select: { id: true, name: true } } as const;
 
@@ -185,20 +194,32 @@ export class BillingService {
           currency: owed.currency,
           dueRule: i.dueRule,
           dueOn: i.dueRule === "fixed" ? toDbDateOrNull(i.dueOn) : null,
+          supplierRef: i.supplierRef ?? null,
           sortOrder: n,
         })),
       });
-      const describe = (rows: { label: string; amount: string; dueRule: string | null }[]) =>
-        rows.map((r) => `${r.label} ${r.amount} (${r.dueRule})`).join("; ");
+      const describe = (rows: { label: string; amount: string; dueRule: string | null; supplierRef: string | null }[]) =>
+        rows.map((r) => `${r.label} ${r.amount} (${r.dueRule})${r.supplierRef ? ` inv. ${r.supplierRef}` : ""}`).join("; ");
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out_plan",
         entityType: "order",
         entityId: orderId,
         summary: `${o.refNo}: plan for paying ${f.name} set`,
-        oldValues: { plan: describe(before.map((b) => ({ label: b.label, amount: b.amount.toFixed(2), dueRule: b.dueRule }))) },
+        oldValues: {
+          plan: describe(
+            before.map((b) => ({ label: b.label, amount: b.amount.toFixed(2), dueRule: b.dueRule, supplierRef: b.supplierRef })),
+          ),
+        },
         newValues: {
-          plan: describe(input.items.map((i) => ({ label: i.label, amount: fromMinor(toMinor(i.amount)), dueRule: i.dueRule }))),
+          plan: describe(
+            input.items.map((i) => ({
+              label: i.label,
+              amount: fromMinor(toMinor(i.amount)),
+              dueRule: i.dueRule,
+              supplierRef: i.supplierRef ?? null,
+            })),
+          ),
         },
       });
     });
@@ -280,4 +301,164 @@ export class BillingService {
       }))
       .sort((a, b) => Number(b.toPay) - Number(a.toPay));
   }
+
+  /* ---------------------------------------------------------------- open invoices */
+
+  /**
+   * Every invoice still open on one side, instalment by instalment: the customer's (with its payment request
+   * number) or the suppliers' (with their own number, if known). Late first (most days late), then by due date;
+   * no date last. Each is paid in due order from the order's payments, as everywhere else. `mine`: the orders I
+   * handle (receivable) or the suppliers I look after (payable).
+   */
+  async openInvoices(user: SessionUser, side: InvoiceSide, mine: boolean) {
+    const today = this.clock.today();
+    const s = await this.settings.get();
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    const rows: OpenInvoice[] = [];
+    if (side === "receivable") {
+      if (!can(user, "payments.record") && !can(user, "expenses.manage")) throw new ForbiddenError("You do not record money.");
+      const orders = await this.prisma.db.order.findMany({
+        where: {
+          status: { in: ["open", "closed"] },
+          id: { in: await ordersWithMoneyDue(this.prisma, fx) },
+          ...(mine && { inquiry: { assigneeId: user.id } }),
+        },
+        select: {
+          id: true,
+          refNo: true,
+          currency: true,
+          mainCurrency: true,
+          mainRate: true,
+          depositPercent: true,
+          total: true,
+          expenses: chargedExpenses,
+          customer: { select: { id: true, name: true } },
+          inquiry: { select: { assignee: person } },
+          allocations: { where: livePart, select: { amount: true, bankCharges: true } },
+          receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        },
+      });
+      const plans = await livePlansOf(
+        this.prisma.db,
+        orders.map((o) => o.id),
+      );
+      for (const o of orders) {
+        const pos = positionOf(o, fx);
+        const plan = planStatus(plans.get(o.id)?.items ?? [], pos.settledMinor, today, s.reminders.dueSoonDays);
+        // What is due beyond the open instalments (expenses charged to the customer, or a total that grew after the
+        // plan was made): listed too, without a number, so the list adds up to what the customer owes.
+        const rest = pos.dueMinor - plan.reduce((t, i) => t + i.openMinor, 0);
+        if (rest > 0)
+          rows.push({
+            id: null,
+            number: null,
+            label: pos.chargedMinor > 0 ? "Charged to the customer, not on a payment request yet" : "Not on a payment request yet",
+            order: { id: o.id, refNo: o.refNo },
+            party: o.customer,
+            lookedAfterBy: o.inquiry.assignee,
+            currency: o.currency,
+            amount: fromMinor(rest),
+            paid: fromMinor(0),
+            open: fromMinor(rest),
+            dueOn: null,
+            late: 0,
+            soon: false,
+          });
+        for (const i of plan) {
+          if (i.openMinor <= 0) continue;
+          rows.push({
+            id: i.id,
+            number: paperNumber(o.refNo, "payment-request", i.requestNo),
+            label: i.label,
+            order: { id: o.id, refNo: o.refNo },
+            party: o.customer,
+            lookedAfterBy: o.inquiry.assignee,
+            currency: o.currency,
+            amount: fromMinor(i.amountMinor),
+            paid: fromMinor(i.paidMinor),
+            open: fromMinor(i.openMinor),
+            dueOn: i.dueOn,
+            late: lateDays(i.dueOn, today),
+            soon: i.status === "due_soon",
+          });
+        }
+      }
+    } else {
+      if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+      const orders = await this.prisma.db.order.findMany({
+        where: { status: { not: "cancelled" }, id: { in: await ordersOwingFactories(this.prisma, fx) } },
+        select: { id: true, refNo: true, lines: { select: { factory: { select: { id: true, owner: person } } } } },
+      });
+      for (const o of orders) {
+        const owners = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.owner] as const] : [])));
+        for (const f of await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx)) {
+          const owner = owners.get(f.factory.id) ?? null;
+          if (mine && owner?.id !== user.id) continue;
+          for (const r of f.rows) {
+            if (Number(r.open) <= 0) continue;
+            rows.push({
+              id: r.id,
+              number: r.supplierRef,
+              label: r.label,
+              order: { id: o.id, refNo: o.refNo },
+              party: f.factory,
+              lookedAfterBy: owner,
+              currency: f.currency,
+              amount: r.amount,
+              paid: r.paid,
+              open: r.open,
+              dueOn: r.due,
+              late: lateDays(r.due, today),
+              soon: r.status === "due",
+            });
+          }
+        }
+      }
+    }
+    rows.sort(
+      (a, b) => b.late - a.late || (a.dueOn ?? "9999").localeCompare(b.dueOn ?? "9999") || a.order.refNo.localeCompare(b.order.refNo),
+    );
+    const totals = new Map<string, { open: Minor; late: Minor; count: number }>();
+    for (const r of rows) {
+      const t = totals.get(r.currency) ?? { open: 0, late: 0, count: 0 };
+      t.open += toMinor(r.open);
+      if (r.late > 0) t.late += toMinor(r.open);
+      t.count += 1;
+      totals.set(r.currency, t);
+    }
+    return {
+      side,
+      rows,
+      totals: [...totals.entries()].map(([currency, t]) => ({
+        currency,
+        open: fromMinor(t.open),
+        late: fromMinor(t.late),
+        count: t.count,
+      })),
+    };
+  }
+}
+
+/** Days past its due date (0: not late, or no date yet). */
+const lateDays = (dueOn: ISODate | null, today: ISODate) => (dueOn && dueOn < today ? daysBetween(dueOn, today) : 0);
+
+/** One open invoice in the Receivables or Payables list. */
+interface OpenInvoice {
+  /** The invoice (null: a supplier's default plan not saved yet, or what is due beyond the customer's instalments). */
+  id: string | null;
+  /** The payment request's number (PR-2026-0031-2), or the supplier's own number if known. */
+  number: string | null;
+  label: string;
+  order: { id: string; refNo: string };
+  party: { id: string; name: string };
+  lookedAfterBy: { id: string; name: string } | null;
+  currency: string;
+  amount: string;
+  paid: string;
+  open: string;
+  dueOn: ISODate | null;
+  /** Days late (0: not late). */
+  late: number;
+  /** Falls due within the reminder window. */
+  soon: boolean;
 }

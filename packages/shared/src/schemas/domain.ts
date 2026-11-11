@@ -599,12 +599,27 @@ export const factoryPlanInput = z.object({
         amount: amount(),
         dueRule: z.enum(FACTORY_DUE_RULES),
         dueOn: optionalDate,
+        /** The supplier's own invoice number for this part, if they sent one. */
+        supplierRef: optionalText(60),
       }),
     )
     .min(1, "Add at least one part")
     .max(12),
 });
 export type FactoryPlanInput = z.infer<typeof factoryPlanInput>;
+
+/** Billing: an invoice is the customer's (receivable) or a supplier's (payable). */
+export const INVOICE_SIDES = ["receivable", "payable"] as const;
+export type InvoiceSide = (typeof INVOICE_SIDES)[number];
+/** GET /billing/invoices: the open ones on one side. ?mine=true: the orders I handle, or the suppliers I look after. */
+export const invoicesQuery = z.object({
+  side: z.enum(INVOICE_SIDES),
+  mine: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+});
+export type InvoicesQuery = z.infer<typeof invoicesQuery>;
 
 /* ---------------------------------------------------------------- payment plan */
 

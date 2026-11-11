@@ -962,7 +962,7 @@ export function PlanLines({ plan, currency, total, received, due }: { plan: Orde
   }));
   const columns: LineColumn[] = [
     // Fixed widths: the line table gives a flexible column 16rem at least, more than a step page's card has.
-    { key: "label", label: "Part", width: "8rem" },
+    { key: "label", label: "Part", width: "11rem" },
     { key: "how", label: "How", width: "7rem", phoneHidden: true },
     { key: "due", label: "Due", width: "7.5rem" },
     { key: "amount", label: `Amount ${currency}`, width: "6.5rem", align: "right", format: (v) => <span className="tabular">{grouped(v.amount)}</span> },
@@ -1074,21 +1074,29 @@ export function FactoryPlanCard({
   const [advance, setAdvance] = useState(String(advanceRow?.percent ?? 0));
   const [rule, setRule] = useState<FactoryDueRule>((balanceRow?.dueRule as FactoryDueRule) ?? "on_ready");
   const [fixedOn, setFixedOn] = useState(balanceRow?.dueOn ?? "");
+  // The supplier's own invoice number for each part, once they send one (Billing: we do not number their bills).
+  const [advanceRef, setAdvanceRef] = useState(advanceRow?.supplierRef ?? "");
+  const [balanceRef, setBalanceRef] = useState(balanceRow?.supplierRef ?? "");
   const owedMinor = toMinor(plan.owed);
   const p = Math.min(Math.max(num(advance), 0), 100);
   const advanceMinor = Math.round((owedMinor * p) / 100);
-  const changed = String(advanceRow?.percent ?? 0) !== advance || (balanceRow?.dueRule ?? "on_ready") !== rule || (rule === "fixed" && fixedOn !== (balanceRow?.dueOn ?? ""));
+  const changed =
+    String(advanceRow?.percent ?? 0) !== advance ||
+    (balanceRow?.dueRule ?? "on_ready") !== rule ||
+    (rule === "fixed" && fixedOn !== (balanceRow?.dueOn ?? "")) ||
+    advanceRef.trim() !== (advanceRow?.supplierRef ?? "") ||
+    balanceRef.trim() !== (balanceRow?.supplierRef ?? "");
   const items = [
-    ...(advanceMinor > 0 ? [{ label: `Advance ${p}%`, percent: p, amount: fromMinor(advanceMinor), dueRule: "on_order", dueOn: null }] : []),
+    ...(advanceMinor > 0 ? [{ label: `Advance ${p}%`, percent: p, amount: fromMinor(advanceMinor), dueRule: "on_order", dueOn: null, supplierRef: advanceRef.trim() || null }] : []),
     ...(owedMinor - advanceMinor > 0
-      ? [{ label: advanceMinor > 0 ? `Balance ${Math.round((100 - p) * 100) / 100}%` : "Payment", percent: 100 - p, amount: fromMinor(owedMinor - advanceMinor), dueRule: rule, dueOn: rule === "fixed" ? fixedOn || null : null }]
+      ? [{ label: advanceMinor > 0 ? `Balance ${Math.round((100 - p) * 100) / 100}%` : "Payment", percent: 100 - p, amount: fromMinor(owedMinor - advanceMinor), dueRule: rule, dueOn: rule === "fixed" ? fixedOn || null : null, supplierRef: balanceRef.trim() || null }]
       : []),
   ];
   const rows: LineRow[] = plan.rows.map((r, i) => ({
     key: `${i}`,
     parentKey: null,
     values: {
-      label: r.label,
+      label: r.supplierRef ? `${r.label} · inv. ${r.supplierRef}` : r.label,
       due: `${r.due ? day(r.due) : "not known yet"} · ${FACTORY_DUE_RULE_LABEL[r.dueRule]}`,
       amount: fromMinor(toMinor(r.amount)),
       // The line table keeps only its columns' values: the days ride along with the status.
@@ -1096,7 +1104,7 @@ export function FactoryPlanCard({
     },
   }));
   const columns: LineColumn[] = [
-    { key: "label", label: "Part", width: "8rem" },
+    { key: "label", label: "Part", width: "11rem" },
     { key: "due", label: "Due", width: "13rem" },
     { key: "amount", label: `Amount ${plan.currency}`, width: "8.5rem", align: "right", format: (v) => <span className="tabular">{grouped(v.amount)}</span> },
     {
@@ -1133,6 +1141,19 @@ export function FactoryPlanCard({
                   </Select>
                 </Field>
                 {rule === "fixed" && <Input aria-label="Balance due on" type="date" className="w-40" value={fixedOn} onChange={(e) => setFixedOn(e.target.value)} />}
+              </div>
+              {/* The supplier's own invoice numbers, once they send them (we do not number their bills). */}
+              <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+                {advanceMinor > 0 && (
+                  <Field label="Their invoice no. (advance)" htmlFor={`fra-${plan.factory.id}`} className="w-52">
+                    <Input id={`fra-${plan.factory.id}`} maxLength={60} value={advanceRef} onChange={(e) => setAdvanceRef(e.target.value)} placeholder="If they sent one" />
+                  </Field>
+                )}
+                {owedMinor - advanceMinor > 0 && (
+                  <Field label={advanceMinor > 0 ? "Their invoice no. (balance)" : "Their invoice no."} htmlFor={`frb-${plan.factory.id}`} className="w-52">
+                    <Input id={`frb-${plan.factory.id}`} maxLength={60} value={balanceRef} onChange={(e) => setBalanceRef(e.target.value)} placeholder="If they sent one" />
+                  </Field>
+                )}
                 {(changed || !plan.saved) && (
                   <SubmitButton size="sm" variant="secondary" pendingText="Saving…" disabled={rule === "fixed" && !fixedOn}>
                     {plan.saved ? "Save the plan" : "Keep this plan"}

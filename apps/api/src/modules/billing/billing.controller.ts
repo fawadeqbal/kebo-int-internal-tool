@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
+import { invoicesQuery, type InvoicesQuery } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -29,5 +30,11 @@ export class BillingController {
     q: { mine: boolean },
   ) {
     return this.billing.payables(user, q.mine);
+  }
+
+  /** The open invoices of one side, instalment by instalment (late first). ?side=receivable|payable, ?mine=true. */
+  @Get("billing/invoices")
+  invoices(@CurrentUser() user: SessionUser, @Query(Validate(invoicesQuery)) q: InvoicesQuery) {
+    return this.billing.openInvoices(user, q.side, q.mine);
   }
 }
