@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { asSupplierPayment, createSupplierPayment, fromDbDate, isSupplier, liveFile, purchasePart, supplierPayment, toDbDate } from "@kebo/database";
-import { fromMinor, toMinor } from "@kebo/money";
+import { fromMinor, fxRate, toMinor } from "@kebo/money";
 import { can, type FactoryPaymentInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import type { Prisma } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -11,12 +12,13 @@ import { requireReason } from "../../common/audit/reason";
 import type { SessionUser } from "../../common/auth/session-user";
 import { LedgerPosting } from "../ledger/posting.service";
 import { OrdersService } from "../orders/orders.service";
-import { MoneyService } from "../money/money.service";
+import { SettingsService } from "../settings/settings.service";
 import { checkAccount } from "./account-check";
 
 /**
  * Money out to a supplier on an order: a payment entry (out, the supplier) with one allocation paying the order's
- * purchase. Treasury records, changes and removes it; the order's money (MoneyService.forOrder) shows it.
+ * purchase. Treasury records, changes and removes it; the routes answer with the order's money view (Money
+ * composes it: Treasury does not depend on Money).
  */
 @Injectable()
 export class SupplierPaymentsService {
@@ -27,8 +29,31 @@ export class SupplierPaymentsService {
     private readonly limits: LimitsService,
     private readonly ledger: LedgerPosting,
     private readonly orders: OrdersService,
-    private readonly money: MoneyService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** Units of `from` per one unit of `to`: 1 for the same currency, else the rate given, or Settings. Never 1:1 by default. */
+  private async rateFor(from: string, to: string, given: number | null | undefined) {
+    if (from === to) return 1;
+    if (given) return given;
+    const { sales } = await this.settings.get();
+    const r = fxRate(from, to, sales.currency, sales.exchangeRates);
+    if (r === null) throw new DomainError(`There is no exchange rate for ${from} in Settings. Enter the rate (${from} per 1 ${to}).`);
+    return r;
+  }
+
+  /** On a change: the rate sent; else the one used before while the currency stays; else Settings. */
+  private keptRate(input: { currency: string; rate?: number | null }, before: { currency: string; rate: Prisma.Decimal }) {
+    return input.rate ?? (input.currency === before.currency ? Number(before.rate) : null);
+  }
+
+  /** Someone active on the team (who paid), or none. */
+  private async activePerson(id: string | null | undefined) {
+    if (!id) return null;
+    const u = await this.prisma.db.user.findFirst({ where: { id, isActive: true } });
+    if (!u) throw new DomainError("Choose an active person from the team.");
+    return id;
+  }
 
 
   /**
@@ -62,11 +87,11 @@ export class SupplierPaymentsService {
       kind: input.kind,
       amount: input.amount,
       currency: input.currency,
-      rate: await this.money.rateFor(input.currency, o.currency, input.rate),
+      rate: await this.rateFor(input.currency, o.currency, input.rate),
       paidOn: toDbDate(input.paidOn),
       method: input.method,
       // The person who looks after the factory pays it, unless someone else is named.
-      paidById: (await this.money.activePerson(input.paidById)) ?? f.ownerId,
+      paidById: (await this.activePerson(input.paidById)) ?? f.ownerId,
       reference: input.reference,
       note: input.note,
       accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount, await this.limits.allows("cash_book")),
@@ -93,7 +118,7 @@ export class SupplierPaymentsService {
       return created.id;
     });
     /** `createdId`: the new payment, so its proof can follow. */
-    return { ...(await this.money.forOrder(user, orderId)), createdId };
+    return { orderId, createdId };
   }
 
   private async findFactoryPayment(user: SessionUser, id: string) {
@@ -117,7 +142,7 @@ export class SupplierPaymentsService {
     // A payment already recorded in another currency (before this rule) may keep it.
     const { factoryName, ...data } = await this.factoryPaymentData(
       o,
-      { ...input, rate: this.money.keptRate(input, p) },
+      { ...input, rate: this.keptRate(input, p) },
       p.factoryId === input.factoryId ? p.currency : undefined,
       p.accountId,
     );
@@ -164,7 +189,7 @@ export class SupplierPaymentsService {
       });
       await this.ledger.post(tx, [{ type: "movement", id: p.movementId }, { type: "order", id: o.id }], { userId: user.id, reason });
     });
-    return this.money.forOrder(user, o.id);
+    return { orderId: o.id };
   }
 
   /** A payment recorded by mistake: it stays listed, crossed out. */
@@ -184,6 +209,6 @@ export class SupplierPaymentsService {
       });
       await this.ledger.post(tx, [{ type: "movement", id: p.movementId }, { type: "order", id: o.id }], { userId: user.id, reason });
     });
-    return this.money.forOrder(user, o.id);
+    return { orderId: o.id };
   }
 }

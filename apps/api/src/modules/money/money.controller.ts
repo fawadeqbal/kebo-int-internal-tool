@@ -19,6 +19,8 @@ import { z } from "zod";
 import {
   EXPENSE_CATEGORIES,
   expenseInput,
+  factoryPaymentInput,
+  type FactoryPaymentInput,
   factoryPlanInput,
   type FactoryPlanInput,
   paymentPlanInput,
@@ -35,6 +37,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { MoneyService } from "./money.service";
 import { BillingService } from "../billing/billing.service";
+import { SupplierPaymentsService } from "../treasury/supplier-payments.service";
 import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
 import { LeaksService } from "./leaks.service";
@@ -61,6 +64,7 @@ export class MoneyController {
   constructor(
     private readonly money: MoneyService,
     private readonly billing: BillingService,
+    private readonly supplierPayments: SupplierPaymentsService,
     private readonly costs: CostsService,
     private readonly accounts: AccountsService,
     private readonly leaks: LeaksService,
@@ -100,6 +104,28 @@ export class MoneyController {
   @Get("orders/:id/costs")
   costsOf(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.costs.forOrder(user, id);
+  }
+
+  /* The order's payments to its suppliers: Treasury records them; the answer is the order's money view. */
+
+  @Post("orders/:id/factory-payments")
+  async payFactory(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
+    const { createdId } = await this.supplierPayments.recordFactoryPayment(user, id, body);
+    return { ...(await this.money.forOrder(user, id)), createdId };
+  }
+
+  /** Same body as recording, plus reason (always asked). */
+  @Patch("factory-payments/:id")
+  async editFactoryPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
+    const { orderId } = await this.supplierPayments.editFactoryPayment(user, id, body);
+    return this.money.forOrder(user, orderId);
+  }
+
+  @Post("factory-payments/:id/void")
+  @HttpCode(200)
+  async voidFactoryPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
+    const { orderId } = await this.supplierPayments.voidFactoryPayment(user, id, body.reason);
+    return this.money.forOrder(user, orderId);
   }
 
   /** { items: [{ id?, label, amount, dueOn? }], reason? } — they must add up to the order total. */

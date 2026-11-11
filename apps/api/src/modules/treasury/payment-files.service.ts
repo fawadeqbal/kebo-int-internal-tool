@@ -4,7 +4,7 @@ import { can } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { fileOf, liveFile } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
-import { removeProof, setProof } from "../files/proofs";
+import { removeProof, setProof } from "../../common/storage/proofs";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { AuditService } from "../../common/audit/audit.service";
 import type { SessionUser } from "../../common/auth/session-user";

@@ -23,7 +23,7 @@ import {
 } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
-import { removeProof, setProof } from "../files/proofs";
+import { removeProof, setProof } from "../../common/storage/proofs";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { checkAccount } from "../treasury/api";
