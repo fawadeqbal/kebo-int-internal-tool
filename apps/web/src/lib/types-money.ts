@@ -557,6 +557,10 @@ export interface FactoryPlanView {
   takenOff?: string;
   toPay: string;
   rows: {
+    /** The invoice (null: the company's default, not saved yet). */
+    id: string | null;
+    /** The supplier's own invoice number, if they sent one. */
+    supplierRef: string | null;
     label: string;
     percent: number | null;
     amount: string;
@@ -587,4 +591,28 @@ export interface CustomerCreditView {
     voided: { at: string; reason: string | null } | null;
   }[];
   canRecord: boolean;
+}
+
+/** GET /billing/invoices: the open invoices of one side, instalment by instalment (late first). */
+export interface OpenInvoices {
+  side: "receivable" | "payable";
+  rows: {
+    /** null: a supplier's default plan, not saved yet. */
+    id: string | null;
+    /** The payment request's number (PR-2026-0031-2), or the supplier's own number if known. */
+    number: string | null;
+    label: string;
+    order: { id: string; refNo: string };
+    party: { id: string; name: string };
+    lookedAfterBy: { id: string; name: string } | null;
+    currency: string;
+    amount: string;
+    paid: string;
+    open: string;
+    dueOn: string | null;
+    /** Days late (0: not late). */
+    late: number;
+    soon: boolean;
+  }[];
+  totals: { currency: string; open: string; late: string; count: number }[];
 }

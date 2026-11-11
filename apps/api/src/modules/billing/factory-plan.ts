@@ -90,15 +90,17 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
   const orderedOn = fromDbDateOrNull(o.factoryOrderedOn);
   return [...owed.entries()].map(([key, f]) => {
     const stored = o.payables.filter((r) => `${r.supplierId}:${r.currency}` === key);
-    const rows: FactoryPlanRow[] = stored.length
+    const rows: (FactoryPlanRow & { id: string | null; supplierRef: string | null })[] = stored.length
       ? stored.map((r) => ({
+          id: r.id,
+          supplierRef: r.supplierRef,
           label: r.label,
           percent: r.percent === null ? null : Number(r.percent),
           amountMinor: decimalToMinor(r.amount),
           dueRule: r.dueRule as FactoryDueRule,
           dueOn: fromDbDateOrNull(r.dueOn),
         }))
-      : defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent));
+      : defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent)).map((r) => ({ ...r, id: null, supplierRef: null }));
     const paidMinor = f.settledMinor;
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
     // This factory's own ready date (one per factory; the order's is the latest).
@@ -120,6 +122,10 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
       takenOff: fromMinor(f.takenOffMinor),
       toPay: fromMinor(Math.max(f.owedMinor - paidMinor, 0)),
       rows: status.map((r) => ({
+        /** The invoice (null: the company's default, not saved yet). */
+        id: r.id,
+        /** The supplier's own invoice number, if they sent one. */
+        supplierRef: r.supplierRef,
         label: r.label,
         percent: r.percent,
         amount: fromMinor(r.amountMinor),

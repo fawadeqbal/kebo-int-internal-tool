@@ -18,7 +18,8 @@ import { hasFeature } from "@/lib/session";
 import { PeriodBar, periodOf } from "@/components/common/period";
 import type { Receivables } from "@/lib/types-insights";
 import { date, money, TZ } from "@/lib/format";
-import type { CashBook, CashRow, ExpenseList, Payable } from "@/lib/types-money";
+import type { CashBook, CashRow, ExpenseList, OpenInvoices, Payable } from "@/lib/types-money";
+import { recordPaymentHref } from "@/components/money/pay-links";
 import { NewExpense, VoidForm, type ExpenseChoices } from "@/components/money/forms";
 import { EditAccount, MoveMoney, NewAccount, PutOnAccount, type AccountRow } from "@/components/money/cash-forms";
 import { ExpenseRecord } from "@/components/money/expense-record";
@@ -642,6 +643,114 @@ export async function ReceiveBody() {
   );
 }
 
+/* ---------------------------------------------------------------- invoice by invoice (Billing) */
+
+/**
+ * The open invoices of one side, instalment by instalment (Billing): a customer's with its payment
+ * request number, a supplier's with their own number once given. Late first. Each is paid in due order
+ * from the order's payments, so this is the same money as the order-by-order view, split by instalment.
+ */
+export async function InvoicesBody({ side, mine = false }: { side: "receivable" | "payable"; mine?: boolean }) {
+  const r = await api.get<OpenInvoices>("/billing/invoices", { side, mine: mine ? "true" : undefined });
+  const receivable = side === "receivable";
+  const back = receivable ? "/finance/to-receive" : "/purchasing/to-pay";
+  return (
+    <div className="flex flex-col gap-4">
+      {r.totals.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {r.totals.map((t) => (
+            <StatTile
+              key={t.currency}
+              label={`${receivable ? "Open customer invoices" : "Open supplier invoices"} (${t.currency})`}
+              value={money(t.open, t.currency)}
+              sub={`${t.count} invoice${t.count === 1 ? "" : "s"}${Number(t.late) > 0 ? ` · ${money(t.late, t.currency)} late` : " · nothing late"}`}
+            />
+          ))}
+        </div>
+      )}
+      <Card className="overflow-hidden">
+        <CardHeader
+          title={receivable ? "Customer invoices" : "Supplier invoices"}
+          description={
+            receivable
+              ? "Each instalment still open, with its payment request number. Late first."
+              : "Each part we still owe a supplier, with their invoice number once they send one. Late first."
+          }
+        />
+        {r.rows.length === 0 ? (
+          <EmptyState
+            title={receivable ? "Nothing to receive" : "Nothing to pay"}
+            description={receivable ? "Every customer has paid what they owe." : "Every supplier is paid for the goods on our orders."}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <THead>
+                <tr>
+                  <Th>Invoice</Th>
+                  <Th>{receivable ? "Customer" : "Supplier"}</Th>
+                  <Th>Due</Th>
+                  <Th className="text-right">Paid</Th>
+                  <Th className="text-right">Open</Th>
+                  <Th>
+                    <span className="sr-only">Record payment</span>
+                  </Th>
+                </tr>
+              </THead>
+              <tbody>
+                {r.rows.map((i, n) => (
+                  <Tr key={i.id ?? `${i.order.id}-${n}`} className="hover:bg-surface-2/50">
+                    <Td>
+                      <span className="block font-medium">{i.number ?? <span className="text-muted">No number yet</span>}</span>
+                      <span className="block text-xs text-muted">
+                        {i.label} ·{" "}
+                        <Link href={`/orders/${i.order.id}/${receivable ? "payment" : "money"}`} className="hover:text-primary">
+                          {i.order.refNo}
+                        </Link>
+                      </span>
+                    </Td>
+                    <Td>
+                      <Link href={`/${receivable ? "customers" : "factories"}/${i.party.id}`} className="hover:text-primary">
+                        {i.party.name}
+                      </Link>
+                      {i.lookedAfterBy && <span className="block text-xs text-muted">{i.lookedAfterBy.name}</span>}
+                    </Td>
+                    <Td className="text-sm whitespace-nowrap">
+                      {i.dueOn ? date(i.dueOn) : <span className="text-muted">No date yet</span>}
+                      {i.late > 0 ? (
+                        <span className="block text-xs font-medium text-bad">{i.late} days late</span>
+                      ) : i.soon ? (
+                        <span className="block text-xs text-warn">Due soon</span>
+                      ) : null}
+                    </Td>
+                    <Td className="text-right whitespace-nowrap tabular">
+                      {money(i.paid, i.currency)}
+                      <span className="block text-xs text-muted">of {money(i.amount, i.currency)}</span>
+                    </Td>
+                    <Td className={cn("text-right font-semibold whitespace-nowrap tabular", i.late > 0 && "text-bad")}>{money(i.open, i.currency)}</Td>
+                    <Td className="text-right">
+                      <Link
+                        href={recordPaymentHref(
+                          receivable
+                            ? { kind: "in", order: i.order.id, amount: i.open, back }
+                            : { kind: "out", order: i.order.id, factory: i.party.id, amount: i.open, back },
+                        )}
+                        className="text-sm font-medium whitespace-nowrap text-primary hover:underline"
+                      >
+                        Record payment
+                      </Link>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------- payables */
 
 export async function OweBody({ mine }: { mine: boolean }) {
@@ -654,8 +763,8 @@ export async function OweBody({ mine }: { mine: boolean }) {
         <Segmented
           label="Which factories"
           options={[
-            { href: "/purchasing/to-pay", label: "All factories", active: !mine },
-            { href: "/purchasing/to-pay?mine=1", label: "My factories", active: mine },
+            { href: "/purchasing/to-pay?view=factories", label: "All factories", active: !mine },
+            { href: "/purchasing/to-pay?view=factories&mine=1", label: "My factories", active: mine },
           ]}
         />
         <p className="flex flex-wrap items-center gap-3 text-sm">
