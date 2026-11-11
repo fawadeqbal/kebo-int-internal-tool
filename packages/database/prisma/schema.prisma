@@ -758,37 +758,47 @@ model InquiryAssignment {
 
 /// Files on a deal. Optionally tied to an order step (inspection report, payment slip, B/L copy).
 model Attachment {
-  id             String        @id @default(uuid()) @db.Uuid
+  id             String           @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId      String        @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company        Company       @relation(fields: [companyId], references: [id])
-  inquiryId      String        @map("inquiry_id") @db.Uuid
-  inquiry        Inquiry       @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  companyId      String           @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company        Company          @relation(fields: [companyId], references: [id])
+  /// A file on a deal (and its order): the inquiry. A proof (bank slip, receipt photo) is on its record instead.
+  inquiryId      String?          @map("inquiry_id") @db.Uuid
+  inquiry        Inquiry?         @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  /// The proof of a payment entry (bank slip, transfer screenshot): one live file per record; a new one replaces it.
+  movementId     String?          @map("movement_id") @db.Uuid
+  movement       MoneyMovement?   @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  /// The receipt or ticket of an expense.
+  expenseId      String?          @map("expense_id") @db.Uuid
+  expense        Expense?         @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  /// The photo sent with money for approval (it moves to what is recorded when approved).
+  submissionId   String?          @map("submission_id") @db.Uuid
+  submission     MoneySubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   /// The factory offer this file is evidence for (its quotation, catalogue, WeChat screenshots). Internal: only people who see factory prices.
-  factoryQuoteId String?       @map("factory_quote_id") @db.Uuid
-  factoryQuote   FactoryQuote? @relation(fields: [factoryQuoteId], references: [id], onDelete: SetNull)
-  fileName       String        @map("file_name") @db.VarChar(255)
-  mimeType       String        @map("mime_type") @db.VarChar(150)
+  factoryQuoteId String?          @map("factory_quote_id") @db.Uuid
+  factoryQuote   FactoryQuote?    @relation(fields: [factoryQuoteId], references: [id], onDelete: SetNull)
+  fileName       String           @map("file_name") @db.VarChar(255)
+  mimeType       String           @map("mime_type") @db.VarChar(150)
   size           Int
-  storageKey     String        @map("storage_key")
+  storageKey     String           @map("storage_key")
   /// urs | drawing | photo | specification | factory_quote | other
-  kind           String        @default("other") @db.VarChar(20)
-  note           String?       @db.VarChar(300)
-  uploadedById   String        @map("uploaded_by") @db.Uuid
-  uploadedBy     User          @relation("AttachmentUploader", fields: [uploadedById], references: [id])
-  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  kind           String           @default("other") @db.VarChar(20)
+  note           String?          @db.VarChar(300)
+  uploadedById   String           @map("uploaded_by") @db.Uuid
+  uploadedBy     User             @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
   /// Added on an order (Documents v3: uploaded or dropped on a step): the order and the step it belongs to.
-  orderId        String?       @map("order_id") @db.Uuid
-  order          Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId        String?          @map("order_id") @db.Uuid
+  order          Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
   /// payment | factory | production | shipping | documents | delivery
-  step           String?       @db.VarChar(20)
+  step           String?          @db.VarChar(20)
   /// "Replace with a newer one": the newer file. The old one is kept (as an earlier version), out of the lists.
-  replacedById   String?       @map("replaced_by") @db.Uuid
-  replacedBy     Attachment?   @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
-  earlier        Attachment[]  @relation("AttachmentVersions")
+  replacedById   String?          @map("replaced_by") @db.Uuid
+  replacedBy     Attachment?      @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
+  earlier        Attachment[]     @relation("AttachmentVersions")
   /// 1 for the first file; each replacement counts up.
-  version        Int           @default(1)
+  version        Int              @default(1)
 
   orderDocuments OrderDocument[]
   checklistItems OrderChecklistItem[]
@@ -797,6 +807,9 @@ model Attachment {
   @@index([orderId])
   @@index([replacedById])
   @@index([factoryQuoteId])
+  @@index([movementId])
+  @@index([expenseId])
+  @@index([submissionId])
   @@index([companyId])
   @@map("attachments")
 }
@@ -1647,11 +1660,6 @@ model Expense {
   paidBy          User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
   reference       String?       @db.VarChar(120)
   note            String?
-  /// A photo or PDF of the receipt or ticket.
-  receiptKey      String?       @map("receipt_key")
-  receiptName     String?       @map("receipt_name") @db.VarChar(255)
-  receiptType     String?       @map("receipt_type") @db.VarChar(150)
-  receiptSize     Int?          @map("receipt_size")
   /// Which of our accounts the money moved through (cash, a bank, a wallet).
   accountId       String?       @map("account_id") @db.Uuid
   account         MoneyAccount? @relation(fields: [accountId], references: [id])
@@ -1671,6 +1679,8 @@ model Expense {
   voidReason      String?       @map("void_reason")
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  /// Its proof (one live file; replaced ones are kept, deleted).
+  files           Attachment[]
 
   @@index([orderId])
   @@index([customerId])
@@ -1822,11 +1832,6 @@ model MoneyMovement {
   /// Someone paying for the customer (their agent, a relative).
   paidByName    String?        @map("paid_by_name") @db.VarChar(120)
   note          String?
-  /// A photo or PDF proving it (bank slip, transfer screenshot).
-  fileKey       String?        @map("file_key")
-  fileName      String?        @map("file_name") @db.VarChar(255)
-  fileType      String?        @map("file_type") @db.VarChar(150)
-  fileSize      Int?           @map("file_size")
   recordedById  String         @map("recorded_by") @db.Uuid
   recordedBy    User           @relation("MovementRecorder", fields: [recordedById], references: [id])
   voidedAt      DateTime?      @map("voided_at") @db.Timestamptz
@@ -1837,6 +1842,8 @@ model MoneyMovement {
   allocations Allocation[] @relation("MovementAllocations")
   /// An out movement: the advance it paid back.
   refunds     Allocation[] @relation("RefundAllocations")
+  /// Its proof (one live file; replaced ones are kept, deleted).
+  files       Attachment[]
 
   @@index([partyId])
   @@index([accountId])
@@ -2487,36 +2494,33 @@ model FactsQueue {
 /// Money received or an expense a person added for a manager to approve. Nothing here counts: no payment, expense
 /// or money figure changes until it is approved, which records it through the usual endpoint's code as the approver.
 model MoneySubmission {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String       @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId     String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company       Company   @relation(fields: [companyId], references: [id])
+  companyId     String       @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company       Company      @relation(fields: [companyId], references: [id])
   /// payment (money received from the customer) | expense
-  kind          String    @db.VarChar(10)
+  kind          String       @db.VarChar(10)
   /// The order it is on (always for a payment; for an expense when it is on one).
-  orderId       String?   @map("order_id") @db.Uuid
-  order         Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       String?      @map("order_id") @db.Uuid
+  order         Order?       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   /// Exactly what the usual endpoint takes (paymentInput / expenseInput), as checked when it was sent.
   body          Json
-  /// The bank slip or receipt photo, until it moves to the payment or expense made on approval.
-  fileKey       String?   @map("file_key")
-  fileName      String?   @map("file_name") @db.VarChar(255)
-  fileType      String?   @map("file_type") @db.VarChar(150)
-  fileSize      Int?      @map("file_size")
   /// pending | approved | sent_back | withdrawn
-  status        String    @default("pending") @db.VarChar(10)
-  submittedById String    @map("submitted_by") @db.Uuid
-  submittedBy   User      @relation("SubmissionSubmittedBy", fields: [submittedById], references: [id])
-  submittedAt   DateTime  @default(now()) @map("submitted_at") @db.Timestamptz
-  decidedById   String?   @map("decided_by") @db.Uuid
-  decidedBy     User?     @relation("SubmissionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
-  decidedAt     DateTime? @map("decided_at") @db.Timestamptz
+  status        String       @default("pending") @db.VarChar(10)
+  submittedById String       @map("submitted_by") @db.Uuid
+  submittedBy   User         @relation("SubmissionSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt   DateTime     @default(now()) @map("submitted_at") @db.Timestamptz
+  decidedById   String?      @map("decided_by") @db.Uuid
+  decidedBy     User?        @relation("SubmissionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt     DateTime?    @map("decided_at") @db.Timestamptz
   /// Why it was sent back.
-  reason        String?   @db.VarChar(500)
+  reason        String?      @db.VarChar(500)
   /// The payment or expense made when it was approved.
-  createdId     String?   @map("created_id") @db.Uuid
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  createdId     String?      @map("created_id") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  /// Its proof (one live file; replaced ones are kept, deleted).
+  files         Attachment[]
 
   @@index([companyId, status])
   @@index([orderId])

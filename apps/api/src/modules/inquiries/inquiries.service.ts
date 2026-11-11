@@ -681,9 +681,10 @@ export class InquiriesService {
 
   /** A file the person may see: a factory offer's files only for people who see factory prices. */
   private async fileFor(user: SessionUser, attachmentId: string) {
-    const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null } });
+    // A deal's file (a proof is on its own record, opened there).
+    const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null, inquiryId: { not: null } } });
     if (!a || (a.factoryQuoteId && !can(user, "sourcing.manage"))) throw new NotFoundError("File");
-    return a;
+    return { ...a, inquiryId: a.inquiryId! };
   }
 
   /** Streams a file after checking the person may see its deal. */

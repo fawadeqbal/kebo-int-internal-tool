@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { livePurchase, livePart, decimalToMinor, fromDbDate, Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { liveFile, livePurchase, livePart, decimalToMinor, fromDbDate, Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, payInstalments, type Minor } from "@kebo/money";
 import {
   AGEING_BUCKETS,
@@ -363,6 +363,7 @@ export class LedgerService {
           toAccount: { select: { name: true } },
           party: { select: { name: true } },
           recordedBy: { select: { name: true } },
+          files: liveFile,
           allocations: { where: { target: "purchase" }, include: { purchaseOrder: { select: { id: true, refNo: true, customerId: true } } }, take: 1 },
         },
       });
@@ -381,7 +382,7 @@ export class LedgerService {
           customerId: p?.purchaseOrder?.customerId ?? null,
           factoryId: other.partyId,
           label: `Payment to ${other.party?.name ?? ""} for ${p?.purchaseOrder?.refNo ?? ""}`,
-          file: other.fileKey ? { kind: "factory_payment" as const, id: p?.id ?? other.id, name: other.fileName ?? "file" } : null,
+          file: other.files[0] ? { kind: "factory_payment" as const, id: p?.id ?? other.id, name: other.files[0].fileName } : null,
           recordedBy: other.recordedBy.name,
           settles: p ? await this.settlesOfFactoryPayment(p.id) : null,
           removed: other.voidedAt ? { at: other.voidedAt, reason: other.voidReason } : null,
@@ -402,7 +403,7 @@ export class LedgerService {
         partId: one?.id ?? null,
         customerId: m.partyId,
         label: m.direction === "out" ? "Credit refunded" : one ? `Payment on ${one.order!.refNo}` : "One transfer over several orders",
-        file: m.fileKey ? { kind: "payment" as const, id: m.id, name: m.fileName ?? "file" } : null,
+        file: other?.files[0] ? { kind: "payment" as const, id: m.id, name: other.files[0].fileName } : null,
         recordedBy: a?.recordedBy ?? m.recordedBy.name,
         approvedBy: a?.approvedBy ?? null,
         settles:
@@ -435,6 +436,7 @@ export class LedgerService {
       const e = await db.expense.findUnique({
         where: { id: sourceId },
         include: {
+          files: liveFile,
           order: { select: { refNo: true } },
           factory: { select: { name: true } },
           paidBy: { select: { name: true } },
@@ -460,7 +462,7 @@ export class LedgerService {
         factoryId: e.factoryId,
         userId: e.ownMoney ? e.paidById : null,
         label: e.description,
-        file: e.receiptKey ? { kind: "expense" as const, id: e.id, name: e.receiptName ?? "receipt" } : null,
+        file: e.files[0] ? { kind: "expense" as const, id: e.id, name: e.files[0].fileName } : null,
         recordedBy: a?.recordedBy ?? e.recordedBy.name,
         approvedBy: a?.approvedBy ?? null,
         settles,

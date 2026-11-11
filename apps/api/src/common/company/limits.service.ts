@@ -35,9 +35,7 @@ export class LimitsService {
       db.user.count({ where: { isSystem: false, platformAdminId: null, isActive: true } }),
       db.$queryRaw<{ bytes: bigint | null }[]>`
         select (coalesce((select sum(size) from attachments), 0)
-              + coalesce((select sum(file_size) from money_movements), 0)
-              + coalesce((select sum(receipt_size) from expenses), 0)
-              + coalesce((select sum(file_size) from money_submissions), 0))::bigint as bytes`,
+              )::bigint as bytes`,
     ]);
     return { users, storageBytes: Number(files[0]?.bytes ?? 0) };
   }

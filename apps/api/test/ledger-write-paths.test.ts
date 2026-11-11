@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 /**
  * Every write of money (customer payment entries and what they pay, factory payments, expenses, transfers
  * between accounts, money accounts, orders made) posts to the ledger in the same method: a new write path that
- * does not fails here. The customer-money functions (treasury/customer-money.ts) are called inside such methods. Writes that touch only a file (a proof, a receipt, its name) are listed with why.
+ * does not fails here. The customer-money functions (treasury/customer-money.ts) are called inside such methods. Writes that change no money (listed with why) are let through.
  */
 const SRC = path.join(__dirname, "../src");
 const MONEY =
@@ -14,12 +14,7 @@ const METHOD = /^ {2}(?:(?:async|private|protected|public|static)\s+)*([A-Za-z0-
 
 /** file:method → why it posts nothing. */
 const FILE_ONLY: Record<string, string> = {
-  "modules/money/payment-files.service.ts:update": "the proof's file columns only (fileKey, fileName, fileType, fileSize)",
-  "modules/money/money.service.ts:attachReceipt": "the receipt's file columns only",
-  "modules/money/money.service.ts:removeReceipt": "the receipt's file columns only",
-  "modules/files/order-files.service.ts:update": "a file's name only (fileName, receiptName)",
-  "modules/approvals/approvals.service.ts:approve":
-    "moves the photo onto the payment or expense recorded (and posted) by record()/createExpense()",
+  // Files are attachment rows (a proof, a receipt): writing one changes no money, so none is listed here now.
 };
 /** Order writes that change no money (stage, dates, details, packing, the proforma's number…): only these post. */
 const ORDER_MONEY = new Set(["create"]);

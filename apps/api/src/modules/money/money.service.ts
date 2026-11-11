@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
-import { livePurchase, supplierPayment, createSupplierPayment, asSupplierPayment, purchasePart, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { liveFile, livePurchase, supplierPayment, createSupplierPayment, asSupplierPayment, purchasePart, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   balanceTermsOf,
@@ -27,6 +27,7 @@ import {
 } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
+import { removeProof, setProof } from "../files/proofs";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { checkAccount } from "./account-check";
@@ -63,6 +64,8 @@ const expenseInclude = {
   factory: { select: { id: true, name: true } },
   account: { select: { id: true, name: true } },
   repaidAccount: { select: { id: true, name: true } },
+  /** Its receipt or ticket (one live file). */
+  files: liveFile,
 } satisfies Prisma.ExpenseInclude;
 type ExpenseRow = Prisma.ExpenseGetPayload<{ include: typeof expenseInclude }>;
 
@@ -137,7 +140,9 @@ export class MoneyService {
         supplierPaid: {
           where: purchasePart,
           orderBy: [{ on: "asc" }, { createdAt: "asc" }],
-          include: { movement: { include: { party: { select: { id: true, name: true } }, paidBy: person, account: { select: { id: true, name: true } } } } },
+          include: {
+            movement: { include: { party: { select: { id: true, name: true } }, paidBy: person, account: { select: { id: true, name: true } }, files: liveFile } },
+          },
         },
         expenses: { orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }], include: expenseInclude },
       },
@@ -530,7 +535,7 @@ export class MoneyService {
     // The payment on the order (its part), or its entry.
     const part = await this.prisma.db.allocation.findFirst({
       where: { ...purchasePart, OR: [{ id }, { movementId: id }] },
-      include: { movement: { include: { party: { select: { name: true } } } } },
+      include: { movement: { include: { party: { select: { name: true } }, files: liveFile } } },
     });
     if (!part) throw new NotFoundError("Payment");
     const p = { ...asSupplierPayment(part), factory: part.movement.party! };
@@ -750,9 +755,7 @@ export class MoneyService {
       paidBy: e.paidBy,
       reference: e.reference,
       note: e.note,
-      receipt: e.receiptKey
-        ? { name: e.receiptName ?? "receipt", type: e.receiptType ?? "application/octet-stream", size: e.receiptSize ?? 0 }
-        : null,
+      receipt: e.files[0] ? { name: e.files[0].fileName, type: e.files[0].mimeType, size: e.files[0].size } : null,
       /** The order's step it belongs to. */
       step: (e.step as FlowStep | null) ?? null,
       borneBy: e.borneBy as ExpenseBearer,
@@ -1104,23 +1107,20 @@ export class MoneyService {
     await this.storage.put(key, file.buffer, file.mimetype);
     try {
       const row = await this.prisma.tx(async (tx) => {
-        const updated = await tx.expense.update({
-          where: { id },
-          data: { receiptKey: key, receiptName: name, receiptType: file.mimetype || "application/octet-stream", receiptSize: file.size },
-          include: expenseInclude,
-        });
+        await setProof(tx, { expenseId: id }, { key, name, type: file.mimetype || "application/octet-stream", size: file.size }, user.id);
+        const updated = await tx.expense.findUniqueOrThrow({ where: { id }, include: expenseInclude });
         await this.expenseAudit(
           tx,
           user,
           id,
           e.order,
-          `${e.receiptKey ? "replaced" : "added"} the receipt of "${e.description}"`,
+          `${e.files[0] ? "replaced" : "added"} the receipt of "${e.description}"`,
           "expense_receipt",
           { newValues: { step: e.step } },
         );
         return updated;
       });
-      if (e.receiptKey) await this.storage.delete(e.receiptKey).catch(() => undefined);
+      if (e.files[0]) await this.storage.delete(e.files[0].storageKey).catch(() => undefined);
       return this.expenseView(row);
     } catch (error) {
       await this.storage.delete(key).catch(() => undefined);
@@ -1130,24 +1130,20 @@ export class MoneyService {
 
   async receipt(user: SessionUser, id: string): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
     this.assertExpenses(user);
-    const e = await this.prisma.db.expense.findUnique({ where: { id } });
-    if (!e?.receiptKey) throw new NotFoundError("Receipt");
-    return {
-      stream: await this.storage.get(e.receiptKey),
-      fileName: e.receiptName ?? "receipt",
-      mimeType: e.receiptType ?? "application/octet-stream",
-      size: e.receiptSize ?? 0,
-    };
+    const f = (await this.prisma.db.expense.findUnique({ where: { id }, include: { files: liveFile } }))?.files[0];
+    if (!f) throw new NotFoundError("Receipt");
+    return { stream: await this.storage.get(f.storageKey), fileName: f.fileName, mimeType: f.mimeType, size: f.size };
   }
 
   async removeReceipt(user: SessionUser, id: string) {
     const e = await this.findExpense(user, id);
-    if (!e.receiptKey) return { ok: true };
+    const old = e.files[0];
+    if (!old) return { ok: true };
     await this.prisma.tx(async (tx) => {
-      await tx.expense.update({ where: { id }, data: { receiptKey: null, receiptName: null, receiptType: null, receiptSize: null } });
+      await removeProof(tx, { expenseId: id });
       await this.expenseAudit(tx, user, id, e.order, `removed the receipt of "${e.description}"`, "expense_receipt", { newValues: { step: e.step } });
     });
-    await this.storage.delete(e.receiptKey).catch(() => undefined);
+    await this.storage.delete(old.storageKey).catch(() => undefined);
     return { ok: true };
   }
 

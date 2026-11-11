@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { livePart, decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
+import { liveFile, livePart, decimalToMinor, fromDbDate, type Prisma } from "@kebo/database";
 import { fromMinor, orderCosting, orderMoney, roundHalfAway, type Minor } from "@kebo/money";
 import {
   can,
@@ -58,6 +58,7 @@ export class CostsService {
             factory: { select: { id: true, name: true } },
             account: { select: { id: true, name: true } },
             repaidAccount: { select: { id: true, name: true } },
+            files: liveFile,
             recordedBy: person,
           },
         },
@@ -122,7 +123,7 @@ export class CostsService {
       repay.set(key, r);
     }
 
-    const missing = live.filter((e) => !e.receiptKey);
+    const missing = live.filter((e) => !e.files.length);
     const missingByCurrency = new Map<string, Minor>();
     for (const e of missing) missingByCurrency.set(e.currency, (missingByCurrency.get(e.currency) ?? 0) + decimalToMinor(e.amount));
 
@@ -190,9 +191,7 @@ export class CostsService {
         repaid: e.repaidOn ? { on: fromDbDate(e.repaidOn), account: e.repaidAccount } : null,
         reference: e.reference,
         note: e.note,
-        receipt: e.receiptKey
-          ? { name: e.receiptName ?? "receipt", type: e.receiptType ?? "application/octet-stream", size: e.receiptSize ?? 0 }
-          : null,
+        receipt: e.files[0] ? { name: e.files[0].fileName, type: e.files[0].mimeType, size: e.files[0].size } : null,
         recordedBy: e.recordedBy,
         recordedAt: e.createdAt,
         voided: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,
