@@ -43,6 +43,7 @@ export function paymentTermsOf(depositPercent: number, balanceTerms: BalanceTerm
 }
 
 export const orderDocInclude = {
+  paymentTerms: true,
   lines: {
     orderBy: { sortOrder: "asc" },
     include: {

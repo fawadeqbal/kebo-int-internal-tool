@@ -1,4 +1,4 @@
-import { asSupplierPayment, purchasesWithEntry, asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
+import { asSupplierPayment, purchasesWithEntry, asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf } from "@kebo/database";
 import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
@@ -46,6 +46,7 @@ import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
+  paymentTerms: true,
   lines: {
     orderBy: { sortOrder: "asc" },
     include: {
@@ -88,7 +89,7 @@ export const paperOrderInclude = {
     include: { doneBy: { select: { name: true } }, attachment: { select: { fileName: true, deletedAt: true } } },
   },
   papers: { orderBy: [{ version: "asc" }] },
-  satEngineer: { select: { name: true } },
+  delivery: { include: { satEngineer: { select: { name: true } } } },
   inquiry: { select: { id: true, contactId: true } },
   // Each factory's ready date (its purchase order prints its own), and the papers' day at the customer's bank
   // (an LC's instalment is due from it): what the plan's dates are worked out from.
@@ -171,8 +172,8 @@ const COL = {
   amount: { key: "amount", label: "Amount", width: 80, align: "right" } satisfies PaperColumn,
 };
 
-const BANK_ROUTE = (c: PaperCtx) => c.o.paymentRoute === "letter_of_credit" || c.o.paymentRoute === "bank_contract";
-const LC = (c: PaperCtx) => c.o.paymentRoute === "letter_of_credit";
+const BANK_ROUTE = (c: PaperCtx) => routeOf(c.o) === "letter_of_credit" || routeOf(c.o) === "bank_contract";
+const LC = (c: PaperCtx) => routeOf(c.o) === "letter_of_credit";
 const lcWord = (c: PaperCtx) => (LC(c) ? "LC" : "Contract");
 
 /** The order's lines with their numbers ("1", "1.1", "2") and totals in the order's currency. */
@@ -281,7 +282,7 @@ function totalsOf(c: PaperCtx) {
 function salesContract(c: PaperCtx): Built {
   const hs = hsOf(c);
   const { pol, pod } = portsOf(c);
-  const route = c.o.paymentRoute;
+  const route = routeOf(c.o);
   const b = c.o.bankContract;
   const rev = c.o.revision;
   // The accepted option's lead time (the revision keeps none of its own).
@@ -768,7 +769,7 @@ function paymentRequest(c: PaperCtx): Built {
  * the inspection), whatever its title; one for another payment route does not count.
  */
 export function reportItem(c: { o: PaperOrder }, kind: "fat-report" | "inspection-report") {
-  return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === c.o.paymentRoute)) ?? null;
+  return c.o.checklist.find((i) => i.paper === kind && (!i.route || i.route === routeOf(c.o))) ?? null;
 }
 
 function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
@@ -843,7 +844,7 @@ function report(c: PaperCtx, kind: "fat-report" | "inspection-report"): Built {
 }
 
 function deliveryNote(c: PaperCtx): Built {
-  const on = fromDbDateOrNull(c.o.deliveredOn);
+  const on = fromDbDateOrNull(c.o.delivery?.deliveredOn);
   // Worked out from the goods lines (the worst of them): the only place a condition is recorded.
   const worked = deliveryConditionOf(c.o.lines.filter((l) => l.type === "goods"));
   const condition = worked ? DELIVERY_CONDITION_LABEL[worked] : null;
@@ -883,7 +884,7 @@ function deliveryNote(c: PaperCtx): Built {
       bullets: [
         ...(on ? [{ label: "Delivered on:", value: date(on) }] : []),
         ...(condition ? [{ label: "Condition:", value: condition }] : []),
-        ...bullets(c.o.deliveryNote),
+        ...bullets(c.o.delivery?.note ?? null),
         "Received the goods above in the condition stated.",
       ],
       bank: null,
@@ -896,7 +897,7 @@ function satCertificate(c: PaperCtx): Built {
   const checks = c.o.satChecks;
   const passed = checks.filter((x) => x.result === "pass" || x.result === "not_applicable").length;
   const failed = checks.filter((x) => x.result === "fail").length;
-  const on = fromDbDateOrNull(c.o.satDoneOn);
+  const on = fromDbDateOrNull(c.o.delivery?.satDoneOn);
   return {
     checks: [
       check(
@@ -910,7 +911,7 @@ function satCertificate(c: PaperCtx): Built {
         },
       ),
       check("done", "Signed off on", on ? paperDateText(on) : "not yet", !!on, { required: true, href: "delivery" }),
-      check("by", "Signed by", c.o.satSignedBy ?? "not recorded", !!c.o.satSignedBy, { href: "delivery" }),
+      check("by", "Signed by", c.o.delivery?.satSignedBy ?? "not recorded", !!c.o.delivery?.satSignedBy, { href: "delivery" }),
       check("warranty", "Warranty", c.settings.sales.warrantyTerms ? "from Settings" : "not set", !!c.settings.sales.warrantyTerms, {
         href: "/settings/sales",
       }),
@@ -934,8 +935,8 @@ function satCertificate(c: PaperCtx): Built {
         ...(on ? [`Machine accepted by the customer on ${paperDateText(on)}.`] : []),
         ...(on ? [{ label: "Warranty starts:", value: date(on) }] : []),
         ...bullets(c.settings.sales.warrantyTerms),
-        ...(c.o.satSignedBy ? [{ label: "Signed for the customer:", value: c.o.satSignedBy }] : []),
-        ...(c.o.satEngineer ? [{ label: "Our engineer:", value: c.o.satEngineer.name }] : []),
+        ...(c.o.delivery?.satSignedBy ? [{ label: "Signed for the customer:", value: c.o.delivery.satSignedBy }] : []),
+        ...(c.o.delivery?.satEngineer ? [{ label: "Our engineer:", value: c.o.delivery.satEngineer.name }] : []),
       ],
       bank: null,
       signatures: { left: `For the seller · ${c.company.name}`, right: `For the buyer · ${c.customer.name}` },
@@ -1090,7 +1091,7 @@ function coverLetter(c: PaperCtx): Built {
   const b = c.o.bankContract;
   const mode = shipOf(c).primary?.mode ?? "sea";
   // The papers enclosed: the set the shipment needs that the company uses (Settings › Papers we use), and any already in.
-  const set = documentsInUse(c.o.paymentRoute, mode, c.settings.papers.off, (k) =>
+  const set = documentsInUse(routeOf(c.o), mode, c.settings.papers.off, (k) =>
     k === "proforma_invoice" ? !!c.o.proformaNo : k === "packing_list" ? !!c.o.packedAt : c.o.documents.some((d) => d.kind === k && documentDone(d.status)),
   );
   const numberOf = (kind: OrderDocumentKind) => {

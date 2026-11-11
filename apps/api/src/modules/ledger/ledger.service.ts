@@ -474,7 +474,7 @@ export class LedgerService {
       const [orderId, factoryId] = sourceId.split(":") as [string, string | undefined];
       const o = await db.order.findUnique({
         where: { id: orderId },
-        select: { id: true, refNo: true, customerId: true, status: true, cancelledAt: true, cancelReason: true },
+        select: { id: true, refNo: true, customerId: true, status: true, cancellation: { select: { cancelledAt: true, reason: true } } },
       });
       if (!o) return out;
       return {
@@ -488,7 +488,7 @@ export class LedgerService {
             : type === "purchase_order"
               ? `What we owe the factory on ${o.refNo}`
               : `Exchange difference on ${o.refNo}`,
-        removed: o.status === "cancelled" && o.cancelledAt ? { at: o.cancelledAt, reason: o.cancelReason } : null,
+        removed: o.status === "cancelled" && o.cancellation ? { at: o.cancellation.cancelledAt, reason: o.cancellation.reason } : null,
       };
     }
     if (type === "account") {

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fileOf, fromDbDate, isCustomer, liveFile, orderPart, toDbDate, type Prisma } from "@kebo/database";
+import { decimalToMinor, fileOf, fromDbDate, isCustomer, liveFile, orderPart, toDbDate, type Prisma, routeOf, type WithTerms } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, toMinor, type Minor } from "@kebo/money";
 import {
   bankStepsFor,
@@ -561,7 +561,7 @@ export class CustomerPaymentsService {
   async check(user: SessionUser, orderId: string, input: PaymentInput) {
     const cashBook = await this.checkInput(input);
     const { o, thisMinor } = await this.prepare(this.prisma.db, user, orderId, input, cashBook);
-    if (input.bankStep && thisMinor > 0 && !bankStepsFor(o.paymentRoute as never).includes("bank_paid_us"))
+    if (input.bankStep && thisMinor > 0 && !bankStepsFor(routeOf(o) as never).includes("bank_paid_us"))
       throw new DomainError("Money reaches us through the banks only on a bank contract or LC.");
     return { id: o.id, refNo: o.refNo };
   }
@@ -626,12 +626,12 @@ export class CustomerPaymentsService {
   private async moneyReachedUs(
     tx: Tx,
     user: SessionUser,
-    o: { id: string; refNo: string; paymentRoute: string | null },
+    o: WithTerms & { id: string; refNo: string },
     allocationId: string,
     on: ISODate,
     reference: string | null,
   ) {
-    if (!bankStepsFor(o.paymentRoute as never).includes("bank_paid_us"))
+    if (!bankStepsFor(routeOf(o) as never).includes("bank_paid_us"))
       throw new DomainError("Money reaches us through the banks only on a bank contract or LC.");
     const data = { doneOn: toDbDate(on), reference, allocationId };
     await tx.orderBankStep.upsert({

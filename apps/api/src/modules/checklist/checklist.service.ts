@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, routeOf, termsSelect } from "@kebo/database";
 import {
   autoChecklist,
   autoTitle,
@@ -320,7 +320,7 @@ export class ChecklistService {
     const auto = autoChecklist(facts, features)
       .filter((a) => !choices.hidden.includes(a.key) && steps.includes(a.step))
       .map(autoView);
-    const own = rows.filter((r) => !r.key && steps.includes(r.step as FlowStep) && (!r.route || r.route === o.paymentRoute)).map(ownView);
+    const own = rows.filter((r) => !r.key && steps.includes(r.step as FlowStep) && (!r.route || r.route === routeOf(o))).map(ownView);
     const items = [...auto, ...own].sort(
       (a, b) => steps.indexOf(a.step) - steps.indexOf(b.step) || a.sort - b.sort || Number(b.auto) - Number(a.auto),
     );
@@ -378,7 +378,7 @@ export class ChecklistService {
     await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
     const o = await tx.order.findFirst({
       where: { id, ...orderAccess(user) },
-      select: { id: true, refNo: true, status: true, inquiryId: true, paymentRoute: true },
+      select: { id: true, refNo: true, status: true, inquiryId: true, ...termsSelect },
     });
     if (!o) throw new NotFoundError("Order");
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
@@ -669,12 +669,12 @@ export class ChecklistService {
         dueOn: true,
         route: true,
         assignee: { select: { name: true } },
-        order: { select: { id: true, refNo: true, paymentRoute: true, inquiry: { select: { assignee: { select: { name: true } } } } } },
+        order: { select: { id: true, refNo: true, ...termsSelect, inquiry: { select: { assignee: { select: { name: true } } } } } },
       },
       orderBy: { dueOn: "asc" },
       take: 200,
     });
-    const own = rows.filter((r) => !r.key && (!r.route || r.route === r.order.paymentRoute));
+    const own = rows.filter((r) => !r.key && (!r.route || r.route === routeOf(r.order)));
     // Automatic items: still open by the order's data (a few orders at most).
     const autoOrders = [...new Set(rows.filter((r) => r.key).map((r) => r.order.id))].slice(0, 20);
     const open = new Map<string, string>();

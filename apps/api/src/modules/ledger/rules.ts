@@ -482,7 +482,7 @@ export interface ExpenseDoc {
     currency: string;
     rate: number | null;
     cancelled: boolean;
-    /** Money paid to the factories was written off when it was cancelled (cancelFactoryMoney "loss"). */
+    /** Money paid to the factories was written off when it was cancelled (order_cancellations.factory_money "loss"). */
     lossOnCancel: boolean;
     /** What each factory's lines owe on the order (to pick the currency an expense it bears counts in). */
     factoryCurrencies: Map<string, string[]>;
