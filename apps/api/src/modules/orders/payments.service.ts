@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, isCustomer, orderPart, toDbDate, type Prisma } from "@kebo/database";
+import { decimalToMinor, fileOf, fromDbDate, isCustomer, liveFile, orderPart, toDbDate, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, toMinor, type Minor } from "@kebo/money";
 import {
   bankStepsFor,
@@ -65,6 +65,7 @@ const withMovement = {
   movement: {
     include: {
       account: { select: { id: true, name: true } },
+      files: liveFile,
       allocations: { where: { later: false }, select: { id: true, amount: true } },
     },
   },
@@ -100,7 +101,7 @@ function partView(a: PartRow) {
     reference: a.later ? null : m.reference,
     note: a.later ? (a.note ?? "Paid from the customer's credit") : m.note,
     account: a.later ? null : m.account,
-    file: a.later ? null : fileView(m),
+    file: a.later ? null : fileView(fileOf(m.files)),
   };
 }
 

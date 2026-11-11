@@ -1,4 +1,4 @@
-import { livePart, livePurchase } from "@kebo/database";
+import { fileOf, liveFile, livePart, livePurchase } from "@kebo/database";
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { zipSync } from "fflate";
@@ -146,27 +146,36 @@ export class OrderFilesService {
       // Proof of money in is kept on its payment entry (one per transfer, shown on each order it pays).
       db.allocation
         .findMany({
-          where: { orderId, ...livePart, later: false, movement: { fileKey: { not: null } } },
-          include: { movement: { include: { recordedBy: { select: { id: true, name: true } } } } },
+          where: { orderId, ...livePart, later: false, movement: { files: { some: { deletedAt: null } } } },
+          include: { movement: { include: { recordedBy: { select: { id: true, name: true } }, files: liveFile } } },
           orderBy: [{ on: "asc" }, { createdAt: "asc" }],
         })
         // Listed as the payment on this order (its id), the file kept on the entry.
-        .then((parts) => parts.map((a) => ({ ...a.movement, id: a.id, kind: a.kind, paidOn: a.on }))),
+        .then((parts) => parts.map((a) => ({ ...a.movement, ...fileOf(a.movement.files), id: a.id, kind: a.kind, paidOn: a.on }))),
       seeCosts
         ? db.allocation
             .findMany({
-              where: { purchaseOrderId: orderId, ...livePurchase, movement: { fileKey: { not: null } } },
-              include: { movement: { include: { recordedBy: { select: { id: true, name: true } }, party: { select: { name: true } } } } },
+              where: { purchaseOrderId: orderId, ...livePurchase, movement: { files: { some: { deletedAt: null } } } },
+              include: {
+                movement: { include: { recordedBy: { select: { id: true, name: true } }, party: { select: { name: true } }, files: liveFile } },
+              },
               orderBy: [{ on: "asc" }, { createdAt: "asc" }],
             })
-            .then((parts) => parts.map((a) => ({ ...a.movement, id: a.id, factory: a.movement.party!, paidOn: a.on })))
+            .then((parts) => parts.map((a) => ({ ...a.movement, ...fileOf(a.movement.files), id: a.id, factory: a.movement.party!, paidOn: a.on })))
         : Promise.resolve([]),
       seeExpenses
-        ? db.expense.findMany({
-            where: { orderId, receiptKey: { not: null } },
-            include: { recordedBy: { select: { id: true, name: true } } },
-            orderBy: { spentOn: "asc" },
-          })
+        ? db.expense
+            .findMany({
+              where: { orderId, files: { some: { deletedAt: null } } },
+              include: { recordedBy: { select: { id: true, name: true } }, files: liveFile },
+              orderBy: { spentOn: "asc" },
+            })
+            .then((rows) =>
+              rows.map((e) => {
+                const f = fileOf(e.files);
+                return { ...e, receiptKey: f.fileKey, receiptName: f.fileName, receiptType: f.fileType, receiptSize: f.fileSize };
+              }),
+            )
         : Promise.resolve([]),
       db.orderDocument.findMany({ where: { orderId, attachmentId: { not: null } } }),
     ]);
@@ -487,9 +496,9 @@ export class OrderFilesService {
             ...(input.note !== undefined && { note: input.note }),
           },
         });
-      else if (source === "payment") await tx.moneyMovement.updateMany({ where: entryOf(fileId), data: { fileName: name } });
-      else if (source === "factory_payment") await tx.moneyMovement.updateMany({ where: entryOf(fileId), data: { fileName: name } });
-      else await tx.expense.update({ where: { id: fileId }, data: { receiptName: name } });
+      else if (source === "payment" || source === "factory_payment")
+        await tx.attachment.updateMany({ where: { deletedAt: null, movement: entryOf(fileId) }, data: { fileName: name } });
+      else await tx.attachment.updateMany({ where: { deletedAt: null, expenseId: fileId }, data: { fileName: name } });
       if (name !== undefined && name !== f.name)
         await this.log(tx, user, o, "rename", `renamed ${f.name} to ${name}`, f.step, { name }, { name: f.name });
       if (input.kind !== undefined || input.note !== undefined)
@@ -710,10 +719,10 @@ export class OrderFilesService {
     if (f.source === "attachment")
       return (await db.attachment.findUnique({ where: { id: f.sourceId }, select: { storageKey: true } }))?.storageKey ?? null;
     if (f.source === "payment")
-      return (await db.moneyMovement.findFirst({ where: entryOf(f.sourceId), select: { fileKey: true } }))?.fileKey ?? null;
+      return (await db.attachment.findFirst({ where: { deletedAt: null, movement: entryOf(f.sourceId) }, select: { storageKey: true } }))?.storageKey ?? null;
     if (f.source === "factory_payment")
-      return (await db.moneyMovement.findFirst({ where: entryOf(f.sourceId), select: { fileKey: true } }))?.fileKey ?? null;
-    return (await db.expense.findUnique({ where: { id: f.sourceId }, select: { receiptKey: true } }))?.receiptKey ?? null;
+      return (await db.attachment.findFirst({ where: { deletedAt: null, movement: entryOf(f.sourceId) }, select: { storageKey: true } }))?.storageKey ?? null;
+    return (await db.attachment.findFirst({ where: { deletedAt: null, expenseId: f.sourceId }, select: { storageKey: true } }))?.storageKey ?? null;
   }
 
   /** POST /orders/:id/files/share — nothing is sent by the app: this only notes who shared what, how and when. */

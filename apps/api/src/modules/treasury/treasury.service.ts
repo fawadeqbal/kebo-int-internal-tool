@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, isCustomer, orderPart, toDbDate, type Prisma } from "@kebo/database";
+import { liveFile, decimalToMinor, fromDbDate, isCustomer, orderPart, toDbDate, type Prisma } from "@kebo/database";
 import {
   can,
   EXPENSE_CATEGORY_LABEL,
@@ -460,7 +460,11 @@ export class TreasuryService {
       case "customer": {
         const m = await db.moneyMovement.findUniqueOrThrow({
           where: { id },
-          include: { recordedBy: name, allocations: { where: { later: false, ...orderPart }, include: { order: { select: { id: true, refNo: true } } } } },
+          include: {
+            recordedBy: name,
+            files: liveFile,
+            allocations: { where: { later: false, ...orderPart }, include: { order: { select: { id: true, refNo: true } } } },
+          },
         });
         const live = m.allocations.filter((a) => !a.voidedAt || m.voidedAt);
         const one = m.allocations.length === 1 && decimalToMinor(m.allocatable) === decimalToMinor(m.allocations[0]!.amount) ? m.allocations[0]! : null;
@@ -482,7 +486,7 @@ export class TreasuryService {
             ...(m.paidByName ? [{ label: "Paid by", value: m.paidByName }] : []),
             ...(m.note ? [{ label: "Note", value: m.note }] : []),
           ],
-          file: m.fileKey ? { name: m.fileName ?? "Proof", href: `/files/payments/${m.id}` } : null,
+          file: m.files[0] ? { name: m.files[0].fileName, href: `/files/payments/${m.id}` } : null,
           recordedBy: m.recordedBy.name,
           recordedAt: m.createdAt.toISOString(),
           voided: voidOf(m.voidedAt, m.voidReason),
@@ -522,7 +526,7 @@ export class TreasuryService {
       case "supplier": {
         const a = await db.allocation.findUniqueOrThrow({
           where: { id },
-          include: { purchaseOrder: orderRef, movement: { include: { recordedBy: name, paidBy: name } } },
+          include: { purchaseOrder: orderRef, movement: { include: { recordedBy: name, paidBy: name, files: liveFile } } },
         });
         const p = { ...a.movement, kind: a.kind, order: a.purchaseOrder!, orderId: a.purchaseOrderId!, paidOn: a.on, voidedAt: a.voidedAt ?? a.movement.voidedAt, id: a.id };
         return {
@@ -533,7 +537,7 @@ export class TreasuryService {
             ...(p.paidBy ? [{ label: "Paid by", value: p.paidBy.name }] : []),
             ...(p.note ? [{ label: "Note", value: p.note }] : []),
           ],
-          file: p.fileKey ? { name: p.fileName ?? "Proof", href: `/files/factory-payments/${p.id}` } : null,
+          file: p.files[0] ? { name: p.files[0].fileName, href: `/files/factory-payments/${p.id}` } : null,
           recordedBy: p.recordedBy.name,
           recordedAt: p.createdAt.toISOString(),
           voided: voidOf(p.voidedAt, p.voidReason),
@@ -542,7 +546,7 @@ export class TreasuryService {
         };
       }
       case "expense": {
-        const e = await db.expense.findUniqueOrThrow({ where: { id }, include: { recordedBy: name, paidBy: name, repaidAccount: name } });
+        const e = await db.expense.findUniqueOrThrow({ where: { id }, include: { recordedBy: name, paidBy: name, repaidAccount: name, files: liveFile } });
         const borne =
           e.borneBy === "customer"
             ? "The customer (added to what they owe)"
@@ -565,7 +569,7 @@ export class TreasuryService {
               : []),
             ...(e.note ? [{ label: "Note", value: e.note }] : []),
           ],
-          file: e.receiptKey ? { name: e.receiptName ?? "Receipt", href: `/files/expenses/${e.id}` } : null,
+          file: e.files[0] ? { name: e.files[0].fileName, href: `/files/expenses/${e.id}` } : null,
           recordedBy: e.recordedBy.name,
           recordedAt: e.createdAt.toISOString(),
           voided: voidOf(e.voidedAt, e.voidReason),
@@ -595,7 +599,7 @@ export class TreasuryService {
         };
       }
       case "submission": {
-        const m = await db.moneySubmission.findUniqueOrThrow({ where: { id }, include: { submittedBy: name, decidedBy: name } });
+        const m = await db.moneySubmission.findUniqueOrThrow({ where: { id }, include: { submittedBy: name, decidedBy: name, files: liveFile } });
         const b = (m.body ?? {}) as Record<string, unknown>;
         return {
           fields: [
@@ -604,7 +608,7 @@ export class TreasuryService {
             ...(m.status === "sent_back" && m.reason ? [{ label: "Sent back because", value: m.reason }] : []),
             { label: "Verify it", value: "In the verification queue", href: "/approvals" },
           ],
-          file: m.fileKey ? { name: m.fileName ?? "Proof", href: `/files/submissions/${m.id}` } : null,
+          file: m.files[0] ? { name: m.files[0].fileName, href: `/files/submissions/${m.id}` } : null,
           recordedBy: m.submittedBy.name,
           recordedAt: m.submittedAt.toISOString(),
           voided: null,

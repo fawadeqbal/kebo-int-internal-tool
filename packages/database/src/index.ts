@@ -11,3 +11,4 @@ export * from "./companies";
 export * from "./order-freeze";
 export * from "./parties";
 export * from "./allocations";
+export * from "./files";

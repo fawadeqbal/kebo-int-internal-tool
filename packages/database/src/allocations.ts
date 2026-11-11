@@ -1,4 +1,5 @@
 import type { Prisma } from "./generated/prisma/client";
+import { fileOf, liveFile } from "./files";
 
 /**
  * Customer money is a payment entry (money_movements: what arrived or left) and what it pays underneath
@@ -132,10 +133,10 @@ export const livePurchase = { target: "purchase", voidedAt: null } as const sati
 export const purchasesWithEntry = {
   where: livePurchase,
   orderBy: [{ on: "asc" }, { createdAt: "asc" }],
-  include: { movement: true },
+  include: { movement: { include: { files: liveFile } } },
 } as const satisfies Prisma.Order$supplierPaidArgs;
 
-type PurchaseWithEntry = Prisma.AllocationGetPayload<{ include: { movement: true } }>;
+type PurchaseWithEntry = Prisma.AllocationGetPayload<{ include: { movement: { include: { files: typeof liveFile } } } }>;
 
 /** A purchase allocation read as a payment to the supplier (as factory_payments had it). */
 export const asSupplierPayment = (a: PurchaseWithEntry) => ({
@@ -155,10 +156,7 @@ export const asSupplierPayment = (a: PurchaseWithEntry) => ({
   reference: a.movement.reference,
   note: a.movement.note,
   accountId: a.movement.accountId,
-  fileKey: a.movement.fileKey,
-  fileName: a.movement.fileName,
-  fileType: a.movement.fileType,
-  fileSize: a.movement.fileSize,
+  ...fileOf(a.movement.files),
   recordedById: a.movement.recordedById,
   voidedAt: a.voidedAt ?? a.movement.voidedAt,
   voidReason: a.voidReason ?? a.movement.voidReason,

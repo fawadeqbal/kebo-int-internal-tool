@@ -361,8 +361,12 @@ describe("money sent for approval", () => {
       submission: Submission;
       createdId: string;
     };
-    const e = await prisma.company(FIRST_COMPANY_ID).expense.findUniqueOrThrow({ where: { id: done.createdId } });
-    expect(e).toMatchObject({ orderId, description: "Taxi to the factory", currency: "USD", receiptName: "taxi.pdf" });
+    const e = await prisma
+      .company(FIRST_COMPANY_ID)
+      .expense.findUniqueOrThrow({ where: { id: done.createdId }, include: { files: { where: { deletedAt: null } } } });
+    expect(e).toMatchObject({ orderId, description: "Taxi to the factory", currency: "USD" });
+    // The photo moved to the expense as its receipt (the same file row, no copy).
+    expect(e.files.map((f) => f.fileName)).toEqual(["taxi.pdf"]);
     expect(e.amount.toFixed(2)).toBe("25.00");
     const receipt = await api(app, manager).get(`/expenses/${done.createdId}/receipt`).buffer(true).expect(200);
     expect(Buffer.from(receipt.body).toString()).toBe("%PDF-1.4 taxi");

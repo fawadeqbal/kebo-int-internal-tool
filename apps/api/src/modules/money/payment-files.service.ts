@@ -3,7 +3,9 @@ import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
 import { can } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
-import { PrismaService, type Tx } from "../../database/prisma.service";
+import { fileOf, liveFile } from "@kebo/database";
+import { PrismaService } from "../../database/prisma.service";
+import { removeProof, setProof } from "../files/proofs";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import { AuditService } from "../../common/audit/audit.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -49,11 +51,11 @@ export class PaymentFilesService {
     const part = await this.prisma.db.allocation.findUnique({ where: { id }, select: { movementId: true, orderId: true, purchaseOrderId: true } });
     const m = await this.prisma.db.moneyMovement.findFirst({
       where: { id: part?.movementId ?? id, partyRole: role },
-      include: { allocations: { where: { OR: [{ orderId: { not: null } }, { purchaseOrderId: { not: null } }] }, take: 1 } },
+      include: { files: liveFile, allocations: { where: { OR: [{ orderId: { not: null } }, { purchaseOrderId: { not: null } }] }, take: 1 } },
     });
     if (!m) throw new NotFoundError("Payment");
     const first = m.allocations[0];
-    return { ...m, orderId: part?.orderId ?? part?.purchaseOrderId ?? first?.orderId ?? first?.purchaseOrderId ?? null };
+    return { ...m, ...fileOf(m.files), orderId: part?.orderId ?? part?.purchaseOrderId ?? first?.orderId ?? first?.purchaseOrderId ?? null };
   }
 
   /** Can this person see the payment? (Throws as if it were not there.) */
@@ -69,15 +71,6 @@ export class PaymentFilesService {
     await this.canSee(user, side, row);
     if (row.voidedAt) throw new DomainError("This payment was removed.");
     return row;
-  }
-
-  private update(
-    side: PaymentSide,
-    id: string,
-    data: { fileKey: string | null; fileName: string | null; fileType: string | null; fileSize: number | null },
-    tx: Tx,
-  ) {
-    return tx.moneyMovement.update({ where: { id }, data });
   }
 
   async attach(
@@ -97,12 +90,7 @@ export class PaymentFilesService {
     try {
       const ref = row.orderId ? (await this.orders.load(user, row.orderId)).refNo : "Credit";
       await this.prisma.tx(async (tx) => {
-        await this.update(
-          side,
-          row.id,
-          { fileKey: key, fileName: name, fileType: file.mimetype || "application/octet-stream", fileSize: file.size },
-          tx,
-        );
+        await setProof(tx, { movementId: row.id }, { key, name, type: file.mimetype || "application/octet-stream", size: file.size }, user.id);
         await this.audit.record(tx, {
           userId: user.id,
           action: "payment_file",
@@ -140,7 +128,7 @@ export class PaymentFilesService {
     if (!row.fileKey) return { ok: true };
     const ref = row.orderId ? (await this.orders.load(user, row.orderId)).refNo : "Credit";
     await this.prisma.tx(async (tx) => {
-      await this.update(side, row.id, { fileKey: null, fileName: null, fileType: null, fileSize: null }, tx);
+      await removeProof(tx, { movementId: row.id });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_file",

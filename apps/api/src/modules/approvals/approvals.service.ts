@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { isCustomer } from "@kebo/database";
+import { liveFile, isCustomer } from "@kebo/database";
 import type { Readable } from "node:stream";
 import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
@@ -7,6 +7,7 @@ import { formatMinor, fromMinor, toMinor } from "@kebo/money";
 import { can, expenseInput, paymentInput, type ExpenseInput, type PaymentInput } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { z } from "zod";
+import { removeProof, setProof } from "../files/proofs";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { LimitsService } from "../../common/company/limits.service";
@@ -44,6 +45,8 @@ const include = {
   },
   submittedBy: { select: { id: true, name: true } },
   decidedBy: { select: { id: true, name: true } },
+  /** The photo sent with it (one live file). */
+  files: liveFile,
 } satisfies Prisma.MoneySubmissionInclude;
 type Row = Prisma.MoneySubmissionGetPayload<{ include: typeof include }>;
 
@@ -240,8 +243,8 @@ export class ApprovalsService {
         body: b,
         submittedBy: r.submittedBy,
         submittedAt: r.submittedAt,
-        hasFile: !!r.fileKey,
-        file: r.fileKey ? { name: r.fileName ?? "file", type: r.fileType ?? "application/octet-stream", size: r.fileSize ?? 0 } : null,
+        hasFile: r.files.length > 0,
+        file: r.files[0] ? { name: r.files[0].fileName, type: r.files[0].mimeType, size: r.files[0].size } : null,
         reason: r.reason,
         decidedBy: r.decidedBy,
         decidedAt: r.decidedAt,
@@ -446,13 +449,10 @@ export class ApprovalsService {
           status: "withdrawn",
           decidedById: user.id,
           decidedAt: new Date(),
-          fileKey: null,
-          fileName: null,
-          fileType: null,
-          fileSize: null,
         },
       });
       if (!done.count) throw new ConflictError(this.closedMessage((await this.find(id, tx)).status));
+      await removeProof(tx, { submissionId: id });
       await this.addHistory(
         tx,
         user,
@@ -461,7 +461,7 @@ export class ApprovalsService {
         { newValues: { status: "withdrawn" } },
       );
     });
-    if (row.fileKey) await this.storage.delete(row.fileKey).catch(() => undefined);
+    if (row.files[0]) await this.storage.delete(row.files[0].storageKey).catch(() => undefined);
     return this.view(user, id);
   }
 
@@ -515,32 +515,23 @@ export class ApprovalsService {
     try {
       await this.prisma.tx(async (tx) => {
         // The photo as it is now (no change is let in once it is taken).
-        const now = await tx.moneySubmission.findUniqueOrThrow({ where: { id } });
-        const file =
-          now.fileKey && createdId
-            ? { key: now.fileKey, name: now.fileName ?? "file", type: now.fileType ?? "application/octet-stream", size: now.fileSize ?? 0 }
-            : null;
-        // Money in keeps its proof on its payment entry (createdId: the payment on the order, or the entry).
-        if (file && kind === "payment")
-          await tx.moneyMovement.update({
-            where: { id: (await tx.allocation.findUnique({ where: { id: createdId! }, select: { movementId: true } }))?.movementId ?? createdId! },
-            data: { fileKey: file.key, fileName: file.name, fileType: file.type, fileSize: file.size },
-          });
-        if (file && kind === "expense")
-          await tx.expense.update({
-            where: { id: createdId! },
-            data: { receiptKey: file.key, receiptName: file.name, receiptType: file.type, receiptSize: file.size },
-          });
-        await tx.moneySubmission.update({
-          where: { id },
-          data: { createdId, ...(file ? { fileKey: null, fileName: null, fileType: null, fileSize: null } : {}) },
-        });
+        const now = await tx.moneySubmission.findUniqueOrThrow({ where: { id }, include: { files: liveFile } });
+        // The photo moves to what was recorded: money in keeps it on its payment entry (createdId: the payment on
+        // the order, or the entry), an expense as its receipt.
+        if (now.files[0] && createdId) {
+          const to =
+            kind === "payment"
+              ? { movementId: (await tx.allocation.findUnique({ where: { id: createdId }, select: { movementId: true } }))?.movementId ?? createdId }
+              : { expenseId: createdId };
+          await tx.attachment.update({ where: { id: now.files[0].id }, data: { submissionId: null, ...to } });
+        }
+        await tx.moneySubmission.update({ where: { id }, data: { createdId } });
         const refNo = row.order?.refNo ?? null;
         await this.addHistory(
           tx,
           user,
           { ...row, orderId, createdId, body: body as Prisma.JsonValue },
-          `${refNo ? `${refNo}: ` : ""}${this.describe(kind, body as Prisma.JsonValue, null)} added by ${row.submittedBy.name}, approved by ${user.name}${file ? ` (with ${file.name})` : ""}`,
+          `${refNo ? `${refNo}: ` : ""}${this.describe(kind, body as Prisma.JsonValue, null)} added by ${row.submittedBy.name}, approved by ${user.name}${now.files[0] && createdId ? ` (with ${now.files[0].fileName})` : ""}`,
           { newValues: { status: "approved", createdId, submittedBy: row.submittedBy.name, approvedBy: user.name } },
         );
       });
@@ -614,12 +605,9 @@ export class ApprovalsService {
     try {
       await this.prisma.tx(async (tx) => {
         const now = await tx.moneySubmission.findUniqueOrThrow({ where: { id } });
-        old = now.fileKey;
-        const done = await tx.moneySubmission.updateMany({
-          where: { id, status: { in: ["pending", "sent_back"] } },
-          data: { fileKey: key, fileName: name, fileType: file.mimetype || "application/octet-stream", fileSize: file.size },
-        });
-        if (!done.count) throw new ConflictError(this.closedMessage(now.status));
+        await tx.$queryRaw`select id from money_submissions where id = ${id}::uuid for update`;
+        if (now.status !== "pending" && now.status !== "sent_back") throw new ConflictError(this.closedMessage(now.status));
+        old = await setProof(tx, { submissionId: id }, { key, name, type: file.mimetype || "application/octet-stream", size: file.size }, user.id);
         await this.addHistory(
           tx,
           user,
@@ -637,32 +625,26 @@ export class ApprovalsService {
 
   async open(user: SessionUser, id: string): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
     const { row } = await this.visible(user, id);
-    if (!row.fileKey) throw new NotFoundError("File");
-    return {
-      stream: await this.storage.get(row.fileKey),
-      fileName: row.fileName ?? "file",
-      mimeType: row.fileType ?? "application/octet-stream",
-      size: row.fileSize ?? 0,
-    };
+    const f = row.files[0];
+    if (!f) throw new NotFoundError("File");
+    return { stream: await this.storage.get(f.storageKey), fileName: f.fileName, mimeType: f.mimeType, size: f.size };
   }
 
   async removeFile(user: SessionUser, id: string) {
     const row = await this.forSubmitter(user, id, ["pending", "sent_back"]);
-    if (!row.fileKey) return this.view(user, id);
+    const f = row.files[0];
+    if (!f) return this.view(user, id);
     await this.prisma.tx(async (tx) => {
-      const done = await tx.moneySubmission.updateMany({
-        where: { id, status: { in: ["pending", "sent_back"] }, fileKey: row.fileKey },
-        data: { fileKey: null, fileName: null, fileType: null, fileSize: null },
-      });
+      const done = await tx.attachment.updateMany({ where: { id: f.id, deletedAt: null }, data: { deletedAt: new Date() } });
       if (!done.count) throw new ConflictError("This changed meanwhile. Reload and try again.");
       await this.addHistory(
         tx,
         user,
         row,
-        `${row.order ? `${row.order.refNo}: ` : ""}${user.name} removed the photo of ${this.describe(row.kind, row.body, null)} sent for approval (${row.fileName})`,
+        `${row.order ? `${row.order.refNo}: ` : ""}${user.name} removed the photo of ${this.describe(row.kind, row.body, null)} sent for approval (${f.fileName})`,
       );
     });
-    await this.storage.delete(row.fileKey).catch(() => undefined);
+    await this.storage.delete(f.storageKey).catch(() => undefined);
     return this.view(user, id);
   }
 }
