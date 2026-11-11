@@ -136,7 +136,7 @@ export function AttachedFile({
   remove,
   empty = "None kept",
 }: {
-  /** Our /files route for this record (GET opens it, POST replaces it). */
+  /** Our route for this record's file (POST replaces it); the file opens at /files/<id>. */
   src: string;
   file: AttachedFileInfo | null;
   /** For the image's alt text: "Receipt", "Proof of payment". */
@@ -162,16 +162,17 @@ export function AttachedFile({
     if (input.current) input.current.value = "";
   };
   const viewable = !!file && VIEWABLE.test(file.type);
+  const href = file ? `/files/${file.id}` : "";
   const tools = useFileTools();
-  const orderFile = file ? tools?.files.find((f) => f.href === src) : undefined;
+  const orderFile = file ? tools?.files.find((f) => f.href === href) : undefined;
   return (
     <div className="flex flex-col gap-2">
       {file ? (
         <div className="flex flex-wrap items-center gap-3">
           {viewable && file.type.startsWith("image/") ? (
-            <a href={`${src}?view=1`} target="_blank" rel="noreferrer" className="block shrink-0" aria-label={`Open ${file.name}`}>
+            <a href={`${href}?view=1`} target="_blank" rel="noreferrer" className="block shrink-0" aria-label={`Open ${file.name}`}>
               {/* eslint-disable-next-line @next/next/no-img-element -- a private file from our own route, not an optimisable image */}
-              <img src={`${src}?view=1`} alt={`${what}: ${file.name}`} className="h-20 w-28 rounded-md border border-line object-cover" />
+              <img src={`${href}?view=1`} alt={`${what}: ${file.name}`} className="h-20 w-28 rounded-md border border-line object-cover" />
             </a>
           ) : (
             <span className="flex size-12 items-center justify-center rounded-md border border-line bg-surface">
@@ -184,7 +185,7 @@ export function AttachedFile({
               <FileChip file={orderFile} />
             ) : (
               <a
-                href={`${src}${viewable ? "?view=1" : ""}`}
+                href={`${href}${viewable ? "?view=1" : ""}`}
                 target={viewable ? "_blank" : undefined}
                 rel="noreferrer"
                 className="block truncate font-medium hover:text-primary"

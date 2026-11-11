@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
 import { liveFile, livePurchase, asSupplierPayment, purchasePart, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
@@ -89,6 +88,11 @@ export class MoneyService {
     private readonly limits: LimitsService,
     private readonly ledger: LedgerPosting,
   ) {}
+
+  /** Whether the person may open an expense's receipt: those who see expenses. */
+  mayOpenReceipt(user: SessionUser) {
+    this.assertExpenses(user);
+  }
 
   private assertExpenses(user: SessionUser) {
     if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can see expenses and profit.");
@@ -596,7 +600,7 @@ export class MoneyService {
       paidBy: e.paidBy,
       reference: e.reference,
       note: e.note,
-      receipt: e.files[0] ? { name: e.files[0].fileName, type: e.files[0].mimeType, size: e.files[0].size } : null,
+      receipt: e.files[0] ? { id: e.files[0].id, name: e.files[0].fileName, type: e.files[0].mimeType, size: e.files[0].size } : null,
       /** The order's step it belongs to. */
       step: (e.step as FlowStep | null) ?? null,
       borneBy: e.borneBy as ExpenseBearer,
@@ -967,13 +971,6 @@ export class MoneyService {
       await this.storage.delete(key).catch(() => undefined);
       throw error;
     }
-  }
-
-  async receipt(user: SessionUser, id: string): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
-    this.assertExpenses(user);
-    const f = (await this.prisma.db.expense.findUnique({ where: { id }, include: { files: liveFile } }))?.files[0];
-    if (!f) throw new NotFoundError("Receipt");
-    return { stream: await this.storage.get(f.storageKey), fileName: f.fileName, mimeType: f.mimeType, size: f.size };
   }
 
   async removeReceipt(user: SessionUser, id: string) {

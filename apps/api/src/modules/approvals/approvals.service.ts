@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { liveFile, isCustomer } from "@kebo/database";
-import type { Readable } from "node:stream";
 import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, toMinor } from "@kebo/money";
@@ -123,6 +122,11 @@ export class ApprovalsService {
   }
 
   /** The submitter or an approver may see it; anyone else is told it is not there. */
+  /** Whether the person may open a submission's photo: its submitter or someone who approves it. */
+  async mayOpen(user: SessionUser, id: string) {
+    await this.visible(user, id);
+  }
+
   private async visible(user: SessionUser, id: string) {
     const row = await this.find(id);
     const mine = row.submittedById === user.id;
@@ -244,7 +248,7 @@ export class ApprovalsService {
         submittedBy: r.submittedBy,
         submittedAt: r.submittedAt,
         hasFile: r.files.length > 0,
-        file: r.files[0] ? { name: r.files[0].fileName, type: r.files[0].mimeType, size: r.files[0].size } : null,
+        file: r.files[0] ? { id: r.files[0].id, name: r.files[0].fileName, type: r.files[0].mimeType, size: r.files[0].size } : null,
         reason: r.reason,
         decidedBy: r.decidedBy,
         decidedAt: r.decidedAt,
@@ -607,7 +611,7 @@ export class ApprovalsService {
         const now = await tx.moneySubmission.findUniqueOrThrow({ where: { id } });
         await tx.$queryRaw`select id from money_submissions where id = ${id}::uuid for update`;
         if (now.status !== "pending" && now.status !== "sent_back") throw new ConflictError(this.closedMessage(now.status));
-        old = await setProof(tx, { submissionId: id }, { key, name, type: file.mimetype || "application/octet-stream", size: file.size }, user.id);
+        old = (await setProof(tx, { submissionId: id }, { key, name, type: file.mimetype || "application/octet-stream", size: file.size }, user.id)).replaced;
         await this.addHistory(
           tx,
           user,
@@ -621,13 +625,6 @@ export class ApprovalsService {
     }
     if (old) await this.storage.delete(old).catch(() => undefined);
     return this.view(user, id);
-  }
-
-  async open(user: SessionUser, id: string): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
-    const { row } = await this.visible(user, id);
-    const f = row.files[0];
-    if (!f) throw new NotFoundError("File");
-    return { stream: await this.storage.get(f.storageKey), fileName: f.fileName, mimeType: f.mimeType, size: f.size };
   }
 
   async removeFile(user: SessionUser, id: string) {

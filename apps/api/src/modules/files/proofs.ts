@@ -12,14 +12,15 @@ export interface StoredFile {
 /**
  * The proof of a payment entry, an expense or money sent for approval: one live attachment per record. Setting
  * one replaces the one before (kept, deleted); the caller removes the old stored file once the transaction holds.
- * Returns the storage key it replaced, if any.
+ * Returns the new file's id and the storage key it replaced, if any.
  */
-export async function setProof(tx: Tx, of: ProofOf, file: StoredFile, uploadedById: string): Promise<string | null> {
-  const old = await removeProof(tx, of);
-  await tx.attachment.create({
+export async function setProof(tx: Tx, of: ProofOf, file: StoredFile, uploadedById: string): Promise<{ id: string; replaced: string | null }> {
+  const replaced = await removeProof(tx, of);
+  const { id } = await tx.attachment.create({
     data: { ...of, storageKey: file.key, fileName: file.name, mimeType: file.type, size: file.size, uploadedById },
+    select: { id: true },
   });
-  return old;
+  return { id, replaced };
 }
 
 /** Takes the record's proof off (the row is kept, deleted). Returns its storage key, if there was one. */

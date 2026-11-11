@@ -204,7 +204,7 @@ function Photo({ s }: { s: Submission }) {
         No photo
       </span>
     );
-  const href = `/files/submissions/${s.id}?view=1`;
+  const href = `/files/${s.file.id}?view=1`;
   const label = `Open the ${s.kind === "payment" ? "bank slip" : "receipt"} (${s.file.name}) in a new tab`;
   return (
     <a

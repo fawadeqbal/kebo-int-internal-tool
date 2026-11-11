@@ -173,7 +173,7 @@ export class OrderFilesService {
             .then((rows) =>
               rows.map((e) => {
                 const f = fileOf(e.files);
-                return { ...e, receiptKey: f.fileKey, receiptName: f.fileName, receiptType: f.fileType, receiptSize: f.fileSize };
+                return { ...e, receiptId: f.fileId!, receiptKey: f.fileKey, receiptName: f.fileName, receiptType: f.fileType, receiptSize: f.fileSize };
               }),
             )
         : Promise.resolve([]),
@@ -329,8 +329,8 @@ export class OrderFilesService {
         group: "money",
         by: p.recordedBy,
         at: p.createdAt.toISOString(),
-        href: `/files/payments/${p.id}`,
-        viewHref: VIEWABLE_FILE.test(type) ? `/files/payments/${p.id}?view=1` : null,
+        href: `/files/${p.fileId}`,
+        viewHref: VIEWABLE_FILE.test(type) ? `/files/${p.fileId}?view=1` : null,
         version: 1,
         versions: [],
         can: { rename: payEdit, describe: false, attach: false, replace: payEdit, remove: payEdit },
@@ -354,8 +354,8 @@ export class OrderFilesService {
         group: "money",
         by: p.recordedBy,
         at: p.createdAt.toISOString(),
-        href: `/files/factory-payments/${p.id}`,
-        viewHref: VIEWABLE_FILE.test(type) ? `/files/factory-payments/${p.id}?view=1` : null,
+        href: `/files/${p.fileId}`,
+        viewHref: VIEWABLE_FILE.test(type) ? `/files/${p.fileId}?view=1` : null,
         version: 1,
         versions: [],
         can: { rename: payEdit, describe: false, attach: false, replace: payEdit, remove: payEdit },
@@ -381,8 +381,8 @@ export class OrderFilesService {
         group: "money",
         by: e.recordedBy,
         at: e.createdAt.toISOString(),
-        href: `/files/expenses/${e.id}`,
-        viewHref: VIEWABLE_FILE.test(type) ? `/files/expenses/${e.id}?view=1` : null,
+        href: `/files/${e.receiptId}`,
+        viewHref: VIEWABLE_FILE.test(type) ? `/files/${e.receiptId}?view=1` : null,
         version: 1,
         versions: [],
         can: { rename: expEdit, describe: false, attach: false, replace: expEdit, remove: expEdit },

@@ -46,8 +46,7 @@ const noFile = () => new z.ZodError([{ code: "custom", path: ["file"], message: 
  * Documents v3: every file of an order in one list, and the same tools on each
  * (rename, say what it is, attach to, replace with a newer one, delete), plus
  * many at once (zip) and noting a share. Who may change a file follows what it
- * is attached to (see OrderFilesService). The older per-source endpoints
- * (/files/:id, /payments/:id/file, /expenses/:id/receipt…) stay as they were.
+ * is attached to (see OrderFilesService). Each file opens at /files/:id.
  */
 @ApiTags("order files")
 @Controller("orders/:id/files")

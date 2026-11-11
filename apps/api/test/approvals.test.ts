@@ -198,10 +198,11 @@ describe("money sent for approval", () => {
       await upload(sana, `/submissions/${sent.id}/file`).attach("file", png, { filename: "slip.png", contentType: "image/png" }).expect(201)
     ).body;
     expect(withFile).toMatchObject({ hasFile: true, file: { name: "slip.png", type: "image/png", size: png.length } });
-    const got = await api(app, manager).get(`/submissions/${sent.id}/file`).buffer(true).expect(200);
+    const slipFile = `/files/${withFile.file.id}`;
+    const got = await api(app, manager).get(slipFile).buffer(true).expect(200);
     expect(Buffer.from(got.body).equals(png)).toBe(true);
-    await api(app, sana).get(`/submissions/${sent.id}/file`).expect(200);
-    await api(app, bilal).get(`/submissions/${sent.id}/file`).expect(404);
+    await api(app, sana).get(slipFile).expect(200);
+    await api(app, bilal).get(slipFile).expect(404);
     await api(app, bilal).get(`/submissions/${sent.id}`).expect(404);
 
     // Managers are told and see it in their list; staff see only their own.
@@ -246,9 +247,10 @@ describe("money sent for approval", () => {
     expect(made).toMatchObject({ amount: "100.00", reference: `SLIP-${tag}`, recordedBy: { name: "Manager" }, file: { name: "slip.png" } });
     expect(made.receiptNo).toEqual(expect.any(Number));
     expect(Number(after.due)).toBeCloseTo(Number(before.due) - 100, 2);
-    const slip = await api(app, manager).get(`/payments/${approved.createdId}/file`).buffer(true).expect(200);
+    // The same file, now the payment's proof: its address does not change.
+    expect(made.file).toMatchObject({ id: withFile.file.id });
+    const slip = await api(app, manager).get(slipFile).buffer(true).expect(200);
     expect(Buffer.from(slip.body).equals(png)).toBe(true);
-    await api(app, manager).get(`/submissions/${sent.id}/file`).expect(404);
 
     // Recorded directly, the same way: the next receipt number of the same series.
     const direct = (await api(app, manager).post(`/orders/${orderId}/payments`, { amount: 1, currency: "USD", paidOn: today }).expect(201))
@@ -368,7 +370,7 @@ describe("money sent for approval", () => {
     // The photo moved to the expense as its receipt (the same file row, no copy).
     expect(e.files.map((f) => f.fileName)).toEqual(["taxi.pdf"]);
     expect(e.amount.toFixed(2)).toBe("25.00");
-    const receipt = await api(app, manager).get(`/expenses/${done.createdId}/receipt`).buffer(true).expect(200);
+    const receipt = await api(app, manager).get(`/files/${e.files[0]!.id}`).buffer(true).expect(200);
     expect(Buffer.from(receipt.body).toString()).toBe("%PDF-1.4 taxi");
 
     // The money received, approved with a corrected amount.

@@ -191,7 +191,7 @@ export class CostsService {
         repaid: e.repaidOn ? { on: fromDbDate(e.repaidOn), account: e.repaidAccount } : null,
         reference: e.reference,
         note: e.note,
-        receipt: e.files[0] ? { name: e.files[0].fileName, type: e.files[0].mimeType, size: e.files[0].size } : null,
+        receipt: e.files[0] ? { id: e.files[0].id, name: e.files[0].fileName, type: e.files[0].mimeType, size: e.files[0].size } : null,
         recordedBy: e.recordedBy,
         recordedAt: e.createdAt,
         voided: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,

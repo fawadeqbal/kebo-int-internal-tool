@@ -10,13 +10,10 @@ import {
   Post,
   Put,
   Query,
-  Res,
-  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import type { Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
@@ -161,16 +158,6 @@ class CashController {
     return this.attachFile(user, "out", id, file);
   }
 
-  @Get("payments/:id/file")
-  paymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
-    return this.sendFile(user, "in", id, res);
-  }
-
-  @Get("factory-payments/:id/file")
-  factoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
-    return this.sendFile(user, "out", id, res);
-  }
-
   @Delete("payments/:id/file")
   removePaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.paymentFiles.remove(user, "in", id);
@@ -184,18 +171,6 @@ class CashController {
   private attachFile(user: SessionUser, side: PaymentSide, id: string, file: Express.Multer.File | undefined) {
     if (!file) throw new z.ZodError([{ code: "custom", path: ["file"], message: "Choose a photo or PDF of the payment", input: undefined }]);
     return this.paymentFiles.attach(user, side, id, file);
-  }
-
-  private async sendFile(user: SessionUser, side: PaymentSide, id: string, res: Response) {
-    const f = await this.paymentFiles.open(user, side, id);
-    res.set({
-      "Content-Type": f.mimeType,
-      "Content-Length": String(f.size),
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-    });
-    return new StreamableFile(f.stream);
   }
 }
 

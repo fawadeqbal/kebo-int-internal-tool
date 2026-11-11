@@ -516,7 +516,7 @@ export function EditOrderExpense({ setup, expense }: { setup: ExpenseSetup; expe
       <ExpenseDialog title="Change the expense" sub={`${setup.refNo} · ${date(expense.spentOn)}`} open={open} onClose={() => setOpen(false)}>
         {notice && <Alert tone="warning">{notice}</Alert>}
         {expense.receipt && (
-          <a href={`/files/expenses/${expense.id}?view=1`} target="_blank" rel="noreferrer" className="w-fit text-sm text-primary hover:underline">
+          <a href={`/files/${expense.receipt.id}?view=1`} target="_blank" rel="noreferrer" className="w-fit text-sm text-primary hover:underline">
             Open the receipt ({expense.receipt.name})
           </a>
         )}

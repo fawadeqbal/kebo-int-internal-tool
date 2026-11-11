@@ -81,11 +81,11 @@ describe("every read endpoint answers for every record", () => {
   });
 
   it("every money submission and its photo", async () => {
-    const all = (await ok(manager, "/submissions?status=all&pageSize=200")) as { rows: { id: string }[] };
+    const all = (await ok(manager, "/submissions?status=all&pageSize=200")) as { rows: { id: string; file: { id: string } | null }[] };
     const mine = (await ok(staff, "/submissions?status=all&mine=true&pageSize=200")) as { rows: { id: string }[] };
     for (const s of all.rows) {
       await ok(manager, `/submissions/${s.id}`);
-      await ok(manager, `/submissions/${s.id}/file`);
+      if (s.file) await ok(manager, `/files/${s.file.id}`);
       await ok(staff, `/submissions/${s.id}`);
     }
     for (const s of mine.rows) await ok(staff, `/submissions/${s.id}`);

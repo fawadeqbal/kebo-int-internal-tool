@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
 import { can } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
@@ -87,10 +86,11 @@ export class PaymentFilesService {
     const name = safeFileName(file.originalname);
     const key = this.storage.keyFor(`payments/${side}/${id}/${randomUUID()}-${name}`);
     await this.storage.put(key, file.buffer, file.mimetype);
+    let fileId: string;
     try {
       const ref = row.orderId ? (await this.orders.load(user, row.orderId)).refNo : "Credit";
-      await this.prisma.tx(async (tx) => {
-        await setProof(tx, { movementId: row.id }, { key, name, type: file.mimetype || "application/octet-stream", size: file.size }, user.id);
+      fileId = await this.prisma.tx(async (tx) => {
+        const set = await setProof(tx, { movementId: row.id }, { key, name, type: file.mimetype || "application/octet-stream", size: file.size }, user.id);
         await this.audit.record(tx, {
           userId: user.id,
           action: "payment_file",
@@ -98,29 +98,22 @@ export class PaymentFilesService {
           entityId: row.orderId ?? row.id,
           summary: `${ref}: ${row.fileKey ? "replaced" : "added"} the proof of a payment ${side === "in" ? "from the customer" : "to a factory"} (${name})`,
         });
+        return set.id;
       });
     } catch (error) {
       await this.storage.delete(key).catch(() => undefined);
       throw error;
     }
     if (row.fileKey) await this.storage.delete(row.fileKey).catch(() => undefined);
-    return { id, file: { name, type: file.mimetype, size: file.size } };
+    return { id, file: { id: fileId, name, type: file.mimetype, size: file.size } };
   }
 
-  async open(
-    user: SessionUser,
-    side: PaymentSide,
-    id: string,
-  ): Promise<{ stream: Readable; fileName: string; mimeType: string; size: number }> {
-    const row = await this.find(side, id);
-    await this.canSee(user, side, row);
-    if (!row.fileKey) throw new NotFoundError("File");
-    return {
-      stream: await this.storage.get(row.fileKey),
-      fileName: row.fileName ?? "payment",
-      mimeType: row.fileType ?? "application/octet-stream",
-      size: row.fileSize ?? 0,
-    };
+  /** Whether the person may open a payment entry's proof (money out: those who see costs). */
+  async mayOpen(user: SessionUser, movementId: string) {
+    const m = await this.prisma.db.moneyMovement.findUnique({ where: { id: movementId }, select: { partyRole: true } });
+    if (m?.partyRole !== "customer" && m?.partyRole !== "supplier") throw new NotFoundError("Payment");
+    const side: PaymentSide = m.partyRole === "customer" ? "in" : "out";
+    await this.canSee(user, side, await this.find(side, movementId));
   }
 
   async remove(user: SessionUser, side: PaymentSide, id: string) {

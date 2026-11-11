@@ -10,13 +10,10 @@ import {
   Post,
   Put,
   Query,
-  Res,
-  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import type { Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
@@ -173,20 +170,6 @@ export class MoneyController {
   attachReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
     if (!file) throw new z.ZodError([{ code: "custom", path: ["file"], message: "Choose a photo or PDF of the receipt", input: undefined }]);
     return this.money.attachReceipt(user, id, file);
-  }
-
-  @RequireFeature("expenses")
-  @Get("expenses/:id/receipt")
-  async receipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
-    const f = await this.money.receipt(user, id);
-    res.set({
-      "Content-Type": f.mimeType,
-      "Content-Length": String(f.size),
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-    });
-    return new StreamableFile(f.stream);
   }
 
   @RequireFeature("expenses")

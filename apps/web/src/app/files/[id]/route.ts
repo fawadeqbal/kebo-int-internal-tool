@@ -4,8 +4,9 @@ import { apiFetch } from "@/lib/api";
 const VIEWABLE = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 /**
- * Downloads go through the web server (the API checks the person may see the
- * deal). ?view=1 opens a PDF or a photo in the browser instead of saving it.
+ * Every stored file (a deal's document, a payment's proof, an expense's
+ * receipt, a submission's photo) opens here; the API checks the person may see
+ * what it is kept on. ?view=1 opens a PDF or a photo in the browser instead of saving it.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, livePurchase, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, livePurchase, nextCount, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
 import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
@@ -502,11 +502,7 @@ export class OrdersService {
       let number = "";
       // Two people can reach the same number for the same customer on the same day: take the next count then.
       for (let tries = 0; tries < 20 && !number; tries++) {
-        const [row] = await tx.$queryRaw<{ value: number }[]>`
-          insert into counters (key, value) values (${key}, 1)
-          on conflict (company_id, key) do update set value = counters.value + 1
-          returning value`;
-        const candidate = proformaNumber(company.proformaPrefix, today, letters, row!.value);
+        const candidate = proformaNumber(company.proformaPrefix, today, letters, await nextCount(tx, key));
         if (!(await tx.order.findFirst({ where: { proformaNo: candidate }, select: { id: true } }))) number = candidate;
       }
       if (!number) throw new DomainError("Could not find a free proforma number. Try again.");

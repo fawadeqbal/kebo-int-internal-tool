@@ -30,4 +30,12 @@ describe("table owners", () => {
     }
     expect(wrong).toEqual([]);
   });
+
+  it("gives out numbers only through the counters helpers", () => {
+    // nextCount / nextReference / claimOnce (packages/database/src/counters.ts): one place takes a number.
+    const raw = files(resolve(__dirname, "../src"))
+      .filter((file) => /insert\s+into\s+counters/i.test(readFileSync(file, "utf8")))
+      .map((file) => relative(MODULES, file));
+    expect(raw).toEqual([]);
+  });
 });

@@ -34,7 +34,6 @@ export function sourceHref(s: LedgerEntry["source"]): { href: string; label: str
   }
 }
 
-const FILE: Record<string, string> = { payment: "payments", factory_payment: "factory-payments", expense: "expenses" };
 
 /**
  * One posting in the side panel: both sides (as recorded, and in the main currency when it differs), what it
@@ -90,7 +89,7 @@ export function EntryBody({ e, main, back }: { e: LedgerEntry; main: string; bac
       ? ([
           [
             "File",
-            <a key="f" href={`/files/${FILE[e.source.file.kind]}/${e.source.file.id}`} className="text-primary underline">
+            <a key="f" href={`/files/${e.source.file.id}`} className="text-primary underline">
               {e.source.file.name}
             </a>,
           ],

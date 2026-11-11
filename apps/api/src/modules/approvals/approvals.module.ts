@@ -8,5 +8,5 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { ApprovalsService } from "./approvals.service";
 import { SubmissionsController } from "./submissions.controller";
 
-@Module({ imports: [OrdersModule, MoneyModule, TreasuryModule, NotificationsModule], controllers: [SubmissionsController], providers: [ApprovalsService] })
+@Module({ imports: [OrdersModule, MoneyModule, TreasuryModule, NotificationsModule], controllers: [SubmissionsController], providers: [ApprovalsService], exports: [ApprovalsService] })
 export class ApprovalsModule {}
