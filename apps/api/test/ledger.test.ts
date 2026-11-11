@@ -690,9 +690,10 @@ describe("the ledger", () => {
     const list = (await api(app, manager).get(`/ledger/entries?customerId=${customerId}&lead=true&pageSize=200`).expect(200)).body;
     expect(list.rows.length).toBeGreaterThan(5);
     expect(list.totals.balanced).toBe(true);
+    // A payment on one order (a transfer over several orders is on none).
     const payment = list.rows.find(
-      (r: { type: string; removed: unknown; source: { type: string } }) =>
-        r.type === "money_in" && !r.removed && r.source.type === "movement",
+      (r: { type: string; removed: unknown; source: { type: string }; order: unknown }) =>
+        r.type === "money_in" && !r.removed && r.source.type === "movement" && !!r.order,
     );
     expect(payment.counter.label).toBeTruthy();
     expect(payment.with).toMatchObject({ kind: "customer", id: customerId });
