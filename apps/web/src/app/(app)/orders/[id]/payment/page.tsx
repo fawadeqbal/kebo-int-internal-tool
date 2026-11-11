@@ -1,7 +1,6 @@
 import { ArrowDownLeft } from "lucide-react";
 import { BALANCE_TERMS_LABEL, can, PAYMENT_ROUTE_LABEL, type PaymentRoute } from "@kebo/shared";
 import { CardBody } from "@kebo/ui";
-import { api } from "@/lib/api";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
@@ -19,6 +18,7 @@ import { paymentAction, useCreditAction } from "../../actions";
 import { CustomerSummary, MoneySection, PaymentsReceived } from "../money-sections";
 import { stepData } from "../step-data";
 import { termsOf } from "../shared";
+import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Order · payment" };
 
@@ -41,7 +41,7 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
   const [p, m, settings] = await Promise.all([
     orderPaymentsOf(id),
     orderMoneyOf(id),
-    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
+    getSettings(),
   ]);
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   const c = o.currency;

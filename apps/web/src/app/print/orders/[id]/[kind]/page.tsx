@@ -23,13 +23,13 @@ import {
   textBullets,
   type DocColumn,
 } from "@/components/print/kebo-doc";
+import { UUID } from "@/lib/ids";
 
 /** The print page for the customer's or the internal copy, keeping where Back goes. */
 const copyHref = (path: string, back: string | undefined, internal: boolean, v?: string | null) =>
   `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}), ...(v ? { v } : {}) })}`;
 
 const KINDS: readonly OrderDocumentKind[] = ["proforma", "packing-list"];
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Weights with up to 2 decimals and volume with up to 3; blank when not recorded. */
 const kg = (v: string | null | undefined) =>

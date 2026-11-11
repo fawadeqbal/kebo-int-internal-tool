@@ -6,6 +6,7 @@ import type { PaperDocView } from "@/lib/types-papers";
 import { LEDGER_PARTY_KINDS, PAPER_KINDS, type PaperKind } from "@kebo/shared";
 import type { LedgerStatement } from "@/lib/types-ledger";
 import { attachmentHeaders, pdfName, withChromium } from "../../render";
+import { UUID } from "@/lib/ids";
 
 /**
  * A document as a PDF: its print page rendered by headless Chromium with the
@@ -25,7 +26,6 @@ import { attachmentHeaders, pdfName, withChromium } from "../../render";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** What a session token may look like (it becomes a cookie value). */
 const TOKEN = /^[A-Za-z0-9._~+/=-]{16,4096}$/;

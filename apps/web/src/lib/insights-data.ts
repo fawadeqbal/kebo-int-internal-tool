@@ -17,6 +17,7 @@ import type {
   OrderGroupRow,
   OrderGroups,
 } from "./types-facts";
+import { TZ } from "@/lib/format";
 
 /*
  * What each Insights section shows, read from the Insights tables (GET /insights/facts/*) — never worked
@@ -706,8 +707,6 @@ export async function loadFunnel(p: Period) {
 }
 
 /* ------------------------------------------------------------------------------------------- Excel */
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 /** "Excel" on an Insights section: the tables that section shows, for the same period (one tab each). */
 export async function insightsSheets(q: Record<string, string | undefined>): Promise<SheetSpec[]> {

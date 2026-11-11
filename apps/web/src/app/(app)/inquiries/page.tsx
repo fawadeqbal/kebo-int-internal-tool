@@ -8,15 +8,13 @@ import { ExportLink } from "@/components/sheets/export-link";
 import { DataTable } from "@/components/common/data-table";
 import { MoreMenu, RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { hasFeature, requireUser } from "@/lib/session";
-import { date, money, timeAgo } from "@/lib/format";
+import { date, money, timeAgo, plural } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 import { crumbsFor, labelFor } from "@/lib/nav";
 
 export const metadata = { title: "Inquiries (RFQs)" };
 
 type Params = Record<string, string | undefined>;
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** The chips, in order: the working list (Open) first, then each stage, the two flags, and All. */
 const STAGES = ["open", "new", "sourcing", "quoted", "overdue", "on_hold", "won", "lost", "all"] as const;

@@ -2,6 +2,7 @@ import "server-only";
 import { api, ApiError } from "@/lib/api";
 import type { CompanySnapshot, CustomerNow, CustomerSnapshot } from "@/lib/types-orders";
 import { localPath } from "@/lib/paths";
+import { getSettings } from "@/lib/loaders";
 
 /**
  * Sent and issued documents carry the letterhead and customer as they were
@@ -12,7 +13,7 @@ import { localPath } from "@/lib/paths";
  */
 export async function companyOr(snapshot: CompanySnapshot | null): Promise<CompanySnapshot> {
   if (snapshot?.name) return snapshot;
-  return (await api.get<{ company: CompanySnapshot }>("/settings")).company;
+  return (await getSettings()).company;
 }
 
 export async function customerOr(

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { COMPANY_KIND_LABEL, COMPANY_LOG_KINDS, LIFECYCLE, planFeatureName, type CompanyLogKind } from "@kebo/shared";
-import { Badge, buildHref, buttonClass, Card, cn, EmptyState, ListToolbar, Pager, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Badge, buildHref, buttonClass, Card, cn, EmptyState, ListToolbar, Pager, StatusBadge, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
 import type { ISODate } from "@kebo/utils";
 import { RowMenu } from "@/components/common/more-menu";
 import { date, dateTime, money, timeAgo } from "@/lib/format";
@@ -68,17 +68,6 @@ function Bar({ percent, tone = "primary", className }: { percent: number; tone?:
   );
 }
 
-function Tile({ label, value, sub, bar }: { label: string; value: ReactNode; sub?: ReactNode; bar?: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
-      <span className="text-xs text-text-2">{label}</span>
-      <span className="truncate text-lg font-semibold tracking-tight tabular sm:text-xl">{value}</span>
-      {bar}
-      {sub && <span className="truncate text-xs text-muted">{sub}</span>}
-    </div>
-  );
-}
-
 function Pairs({ items }: { items: { label: string; value: ReactNode }[] }) {
   return (
     <dl className="divide-y divide-line px-4">
@@ -127,7 +116,8 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
   return (
     <>
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Tile
+        <StatTile
+          size="sm"
           label="People"
           value={c.plan?.maxUsers ? `${users} of ${c.plan.maxUsers}` : users}
           bar={
@@ -137,7 +127,8 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
           }
           sub={a ? `${a.signedInThisWeek} signed in this week` : undefined}
         />
-        <Tile
+        <StatTile
+          size="sm"
           label="Files"
           value={c.plan?.maxStorageMb ? `${storage(mb)} of ${storage(c.plan.maxStorageMb)}` : storage(mb)}
           bar={
@@ -147,20 +138,23 @@ export function OverviewSection({ c, today }: { c: CompanyDetail; today: ISODate
           }
           sub={c.plan?.maxStorageMb ? `${Math.round((mb / c.plan.maxStorageMb) * 100)}% used` : "no limit"}
         />
-        <Tile
+        <StatTile
+          size="sm"
           label="Last active"
           value={lastActive(latest(c.lastActiveAt, a?.lastSignIn?.at ?? null))}
           sub={a?.lastSignIn ? `last sign-in: ${a.lastSignIn.name ?? a.lastSignIn.email}` : "nobody has signed in yet"}
         />
         {c.kind === "client" ? (
-          <Tile
+          <StatTile
+            size="sm"
             label="Paid until"
             value={c.renewsOn ? date(c.renewsOn) : "No date"}
             bar={share !== null ? <Bar className="my-1" percent={share} tone={paid?.meaning === "bad" ? "bad" : "warn"} /> : undefined}
             sub={paid?.sub}
           />
         ) : (
-          <Tile
+          <StatTile
+            size="sm"
             label={`${COMPANY_KIND_LABEL[c.kind]} ends`}
             value={ends ? date(c.endsAt) : "No end"}
             sub={ends ? (ends <= new Date() ? "ended" : `ends ${inDays(daysTo(today, c.endsAt) ?? 0)}`) : undefined}

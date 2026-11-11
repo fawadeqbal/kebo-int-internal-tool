@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { BANK_STEP_LABEL, can, paperDone, type BankStepKind } from "@kebo/shared";
 import { buttonClass } from "@kebo/ui";
-import { api } from "@/lib/api";
 import { orderFilesOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { Checklist } from "@/components/orders/checklist";
@@ -18,6 +17,7 @@ import { addDocumentAction, updateDocumentAction } from "../../flow-actions";
 import { issueProformaAction, paymentAction } from "../../actions";
 import { docHref } from "../shared";
 import { stepData } from "../step-data";
+import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Order · documents and bank" };
 
@@ -133,7 +133,7 @@ export default async function OrderDocuments({
   if (current?.step === "bank_paid_us" && can(me, "payments.record") && open) {
     const [pays, settings] = await Promise.all([
       orderPaymentsOf(o.id),
-      api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
+      getSettings(),
     ]);
     tool = {
       kind: "form",

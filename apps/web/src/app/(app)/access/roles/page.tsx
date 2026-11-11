@@ -2,11 +2,10 @@ import Link from "next/link";
 import { getCompany, hasFeature, requireUser } from "@/lib/session";
 import { Plus } from "lucide-react";
 import { PERMISSIONS, permissionInPlan } from "@kebo/shared";
-import { Banner, Badge, Card, CardHeader, PageHeader, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Banner, Badge, Card, CardHeader, PageHeader, StatusBadge, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { api } from "@/lib/api";
 import type { RoleRow, SecurityOverview } from "@/lib/types-people";
-import { Stat } from "@/components/common/stat";
 import { OpenPanelButton } from "@/components/common/panel";
 import { createRoleAction } from "../actions";
 import { RolePanel } from "../role-form";
@@ -31,15 +30,15 @@ export default async function RolesPage() {
       <PageHeader crumbs={crumbsFor("/access/roles")} title="Roles" description="Who may do what, who must use two-step sign-in, and how people stand." />
       <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Signed in now" value={o.liveSessions} hint="Browsers and phones" href="/access/sessions" />
-        <Stat
+        <StatTile label="Signed in now" value={o.liveSessions} sub="Browsers and phones" href="/access/sessions" />
+        <StatTile
           label="Two-step sign-in"
           value={`${o.withTwoStep} of ${o.people}`}
-          hint="Active people using it"
+          sub="Active people using it"
           tone={o.people && o.withTwoStep === o.people ? "ok" : undefined}
         />
-        <Stat label="Failed sign-ins" value={o.failedLastDay} hint="In the last 24 hours" tone={o.failedLastDay >= 10 ? "bad" : o.failedLastDay ? "warn" : undefined} href="/access/sign-ins?failed=1" />
-        <Stat label="Blocked addresses" value={o.blockedIpsLastDay} hint="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} href="/access/sign-ins?failed=1" />
+        <StatTile label="Failed sign-ins" value={o.failedLastDay} sub="In the last 24 hours" tone={o.failedLastDay >= 10 ? "bad" : o.failedLastDay ? "warn" : undefined} href="/access/sign-ins?failed=1" />
+        <StatTile label="Blocked addresses" value={o.blockedIpsLastDay} sub="Too many attempts, last 24 hours" tone={o.blockedIpsLastDay ? "bad" : undefined} href="/access/sign-ins?failed=1" />
       </div>
 
       {o.mustSetUp.length > 0 && (

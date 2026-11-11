@@ -5,9 +5,10 @@ import { PageHeader } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
-import type { Paged, Person } from "@/lib/types";
+import type { Paged } from "@/lib/types";
 import type { SignInRow } from "@/lib/types-people";
 import { SignInList } from "@/components/security/sign-in-list";
+import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Sign-ins" };
 
@@ -19,7 +20,7 @@ export default async function SignInsPage({ searchParams }: { searchParams: Prom
   const failed = sp.failed === "1";
   const [data, people] = await Promise.all([
     api.get<Paged<SignInRow>>("/security/sign-ins", { userId: sp.person, failed: failed || undefined, q: sp.q, page: toPage(sp.page), pageSize: PAGE_SIZE }),
-    api.get<Person[]>("/users/people"),
+    getPeople(),
   ]);
   const keep = { person: sp.person, failed: sp.failed, q: sp.q };
   const filtered = !!(sp.person || failed || sp.q);

@@ -2,8 +2,7 @@ import { CalendarClock, Mail, MapPin, MessageCircle, Phone, StickyNote, Users, t
 import { FOLLOW_UP_KIND_LABEL, NOTE_KIND_LABEL, type FollowUpKind, type NoteKind } from "@kebo/shared";
 import { todayIn } from "@kebo/utils";
 import { cn } from "@kebo/ui";
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+import { TZ } from "@/lib/format";
 
 export const NOTE_ICON: Record<NoteKind, LucideIcon> = { note: StickyNote, call: Phone, visit: MapPin, whatsapp: MessageCircle, email: Mail };
 export const FOLLOW_UP_ICON: Record<FollowUpKind, LucideIcon> = { call: Phone, visit: MapPin, meeting: Users, other: CalendarClock };

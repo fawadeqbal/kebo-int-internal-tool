@@ -1,6 +1,7 @@
 import { COMPANY_KIND_LABEL, PLAN_FEATURE_KEYS } from "@kebo/shared";
 import { daysBetween, type ISODate } from "@kebo/utils";
 import type { CompanyDetail } from "@/lib/types-platform";
+import { plural } from "@/lib/format";
 
 /**
  * The company page's sections (design system: record frame with a visible
@@ -60,7 +61,6 @@ export const daysTo = (today: ISODate, d: string | null | undefined) => (d ? day
 export const dayMonth = (iso: string) =>
   new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** "in 3 days", "today", "3 days ago". */
 export const inDays = (n: number) => (n === 0 ? "today" : n > 0 ? `in ${plural(n, "day")}` : `${plural(-n, "day")} ago`);
 

@@ -5,7 +5,7 @@ import { Alert, Banner, buttonClass, PageHeader, SectionList, StatusBadge, toPag
 import { todayIn } from "@kebo/utils";
 import { platformApi } from "@/lib/api";
 import { loadPlatform, readFlash } from "@/lib/platform";
-import { date } from "@/lib/format";
+import { date, TZ } from "@/lib/format";
 import type { CompanyDetail, CompanyHistory, Plan } from "@/lib/types-platform";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import {
@@ -27,8 +27,6 @@ import { CompanyPanels, type SavedCard } from "./panels";
 import { BillingSection, DetailsSection, HistorySection, OverviewSection, PeopleSection, PlanSection } from "./sections";
 
 export const metadata = { title: "Company" };
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 type Search = { section?: string; kind?: string; page?: string; saved?: string };
 

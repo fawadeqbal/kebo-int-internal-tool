@@ -6,7 +6,6 @@ import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
 import { date } from "@/lib/format";
 import { dealHistoryOf, dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
-import type { Person } from "@/lib/types";
 import type { FollowUpList } from "@/lib/types-notes";
 import { FollowUpsCard } from "@/components/notes/cards";
 import type { CustomerDetail } from "@/lib/types-people";
@@ -18,6 +17,7 @@ import { CHANGE_STEP_LABEL, changeStep } from "@/components/deals/inquiry-side";
 import { assignAction, holdAction, moveStageAction, noteAction } from "../actions";
 import { AssignForm, DecisionButtons, NoteForm } from "./panels";
 import { guidance, inquirySteps, itemsLine, plural, revisionsOf, type InquiryStep } from "./steps";
+import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Inquiry" };
 
@@ -33,7 +33,7 @@ export default async function DealOverview({ params }: { params: Promise<{ id: s
   const sourcing = can(me, "sourcing.manage");
   const d = await dealOf(id);
   const [people, history, q, s, cust, followUps] = await Promise.all([
-    api.get<Person[]>("/users/people"),
+    getPeople(),
     optional(() => dealHistoryOf(id)),
     optional(() => quotationOf(id)),
     sourcing ? optional(() => sourcingOf(id)) : null,

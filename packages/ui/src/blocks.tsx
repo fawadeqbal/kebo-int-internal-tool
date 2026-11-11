@@ -206,14 +206,77 @@ export function StatRow({ children, className }: { children: ReactNode; classNam
   return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(170px,1fr))]", className)}>{children}</div>;
 }
 
-/** One headline number, its change in words (coloured by meaning, not by sign) and one line of context. */
-export function StatTile({ label, value, delta, tone }: { label: ReactNode; value: ReactNode; delta?: ReactNode; tone?: "up" | "down" }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-line bg-surface px-4 py-3.5 shadow-card">
-      <span className="text-xs font-medium text-muted">{label}</span>
-      <span className="truncate text-xl font-semibold tracking-tight tabular sm:text-2xl">{value}</span>
-      {delta && <span className={cn("text-xs font-medium", tone === "up" ? "text-ok" : tone === "down" ? "text-bad" : "text-muted")}>{delta}</span>}
-    </div>
+/**
+ * One headline figure: the only tile in the app (dashboard, reports, records, platform).
+ * Label with its change top right, the value (coloured by `tone` when it means something),
+ * an optional bar, one line of context. `href` makes the whole tile a link to the list behind
+ * the number. `size="sm"` is for five or more in a row and for tiles inside a card.
+ */
+export function StatTile({
+  label,
+  value,
+  sub,
+  delta,
+  tone,
+  href,
+  meter,
+  bar,
+  size = "md",
+  className,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  /** One line of context under the value. */
+  sub?: ReactNode;
+  /** The change against the period before (Delta), top right. */
+  delta?: ReactNode;
+  tone?: "ok" | "warn" | "bad";
+  href?: string;
+  /** The share of the value that is bad (overdue), as a thin bar. */
+  meter?: { percent: number; label: string };
+  /** A bar of the caller's own (use of a limit), between the value and the context line. */
+  bar?: ReactNode;
+  size?: "sm" | "md";
+  className?: string;
+}) {
+  const body = (
+    <>
+      <span className="flex items-start justify-between gap-2">
+        <span className="text-xs font-medium text-text-2">{label}</span>
+        {delta}
+      </span>
+      <span
+        title={typeof value === "string" ? value : undefined}
+        className={cn(
+          "truncate font-semibold tracking-tight tabular",
+          size === "sm" ? "text-lg sm:text-xl" : "text-xl leading-7 sm:text-2xl",
+          tone === "bad" && "text-bad",
+          tone === "warn" && "text-warn",
+          tone === "ok" && "text-ok",
+        )}
+      >
+        {value}
+      </span>
+      {meter && (
+        <span className="block h-1.5 overflow-hidden rounded-full bg-surface-3" role="img" aria-label={meter.label}>
+          <span className="block h-full rounded-full bg-chart-3" style={{ width: `${Math.max(0, Math.min(100, meter.percent))}%` }} />
+        </span>
+      )}
+      {bar}
+      {sub && <span className="text-xs text-muted">{sub}</span>}
+    </>
+  );
+  const cls = cn(
+    "flex h-full min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card",
+    size === "sm" ? "gap-0.5 px-4 py-3" : "gap-1 px-4 py-3.5",
+    className,
+  );
+  return href ? (
+    <Link href={href} className={cn(cls, "transition-colors hover:border-line-strong")}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
   );
 }
 

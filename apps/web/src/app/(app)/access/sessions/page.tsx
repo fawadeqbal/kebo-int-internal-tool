@@ -5,18 +5,18 @@ import { PageHeader } from "@kebo/ui";
 import { crumbsFor } from "@/lib/nav";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
-import type { Person } from "@/lib/types";
 import type { SessionRow } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
 import { SessionList } from "@/components/security/session-list";
 import { endSessionAction, signOutEverywhereAction } from "../actions";
+import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Sessions" };
 
 /** Every browser and phone signed in now, newest use first; sign out one, or someone everywhere. */
 export default async function SessionsPage({ searchParams }: { searchParams: Promise<{ person?: string }> }) {
   const { person } = await searchParams;
-  const [sessions, people] = await Promise.all([api.get<SessionRow[]>("/security/sessions", { userId: person }), api.get<Person[]>("/users/people")]);
+  const [sessions, people] = await Promise.all([api.get<SessionRow[]>("/security/sessions", { userId: person }), getPeople()]);
   const who = person ? people.find((p) => p.id === person) : null;
   const byPerson = new Set(sessions.map((s) => s.user.id)).size;
   return (

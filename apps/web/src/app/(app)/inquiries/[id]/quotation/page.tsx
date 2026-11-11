@@ -6,7 +6,7 @@ import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { FileActions } from "@/components/common/file-actions";
 import { hasFeature, requireUser } from "@/lib/session";
-import { date, money } from "@/lib/format";
+import { date, money, TZ } from "@/lib/format";
 import { dealHistoryOf, dealOf, quotationOf } from "@/lib/deal-data";
 import type { QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
 import { optional } from "@/components/print/data";
@@ -20,8 +20,6 @@ import { inquirySteps } from "../steps";
 import { createRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
 
 export const metadata = { title: "Quotation" };
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 const printHref = (r: { id: string }) => `/print/revisions/${r.id}`;
 const pdfHref = (r: { id: string }) => `/pdf/revisions/${r.id}`;

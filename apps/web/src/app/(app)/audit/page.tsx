@@ -9,9 +9,10 @@ import { ExportLink } from "@/components/sheets/export-link";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
 import { dateTime, timeAgo } from "@/lib/format";
-import type { Paged, Person } from "@/lib/types";
+import type { Paged } from "@/lib/types";
 import type { AuditRow } from "@/lib/types-people";
 import { crumbsFor } from "@/lib/nav";
+import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Audit log" };
 
@@ -118,7 +119,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const [data, people] = await Promise.all([
     api.get<Paged<AuditRow> & { counts: Record<string, number> }>("/audit", { entityType: sp.type, userId: sp.person, page: toPage(sp.page), pageSize: PAGE_SIZE }),
-    api.get<Person[]>("/users/people"),
+    getPeople(),
   ]);
   const keep = { type: sp.type, person: sp.person };
   const href = (patch: Record<string, string | undefined>) => buildHref("/audit", keep, { page: undefined, ...patch });

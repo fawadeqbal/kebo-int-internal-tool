@@ -3,9 +3,10 @@ import { Alert } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { load, requireUser } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
-import type { DealFormValues, SalesSettings } from "@/lib/types-deals";
+import type { DealFormValues } from "@/lib/types-deals";
 import { DealForm } from "@/components/deals/deal-form";
 import { customerContactsAction, saveDealAction, searchCustomersAction } from "../../actions";
+import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Edit inquiry" };
 
@@ -15,7 +16,7 @@ export default async function EditDealPage({ params }: { params: Promise<{ id: s
   const me = await requireUser();
   const [d, settings] = await Promise.all([
     load(() => api.get<DealDetail>(`/inquiries/${id}`)),
-    api.get<{ sales: SalesSettings }>("/settings"),
+    getSettings(),
   ]);
   if (!d.allowed.edit)
     return (

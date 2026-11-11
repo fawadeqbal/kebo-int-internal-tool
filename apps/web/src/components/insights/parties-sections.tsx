@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { CHANNEL_LABEL, type InquiryChannel } from "@kebo/shared";
-import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn } from "@kebo/ui";
+import { Card, CardHeader, DataRow, FilterChip, Meter, Pager, Table, Td, Th, THead, Tr, cn, StatTile } from "@kebo/ui";
 import { DataTable } from "@/components/common/data-table";
 import { countryName } from "@/lib/countries";
-import { money } from "@/lib/format";
+import { money, plural } from "@/lib/format";
 import { amountCell, bigMoney, change, compactMoney, percent, type Period } from "@/lib/insights-period";
 import {
   CUSTOMER_CHIP_LABEL,
@@ -14,10 +14,9 @@ import {
   type loadFunnel,
   type loadPeople,
 } from "@/lib/insights-data";
-import { BarList, Delta, Spark, Tile, Tiles } from "./frame";
+import { BarList, Delta, Spark, Tiles } from "./frame";
 
 type Href = (patch: Record<string, string | undefined>) => string;
-const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
 
 /* ------------------------------------------------------------------------------------------- Customers */
 
@@ -48,13 +47,13 @@ export function CustomersSection({
   return (
     <div className="flex flex-col gap-4">
       <Tiles>
-        <Tile
+        <StatTile
           label="Customers who ordered"
           value={String(d.ordered.now)}
           delta={<Delta value={change(d.ordered.now, d.ordered.before)} vs={vs} />}
           sub={`of ${d.total} · ${d.ordered.new} new`}
         />
-        <Tile
+        <StatTile
           label="Repeat share"
           value={percent(d.repeat.now)}
           delta={
@@ -66,7 +65,7 @@ export function CustomersSection({
           }
           sub="of orders from returning customers"
         />
-        <Tile
+        <StatTile
           label="Average order"
           value={bigMoney(d.average.now, c)}
           delta={
@@ -74,7 +73,7 @@ export function CustomersSection({
           }
           sub={plural(d.average.orders, "order")}
         />
-        <Tile
+        <StatTile
           label="Sleeping"
           value={String(d.sleeping.count)}
           sub={`no order in 6 months · ${compactMoney(d.sleeping.sales, c)} before`}

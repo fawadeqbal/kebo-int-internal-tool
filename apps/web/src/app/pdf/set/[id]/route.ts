@@ -5,6 +5,7 @@ import { paperDone } from "@kebo/shared";
 import { apiFetch, SESSION_COOKIE } from "@/lib/api";
 import type { OrderPapers, PaperRow } from "@/lib/types-papers";
 import { attachmentHeaders, pdfName, withChromium, type Render } from "../../render";
+import { UUID } from "@/lib/ids";
 
 /**
  * The order's papers in one download (Documents › Papers › Download the set):
@@ -21,7 +22,6 @@ import { attachmentHeaders, pdfName, withChromium, type Render } from "../../ren
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN = /^[A-Za-z0-9._~+/=-]{16,4096}$/;
 const A4 = { w: 595.28, h: 841.89 };
 

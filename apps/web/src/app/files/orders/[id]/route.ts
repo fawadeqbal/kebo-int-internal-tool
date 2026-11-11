@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import { sameSite } from "@/lib/file-proxy";
+import { UUID } from "@/lib/ids";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REF = /^(attachment|payment|factory_payment|expense):[0-9a-f-]{36}$/i;
 
 /** Some files of an order (?files=attachment:<id>,…), or all of them, in one zip; the API checks who may see each. */

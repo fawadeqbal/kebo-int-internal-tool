@@ -19,8 +19,7 @@ import { CustomersSection, FactoriesSection, FunnelSection, PeopleSection } from
 import { TargetsView } from "./targets-view";
 import { LEAK_VIEWS, LeaksBody, type LeakView } from "./leaks";
 import { ProfitTable } from "./pnl";
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+import { TZ } from "@/lib/format";
 
 export type ReportSearch = {
   period?: string;

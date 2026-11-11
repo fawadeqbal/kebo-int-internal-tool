@@ -20,6 +20,7 @@ import type { CashBook, ExpenseList, Payable } from "./types-money";
 import type { Receivables } from "./types-insights";
 import type { LedgerListRow, LedgerParty } from "./types-ledger";
 import { insightsSheets } from "./insights-data";
+import { UUID } from "@/lib/ids";
 
 /**
  * The lists as Excel files: every row the person may see with the filters on
@@ -581,8 +582,6 @@ async function report(q: Q): Promise<SheetSpec[]> {
     },
   ];
 }
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * A quotation as the printed one: the customer's copy has the items and each
