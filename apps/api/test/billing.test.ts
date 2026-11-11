@@ -72,6 +72,12 @@ describe("billing", () => {
       const open = r.rows.filter((i) => i.order.id === o.id).reduce((t, i) => t + Number(i.open), 0);
       expect(open.toFixed(2), o.id).toBe(Number(o.due).toFixed(2));
     }
+    // The order's own money view names each instalment by the same number (the Overview's payment plan).
+    const one = r.rows.find((i) => i.id)!;
+    const m = (await api(app, manager).get(`/orders/${one.order.id}/money`).expect(200)).body as {
+      plan: { items: { id: string; number: string }[] };
+    };
+    expect(m.plan.items.find((i) => i.id === one.id)?.number).toBe(one.number);
     const total = r.totals.reduce((t, x) => t + x.count, 0);
     expect(total).toBe(r.rows.length);
   });

@@ -9,7 +9,7 @@ import { date, money, whole } from "@/lib/format";
 import { FileActions } from "@/components/common/file-actions";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
-import { StepNav } from "@/components/orders/step-nav";
+import { OrderTabs } from "@/components/orders/order-tabs";
 import { orderCostsSetup } from "@/components/orders/costs-data";
 import { FileToolsProvider } from "@/components/files/file-tools";
 import { OrderDrop } from "@/components/files/order-drop";
@@ -19,8 +19,9 @@ import { docHref } from "./shared";
  * Every page of an order shares one top (design system: page header): ← Orders,
  * the order number with its stage, one summary line (customer · inquiry · total
  * · route · who handles it), the proforma's View / Print and Download PDF (the
- * papers; in ⋯ on a phone) and ⋯ more; then the order's navigation (Overview,
- * the six steps, History). Each step's own header has that page's one primary.
+ * papers; in ⋯ on a phone) and ⋯ more; then the order's tabs (Overview, Items,
+ * Payment, Purchase, Shipping, Documents, Costs, Notes: the six steps inside
+ * them). Each step's own header has that page's one primary.
  */
 export default async function OrderLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -128,7 +129,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
       </ScrolledBar>
 
       {steps && (
-        <StepNav
+        <OrderTabs
           base={base}
           steps={steps.steps.map((s) => ({
             key: s.key,
@@ -139,6 +140,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
             total: s.total,
             href: `${base}/${STEP_PATH[s.key]}`,
           }))}
+          items={o.lines.filter((l) => !l.no.includes(".")).length}
           costs={costs && { spent: whole(costs.costs.totals.spent, costs.costs.currency) }}
         />
       )}

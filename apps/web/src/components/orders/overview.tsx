@@ -1,10 +1,8 @@
 import "server-only";
-import type { ReactNode } from "react";
 import Link from "next/link";
-import { Check } from "lucide-react";
 import { PROFIT_LABEL } from "@kebo/money";
 import { CHANNEL_LABEL, FLOW_STEP_LABEL, shipByVsLc, STEP_PATH, type FlowStep } from "@kebo/shared";
-import { Badge, buttonClass, Card, CardHeader, cn } from "@kebo/ui";
+import { buttonClass, Card, CardHeader, cn } from "@kebo/ui";
 import { date, money, qty, whole } from "@/lib/format";
 import { countryName, isUnknownCountry } from "@/lib/countries";
 import type { DealDetail } from "@/lib/types";
@@ -13,7 +11,6 @@ import type { OrderFlow } from "@/lib/types-flow";
 import type { OrderCosts, OrderMoney } from "@/lib/types-money";
 import type { OrderSteps } from "@/lib/types-checklist";
 import { incotermOf } from "@/app/(app)/orders/[id]/shared";
-import type { ChangeLine } from "./side-panel";
 
 /* ---------------------------------------------------------------- the facts */
 
@@ -53,11 +50,6 @@ const daysFrom = (a: string, b: string) => Math.round((Date.parse(b.slice(0, 10)
 const pct = (part: number, of: number) => (of > 0 ? Math.max(0, Math.min(100, Math.round((part / of) * 100))) : 0);
 /** "B/L" of "Bill of lading (B/L)"; the name itself when it has no short form. */
 const shortPaper = (label: string) => /\(([^)]{1,6})\)$/.exec(label)?.[1] ?? label.replace(/\s*\(.*\)$/, "");
-/** A line's name in a sentence: its first line, at most ~60 characters. */
-const named = (d: string) => {
-  const first = d.split("\n")[0]!.trim();
-  return first.length > 60 ? `${first.slice(0, 57).trimEnd()}…` : first;
-};
 const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : n > 0 ? `in ${n} days` : n === -1 ? "1 day late" : `${-n} days late`);
 
 /** Everything the overview says, worked out from what the pages already load (missing facts are left out). */
@@ -283,177 +275,6 @@ export function overviewFacts({ o, steps, flow, m, costs, deal, now }: OverviewI
 
 export type OverviewFacts = ReturnType<typeof overviewFacts>;
 
-/* ---------------------------------------------------------------- the order in one sentence + journey */
-
-/** "Al-Shifa Pharma (Pakistan) bought … for USD 63,000 CFR Karachi. Wenzhou factory made it; it sailed … The customer paid 30% and pays the rest by LC." */
-function Sentence({ o, f }: { o: OverviewInput["o"]; f: OverviewFacts }) {
-  const main = o.lines.filter((l) => !l.no.includes(".") && l.type !== "charge");
-  const names = main.slice(0, 2).map((l) => named(l.description));
-  const where = isUnknownCountry(o.customer.country) ? "" : ` (${countryName(o.customer.country)})`;
-  const madeDone = f.stops.find((s) => s.key === "production")?.state === "done";
-  const parts: ReactNode[] = [];
-  parts.push(
-    <span key="who">
-      {o.customer.name}
-      {where} bought{" "}
-      {names.length ? (
-        <>
-          <b className="font-semibold">{names.join(" and ")}</b>
-          {main.length > 2 ? ` and ${main.length - 2} more` : ""}
-        </>
-      ) : (
-        <b className="font-semibold">{o.inquiry.title || "goods"}</b>
-      )}{" "}
-      for{" "}
-      <b className="font-semibold">
-        {whole(o.money.total, f.c)} {incotermOf(o)}
-      </b>
-      .
-    </span>,
-  );
-  const ship = f.ship;
-  const shipping: ReactNode = ship?.arrivedOn ? (
-    <>
-      it <b className="font-semibold">arrived {f.pod ? `at ${f.pod} ` : ""}{f.short(ship.arrivedOn)}</b>
-    </>
-  ) : ship?.departedOn ? (
-    <>
-      it <b className="font-semibold">sailed {f.short(ship.departedOn)}{ship.vessel ? ` on ${ship.vessel}` : ""}</b>
-      {ship.eta ? (
-        <>
-          {" "}
-          and reaches {f.pod ?? "the port"} <b className="font-semibold">{f.short(ship.eta)}</b>
-        </>
-      ) : null}
-    </>
-  ) : ship?.etd ? (
-    <>
-      it leaves {ship.portOfLoading ? `${ship.portOfLoading} ` : ""}
-      <b className="font-semibold">{f.short(ship.etd)}</b>
-    </>
-  ) : o.shipBy ? (
-    <>
-      it ships by <b className="font-semibold">{f.short(o.shipBy)}</b>
-    </>
-  ) : null;
-  if (f.factories.length || shipping)
-    parts.push(
-      <span key="made">
-        {" "}
-        {f.factories.length ? (
-          <>
-            {f.factories.map((x) => x.name).join(" and ")} {madeDone ? "made" : "makes"} it
-            {shipping ? "; " : "."}
-          </>
-        ) : null}
-        {shipping}
-        {shipping ? "." : null}
-      </span>,
-    );
-  parts.push(
-    <span key="paid">
-      {" "}
-      {f.due <= 0 ? (
-        <>The customer paid in full.</>
-      ) : f.received <= 0 ? (
-        <>
-          Nothing is received yet{f.restHow ? <>; they pay <b className="font-semibold">{f.restHow}</b></> : null}.
-        </>
-      ) : (
-        <>
-          The customer paid {f.receivedPct}%{f.restHow ? <> and pays the rest <b className="font-semibold">{f.restHow}</b></> : null}.
-        </>
-      )}
-    </span>,
-  );
-  return <p className="text-[17px] leading-relaxed text-text">{parts}</p>;
-}
-
-function Dot({ state, n }: { state: JourneyState; n: number }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold",
-        state === "done"
-          ? "bg-ok text-white"
-          : state === "now"
-            ? "bg-primary text-primary-fg ring-4 ring-primary-soft"
-            : state === "late"
-              ? "bg-bad text-white ring-4 ring-bad-soft"
-              : "border-[1.5px] border-line-strong bg-surface text-muted",
-      )}
-    >
-      {state === "done" ? <Check className="size-3.5" strokeWidth={3} /> : n}
-    </span>
-  );
-}
-
-const STATE_WORD: Record<JourneyState, string> = { done: "done", now: "now", late: "late", todo: "later" };
-
-/** The order in one sentence, On time / Late and its day, then the journey (each stop opens its page). */
-export function OrderStory({ o, f }: { o: OverviewInput["o"]; f: OverviewFacts }) {
-  return (
-    <section aria-label="The order in one sentence" className="flex flex-col gap-5 rounded-xl border border-line bg-surface p-4 shadow-card sm:px-[22px] sm:py-5">
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
-        <div className="max-w-[820px] min-w-0">
-          <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">The order in one sentence</p>
-          <Sentence o={o} f={f} />
-        </div>
-        <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end sm:gap-1.5">
-          <Badge tone={f.status.tone} dot>
-            {f.status.label}
-          </Badge>
-          <span className="text-xs text-text-2">Day {f.day} since the order</span>
-        </div>
-      </div>
-      {/* Wide: the stops in a row joined by a line. Phone: one under the other. */}
-      <ol aria-label="The order's journey" className="hidden gap-2 md:flex">
-        {f.stops.map((s, i) => (
-          <li key={s.key} className="min-w-0 flex-1">
-            <Link href={s.href} className="group flex flex-col gap-1.5">
-              <span className="flex items-center">
-                <Dot state={s.state} n={i + 1} />
-                {i < f.stops.length - 1 && <span aria-hidden className={cn("ml-1.5 h-[3px] flex-1 rounded-full", s.state === "done" ? "bg-ok" : "bg-line")} />}
-              </span>
-              <b
-                className={cn(
-                  "text-[13px] font-semibold group-hover:underline",
-                  s.state === "now" ? "text-primary" : s.state === "late" ? "text-bad" : "text-text",
-                )}
-              >
-                {s.label}
-                <span className="sr-only">: {STATE_WORD[s.state]}</span>
-              </b>
-              {s.top && <span className="text-xs text-text-2 tabular">{s.top}</span>}
-              {s.sub && <span className="text-xs text-muted [overflow-wrap:anywhere]">{s.sub}</span>}
-            </Link>
-          </li>
-        ))}
-      </ol>
-      <ol aria-label="The order's journey" className="flex flex-col md:hidden">
-        {f.stops.map((s, i) => (
-          <li key={s.key} className="relative pb-3 last:pb-0">
-            {i < f.stops.length - 1 && (
-              <span aria-hidden className={cn("absolute top-8 bottom-1 left-[13px] w-[2px] rounded-full", s.state === "done" ? "bg-ok" : "bg-line")} />
-            )}
-            <Link href={s.href} className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-3">
-              <Dot state={s.state} n={i + 1} />
-              <span className="min-w-0 pt-1">
-                <b className={cn("block text-sm font-semibold", s.state === "now" ? "text-primary" : s.state === "late" ? "text-bad" : "text-text")}>
-                  {s.label}
-                  {(s.state === "now" || s.state === "late") && <span className="ml-1.5 text-xs font-normal">· {STATE_WORD[s.state]}</span>}
-                </b>
-                <span className="block text-xs text-text-2">{[s.top, s.sub].filter(Boolean).join(" · ")}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
 /* ---------------------------------------------------------------- six figures */
 
 const TONE_TEXT: Record<Tone, string> = { ok: "text-ok", warn: "text-warn", bad: "text-bad", primary: "text-primary", neutral: "text-text" };
@@ -474,6 +295,8 @@ interface Figure {
   tone: Tone;
   bar?: number;
   sub: string | null;
+  /** Where the figure is broken down (the margin: the order's Costs). */
+  href?: string;
 }
 
 /** The six figures a manager asks for first, in one card: 6 across, 3×2 on a tablet, 2×3 on a phone. */
@@ -501,15 +324,17 @@ export function OrderFigures({ o, f, steps }: { o: OverviewInput["o"]; f: Overvi
       sub: t ? `${whole(t.paid, t.currency)} of ${whole(t.owed, t.currency)} to ${names.length === 1 ? names[0] : `${names.length} factories`}` : null,
     });
   }
+  // The margin: one figure, for those who may see profit, linked to its breakdown (decided 11 Nov).
   if (f.profit) {
     figures.push({
       key: "profit",
-      label: PROFIT_LABEL.expected,
-      value: whole(f.profit.expected, c),
+      label: "Margin",
+      value: f.profit.margin !== null ? `${f.profit.margin.toFixed(1)}%` : whole(f.profit.expected, c),
       tone: Number(f.profit.expected) < 0 ? "bad" : "neutral",
-      sub: [f.profit.margin !== null ? `${f.profit.margin.toFixed(1)}%` : null, f.profit.onQuoteMargin !== null ? `quoted at ${f.profit.onQuoteMargin.toFixed(1)}%` : null]
+      href: `/orders/${o.id}/costs`,
+      sub: [`${PROFIT_LABEL.expected.toLowerCase()} ${whole(f.profit.expected, c)}`, f.profit.onQuoteMargin !== null ? `quoted at ${f.profit.onQuoteMargin.toFixed(1)}%` : null]
         .filter(Boolean)
-        .join(" · ") || null,
+        .join(" · "),
     });
   }
   const d = f.nextDeadline;
@@ -545,7 +370,13 @@ export function OrderFigures({ o, f, steps }: { o: OverviewInput["o"]; f: Overvi
           <div key={x.key} className="flex min-w-0 flex-col gap-0.5 border-r border-b border-line px-4 py-3.5">
             <dt className="text-xs text-text-2">{x.label}</dt>
             <dd className="contents">
-              <b className={cn("text-xl leading-7 font-semibold tabular", TONE_TEXT[x.tone])}>{x.value}</b>
+              {x.href ? (
+                <Link href={x.href} className={cn("text-xl leading-7 font-semibold tabular hover:underline", TONE_TEXT[x.tone])}>
+                  {x.value}
+                </Link>
+              ) : (
+                <b className={cn("text-xl leading-7 font-semibold tabular", TONE_TEXT[x.tone])}>{x.value}</b>
+              )}
               {x.bar !== undefined && <Bar value={x.bar} tone={x.tone === "neutral" ? "primary" : x.tone} className="mt-1" />}
               {x.sub && <span className="text-xs text-muted [overflow-wrap:anywhere]">{x.sub}</span>}
             </dd>
@@ -620,122 +451,15 @@ export function KeepAnEye({ f }: { f: OverviewFacts }) {
 
 /* ---------------------------------------------------------------- money · what they bought */
 
-function MoneyBar({
-  label,
-  amount,
-  parts,
-  legend,
-}: {
-  label: string;
-  amount: string;
-  parts: { value: number; className: string }[];
-  legend: { className: string; text: string }[];
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="flex items-baseline justify-between gap-3">
-        <span className="text-xs text-text-2">{label}</span>
-        <b className="text-sm font-semibold tabular">{amount}</b>
-      </span>
-      <span aria-hidden className="flex h-2.5 overflow-hidden rounded-full bg-surface-3">
-        {parts.map((p, k) => (
-          <span key={k} className={cn("block h-full", p.className)} style={{ width: `${p.value}%` }} />
-        ))}
-      </span>
-      <span className="flex flex-wrap gap-x-3.5 gap-y-1">
-        {legend.map((l, k) => (
-          <span key={k} className="flex items-center gap-1.5 text-xs">
-            <span aria-hidden className={cn("size-2.5 shrink-0 rounded-[2px]", l.className)} />
-            {l.text}
-          </span>
-        ))}
-      </span>
-    </div>
-  );
-}
-
-export function MoneyCard({ f, costs, base }: { f: OverviewFacts; costs: OrderCosts | null; base: string }) {
-  const c = f.c;
-  const restWhen = f.rest ? [f.rest.how.trim() || null, f.rest.when ?? (f.rest.dueOn ? `due ${f.short(f.rest.dueOn)}` : null)].filter(Boolean).join(" · ") : null;
-  return (
-    <Card>
-      <CardHeader
-        title="Money"
-        actions={
-          <Link href={costs ? `${base}/costs` : `${base}/payment`} className={buttonClass("ghost", "sm")}>
-            {costs ? "Costs" : "Payment"}
-          </Link>
-        }
-      />
-      <div className="flex flex-col gap-4 px-4 py-3.5">
-        <MoneyBar
-          label="From the customer"
-          amount={whole(f.total, c)}
-          parts={[
-            { value: f.receivedPct, className: "bg-ok" },
-            { value: 100 - f.receivedPct, className: "bg-primary-soft" },
-          ]}
-          legend={[
-            { className: "bg-ok", text: `received ${whole(f.received, c)}` },
-            ...(f.due > 0 ? [{ className: "bg-primary-soft", text: `still due ${whole(f.due, c)}${restWhen ? ` · ${restWhen}` : ""}` }] : []),
-          ]}
-        />
-        {f.factoryRows?.map((r) => {
-          const p = pct(Number(r.paid), Number(r.owed));
-          return (
-            <MoneyBar
-              key={r.factory.id}
-              label={`To ${r.factory.name}`}
-              amount={whole(r.owed, r.currency)}
-              parts={[{ value: p, className: "bg-ok" }]}
-              legend={[
-                { className: "bg-ok", text: Number(r.toPay) <= 0 ? `paid ${whole(r.paid, r.currency)} in full` : `paid ${whole(r.paid, r.currency)}` },
-                ...(Number(r.toPay) > 0 ? [{ className: "bg-surface-3", text: `to pay ${whole(r.toPay, r.currency)}` }] : []),
-              ]}
-            />
-          );
-        })}
-        {costs && (
-          <MoneyBar
-            label="Costs"
-            amount={whole(Math.max(Number(costs.totals.spent), Number(costs.totals.planned)), costs.currency)}
-            parts={[
-              {
-                value: pct(Number(costs.totals.spent), Math.max(Number(costs.totals.spent), Number(costs.totals.planned))),
-                className: Number(costs.totals.notPlanned) > 0 ? "bg-warn" : "bg-primary",
-              },
-            ]}
-            legend={[
-              {
-                className: Number(costs.totals.notPlanned) > 0 ? "bg-warn" : "bg-primary",
-                text: `spent ${whole(costs.totals.spent, costs.currency)}${Number(costs.totals.notPlanned) > 0 ? ` (${whole(costs.totals.notPlanned, costs.currency)} not planned)` : ""}`,
-              },
-              { className: "bg-surface-3", text: `planned ${whole(costs.totals.planned, costs.currency)}` },
-            ]}
-          />
-        )}
-        {f.profit && (
-          <p className="flex items-baseline justify-between gap-3 border-t border-line pt-2.5 text-xs text-text-2">
-            {PROFIT_LABEL.expected}
-            <b className={cn("text-sm font-semibold tabular", Number(f.profit.expected) < 0 ? "text-bad" : "text-text")}>
-              {whole(f.profit.expected, c)}
-              {f.profit.margin !== null ? ` · ${f.profit.margin.toFixed(1)}%` : ""}
-            </b>
-          </p>
-        )}
-      </div>
-    </Card>
-  );
-}
-
 /** "37,500" when every price is whole, else with cents. */
 function priceFormat(values: string[]) {
   const whole = values.every((v) => Number(v) % 1 === 0);
   return (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
 }
 
-/** The order's lines, read only, and the total. */
-export function WhatTheyBought({ o, f }: { o: OverviewInput["o"]; f: OverviewFacts }) {
+/** The order's lines (the Items tab): what they bought, with the quotation it came from. */
+export function OrderItems({ o, accepted }: { o: OverviewInput["o"]; accepted: { number: number } | null }) {
+  const f = { c: o.currency, accepted };
   const fmt = priceFormat(o.lines.map((l) => l.lineTotal));
   return (
     <Card>
@@ -854,88 +578,4 @@ export function WhoIsInvolved({ o, f, deal }: { o: OverviewInput["o"]; f: Overvi
   );
 }
 
-export function KeyDates({ o, f, deal }: { o: OverviewInput["o"]; f: OverviewFacts; deal: DealDetail | null }) {
-  const rows: [string, string | null | undefined][] = [
-    ["Inquiry", deal?.createdAt.slice(0, 10)],
-    ["Order", o.orderedOn],
-    ["Ready at factory", o.readyOn],
-    ["Ship by", o.shipBy],
-    ["LC latest shipment", f.lcLatest],
-    [f.ship?.departedOn ? "Sailed" : "ETD", f.ship?.departedOn ?? f.ship?.etd],
-    [f.ship?.arrivedOn ? `Arrived${f.pod ? ` ${f.pod}` : ""}` : `ETA${f.pod ? ` ${f.pod}` : ""}`, f.ship?.arrivedOn ?? f.ship?.eta],
-    [f.lc ? "LC expires" : "Contract expires", f.contract?.expiresOn],
-    ["Delivered", f.delivery?.deliveredOn],
-    [f.delivery?.satDoneOn ? "SAT signed" : "SAT (planned)", f.delivery?.satDoneOn ?? f.delivery?.satPlannedOn],
-  ];
-  return (
-    <Card>
-      <CardHeader title="Key dates" />
-      <dl className="flex flex-col gap-2.5 px-4 py-3.5">
-        {rows
-          .filter((r) => r[1])
-          .map(([label, d]) => (
-            <div key={label} className="flex items-baseline justify-between gap-3">
-              <dt className="text-xs text-text-2">{label}</dt>
-              <dd className="text-sm font-medium tabular">{date(d!)}</dd>
-            </div>
-          ))}
-      </dl>
-    </Card>
-  );
-}
-
 /* ---------------------------------------------------------------- recent changes */
-
-/** Every step's changes, newest first: one line each (the whole on hover), its step and when; five show, the rest scroll. */
-export function RecentChanges({ lines, more, historyHref }: { lines: ChangeLine[]; more: boolean; historyHref: string }) {
-  return (
-    <Card>
-      <CardHeader
-        title={
-          <>
-            Recent changes{" "}
-            <span className="ml-0.5 text-xs font-normal text-muted tabular">
-              {lines.length}
-              {more ? "+" : ""}
-            </span>
-          </>
-        }
-        description="across every step · 5 show, scroll for more"
-        actions={
-          <Link href={historyHref} className={buttonClass("ghost", "sm")}>
-            All history
-          </Link>
-        }
-        className="max-sm:flex-row"
-      />
-      {lines.length ? (
-        <ul className="max-h-[290px] overflow-y-auto px-4 pt-1 pb-2 [scrollbar-width:thin] sm:max-h-[204px]">
-          {lines.map((c) => {
-            const step = c.step ? (FLOW_STEP_LABEL[c.step as FlowStep] ?? c.step) : null;
-            return (
-              <li
-                key={c.id}
-                title={c.title}
-                className="grid grid-cols-[24px_minmax(0,1fr)] items-center gap-x-2.5 border-b border-line py-2 last:border-b-0 sm:h-10 sm:grid-cols-[24px_minmax(0,1fr)_130px_90px] sm:py-0"
-              >
-                <span aria-hidden className="row-span-2 grid size-6 place-items-center rounded-full bg-primary-soft text-[11px] font-bold text-primary sm:row-span-1">
-                  {c.initial}
-                </span>
-                <span className="truncate text-sm">
-                  <b className="font-semibold">{c.who}</b> {c.text}
-                </span>
-                <span className="truncate text-xs text-text-2">
-                  {step ?? <span className="text-muted">Order</span>}
-                  <span className="text-muted sm:hidden"> · {c.when}</span>
-                </span>
-                <span className="hidden text-right text-xs text-muted tabular sm:block">{c.when}</span>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="px-4 py-3.5 text-sm text-muted">Nothing changed yet.</p>
-      )}
-    </Card>
-  );
-}
