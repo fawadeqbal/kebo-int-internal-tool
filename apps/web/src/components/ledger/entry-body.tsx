@@ -7,21 +7,20 @@ import { amount, TypeBadge } from "./ledger-parts";
 /** Where a posting's document is in the app. */
 export function sourceHref(s: LedgerEntry["source"]): { href: string; label: string } | null {
   switch (s.type) {
-    // A customer's payment entry, or what it paid later from their credit: the order it pays, else the customer.
+    // A payment entry (or what it paid later from credit): to a supplier, the order's money; from a customer, the
+    // order it pays, else the customer; a move between our accounts, the cash book.
     case "movement":
     case "allocation":
+      if (s.factoryId) return s.orderId ? { href: `/orders/${s.orderId}/money`, label: "Open the factory payment" } : null;
       return s.orderId
         ? { href: `/orders/${s.orderId}/payment`, label: "Open the payment" }
         : s.customerId
           ? { href: `/customers/${s.customerId}`, label: "Open the customer's money" }
-          : null;
-    case "factory_payment":
-      return s.orderId ? { href: `/orders/${s.orderId}/money`, label: "Open the factory payment" } : null;
+          : { href: "/finance/cash-book", label: "Open the cash book" };
     case "expense":
       return s.orderId
         ? { href: `/orders/${s.orderId}/costs`, label: "Open the expense" }
         : { href: "/finance/expenses", label: "Open the expenses" };
-    case "transfer":
     case "account":
       return { href: "/finance/cash-book", label: "Open the cash book" };
     case "order":

@@ -123,6 +123,7 @@ export async function refund(tx: Tx, r: Refund): Promise<string> {
   const out = await tx.moneyMovement.create({
     data: {
       direction: "out",
+      partyRole: "customer",
       partyId: r.partyId,
       amount: fromMinor(r.amountMinor),
       currency: r.currency,

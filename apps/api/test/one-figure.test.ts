@@ -124,7 +124,7 @@ describe("one figure: Home, Reports and Leaks read the same tables as Insights",
     // The pages that add figures up read the tables: none of the per-record helpers or sums of money rows.
     for (const f of ["reports/reports.service.ts", "money/leaks.service.ts", "insights/insights.service.ts"]) {
       const code = src(f).replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, "");
-      for (const banned of ["costingsOf", "costDocLines", "profitTotals", "profitBy", "orderMoney(", "positionsSql", "from payments", "from factory_payments", "fx.order("])
+      for (const banned of ["costingsOf", "costDocLines", "profitTotals", "profitBy", "orderMoney(", "positionsSql", "from allocations", "from money_movements", "fx.order("])
         expect(`${f}: ${code.includes(banned) ? banned : "ok"}`).toBe(`${f}: ok`);
     }
   });

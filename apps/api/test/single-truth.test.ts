@@ -7,7 +7,7 @@ import { todayIn } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
 import { factoryPositionsSql, positionsSql } from "../src/modules/money/due";
-import { factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, positionRelations } from "../src/modules/money/position";
+import { factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, positionRelations, supplierPaidRelation } from "../src/modules/money/position";
 import { api, signIn, startApp } from "./app";
 
 /**
@@ -348,7 +348,7 @@ describe("one money truth", () => {
     it("SQL factory positions equal factoryPositionOf on every order", async () => {
       const rows = await db().order.findMany({
         where: { status: { not: "cancelled" } },
-        include: { lines: true, factoryPaid: { where: { voidedAt: null } }, expenses: factoryBorneExpenses },
+        include: { lines: true, supplierPaid: supplierPaidRelation, expenses: factoryBorneExpenses },
       });
       for (const f of [await fx(), { ...(await fx()), expensesOn: false }]) {
         const sql = await factoryPositionsSql(db(), f);

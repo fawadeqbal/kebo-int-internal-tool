@@ -64,9 +64,10 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
   const expected = new Map<string, Minor>();
   for (const r of parts) expected.set(`${r.orderId}:${r.factoryId}:${r.currency}`, Math.round(r.owedMinor - r.paidMinor - r.takenOffMinor));
   const paidOnly = await db.$queryRaw<{ orderId: string; factoryId: string; currency: string; paid: string }[]>`
-    select p.order_id as "orderId", p.factory_id as "factoryId", p.currency::text, sum(p.amount)::text as paid
-      from factory_payments p join orders o on o.id = p.order_id and o.status <> 'cancelled'
-     where p.voided_at is null
+    select a.purchase_order_id as "orderId", m.party_id as "factoryId", m.currency::text, sum(a.share)::text as paid
+      from allocations a join money_movements m on m.id = a.movement_id
+      join orders o on o.id = a.purchase_order_id and o.status <> 'cancelled'
+     where a.target = 'purchase' and a.voided_at is null
      group by 1, 2, 3`;
   for (const r of paidOnly) {
     const k = `${r.orderId}:${r.factoryId}:${r.currency}`;
@@ -97,11 +98,10 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
               select sum(x) from (
                 select case direction when 'in' then amount else -amount end as x from money_movements
                  where account_id = a.id and voided_at is null and value_date >= a.opening_on
-                union all select -amount from factory_payments where account_id = a.id and voided_at is null and paid_on >= a.opening_on
+                union all select allocatable from money_movements
+                 where to_account_id = a.id and direction = 'move' and voided_at is null and value_date >= a.opening_on
                 union all select -amount from expenses where account_id = a.id and voided_at is null and spent_on >= a.opening_on
                 union all select -amount from expenses where repaid_account_id = a.id and voided_at is null and repaid_on >= a.opening_on
-                union all select -amount_out from money_transfers where from_account_id = a.id and voided_at is null and transferred_on >= a.opening_on
-                union all select amount_in from money_transfers where to_account_id = a.id and voided_at is null and transferred_on >= a.opening_on
               ) y), 0))::text as balance,
            coalesce((select sum(debit - credit) from ledger_entries where account = 'money:' || a.id::text), 0)::text as ledger
       from money_accounts a`;

@@ -1,4 +1,4 @@
-import { livePart } from "@kebo/database";
+import { livePart, livePurchase } from "@kebo/database";
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { zipSync } from "fflate";
@@ -153,11 +153,13 @@ export class OrderFilesService {
         // Listed as the payment on this order (its id), the file kept on the entry.
         .then((parts) => parts.map((a) => ({ ...a.movement, id: a.id, kind: a.kind, paidOn: a.on }))),
       seeCosts
-        ? db.factoryPayment.findMany({
-            where: { orderId, voidedAt: null, fileKey: { not: null } },
-            include: { recordedBy: { select: { id: true, name: true } }, factory: { select: { name: true } } },
-            orderBy: { paidOn: "asc" },
-          })
+        ? db.allocation
+            .findMany({
+              where: { purchaseOrderId: orderId, ...livePurchase, movement: { fileKey: { not: null } } },
+              include: { movement: { include: { recordedBy: { select: { id: true, name: true } }, party: { select: { name: true } } } } },
+              orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+            })
+            .then((parts) => parts.map((a) => ({ ...a.movement, id: a.id, factory: a.movement.party!, paidOn: a.on })))
         : Promise.resolve([]),
       seeExpenses
         ? db.expense.findMany({
@@ -486,7 +488,7 @@ export class OrderFilesService {
           },
         });
       else if (source === "payment") await tx.moneyMovement.updateMany({ where: entryOf(fileId), data: { fileName: name } });
-      else if (source === "factory_payment") await tx.factoryPayment.update({ where: { id: fileId }, data: { fileName: name } });
+      else if (source === "factory_payment") await tx.moneyMovement.updateMany({ where: entryOf(fileId), data: { fileName: name } });
       else await tx.expense.update({ where: { id: fileId }, data: { receiptName: name } });
       if (name !== undefined && name !== f.name)
         await this.log(tx, user, o, "rename", `renamed ${f.name} to ${name}`, f.step, { name }, { name: f.name });
@@ -710,7 +712,7 @@ export class OrderFilesService {
     if (f.source === "payment")
       return (await db.moneyMovement.findFirst({ where: entryOf(f.sourceId), select: { fileKey: true } }))?.fileKey ?? null;
     if (f.source === "factory_payment")
-      return (await db.factoryPayment.findUnique({ where: { id: f.sourceId }, select: { fileKey: true } }))?.fileKey ?? null;
+      return (await db.moneyMovement.findFirst({ where: entryOf(f.sourceId), select: { fileKey: true } }))?.fileKey ?? null;
     return (await db.expense.findUnique({ where: { id: f.sourceId }, select: { receiptKey: true } }))?.receiptKey ?? null;
   }
 

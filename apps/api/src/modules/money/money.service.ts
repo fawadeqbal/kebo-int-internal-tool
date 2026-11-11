@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { Injectable } from "@nestjs/common";
-import { livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { livePurchase, supplierPayment, createSupplierPayment, asSupplierPayment, purchasePart, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   balanceTermsOf,
@@ -34,7 +34,7 @@ import { ordersOwingFactories } from "./due";
 import { convert, costingsOf, MainMoney, orderRate, paysBasis } from "./order-money";
 import { fileView } from "./payment-file-view";
 import { factoryPlansOf, owedByFactory } from "./factory-plan";
-import { chargedOf, factoryBorneExpenses, factoryPositionOf, fxOf, positionOf } from "./position";
+import { chargedOf, factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "./position";
 import { termsOf } from "./route-plan";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
@@ -134,9 +134,10 @@ export class MoneyService {
         costs: true,
         planItems: { orderBy: { sortOrder: "asc" } },
         allocations: { where: livePart },
-        factoryPaid: {
-          orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
-          include: { factory: { select: { id: true, name: true } }, paidBy: person, account: { select: { id: true, name: true } } },
+        supplierPaid: {
+          where: purchasePart,
+          orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+          include: { movement: { include: { party: { select: { id: true, name: true } }, paidBy: person, account: { select: { id: true, name: true } } } } },
         },
         expenses: { orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }], include: expenseInclude },
       },
@@ -177,7 +178,9 @@ export class MoneyService {
     const dueMinor = position.dueMinor;
 
     // Factories: owed from the order's lines (with tax), less what we paid them and the expenses they bear: factoryPosition.
-    const livePaid = o.factoryPaid.filter((p) => !p.voidedAt);
+    // Each supplier payment as the order shows it (its part; the money facts from its entry).
+    const factoryPaid = o.supplierPaid.map((a) => ({ ...asSupplierPayment(a), factory: a.movement.party!, paidBy: a.movement.paidBy, account: a.movement.account }));
+    const livePaid = factoryPaid.filter((p) => !p.voidedAt);
     const factoryRows = factoryPositionOf(o, fx);
     const factoryOf = new Map<string, FactoryRow>(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
     for (const r of factoryRows)
@@ -196,7 +199,7 @@ export class MoneyService {
     const recorders = new Map(
       (
         await this.prisma.db.user.findMany({
-          where: { id: { in: [...new Set(o.factoryPaid.map((p) => p.recordedById))] } },
+          where: { id: { in: [...new Set(factoryPaid.map((p) => p.recordedById))] } },
           select: { id: true, name: true },
         })
       ).map((u) => [u.id, u]),
@@ -302,7 +305,7 @@ export class MoneyService {
       factories: seeCosts
         ? {
             rows: factories,
-            payments: o.factoryPaid.map((p) => ({
+            payments: factoryPaid.map((p) => ({
               id: p.id,
               factory: p.factory,
               recordedBy: recorders.get(p.recordedById) ?? null,
@@ -506,7 +509,8 @@ export class MoneyService {
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
     const { factoryName, ...data } = await this.factoryPaymentData(o, input);
     const createdId = await this.prisma.tx(async (tx) => {
-      const created = await tx.factoryPayment.create({ data: { ...data, orderId, recordedById: user.id } });
+      const { factoryId, paidOn, ...rest } = data;
+      const created = await createSupplierPayment(tx, { ...rest, orderId, orderCurrency: o.currency, supplierId: factoryId, paidOn, recordedById: user.id });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out",
@@ -514,7 +518,7 @@ export class MoneyService {
         entityId: orderId,
         summary: `${o.refNo}: paid ${factoryName} ${input.currency} ${data.amount}${input.reference ? ` (${input.reference})` : ""}`,
       });
-      await this.ledger.post(tx, [{ type: "factory_payment", id: created.id }], { userId: user.id });
+      await this.ledger.post(tx, [{ type: "movement", id: created.movementId }, { type: "order", id: orderId }], { userId: user.id });
       return created.id;
     });
     /** `createdId`: the new payment, so its proof can follow. */
@@ -523,8 +527,13 @@ export class MoneyService {
 
   private async findFactoryPayment(user: SessionUser, id: string) {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can change payments.");
-    const p = await this.prisma.db.factoryPayment.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
-    if (!p) throw new NotFoundError("Payment");
+    // The payment on the order (its part), or its entry.
+    const part = await this.prisma.db.allocation.findFirst({
+      where: { ...purchasePart, OR: [{ id }, { movementId: id }] },
+      include: { movement: { include: { party: { select: { name: true } } } } },
+    });
+    if (!part) throw new NotFoundError("Payment");
+    const p = { ...asSupplierPayment(part), factory: part.movement.party! };
     const o = await this.orders.load(user, p.orderId);
     if (p.voidedAt) throw new DomainError("This payment was removed.");
     return { p, o };
@@ -542,7 +551,24 @@ export class MoneyService {
       p.accountId,
     );
     await this.prisma.tx(async (tx) => {
-      await tx.factoryPayment.update({ where: { id }, data });
+      const counts = supplierPayment({ ...data, supplierId: data.factoryId, orderId: o.id, orderCurrency: o.currency, recordedById: user.id });
+      await tx.moneyMovement.update({
+        where: { id: p.movementId },
+        data: {
+          partyId: data.factoryId,
+          amount: data.amount,
+          currency: data.currency,
+          rate: data.rate,
+          allocatable: counts.allocatable,
+          valueDate: data.paidOn,
+          method: data.method,
+          paidById: data.paidById,
+          reference: data.reference,
+          note: data.note,
+          accountId: data.accountId,
+        },
+      });
+      await tx.allocation.update({ where: { id: p.id }, data: { kind: data.kind, amount: counts.allocatable, share: data.amount, on: data.paidOn } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out_edit",
@@ -565,7 +591,7 @@ export class MoneyService {
         },
         reason,
       });
-      await this.ledger.post(tx, [{ type: "factory_payment", id }], { userId: user.id, reason });
+      await this.ledger.post(tx, [{ type: "movement", id: p.movementId }, { type: "order", id: o.id }], { userId: user.id, reason });
     });
     return this.forOrder(user, o.id);
   }
@@ -574,7 +600,9 @@ export class MoneyService {
   async voidFactoryPayment(user: SessionUser, id: string, reason: string) {
     const { p, o } = await this.findFactoryPayment(user, id);
     await this.prisma.tx(async (tx) => {
-      await tx.factoryPayment.update({ where: { id }, data: { voidedAt: new Date(), voidReason: reason } });
+      const now = new Date();
+      await tx.moneyMovement.update({ where: { id: p.movementId }, data: { voidedAt: now, voidReason: reason } });
+      await tx.allocation.update({ where: { id: p.id }, data: { voidedAt: now, voidReason: reason } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out_void",
@@ -583,7 +611,7 @@ export class MoneyService {
         summary: `${o.refNo}: removed the payment of ${p.currency} ${p.amount.toFixed(2)} to ${p.factory.name}`,
         reason,
       });
-      await this.ledger.post(tx, [{ type: "factory_payment", id }], { userId: user.id, reason });
+      await this.ledger.post(tx, [{ type: "movement", id: p.movementId }, { type: "order", id: o.id }], { userId: user.id, reason });
     });
     return this.forOrder(user, o.id);
   }
@@ -652,7 +680,7 @@ export class MoneyService {
         stage: true,
         customer: { select: { name: true } },
         lines: linesWithFactory,
-        factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true } },
+        supplierPaid: supplierPaidRelation,
         expenses: factoryBorneExpenses,
       },
       orderBy: { orderedOn: "asc" },
@@ -1171,10 +1199,13 @@ export class MoneyService {
           select: { amount: true, bankCharges: true, on: true, order: { select: { status: true, ...rated } } },
         })
         .then((rows) => rows.map((a) => ({ ...a, paidOn: a.on, order: a.order! }))),
-      this.prisma.db.factoryPayment.findMany({
-        where: { voidedAt: null, paidOn: { gte: from, lte: to } },
-        select: { amount: true, rate: true, paidOn: true, order: { select: rated } },
-      }),
+      // What we paid suppliers (in what was paid, at its rate to the order's currency).
+      this.prisma.db.allocation
+        .findMany({
+          where: { ...livePurchase, on: { gte: from, lte: to } },
+          select: { share: true, on: true, movement: { select: { rate: true } }, purchaseOrder: { select: rated } },
+        })
+        .then((rows) => rows.map((a) => ({ amount: a.share, rate: a.movement.rate, paidOn: a.on, order: a.purchaseOrder! }))),
       this.prisma.db.expense.findMany({
         where: { voidedAt: null, spentOn: { gte: from, lte: to } },
         select: { amount: true, rate: true, spentOn: true, orderId: true, order: { select: { status: true } } },

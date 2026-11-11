@@ -36,7 +36,6 @@ export class LimitsService {
       db.$queryRaw<{ bytes: bigint | null }[]>`
         select (coalesce((select sum(size) from attachments), 0)
               + coalesce((select sum(file_size) from money_movements), 0)
-              + coalesce((select sum(file_size) from factory_payments), 0)
               + coalesce((select sum(receipt_size) from expenses), 0)
               + coalesce((select sum(file_size) from money_submissions), 0))::bigint as bytes`,
     ]);

@@ -106,9 +106,9 @@ export async function factoryPositionsSql(db: Db, fx: MoneyCtx, orderIds?: strin
       group by 1, 2, 3
     ),
     paid as (
-      select order_id, factory_id, currency, sum(amount * 100) as paid
-      from factory_payments
-      where voided_at is null
+      select a.purchase_order_id as order_id, m.party_id as factory_id, m.currency, sum(a.share * 100) as paid
+      from allocations a join money_movements m on m.id = a.movement_id
+      where a.target = 'purchase' and a.voided_at is null
       group by 1, 2, 3
     ),
     target as (

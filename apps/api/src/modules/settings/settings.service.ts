@@ -51,7 +51,7 @@ export class SettingsService {
     const [orders, payments, factoryPayments, expenses] = await Promise.all([
       db.order.count({ take: 1 }),
       db.moneyMovement.count({ take: 1 }),
-      db.factoryPayment.count({ take: 1 }),
+      db.allocation.count({ where: { target: "purchase" }, take: 1 }),
       db.expense.count({ take: 1 }),
     ]);
     const has = [orders && "orders", payments && "payments", factoryPayments && "factory payments", expenses && "expenses"].filter(

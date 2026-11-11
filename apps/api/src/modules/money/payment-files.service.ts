@@ -44,18 +44,16 @@ export class PaymentFilesService {
   ) {}
 
   private async find(side: PaymentSide, id: string): Promise<Row> {
-    if (side === "out") {
-      const row = await this.prisma.db.factoryPayment.findUnique({ where: { id } });
-      if (!row) throw new NotFoundError("Payment");
-      return row;
-    }
-    const part = await this.prisma.db.allocation.findUnique({ where: { id }, select: { movementId: true, orderId: true } });
-    const m = await this.prisma.db.moneyMovement.findUnique({
-      where: { id: part?.movementId ?? id },
-      include: { allocations: { where: { orderId: { not: null } }, select: { orderId: true }, take: 1 } },
+    // Kept on the payment entry: asked for by the payment on the order (its part) or by the entry.
+    const role = side === "in" ? "customer" : "supplier";
+    const part = await this.prisma.db.allocation.findUnique({ where: { id }, select: { movementId: true, orderId: true, purchaseOrderId: true } });
+    const m = await this.prisma.db.moneyMovement.findFirst({
+      where: { id: part?.movementId ?? id, partyRole: role },
+      include: { allocations: { where: { OR: [{ orderId: { not: null } }, { purchaseOrderId: { not: null } }] }, take: 1 } },
     });
     if (!m) throw new NotFoundError("Payment");
-    return { ...m, orderId: part?.orderId ?? m.allocations[0]?.orderId ?? null };
+    const first = m.allocations[0];
+    return { ...m, orderId: part?.orderId ?? part?.purchaseOrderId ?? first?.orderId ?? first?.purchaseOrderId ?? null };
   }
 
   /** Can this person see the payment? (Throws as if it were not there.) */
@@ -79,7 +77,7 @@ export class PaymentFilesService {
     data: { fileKey: string | null; fileName: string | null; fileType: string | null; fileSize: number | null },
     tx: Tx,
   ) {
-    return side === "in" ? tx.moneyMovement.update({ where: { id }, data }) : tx.factoryPayment.update({ where: { id }, data });
+    return tx.moneyMovement.update({ where: { id }, data });
   }
 
   async attach(

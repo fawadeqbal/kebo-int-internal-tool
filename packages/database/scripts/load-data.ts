@@ -22,7 +22,7 @@ import bcrypt from "bcryptjs";
 import { documentTotals, fromMinor, priceForMargin, splitDeposit, toMinor, withTaxMinor } from "@kebo/money";
 import { defaultPlan, type OrderStage } from "@kebo/shared";
 import { addDays, daysBetween, todayIn, type ISODate } from "@kebo/utils";
-import { createPaymentIn, freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, roleRows, toDbDate, type PrismaClient } from "../src";
+import { createPaymentIn, createSupplierPayment, freezeOrderBuyer, freezeOrderMoney, nextReference, openCompany, roleRows, toDbDate, type PrismaClient } from "../src";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
@@ -502,34 +502,32 @@ async function main() {
     const cny = costs.reduce((t, c, k) => t + Math.round(c.costCny * lines[k]!.quantity), 0);
     const pay = (on: ISODate) => on <= today;
     if (oStage !== "confirmed" && pay(addDays(orderedOn, 6)))
-      await db.factoryPayment.create({
-        data: {
-          orderId: order.id,
-          factoryId: factory.id,
-          kind: "deposit",
-          amount: fromMinor(Math.round(cny * 0.3)),
-          currency: "CNY",
-          rate,
-          paidOn: toDbDate(addDays(orderedOn, 6)),
-          reference: `FP-${n}-1`,
-          recordedById: lead.id,
-          paidById: assignee,
-        },
+      await createSupplierPayment(db, {
+        orderId: order.id,
+        orderCurrency: order.currency,
+        supplierId: factory.id,
+        kind: "deposit",
+        amount: fromMinor(Math.round(cny * 0.3)),
+        currency: "CNY",
+        rate,
+        paidOn: toDbDate(addDays(orderedOn, 6)),
+        reference: `FP-${n}-1`,
+        recordedById: lead.id,
+        paidById: assignee,
       });
     if (shippedOn)
-      await db.factoryPayment.create({
-        data: {
-          orderId: order.id,
-          factoryId: factory.id,
-          kind: "balance",
-          amount: fromMinor(cny - Math.round(cny * 0.3)),
-          currency: "CNY",
-          rate,
-          paidOn: toDbDate(addDays(shippedOn, -3)),
-          reference: `FP-${n}-2`,
-          recordedById: lead.id,
-          paidById: assignee,
-        },
+      await createSupplierPayment(db, {
+        orderId: order.id,
+        orderCurrency: order.currency,
+        supplierId: factory.id,
+        kind: "balance",
+        amount: fromMinor(cny - Math.round(cny * 0.3)),
+        currency: "CNY",
+        rate,
+        paidOn: toDbDate(addDays(shippedOn, -3)),
+        reference: `FP-${n}-2`,
+        recordedById: lead.id,
+        paidById: assignee,
       });
     const { deposit, balance } = splitDeposit(accepted.total, 30);
     // Most customers pay the deposit on time; a few are late, so "overdue" has something in it.
@@ -689,7 +687,7 @@ async function main() {
     await db.expense.updateMany({ where: { ...mine, currency: "USD" }, data: { accountId: usd.id } });
   }
   if (cnyAcct) {
-    await db.factoryPayment.updateMany({ where: { ...mine, currency: "CNY" }, data: { accountId: cnyAcct.id } });
+    await db.moneyMovement.updateMany({ where: { ...mine, currency: "CNY", partyRole: "supplier" }, data: { accountId: cnyAcct.id } });
     // A few CNY expenses left off an account, so the cash book has something to point out.
     const left = await db.expense.findMany({ where: { ...mine, currency: "CNY" }, select: { id: true } });
     await db.expense.updateMany({

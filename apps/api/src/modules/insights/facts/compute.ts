@@ -17,7 +17,7 @@ import { reachedOn } from "../../checklist/checklist-facts";
 import { factoryPlansOf } from "../../money/factory-plan";
 import { convert, MainMoney, orderRate } from "../../money/order-money";
 import { livePlansOf } from "../../money/plan-live";
-import { factoryPositionOf, fxOf, positionOf, type MoneyCtx } from "../../money/position";
+import { factoryPositionOf, fxOf, positionOf, type MoneyCtx, supplierPaidRelation } from "../../money/position";
 import { factoryReadyOf, readyOnOf } from "../../orders/ready";
 import { optionFigures, worthOf } from "../../quotations/revision-figures";
 
@@ -112,7 +112,7 @@ const orderSelect = {
       quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { factoryId: true } } } } } },
     },
   },
-  factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true, voidedAt: true } },
+  supplierPaid: supplierPaidRelation,
   factories: { select: { factoryId: true, readyOn: true } },
   _count: { select: { claims: true } },
 } satisfies Prisma.OrderSelect;
