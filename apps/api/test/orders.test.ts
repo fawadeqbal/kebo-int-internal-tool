@@ -1,6 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
+import { day } from "./dates";
 import { paymentSentenceOf, paymentTermsOf } from "../src/modules/orders/documents.service";
 
 /**
@@ -31,7 +32,7 @@ describe("orders: four stages", () => {
     const inquiry = (await api(app, sana).post("/inquiries", { customerId, category: "Machinery", assigneeId: me, items: [{ description: "Maize sheller 5t/h", quantity: 100 }] }).expect(201)).body;
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Henan Agri ${tag}`, receivedOn: "2026-10-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Maize sheller", quantity: 100, unitPrice: 1420 }] })
+      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Henan Agri ${tag}`, receivedOn: day(-41), currency: "CNY", lines: [{ requestedItemId: item.id, description: "Maize sheller", quantity: 100, unitPrice: 1420 }] })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
     draft.options[0].charges.push({ type: "charge", description: "Sea freight to Lagos", quantity: 1, unitPrice: 1500 });
@@ -94,10 +95,10 @@ describe("orders: four stages", () => {
     const warned = await move(sana, { to: "in_production" }).expect(409);
     expect(warned.body).toMatchObject({ code: "confirm", error: expect.stringMatching(/deposit .* has not been received/) });
     expect((await order()).stage).toBe("confirmed"); // nothing changed
-    const moved = (await move(sana, { to: "in_production", confirm: true, readyOn: "2026-12-01", note: "Customer sent the swift copy" }).expect(200)).body;
-    expect(moved).toMatchObject({ stage: "in_production", readyOn: "2026-12-01", back: { to: "confirmed" }, next: { to: "shipped" } });
+    const moved = (await move(sana, { to: "in_production", confirm: true, readyOn: day(20), note: "Customer sent the swift copy" }).expect(200)).body;
+    expect(moved).toMatchObject({ stage: "in_production", readyOn: day(20), back: { to: "confirmed" }, next: { to: "shipped" } });
     expect(moved.history.at(-1)).toMatchObject({ from: "confirmed", to: "in_production", confirmed: true, note: "Customer sent the swift copy", by: { name: expect.any(String) } });
-    expect(moved.needs).toMatchObject({ title: "Goods due from the factory", due: "2026-12-01" });
+    expect(moved.needs).toMatchObject({ title: "Goods due from the factory", due: day(20) });
   });
 
   it("moves back one stage once told why, and forward again", async () => {
@@ -112,9 +113,9 @@ describe("orders: four stages", () => {
   it("records payments (accounts only) and works out what is still due", async () => {
     const o = await order();
     const deposit = Number(o.money.deposit);
-    await api(app, sana).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: "2026-10-21" }).expect(403);
+    await api(app, sana).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: day(-21) }).expect(403);
     await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: "100", currency: "USD", paidOn: "2099-01-01" }).expect(400);
-    const paid = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: (deposit - 25).toFixed(2), bankCharges: "25", currency: "USD", paidOn: "2026-10-21", reference: "TT-1" }).expect(201)).body;
+    const paid = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: (deposit - 25).toFixed(2), bankCharges: "25", currency: "USD", paidOn: day(-21), reference: "TT-1" }).expect(201)).body;
     expect(paid).toMatchObject({ status: "deposit_paid", received: deposit.toFixed(2) });
     // The full record: what it counts for, who recorded it, and where the order stood after it.
     expect(paid.payments.at(-1)).toMatchObject({
@@ -123,7 +124,7 @@ describe("orders: four stages", () => {
       after: { received: deposit.toFixed(2), due: (Number(o.total) - deposit).toFixed(2) },
     });
     // More than is due is never refused: the rest becomes the customer's credit (one transfer: the order's part and the credit).
-    const over = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: (Number(o.total) + 1).toFixed(2), currency: "USD", paidOn: "2026-10-21" }).expect(201)).body;
+    const over = (await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: (Number(o.total) + 1).toFixed(2), currency: "USD", paidOn: day(-21) }).expect(201)).body;
     expect(over).toMatchObject({ due: "0.00" });
     const receiptId = over.payments.at(-1).receiptId as string;
     expect(receiptId).toBeTruthy();
@@ -145,8 +146,8 @@ describe("orders: four stages", () => {
     await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 101 }] }).expect(400);
     await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: charge.id, receivedQty: 1 }] }).expect(400);
     await api(app, bilal).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 1 }] }).expect(404);
-    const part = (await api(app, sana).put(`/orders/${orderId}/receipt`, { on: "2026-10-22", lines: [{ lineId: goods.id, receivedQty: "60" }] }).expect(200)).body;
-    expect(part.lines.find((l: { id: string }) => l.id === goods.id)).toMatchObject({ receivedQty: "60", receivedOn: "2026-10-22" });
+    const part = (await api(app, sana).put(`/orders/${orderId}/receipt`, { on: day(-20), lines: [{ lineId: goods.id, receivedQty: "60" }] }).expect(200)).body;
+    expect(part.lines.find((l: { id: string }) => l.id === goods.id)).toMatchObject({ receivedQty: "60", receivedOn: day(-20) });
     expect(part.goods.short).toEqual(["Maize sheller: 60 of 100 pcs"]);
     const all = (await api(app, sana).put(`/orders/${orderId}/receipt`, { lines: [{ lineId: goods.id, receivedQty: 100 }] }).expect(200)).body;
     expect(all.goods).toMatchObject({ received: 1, allReceived: true, short: [] });
@@ -170,14 +171,14 @@ describe("orders: four stages", () => {
     const warned = await move(sana, { to: "shipped", blNo: "QDLOS-77" }).expect(409);
     expect(warned.body.error).toMatch(/^USD [\d,.]+ is still due, and the terms say the balance is paid before shipping\.$/); // only the money now: goods are in and packed
     await move(sana, { to: "shipped", confirm: true, shippedOn: "2099-01-01" }).expect(400); // no future dates
-    const shipped = (await move(sana, { to: "shipped", confirm: true, shippedOn: "2026-10-24", blNo: "QDLOS-77" }).expect(200)).body;
-    expect(shipped).toMatchObject({ stage: "shipped", shippedOn: "2026-10-24", blNo: "QDLOS-77", next: { to: "done", label: "Close the order" } });
+    const shipped = (await move(sana, { to: "shipped", confirm: true, shippedOn: day(-18), blNo: "QDLOS-77" }).expect(200)).body;
+    expect(shipped).toMatchObject({ stage: "shipped", shippedOn: day(-18), blNo: "QDLOS-77", next: { to: "done", label: "Close the order" } });
     expect(shipped.needs.title).toMatch(/^Get the balance \(USD /);
   });
 
   it("serves two clicks at once one after the other: exactly one moves", async () => {
     const o = await order();
-    await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: o.money.due, currency: "USD", paidOn: "2026-10-25" }).expect(201);
+    await api(app, manager).post(`/orders/${orderId}/payments`, { kind: "balance", amount: o.money.due, currency: "USD", paidOn: day(-17) }).expect(201);
     const [a, b] = await Promise.all([move(sana, { to: "done" }), move(sana, { to: "done" })]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     const done = await order();
@@ -250,13 +251,13 @@ describe("orders: four stages", () => {
 
   it("changes only the details sent, and keeps the real ship date when shipping again", async () => {
     await move(manager, { to: "shipped", reason: "Customer claim" }).expect(200);
-    const d = (await api(app, sana).patch(`/orders/${orderId}/details`, { shipBy: "2026-12-20" }).expect(200)).body;
-    expect(d).toMatchObject({ shipBy: "2026-12-20", shippedOn: "2026-10-24", blNo: "QDLOS-77" });
+    const d = (await api(app, sana).patch(`/orders/${orderId}/details`, { shipBy: day(39) }).expect(200)).body;
+    expect(d).toMatchObject({ shipBy: day(39), shippedOn: day(-18), blNo: "QDLOS-77" });
     // The B/L is on the customer's papers once shipped: changing it says why.
     expect((await api(app, sana).patch(`/orders/${orderId}/details`, { blNo: "" }).expect(409)).body.code).toBe("reason_needed");
     expect((await api(app, sana).patch(`/orders/${orderId}/details`, { blNo: "", reason: "B/L number corrected" }).expect(200)).body.blNo).toBeNull();
     await move(sana, { to: "in_production", reason: "Goods not ready after all" }).expect(200);
-    expect((await move(sana, { to: "shipped", confirm: true }).expect(200)).body.shippedOn).toBe("2026-10-24");
+    expect((await move(sana, { to: "shipped", confirm: true }).expect(200)).body.shippedOn).toBe(day(-18));
   });
 
   it("lists my to-do: what each order needs, late first", async () => {

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FIRST_COMPANY_ID } from "@kebo/database";
 import { flowSteps, MODULE_PRESETS, ORDER_FLOW_FEATURES, requiredDocuments, withPreset, type FlowFacts } from "@kebo/shared";
 import { api, signIn, startApp } from "./app";
+import { day } from "./dates";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
 
@@ -26,7 +27,6 @@ describe("order flow: from asking factories to SAT", () => {
   const tag = Date.now().toString(36);
   const password = "Person@12345";
   /** A reply-by date that is still ahead whenever the test runs (a fixed date fails once it has passed). */
-  const nextWeek = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
   const flow = async (who = sana) => (await api(app, who).get(`/orders/${orderId}/flow`).expect(200)).body;
   const stepState = (f: { steps: { key: string; state: string }[] }) => Object.fromEntries(f.steps.map((s) => [s.key, s.state]));
   const modulesOff = async (off: string[]) => {
@@ -58,7 +58,7 @@ describe("order flow: from asking factories to SAT", () => {
     const before = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
     expect(before.items).toEqual([]);
     expect(before.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ name: `Henan Pack ${tag}`, askedHere: false, lastAskedOn: null });
-    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan, wuxi], replyBy: nextWeek, channel: "wechat" }).expect(201)).body;
+    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan, wuxi], replyBy: day(7), channel: "wechat" }).expect(201)).body;
     expect(asked.counts).toEqual({ asked: 2, quoted: 0, waiting: 2, late: 0 });
     expect(asked.items[0]).toMatchObject({ channel: "wechat", waitingDays: 0 });
     expect(asked.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ askedHere: true, lastAskedOn: expect.any(String) });
@@ -70,7 +70,7 @@ describe("order flow: from asking factories to SAT", () => {
     // Henan's offer comes in: its request counts as answered.
     const item = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiryId}/factory-quotes`, { factoryId: henan, receivedOn: "2026-10-20", currency: "CNY", lines: [{ requestedItemId: item.id, description: "DPP-250 blister machine", quantity: 1, unitPrice: 185000 }] })
+      .post(`/inquiries/${inquiryId}/factory-quotes`, { factoryId: henan, receivedOn: day(-22), currency: "CNY", lines: [{ requestedItemId: item.id, description: "DPP-250 blister machine", quantity: 1, unitPrice: 185000 }] })
       .expect(201);
     const list = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
     const byFactory = Object.fromEntries(list.items.map((i: { factory: { id: string }; status: string; id: string }) => [i.factory.id, i]));
@@ -81,7 +81,7 @@ describe("order flow: from asking factories to SAT", () => {
 
     // Staff who do not handle the deal cannot see it; a reply-by before the date sent is refused.
     await api(app, bilal).get(`/inquiries/${inquiryId}/factory-requests`).expect(404);
-    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [wuxi], sentOn: "2026-10-10", replyBy: "2026-10-01" }).expect(400);
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [wuxi], sentOn: day(-32), replyBy: day(-41) }).expect(400);
     await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [] }).expect(422);
 
     // The history of the deal says who was asked.
@@ -122,9 +122,9 @@ describe("order flow: from asking factories to SAT", () => {
           ourBank: "Bank of China, Guangzhou",
           amount: 26500,
           currency: "USD",
-          openedOn: "2026-10-25",
-          latestShipOn: "2026-12-20",
-          expiresOn: "2027-01-10",
+          openedOn: day(-17),
+          latestShipOn: day(39),
+          expiresOn: day(60),
         })
         .expect(200)
     ).body;
@@ -134,19 +134,19 @@ describe("order flow: from asking factories to SAT", () => {
     expect(f.documents.bankSteps).toHaveLength(6);
     // An amount needs its currency; an LC cannot expire before it opens.
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { amount: 100 }).expect(400);
-    await api(app, sana).put(`/orders/${orderId}/bank-contract`, { openedOn: "2026-10-25", expiresOn: "2026-10-01" }).expect(400);
+    await api(app, sana).put(`/orders/${orderId}/bank-contract`, { openedOn: day(-17), expiresOn: day(-41) }).expect(400);
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "by_pigeon" }).expect(422);
 
     // The deposit arrives: Payment is done, the factory order is next.
     const o = (await api(app, sana).get(`/orders/${orderId}`)).body;
     await api(app, sana).post(`/orders/${orderId}/payments`).send({}).expect(403); // staff do not record money
-    await api(app, admin).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: o.money.deposit, currency: o.currency, paidOn: "2026-10-26", method: "letter_of_credit" }).expect(201);
+    await api(app, admin).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: o.money.deposit, currency: o.currency, paidOn: day(-16), method: "letter_of_credit" }).expect(201);
     expect(stepState(await flow())).toMatchObject({ payment: "done", factory: "current" });
   });
 
   it("factory order and production timeline", async () => {
     await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: "2099-01-01" }).expect(400);
-    let f = (await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: "2026-10-27" }).expect(200)).body;
+    let f = (await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: day(-15) }).expect(200)).body;
     expect(stepState(f)).toMatchObject({ factory: "done", production: "current" });
     // The order's stage follows: ordered from the factory → In production, said in its history.
     const moved = (await api(app, sana).get(`/orders/${orderId}`)).body;
@@ -157,20 +157,20 @@ describe("order flow: from asking factories to SAT", () => {
       await api(app, sana)
         .put(`/orders/${orderId}/production`, {
           steps: [
-            { title: "Drawings approved", factoryId: henan, plannedOn: "2026-10-30", doneOn: "2026-10-29" },
-            { title: "Factory test run (FAT)", plannedOn: "2026-11-20" },
+            { title: "Drawings approved", factoryId: henan, plannedOn: day(-12), doneOn: day(-13) },
+            { title: "Factory test run (FAT)", plannedOn: day(9) },
           ],
         })
         .expect(200)
     ).body;
     expect(f.production.steps.map((s: { title: string; doneOn: string | null }) => [s.title, s.doneOn])).toEqual([
-      ["Drawings approved", "2026-10-29"],
+      ["Drawings approved", day(-13)],
       ["Factory test run (FAT)", null],
     ]);
     expect(f.steps.find((s: { key: string }) => s.key === "production").sub).toBe("1 of 2 steps");
     // Changing a step keeps it; leaving one out removes it; another order's step id is refused.
     const [first, second] = f.production.steps;
-    f = (await api(app, sana).put(`/orders/${orderId}/production`, { steps: [{ ...first, factoryId: henan }, { ...second, doneOn: "2026-11-01" }] }).expect(200)).body;
+    f = (await api(app, sana).put(`/orders/${orderId}/production`, { steps: [{ ...first, factoryId: henan }, { ...second, doneOn: day(-10) }] }).expect(200)).body;
     expect(f.production.steps.map((s: { id: string }) => s.id)).toEqual([first.id, second.id]);
     expect(stepState(f)).toMatchObject({ production: "done", shipping: "current" });
     await api(app, sana).put(`/orders/${orderId}/production`, { steps: [{ id: "6b65626f-0000-4000-8000-00000000abcd", title: "x" }] }).expect(400);
@@ -179,20 +179,20 @@ describe("order flow: from asking factories to SAT", () => {
   it("shipping: a sea shipment from booked to arrived", async () => {
     let f = (
       await api(app, sana)
-        .post(`/orders/${orderId}/shipments`, { mode: "sea", status: "booked", forwarder: "Sino Trans", portOfLoading: "Shanghai", portOfDischarge: "Karachi", containerType: "40HQ", etd: "2026-11-25", eta: "2026-12-15" })
+        .post(`/orders/${orderId}/shipments`, { mode: "sea", status: "booked", forwarder: "Sino Trans", portOfLoading: "Shanghai", portOfDischarge: "Karachi", containerType: "40HQ", etd: day(14), eta: day(34) })
         .expect(201)
     ).body;
     const ship = f.shipping.shipments[0];
-    expect(ship).toMatchObject({ mode: "sea", status: "booked", portOfDischarge: "Karachi", eta: "2026-12-15" });
-    await api(app, sana).patch(`/shipments/${ship.id}`, { eta: "2026-11-01" }).expect(400); // before ETD
-    await api(app, sana).post(`/orders/${orderId}/shipments`, { etd: "2026-12-01", eta: "2026-11-01" }).expect(422);
+    expect(ship).toMatchObject({ mode: "sea", status: "booked", portOfDischarge: "Karachi", eta: day(34) });
+    await api(app, sana).patch(`/shipments/${ship.id}`, { eta: day(-10) }).expect(400); // before ETD
+    await api(app, sana).post(`/orders/${orderId}/shipments`, { etd: day(20), eta: day(-10) }).expect(422);
     expect((await api(app, sana).get(`/orders/${orderId}`)).body.stage).toBe("in_production"); // booked is not shipped
-    f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "departed", departedOn: "2026-10-30", blNo: "COSU6281734510", containerNo: "CSNU7154420" }).expect(200)).body;
+    f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "departed", departedOn: day(-12), blNo: "COSU6281734510", containerNo: "CSNU7154420" }).expect(200)).body;
     const sailed = (await api(app, sana).get(`/orders/${orderId}`)).body;
-    expect(sailed).toMatchObject({ stage: "shipped", shippedOn: "2026-10-30", blNo: "COSU6281734510" });
+    expect(sailed).toMatchObject({ stage: "shipped", shippedOn: day(-12), blNo: "COSU6281734510" });
     expect(sailed.history.at(-1)).toMatchObject({ from: "in_production", to: "shipped", note: "a shipment left" });
     expect(f.steps.find((s: { key: string }) => s.key === "shipping").sub).toBe("On the way");
-    f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "arrived", arrivedOn: "2026-11-01" }).expect(200)).body;
+    f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "arrived", arrivedOn: day(-10) }).expect(200)).body;
     expect(stepState(f)).toMatchObject({ shipping: "done", documents: "current" });
   });
 
@@ -234,16 +234,16 @@ describe("order flow: from asking factories to SAT", () => {
     f = await flow();
     expect(f.documents.set.filter((d: { required: boolean; status: string }) => d.required && d.status !== "ready")).toEqual([]);
 
-    await api(app, sana).put(`/orders/${orderId}/bank-steps/teleported`, { doneOn: "2026-11-01" }).expect(422);
+    await api(app, sana).put(`/orders/${orderId}/bank-steps/teleported`, { doneOn: day(-10) }).expect(422);
     await api(app, sana).put(`/orders/${orderId}/bank-steps/sent_to_our_bank`, { doneOn: "2099-01-01" }).expect(400);
     const steps = ["sent_to_our_bank", "couriered_to_customer_bank", "customer_bank_received", "copies_to_customer", "customer_paid_bank"];
     for (const step of steps) {
-      await api(app, sana).put(`/orders/${orderId}/bank-steps/${step}`, { doneOn: "2026-11-01", ...(step === "couriered_to_customer_bank" && { courier: "DHL", reference: "1234567890" }) }).expect(200);
+      await api(app, sana).put(`/orders/${orderId}/bank-steps/${step}`, { doneOn: day(-10), ...(step === "couriered_to_customer_bank" && { courier: "DHL", reference: "1234567890" }) }).expect(200);
     }
     // "Money reached us" is the payment itself: ticked by recording it, never on its own.
-    await api(app, sana).put(`/orders/${orderId}/bank-steps/bank_paid_us`, { doneOn: "2026-11-01" }).expect(400);
+    await api(app, sana).put(`/orders/${orderId}/bank-steps/bank_paid_us`, { doneOn: day(-10) }).expect(400);
     const reached = async () =>
-      (await api(app, admin).post(`/orders/${orderId}/payments`, { kind: "balance", amount: "1.00", currency: "USD", paidOn: "2026-11-01", bankStep: "bank_paid_us" }).expect(201)).body.createdId as string;
+      (await api(app, admin).post(`/orders/${orderId}/payments`, { kind: "balance", amount: "1.00", currency: "USD", paidOn: day(-10), bankStep: "bank_paid_us" }).expect(201)).body.createdId as string;
     const paymentId = await reached();
     f = await flow();
     expect(f.documents.bankSteps.find((b: { step: string }) => b.step === "couriered_to_customer_bank")).toMatchObject({ courier: "DHL", reference: "1234567890" });
@@ -258,10 +258,10 @@ describe("order flow: from asking factories to SAT", () => {
 
   it("delivery, SAT by our engineer, and a claim", async () => {
     const engineer = (await api(app, sana).get("/auth/me")).body.id;
-    await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: "2026-11-01" }).expect(400); // not delivered yet
+    await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: day(-10) }).expect(400); // not delivered yet
     // The order keeps no condition of its own (an old client's is ignored): it is the goods lines', the worst of them.
-    let f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { deliveredOn: "2026-11-01", deliveryCondition: "good", satEngineerId: engineer, satPlannedOn: "2026-11-03" }).expect(200)).body;
-    expect(f.delivery).toMatchObject({ deliveredOn: "2026-11-01", condition: null, satEngineer: { id: engineer } });
+    let f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { deliveredOn: day(-10), deliveryCondition: "good", satEngineerId: engineer, satPlannedOn: day(-8) }).expect(200)).body;
+    expect(f.delivery).toMatchObject({ deliveredOn: day(-10), condition: null, satEngineer: { id: engineer } });
     const goods = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body.lines.filter((l: { type: string }) => l.type === "goods");
     await api(app, sana).patch(`/order-lines/${goods[0].id}`, { set: "delivered", deliveredQty: goods[0].quantity, condition: "minor_damage" }).expect(200);
     f = (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
@@ -270,13 +270,13 @@ describe("order flow: from asking factories to SAT", () => {
     f = (await api(app, sana).put(`/orders/${orderId}/sat`, { checks: f.delivery.suggestedSat.map((item: string) => ({ item })) }).expect(200)).body;
     expect(f.delivery.sat.every((c: { result: string }) => c.result === "pending")).toBe(true);
     // Not every point passed: no sign-off.
-    await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: "2026-11-02" }).expect(400);
+    await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: day(-9) }).expect(400);
     await api(app, sana).put(`/orders/${orderId}/sat`, { checks: f.delivery.sat.map((c: { id: string; item: string }, i: number) => ({ id: c.id, item: c.item, result: i === 0 ? "not_applicable" : "pass" })) }).expect(200);
 
     f = (await api(app, sana).post(`/orders/${orderId}/claims`, { title: "Dented guard door", detail: "Arrived bent; factory to send a new one." }).expect(201)).body;
     const claim = f.delivery.claims[0];
     expect(claim).toMatchObject({ status: "open", title: "Dented guard door" });
-    f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: "2026-11-02", satSignedBy: "Mr. Ali, QA head" }).expect(200)).body;
+    f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: day(-9), satSignedBy: "Mr. Ali, QA head" }).expect(200)).body;
     expect(stepState(f).delivery).toBe("current"); // the claim is still open
     await api(app, sana).patch(`/claims/${claim.id}`, { status: "resolved" }).expect(400); // how was it settled?
     f = (await api(app, sana).patch(`/claims/${claim.id}`, { status: "resolved", resolution: "Factory sent a new door by air; fitted." }).expect(200)).body;
@@ -352,7 +352,7 @@ describe("order flow: from asking factories to SAT", () => {
       cancelled: false,
       route: "informal",
       depositIn: true,
-      factoryOrderedOn: "2026-10-01",
+      factoryOrderedOn: day(-41),
       production: { total: 0, done: 0 },
       readyOn: null,
       shipments: { total: 0, departed: 0, arrived: 0 },

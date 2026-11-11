@@ -1,6 +1,7 @@
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
+import { day } from "./dates";
 
 /**
  * Step 2: the customer's payment plan, what we owe and paid each factory,
@@ -133,7 +134,7 @@ describe("money", () => {
       amount: Number(i.amount),
       dueOn: i.dueOn,
     }));
-    items[2].dueOn = "2027-01-15";
+    items[2].dueOn = day(65);
     expect((await api(app, sana).put(`/orders/${orderId}/payment-plan`, { items }).expect(409)).body).toMatchObject({
       code: "reason_needed",
       choices: expect.arrayContaining(["Agreed a new schedule"]),
