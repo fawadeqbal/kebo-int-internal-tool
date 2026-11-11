@@ -729,10 +729,10 @@ export async function seedDemoData(
   const at = (daysBack: number, time: string) => new Date(`${addDays(today, -daysBack)}T${time}:00Z`);
   if (shipped) {
     const contact = contactOf(shipped.customerId);
-    await db.recordNote.create({
+    await db.note.create({
       data: { orderId: shipped.id, kind: "call", contactId: contact?.id, body: "Says the bank will pay the balance on Thursday.", at: at(1, "04:02"), authorId: sana.id },
     });
-    await db.recordNote.create({
+    await db.note.create({
       data: { customerId: shipped.customerId, kind: "visit", contactId: contact?.id, body: "Asked for a second line next year.", at: at(6, "07:30"), authorId: sana.id },
     });
     await db.followUp.create({
@@ -742,7 +742,7 @@ export async function seedDemoData(
       data: { title: "Send the B/L copy to the bank", kind: "other", dueOn: toDbDate(addDays(today, -1)), orderId: shipped.id, assigneeId: sana.id, createdById: people.manager.id },
     });
   }
-  await db.recordNote.create({
+  await db.note.create({
     data: { factoryId: factories[1].id, kind: "visit", body: "Saw the valves on the test bench; packing starts next week.", at: at(3, "02:00"), authorId: people.manager.id },
   });
   await db.followUp.create({

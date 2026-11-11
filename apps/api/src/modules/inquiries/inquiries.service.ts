@@ -498,7 +498,7 @@ export class InquiriesService {
         : (input.reason ?? input.note ?? null);
       await tx.inquiry.update({ where: { id }, data: { onHold: input.onHold } });
       if (input.note)
-        await tx.inquiryNote.create({
+        await tx.note.create({
           data: { inquiryId: id, authorId: user.id, body: `${input.onHold ? "On hold" : "Resumed"}: ${input.note}` },
         });
       await this.audit.record(tx, {

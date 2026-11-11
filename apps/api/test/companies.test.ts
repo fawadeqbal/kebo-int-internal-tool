@@ -246,7 +246,7 @@ describe("companies: isolation and the platform", () => {
     for (const [sql, args] of [
       [`update parties set created_by = $1::uuid where id = $2::uuid`, [keboUser, bCustomer]],
       [
-        `insert into inquiry_notes (id, inquiry_id, author_id, body) values (gen_random_uuid(), $2::uuid, $1::uuid, 'x')`,
+        `insert into notes (id, inquiry_id, author_id, body) values (gen_random_uuid(), $2::uuid, $1::uuid, 'x')`,
         [keboUser, bInquiry],
       ],
       [

@@ -695,7 +695,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       assignedAt: a.assigned_at,
     })),
   });
-  await tx.inquiryNote.createMany({
+  await tx.note.createMany({
     data: old.comments.map((c) => ({ id: c.id, inquiryId: c.query_id, body: c.body, authorId: c.author_id, createdAt: c.created_at })),
   });
   await tx.attachment.createMany({
@@ -1157,7 +1157,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     requestedItems: await tx.requestedItem.count(),
     stageChanges: await tx.inquiryStageChange.count(),
     assignments: await tx.inquiryAssignment.count(),
-    notes: await tx.inquiryNote.count(),
+    notes: await tx.note.count(),
     attachments: await tx.attachment.count(),
     factoryQuotes: await tx.factoryQuote.count(),
     factoryQuoteLines: await tx.factoryQuoteLine.count(),
@@ -1189,7 +1189,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "query_items → requested_items", old: old.queryItems.length, new: c.requestedItems },
     { what: "query_status_history → inquiry_stage_changes", old: old.history.length, new: c.stageChanges },
     { what: "query_assignments → inquiry_assignments", old: old.assignments.length, new: c.assignments },
-    { what: "comments → inquiry_notes", old: old.comments.length, new: c.notes },
+    { what: "comments → notes", old: old.comments.length, new: c.notes },
     { what: "attachments → attachments", old: old.attachments.length, new: c.attachments },
     { what: "supplier_quotes → factory_quotes", old: old.supplierQuotes.length, new: c.factoryQuotes },
     { what: "supplier_quote_items → factory_quote_lines", old: old.supplierQuoteItems.length, new: c.factoryQuoteLines },
