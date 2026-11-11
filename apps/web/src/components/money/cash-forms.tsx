@@ -108,9 +108,9 @@ export function EditAccount({ account, today }: { account: AccountRow; today: st
 }
 
 /** Move money between two of our accounts; asks what arrived when the currencies differ. */
-export function MoveMoney({ accounts, today }: { accounts: AccountRow[]; today: string }) {
+export function MoveMoney({ accounts, today, startOpen = false }: { accounts: AccountRow[]; today: string; startOpen?: boolean }) {
   const open_ = accounts.filter((a) => !a.archived);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [from, setFrom] = useState(open_[0]?.id ?? "");
   const [to, setTo] = useState(open_[1]?.id ?? "");
   if (open_.length < 2) return null;

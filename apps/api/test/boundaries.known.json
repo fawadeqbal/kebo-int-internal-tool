@@ -69,5 +69,7 @@
   "settings -> ledger",
   "sourcing -> inquiries",
   "sourcing -> settings",
+  "treasury -> orders",
+  "treasury -> parties",
   "users -> notifications"
 ]

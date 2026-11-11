@@ -69,7 +69,7 @@ describe("the modules", () => {
     expect(pages(m, "partners")).toEqual(["Customers", "Suppliers"]);
     expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders"]);
     expect(pages(m, "revenue")).toEqual(["Profit & loss", "Cost & expense allocation", "Variance analysis"]);
-    expect(pages(m, "treasury")).toEqual(["Verification queue", "Multi-currency vault"]);
+    expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue", "Multi-currency vault"]);
     expect(pages(m, "finance")).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
     expect(pages(m, "admin")).toEqual(["Company settings", "Sales & quotations", "Reminders", "Emails", "Order checklist", "Document templates", "Users", "Roles", "Sessions", "Sign-ins"]);
   });
@@ -117,7 +117,8 @@ describe("the modules", () => {
     expect(titles(m)).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments"]);
     expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines"]);
     expect(pages(m, "partners")).toEqual(["Customers"]);
-    expect(pages(m, "treasury")).toEqual(["Verification queue"]);
+    // Staff who send money for approval see their payments and the queue.
+    expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue"]);
     // No verification queue for someone who neither verifies nor sends money for it.
     const none = buildModules({ can: () => false, feature: () => true, approvals: null, approves: false, companyAddresses: false });
     expect(titles(none)).toEqual(["Overview", "Partners & CRM", "Operations & trading"]);
@@ -125,7 +126,7 @@ describe("the modules", () => {
 
   it("follow the plan: no vault, costs, reports or audit log when the plan leaves them out", () => {
     const m = buildModules({ can: () => true, feature: (f) => !["cash_book", "expenses", "insights", "audit_log"].includes(f), approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(m, "treasury")).toEqual(["Verification queue"]);
+    expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue"]);
     expect(pages(m, "finance")).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
     expect(titles(m)).not.toContain("Revenue & profitability");
     expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines"]);

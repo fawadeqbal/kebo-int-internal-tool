@@ -79,6 +79,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
     title: "Treasury & payments",
     icon: "treasury",
     pages: [
+      { href: "/payments", label: "Payments" },
       { href: "/approvals", label: "Verification queue" },
       { href: "/finance/cash-book", label: "Multi-currency vault" },
     ],
@@ -187,6 +188,7 @@ export function buildModules({
     "/finance/profit": reports && managers,
     "/finance/expenses": sourcing && managers && feature("expenses"),
     "/finance/leaks": reports && managers,
+    "/payments": ["payments.record", "sourcing.manage", "expenses.manage", "ledger.view", "money.submit"].some(can),
     "/approvals": approvals !== null,
     "/finance/cash-book": sourcing && managers && feature("cash_book"),
     "/finance/to-receive": sourcing && (managers || can("payments.record")),

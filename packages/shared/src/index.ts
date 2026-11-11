@@ -28,4 +28,5 @@ export * from "./schemas/papers";
 export * from "./schemas/notes";
 export * from "./workflows/devices";
 export * from "./platform";
+export * from "./treasury";
 export * from "./site";
