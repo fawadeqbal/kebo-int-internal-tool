@@ -291,7 +291,8 @@ describe("papers that never move", () => {
     await asCompany(() => prisma.db.orderPaper.deleteMany({ where: { orderId: o.id, kind: "proforma" } }));
     expect(await app.get(DocumentsService).rebuildAll()).toBeGreaterThanOrEqual(1);
     const rebuilt = await proforma(o.id);
-    expect(rebuilt).toMatchObject({ final: true, paper: { version: 1, rebuiltOn: today } });
+    // Rebuilt today: the clock's day now (a run can cross midnight in the company's time zone).
+    expect(rebuilt).toMatchObject({ final: true, paper: { version: 1, rebuiltOn: app.get(Clock).today() } });
     const strip = (d: Record<string, unknown>) => ({ ...d, paper: null, versions: null, rebuiltOn: null });
     expect(strip(rebuilt)).toEqual(strip(printed));
     expect((await papers(o.id)).find((p) => p.kind === "proforma")!.sub).toContain(`rebuilt from the data on ${today}`);
