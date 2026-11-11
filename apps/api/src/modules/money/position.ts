@@ -1,4 +1,4 @@
-import { decimalToMinor, livePart, type Prisma } from "@kebo/database";
+import { decimalToMinor, livePart, livePurchase, type Prisma } from "@kebo/database";
 import { expenseIn, factoryPosition, orderPosition, type FactoryOwing, type Fx, type Minor, type OrderPosition } from "@kebo/money";
 import type { Settings } from "@kebo/shared";
 import { orderRate } from "./order-money";
@@ -89,6 +89,13 @@ export const moneyFacts = (p: OrderPosition) => ({
   depositMinor: p.depositMinor,
 });
 
+/** What an order paid its suppliers, as factoryPositionOf reads it (live parts, in the supplier's currency). */
+export const supplierPaidRelation = {
+  where: livePurchase,
+  orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+  select: { share: true, voidedAt: true, movement: { select: { partyId: true, currency: true, rate: true } } },
+} satisfies Prisma.Order$supplierPaidArgs;
+
 /** The expenses the factories bear, to load with an order. */
 export const factoryBorneExpenses = {
   where: { voidedAt: null, borneBy: "factory", factoryId: { not: null } },
@@ -104,7 +111,8 @@ export interface FactoryFacts {
     factoryTaxIncluded: boolean;
     quantity: Decimalish;
   }[];
-  factoryPaid: { factoryId: string; currency: string; amount: Decimalish; voidedAt?: Date | null }[];
+  /** What we paid its suppliers: each payment's part (what was paid, in the supplier's currency) and its entry. */
+  supplierPaid: { share: Decimalish; voidedAt?: Date | null; movement: { partyId: string | null; currency: string } }[];
   /** At least the expenses the factories bear (others are left out here). */
   expenses: { amount: Decimalish; currency: string; rate: Decimalish; factoryId: string | null; borneBy?: string; voidedAt?: Date | null }[];
 }
@@ -126,7 +134,9 @@ export function factoryPositionOf(o: FactoryFacts, fx: MoneyCtx): FactoryOwing[]
           ]
         : [],
     ),
-    o.factoryPaid.filter((p) => !p.voidedAt).map((p) => ({ factoryId: p.factoryId, currency: p.currency, amountMinor: minor(p.amount) })),
+    o.supplierPaid
+      .filter((p) => !p.voidedAt)
+      .map((p) => ({ factoryId: p.movement.partyId!, currency: p.movement.currency, amountMinor: minor(p.share) })),
     o.expenses
       .filter((e) => fx.expensesOn && (e.borneBy ?? "factory") === "factory" && !e.voidedAt && e.factoryId)
       .map((e) => ({ factoryId: e.factoryId!, currency: e.currency, amountMinor: minor(e.amount), rate: e.rate.toString() })),

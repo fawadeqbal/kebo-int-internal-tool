@@ -41,9 +41,9 @@ const LEDGER_SOURCE: Partial<Record<PaymentRecordKind, string>> = {
   customer: "movement",
   credit: "allocation",
   refund: "movement",
-  supplier: "factory_payment",
+  supplier: "movement",
   expense: "expense",
-  transfer: "transfer",
+  transfer: "movement",
 };
 
 const name = { select: { id: true, name: true } } as const;
@@ -219,9 +219,16 @@ export class TreasuryService {
           })
         : [],
       s.supplier && pick("supplier")
-        ? this.prisma.db.factoryPayment.findMany({
-            where: { ...pick("supplier"), order: onOrder, ...(range ? { paidOn: range } : {}), ...(party ? { factoryId: party } : {}) },
-            include: { order: orderRef, factory: name, account: name },
+        ? this.prisma.db.allocation.findMany({
+            // A supplier payment, listed as its payment on the order (its part).
+            where: {
+              ...pick("supplier"),
+              target: "purchase",
+              purchaseOrder: onOrder,
+              ...(range ? { on: range } : {}),
+              ...(party ? { movement: { partyId: party } } : {}),
+            },
+            include: { purchaseOrder: orderRef, movement: { include: { party: name, account: name } } },
           })
         : [],
       s.expense && pick("expense")
@@ -236,9 +243,9 @@ export class TreasuryService {
           })
         : [],
       s.transfer && !q.order && !party && pick("transfer")
-        ? this.prisma.db.moneyTransfer.findMany({
-            where: { ...pick("transfer"), ...(range ? { transferredOn: range } : {}) },
-            include: { fromAccount: { select: { id: true, name: true, currency: true } }, toAccount: name },
+        ? this.prisma.db.moneyMovement.findMany({
+            where: { ...pick("transfer"), direction: "move", ...(range ? { valueDate: range } : {}) },
+            include: { account: name, toAccount: name },
           })
         : [],
       (s.approves.length || s.submits) && pick("submission")
@@ -322,16 +329,16 @@ export class TreasuryService {
         kind: "supplier",
         id: p.id,
         number: null,
-        on: fromDbDate(p.paidOn),
+        on: fromDbDate(p.on),
         direction: "out",
-        what: `${PAYMENT_KIND_LABEL[p.kind]} to the supplier for ${p.order.refNo}`,
-        amount: money(p.amount),
-        currency: p.currency,
-        party: supplierLink(p.factory),
-        for: [orderLink(p.order)],
-        account: p.account?.name ?? null,
-        reference: p.reference,
-        status: statusOf(p.voidedAt),
+        what: `${PAYMENT_KIND_LABEL[p.kind as PaymentKind]} to the supplier for ${p.purchaseOrder!.refNo}`,
+        amount: money(p.share),
+        currency: p.movement.currency,
+        party: supplierLink(p.movement.party!),
+        for: [orderLink(p.purchaseOrder!)],
+        account: p.movement.account?.name ?? null,
+        reference: p.movement.reference,
+        status: statusOf(p.voidedAt ?? p.movement.voidedAt),
         fromCredit: false,
       });
     for (const e of expenses)
@@ -356,14 +363,14 @@ export class TreasuryService {
         kind: "transfer",
         id: t.id,
         number: null,
-        on: fromDbDate(t.transferredOn),
+        on: fromDbDate(t.valueDate),
         direction: "move",
-        what: `${t.fromAccount.name} → ${t.toAccount.name}${t.note ? `: ${t.note}` : ""}`,
-        amount: money(t.amountOut),
-        currency: t.fromAccount.currency,
+        what: `${t.account!.name} → ${t.toAccount!.name}${t.note ? `: ${t.note}` : ""}`,
+        amount: money(t.amount),
+        currency: t.currency,
         party: null,
         for: [],
-        account: t.fromAccount.name,
+        account: t.account!.name,
         reference: t.reference,
         status: statusOf(t.voidedAt),
         fromCredit: false,
@@ -395,16 +402,27 @@ export class TreasuryService {
   }
 
   /** The number each record was posted under in the ledger (one query for the page). */
+  /** The ledger document of a row: a supplier payment is listed by its part, posted by its entry. */
+  private async sourceIds(rows: PaymentRow[]) {
+    const parts = rows.filter((r) => r.kind === "supplier").map((r) => r.id);
+    const entries = parts.length
+      ? await this.prisma.db.allocation.findMany({ where: { id: { in: parts } }, select: { id: true, movementId: true } })
+      : [];
+    const of = new Map(entries.map((e) => [e.id, e.movementId]));
+    return (r: { kind: PaymentRecordKind; id: string }) => of.get(r.id) ?? r.id;
+  }
+
   private async numberRows(rows: PaymentRow[]) {
     const wanted = rows.filter((r) => !r.number && LEDGER_SOURCE[r.kind]);
     if (!wanted.length) return;
+    const sourceId = await this.sourceIds(wanted);
     const posted = await this.prisma.db.ledgerEntry.findMany({
-      where: { OR: wanted.map((r) => ({ sourceType: LEDGER_SOURCE[r.kind]!, sourceId: r.id })), part: "" },
+      where: { OR: wanted.map((r) => ({ sourceType: LEDGER_SOURCE[r.kind]!, sourceId: sourceId(r) })), part: "" },
       select: { sourceType: true, sourceId: true, ref: true },
       distinct: ["sourceType", "sourceId"],
     });
     const ref = new Map(posted.map((p) => [`${p.sourceType}:${p.sourceId}`, p.ref]));
-    for (const r of wanted) r.number = ref.get(`${LEDGER_SOURCE[r.kind]}:${r.id}`) || null;
+    for (const r of wanted) r.number = ref.get(`${LEDGER_SOURCE[r.kind]}:${sourceId(r)}`) || null;
   }
 
   /** One payment's page. 404 when this person does not see it. */
@@ -415,7 +433,7 @@ export class TreasuryService {
     await this.numberRows([row]);
     const posting = LEDGER_SOURCE[kind]
       ? await this.prisma.db.ledgerEntry.findFirst({
-          where: { sourceType: LEDGER_SOURCE[kind]!, sourceId: id },
+          where: { sourceType: LEDGER_SOURCE[kind]!, sourceId: (await this.sourceIds([row]))(row) },
           orderBy: { postedAt: "asc" },
           select: { groupId: true },
         })
@@ -502,10 +520,11 @@ export class TreasuryService {
         };
       }
       case "supplier": {
-        const p = await db.factoryPayment.findUniqueOrThrow({
+        const a = await db.allocation.findUniqueOrThrow({
           where: { id },
-          include: { order: orderRef, recordedBy: name, paidBy: name },
+          include: { purchaseOrder: orderRef, movement: { include: { recordedBy: name, paidBy: name } } },
         });
+        const p = { ...a.movement, kind: a.kind, order: a.purchaseOrder!, orderId: a.purchaseOrderId!, paidOn: a.on, voidedAt: a.voidedAt ?? a.movement.voidedAt, id: a.id };
         return {
           fields: [
             { label: "For", value: `${PAYMENT_KIND_LABEL[p.kind as PaymentKind]} on ${p.order.refNo}`, href: `/orders/${p.order.id}` },
@@ -555,10 +574,11 @@ export class TreasuryService {
         };
       }
       case "transfer": {
-        const t = await db.moneyTransfer.findUniqueOrThrow({
-          where: { id },
-          include: { recordedBy: name, fromAccount: true, toAccount: true },
+        const m = await db.moneyMovement.findFirstOrThrow({
+          where: { id, direction: "move" },
+          include: { recordedBy: name, account: true, toAccount: true },
         });
+        const t = { ...m, fromAccount: m.account!, toAccount: m.toAccount!, amountOut: m.amount, amountIn: m.allocatable, transferredOn: m.valueDate };
         return {
           fields: [
             { label: "From", value: `${t.fromAccount.name} · ${amount(t.fromAccount.currency, t.amountOut)}` },

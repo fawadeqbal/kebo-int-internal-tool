@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
+import { livePurchase, decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
 import { daysBetween, ForbiddenError, type ISODate } from "@kebo/utils";
@@ -278,11 +278,13 @@ export class LeaksService {
     /* ----- money stuck: paid to factories before the customer paid us (open orders) */
     const open = money.rows.filter((o) => o.status === "open" && o.factoryPaidMinor - o.receivedMinor > 0);
     const firstPaid = open.length
-      ? await this.prisma.db.factoryPayment.groupBy({
-          by: ["orderId"],
-          where: { voidedAt: null, orderId: { in: open.map((o) => o.orderId) } },
-          _min: { paidOn: true },
-        })
+      ? (
+          await this.prisma.db.allocation.groupBy({
+            by: ["purchaseOrderId"],
+            where: { ...livePurchase, purchaseOrderId: { in: open.map((o) => o.orderId) } },
+            _min: { on: true },
+          })
+        ).map((p) => ({ orderId: p.purchaseOrderId, _min: { paidOn: p._min.on } }))
       : [];
     const stuck = open
       .map((o) => {
@@ -333,7 +335,6 @@ export class LeaksService {
     /* ----- amounts not on an account (the cash book cannot match the bank) */
     const unassigned =
       (await this.prisma.db.moneyMovement.count({ where: { accountId: null, voidedAt: null, valueDate: range } })) +
-      (await this.prisma.db.factoryPayment.count({ where: { accountId: null, voidedAt: null, paidOn: range } })) +
       (await this.prisma.db.expense.count({ where: { accountId: null, voidedAt: null, spentOn: range } }));
     const hasAccounts = (await this.prisma.db.moneyAccount.count()) > 0;
     if (cashBook && hasAccounts && unassigned > 0)

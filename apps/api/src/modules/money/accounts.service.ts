@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { livePurchase, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, orderMoney, roundHalfAway } from "@kebo/money";
 import { can, shippedOnOf, type LostReason } from "@kebo/shared";
 import { addDays, dateIn, ForbiddenError, NotFoundError } from "@kebo/utils";
@@ -114,7 +114,7 @@ export class AccountsService {
               shipments: { select: { departedOn: true } },
               stage: true,
               status: true,
-              factoryPaid: { where: { voidedAt: null }, select: { amount: true, rate: true } },
+              supplierPaid: { where: livePurchase, select: { share: true, movement: { select: { rate: true } } } },
               allocations: { where: livePart, select: { bankCharges: true } },
             },
           },
@@ -225,7 +225,7 @@ export class AccountsService {
         t.beforeSale += spent.beforeSale;
         t.uncosted += revenue - costedRevenue;
         t.profit += profit;
-        t.factoryPaid += order.factoryPaid.reduce((s, x) => s + inMain(convert(decimalToMinor(x.amount), Number(x.rate))), 0);
+        t.factoryPaid += order.supplierPaid.reduce((s, x) => s + inMain(convert(decimalToMinor(x.share), Number(x.movement.rate))), 0);
       } else if (d.stage === "lost") {
         t.lostDeals += spent.beforeSale + spent.onOrder;
         const key = d.lostReason ?? "not_said";

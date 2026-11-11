@@ -1,4 +1,4 @@
-import { asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
+import { asSupplierPayment, purchasesWithEntry, asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
 import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
@@ -66,7 +66,7 @@ export const paperOrderInclude = {
   // Receipts are numbered when the payment is recorded (its allocation's receiptNo); listed in date order.
   allocations: livePartsWithEntry,
   planItems: { orderBy: { sortOrder: "asc" } },
-  factoryPaid: { where: { voidedAt: null }, orderBy: { paidOn: "asc" } },
+  supplierPaid: purchasesWithEntry,
   factoryPlan: { orderBy: { sortOrder: "asc" } },
   // Charged to the customer (added to what they owe) or borne by a factory (taken off what we owe it).
   expenses: {
@@ -488,7 +488,7 @@ function purchaseOrder(c: PaperCtx): Built {
   // This factory's own ready date (one per factory).
   const readyOn = factoryReadyOf(c.o, f?.id ?? null);
   const tax = poTax(priced);
-  const paid = c.o.factoryPaid.filter((p) => f && p.factoryId === f.id);
+  const paid = c.o.supplierPaid.map(asSupplierPayment).filter((p) => f && p.factoryId === f.id);
   // Where we stand with this factory, as on the order's money (factoryPosition): paid, what it bears, still to pay.
   const position = f && currency ? (factoryPositionOf(c.o, fxOf(c.settings, has(c, "expenses"))).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
   const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.factoryId === f.id);

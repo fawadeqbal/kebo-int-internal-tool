@@ -104,9 +104,7 @@ const SOURCE_ORDER: Record<LedgerSource, number> = {
   purchase_order: 1,
   movement: 2,
   allocation: 3,
-  factory_payment: 4,
   expense: 5,
-  transfer: 6,
   account: 7,
   fx_order: 8,
   fx_factory: 8,
@@ -189,16 +187,17 @@ export class LedgerPosting {
       for (const l of lines) add("purchase_order", `${l.orderId}:${l.factoryId}`);
       for (const p of posted) add("purchase_order", p.sourceId);
       if (all.length) {
-        const [parts, factoryPaid, expenses] = await Promise.all([
-          tx.allocation.findMany({ where: { orderId: { in: all } }, select: { id: true, movementId: true } }),
-          tx.factoryPayment.findMany({ where: { orderId: { in: all } }, select: { id: true } }),
+        const [parts, expenses] = await Promise.all([
+          tx.allocation.findMany({
+            where: { OR: [{ orderId: { in: all } }, { purchaseOrderId: { in: all } }] },
+            select: { id: true, movementId: true },
+          }),
           tx.expense.findMany({ where: { orderId: { in: all } }, select: { id: true } }),
         ]);
         for (const p of parts) {
           add("movement", p.movementId);
           add("allocation", p.id);
         }
-        for (const p of factoryPaid) add("factory_payment", p.id);
         for (const e of expenses) add("expense", e.id);
       }
     }
@@ -318,9 +317,72 @@ export class LedgerPosting {
     if (ids("movement").length) {
       const rows = await tx.moneyMovement.findMany({
         where: { id: { in: ids("movement") } },
-        include: { allocations: { where: { later: false }, include: { order: orderSel }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+        include: {
+          allocations: {
+            where: { later: false },
+            include: { order: orderSel, purchaseOrder: orderSel },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          },
+          party: { select: { id: true, name: true } },
+          account: { select: { id: true, currency: true } },
+          toAccount: { select: { id: true, currency: true } },
+        },
       });
+      // FP-2026-0031-n: the n-th payment to the suppliers on the order, in the order they were recorded (never renumbered).
+      const purchaseIds = rows.flatMap((m) => (m.partyRole === "supplier" ? m.allocations.map((a) => a.id) : []));
+      const ranks = purchaseIds.length
+        ? await tx.$queryRaw<{ id: string; n: number }[]>`
+            select id, n::int from (
+              select id, row_number() over (partition by order_id order by created_at, id) as n
+                from allocations where target = 'purchase'
+                 and purchase_order_id in (select purchase_order_id from allocations where id = any(${purchaseIds}::uuid[]))) x
+             where id = any(${purchaseIds}::uuid[])`
+        : [];
+      const rank = new Map(ranks.map((r) => [r.id, r.n]));
       for (const m of rows) {
+        const voided = this.voidOf(m.voidedAt, m.voidReason);
+        if (m.direction === "move") {
+          out.push(
+            transferPlan(
+              {
+                id: m.id,
+                from: m.account!,
+                to: m.toAccount!,
+                outMinor: decimalToMinor(m.amount),
+                inMinor: decimalToMinor(m.allocatable),
+                on: fromDbDate(m.valueDate),
+                note: m.note,
+                voided,
+              },
+              ctx,
+            ),
+          );
+          continue;
+        }
+        if (m.partyRole === "supplier") {
+          const p = m.allocations[0];
+          const po = p?.purchaseOrder;
+          if (!p || !po) continue;
+          out.push(
+            factoryPaymentPlan(
+              {
+                id: m.id,
+                ref: `FP-${po.refNo.replace(/^[A-Za-z]+-/, "")}-${rank.get(p.id) ?? 1}`,
+                kind: p.kind as PaymentKind,
+                order: orderOf(po),
+                factory: m.party!,
+                amountMinor: decimalToMinor(m.amount),
+                currency: m.currency,
+                rate: Number(m.rate),
+                accountId: m.accountId,
+                paidOn: fromDbDate(m.valueDate),
+                voided,
+              },
+              ctx,
+            ),
+          );
+          continue;
+        }
         const numbers = m.allocations.map(numberOf);
         const first = m.allocations[0]?.order;
         out.push(
@@ -329,7 +391,7 @@ export class LedgerPosting {
               id: m.id,
               ref: numbers.length ? `${numbers[0]}${numbers.length > 1 ? ` +${numbers.length - 1}` : ""}` : "",
               direction: m.direction as "in" | "out",
-              partyId: m.partyId,
+              partyId: m.partyId!,
               amountMinor: decimalToMinor(m.amount),
               currency: m.currency,
               allocCurrency: m.allocCurrency,
@@ -353,7 +415,7 @@ export class LedgerPosting {
                     ]
                   : [],
               ),
-              voided: this.voidOf(m.voidedAt, m.voidReason),
+              voided,
             },
             ctx,
           ),
@@ -372,8 +434,8 @@ export class LedgerPosting {
             {
               id: a.id,
               ref: numberOf(a),
-              target: a.target as "order" | "refund" | "fee",
-              partyId: a.movement.partyId,
+              target: a.target as "order" | "purchase" | "refund" | "fee",
+              partyId: a.movement.partyId!,
               later: a.later,
               amountMinor: decimalToMinor(a.amount),
               bankChargesMinor: decimalToMinor(a.bankCharges),
@@ -383,42 +445,6 @@ export class LedgerPosting {
               note: a.note,
               movementVoided: !!a.movement.voidedAt,
               voided: this.voidOf(a.voidedAt, a.voidReason),
-            },
-            ctx,
-          ),
-        );
-    }
-
-    if (ids("factory_payment").length) {
-      const list = ids("factory_payment");
-      const [rows, ranks] = await Promise.all([
-        tx.factoryPayment.findMany({
-          where: { id: { in: list } },
-          include: { order: orderSel, factory: { select: { id: true, name: true } } },
-        }),
-        // FP-2026-0031-n: the n-th payment to the factories on the order, in the order they were recorded (never renumbered).
-        tx.$queryRaw<{ id: string; n: number }[]>`
-          select id, n::int from (
-            select id, row_number() over (partition by order_id order by created_at, id) as n
-              from factory_payments where order_id in (select order_id from factory_payments where id = any(${list}::uuid[]))) x
-           where id = any(${list}::uuid[])`,
-      ]);
-      const rank = new Map(ranks.map((r) => [r.id, r.n]));
-      for (const p of rows)
-        out.push(
-          factoryPaymentPlan(
-            {
-              id: p.id,
-              ref: `FP-${p.order.refNo.replace(/^[A-Za-z]+-/, "")}-${rank.get(p.id) ?? 1}`,
-              kind: p.kind as PaymentKind,
-              order: orderOf(p.order),
-              factory: p.factory,
-              amountMinor: decimalToMinor(p.amount),
-              currency: p.currency,
-              rate: Number(p.rate),
-              accountId: p.accountId,
-              paidOn: fromDbDate(p.paidOn),
-              voided: this.voidOf(p.voidedAt, p.voidReason),
             },
             ctx,
           ),
@@ -483,28 +509,6 @@ export class LedgerPosting {
       }
     }
 
-    if (ids("transfer").length) {
-      const rows = await tx.moneyTransfer.findMany({
-        where: { id: { in: ids("transfer") } },
-        include: { fromAccount: { select: { id: true, currency: true } }, toAccount: { select: { id: true, currency: true } } },
-      });
-      for (const t of rows)
-        out.push(
-          transferPlan(
-            {
-              id: t.id,
-              from: t.fromAccount,
-              to: t.toAccount,
-              outMinor: decimalToMinor(t.amountOut),
-              inMinor: decimalToMinor(t.amountIn),
-              on: fromDbDate(t.transferredOn),
-              note: t.note,
-              voided: this.voidOf(t.voidedAt, t.voidReason),
-            },
-            ctx,
-          ),
-        );
-    }
     return out;
   }
 
@@ -957,9 +961,7 @@ export class LedgerPosting {
       union all select 'movement', id::text, value_date from money_movements
       union all select 'allocation', a.id::text, a."on" from allocations a join money_movements m on m.id = a.movement_id
        where a.later or (a.voided_at is not null and m.voided_at is null)
-      union all select 'factory_payment', id::text, paid_on from factory_payments
       union all select 'expense', id::text, spent_on from expenses
-      union all select 'transfer', id::text, transferred_on from money_transfers
       union all select 'account', id::text, opening_on from money_accounts`;
     return rows
       .map((r) => ({ ...r, day: fromDbDate(r.day) }))

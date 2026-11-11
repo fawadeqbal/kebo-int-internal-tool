@@ -82,6 +82,7 @@ export interface PaymentIn {
 export function paymentIn(p: PaymentIn) {
   return {
     direction: "in",
+    partyRole: "customer",
     partyId: p.partyId,
     amount: p.receivedAmount ?? p.amount,
     currency: p.receivedCurrency ?? p.currency,
@@ -120,5 +121,108 @@ export async function createPaymentIn(
   p: PaymentIn,
 ): Promise<{ id: string; movementId: string }> {
   const m = await db.moneyMovement.create({ data: paymentIn(p), include: { allocations: true } });
+  return { id: m.allocations[0]!.id, movementId: m.id };
+}
+
+/** What pays what we owe a supplier on an order (its purchase). */
+export const purchasePart = { target: "purchase" } as const satisfies Prisma.AllocationWhereInput;
+export const livePurchase = { target: "purchase", voidedAt: null } as const satisfies Prisma.AllocationWhereInput;
+
+/** A supplier payment as the factory's money reads it: who, in what currency, how much, at what rate. */
+export const purchasesWithEntry = {
+  where: livePurchase,
+  orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+  include: { movement: true },
+} as const satisfies Prisma.Order$supplierPaidArgs;
+
+type PurchaseWithEntry = Prisma.AllocationGetPayload<{ include: { movement: true } }>;
+
+/** A purchase allocation read as a payment to the supplier (as factory_payments had it). */
+export const asSupplierPayment = (a: PurchaseWithEntry) => ({
+  id: a.id,
+  movementId: a.movementId,
+  orderId: a.purchaseOrderId!,
+  factoryId: a.movement.partyId!,
+  kind: a.kind,
+  /** What was paid, in the supplier's currency. */
+  amount: a.share,
+  currency: a.movement.currency,
+  /** Units of the currency paid per one of the order's. */
+  rate: a.movement.rate,
+  paidOn: a.on,
+  method: a.movement.method,
+  paidById: a.movement.paidById,
+  reference: a.movement.reference,
+  note: a.movement.note,
+  accountId: a.movement.accountId,
+  fileKey: a.movement.fileKey,
+  fileName: a.movement.fileName,
+  fileType: a.movement.fileType,
+  fileSize: a.movement.fileSize,
+  recordedById: a.movement.recordedById,
+  voidedAt: a.voidedAt ?? a.movement.voidedAt,
+  voidReason: a.voidReason ?? a.movement.voidReason,
+  createdAt: a.createdAt,
+  updatedAt: a.movement.updatedAt,
+});
+
+export interface SupplierPayment {
+  orderId: string;
+  supplierId: string;
+  /** The order's currency. */
+  orderCurrency: string;
+  kind?: "deposit" | "balance" | "other";
+  amount: Amount;
+  currency: string;
+  /** Units of `currency` per one of the order's. */
+  rate: Amount;
+  accountId?: string | null;
+  paidOn: Date;
+  method?: Prisma.MoneyMovementUncheckedCreateInput["method"];
+  paidById?: string | null;
+  reference?: string | null;
+  note?: string | null;
+  recordedById: string;
+}
+
+/** A supplier payment: money out to the supplier, paying their part of one order. */
+export function supplierPayment(p: SupplierPayment) {
+  const counts = Math.max(Math.round((Number(p.amount) / Number(p.rate)) * 100) / 100, 0.01).toFixed(2);
+  return {
+    direction: "out",
+    partyRole: "supplier",
+    partyId: p.supplierId,
+    amount: p.amount,
+    currency: p.currency,
+    allocCurrency: p.orderCurrency,
+    rate: p.rate,
+    allocatable: counts,
+    accountId: p.accountId ?? null,
+    paidById: p.paidById ?? null,
+    valueDate: p.paidOn,
+    method: p.method ?? "bank_transfer",
+    reference: p.reference ?? null,
+    note: p.note ?? null,
+    recordedById: p.recordedById,
+    allocations: {
+      create: {
+        target: "purchase",
+        purchaseOrderId: p.orderId,
+        kind: p.kind ?? "deposit",
+        amount: counts,
+        share: p.amount,
+        on: p.paidOn,
+        recordedById: p.recordedById,
+      },
+    },
+  } satisfies Prisma.MoneyMovementUncheckedCreateInput;
+}
+
+/** Records a supplier payment; returns its allocation's id (the payment on the order) and the movement's. */
+export async function createSupplierPayment(
+  db: { moneyMovement: Prisma.TransactionClient["moneyMovement"] },
+  p: SupplierPayment,
+): Promise<{ id: string; movementId: string }> {
+  const m = await db.moneyMovement.create({ data: supplierPayment(p), include: { allocations: true } });
   return { id: m.allocations[0]!.id, movementId: m.id };
 }

@@ -456,9 +456,9 @@ export class FactsReadService {
         where p.target = 'order' and p.voided_at is null and p."on" between ${from}::date and ${to}::date`,
       seeMoney
         ? db.$queryRaw<{ m: string; minor: string; rate: string; currency: string; mainCurrency: string | null; mainRate: string | null }[]>`
-            select to_char(fp.paid_on, 'YYYY-MM') as m, (fp.amount * 100)::text as minor, fp.rate::text as rate, o.currency, o.main_currency as "mainCurrency", o.main_rate::text as "mainRate"
-            from factory_payments fp join orders o on o.id = fp.order_id
-            where fp.voided_at is null and fp.paid_on between ${from}::date and ${to}::date`
+            select to_char(a."on", 'YYYY-MM') as m, (a.share * 100)::text as minor, mv.rate::text as rate, o.currency, o.main_currency as "mainCurrency", o.main_rate::text as "mainRate"
+            from allocations a join money_movements mv on mv.id = a.movement_id join orders o on o.id = a.purchase_order_id
+            where a.target = 'purchase' and a.voided_at is null and a."on" between ${from}::date and ${to}::date`
         : Promise.resolve([]),
       seeExpenses
         ? db.$queryRaw<{ m: string; minor: string; rate: string; category: string; orderId: string | null }[]>`

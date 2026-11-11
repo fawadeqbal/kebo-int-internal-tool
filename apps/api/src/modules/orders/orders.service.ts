@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
+import { decimalToMinor, fromDbDate, fromDbDateOrNull, livePart, livePurchase, nextReference, toDbDate, toDbDateOrNull, type Prisma, isCustomer } from "@kebo/database";
 import { fromMinor, fxRate } from "@kebo/money";
 import {
   can,
@@ -383,7 +383,9 @@ export class OrdersService {
       if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
       // Money in from the customer (in the order's currency), and money out to the factories (per factory and currency).
       const inMinor = o.allocations.reduce((t, p) => t + decimalToMinor(p.amount), 0);
-      const factoryPaid = await tx.factoryPayment.findMany({ where: { orderId: id, voidedAt: null }, include: { factory: { select: { id: true, name: true } } } });
+      const factoryPaid = (
+        await tx.allocation.findMany({ where: { purchaseOrderId: id, ...livePurchase }, include: { movement: { include: { party: { select: { id: true, name: true } } } } } })
+      ).map((a) => ({ factoryId: a.movement.partyId!, factory: a.movement.party!, currency: a.movement.currency, amount: a.share }));
       const customerMoney = inMinor > 0 ? (money.customerMoney ?? "credit") : null;
       const factoryMoney = factoryPaid.length ? (money.factoryMoney ?? "refund_due") : null;
       const posted: LedgerRef[] = [{ type: "order_all", id }];

@@ -4,7 +4,7 @@ import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type Factor
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 import { factoryReadyOf, readySelect } from "../orders/ready";
-import { factoryBorneExpenses, factoryPositionOf, type MoneyCtx } from "./position";
+import { factoryBorneExpenses, factoryPositionOf, type MoneyCtx, supplierPaidRelation } from "./position";
 
 type Db = PrismaService["db"] | Tx;
 type FactoryRef = { id: string; name: string };
@@ -18,7 +18,7 @@ export function owedByFactory<F extends FactoryRef>(
   lines: { factory: F | null; factoryUnitPrice: Prisma.Decimal | null; factoryCurrency: string | null; factoryTaxRate: Prisma.Decimal | null; factoryTaxIncluded: boolean; quantity: Prisma.Decimal }[],
 ) {
   // The one formula (factoryPosition), without payments or expenses: only what the lines owe.
-  const rows = factoryPositionOf({ lines: lines.map((l) => ({ ...l, factoryId: l.factory?.id ?? null })), factoryPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
+  const rows = factoryPositionOf({ lines: lines.map((l) => ({ ...l, factoryId: l.factory?.id ?? null })), supplierPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
   const factories = new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
   return new Map(rows.map((r) => [r.key, { factory: factories.get(r.factoryId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
 }
@@ -68,7 +68,7 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
       factoryOrderedOn: true,
       ...readySelect,
       lines: planLines,
-      factoryPaid: { where: { voidedAt: null }, select: { factoryId: true, currency: true, amount: true } },
+      supplierPaid: supplierPaidRelation,
       expenses: factoryBorneExpenses,
       factoryPlan: { orderBy: { sortOrder: "asc" }, include: { factory: { select: { id: true, name: true } } } },
     },
@@ -81,7 +81,9 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
   for (const r of o.factoryPlan) {
     const key = `${r.factoryId}:${r.currency}`;
     if (!owed.has(key)) {
-      const paid = o.factoryPaid.filter((p) => `${p.factoryId}:${p.currency}` === key).reduce((t, p) => t + decimalToMinor(p.amount), 0);
+      const paid = o.supplierPaid
+        .filter((p) => `${p.movement.partyId}:${p.movement.currency}` === key)
+        .reduce((t, p) => t + decimalToMinor(p.share), 0);
       owed.set(key, { factory: r.factory, currency: r.currency, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
     }
   }

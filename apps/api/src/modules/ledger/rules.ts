@@ -327,7 +327,7 @@ export function movementPlan(m: MovementDoc, ctx: RuleCtx): DocPlan {
 export interface AllocationDoc {
   id: string;
   ref: string;
-  target: "order" | "refund" | "fee";
+  target: "order" | "purchase" | "refund" | "fee";
   partyId: string;
   /** Made after its movement, from the customer's credit. */
   later: boolean;
@@ -354,7 +354,8 @@ export interface AllocationDoc {
 export function allocationPlan(a: AllocationDoc, ctx: RuleCtx): DocPlan {
   const base = { sourceType: "allocation" as const, sourceId: a.id, mode: "full" as const, voided: a.voided };
   const none = { ...base, voided: null, parts: [] };
-  if (a.movementVoided || a.target === "refund") return none;
+  // A supplier payment's part is posted by its money out, like a refund's.
+  if (a.movementVoided || a.target === "refund" || a.target === "purchase") return none;
   const rate = a.order?.rate ?? liveRate(ctx, a.currency);
   const d = dims({ customerId: a.partyId, orderId: a.order?.id ?? null });
   const credit = acc.credit(a.partyId);
@@ -436,7 +437,7 @@ export function factoryPaymentPlan(p: FactoryPaymentDoc, ctx: RuleCtx): DocPlan 
             ? null
             : r14(p.rate * p.order.rate);
   return {
-    sourceType: "factory_payment",
+    sourceType: "movement",
     sourceId: p.id,
     mode: "full",
     voided: p.voided,
@@ -586,7 +587,7 @@ export function transferPlan(t: TransferDoc, ctx: RuleCtx): DocPlan {
   const toRate = liveRate(ctx, t.to.currency);
   const fromRate = liveRate(ctx, t.from.currency);
   return {
-    sourceType: "transfer",
+    sourceType: "movement",
     sourceId: t.id,
     mode: "full",
     voided: t.voided,

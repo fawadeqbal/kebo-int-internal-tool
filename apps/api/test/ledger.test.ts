@@ -361,7 +361,9 @@ describe("the ledger", () => {
         .expect(201)
     ).body;
     const id = made.createdId as string;
-    const rows = await rowsOf("factory_payment", id);
+    // Posted by its payment entry (the money out); changed and removed as the payment on the order.
+    const entry = (await db().allocation.findUniqueOrThrow({ where: { id } })).movementId;
+    const rows = await rowsOf("movement", entry);
     expect(rows.map((r) => [r.type, r.account, r.currency, n(r.debit), n(r.credit)])).toEqual([
       ["money_out", `factory:${factoryId}`, "CNY", 11300, 0],
       ["money_out", `money:${cnyAccount}`, "CNY", 0, 11300],
@@ -393,7 +395,7 @@ describe("the ledger", () => {
     expect((await rowsOf("fx_factory", part)).filter((r) => r.reversesId)).toHaveLength(2);
     await agrees();
     await api(app, manager).post(`/factory-payments/${id}/void`, { reason: "Bank sent it back" }).expect(200);
-    const after = await rowsOf("factory_payment", id);
+    const after = await rowsOf("movement", entry);
     expect(after.filter((r) => r.reversesId && r.reason === "Bank sent it back")).toHaveLength(2);
     balanced((await db().ledgerEntry.findMany({ where: { orderId } })) as unknown as Row[]);
     await agrees();
@@ -540,13 +542,13 @@ describe("the ledger", () => {
         .post("/money/transfers", { fromAccountId: usdAccount, toAccountId: pkr, amountOut: 100, amountIn: 28000, transferredOn: today })
         .expect(201)
     ).body;
-    const rows = await rowsOf("transfer", t.id);
+    const rows = await rowsOf("movement", t.id);
     expect(rows.find((r) => r.account === `money:${pkr}`)!.debit).toBeTruthy();
     expect(rows[0]!.ref).toMatch(/^TR-\d{4}-\d{4}$/);
     balanced(rows);
     await agrees();
     await api(app, manager).post(`/money/transfers/${t.id}/void`, { reason: "Typed twice" }).expect(200);
-    expect((await rowsOf("transfer", t.id)).filter((r) => r.reversesId && r.reason === "Typed twice").length).toBeGreaterThan(0);
+    expect((await rowsOf("movement", t.id)).filter((r) => r.reversesId && r.reason === "Typed twice").length).toBeGreaterThan(0);
     await agrees();
 
     const acc = (await api(app, manager).get("/money/accounts").expect(200)).body.find((a: { id: string }) => a.id === usdAccount);
@@ -688,9 +690,10 @@ describe("the ledger", () => {
     const list = (await api(app, manager).get(`/ledger/entries?customerId=${customerId}&lead=true&pageSize=200`).expect(200)).body;
     expect(list.rows.length).toBeGreaterThan(5);
     expect(list.totals.balanced).toBe(true);
+    // A payment on one order (a transfer over several orders is on none).
     const payment = list.rows.find(
-      (r: { type: string; removed: unknown; source: { type: string } }) =>
-        r.type === "money_in" && !r.removed && r.source.type === "movement",
+      (r: { type: string; removed: unknown; source: { type: string }; order: unknown }) =>
+        r.type === "money_in" && !r.removed && r.source.type === "movement" && !!r.order,
     );
     expect(payment.counter.label).toBeTruthy();
     expect(payment.with).toMatchObject({ kind: "customer", id: customerId });

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { livePart, decimalToMinor, fromDbDate, Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { livePurchase, livePart, decimalToMinor, fromDbDate, Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, payInstalments, type Minor } from "@kebo/money";
 import {
   AGEING_BUCKETS,
@@ -356,6 +356,37 @@ export class LedgerService {
         : null;
     };
     if (type === "movement") {
+      const other = await db.moneyMovement.findUnique({
+        where: { id: sourceId },
+        include: {
+          account: { select: { name: true } },
+          toAccount: { select: { name: true } },
+          party: { select: { name: true } },
+          recordedBy: { select: { name: true } },
+          allocations: { where: { target: "purchase" }, include: { purchaseOrder: { select: { id: true, refNo: true, customerId: true } } }, take: 1 },
+        },
+      });
+      if (other?.direction === "move")
+        return {
+          ...out,
+          label: `${other.account?.name ?? ""} → ${other.toAccount?.name ?? ""}`,
+          recordedBy: other.recordedBy.name,
+          removed: other.voidedAt ? { at: other.voidedAt, reason: other.voidReason } : null,
+        };
+      if (other?.partyRole === "supplier") {
+        const p = other.allocations[0];
+        return {
+          ...out,
+          orderId: p?.purchaseOrderId ?? null,
+          customerId: p?.purchaseOrder?.customerId ?? null,
+          factoryId: other.partyId,
+          label: `Payment to ${other.party?.name ?? ""} for ${p?.purchaseOrder?.refNo ?? ""}`,
+          file: other.fileKey ? { kind: "factory_payment" as const, id: p?.id ?? other.id, name: other.fileName ?? "file" } : null,
+          recordedBy: other.recordedBy.name,
+          settles: p ? await this.settlesOfFactoryPayment(p.id) : null,
+          removed: other.voidedAt ? { at: other.voidedAt, reason: other.voidReason } : null,
+        };
+      }
       const m = await db.moneyMovement.findUnique({
         where: { id: sourceId },
         include: { allocations: { where: { later: false }, select: { id: true, orderId: true, amount: true, order: { select: { refNo: true } } } }, recordedBy: { select: { name: true } } },
@@ -366,7 +397,8 @@ export class LedgerService {
       const a = await approval(one?.id ?? m.id);
       return {
         ...out,
-        orderId: one?.orderId ?? null,
+        // On its order when it pays one (credit left over or not); the payment on it when it pays it exactly.
+        orderId: one?.orderId ?? (new Set(parts.map((p) => p.orderId)).size === 1 ? parts[0]!.orderId : null),
         partId: one?.id ?? null,
         customerId: m.partyId,
         label: m.direction === "out" ? "Credit refunded" : one ? `Payment on ${one.order!.refNo}` : "One transfer over several orders",
@@ -397,28 +429,6 @@ export class LedgerService {
         recordedBy: x.recordedBy.name,
         settles: x.later && x.orderId ? await this.settlesOfPayment(x.id, x.orderId) : null,
         removed: x.later && x.voidedAt ? { at: x.voidedAt, reason: x.voidReason } : null,
-      };
-    }
-    if (type === "factory_payment") {
-      const p = await db.factoryPayment.findUnique({
-        where: { id: sourceId },
-        include: {
-          order: { select: { refNo: true, customerId: true } },
-          factory: { select: { name: true } },
-          recordedBy: { select: { name: true } },
-        },
-      });
-      if (!p) return out;
-      return {
-        ...out,
-        orderId: p.orderId,
-        customerId: p.order.customerId,
-        factoryId: p.factoryId,
-        label: `Payment to ${p.factory.name} for ${p.order.refNo}`,
-        file: p.fileKey ? { kind: "factory_payment" as const, id: p.id, name: p.fileName ?? "file" } : null,
-        recordedBy: p.recordedBy.name,
-        settles: await this.settlesOfFactoryPayment(p.id),
-        removed: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
       };
     }
     if (type === "expense") {
@@ -455,19 +465,6 @@ export class LedgerService {
         approvedBy: a?.approvedBy ?? null,
         settles,
         removed: e.voidedAt ? { at: e.voidedAt, reason: e.voidReason } : null,
-      };
-    }
-    if (type === "transfer") {
-      const t = await db.moneyTransfer.findUnique({
-        where: { id: sourceId },
-        include: { fromAccount: { select: { name: true } }, toAccount: { select: { name: true } }, recordedBy: { select: { name: true } } },
-      });
-      if (!t) return out;
-      return {
-        ...out,
-        label: `${t.fromAccount.name} → ${t.toAccount.name}`,
-        recordedBy: t.recordedBy.name,
-        removed: t.voidedAt ? { at: t.voidedAt, reason: t.voidReason } : null,
       };
     }
     if (type === "order" || type === "fx_order" || type === "purchase_order" || type === "fx_factory") {
@@ -526,17 +523,17 @@ export class LedgerService {
   /** The parts of the factory's plan a payment paid. */
   private async settlesOfFactoryPayment(id: string) {
     const db = this.prisma.db;
-    const p = await db.factoryPayment.findUnique({
-      where: { id },
-      select: { orderId: true, factoryId: true, currency: true, paidOn: true, createdAt: true },
-    });
-    if (!p) return null;
+    const part = await db.allocation.findUnique({ where: { id }, include: { movement: { select: { partyId: true, currency: true } } } });
+    if (!part?.purchaseOrderId) return null;
+    const p = { orderId: part.purchaseOrderId, factoryId: part.movement.partyId!, currency: part.movement.currency };
     const [paid, plan] = await Promise.all([
-      db.factoryPayment.findMany({
-        where: { orderId: p.orderId, factoryId: p.factoryId, currency: p.currency, voidedAt: null },
-        orderBy: [{ paidOn: "asc" }, { createdAt: "asc" }],
-        select: { id: true, amount: true },
-      }),
+      db.allocation
+        .findMany({
+          where: { ...livePurchase, purchaseOrderId: p.orderId, movement: { partyId: p.factoryId, currency: p.currency } },
+          orderBy: [{ on: "asc" }, { createdAt: "asc" }],
+          select: { id: true, share: true },
+        })
+        .then((rows) => rows.map((x) => ({ id: x.id, amount: x.share }))),
       db.factoryPaymentPlan.findMany({
         where: { orderId: p.orderId, factoryId: p.factoryId, currency: p.currency },
         orderBy: { sortOrder: "asc" },

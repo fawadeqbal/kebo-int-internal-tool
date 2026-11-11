@@ -295,7 +295,7 @@ export class PaymentsService {
    */
   async creditView(user: SessionUser, customerId: string) {
     const movements = await this.prisma.db.moneyMovement.findMany({
-      where: { partyId: customerId },
+      where: { partyId: customerId, partyRole: "customer" },
       include: {
         account: { select: { id: true, name: true } },
         allocations: { include: { order: { select: { id: true, refNo: true } } } },
@@ -456,6 +456,7 @@ export class PaymentsService {
     const m = await tx.moneyMovement.create({
       data: {
         direction: "in",
+        partyRole: "customer",
         partyId: customerId,
         amount: fromMinor(a.receivedMinor),
         currency: a.receivedCurrency,
@@ -798,7 +799,7 @@ export class PaymentsService {
   async voidCredit(user: SessionUser, id: string, reason: string) {
     if (!can(user, "orders.manage")) throw new ForbiddenError("Only a manager can remove a refund.");
     const m = await this.prisma.db.moneyMovement.findUnique({ where: { id } });
-    if (!m || m.direction !== "out") {
+    if (!m || m.direction !== "out" || m.partyRole !== "customer") {
       if (m || (await this.prisma.db.allocation.findUnique({ where: { id } })))
         throw new DomainError("Only a refund is removed here; remove the payment or the transfer it belongs to.");
       throw new NotFoundError("Credit entry");
@@ -810,13 +811,13 @@ export class PaymentsService {
         userId: user.id,
         action: "credit_refund_void",
         entityType: "customer",
-        entityId: m.partyId,
+        entityId: m.partyId!,
         summary: `Removed the refund of ${m.currency} ${m.amount.toFixed(2)}`,
         reason,
       });
       await this.ledger.post(tx, [{ type: "movement", id }], { userId: user.id, reason });
     });
-    return this.creditView(user, m.partyId);
+    return this.creditView(user, m.partyId!);
   }
 
   /** A transfer recorded by mistake (managers): it and what it pays are removed together. */
@@ -826,11 +827,11 @@ export class PaymentsService {
       where: { id },
       include: { allocations: { where: { voidedAt: null, ...orderPart } } },
     });
-    if (!m || m.direction !== "in") throw new NotFoundError("Payment");
+    if (!m || m.direction !== "in" || m.partyRole !== "customer") throw new NotFoundError("Payment");
     if (m.voidedAt) throw new DomainError("This payment was already removed.");
     for (const p of m.allocations) await this.orders.load(user, p.orderId!);
     await this.prisma.tx(async (tx) => {
-      await tx.$queryRaw`select id from parties where id = ${m.partyId}::uuid for update`;
+      await tx.$queryRaw`select id from parties where id = ${m.partyId!}::uuid for update`;
       const { orderIds, partIds } = await voidMovement(tx, id, reason);
       await tx.orderBankStep.deleteMany({ where: { allocationId: { in: partIds } } });
       for (const p of m.allocations)
@@ -847,7 +848,7 @@ export class PaymentsService {
         reason,
       });
     });
-    return this.forCustomer(user, m.partyId);
+    return this.forCustomer(user, m.partyId!);
   }
 
   /* ---------------------------------------------------------------- changing and removing */

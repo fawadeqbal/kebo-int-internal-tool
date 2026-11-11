@@ -12,7 +12,7 @@ import { nextReference } from "./counters";
 import { freezeOrderBuyer, freezeOrderMoney } from "./order-freeze";
 import { toDbDate } from "./convert";
 import { newCustomer, newSupplier } from "./parties";
-import { createPaymentIn } from "./allocations";
+import { createPaymentIn, createSupplierPayment } from "./allocations";
 
 /** A company connection (or a transaction on one). */
 export type SeedDb = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
@@ -433,19 +433,18 @@ export async function seedDemoData(
     }
     for (const [f, cny] of owed) {
       const pay = async (kind: "deposit" | "balance", minor: number, on: string) =>
-        db.factoryPayment.create({
-          data: {
-            orderId: order.id,
-            factoryId: factories[f].id,
-            kind,
-            amount: fromMinor(minor),
-            currency: "CNY",
-            rate,
-            paidOn: toDbDate(on),
-            reference: `FP-DEMO-${kind}`,
-            recordedById: people.manager.id,
-            paidById: o.assignee ?? people.manager.id,
-          },
+        createSupplierPayment(db, {
+          orderId: order.id,
+          orderCurrency: order.currency,
+          supplierId: factories[f].id,
+          kind,
+          amount: fromMinor(minor),
+          currency: "CNY",
+          rate,
+          paidOn: toDbDate(on),
+          reference: `FP-DEMO-${kind}`,
+          recordedById: people.manager.id,
+          paidById: o.assignee ?? people.manager.id,
         });
       if (o.order.stage !== "confirmed") await pay("deposit", Math.round(cny * 0.3), addDays(orderedOn, 6));
       if (shippedOn) await pay("balance", cny - Math.round(cny * 0.3), addDays(shippedOn, -3));
@@ -706,8 +705,8 @@ export async function seedDemoData(
   await db.moneyAccount.create({
     data: { name: "Office cash PKR", kind: "cash", currency: "PKR", openingBalance: "150000.00", openingOn: opened },
   });
-  await db.moneyMovement.updateMany({ where: { currency: "USD" }, data: { accountId: usd.id } });
-  await db.factoryPayment.updateMany({ where: { currency: "CNY" }, data: { accountId: cny.id } });
+  await db.moneyMovement.updateMany({ where: { currency: "USD", partyRole: "customer" }, data: { accountId: usd.id } });
+  await db.moneyMovement.updateMany({ where: { currency: "CNY", partyRole: "supplier" }, data: { accountId: cny.id } });
   await db.expense.updateMany({
     where: { currency: "CNY", category: { in: ["rent", "utilities", "inland_transport", "travel"] } },
     data: { accountId: cny.id },
