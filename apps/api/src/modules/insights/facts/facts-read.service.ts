@@ -8,7 +8,7 @@ import { Clock } from "../../../common/time/clock.service";
 import { LimitsService } from "../../../common/company/limits.service";
 import type { SessionUser } from "../../../common/auth/session-user";
 import { convert, MainMoney } from "../../money/order-money";
-import { positionsSql } from "../../money/due";
+import { positionsSql } from "../../billing/api";
 import { factsCtxOf } from "./compute";
 import { FactsService } from "./facts.service";
 

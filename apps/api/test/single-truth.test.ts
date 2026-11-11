@@ -6,8 +6,8 @@ import { paperDateText, readSettings } from "@kebo/shared";
 import { todayIn } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
-import { factoryPositionsSql, positionsSql } from "../src/modules/money/due";
-import { factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, positionRelations, supplierPaidRelation } from "../src/modules/money/position";
+import { factoryPositionsSql, positionsSql } from "../src/modules/billing/api";
+import { factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, positionRelations, supplierPaidRelation } from "../src/modules/billing/api";
 import { api, signIn, startApp } from "./app";
 
 /**
@@ -369,7 +369,7 @@ describe("one money truth", () => {
       for (const r of rows) {
         const total = decimalToMinor(r.total);
         const accepted = splitDeposit(total, Number(r.depositPercent)).deposit;
-        const planDeposit = r.planItems.filter((i) => i.part === "deposit").reduce((t, i) => t + decimalToMinor(i.amount), 0);
+        const planDeposit = r.receivables.filter((i) => i.part === "deposit").reduce((t, i) => t + decimalToMinor(i.amount), 0);
         if (r.expenses.length || (planDeposit && planDeposit !== accepted)) continue;
         const old = settle(
           total,

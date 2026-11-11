@@ -12,7 +12,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { LimitsService } from "../../common/company/limits.service";
 import { safeFileName, StorageService } from "../../common/storage/storage.service";
 import type { SessionUser } from "../../common/auth/session-user";
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
 import { CustomerPaymentsService } from "../treasury/customer-payments.service";
 import { MoneyService } from "../money/money.service";
 import { NotificationsService } from "../notifications/notifications.service";

@@ -53,13 +53,14 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
-import { orderAccess, OrdersService } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
+import { OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 import { SettingsService } from "../settings/settings.service";
-import { lcChecksOf, rebuildRoutePlan, termsOf } from "../money/route-plan";
-import { readyByOf, readyOnOf, readySelect } from "../orders/ready";
-import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
-import { seedFactoryPlans } from "../money/factory-plan";
+import { lcChecksOf, rebuildRoutePlan, termsOf } from "../billing/api";
+import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
+import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../billing/api";
+import { seedFactoryPlans } from "../billing/api";
 import { onPrimaryShipment, SHIPMENT_ORDER } from "../orders/shipment-facts";
 
 const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
@@ -240,7 +241,7 @@ export class FlowService {
       include: {
         allocations: { where: livePart },
         bankContract: true,
-        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, dueRule: true, part: true } },
         expenses: chargedExpenses,
         checklist: {
           where: productionWhere,
@@ -519,7 +520,7 @@ export class FlowService {
         mainCurrency: true,
         mainRate: true,
         allocations: { where: livePart, select: { amount: true, bankCharges: true } },
-        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         expenses: chargedExpenses,
         checklist: { where: productionWhere, select: { doneAt: true, skippedAt: true } },
         shipments: { orderBy: SHIPMENT_ORDER, select: { mode: true, status: true } },

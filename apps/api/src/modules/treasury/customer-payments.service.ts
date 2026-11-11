@@ -21,14 +21,15 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { EventBus } from "../../common/events/event-bus";
 import type { SessionUser } from "../../common/auth/session-user";
-import { orderAccess, OrdersService } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
+import { OrdersService } from "../orders/orders.service";
 import { requireReason } from "../../common/audit/reason";
 import { checkAccount } from "./account-check";
 import { LimitsService } from "../../common/company/limits.service";
 import { fileView } from "./payment-file-view";
 import { SettingsService } from "../settings/settings.service";
-import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
-import { livePlansOf } from "../money/plan-live";
+import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../billing/api";
+import { livePlansOf } from "../billing/api";
 import { LedgerPosting, type LedgerRef } from "../ledger/posting.service";
 import { creditOf, fromCredit, refund, voidMovement } from "./customer-money";
 
@@ -204,7 +205,7 @@ export class CustomerPaymentsService {
         mainCurrency: true,
         mainRate: true,
         orderedOn: true,
-        planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true } },
         expenses: chargedExpenses,
       },
       orderBy: [{ orderedOn: "desc" }, { refNo: "desc" }],

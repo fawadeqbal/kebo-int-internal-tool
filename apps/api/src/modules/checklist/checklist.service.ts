@@ -37,11 +37,11 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
-import { orderAccess } from "../orders/orders.service";
+import { orderAccess } from "../../common/auth/order-access";
 import { MoneyService } from "../money/money.service";
 import { SettingsService } from "../settings/settings.service";
 import { checklistFactsOf, checklistOrderInclude } from "./checklist-facts";
-import { fxOf } from "../money/position";
+import { fxOf } from "../billing/api";
 
 /** The settings row that keeps the company's list choices: { hidden: auto keys, saved: the company made its own list }. */
 export const CHECKLIST_SETTING = "order_checklist";

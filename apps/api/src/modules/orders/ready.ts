@@ -1,35 +1,11 @@
-import { fromDbDateOrNull, toDbDateOrNull, type Prisma } from "@kebo/database";
-import { factoryReadyOn, orderReadyOn, readyByFactory, type FactoryReadyRow } from "@kebo/shared";
+import { fromDbDateOrNull, readyByOf, readySelect, toDbDateOrNull } from "@kebo/database";
+import type { FactoryReadyRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 
+/* The readers (readySelect, readyOnOf, readyByOf, factoryReadyOf) are in @kebo/database: every module reads the dates. */
+
 type Db = PrismaService["db"] | Tx;
-
-/**
- * Single source of truth, PR 4: one ready date per factory (owner, 3 Nov 2026). Each factory of an order
- * keeps its own ready date (OrderFactory); the order's ready date is the latest of them (@kebo/shared
- * orderReadyOn), never stored. Each factory's purchase order, the "on the ready date" part of its payment
- * plan and its production items read that factory's date; the customer's plan reads the order's.
- */
-
-/** What the ready dates are worked out from: each factory's row, and the factories on the lines. */
-export const readySelect = {
-  factories: { select: { factoryId: true, readyOn: true } },
-} satisfies Prisma.OrderSelect;
-
-type ReadyOrder = { factories: { factoryId: string | null; readyOn: Date | null }[]; lines: { factoryId: string | null }[] };
-
-const rowsOf = (o: ReadyOrder): FactoryReadyRow[] => o.factories.map((f) => ({ factoryId: f.factoryId, readyOn: fromDbDateOrNull(f.readyOn) }));
-const idsOf = (o: ReadyOrder) => [...new Set(o.lines.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
-
-/** The order's ready date: the latest of its factories', once each has given one. */
-export const readyOnOf = (o: ReadyOrder): ISODate | null => orderReadyOn(idsOf(o), rowsOf(o));
-
-/** Each factory of the order with its ready date (no factory on the lines: one row, factoryId null). */
-export const readyByOf = (o: ReadyOrder) => readyByFactory(idsOf(o), rowsOf(o));
-
-/** One factory's ready date (no factory: the order's). */
-export const factoryReadyOf = (o: ReadyOrder, factoryId: string | null): ISODate | null => factoryReadyOn(idsOf(o), rowsOf(o), factoryId);
 
 /**
  * Set ready dates: each factory sent gets its date (factoryId null: the order's goods when no line names a
@@ -37,7 +13,7 @@ export const factoryReadyOf = (o: ReadyOrder, factoryId: string | null): ISODate
  */
 export async function setReadyDates(tx: Db, orderId: string, changes: { factoryId: string | null; readyOn: ISODate | null }[]) {
   const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { ...readySelect, lines: { select: { factoryId: true } } } });
-  const ids = idsOf(o);
+  const ids = [...new Set(o.lines.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
   const before = readyByOf(o);
   let changed = false;
   for (const c of changes) {

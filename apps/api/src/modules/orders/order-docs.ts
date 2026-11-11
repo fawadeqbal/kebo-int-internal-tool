@@ -13,12 +13,12 @@ import {
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
-import { chargedExpenses, positionOf, type MoneyCtx } from "../money/position";
-import { termsOf } from "../money/route-plan";
+import { chargedExpenses, positionOf, type MoneyCtx } from "../billing/api";
+import { termsOf } from "../billing/api";
 import { buyerOf } from "./buyer";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
-import { readyOnOf, readySelect } from "./ready";
+import { readyOnOf, readySelect } from "@kebo/database";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /**
@@ -59,7 +59,7 @@ export const orderDocInclude = {
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   allocations: livePartsWithEntry,
-  planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+  receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
   inquiry: { select: { contactId: true } },
   papers: { where: { kind: { in: [...ORDER_DOCUMENTS] } }, orderBy: { version: "asc" } },

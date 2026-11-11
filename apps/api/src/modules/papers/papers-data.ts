@@ -35,13 +35,13 @@ import {
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import { orderLineNumbers } from "../orders/orders.service";
-import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../money/position";
-import { lcBalanceMinor, termsOf } from "../money/route-plan";
+import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../billing/api";
+import { lcBalanceMinor, termsOf } from "../billing/api";
 import { quotedTermsPrinted } from "../orders/order-docs";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
-import { factoryReadyOf, readySelect } from "../orders/ready";
-import { livePlanOfOrder } from "../money/plan-live";
-import { advanceOf } from "../money/factory-plan";
+import { factoryReadyOf, readySelect } from "@kebo/database";
+import { livePlanOfOrder } from "../billing/api";
+import { advanceOf } from "../billing/api";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
 /** Everything one order's papers are made from, read in one query. */
@@ -65,9 +65,9 @@ export const paperOrderInclude = {
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   // Receipts are numbered when the payment is recorded (its allocation's receiptNo); listed in date order.
   allocations: livePartsWithEntry,
-  planItems: { orderBy: { sortOrder: "asc" } },
+  receivables: { orderBy: { sortOrder: "asc" } },
   supplierPaid: purchasesWithEntry,
-  factoryPlan: { orderBy: { sortOrder: "asc" } },
+  payables: { orderBy: { sortOrder: "asc" } },
   // Charged to the customer (added to what they owe) or borne by a factory (taken off what we owe it).
   expenses: {
     where: { voidedAt: null, borneBy: { in: ["customer", "factory"] } },
@@ -459,7 +459,7 @@ export function poTax(lines: { factoryUnitPrice: Prisma.Decimal | null; factoryT
  * company's default until one is saved), as the plan card shows it.
  */
 function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMinor: number): string | null {
-  const stored = c.o.factoryPlan.filter((r) => r.factoryId === factoryId && r.currency === currency);
+  const stored = c.o.payables.filter((r) => r.supplierId === factoryId && r.currency === currency);
   const rows = stored.length
     ? stored.map((r) => ({
         label: r.label,

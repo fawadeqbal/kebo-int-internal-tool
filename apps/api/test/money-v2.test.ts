@@ -414,7 +414,7 @@ describe("money v2", () => {
     await api(app, bilal).get(`/orders/${id}/payments`).expect(404);
     await api(app, bilal).post(`/orders/${id}/use-credit`, { amount: 1 }).expect(403);
     await api(app, bilal).put(`/orders/${id}/factory-plan`, { factoryId, items: [{ label: "All", amount: 1, dueRule: "on_order" }] }).expect(404);
-    for (const t of ["money_movements", "allocations", "factory_payment_plans"]) {
+    for (const t of ["money_movements", "allocations", "invoices"]) {
       const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean }[]>(`select relrowsecurity as rls from pg_class where relname = $1`, t);
       expect(row, t).toMatchObject({ rls: true });
     }

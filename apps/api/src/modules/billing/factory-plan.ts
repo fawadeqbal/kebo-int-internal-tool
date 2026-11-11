@@ -3,7 +3,7 @@ import { fromMinor } from "@kebo/money";
 import { defaultFactoryPlan, factoryPlanStatus, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
-import { factoryReadyOf, readySelect } from "../orders/ready";
+import { factoryReadyOf, readySelect } from "@kebo/database";
 import { factoryBorneExpenses, factoryPositionOf, type MoneyCtx, supplierPaidRelation } from "./position";
 
 type Db = PrismaService["db"] | Tx;
@@ -70,26 +70,26 @@ export async function factoryPlansOf(db: Db, orderId: string, advancePercent: nu
       lines: planLines,
       supplierPaid: supplierPaidRelation,
       expenses: factoryBorneExpenses,
-      factoryPlan: { orderBy: { sortOrder: "asc" }, include: { factory: { select: { id: true, name: true } } } },
+      payables: { orderBy: { sortOrder: "asc" }, include: { supplier: { select: { id: true, name: true } } } },
     },
   });
   const names = new Map<string, FactoryRef>();
   for (const l of o.lines) if (l.factory) names.set(l.factory.id, l.factory);
-  for (const r of o.factoryPlan) names.set(r.factory.id, r.factory);
+  for (const r of o.payables) names.set(r.supplier!.id, r.supplier!);
   const positions = factoryPositionOf(o, fx).filter((r) => r.lines > 0);
   const owed = new Map(positions.map((r) => [r.key, { factory: names.get(r.factoryId)!, currency: r.currency, owedMinor: r.owedMinor, settledMinor: r.settledMinor, takenOffMinor: r.takenOffMinor }]));
-  for (const r of o.factoryPlan) {
-    const key = `${r.factoryId}:${r.currency}`;
+  for (const r of o.payables) {
+    const key = `${r.supplierId}:${r.currency}`;
     if (!owed.has(key)) {
       const paid = o.supplierPaid
         .filter((p) => `${p.movement.partyId}:${p.movement.currency}` === key)
         .reduce((t, p) => t + decimalToMinor(p.share), 0);
-      owed.set(key, { factory: r.factory, currency: r.currency, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
+      owed.set(key, { factory: r.supplier!, currency: r.currency!, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
     }
   }
   const orderedOn = fromDbDateOrNull(o.factoryOrderedOn);
   return [...owed.entries()].map(([key, f]) => {
-    const stored = o.factoryPlan.filter((r) => `${r.factoryId}:${r.currency}` === key);
+    const stored = o.payables.filter((r) => `${r.supplierId}:${r.currency}` === key);
     const rows: FactoryPlanRow[] = stored.length
       ? stored.map((r) => ({
           label: r.label,
@@ -141,13 +141,13 @@ export type FactoryPlanView = Awaited<ReturnType<typeof factoryPlansOf>>[number]
 
 /** Ordered from the factory: each factory owed on the order gets the default plan (its offer's advance), unless it has one. */
 export async function seedFactoryPlans(tx: Tx, orderId: string, advancePercent: number) {
-  const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { lines: planLines, factoryPlan: { select: { factoryId: true, currency: true } } } });
+  const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { lines: planLines, payables: { select: { supplierId: true, currency: true } } } });
   for (const [key, f] of owedByFactory(o.lines)) {
-    if (f.owedMinor <= 0 || o.factoryPlan.some((r) => `${r.factoryId}:${r.currency}` === key)) continue;
-    await tx.factoryPaymentPlan.createMany({
+    if (f.owedMinor <= 0 || o.payables.some((r) => `${r.supplierId}:${r.currency}` === key)) continue;
+    await tx.invoice.createMany({
       data: defaultFactoryPlan(f.owedMinor, advanceOf(o.lines, f.factory.id, advancePercent)).map((r, i) => ({
-        orderId,
-        factoryId: f.factory.id,
+        purchaseOrderId: orderId,
+        supplierId: f.factory.id,
         label: r.label,
         percent: r.percent,
         amount: fromMinor(r.amountMinor),

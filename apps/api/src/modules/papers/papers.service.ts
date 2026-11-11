@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { asPayment, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../money/position";
+import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../billing/api";
 import {
   bankContractInput,
   BANK_PAPERS,
@@ -59,8 +59,9 @@ import { SettingsService } from "../settings/settings.service";
 import { companySnapshot } from "../quotations/quotations.service";
 import { buyerOf, partyOf } from "../orders/buyer";
 import { quotedTermsPrinted } from "../orders/order-docs";
-import { termsOf } from "../money/route-plan";
-import { orderAccess, OrdersService } from "../orders/orders.service";
+import { termsOf } from "../billing/api";
+import { orderAccess } from "../../common/auth/order-access";
+import { OrdersService } from "../orders/orders.service";
 import { FlowService } from "../flow/flow.service";
 import {
   BUILDERS,
@@ -201,7 +202,7 @@ export class PapersService {
       orderBy: { orderedOn: "asc" },
       include: {
         allocations: livePartsWithEntry,
-        planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
         expenses: chargedExpenses,
       },
     });
@@ -544,7 +545,7 @@ export class PapersService {
             }),
           ),
         );
-        if (Number(pos.due) > 0 && !o.planItems.length)
+        if (Number(pos.due) > 0 && !o.receivables.length)
           out.push(
             row({
               ...base,

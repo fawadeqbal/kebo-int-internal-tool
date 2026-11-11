@@ -9,7 +9,7 @@ import { CompanyContext } from "../../common/company/company-context";
 import { toInfo } from "../../common/company/companies.service";
 import { LimitsService } from "../../common/company/limits.service";
 import { SettingsService } from "../settings/settings.service";
-import { fxOf } from "../money/position";
+import { fxOf } from "../billing/api";
 import { OrdersService } from "./orders.service";
 import { buyerOf } from "./buyer";
 import {

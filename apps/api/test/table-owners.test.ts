@@ -10,6 +10,7 @@ const OWNERS: Record<string, string> = {
   moneyMovement: "treasury",
   allocation: "treasury",
   moneyAccount: "treasury",
+  invoice: "billing",
 };
 
 const MODULES = resolve(__dirname, "../src/modules");

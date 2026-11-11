@@ -10,10 +10,10 @@ import { toInfo } from "../src/common/company/companies.service";
 import type { SessionUser } from "../src/common/auth/session-user";
 import { FactsService } from "../src/modules/insights/facts/facts.service";
 import { FactsReadService } from "../src/modules/insights/facts/facts-read.service";
-import { factoryPositionsSql } from "../src/modules/money/due";
-import { fxOf } from "../src/modules/money/position";
+import { factoryPositionsSql } from "../src/modules/billing/api";
+import { fxOf } from "../src/modules/billing/api";
 import { MainMoney } from "../src/modules/money/order-money";
-import { readyOnOf } from "../src/modules/orders/ready";
+import { readyOnOf } from "@kebo/database";
 import { api, signIn, startApp } from "./app";
 
 /**

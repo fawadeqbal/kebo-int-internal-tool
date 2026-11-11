@@ -14,11 +14,11 @@ import {
 import { daysBetween, dateIn, type ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../../database/prisma.service";
 import { reachedOn } from "../../checklist/checklist-facts";
-import { factoryPlansOf } from "../../money/factory-plan";
+import { factoryPlansOf } from "../../billing/api";
 import { convert, MainMoney, orderRate } from "../../money/order-money";
-import { livePlansOf } from "../../money/plan-live";
-import { factoryPositionOf, fxOf, positionOf, type MoneyCtx, supplierPaidRelation } from "../../money/position";
-import { factoryReadyOf, readyOnOf } from "../../orders/ready";
+import { livePlansOf } from "../../billing/api";
+import { factoryPositionOf, fxOf, positionOf, type MoneyCtx, supplierPaidRelation } from "../../billing/api";
+import { factoryReadyOf, readyOnOf } from "@kebo/database";
 import { optionFigures, worthOf } from "../../quotations/revision-figures";
 
 /*
@@ -88,7 +88,7 @@ const orderSelect = {
     orderBy: [{ on: "asc" }, { createdAt: "asc" }],
     select: { amount: true, bankCharges: true, voidedAt: true, on: true },
   },
-  planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+  receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: {
     where: { voidedAt: null },
     select: { amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, category: true, factoryId: true },

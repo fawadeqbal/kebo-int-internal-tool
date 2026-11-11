@@ -1,7 +1,6 @@
 import { decimalToMinor, livePart, livePurchase, type Prisma } from "@kebo/database";
-import { expenseIn, factoryPosition, orderPosition, type FactoryOwing, type Fx, type Minor, type OrderPosition } from "@kebo/money";
+import { expenseIn, factoryPosition, orderPosition, orderRate, type FactoryOwing, type Fx, type Minor, type OrderPosition } from "@kebo/money";
 import type { Settings } from "@kebo/shared";
-import { orderRate } from "./order-money";
 
 /**
  * The one way an order's position with its customer (and with its factories)
@@ -34,7 +33,7 @@ export const chargedExpenses = {
 /** The relations positionOf reads (what pays the order, and the plan, as most screens load them). */
 export const positionRelations = {
   allocations: { where: livePart, select: { amount: true, bankCharges: true, voidedAt: true } },
-  planItems: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+  receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: chargedExpenses,
 } satisfies Prisma.OrderInclude;
 
@@ -46,7 +45,7 @@ export interface PositionFacts {
   mainRate: Decimalish | null;
   /** What pays it (its live allocations; removed ones are left out). */
   allocations: { amount: Decimalish; bankCharges: Decimalish; voidedAt?: Date | null }[];
-  planItems: { amount: Decimalish; part: string | null }[];
+  receivables: { amount: Decimalish; part: string | null }[];
   /** At least the expenses charged to the customer (others are left out here). */
   expenses: { amount: Decimalish; currency: string; rate: Decimalish; borneBy?: string; voidedAt?: Date | null }[];
 }
@@ -73,7 +72,7 @@ export function positionOf(o: PositionFacts, fx: MoneyCtx, toleranceMinor = 0): 
     payments: o.allocations
       .filter((p) => !p.voidedAt)
       .map((p) => ({ amountMinor: minor(p.amount), bankChargesMinor: minor(p.bankCharges) })),
-    plan: o.planItems.map((p) => ({ amountMinor: minor(p.amount), part: p.part })),
+    plan: o.receivables.map((p) => ({ amountMinor: minor(p.amount), part: p.part })),
     depositPercent: Number(o.depositPercent.toString()),
     chargedMinor: charged,
     toleranceMinor,

@@ -10,10 +10,10 @@ import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
-import { ordersWithMoneyDue } from "../money/due";
-import { chargedExpenses, fxOf, positionOf } from "../money/position";
+import { ordersWithMoneyDue } from "../billing/api";
+import { chargedExpenses, fxOf, positionOf } from "../billing/api";
 import { MainMoney } from "../money/order-money";
-import { livePlansOf } from "../money/plan-live";
+import { livePlansOf } from "../billing/api";
 import { FactsReadService } from "./facts/facts-read.service";
 
 const ymOf = (d: ISODate) => d.slice(0, 7);
@@ -236,7 +236,7 @@ export class InsightsService {
         customer: { select: { id: true, name: true } },
         inquiry: { select: { assignee: { select: { id: true, name: true } } } },
         allocations: { where: livePart, select: { amount: true, bankCharges: true, on: true } },
-        planItems: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true, dueRule: true, dueDays: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true, dueRule: true, dueDays: true } },
       },
     });
     const livePlans = await livePlansOf(this.prisma.db, orders.map((o) => o.id));
