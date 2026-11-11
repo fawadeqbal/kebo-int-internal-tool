@@ -20,14 +20,8 @@ import type { Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import {
-  CURRENCIES,
   EXPENSE_CATEGORIES,
   expenseInput,
-  moneyAccountInput,
-  transferInput,
-  type MoneyAccountInput,
-  type TransferInput,
-  factoryPaymentInput,
   factoryPlanInput,
   type FactoryPlanInput,
   paymentPlanInput,
@@ -35,7 +29,6 @@ import {
   voidInput,
   type RepayInput,
   type ExpenseInput,
-  type FactoryPaymentInput,
   type PaymentPlanInput,
 } from "@kebo/shared";
 import { isISODate } from "@kebo/utils";
@@ -46,9 +39,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { MoneyService } from "./money.service";
 import { CostsService } from "./costs.service";
 import { AccountsService } from "./accounts.service";
-import { CashService } from "./cash.service";
 import { LeaksService } from "./leaks.service";
-import { PaymentFilesService, type PaymentSide } from "./payment-files.service";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const expenseQuery = z.object({
@@ -68,13 +59,6 @@ const flag = z
   .enum(["true", "false"])
   .optional()
   .transform((v) => v === "true");
-const cashBookQuery = z.object({
-  from: z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)"),
-  to: z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)"),
-  account: z.union([z.uuid(), z.literal("none")]).optional(),
-  currency: z.enum(CURRENCIES).optional(),
-  removed: flag,
-});
 const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
 
 @ApiTags("money")
@@ -84,9 +68,7 @@ export class MoneyController {
     private readonly money: MoneyService,
     private readonly costs: CostsService,
     private readonly accounts: AccountsService,
-    private readonly cash: CashService,
     private readonly leaks: LeaksService,
-    private readonly paymentFiles: PaymentFilesService,
     private readonly limits: LimitsService,
   ) {}
 
@@ -95,59 +77,6 @@ export class MoneyController {
   @Get("reports/leaks")
   leaksReport(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ from: date, to: date }))) q: { from?: string; to?: string }) {
     return this.leaks.report(user, q);
-  }
-
-  /** Our accounts (cash, banks, wallets): to choose from when recording money; managers also get balances. */
-  @Get("money/accounts")
-  async moneyAccounts(@CurrentUser() user: SessionUser) {
-    // The cash book is a plan feature: without it there are no accounts to choose.
-    return (await this.limits.allows("cash_book")) ? this.cash.accounts(user) : [];
-  }
-
-  @RequireFeature("cash_book")
-  @Post("money/accounts")
-  addAccount(@CurrentUser() user: SessionUser, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
-    return this.cash.saveAccount(user, null, body);
-  }
-
-  @RequireFeature("cash_book")
-  @Patch("money/accounts/:id")
-  changeAccount(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(moneyAccountInput)) body: MoneyAccountInput) {
-    return this.cash.saveAccount(user, id, body);
-  }
-
-  /** Money moved between two of our accounts. */
-  @RequireFeature("cash_book")
-  @Post("money/transfers")
-  transfer(@CurrentUser() user: SessionUser, @Body(Validate(transferInput)) body: TransferInput) {
-    return this.cash.transfer(user, body);
-  }
-
-  @RequireFeature("cash_book")
-  @Post("money/transfers/:id/void")
-  @HttpCode(200)
-  voidTransfer(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
-    return this.cash.voidTransfer(user, id, body.reason);
-  }
-
-  /** Managers: every amount in and out between two dates; ?account=<id>|none, ?currency=, ?removed=true. */
-  @RequireFeature("cash_book")
-  @Get("money/cash-book")
-  cashBook(@CurrentUser() user: SessionUser, @Query(Validate(cashBookQuery)) q: z.infer<typeof cashBookQuery>) {
-    return this.cash.cashBook(user, q);
-  }
-
-  /** Put a payment, a factory payment or an expense on an account afterwards: { accountId | null }. */
-  @RequireFeature("cash_book")
-  @Put("money/entries/:kind/:id/account")
-  setAccount(
-    @CurrentUser() user: SessionUser,
-    @Param("kind") kind: string,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(z.object({ accountId: z.uuid().nullable() }))) body: { accountId: string | null },
-  ) {
-    const k = z.enum(["in", "factory", "expense"]).parse(kind);
-    return this.cash.setAccount(user, k, id, body.accountId);
   }
 
   /** Managers only: what an expense can be for (customers, deals, orders, factories). */
@@ -189,35 +118,6 @@ export class MoneyController {
   @RequirePermissions("sourcing.manage")
   factoryPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPlanInput)) body: FactoryPlanInput) {
     return this.money.setFactoryPlan(user, id, body);
-  }
-
-  @Post("orders/:id/factory-payments")
-  payFactory(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput,
-  ) {
-    return this.money.recordFactoryPayment(user, id, body);
-  }
-
-  /** Same body as recording, plus reason (always asked). */
-  @Patch("factory-payments/:id")
-  editFactoryPayment(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput,
-  ) {
-    return this.money.editFactoryPayment(user, id, body);
-  }
-
-  @Post("factory-payments/:id/void")
-  @HttpCode(200)
-  voidFactoryPayment(
-    @CurrentUser() user: SessionUser,
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(voidInput)) body: z.infer<typeof voidInput>,
-  ) {
-    return this.money.voidFactoryPayment(user, id, body.reason);
   }
 
   /** What we still owe each factory on orders not cancelled. ?mine=true: the factories I look after. */
@@ -293,60 +193,6 @@ export class MoneyController {
   @Delete("expenses/:id/receipt")
   removeReceipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.money.removeReceipt(user, id);
-  }
-
-  /**
-   * multipart/form-data with one `file`: a photo or PDF proving a payment (bank
-   * slip, transfer screenshot). `payments` is money in from a customer,
-   * `factory-payments` money out to a factory. A new one replaces the one there.
-   */
-  @Post("payments/:id/file")
-  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
-  attachPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
-    return this.attachFile(user, "in", id, file);
-  }
-
-  @Post("factory-payments/:id/file")
-  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
-  attachFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
-    return this.attachFile(user, "out", id, file);
-  }
-
-  @Get("payments/:id/file")
-  paymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
-    return this.sendFile(user, "in", id, res);
-  }
-
-  @Get("factory-payments/:id/file")
-  factoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
-    return this.sendFile(user, "out", id, res);
-  }
-
-  @Delete("payments/:id/file")
-  removePaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
-    return this.paymentFiles.remove(user, "in", id);
-  }
-
-  @Delete("factory-payments/:id/file")
-  removeFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
-    return this.paymentFiles.remove(user, "out", id);
-  }
-
-  private attachFile(user: SessionUser, side: PaymentSide, id: string, file: Express.Multer.File | undefined) {
-    if (!file) throw new z.ZodError([{ code: "custom", path: ["file"], message: "Choose a photo or PDF of the payment", input: undefined }]);
-    return this.paymentFiles.attach(user, side, id, file);
-  }
-
-  private async sendFile(user: SessionUser, side: PaymentSide, id: string, res: Response) {
-    const f = await this.paymentFiles.open(user, side, id);
-    res.set({
-      "Content-Type": f.mimeType,
-      "Content-Length": String(f.size),
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
-      "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "private, no-store",
-    });
-    return new StreamableFile(f.stream);
   }
 
   /** Managers only: the year month by month, earned and cash, in the main currency. */

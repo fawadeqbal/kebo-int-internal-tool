@@ -21,16 +21,16 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import { EventBus } from "../../common/events/event-bus";
 import type { SessionUser } from "../../common/auth/session-user";
-import { orderAccess, OrdersService } from "./orders.service";
+import { orderAccess, OrdersService } from "../orders/orders.service";
 import { requireReason } from "../../common/audit/reason";
-import { checkAccount } from "../money/account-check";
+import { checkAccount } from "./account-check";
 import { LimitsService } from "../../common/company/limits.service";
-import { fileView } from "../money/payment-file-view";
+import { fileView } from "./payment-file-view";
 import { SettingsService } from "../settings/settings.service";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../money/position";
 import { livePlansOf } from "../money/plan-live";
 import { LedgerPosting, type LedgerRef } from "../ledger/posting.service";
-import { creditOf, fromCredit, refund, voidMovement } from "../treasury/customer-money";
+import { creditOf, fromCredit, refund, voidMovement } from "./customer-money";
 
 type Live = { amount: Prisma.Decimal; bankCharges: Prisma.Decimal };
 /** Where the order stands with these parts (orderPosition: what was charged to the customer can be paid too). */
@@ -114,7 +114,7 @@ function partView(a: PartRow) {
  * Recording a payment never moves the order's stage.
  */
 @Injectable()
-export class PaymentsService {
+export class CustomerPaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,

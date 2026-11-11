@@ -37,7 +37,7 @@ import { OrdersService } from "../orders/orders.service";
 import { PapersService } from "../papers/papers.service";
 import { ChecklistService } from "../checklist/checklist.service";
 import { FlowService } from "../flow/flow.service";
-import { PaymentFilesService } from "../money/payment-files.service";
+import { PaymentFilesService } from "../treasury/payment-files.service";
 import { MoneyService } from "../money/money.service";
 
 type Upload = { originalname: string; mimetype: string; size: number; buffer: Buffer };
