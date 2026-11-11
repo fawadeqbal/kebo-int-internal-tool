@@ -397,7 +397,8 @@ export class LedgerService {
       const a = await approval(one?.id ?? m.id);
       return {
         ...out,
-        orderId: one?.orderId ?? null,
+        // On its order when it pays one (credit left over or not); the payment on it when it pays it exactly.
+        orderId: one?.orderId ?? (new Set(parts.map((p) => p.orderId)).size === 1 ? parts[0]!.orderId : null),
         partId: one?.id ?? null,
         customerId: m.partyId,
         label: m.direction === "out" ? "Credit refunded" : one ? `Payment on ${one.order!.refNo}` : "One transfer over several orders",
