@@ -12,6 +12,7 @@ import { AppShell } from "@/components/shell/nav";
 import { buildModules, MODULE_PAGES, OPEN_COOKIE, RAIL_COOKIE, type ModuleKey } from "@/lib/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
+import { getSettings } from "@/lib/loaders";
 
 /** The company's own logo (Settings → Company), at a link that changes when the logo does; none: the app's icon. */
 function logoUrl(logo: string | undefined) {
@@ -25,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const me = await requireUser();
   const [{ unread }, settings, company] = await Promise.all([
     api.get<{ unread: number }>("/notifications", { take: 1 }),
-    api.get<{ company: { name: string; logo?: string } }>("/settings"),
+    getSettings(),
     getCompany(),
   ]);
   const feature = (f: string) => !company || company.features.includes(f);

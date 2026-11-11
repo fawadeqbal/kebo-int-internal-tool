@@ -1,9 +1,7 @@
 import { can } from "@kebo/shared";
 import { Badge } from "@kebo/ui";
-import { api } from "@/lib/api";
 import { orderMoneyOf } from "@/lib/order-data";
 import { date } from "@/lib/format";
-import type { Person } from "@/lib/types";
 import type { ChecklistItem } from "@/lib/types-checklist";
 import { optional } from "@/components/print/data";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
@@ -18,6 +16,7 @@ import { fieldsAction, lightAction } from "../../light-actions";
 import { GoodsExcel } from "../goods";
 import { goodsOf } from "../shared";
 import { stepData } from "../step-data";
+import { getSettings, getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Order · production" };
 
@@ -43,8 +42,8 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
   const canEdit = can(me, "orders.update") && d.open;
   const [m, people, settings] = await Promise.all([
     optional(() => orderMoneyOf(id)),
-    optional(() => api.get<Person[]>("/users/people")),
-    optional(() => api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings")),
+    optional(() => getPeople()),
+    optional(() => getSettings()),
   ]);
   const owing = m?.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
   // "Balance paid to the factory": the factory payment form filled in with the plan's next part.

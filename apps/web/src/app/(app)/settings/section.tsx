@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import type { Settings, SettingsKey } from "@kebo/shared";
+import type { SettingsKey } from "@kebo/shared";
 import { PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/session";
 import { saveSettingsAction } from "./actions";
 import { SettingsCards } from "./cards";
 import { SETTING_GROUPS } from "./groups";
+import { getSettings } from "@/lib/loaders";
 
 /**
  * One page of Settings (design system: Settings frame, design page 33: each section is a page in
@@ -31,7 +32,7 @@ export async function GroupPage({ href, group: key }: { href: string; group: Set
   const group = SETTING_GROUPS.find((g) => g.key === key);
   if (!group) notFound();
   const [settings, lock] = await Promise.all([
-    api.get<Settings>("/settings"),
+    getSettings(),
     api.get<{ locked: boolean; reason: string | null }>("/settings/main-currency"),
   ]);
   return (

@@ -1,6 +1,5 @@
 import { apiFetch } from "@/lib/api";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID } from "@/lib/ids";
 
 /** All of a deal's URS & documents in one zip (the API checks the person may see the deal). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -3,8 +3,8 @@
 import { LEDGER_PARTY_KINDS, type LedgerPartyKind } from "@kebo/shared";
 import { api, ApiError } from "@/lib/api";
 import type { LedgerStatement } from "@/lib/types-ledger";
+import { UUID } from "@/lib/ids";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface IssuedStatement {

@@ -1,12 +1,11 @@
 import "server-only";
 import { can, STEP_PATH, type FlowStep } from "@kebo/shared";
-import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderDefaultsOf, orderFlowOf, orderHistoryOf, orderOf, orderStepsOf } from "@/lib/order-data";
-import type { Person } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { checklistAction } from "../checklist-actions";
+import { getPeople } from "@/lib/loaders";
 
 /** What every step page reads: the order, its steps and checklist, its flow, the people to assign, and the step's changes. */
 export async function stepData(id: string, step: FlowStep) {
@@ -15,7 +14,7 @@ export async function stepData(id: string, step: FlowStep) {
   const [steps, flow, people, changes, defaults] = await Promise.all([
     orderStepsOf(id),
     optional(() => orderFlowOf(id)),
-    optional(() => api.get<Person[]>("/users/people")),
+    optional(() => getPeople()),
     optional(() => orderHistoryOf(id, step, 200)),
     optional(() => orderDefaultsOf(id)),
   ]);

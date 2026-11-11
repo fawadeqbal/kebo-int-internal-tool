@@ -3,14 +3,12 @@ import { type InquiryStage } from "@kebo/shared";
 import { Card, CardBody, CardHeader } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
-import type { Person } from "@/lib/types";
+import { money, TZ } from "@/lib/format";
 import type { ExpenseList, ExpenseTargets } from "@/lib/types-money";
 import { expenseAction } from "@/app/(app)/money/actions";
 import { NewExpense } from "./forms";
 import { ExpenseRecord } from "./expense-record";
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+import { getSettings, getPeople } from "@/lib/loaders";
 
 /**
  * What was spent on this deal (trips to check products, samples, visits),
@@ -26,8 +24,8 @@ export async function DealExpensesCard({
   const [list, targets, people, settings] = await Promise.all([
     api.get<ExpenseList>("/expenses", { inquiryId: deal.id }),
     api.get<ExpenseTargets>("/expenses/targets"),
-    api.get<Person[]>("/users/people"),
-    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
+    getPeople(),
+    getSettings(),
   ]);
   const c = list.currency;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };

@@ -1,10 +1,8 @@
 import { ArrowUpRight } from "lucide-react";
 import { can } from "@kebo/shared";
 import { Card, CardBody, CardHeader } from "@kebo/ui";
-import { api } from "@/lib/api";
 import { orderMoneyOf } from "@/lib/order-data";
 import { date } from "@/lib/format";
-import type { Person } from "@/lib/types";
 import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
@@ -18,6 +16,7 @@ import { fieldsAction, lightAction } from "../../light-actions";
 import { FactoriesView } from "../money-cards";
 import { MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
+import { getSettings, getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Order · factory order" };
 
@@ -32,8 +31,8 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const { me, o, flow, now, defaults } = d;
   const [m, people, settings] = await Promise.all([
     orderMoneyOf(id),
-    api.get<Person[]>("/users/people"),
-    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
+    getPeople(),
+    getSettings(),
   ]);
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   const canEdit = can(me, "orders.update") && d.open;

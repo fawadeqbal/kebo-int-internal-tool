@@ -1,15 +1,13 @@
 import Link from "next/link";
-import { Card, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
-import { date, money } from "@/lib/format";
+import { Card, CardHeader, cn, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
+import { date, money, plural } from "@/lib/format";
 import { amountCell, bigMoney, change, compactMoney, monthYearOf, percent, type Period } from "@/lib/insights-period";
 import type { loadOverview } from "@/lib/insights-data";
 import { ChartCard } from "./chart-card";
 import { SalesProfitChart } from "./facts-charts";
-import { Delta, Tile, Tiles } from "./frame";
+import { Delta, Tiles } from "./frame";
 
 type Data = Awaited<ReturnType<typeof loadOverview>>;
-
-const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
 
 /** Insights › Overview: eight tiles, sales and gross profit for 12 months, what needs attention, the top five each side. */
 export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Record<string, string | undefined>) => string }) {
@@ -67,19 +65,19 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
   return (
     <div className="flex flex-col gap-4">
       <Tiles>
-        <Tile
+        <StatTile
           label="Sales"
           value={bigMoney(d.sales.now, c)}
           delta={<Delta value={change(d.sales.now, d.sales.before)} vs={vs} />}
           sub={`${plural(d.sales.orders, "order")}${d.sales.orders ? ` · avg ${bigMoney(d.sales.now / d.sales.orders, c)}` : ""}`}
         />
-        <Tile
+        <StatTile
           label="Gross profit"
           value={bigMoney(d.profit.now, c)}
           delta={<Delta value={change(d.profit.now, d.profit.before)} vs={vs} />}
           sub={`margin ${percent(d.profit.margin)}${d.profit.marginBefore !== null ? ` · was ${percent(d.profit.marginBefore)}` : ""}`}
         />
-        <Tile
+        <StatTile
           className="max-sm:hidden"
           label="Cash in"
           value={bigMoney(d.cashIn.now, c)}
@@ -87,7 +85,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           sub="from customers"
         />
         {d.cashOut ? (
-          <Tile
+          <StatTile
             className="max-sm:hidden"
             label="Cash out"
             value={bigMoney(d.cashOut.now, c)}
@@ -95,14 +93,14 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             sub="factories + costs"
           />
         ) : (
-          <Tile
+          <StatTile
             className="max-sm:hidden"
             label="Shipped on time"
             value={percent(d.shipped?.percent)}
             sub={d.shipped?.withDate ? `${d.shipped.onTime} of ${d.shipped.withDate} by the date promised` : "none shipped with a date yet"}
           />
         )}
-        <Tile
+        <StatTile
           label="Receivable"
           value={bigMoney(recvTotal, c)}
           meter={
@@ -118,7 +116,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
           href={href({ section: "money" })}
         />
         {d.payable ? (
-          <Tile
+          <StatTile
             className="max-sm:hidden"
             label="Payable"
             value={bigMoney(Number(d.payable.total), c)}
@@ -132,7 +130,7 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             href={href({ section: "money" })}
           />
         ) : (
-          <Tile
+          <StatTile
             className="max-sm:hidden"
             label="Orders"
             value={String(d.sales.orders)}
@@ -140,14 +138,14 @@ export function Overview({ d, p, href }: { d: Data; p: Period; href: (patch: Rec
             sub={`was ${d.sales.ordersBefore}`}
           />
         )}
-        <Tile
+        <StatTile
           className="max-sm:hidden"
           label="Open quotes"
           value={bigMoney(Number(d.now.openQuotes.value), c)}
           sub={`${plural(d.now.openQuotes.count, "quote")}${d.now.openQuotes.likely ? ` · likely ${bigMoney(Number(d.now.openQuotes.likely), c)}` : ""}`}
           href="/inquiries?stage=quoted"
         />
-        <Tile
+        <StatTile
           label="Win rate"
           value={percent(d.winRate.now)}
           delta={

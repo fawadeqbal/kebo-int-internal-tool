@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, OctagonAlert } from "lucide-react";
-import { Alert, Card, CardBody, CardHeader, cn, LinkTabs, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Alert, Card, CardBody, CardHeader, cn, LinkTabs, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
 import { money } from "@/lib/format";
 import type { LeakCustomer, LeakGroup, LeaksReport } from "@/lib/types-money";
 import { PROFIT_LABEL } from "@kebo/money";
@@ -9,26 +9,6 @@ export type LeakView = "attention" | "deals" | "orders" | "customers" | "spendin
 export const LEAK_VIEWS: readonly LeakView[] = ["attention", "deals", "orders", "customers", "spending"];
 
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
-
-function Figure({ label, value, hint, tone }: { label: string; value: string; hint: string; tone?: "bad" | "ok" | "warn" }) {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-3 sm:p-4">
-      <p className="text-xs font-medium text-muted">{label}</p>
-      <p
-        className={cn(
-          "mt-1 truncate text-lg font-semibold tabular xl:text-xl",
-          tone === "bad" && "text-bad",
-          tone === "ok" && "text-ok",
-          tone === "warn" && "text-warn",
-        )}
-        title={value}
-      >
-        {value}
-      </p>
-      <p className="mt-0.5 text-xs text-muted">{hint}</p>
-    </div>
-  );
-}
 
 function Bar({ share, tone = "primary" }: { share: number; tone?: "primary" | "bad" | "warn" }) {
   return (
@@ -148,32 +128,36 @@ export function LeaksBody({ r, view, href }: { r: LeaksReport; view: LeakView; h
         </Alert>
       )}
       <section aria-label="Summary" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Figure
+        <StatTile
+          size="sm"
           label="Inquiries lost"
           value={String(s.lostDeals)}
-          hint={`${money(s.lostSpent, c)} spent on them`}
+          sub={`${money(s.lostSpent, c)} spent on them`}
           tone={s.lostDeals ? "bad" : undefined}
         />
-        <Figure label="Win rate" value={s.winRate === null ? "—" : `${s.winRate}%`} hint="Won ÷ (won + lost)" />
-        <Figure
+        <StatTile size="sm" label="Win rate" value={s.winRate === null ? "—" : `${s.winRate}%`} sub="Won ÷ (won + lost)" />
+        <StatTile
+          size="sm"
           label={PROFIT_LABEL.grossOnQuote}
           value={money(s.planned, c)}
-          hint={
+          sub={
             Number(s.uncostedRevenue) > 0
               ? `Value with a cost, less goods and freight; ${money(s.uncostedRevenue, c)} not costed`
               : "Orders placed: value less goods and freight"
           }
         />
-        <Figure
+        <StatTile
+          size="sm"
           label="Profit kept"
           value={money(s.actual, c)}
-          hint={s.keptPercent === null ? "After every cost" : `${s.keptPercent}% kept · ${money(s.leaked, c)} went on costs`}
+          sub={s.keptPercent === null ? "After every cost" : `${s.keptPercent}% kept · ${money(s.leaked, c)} went on costs`}
           tone={Number(s.actual) < 0 ? "bad" : s.keptPercent !== null && s.keptPercent < 75 ? "warn" : "ok"}
         />
-        <Figure
+        <StatTile
+          size="sm"
           label="Stuck with factories"
           value={money(s.stuck, c)}
-          hint="Paid to them before the customer paid us"
+          sub="Paid to them before the customer paid us"
           tone={Number(s.stuck) > 0 ? "warn" : undefined}
         />
       </section>

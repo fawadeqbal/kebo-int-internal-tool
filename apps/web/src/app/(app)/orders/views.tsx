@@ -29,7 +29,7 @@ import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { hasFeature } from "@/lib/session";
 import { optional } from "@/components/print/data";
 import { crumbsFor, labelFor } from "@/lib/nav";
-import { date, money } from "@/lib/format";
+import { date, money, plural } from "@/lib/format";
 import type { Paged } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
 
@@ -41,8 +41,6 @@ const RECENT_DONE = 8;
 const STATUSES = ["open", "late", "closed", "cancelled", "all"] as const;
 type Status = (typeof STATUSES)[number];
 const STATUS_CHIP: Record<Status, string> = { open: "Open", late: "Late", closed: "Done", cancelled: "Cancelled", all: "All" };
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Orders, two pages of the sidebar's Orders module. The list (design system: List frame): a chip

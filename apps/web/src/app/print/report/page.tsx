@@ -4,11 +4,11 @@ import { api } from "@/lib/api";
 import { requirePermission, docBrand, hasFeature } from "@/lib/session";
 import { PlanOff } from "@/components/common/plan-off";
 import { date, money } from "@/lib/format";
-import type { PersonWithRole, ProfitRow, ReportView } from "@/lib/types-deals";
-import type { CompanySnapshot } from "@/lib/types-orders";
+import type { ProfitRow, ReportView } from "@/lib/types-deals";
 import { Letterhead, LinesTable, Sheet } from "@/components/print/doc";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { PROFIT_LABEL } from "@kebo/money";
+import { getSettings, getPeople } from "@/lib/loaders";
 
 /** "under a day", "1 day", "4.5 days". */
 const days = (d: number) => (d < 1 ? "under a day" : `${d.toLocaleString("en-US", { maximumFractionDigits: 1 })} day${d === 1 ? "" : "s"}`);
@@ -104,8 +104,8 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
   const staff = isId(sp.staff) ? sp.staff : undefined;
   const [r, people, settings] = await Promise.all([
     api.get<ReportView>("/reports", { from, to, staff }),
-    api.get<PersonWithRole[]>("/users/people"),
-    api.get<{ company: CompanySnapshot }>("/settings"),
+    getPeople(),
+    getSettings(),
   ]);
   const person = people.find((p) => p.id === staff);
   const f = r.funnel;

@@ -14,6 +14,7 @@ import { FollowUpForm } from "@/components/notes/note-forms";
 import { todayHere } from "@/components/notes/kinds";
 import { addFollowUpAction } from "./actions";
 import { crumbsFor } from "@/lib/nav";
+import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Follow-ups" };
 
@@ -44,7 +45,7 @@ export default async function FollowUpsPage({
       page,
       pageSize: PAGE_SIZE,
     }),
-    api.get<Person[]>("/users/people").catch(() => [] as Person[]),
+    getPeople().catch(() => [] as Person[]),
   ]);
   const keep = { view: everyone ? "everyone" : undefined, status: status === "done" ? "done" : undefined, on };
   const href = (patch: Record<string, string | undefined>) => {

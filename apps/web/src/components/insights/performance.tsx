@@ -1,14 +1,12 @@
 import { can, type Permission } from "@kebo/shared";
 import { api } from "@/lib/api";
-import { date } from "@/lib/format";
+import { date, TZ, plural } from "@/lib/format";
 import { bigMoney, percent } from "@/lib/insights-period";
 import { hasFeature } from "@/lib/session";
 import type { Aging, FactoryGroups, FactOrders, InquiryGroups, OrderGroups } from "@/lib/types-facts";
 import { PerformanceView, type PerfFigure } from "./performance-view";
 
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const facts = <T,>(path: string, q: Record<string, string | number | undefined>) => api.get<T>(`/insights/facts/${path}`, q);
-const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
 const sinceMonth = (d: string | null | undefined) =>
   d ? `since ${new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" })}` : "none yet";
 const n = (v: string | number | null | undefined) => (v === null || v === undefined ? 0 : Number(v));

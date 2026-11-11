@@ -6,7 +6,7 @@ import { Banner, ButtonLink, PageHeader, StageBadge, StatusBadge, type StatusMea
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { load, requireUser, hasFeature } from "@/lib/session";
-import { date, money } from "@/lib/format";
+import { date, money, TZ, plural } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import type { CustomerDetail } from "@/lib/types-people";
 import type { CustomerPayments } from "@/lib/types-money";
@@ -24,12 +24,11 @@ import { CustomerMoney } from "@/components/money/customer-money";
 import { PerformanceCard } from "@/components/insights/performance";
 import { removeCustomerAction, saveCustomerAction } from "../actions";
 import { CustomerPanel } from "../customer-panel";
-import { currenciesFrom, type SalesCurrencies } from "../currencies";
+import { currenciesFrom } from "../currencies";
+import { getSettings, getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Customer" };
 
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** "Mar 2025" */
 const monthOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: TZ });
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
@@ -64,10 +63,10 @@ export default async function CustomerPage({ params, searchParams }: { params: P
     api.get<CustomerPayments>("/payments", { customerId: id }).catch(() => null),
     can(me, "expenses.manage") ? hasFeature("expenses") : false,
     hasFeature("orders_board"),
-    editing ? api.get<SalesCurrencies>("/settings") : null,
+    editing ? getSettings() : null,
     api.get<Note[]>(`/customers/${id}/notes`).catch(() => [] as Note[]),
     api.get<FollowUpList>("/follow-ups", { customerId: id }).catch(() => null),
-    api.get<Person[]>("/users/people").catch(() => [] as Person[]),
+    getPeople().catch(() => [] as Person[]),
   ]);
   const moneyView = sp.view === "profit" || sp.tab === "account" ? "profit" : "payments";
   const openOrders = c.orders.filter((o) => o.status === "open").length;

@@ -10,15 +10,15 @@ import { OpenPanelButton } from "@/components/common/panel";
 import { importFactoriesAction, removeFactoryAction, saveFactoryAction } from "./actions";
 import { FactoryPanel } from "./factory-form";
 import { requirePermission } from "@/lib/session";
-import type { Paged, Person } from "@/lib/types";
+import type { Paged } from "@/lib/types";
 import type { FactoryDetail, FactoryRow } from "@/lib/types-people";
 import { crumbsFor, labelFor } from "@/lib/nav";
+import { plural } from "@/lib/format";
+import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Suppliers" };
 
 type Params = Record<string, string | undefined>;
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** How to reach them, in a few words. */
 const reach = (f: FactoryRow) => [f.phone, f.wechat && `WeChat ${f.wechat}`, f.email].filter(Boolean).join(" · ");
@@ -41,7 +41,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
     api.get<Paged<FactoryRow>>("/factories", { q: sp.q, page: toPage(sp.page), mine: mine ? "true" : undefined }),
     // The other chip's count (for the same search).
     api.get<Paged<FactoryRow>>("/factories", { q: sp.q, pageSize: 1, mine: mine ? undefined : "true" }),
-    panel ? api.get<Person[]>("/users/people") : null,
+    panel ? getPeople() : null,
     panel === "edit-factory" ? api.get<FactoryDetail>(`/factories/${sp.id}`).catch(() => null) : null,
   ]);
   const all = mine ? other.total : data.total;

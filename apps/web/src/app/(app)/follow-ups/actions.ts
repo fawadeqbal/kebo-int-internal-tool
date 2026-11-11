@@ -5,8 +5,7 @@ import { startOfDayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
 import type { RecordKey } from "@/lib/types-notes";
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+import { TZ } from "@/lib/format";
 
 /** "2026-11-04T09:02" typed in the company's time zone → the moment, as the API takes it. Empty: now. */
 function happenedAt(local: string | undefined): string | undefined {

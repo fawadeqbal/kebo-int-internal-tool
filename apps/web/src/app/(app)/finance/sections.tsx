@@ -10,39 +10,21 @@ import {
   type ExpenseCategory,
   type OrderStage,
 } from "@kebo/shared";
-import {
-  Alert,
-  Badge,
-  buildHref,
-  Card,
-  CardBody,
-  CardHeader,
-  cn,
-  EmptyState,
-  FilterChip,
-  Segmented,
-  Table,
-  Td,
-  Th,
-  THead,
-  Tr,
-  Pagination,
-  toPage,
-} from "@kebo/ui";
+import { Alert, Badge, buildHref, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, Segmented, Table, Td, Th, THead, Tr, Pagination, toPage, StatTile } from "@kebo/ui";
 import { addDays } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { ExportLink } from "@/components/sheets/export-link";
 import { hasFeature } from "@/lib/session";
 import type { Receivables } from "@/lib/types-insights";
-import { date, money } from "@/lib/format";
-import type { Person } from "@/lib/types";
+import { date, money, TZ } from "@/lib/format";
 import type { CashBook, CashRow, ExpenseList, Payable } from "@/lib/types-money";
 import { NewExpense, VoidForm, type ExpenseChoices } from "@/components/money/forms";
 import { EditAccount, MoveMoney, NewAccount, PutOnAccount, type AccountRow } from "@/components/money/cash-forms";
 import { ExpenseRecord } from "@/components/money/expense-record";
 import { expenseAction, voidTransferAction } from "../money/actions";
+import { UUID } from "@/lib/ids";
+import { getSettings, getPeople } from "@/lib/loaders";
 
-export const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
 export type Search = {
@@ -78,7 +60,6 @@ export async function moneyAccess(me: Parameters<typeof can>[0]) {
 
 /* ---------------------------------------------------------------- expenses */
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const percent = (part: string, whole: string) => (Number(whole) > 0 ? Math.round((Number(part) / Number(whole)) * 100) : 0);
 
 /**
@@ -103,9 +84,9 @@ export async function ExpensesBody({ sp, today }: { sp: Search; today: string })
 
   const [list, people, choices, settings] = await Promise.all([
     api.get<ExpenseList>("/expenses", { from, to, kind, customerId: customer, category, page: String(toPage(sp.page)), pageSize: "50" }),
-    api.get<Person[]>("/users/people"),
+    getPeople(),
     api.get<ExpenseChoices>("/expenses/targets"),
-    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
+    getSettings(),
   ]);
   const customers = choices.customers;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
@@ -158,24 +139,24 @@ export async function ExpensesBody({ sp, today }: { sp: Search; today: string })
       <NewExpense action={expenseAction.bind(null, null, null)} people={people} mainCurrency={c} fx={fx} today={today} choices={choices} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label={`Spent in ${periodName}`} value={money(list.total, c)} hint={`${list.count} expense${list.count === 1 ? "" : "s"}`} />
-        <Tile
+        <StatTile label={`Spent in ${periodName}`} value={money(list.total, c)} sub={`${list.count} expense${list.count === 1 ? "" : "s"}`} />
+        <StatTile
           label="Running the company"
           value={money(list.company, c)}
-          hint="Rent, salaries, bills, office"
+          sub="Rent, salaries, bills, office"
           href={kind === "general" ? undefined : href({ kind: "general", customer: undefined })}
         />
-        <Tile
+        <StatTile
           label="Spent on customers"
           value={money(list.customers, c)}
-          hint={`${list.byCustomer.length} customer${list.byCustomer.length === 1 ? "" : "s"}, with their orders`}
+          sub={`${list.byCustomer.length} customer${list.byCustomer.length === 1 ? "" : "s"}, with their orders`}
           href={kind === "customer" ? undefined : href({ kind: "customer" })}
         />
-        <Tile
-          small
+        <StatTile
+          size="sm"
           label="Biggest kind"
           value={biggest ? EXPENSE_CATEGORY_LABEL[biggest.category] : "—"}
-          hint={biggest ? `${money(biggest.total, c)} · ${percent(biggest.total, String(kindsTotal))}%` : "Nothing spent yet"}
+          sub={biggest ? `${money(biggest.total, c)} · ${percent(biggest.total, String(kindsTotal))}%` : "Nothing spent yet"}
           href={biggest && category !== biggest.category ? href({ category: biggest.category }) : undefined}
         />
       </div>
@@ -277,26 +258,6 @@ export async function ExpensesBody({ sp, today }: { sp: Search; today: string })
         )}
       </Card>
     </div>
-  );
-}
-
-/** A total at the top of Expenses; two across on a phone. Links narrow the list. */
-function Tile({ label, value, hint, href, small }: { label: string; value: string; hint: string; href?: string; small?: boolean }) {
-  const body = (
-    <div className={cn("h-full rounded-xl border border-line bg-surface p-3 transition-colors sm:p-4", href && "hover:border-line-strong")}>
-      <p className="text-xs font-medium text-muted">{label}</p>
-      <p className={cn("mt-1 truncate font-semibold tabular", small ? "text-base sm:text-lg" : "text-lg sm:text-2xl")} title={value}>
-        {value}
-      </p>
-      <p className="mt-0.5 text-xs text-muted">{hint}</p>
-    </div>
-  );
-  return href ? (
-    <Link href={href} className="block">
-      {body}
-    </Link>
-  ) : (
-    body
   );
 }
 
@@ -473,13 +434,13 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
       {one ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {pr.from >= one.openingOn ? (
-            <Tile label={`On ${date(pr.from)}`} value={money(book.opening ?? "0", one.currency)} hint="Balance before the period" />
+            <StatTile label={`On ${date(pr.from)}`} value={money(book.opening ?? "0", one.currency)} sub="Balance before the period" />
           ) : (
-            <Tile label={`Opened ${date(one.openingOn)}`} value={money(book.opening ?? "0", one.currency)} hint="Balance it started with" />
+            <StatTile label={`Opened ${date(one.openingOn)}`} value={money(book.opening ?? "0", one.currency)} sub="Balance it started with" />
           )}
-          <Tile label="In" value={money(book.totals[0]?.in ?? "0", one.currency)} hint="Customers and moves in" />
-          <Tile label="Out" value={money(book.totals[0]?.out ?? "0", one.currency)} hint="Factories, expenses, moves out" />
-          <Tile label={`On ${date(pr.to)}`} value={money(book.closing ?? "0", one.currency)} hint="Check it against the statement" />
+          <StatTile label="In" value={money(book.totals[0]?.in ?? "0", one.currency)} sub="Customers and moves in" />
+          <StatTile label="Out" value={money(book.totals[0]?.out ?? "0", one.currency)} sub="Factories, expenses, moves out" />
+          <StatTile label={`On ${date(pr.to)}`} value={money(book.closing ?? "0", one.currency)} sub="Check it against the statement" />
         </div>
       ) : (
         book.totals.length > 0 && (
@@ -487,7 +448,7 @@ export async function CashBody({ sp, today }: { sp: Search; today: string }) {
             {book.totals
               .filter((t) => Number(t.in) !== 0 || Number(t.out) !== 0)
               .map((t) => (
-              <Tile key={t.currency} label={`${t.currency} in ${pr.name}`} value={money(t.net, t.currency)} hint={`In ${money(t.in, t.currency)} · out ${money(t.out, t.currency)}`} />
+              <StatTile key={t.currency} label={`${t.currency} in ${pr.name}`} value={money(t.net, t.currency)} sub={`In ${money(t.in, t.currency)} · out ${money(t.out, t.currency)}`} />
             ))}
           </div>
         )
@@ -638,11 +599,11 @@ export async function ReceiveBody() {
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {r.totals.map((t) => (
-          <Tile
+          <StatTile
             key={t.currency}
             label={`Customers owe us (${t.currency})`}
             value={money(t.net ?? t.due, t.currency)}
-            hint={
+            sub={
               Number(t.credit ?? 0) > 0
                 ? `${money(t.credit!, t.currency)} credit taken off${Number(t.overdue) > 0 ? ` · ${money(t.overdue, t.currency)} overdue` : ""}`
                 : Number(t.overdue) > 0
@@ -652,11 +613,11 @@ export async function ReceiveBody() {
           />
         ))}
         {(r.held ?? []).map((h) => (
-          <Tile
+          <StatTile
             key={`held-${h.currency}`}
             label={`Held for customers (${h.currency})`}
             value={money(h.amount, h.currency)}
-            hint={`credit · ${h.customers} customer${h.customers === 1 ? "" : "s"}`}
+            sub={`credit · ${h.customers} customer${h.customers === 1 ? "" : "s"}`}
           />
         ))}
       </div>
@@ -793,3 +754,5 @@ export async function OweBody({ mine }: { mine: boolean }) {
     </div>
   );
 }
+
+export { TZ };

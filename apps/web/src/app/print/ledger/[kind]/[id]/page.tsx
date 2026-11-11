@@ -8,8 +8,8 @@ import { PaperSheet } from "@/components/print/paper";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo } from "@/components/print/data";
 import { PARTY_PATH } from "@/components/ledger/ledger-parts";
+import { UUID } from "@/lib/ids";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 type Query = { from?: string; to?: string; cur?: string; no?: string; back?: string };

@@ -1,5 +1,5 @@
 import { LOST_REASON_LABEL, type StepState } from "@kebo/shared";
-import { date } from "@/lib/format";
+import { date, plural } from "@/lib/format";
 import type { DealDetail } from "@/lib/types";
 
 /**
@@ -21,7 +21,6 @@ export interface InquiryStep {
 }
 
 const STATE_LABEL: Record<StepState, string> = { done: "Done", now: "Now", late: "Late", todo: "Later" };
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 type Rev = NonNullable<DealDetail["quotation"]>["revisions"][number];
 /** The revisions, newest first. */
@@ -100,3 +99,5 @@ export function guidance(d: DealDetail): { text: string; lead?: string; href?: s
       };
   }
 }
+
+export { plural };

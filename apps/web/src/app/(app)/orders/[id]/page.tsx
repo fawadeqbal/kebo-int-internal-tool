@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderFlowOf, orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { date } from "@/lib/format";
-import type { DealDetail, Person } from "@/lib/types";
+import type { DealDetail } from "@/lib/types";
 import type { FollowUpList, Note } from "@/lib/types-notes";
 import { FollowUpsCard, NotesCard } from "@/components/notes/cards";
 import { optional } from "@/components/print/data";
@@ -29,6 +29,7 @@ import {
 import { detailsAction } from "../actions";
 import { DetailsCard } from "./forms";
 import { incotermOf, termsOf } from "./shared";
+import { getPeople } from "@/lib/loaders";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -58,7 +59,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
     orderCostsSetup(id).then((x) => x?.costs ?? null),
     optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
     optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id })),
-    optional(() => api.get<Person[]>("/users/people")),
+    optional(() => getPeople()),
   ]);
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";

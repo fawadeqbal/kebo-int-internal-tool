@@ -3,11 +3,10 @@ import { ArrowLeft, Factory } from "lucide-react";
 import { basisText, offerTaxTag } from "@kebo/shared";
 import { Alert, Badge, buttonClass, ButtonLink, Card, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
-import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
-import { date, money, qty } from "@/lib/format";
+import { date, money, qty, TZ } from "@/lib/format";
 import { dealHistoryOf, dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
-import type { FactoryQuoteView, SalesSettings, SourcingView } from "@/lib/types-deals";
+import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 import { optional } from "@/components/print/data";
 import { StepChanges, StepFrame, StepHeader, StepPrevNext } from "@/components/orders/step-page";
 import { ViewCard } from "@/components/orders/step-view";
@@ -28,10 +27,9 @@ import {
   saveFactoryQuoteAction,
   searchFactoriesAction,
 } from "./actions";
+import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Factory prices" };
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 /** "USD 51,741": whole units for the step's header line. */
 const whole = (v: string | number, currency: string) => `${currency} ${Math.round(Number(v)).toLocaleString("en-US")}`;
@@ -56,7 +54,7 @@ export default async function SourcingPage({
   const [d, s, settings, q, history] = await Promise.all([
     dealOf(id),
     sourcingOf(id),
-    api.get<{ sales: SalesSettings }>("/settings"),
+    getSettings(),
     optional(() => quotationOf(id)),
     optional(() => dealHistoryOf(id)),
   ]);

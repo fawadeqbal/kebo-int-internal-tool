@@ -1,17 +1,17 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
 import { can, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
-import { Alert, Badge, Card, CardBody, CardHeader, Meter, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
+import { Alert, Badge, Card, CardBody, CardHeader, Meter, PageHeader, PriorityBadge, StageBadge, StatTile } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
-import { date, money } from "@/lib/format";
+import { date, money, TZ, plural } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { Reminders } from "@/lib/types-insights";
 import { loadHome } from "@/lib/insights-data";
 import { amountCell, bigMoney, change, monthYearOf, percent } from "@/lib/insights-period";
 import { TargetRing } from "@/components/insights/kpi";
 import { TargetEditor } from "@/components/insights/targets";
-import { Delta, Tile, Tiles } from "@/components/insights/frame";
+import { Delta, Tiles } from "@/components/insights/frame";
 import { ChartCard } from "@/components/insights/chart-card";
 import { SalesProfitChart } from "@/components/insights/facts-charts";
 import { ReminderList } from "@/components/insights/reminder-list";
@@ -20,8 +20,6 @@ import type { Today } from "@/lib/types-notes";
 import { FollowUpRow } from "@/components/notes/cards";
 
 export const metadata = { title: "Home" };
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 
 interface DealLine {
   id: string;
@@ -198,8 +196,6 @@ async function HowMany() {
   );
 }
 
-const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
-
 /**
  * This month, as Insights › Overview shows it for "Month" (the same tiles, labels and endpoints): Sales,
  * Gross profit, To receive with what is overdue, Open quotes; and the month's target.
@@ -221,21 +217,21 @@ async function MonthStrip({ today }: { today: string }) {
       )}
       <section aria-label="This month" className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <Tiles>
-          <Tile
+          <StatTile
             label="Sales"
             value={bigMoney(h.sales.now, c)}
             delta={<Delta value={change(h.sales.now, h.sales.before)} vs={vs} />}
             sub={`this month · ${plural(h.sales.orders, "order")}`}
             href="/reports?period=month"
           />
-          <Tile
+          <StatTile
             label="Gross profit"
             value={bigMoney(h.profit.now, c)}
             delta={<Delta value={change(h.profit.now, h.profit.before)} vs={vs} />}
             sub={`margin ${percent(h.profit.margin)}${h.profit.marginBefore !== null ? ` · was ${percent(h.profit.marginBefore)}` : ""}`}
             href="/reports?period=month"
           />
-          <Tile
+          <StatTile
             label="Receivable"
             value={bigMoney(owed, c)}
             meter={owed > 0 ? { percent: (Number(overdue.amount) / owed) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` } : undefined}
@@ -250,7 +246,7 @@ async function MonthStrip({ today }: { today: string }) {
             }
             href="/finance/to-receive"
           />
-          <Tile
+          <StatTile
             label="Open quotes"
             value={bigMoney(Number(h.now.openQuotes.value), c)}
             sub={`${plural(h.now.openQuotes.count, "quote")}${h.now.openQuotes.likely ? ` · likely ${bigMoney(Number(h.now.openQuotes.likely), c)}` : ""}`}

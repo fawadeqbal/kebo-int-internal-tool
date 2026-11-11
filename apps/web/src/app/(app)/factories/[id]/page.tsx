@@ -4,7 +4,7 @@ import { ButtonLink, Card, PageHeader, StatusBadge, type StatusMeaning } from "@
 import { BookOpen, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { load, requirePermission, hasFeature } from "@/lib/session";
-import { date, money } from "@/lib/format";
+import { date, money, plural } from "@/lib/format";
 import type { ExpenseList } from "@/lib/types-money";
 import type { FactoryDetail } from "@/lib/types-people";
 import type { HistoryEntry, Person } from "@/lib/types";
@@ -20,10 +20,10 @@ import { changeRows, compactChanges } from "@/components/orders/side-panel";
 import { PerformanceCard } from "@/components/insights/performance";
 import { removeFactoryAction, saveFactoryAction } from "../actions";
 import { FactoryPanel } from "../factory-form";
+import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Factory" };
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** Offers a card shows before "Show all". */
 const ROWS = 8;
 
@@ -50,7 +50,7 @@ export default async function FactoryPage({ params, searchParams }: { params: Pr
     load(() => api.get<FactoryDetail>(`/factories/${id}`)),
     api.get<HistoryEntry[]>("/history", { type: "factory", id }).catch(() => [] as HistoryEntry[]),
     can(me, "expenses.manage") ? hasFeature("expenses") : false,
-    api.get<Person[]>("/users/people").catch(() => [] as Person[]),
+    getPeople().catch(() => [] as Person[]),
     api.get<Note[]>(`/factories/${id}/notes`).catch(() => [] as Note[]),
     api.get<FollowUpList>("/follow-ups", { factoryId: id }).catch(() => null),
   ]);

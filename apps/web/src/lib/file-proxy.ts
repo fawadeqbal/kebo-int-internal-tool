@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api";
+import { UUID } from "@/lib/ids";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Types a browser can show safely in a tab (no SVG or HTML: they could run scripts). */
 const VIEWABLE = new Set(["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]);
 

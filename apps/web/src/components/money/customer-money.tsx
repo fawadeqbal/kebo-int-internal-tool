@@ -3,8 +3,7 @@ import { INQUIRY_STAGE_LABEL, INQUIRY_STAGE_TONE } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
-import type { Person } from "@/lib/types";
+import { money, TZ } from "@/lib/format";
 import type { CustomerAccount, CustomerPayments, ExpenseList, ExpenseTargets } from "@/lib/types-money";
 import { expenseAction } from "@/app/(app)/money/actions";
 import { ViewSwitch } from "@/components/common/view-switch";
@@ -14,8 +13,7 @@ import { CustomerPaymentsBody } from "./customer-payments";
 import { CustomerCredit, ReceiptForm } from "./money-v2";
 import { customerReceiptAction, refundCreditAction, useCreditAction, voidCreditAction } from "@/app/(app)/orders/actions";
 import { lostReasonLabel } from "./customer-account";
-
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
+import { getSettings, getPeople } from "@/lib/loaders";
 
 export type CustomerMoneyView = "payments" | "profit";
 
@@ -104,8 +102,8 @@ async function profitData(customerId: string, customerName: string) {
   const [list, targets, people, settings] = await Promise.all([
     api.get<ExpenseList>("/expenses", { customerId }),
     api.get<ExpenseTargets>("/expenses/targets"),
-    api.get<Person[]>("/users/people"),
-    api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings"),
+    getPeople(),
+    getSettings(),
   ]);
   return {
     today,
@@ -352,7 +350,7 @@ async function CreditAndReceipts({ customerId, customerName, pay }: { customerId
   const canRecord = pay.credit.canRecord;
   const hasCredit = pay.credit.entries.length > 0;
   if (!canRecord && !hasCredit) return null;
-  const settings = await api.get<{ sales: { currency: string; exchangeRates: Record<string, number> } }>("/settings");
+  const settings = await getSettings();
   const today = todayIn(TZ);
   const open = pay.orders.filter((o) => o.status !== "cancelled" && Number(o.due) > 0);
   return (

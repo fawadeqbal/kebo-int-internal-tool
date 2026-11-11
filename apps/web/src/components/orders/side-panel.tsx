@@ -2,7 +2,7 @@ import "server-only";
 import Link from "next/link";
 import { BASIS_STEP_LABEL, type BasisStep, type FlowStep } from "@kebo/shared";
 import { buttonClass, Card } from "@kebo/ui";
-import { dateTime, money, whole } from "@/lib/format";
+import { dateTime, money, whole, TZ } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/types";
 import { orderFilesOf, orderOf, orderPapersOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
@@ -14,7 +14,6 @@ import type { PaperLineRow } from "./papers-table";
 import { SideFileRow, SidePaperRow, SidePanelCard, SideSection } from "./side-panel-parts";
 import { today } from "./today";
 
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** The planned costs of the quote that are paid in each step. */

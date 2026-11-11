@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import { sameSite } from "@/lib/file-proxy";
+import { UUID } from "@/lib/ids";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SOURCES = new Set(["attachment", "payment", "factory_payment", "expense"]);
 
 /** Replace with a newer one (multipart: file). The deal's files keep the old one as an earlier version. */

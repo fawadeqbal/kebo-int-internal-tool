@@ -15,9 +15,9 @@ import { StatementButtons } from "@/components/ledger/statement-buttons";
 import { AgeingTiles, day, LedgerFilters, PARTY_PATH, periodOf, span, TypeBadge } from "@/components/ledger/ledger-parts";
 import type { LedgerEntry, LedgerParty } from "@/lib/types-ledger";
 import { TZ } from "../../../sections";
+import { UUID } from "@/lib/ids";
 
 const KIND: Record<string, LedgerPartyKind> = { customers: "customer", factories: "factory", staff: "staff" };
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Search = { period?: string; from?: string; to?: string; open?: string; removed?: string; cur?: string; panel?: string; id?: string };
 

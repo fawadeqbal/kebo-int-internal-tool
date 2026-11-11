@@ -14,14 +14,14 @@ import { COUNTRIES, countryName } from "@/lib/countries";
 import type { Paged } from "@/lib/types";
 import type { CustomerDetail, CustomerRow } from "@/lib/types-people";
 import { CustomerPanel } from "./customer-panel";
-import { currenciesFrom, type SalesCurrencies } from "./currencies";
+import { currenciesFrom } from "./currencies";
 import { crumbsFor } from "@/lib/nav";
+import { plural } from "@/lib/format";
+import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Customers" };
 
 type Params = Record<string, string | undefined>;
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Customers (design system: List frame) — the proof page of the building
@@ -44,7 +44,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     // The chips' counts (for the same search).
     country ? api.get<Paged<CustomerRow>>("/customers", { q: sp.q, pageSize: 1 }) : null,
     country === UNKNOWN_COUNTRY ? null : api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country: UNKNOWN_COUNTRY, pageSize: 1 }),
-    panel === "new-customer" || panel === "edit-customer" ? api.get<SalesCurrencies>("/settings") : null,
+    panel === "new-customer" || panel === "edit-customer" ? getSettings() : null,
     panel === "edit-customer" && sp.id ? api.get<CustomerDetail>(`/customers/${sp.id}`).catch(() => null) : null,
     can(me, "reports.view") ? hasFeature("insights") : false,
   ]);

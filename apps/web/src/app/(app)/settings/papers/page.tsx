@@ -1,7 +1,6 @@
-import type { Settings } from "@kebo/shared";
-import { api } from "@/lib/api";
 import { SettingsPage } from "../section";
 import { PapersCard } from "./card";
+import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Document templates" };
 
@@ -9,7 +8,7 @@ export const metadata = { title: "Document templates" };
 export default async function Page() {
   return (
     <SettingsPage href="/settings/papers" description="The papers your company makes for its orders. Switched-off papers leave the Papers lists and the checklists.">
-      <PapersCard value={(await api.get<Settings>("/settings")).papers} />
+      <PapersCard value={(await getSettings()).papers} />
     </SettingsPage>
   );
 }

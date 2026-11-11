@@ -1,20 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import {
-  Card,
-  cn,
-  DataRow,
-  EmptyState,
-  PageHeader,
-  ButtonLink,
-  PhoneList,
-  PhoneRow,
-  StatusBadge,
-  Td,
-  Th,
-  THead,
-  buttonClass,
-} from "@kebo/ui";
+import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile } from "@kebo/ui";
 import { platformApi } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
 import type { Dashboard, Overview } from "@/lib/types-platform";
@@ -37,19 +23,6 @@ const lastMonthName = () => {
   d.setUTCMonth(d.getUTCMonth() - 1);
   return d.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
 };
-
-function Tile({ label, value, sub, href }: { label: string; value: React.ReactNode; sub?: React.ReactNode; href: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-line bg-surface px-4 py-3 shadow-card transition-colors hover:border-line-strong"
-    >
-      <span className="text-xs text-text-2">{label}</span>
-      <span className="truncate text-lg font-semibold tracking-tight tabular sm:text-xl">{value}</span>
-      {sub && <span className="truncate text-xs text-muted">{sub}</span>}
-    </Link>
-  );
-}
 
 /**
  * The platform at a glance (design system: Dashboard frame, approved page
@@ -86,31 +59,36 @@ export default async function PlatformOverviewPage() {
         }
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <Tile
+        <StatTile
+          size="sm"
           label="Paying companies"
           value={d.paying}
           sub={d.payingNewThisMonth ? `${d.payingNewThisMonth} new this month` : "none new this month"}
           href="/platform/companies?kind=client"
         />
-        <Tile
+        <StatTile
+          size="sm"
           label="Income this month"
           value={moneyText(d.incomeThisMonth)}
           sub={versus(d.incomeThisMonth, d.incomeLastMonth, lastMonthName()) ?? "payments recorded this month"}
           href="/platform/log?kind=companies"
         />
-        <Tile
+        <StatTile
+          size="sm"
           label="Renewals in 30 days"
           value={d.renewals}
           sub={d.renewalsDue.length ? `${moneyText(d.renewalsDue)} due` : "nothing due"}
           href="/platform/companies?kind=client"
         />
-        <Tile
+        <StatTile
+          size="sm"
           label="Demos and trials"
           value={d.trials}
           sub={d.trialsEndingThisWeek ? `${d.trialsEndingThisWeek} end this week` : "none end this week"}
           href="/platform/companies?kind=demo"
         />
-        <Tile
+        <StatTile
+          size="sm"
           label="New client inquiries"
           value={d.newLeads}
           sub={`${d.leadsThisWeek} came in since Monday`}

@@ -2,9 +2,10 @@ import { can } from "@kebo/shared";
 import { PageHeader } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission } from "@/lib/session";
-import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole, SalesSettings } from "@/lib/types-deals";
+import type { ContactOption, CustomerOption, DealFormValues } from "@/lib/types-deals";
 import { DealForm } from "@/components/deals/deal-form";
 import { createDealAction, customerContactsAction, quickCustomerAction, searchCustomersAction } from "../actions";
+import { getSettings, getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "New inquiry" };
 
@@ -13,8 +14,8 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
   const me = await requirePermission("inquiries.create");
   const sp = await searchParams;
   const [settings, people, preset] = await Promise.all([
-    api.get<{ sales: SalesSettings }>("/settings"),
-    api.get<PersonWithRole[]>("/users/people"),
+    getSettings(),
+    getPeople(),
     sp.customer && /^[0-9a-f-]{36}$/i.test(sp.customer)
       ? api.get<{ id: string; name: string; country: string; contacts: ContactOption[] }>(`/customers/${sp.customer}`).catch(() => null)
       : Promise.resolve(null),

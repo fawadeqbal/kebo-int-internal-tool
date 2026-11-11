@@ -78,50 +78,6 @@ export function Delta({
   );
 }
 
-/** One headline figure: label and change on top, the value, one line of context, and an optional meter. */
-export function Tile({
-  label,
-  value,
-  delta,
-  sub,
-  meter,
-  className,
-  href,
-}: {
-  label: string;
-  value: ReactNode;
-  delta?: ReactNode;
-  sub?: ReactNode;
-  /** The share of the value that is bad (overdue), drawn as a thin bar. */
-  meter?: { percent: number; label: string };
-  className?: string;
-  href?: string;
-}) {
-  const body = (
-    <>
-      <span className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium text-text-2">{label}</span>
-        {delta}
-      </span>
-      <span className="truncate text-xl leading-7 font-semibold tracking-tight sm:text-2xl">{value}</span>
-      {meter && (
-        <span className="block h-1.5 overflow-hidden rounded-full bg-surface-3" role="img" aria-label={meter.label}>
-          <span className="block h-full rounded-full bg-chart-3" style={{ width: `${Math.max(0, Math.min(100, meter.percent))}%` }} />
-        </span>
-      )}
-      {sub && <span className="text-xs text-muted">{sub}</span>}
-    </>
-  );
-  const cls = cn("flex min-w-0 flex-col gap-1 rounded-xl border border-line bg-surface px-4 py-3.5 shadow-card", className);
-  return href ? (
-    <Link href={href} className={cn(cls, "transition-colors hover:border-line-strong")}>
-      {body}
-    </Link>
-  ) : (
-    <div className={cls}>{body}</div>
-  );
-}
-
 /** A row of 4 tiles (2 on a phone). */
 export function Tiles({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("grid grid-cols-2 gap-3 xl:grid-cols-4", className)}>{children}</div>;

@@ -2,10 +2,9 @@ import Link from "next/link";
 import { Alert, Card, CardBody, CardHeader, cn, Segmented, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
+import { money, TZ } from "@/lib/format";
 import type { ProfitAndLoss } from "@/lib/types-money";
 
-const TZ = process.env.APP_TIME_ZONE ?? process.env.NEXT_PUBLIC_APP_TIME_ZONE ?? "Asia/Shanghai";
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
 const monthName = (ym: string) => MONTH.format(new Date(`${ym}-01T00:00:00Z`));
 /** Goods and the costs to reach the price basis (freight…); the order's costs and bank charges. */

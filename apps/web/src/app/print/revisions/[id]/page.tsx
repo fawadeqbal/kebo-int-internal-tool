@@ -4,7 +4,7 @@ import { basisText, paymentSentenceOf } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { docBrand, hasFeature, load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
-import type { CompanySnapshot, DocLine, RevisionDoc } from "@/lib/types-orders";
+import type { DocLine, RevisionDoc } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo, companyOr, customerOr } from "@/components/print/data";
 import {
@@ -20,6 +20,7 @@ import {
   textBullets,
   type DocColumn,
 } from "@/components/print/kebo-doc";
+import { getSettings } from "@/lib/loaders";
 
 const copyHref = (id: string, back: string | undefined, internal: boolean) =>
   `/print/revisions/${id}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
@@ -58,7 +59,7 @@ export default async function QuotationPrint({
       return { customerId: deal.customer.id, contactId: deal.contactId };
     }),
     // The stamp is not frozen with the letterhead: documents print the current one.
-    api.get<{ company: CompanySnapshot }>("/settings").then((s) => s.company),
+    getSettings().then((s) => s.company),
   ]);
   const c = r.currency;
   const internal = sp.copy === "internal";

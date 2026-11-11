@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
-import { Card, CardHeader, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { Card, CardHeader, Table, Td, Th, THead, Tr, StatTile } from "@kebo/ui";
 import { amountCell, bigMoney, change, monthYearOf, percent, type Period } from "@/lib/insights-period";
 import { BUCKETS, bucketValue, type loadMoney } from "@/lib/insights-data";
 import type { Aging } from "@/lib/types-facts";
 import { ChartCard } from "./chart-card";
 import { CashChart, PairBars } from "./facts-charts";
-import { BarList, Delta, SegmentBar, Tile, Tiles } from "./frame";
+import { BarList, Delta, SegmentBar, Tiles } from "./frame";
 
 type Data = Awaited<ReturnType<typeof loadMoney>>;
 type Href = (patch: Record<string, string | undefined>) => string;
@@ -21,25 +21,25 @@ export function MoneySection({ d, p, href }: { d: Data; p: Period; href: Href })
   return (
     <div className="flex flex-col gap-4">
       <Tiles>
-        <Tile
+        <StatTile
           label="Net cash"
           value={signedMoney(d.netCash.now, c)}
           delta={<Delta value={change(d.netCash.now, d.netCash.before)} vs={vs} />}
           sub={`in ${amountCell(d.netCash.in)} · out ${amountCell(d.netCash.out)}`}
         />
-        <Tile
+        <StatTile
           label="Profit expected"
           value={bigMoney(d.profitExpected.now, c)}
           delta={<Delta value={change(d.profitExpected.now, d.profitExpected.before)} vs={vs} />}
           sub={`on the period's orders · ${percent(d.profitExpected.margin)}`}
         />
-        <Tile
+        <StatTile
           label="Profit so far"
           value={bigMoney(d.profitDone.now, c)}
           delta={<Delta value={change(d.profitDone.now, d.profitDone.before)} vs={vs} />}
           sub="on orders already paid and shipped"
         />
-        <Tile
+        <StatTile
           label="Costs over plan"
           value={bigMoney(d.overPlan.now, c)}
           delta={<Delta value={change(d.overPlan.now, d.overPlan.before)} goodWhenUp={false} vs={vs} />}
