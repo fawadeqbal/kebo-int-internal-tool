@@ -16,7 +16,7 @@ const AHEAD_MS = 5 * 60 * 1000;
 const people = { select: { id: true, name: true } } as const;
 const include = { author: people, contact: people } as const;
 
-/** A row of either table (inquiry_notes or record_notes) with its author and contact. */
+/** A note with its author and contact. */
 interface NoteRow {
   id: string;
   kind: string;
@@ -38,9 +38,9 @@ const VERB: Record<NoteKind, string> = {
   whatsapp: "logged a WhatsApp message",
   email: "logged an email",
 };
-/** The record_notes column that holds the record. */
-const onRecord = (type: Exclude<RecordType, "inquiry">, id: string) =>
-  type === "order" ? { orderId: id } : type === "customer" ? { customerId: id } : { factoryId: id };
+/** The column of notes that holds the record (a note is on exactly one). */
+const onRecord = (type: RecordType, id: string) =>
+  type === "inquiry" ? { inquiryId: id } : type === "order" ? { orderId: id } : type === "customer" ? { customerId: id } : { factoryId: id };
 /** Not seeing the record (or not seeing factories at all) means not seeing its notes. */
 const hidden = (e: unknown) => {
   throw e instanceof NotFoundError || e instanceof ForbiddenError ? new NotFoundError("Note") : e;
@@ -53,8 +53,8 @@ const quote = (body: string) => {
 
 /**
  * Notes and call logs on inquiries, orders, customers and factories: kind (note, call, visit, WhatsApp,
- * email), the customer's contact it was with, when it happened, who wrote it. Inquiry notes stay in
- * inquiry_notes (their old endpoint unchanged); the others are in record_notes. Who sees the record sees
+ * email), the customer's contact it was with, when it happened, who wrote it. All in one table, notes,
+ * each on exactly one record (an inquiry's old endpoint is unchanged). Who sees the record sees
  * its notes; who may change the record adds them; the author changes one within 24 hours; the author or
  * a manager of that kind of record removes one. Each is written to the record's history.
  */
@@ -91,10 +91,7 @@ export class NotesService {
   async list(user: SessionUser, type: RecordType, id: string) {
     const target = await seeRecord(this.prisma.db, user, type, id);
     const orderBy = [{ at: "desc" as const }, { createdAt: "desc" as const }, { id: "asc" as const }];
-    const rows: NoteRow[] =
-      type === "inquiry"
-        ? await this.prisma.db.inquiryNote.findMany({ where: { inquiryId: id }, include, orderBy })
-        : await this.prisma.db.recordNote.findMany({ where: onRecord(type, id), include, orderBy });
+    const rows: NoteRow[] = await this.prisma.db.note.findMany({ where: onRecord(type, id), include, orderBy });
     return rows.map((n) => this.view(user, target, n));
   }
 
@@ -143,10 +140,7 @@ export class NotesService {
     this.checkAt(input.at);
     const data = { kind: input.kind, body: input.body, contactId: input.contactId ?? null, at: input.at ?? this.clock.now(), authorId: user.id };
     return this.prisma.tx(async (tx) => {
-      const row =
-        type === "inquiry"
-          ? await tx.inquiryNote.create({ data: { ...data, inquiryId: id }, include })
-          : await tx.recordNote.create({ data: { ...data, ...onRecord(type, id) }, include });
+      const row = await tx.note.create({ data: { ...data, ...onRecord(type, id) }, include });
       if (type === "inquiry") await tx.inquiry.update({ where: { id }, data: { updatedAt: new Date() } });
       const kind = row.kind as NoteKind;
       await this.history(
@@ -167,23 +161,18 @@ export class NotesService {
     return this.view(user, target, row);
   }
 
-  /** A note by id in either table, with the record it is on (404 when the person does not see that record). */
+  /** A note by id, with the record it is on (404 when the person does not see that record). */
   private async find(user: SessionUser, noteId: string) {
-    const rec = await this.prisma.db.recordNote.findUnique({ where: { id: noteId }, include });
-    if (rec) {
-      const type: RecordType = rec.orderId ? "order" : rec.customerId ? "customer" : "factory";
-      const target = await seeRecord(this.prisma.db, user, type, (rec.orderId ?? rec.customerId ?? rec.factoryId)!).catch(hidden);
-      return { row: rec as NoteRow, target, table: "record" as const };
-    }
-    const inq = await this.prisma.db.inquiryNote.findUnique({ where: { id: noteId }, include });
-    if (!inq) throw new NotFoundError("Note");
-    const target = await seeRecord(this.prisma.db, user, "inquiry", inq.inquiryId).catch(hidden);
-    return { row: inq as NoteRow, target, table: "inquiry" as const };
+    const row = await this.prisma.db.note.findUnique({ where: { id: noteId }, include });
+    if (!row) throw new NotFoundError("Note");
+    const type: RecordType = row.inquiryId ? "inquiry" : row.orderId ? "order" : row.customerId ? "customer" : "factory";
+    const target = await seeRecord(this.prisma.db, user, type, (row.inquiryId ?? row.orderId ?? row.customerId ?? row.factoryId)!).catch(hidden);
+    return { row: row as NoteRow, target };
   }
 
   /** PATCH /notes/:id — its author, within 24 hours of writing it. */
   async edit(user: SessionUser, noteId: string, input: NoteEditInput) {
-    const { row, target, table } = await this.find(user, noteId);
+    const { row, target } = await this.find(user, noteId);
     if (row.authorId !== user.id) throw new ForbiddenError("Only the person who wrote a note can change it.");
     if (this.clock.now().getTime() - row.createdAt.getTime() >= EDIT_WINDOW_MS)
       throw new ForbiddenError("A note can be changed for 24 hours after it is written. Add a new one instead.", "too_late");
@@ -197,10 +186,7 @@ export class NotesService {
       editedAt: this.clock.now(),
     };
     const after = await this.prisma.tx(async (tx) => {
-      const n: NoteRow =
-        table === "inquiry"
-          ? await tx.inquiryNote.update({ where: { id: noteId }, data, include })
-          : await tx.recordNote.update({ where: { id: noteId }, data, include });
+      const n: NoteRow = await tx.note.update({ where: { id: noteId }, data, include });
       const pick = (x: NoteRow) => ({ kind: x.kind, body: x.body, at: x.at.toISOString(), contact: x.contact?.name ?? null });
       await this.history(tx, user, target, "note.edited", `${target.label}: ${user.name} changed a note: ${quote(n.body)}`, {
         old: pick(row),
@@ -213,12 +199,11 @@ export class NotesService {
 
   /** DELETE /notes/:id — its author, or a manager of that kind of record. */
   async remove(user: SessionUser, noteId: string) {
-    const { row, target, table } = await this.find(user, noteId);
+    const { row, target } = await this.find(user, noteId);
     if (row.authorId !== user.id && !managesNotesOf(user, target.type))
       throw new ForbiddenError("Only the person who wrote a note or a manager can remove it.");
     await this.prisma.tx(async (tx) => {
-      if (table === "inquiry") await tx.inquiryNote.delete({ where: { id: noteId } });
-      else await tx.recordNote.delete({ where: { id: noteId } });
+      await tx.note.delete({ where: { id: noteId } });
       await this.history(tx, user, target, "note.removed", `${target.label}: ${user.name} removed a note by ${row.author.name}: ${quote(row.body)}`, {
         old: { note: row.id, kind: row.kind, body: row.body, at: row.at.toISOString() },
       });

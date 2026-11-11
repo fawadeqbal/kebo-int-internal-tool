@@ -336,7 +336,7 @@ model User {
   relInquiryStageChanger    InquiryStageChange[] @relation("InquiryStageChanger")
   relAssignmentAssignee     InquiryAssignment[]  @relation("AssignmentAssignee")
   relAssignmentAssigner     InquiryAssignment[]  @relation("AssignmentAssigner")
-  relNoteAuthor             InquiryNote[]        @relation("NoteAuthor")
+  relNoteAuthor             Note[]               @relation("NoteAuthor")
   relAttachmentUploader     Attachment[]         @relation("AttachmentUploader")
   relFactoryQuoteCreator    FactoryQuote[]       @relation("FactoryQuoteCreator")
   relRevisionCreator        QuotationRevision[]  @relation("RevisionCreator")
@@ -361,7 +361,6 @@ model User {
   relInquiryFacts           InquiryFact[]        @relation("InquiryFactHandledBy")
   relSubmissionsSent        MoneySubmission[]    @relation("SubmissionSubmittedBy")
   relSubmissionsDecided     MoneySubmission[]    @relation("SubmissionDecidedBy")
-  relRecordNotes            RecordNote[]         @relation("RecordNoteAuthor")
   relFollowUpsAssigned      FollowUp[]           @relation("FollowUpAssignee")
   relFollowUpsCreated       FollowUp[]           @relation("FollowUpCreatedBy")
   relFollowUpsDone          FollowUp[]           @relation("FollowUpDoneBy")
@@ -565,7 +564,7 @@ model Party {
   credits      CustomerCredit[]  @relation("CustomerCreditCustomer")
   orderFacts   OrderFact[]       @relation("OrderFactCustomer")
   inquiryFacts InquiryFact[]     @relation("InquiryFactCustomer")
-  recordNotes  RecordNote[]      @relation("RecordNoteCustomer")
+  recordNotes  Note[]            @relation("NoteCustomer")
   followUps    FollowUp[]        @relation("FollowUpCustomer")
   ledger       LedgerEntry[]     @relation("LedgerEntryCustomer")
 
@@ -579,7 +578,7 @@ model Party {
   paymentPlans       FactoryPaymentPlan[] @relation("FactoryPaymentPlanFactory")
   orderParts         OrderFactory[]       @relation("OrderFactoryFactory")
   factoryOrderFacts  FactoryOrderFact[]   @relation("FactoryOrderFactFactory")
-  factoryRecordNotes RecordNote[]         @relation("RecordNoteFactory")
+  factoryRecordNotes Note[]               @relation("NoteFactory")
   factoryFollowUps   FollowUp[]           @relation("FollowUpFactory")
   factoryLedger      LedgerEntry[]        @relation("LedgerEntryFactory")
 
@@ -624,9 +623,8 @@ model Contact {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  inquiries    Inquiry[]
-  inquiryNotes InquiryNote[] @relation("InquiryNoteContact")
-  recordNotes  RecordNote[]  @relation("RecordNoteContact")
+  inquiries Inquiry[]
+  notes     Note[]
 
   @@index([customerId])
   @@index([email])
@@ -675,7 +673,7 @@ model Inquiry {
   items         RequestedItem[]
   stageChanges  InquiryStageChange[]
   assignments   InquiryAssignment[]
-  notes         InquiryNote[]
+  notes         Note[]
   followUps     FollowUp[]
   attachments   Attachment[]
   factoryQuotes FactoryQuote[]
@@ -762,32 +760,6 @@ model InquiryAssignment {
   @@index([inquiryId])
   @@index([companyId])
   @@map("inquiry_assignments")
-}
-
-model InquiryNote {
-  id        String    @id @default(uuid()) @db.Uuid
-  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company   Company   @relation(fields: [companyId], references: [id])
-  inquiryId String    @map("inquiry_id") @db.Uuid
-  inquiry   Inquiry   @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  body      String
-  /// note | call | visit | whatsapp | email (see NOTE_KINDS)
-  kind      String    @default("note") @db.VarChar(10)
-  /// The customer's contact it was with (a call with Ali).
-  contactId String?   @map("contact_id") @db.Uuid
-  contact   Contact?  @relation("InquiryNoteContact", fields: [contactId], references: [id], onDelete: SetNull)
-  /// When it happened (the call, the visit); when it was written for a plain note.
-  at        DateTime  @default(now()) @db.Timestamptz
-  authorId  String    @map("author_id") @db.Uuid
-  author    User      @relation("NoteAuthor", fields: [authorId], references: [id])
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  /// Last changed by its author (only within 24 hours of writing it).
-  editedAt  DateTime? @map("edited_at") @db.Timestamptz
-
-  @@index([inquiryId])
-  @@index([companyId])
-  @@map("inquiry_notes")
 }
 
 /// Files on a deal. Optionally tied to an order step (inspection report, payment slip, B/L copy).
@@ -1191,7 +1163,7 @@ model Order {
   papers       OrderPaper[]
   fact         OrderFact?
   factoryFacts FactoryOrderFact[]
-  recordNotes  RecordNote[]
+  recordNotes  Note[]
   followUps    FollowUp[]
   ledger       LedgerEntry[]
 
@@ -2189,7 +2161,6 @@ model Company {
   requestedItems      RequestedItem[]
   inquiryStageChanges InquiryStageChange[]
   inquiryAssignments  InquiryAssignment[]
-  inquiryNotes        InquiryNote[]
   attachments         Attachment[]
   factoryQuotes       FactoryQuote[]
   factoryQuoteLines   FactoryQuoteLine[]
@@ -2232,7 +2203,7 @@ model Company {
   ledgerEntries       LedgerEntry[]
   ledgerState         LedgerState?
   moneySubmissions    MoneySubmission[]
-  recordNotes         RecordNote[]
+  recordNotes         Note[]
   followUps           FollowUp[]
 
   @@map("companies")
@@ -2653,38 +2624,40 @@ model MoneySubmission {
   @@map("money_submissions")
 }
 
-/// A note or call log on an order, a customer or a factory (exactly one of them). Inquiries keep theirs in
-/// inquiry_notes, with the same fields.
-model RecordNote {
+/// A note or a call log on one record: an inquiry, an order, a customer or a supplier (exactly one of the
+/// four links is set). Who it was with, when it happened, who wrote it.
+model Note {
   id         String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId  String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company    Company   @relation(fields: [companyId], references: [id])
+  inquiryId  String?   @map("inquiry_id") @db.Uuid
+  inquiry    Inquiry?  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   orderId    String?   @map("order_id") @db.Uuid
   order      Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId String?   @map("customer_id") @db.Uuid
-  customer   Party?    @relation("RecordNoteCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Party?    @relation("NoteCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   factoryId  String?   @map("factory_id") @db.Uuid
-  factory    Party?    @relation("RecordNoteFactory", fields: [factoryId], references: [id], onDelete: Cascade)
-  /// note | call | visit | whatsapp | email (see NOTE_KINDS)
+  factory    Party?    @relation("NoteFactory", fields: [factoryId], references: [id], onDelete: Cascade)
+  /// note | call | visit | whatsapp | email
   kind       String    @default("note") @db.VarChar(10)
   body       String
-  /// The customer's contact it was with (orders and customers; factories have no contact list).
+  /// The customer's contact it was with.
   contactId  String?   @map("contact_id") @db.Uuid
-  contact    Contact?  @relation("RecordNoteContact", fields: [contactId], references: [id], onDelete: SetNull)
-  /// When it happened (the call, the visit); when it was written for a plain note.
+  contact    Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  /// When it happened (a call may be logged later).
   at         DateTime  @default(now()) @db.Timestamptz
   authorId   String    @map("author_id") @db.Uuid
-  author     User      @relation("RecordNoteAuthor", fields: [authorId], references: [id])
+  author     User      @relation("NoteAuthor", fields: [authorId], references: [id])
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  /// Last changed by its author (only within 24 hours of writing it).
   editedAt   DateTime? @map("edited_at") @db.Timestamptz
 
+  @@index([inquiryId, at])
   @@index([orderId, at])
   @@index([customerId, at])
   @@index([factoryId, at])
   @@index([companyId])
-  @@map("record_notes")
+  @@map("notes")
 }
 
 /// A planned call, visit or meeting for someone (Home's "Follow-ups today"), on at most one record: an

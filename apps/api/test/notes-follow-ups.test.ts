@@ -255,7 +255,7 @@ describe("notes and follow-ups", () => {
     await api(app, sana).patch(`/notes/${note.id}`, {}).expect(422);
     await api(app, manager).patch(`/notes/${note.id}`, { body: "x" }).expect(403);
     await api(app, bilal).patch(`/notes/${note.id}`, { body: "x" }).expect(404);
-    await db().recordNote.update({ where: { id: note.id }, data: { createdAt: new Date(Date.now() - 25 * 3600_000) } });
+    await db().note.update({ where: { id: note.id }, data: { createdAt: new Date(Date.now() - 25 * 3600_000) } });
     expect((await api(app, sana).get(`/orders/${orderId}/notes`).expect(200)).body.find((n: Note) => n.id === note.id).can.edit).toBe(false);
     const late = await api(app, sana).patch(`/notes/${note.id}`, { body: "x" }).expect(403);
     expect(late.body.code).toBe("too_late");
@@ -304,6 +304,21 @@ describe("notes and follow-ups", () => {
   });
 
   /* ---------------------------------------------------------------- follow-ups */
+
+  it("one table for every note: each is on exactly one record", async () => {
+    // A note on an inquiry, an order, a customer and a factory: four rows of the same table.
+    const ids: string[] = [];
+    for (const path of [`/inquiries/${inquiryId}`, `/orders/${orderId}`, `/customers/${customerId}`, `/factories/${factoryId}`])
+      ids.push((await api(app, manager).post(`${path}/notes`, { body: `One table ${tag}` }).expect(201)).body.id as string);
+    const rows = await db().note.findMany({ where: { id: { in: ids } }, select: { inquiryId: true, orderId: true, customerId: true, factoryId: true } });
+    expect(rows.map((r) => Object.values(r).filter(Boolean).length)).toEqual([1, 1, 1, 1]);
+    expect(new Set(rows.flatMap((r) => Object.values(r).filter(Boolean)))).toEqual(new Set([inquiryId, orderId, customerId, factoryId]));
+    // The database refuses a note on no record, and one on two.
+    const insert = (columns: string, values: string, ...args: string[]) =>
+      db().$executeRawUnsafe(`insert into notes (id, body, author_id${columns}) values (gen_random_uuid(), 'x', $1::uuid${values})`, sanaId, ...args);
+    await expect(insert("", "")).rejects.toThrow(/notes_one_record_check/);
+    await expect(insert(", inquiry_id, order_id", ", $2::uuid, $3::uuid", inquiryId, orderId)).rejects.toThrow(/notes_one_record_check/);
+  });
 
   it("follow-ups: added on records people see, for anyone; who it is for is told; labels and links", async () => {
     expect((await api(app, manager).get("/auth/me")).body.permissions).toContain("followups.viewAll");
@@ -566,12 +581,12 @@ describe("notes and follow-ups", () => {
 
     // In the database: not seen, not changed, and no link to our rows.
     const theirs = prisma.company(company.id);
-    expect(await theirs.recordNote.findUnique({ where: { id: note.id } })).toBeNull();
+    expect(await theirs.note.findUnique({ where: { id: note.id } })).toBeNull();
     expect(await theirs.followUp.findUnique({ where: { id: fu.id } })).toBeNull();
     expect((await theirs.followUp.updateMany({ where: { id: fu.id }, data: { title: "taken" } })).count).toBe(0);
     const bossId = (await theirs.user.findFirstOrThrow({ where: { email } })).id;
     await expect(
-      theirs.$executeRawUnsafe(`insert into record_notes (id, order_id, body, author_id) values (gen_random_uuid(), $1::uuid, 'x', $2::uuid)`, orderId, bossId),
+      theirs.$executeRawUnsafe(`insert into notes (id, order_id, body, author_id) values (gen_random_uuid(), $1::uuid, 'x', $2::uuid)`, orderId, bossId),
     ).rejects.toThrow(/another company|foreign key/);
     await expect(
       theirs.$executeRawUnsafe(
@@ -588,7 +603,7 @@ describe("notes and follow-ups", () => {
       ),
     ).rejects.toThrow(/another company|foreign key/);
     expect((await db().followUp.findUniqueOrThrow({ where: { id: fu.id } })).title).toBe("Ours");
-    expect((await db().recordNote.findUniqueOrThrow({ where: { id: note.id } })).body).toBe("Ours");
+    expect((await db().note.findUniqueOrThrow({ where: { id: note.id } })).body).toBe("Ours");
     void managerId;
   });
 });
