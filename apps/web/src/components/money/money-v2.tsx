@@ -92,6 +92,7 @@ export function ReceivedForm({
   today,
   label = "Record a payment",
   quiet,
+  startOpen = false,
 }: {
   action: Action;
   currency: string;
@@ -105,8 +106,10 @@ export function ReceivedForm({
   today: string;
   label?: string;
   quiet?: boolean;
+  /** Open at once (the Record payment page), not behind its button. */
+  startOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [fileError, setFileError] = useState<string | null>(null);
   if (Number(due) <= 0) return <p className="text-sm text-muted">Paid in full: nothing more to record.</p>;
   if (!open)

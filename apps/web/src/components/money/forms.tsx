@@ -722,9 +722,10 @@ export function FactoryPaymentForm({
 export function NewFactoryPayment({
   label = "Record a payment to a factory",
   quiet,
+  startOpen = false,
   ...props
-}: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose" | "payment" | "onFileError"> & { label?: string; quiet?: boolean }) {
-  const [open, setOpen] = useState(false);
+}: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose" | "payment" | "onFileError"> & { label?: string; quiet?: boolean; startOpen?: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   const [fileError, setFileError] = useState<string | null>(null);
   if (!open)
     return (
@@ -1094,8 +1095,12 @@ function Notice({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   );
 }
 
-export function NewExpense({ quiet, ...props }: Omit<Parameters<typeof ExpenseForm>[0], "onClose" | "expense" | "onReceiptError"> & { label?: string; quiet?: boolean }) {
-  const [open, setOpen] = useState(false);
+export function NewExpense({
+  quiet,
+  startOpen = false,
+  ...props
+}: Omit<Parameters<typeof ExpenseForm>[0], "onClose" | "expense" | "onReceiptError"> & { label?: string; quiet?: boolean; startOpen?: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   const [notice, setNotice] = useState<string | null>(null);
   return (
     <div className={cn("flex flex-col gap-2", (open || notice) && "w-full")}>
