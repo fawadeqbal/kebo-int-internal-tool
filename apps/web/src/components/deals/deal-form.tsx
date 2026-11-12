@@ -83,7 +83,7 @@ export function DealForm({
   cancelHref,
   mode,
   itemsFromExcel = true,
-  currency = "USD",
+  currency: _currency = "USD",
 }: {
   /** The main currency (the target price placeholder). */
   currency?: string;
@@ -108,6 +108,7 @@ export function DealForm({
 }) {
   const router = useRouter();
   const [v, setV] = useState<DealFormValues>(initial);
+  const [itemsOpen, setItemsOpen] = useState(false);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
   const [otherCategory, setOtherCategory] = useState(
     () => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()),
@@ -203,7 +204,6 @@ export function DealForm({
 
   const create = mode === "create";
   /** The item table is open: a new inquiry starts without one ("Add items now"). */
-  const [itemsOpen, setItemsOpen] = useState(false);
   const listing = !create || v.items.length > 0 || itemsOpen;
   const required = !v.items.length;
   const footer = (
