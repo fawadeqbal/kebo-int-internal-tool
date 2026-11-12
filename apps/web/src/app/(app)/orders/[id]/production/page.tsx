@@ -13,7 +13,8 @@ import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { RecordPaymentLink } from "@/components/money/pay-links";
-import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
+import { OrderLines, OrderLinesEditor, PhoneLines } from "@/components/orders/order-lines";
+import { editsOf } from "@/lib/edit-data";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { GoodsExcel } from "../goods";
 import { goodsOf } from "../shared";
@@ -118,6 +119,8 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
     ...(fat ? [{ label: "Factory test (FAT)", value: itemLine(fat) }] : []),
     ...(inspection ? [{ label: "Inspection", value: itemLine(inspection) }] : []),
   ];
+  const edits = await editsOf("order", o.id);
+  const ref = (card: string) => ({ type: "order" as const, id: o.id, card });
 
   return (
     <StepPage
@@ -174,6 +177,8 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
           factories={factories}
           action={productionStepsAction.bind(null, o.id)}
           canEdit={canEdit}
+          edit={ref("production.steps")}
+          card={edits.cards["production.steps"]}
         />
       )}
       <Checklist
@@ -201,6 +206,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
         canEdit={canEdit}
         panelTitle="Edit production"
         panelDescription="The ready date the factory gave and the ship date we promised. The test and the inspection are ticked in the checklist."
+        edits={{ ref: ref("production"), card: edits.cards.production }}
       />
       {goods.length > 0 && (
         <LinesCard
@@ -209,7 +215,10 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
           description={o.goods.allReceived ? "Everything has come in." : "What has come in so far on each line; the status follows."}
           canEdit={canEdit}
           view={<OrderLines set="received" orderId={o.id} lines={goodsLines} canEdit={false} today={now} />}
-          edit={<OrderLines set="received" orderId={o.id} lines={goodsLines} canEdit today={now} />}
+          edit={<OrderLinesEditor set="received" orderId={o.id} lines={goodsLines} today={now} edit={ref("lines.received")} card={edits.cards["lines.received"]} />}
+          panelTitle="Edit lines · from the factory"
+          panelDescription="What has come in on each line, and when. Nothing is saved until Save changes."
+          edits={edits.cards["lines.received"]}
           phone={<PhoneLines set="received" lines={goodsLines} />}
           actions={
             <>
@@ -217,7 +226,6 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               <GoodsExcel lines={goods} />
             </>
           }
-          editActions={<GoodsExcel lines={goods} />}
         />
       )}
     </StepPage>

@@ -7,7 +7,6 @@ import type { BankContract, BankStepView, DeliveryView, FlowDocument, SatCheckVi
 import { BankContractForm, RouteForm, SatEditor, type RouteTermsValue } from "./flow-forms";
 import { BankChainPanel, PaperSetPanel } from "./flow-panels";
 import { PanelBody, useClosePanel } from "@/components/common/panel";
-import { useRouter } from "next/navigation";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -29,45 +28,6 @@ export function PaymentEdit({
   currency,
   terms,
   fromQuotation,
-}: {
-  routeAction: Action;
-  contractAction: Action;
-  route: PaymentRoute | null;
-  contract: BankContract | null;
-  bankRoutes: boolean;
-  currency: string;
-  terms?: RouteTermsValue;
-  fromQuotation?: boolean;
-}) {
-  const close = useClosePanel();
-  const bank = route === "bank_contract" || route === "letter_of_credit";
-  return (
-    <PanelBody className="flex flex-col gap-6">
-      <section>
-        <h3 className={h}>The route</h3>
-        <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} fromQuotation={fromQuotation} onDone={close} />
-      </section>
-      {bank && bankRoutes && (
-        <section>
-          <h3 className={h}>{route === "letter_of_credit" ? "The LC" : "The bank contract"}</h3>
-          <BankContractForm action={contractAction} contract={contract} lc={route === "letter_of_credit"} currency={currency} onDone={close} />
-        </section>
-      )}
-      <p className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</p>
-    </PanelBody>
-  );
-}
-
-/** How the customer pays, right on the page (board OrderPayment): the route's cards and terms, then the LC or bank contract. */
-export function PaymentInline({
-  routeAction,
-  contractAction,
-  route,
-  contract,
-  bankRoutes,
-  currency,
-  terms,
-  fromQuotation,
   suggest,
 }: {
   routeAction: Action;
@@ -78,21 +38,25 @@ export function PaymentInline({
   currency: string;
   terms?: RouteTermsValue;
   fromQuotation?: boolean;
+  /** The route the order's terms point at, when none is chosen yet. */
   suggest?: PaymentRoute | null;
 }) {
-  const router = useRouter();
-  const done = () => router.refresh();
+  const close = useClosePanel();
   const bank = route === "bank_contract" || route === "letter_of_credit";
   return (
-    <div className="flex flex-col gap-6">
-      <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} fromQuotation={fromQuotation} suggest={suggest} onDone={done} />
+    <PanelBody className="flex flex-col gap-6">
+      <section>
+        <h3 className={h}>The route</h3>
+        <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} fromQuotation={fromQuotation} suggest={suggest} onDone={close} />
+      </section>
       {bank && bankRoutes && (
-        <section className="border-t border-line pt-5">
+        <section>
           <h3 className={h}>{route === "letter_of_credit" ? "The LC" : "The bank contract"}</h3>
-          <BankContractForm action={contractAction} contract={contract} lc={route === "letter_of_credit"} currency={currency} onDone={done} />
+          <BankContractForm action={contractAction} contract={contract} lc={route === "letter_of_credit"} currency={currency} onDone={close} />
         </section>
       )}
-    </div>
+      <p className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</p>
+    </PanelBody>
   );
 }
 

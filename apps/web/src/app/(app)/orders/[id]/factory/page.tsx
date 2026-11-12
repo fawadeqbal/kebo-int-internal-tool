@@ -10,6 +10,7 @@ import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
+import { editsOf } from "@/lib/edit-data";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { RecordPaymentLink } from "@/components/money/pay-links";
@@ -177,6 +178,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         canEdit={canEdit}
         panelTitle="Edit the factory order"
         panelDescription="Their number, the day we ordered and the ready date they gave. Saving updates the checklist."
+        edits={{ ref: { type: "order", id: o.id, card: "factory" }, card: (await editsOf("order", o.id)).cards.factory }}
       />
       {priced.length > 0 && (
         <LinesCard

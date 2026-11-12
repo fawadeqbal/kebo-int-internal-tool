@@ -20,6 +20,13 @@ const PanelClose = createContext<(arg?: CloseArg) => void>(() => {});
  */
 export const useClosePanel = () => useContext(PanelClose);
 
+const PanelDirty = createContext<(dirty: boolean | null) => void>(() => {});
+/**
+ * Inside a side panel: tells it whether there are unsaved changes, for an editor whose changes are not typing
+ * in its fields (a table of lines kept in the page). `null` goes back to noticing typing.
+ */
+export const useReportDirty = () => useContext(PanelDirty);
+
 const saved = (arg: CloseArg) => !!arg && typeof arg === "object" && "ok" in arg && (arg as { ok?: boolean }).ok === true;
 
 /* ---------------------------------------------------------------- the panel */
@@ -62,7 +69,8 @@ export function SidePanel({
   const mounted = useMounted();
   const [typed, setTyped] = useState(false);
   const [asking, setAsking] = useState(false);
-  const dirty = dirtyProp ?? typed;
+  const [reported, setReported] = useState<boolean | null>(null);
+  const dirty = dirtyProp ?? reported ?? typed;
   useFocusTrap(box, mounted);
 
   const request = useCallback(
@@ -137,7 +145,9 @@ export function SidePanel({
             <X aria-hidden />
           </Button>
         </div>
-        <PanelClose.Provider value={request}>{children}</PanelClose.Provider>
+        <PanelClose.Provider value={request}>
+          <PanelDirty.Provider value={setReported}>{children}</PanelDirty.Provider>
+        </PanelClose.Provider>
       </div>
       {asking && (
         <ConfirmDialog

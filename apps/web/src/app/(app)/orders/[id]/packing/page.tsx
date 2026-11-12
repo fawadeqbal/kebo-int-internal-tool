@@ -7,6 +7,7 @@ import { StepFrame } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
 import { packingAction, packingMarksAction } from "../../actions";
 import { PackingCard } from "../goods";
+import { editsOf } from "@/lib/edit-data";
 import { docHref, goodsOf } from "../shared";
 import { stepData } from "../step-data";
 
@@ -49,6 +50,8 @@ export default async function OrderPackingPage({ params }: { params: Promise<{ i
             marksAction={packingMarksAction.bind(null, o.id)}
             links={o.goods.packed || o.goods.totals.packages > 0 ? paper : undefined}
             today={now}
+            toggle
+            edits={await editsOf("order", o.id)}
           />
         </div>
       ) : (

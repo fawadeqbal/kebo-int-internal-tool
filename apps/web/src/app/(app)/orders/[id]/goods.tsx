@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { LINE_CONDITION_LABEL } from "@kebo/shared";
-import { Button, Card, CardBody, CardHeader, cn, Field, Textarea } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
 import type { LinePacking, OrderLineView } from "@/lib/types-orders";
 import { ExcelMenu } from "@/components/sheets/excel-menu";
 import { FileActions } from "@/components/common/file-actions";
-import { EditableRows, EditButton, useFocusRow } from "@/components/common/edit-button";
-import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
+import { EditButton } from "@/components/common/edit-button";
+import { SidePanel } from "@/components/common/panel";
+import { EditsChip, editedMark } from "@/components/edits/edits";
+import { OrderLines, OrderLinesEditor, PhoneLines } from "@/components/orders/order-lines";
+import { FieldsForm } from "@/components/orders/step-view";
+import type { EditCard, EditRef, EditsView } from "@/lib/types-edits";
 import { headerKey, sheetNumber, type ReadSheet, type SheetSpec } from "@/lib/sheet-spec";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -270,6 +274,7 @@ export function PackingCard({
   links,
   today,
   toggle,
+  edits,
 }: {
   title: string;
   description?: string;
@@ -289,22 +294,25 @@ export function PackingCard({
   /** The paper's View / Print and PDF (once there is something on it). */
   links?: { view: string; pdf: string };
   today: string;
-  /** Order v4's view: read-only until "Edit lines" ("#edit-lines" opens it); short text lines on a phone. */
+  /** Short text lines on a phone. */
   toggle?: boolean;
+  /** The order's saved edits ("Edited n×" on the lines and the marks). */
+  edits?: EditsView;
 }) {
+  // Read only, always: "Edit lines" opens them in the edit panel ("#edit-lines" too).
   const [editing, setEditing] = useState(false);
-  // The row clicked in the read-only lines: selected in the editor once it is open.
-  const [row, setRow] = useState<number | null>(null);
-  const tableBox = useRef<HTMLDivElement>(null);
-  useFocusRow(editing ? row : null, tableBox, () => setRow(null));
   useEffect(() => {
-    if (!toggle || !canEdit) return;
+    if (!canEdit) return;
     const check = () => window.location.hash === "#edit-lines" && setEditing(true);
     check();
     window.addEventListener("hashchange", check);
     return () => window.removeEventListener("hashchange", check);
-  }, [toggle, canEdit]);
-  const editable = toggle ? canEdit && editing : canEdit;
+  }, [canEdit]);
+  const closeEditor = () => {
+    setEditing(false);
+    if (window.location.hash === "#edit-lines") history.replaceState(null, "", window.location.pathname + window.location.search);
+  };
+  const ref = (card: string) => ({ type: "order" as const, id: orderId, card });
   const [fromFile, setFromFile] = useState<{ file: string; rows: PackRow[]; filled: number; problems: string[]; error: string | null } | null>(null);
   const saved = rowsOf(goods);
 
@@ -335,17 +343,10 @@ export function PackingCard({
         description={description}
         actions={
           <>
+            <EditsChip card={edits?.cards["lines.packing"]} title="Packing lines" />
             {badge}
             <FileActions excel={excel} viewHref={links?.view} pdfHref={links?.pdf} />
-            {toggle &&
-              canEdit &&
-              (editing ? (
-                <Button size="sm" variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setEditing(false)}>
-                  Done
-                </Button>
-              ) : (
-                <EditButton label="Edit lines" onClick={() => setEditing(true)} />
-              ))}
+            {canEdit && <EditButton label="Edit lines" onClick={() => setEditing(true)} />}
           </>
         }
       />
@@ -387,52 +388,63 @@ export function PackingCard({
             </div>
           </div>
         )}
-        {toggle && !editing && (
+        {toggle && (
           <div className="sm:hidden">
             <PhoneLines set="packing" lines={lines} />
           </div>
         )}
-        <div ref={tableBox} className={cn(toggle && !editing && "max-sm:hidden")}>
-          {toggle && canEdit && !editing ? (
-            <EditableRows label="Click a row to change it" onRow={(n) => (setRow(n), setEditing(true))}>
-              <OrderLines
-                set="packing"
-                orderId={orderId}
-                lines={lines}
-                canEdit={false}
-                today={today}
-                footer={<PackingMarks containerNo={containerNo} containerHref={containerHref} shippingMarks={shippingMarks} canEdit={false} action={marksAction} />}
+        <div className={cn(toggle && "max-sm:hidden")}>
+          <OrderLines
+            set="packing"
+            orderId={orderId}
+            lines={lines}
+            canEdit={false}
+            today={today}
+            footer={
+              <PackingMarks
+                containerNo={containerNo}
+                containerHref={containerHref}
+                shippingMarks={shippingMarks}
+                canEdit={canEdit}
+                action={marksAction}
+                edit={ref("packing.marks")}
+                card={edits?.cards["packing.marks"]}
               />
-            </EditableRows>
-          ) : (
-            <OrderLines
-              set="packing"
-              orderId={orderId}
-              lines={lines}
-              canEdit={editable}
-              today={today}
-              footer={<PackingMarks containerNo={containerNo} containerHref={containerHref} shippingMarks={shippingMarks} canEdit={editable} action={marksAction} />}
-            />
-          )}
+            }
+          />
         </div>
+        {editing && canEdit && (
+          <SidePanel
+            title="Edit packing lines"
+            description="Packed in, packages, weights and volume of each line. Nothing is saved until Save changes."
+            onClose={closeEditor}
+            className="md:w-[1180px]"
+          >
+            <OrderLinesEditor set="packing" orderId={orderId} lines={lines} today={today} edit={ref("lines.packing")} card={edits?.cards["lines.packing"]} />
+          </SidePanel>
+        )}
       </CardBody>
     </Card>
   );
 }
 
-/** The container (the shipment's, read-only here) and the shipping marks, under the packing totals; "Change" opens the marks. */
+/** The container (the shipment's, read-only here) and the shipping marks, under the packing totals; "Change" opens the marks in the panel. */
 function PackingMarks({
   containerNo,
   containerHref,
   shippingMarks,
   canEdit,
   action,
+  edit,
+  card,
 }: {
   containerNo: string | null;
   containerHref?: string;
   shippingMarks: string | null;
   canEdit: boolean;
   action: Action;
+  edit?: EditRef;
+  card?: EditCard | null;
 }) {
   const [editing, setEditing] = useState(false);
   const fromShipment = containerHref ? (
@@ -440,31 +452,6 @@ function PackingMarks({
       {containerNo ? "from Shipment 1 · change it there" : "add it on the shipment"}
     </a>
   ) : null;
-  if (editing)
-    return (
-      <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3 border-t border-line pt-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Container number</span>
-            <span id="pk-container" className="flex min-h-9 flex-wrap items-center gap-x-2 rounded-md border border-line bg-surface-2/60 px-3 text-sm" aria-readonly="true">
-              {containerNo ?? <span className="text-muted">—</span>}
-            </span>
-            {fromShipment}
-          </div>
-          <Field label="Shipping marks" htmlFor="pk-marks" optional hint="As printed on the cartons">
-            <Textarea id="pk-marks" name="shippingMarks" rows={2} className="min-h-0" maxLength={2000} defaultValue={shippingMarks ?? ""} />
-          </Field>
-        </div>
-        <div className="flex gap-2">
-          <SubmitButton size="xs" pendingText="Saving…">
-            Save
-          </SubmitButton>
-          <Button type="button" size="xs" variant="ghost" onClick={() => setEditing(false)}>
-            Cancel
-          </Button>
-        </div>
-      </ActionForm>
-    );
   if (!containerNo && !shippingMarks && !canEdit) return null;
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-t border-line pt-2 text-sm">
@@ -475,11 +462,26 @@ function PackingMarks({
           {fromShipment && <dd>{fromShipment}</dd>}
         </div>
         <div className="flex min-w-0 gap-1.5">
-          <dt className="shrink-0 text-muted">Shipping marks</dt>
+          <dt className="shrink-0 text-muted">
+            Shipping marks{edit && editedMark(card, "shippingMarks")}
+          </dt>
           <dd className="min-w-0 font-medium whitespace-pre-line">{shippingMarks ?? <span className="text-muted">—</span>}</dd>
         </div>
       </dl>
-      {canEdit && <EditButton size="xs" label="Change" onClick={() => setEditing(true)} />}
+      <span className="flex items-center gap-2">
+        <EditsChip card={card} title="Shipping marks" />
+        {canEdit && <EditButton size="xs" label="Change" onClick={() => setEditing(true)} />}
+      </span>
+      {editing && (
+        <SidePanel title="Edit the shipping marks" description="As printed on the cartons. The container is changed on the shipment." onClose={() => setEditing(false)}>
+          <FieldsForm
+            action={action}
+            edit={edit}
+            card={card}
+            fields={[{ name: "shippingMarks", label: "Shipping marks", value: shippingMarks, type: "textarea", wide: true, hint: "As printed on the cartons" }]}
+          />
+        </SidePanel>
+      )}
     </div>
   );
 }

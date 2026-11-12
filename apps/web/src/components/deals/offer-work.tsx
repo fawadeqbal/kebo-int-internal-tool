@@ -24,6 +24,9 @@ import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
 import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, type QuoteState } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
+import { BatchLines } from "@/components/edits/batch-lines";
+import { editedMark } from "@/components/edits/edits";
+import type { EditCard } from "@/lib/types-edits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Items = SourcingView["items"];
@@ -63,28 +66,6 @@ function toBody(v: LineValues, offerRate?: number) {
   };
 }
 
-/**
- * The customer's items as an offer's lines, with the prices typed for them.
- * With `prices`, only the items that have one (and the item a priced part
- * belongs to) are kept; without, every item, unpriced.
- */
-function linesFromItems(items: Items, prices?: Record<string, string>) {
-  const priced = (id: string) => !!prices?.[id]?.replace(/[^\d.]/g, "");
-  const keep = prices ? items.filter((it) => priced(it.id) || items.some((p) => p.parentId === it.id && priced(p.id))) : items;
-  const at = new Map(keep.map((it, n) => [it.id, n]));
-  return keep.map((it) => ({
-    ...toBody({
-      description: it.description,
-      model: it.model ?? "",
-      requestedItemId: it.id,
-      quantity: it.quantity,
-      unit: it.unit,
-      unitPrice: prices?.[it.id]?.replace(/[^\d.]/g, "") ?? "0",
-      taxRate: "",
-    }),
-    partOf: it.parentId ? (at.get(it.parentId) ?? null) : null,
-  }));
-}
 
 /** A line typed in the Enter-offer window (the lines table's row): its place (a part has its line's key) and values. */
 interface OfferRow {
@@ -402,6 +383,7 @@ export function OfferLines({
   canEdit,
   mainCurrency,
   lines,
+  edits,
 }: {
   q: FactoryQuoteView;
   others: FactoryQuoteView[];
@@ -409,6 +391,8 @@ export function OfferLines({
   canEdit: boolean;
   mainCurrency: string;
   lines: OfferLineActions;
+  /** This offer's saved edits to its lines ("Edited n×"). */
+  edits?: EditCard | null;
 }) {
   const used = q.lines.some((l) => l.used);
   const rows: LineRow[] = q.lines.map((l) => ({
@@ -425,6 +409,8 @@ export function OfferLines({
       alternativeOfId: l.alternativeOfId ?? "",
     },
   }));
+  // The view marks lines changed since they were first saved ("edited 2×"); the editor shows them plain.
+  const viewRows: LineRow[] = rows.map((r) => ({ ...r, badge: editedMark(edits, r.key) }));
   // Lines another spec can point at: the offer's main lines (not parts, not specs themselves).
   const mains = q.lines.filter((l) => !l.parentId && !l.alternativeOfId);
   const numberOf = (id: string) => q.lines.find((l) => l.id === id)?.no ?? "";
@@ -596,7 +582,7 @@ export function OfferLines({
       actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
       view={
         q.lines.length ? (
-          <LinesView label={`${q.factory.name} · lines`} rows={rows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
+          <LinesView label={`${q.factory.name} · lines`} rows={viewRows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
         ) : (
           <p className="text-sm text-muted">No lines yet.</p>
         )
@@ -621,19 +607,10 @@ export function OfferLines({
           </ul>
         ) : undefined
       }
-      edit={
-        <OfferLinesEditor
-          q={q}
-          others={others}
-          items={items}
-          rows={rows}
-          columns={columns}
-          footer={footer}
-          sheet={sheet}
-          used={used}
-          lines={lines}
-        />
-      }
+      edits={edits}
+      panelTitle={`Edit lines · ${q.factory.name}`}
+      panelDescription="Type, paste or upload the factory's lines and prices. Nothing is saved until Save changes."
+      edit={<OfferLinesEditor q={q} others={others} items={items} rows={rows} columns={columns} sheet={sheet} used={used} lines={lines} card={edits} />}
     />
   );
 }
@@ -644,115 +621,74 @@ function OfferLinesEditor({
   items,
   rows,
   columns,
-  footer,
   sheet,
   used,
   lines,
+  card,
 }: {
   q: FactoryQuoteView;
   others: FactoryQuoteView[];
   items: Items;
   rows: LineRow[];
   columns: LineColumn[];
-  footer: ReactNode;
   sheet: { name: string; upload: boolean; templateRows: { no: string; values: LineValues }[] };
   used: boolean;
   lines: OfferLineActions;
+  card?: EditCard | null;
 }) {
   const [copyFrom, setCopyFrom] = useState(others[0]?.id ?? "");
-  const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
 
-  /** The line table's answer from an action's answer; new line ids for "keep adding after this". */
+  /** The line table's answer from an action's answer; the offer's lines that were not there before (new ones). */
   const result = (r: OfferLineResult): LineResult => {
     if (!r.ok) return { ok: false, message: r.message, reasonChoices: r.reasonChoices };
     const had = new Set(q.lines.map((l) => l.id));
     return { ok: true, keys: r.offer.lines.filter((l) => !had.has(l.id)).map((l) => l.id) };
   };
-  const start = async (fn: () => Promise<OfferLineResult>) => {
-    setStarting(true);
-    setStartError(null);
-    const r = await fn();
-    setStarting(false);
-    if (!r.ok) setStartError(r.message);
+  /** Lines as new rows of this offer: values for its columns, parts under their line. */
+  const asNew = (src: { id: string; parentId: string | null; values: LineValues }[]): NewLine[] => {
+    const at = new Map(src.map((l, n) => [l.id, n]));
+    return src.map((l) => ({ values: l.values, partOf: l.parentId ? (at.get(l.parentId) ?? null) : null }));
+  };
+  const fromItems = () =>
+    asNew(
+      items.map((it) => ({
+        id: it.id,
+        parentId: it.parentId,
+        values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(q.taxRate) },
+      })),
+    );
+  const fromOffer = (o: FactoryQuoteView) =>
+    asNew(
+      o.lines
+        .filter((l) => !l.alternativeOfId)
+        .map((l) => ({
+          id: l.id,
+          parentId: l.parentId,
+          values: { description: l.description, model: l.model ?? "", requestedItemId: l.requestedItemId ?? "", quantity: l.quantity, unit: l.unit, unitPrice: "", taxRate: String(q.taxRate) },
+        })),
+    );
+  const total = (list: LineRow[]) => {
+    let t = 0;
+    for (const r of list) {
+      if (r.values.alternativeOfId) continue;
+      const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));
+      const n = Number((r.values.quantity ?? "").replace(/,/g, ""));
+      if (Number.isFinite(p * n)) t += Math.round(toMinor(p) * n);
+    }
+    return t;
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {used && (
-        <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
-          <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-          <span>
-            A quotation is priced from this offer. Changing a price, quantity or the order of its lines asks why; wording and models can
-            change freely (the quotation keeps its own copy).
-          </span>
-        </p>
-      )}
-      {q.lines.length === 0 && (items.length > 0 || others.length > 0) && (
-        <div className="flex flex-col gap-3 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary-soft/20 p-3 sm:p-4">
-          <p className="text-sm font-semibold">Start this offer</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {items.length > 0 && (
-              <button
-                type="button"
-                onClick={() => void start(() => lines.add(q.id, { lines: linesFromItems(items) }))}
-                disabled={starting}
-                className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-left text-sm hover:border-primary disabled:opacity-60"
-              >
-                <ListPlus className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                <span>
-                  <span className="block font-medium">From the customer&apos;s list ({items.length})</span>
-                  <span className="block text-xs text-text-2">Then change the models and add their prices</span>
-                </span>
-              </button>
-            )}
-            {others.length > 0 && (
-              <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-sm">
-                <span className="flex items-start gap-2.5">
-                  <Copy className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                  <span>
-                    <span className="block font-medium">Copy another factory&apos;s lines</span>
-                    <span className="block text-xs text-text-2">Same lines, prices left empty</span>
-                  </span>
-                </span>
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <Select
-                    compact
-                    aria-label="Offer to copy lines from"
-                    value={copyFrom}
-                    onChange={(e) => setCopyFrom(e.target.value)}
-                    className="h-8 min-w-0 flex-1"
-                  >
-                    {others.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.factory.name} ({o.lines.length})
-                      </option>
-                    ))}
-                  </Select>
-                  <Button
-                    size="xs"
-                    variant="secondary"
-                    onClick={() => copyFrom && void start(() => lines.copy(q.id, copyFrom))}
-                    disabled={starting}
-                  >
-                    Copy
-                  </Button>
-                </span>
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-muted">
-            Or type the first line in the table below, paste their list, or use the Excel menu to upload their file.
-          </p>
-          {startError && <p className="text-xs text-bad">{startError}</p>}
-        </div>
-      )}
-      <LineTable
-        rows={rows}
-        columns={columns}
-        noun="line"
-        sheet={sheet}
-        onAdd={async (newLines: NewLine[], at, reason) =>
+    <BatchLines
+      rows={rows}
+      columns={columns}
+      noun="line"
+      sheet={sheet}
+      edit={{ type: "factory_quote", id: q.id, card: "lines" }}
+      card={card}
+      plain={!used}
+      handlers={{
+        onAdd: async (newLines: NewLine[], at, reason) =>
           result(
             await lines.add(q.id, {
               lines: newLines.map((l) => ({ ...toBody(l.values, q.taxRate), partOf: l.partOf })),
@@ -760,19 +696,87 @@ function OfferLinesEditor({
               parentId: at.parentKey,
               reason,
             }),
-          )
-        }
-        onEdit={async (key, values, reason) => {
+          ),
+        onEdit: async (key, values, reason) => {
           const body: Record<string, unknown> = { reason };
-          const full = toBody({ ...rows.find((r) => r.key === key)!.values, ...values }, q.taxRate);
+          const full = toBody({ ...(rows.find((r) => r.key === key)?.values ?? {}), ...values }, q.taxRate);
           for (const k of Object.keys(values)) body[k] = full[k as keyof typeof full];
           return result(await lines.edit(key, body));
-        }}
-        onRemove={async (key, reason) => result(await lines.remove(key, reason))}
-        onMove={async (key, to: LineMove, reason) => result(await lines.move(key, { to, reason }))}
-        footer={footer}
-      />
-    </div>
+        },
+        onRemove: async (key, reason) => result(await lines.remove(key, reason)),
+        onMove: async (key, to: LineMove, reason) => result(await lines.move(key, { to, reason })),
+      }}
+      footer={(list) =>
+        list.length ? (
+          <div className="flex flex-wrap items-center justify-end gap-x-1.5 px-3 py-2 text-sm text-muted">
+            Factory total <span className="font-semibold text-text tabular">{formatMinor(total(list), q.currency)}</span>
+            {q.taxIncluded ? "tax included" : "without tax"}
+          </div>
+        ) : null
+      }
+      note={used ? "A quotation is priced from this offer: it keeps its own copy." : undefined}
+      above={({ rows: now, add }) => (
+        <>
+          {used && (
+            <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
+              <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+              <span>A quotation is priced from this offer. Saving changes to its lines asks why; the quotation keeps its own copy.</span>
+            </p>
+          )}
+          {now.length === 0 && (items.length > 0 || others.length > 0) && (
+            <div className="flex flex-col gap-3 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary-soft/20 p-3 sm:p-4">
+              <p className="text-sm font-semibold">Start this offer</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {items.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => add(fromItems())}
+                    className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-left text-sm hover:border-primary"
+                  >
+                    <ListPlus className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                    <span>
+                      <span className="block font-medium">From the customer&apos;s list ({items.length})</span>
+                      <span className="block text-xs text-text-2">Then change the models and add their prices</span>
+                    </span>
+                  </button>
+                )}
+                {others.length > 0 && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-sm">
+                    <span className="flex items-start gap-2.5">
+                      <Copy className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                      <span>
+                        <span className="block font-medium">Copy another factory&apos;s lines</span>
+                        <span className="block text-xs text-text-2">Same lines, prices left empty</span>
+                      </span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <Select compact aria-label="Offer to copy lines from" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-8 min-w-0 flex-1">
+                        {others.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.factory.name} ({o.lines.length})
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => {
+                          const o = others.find((x) => x.id === copyFrom);
+                          if (o) add(fromOffer(o));
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted">Or type the first line in the table below, paste their list, or use the Excel menu to upload their file.</p>
+            </div>
+          )}
+        </>
+      )}
+    />
   );
 }
 

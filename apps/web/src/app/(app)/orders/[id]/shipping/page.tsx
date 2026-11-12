@@ -1,3 +1,4 @@
+import { editsOf } from "@/lib/edit-data";
 import { Globe, Plus } from "lucide-react";
 import { can, trackingLink, portsOf, SHIP_MODE_LABEL, SHIP_MODES, SHIPMENT_STATUS_LABEL, SHIPMENT_STATUSES, shipByVsLc } from "@kebo/shared";
 import { Badge, buttonClass } from "@kebo/ui";
@@ -6,7 +7,7 @@ import type { ShipmentView } from "@/lib/types-flow";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
-import { DetailsCard, FieldsForm, InlineFieldsCard, PanelButton, StatusBar, type DetailField } from "@/components/orders/step-view";
+import { DetailsCard, FieldsForm, PanelButton, StatusBar, type DetailField } from "@/components/orders/step-view";
 import { HeaderTap } from "@/components/orders/header-slot";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { fieldsAction, lightAction } from "../../light-actions";
@@ -105,34 +106,6 @@ function shipmentFields(s: Partial<ShipmentView>, shipBy: ShipBy): DetailField[]
   return out.map((f) => (f.type === "date" && f.value && !f.show ? { ...f, show: date(f.value) } : f));
 }
 
-/** The shipment's form on the page, in the board's order (OrderShipping): mode, status, forwarder, booking, B/L, vessel, ports, container, dates, note. */
-function formFields(s: Partial<ShipmentView>): DetailField[] {
-  const air = s.mode === "air";
-  return [
-    { name: "mode", label: "Mode", value: s.mode ?? "sea", type: "select", options: SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_LABEL[m] })) },
-    { name: "status", label: "Status", value: s.status ?? "planned", type: "select", options: SHIPMENT_STATUSES.map((m) => ({ value: m, label: SHIPMENT_STATUS_LABEL[m] })) },
-    { name: "forwarder", label: "Forwarder", value: s.forwarder },
-    { name: "bookingNo", label: "Booking no.", value: s.bookingNo },
-    { name: "blNo", label: air ? "AWB no." : "B/L no.", value: s.blNo, placeholder: air ? "e.g. 999-12345675" : "e.g. MEDU1234567" },
-    ...(air ? [] : [{ name: "vessel", label: "Vessel / voyage", value: s.vessel, placeholder: "e.g. MSC Aurora" } satisfies DetailField]),
-    { name: "portOfLoading", label: air ? "Airport of departure" : "Port of loading", value: s.portOfLoading },
-    { name: "portOfDischarge", label: air ? "Airport of arrival" : "Port of discharge", value: s.portOfDischarge },
-    ...(air
-      ? []
-      : ([
-          { name: "containerNo", label: "Container no.", value: s.containerNo },
-          { name: "containerType", label: "Container type", value: s.containerType, placeholder: "e.g. 1 × 40 HQ" },
-          { name: "sealNo", label: "Seal no.", value: s.sealNo },
-          { name: "vgmKg", label: "VGM kg", value: s.vgmKg, type: "number", hint: "container gross mass" },
-        ] satisfies DetailField[])),
-    { name: "loadedOn", label: air ? "Handed over on" : "Loaded on", value: s.loadedOn, type: "date" },
-    { name: "etd", label: "ETD", value: s.etd, type: "date" },
-    { name: "eta", label: "ETA", value: s.eta, type: "date" },
-    { name: "departedOn", label: air ? "Flown on" : "Departed on", value: s.departedOn, type: "date" },
-    { name: "arrivedOn", label: "Arrived on", value: s.arrivedOn, type: "date" },
-    { name: "note", label: "Note", value: s.note, type: "textarea" },
-  ];
-}
 
 const DAY = 86_400_000;
 /** "At sea · day 4 of 17", "Booked", "Arrived 8 Jan": where the shipment is, for its card. */
@@ -285,6 +258,9 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
     </>
   );
 
+  const edits = await editsOf("order", o.id);
+  const ref = (card: string) => ({ type: "order" as const, id: o.id, card });
+
   return (
     <StepPage
       steps={d.steps}
@@ -314,16 +290,18 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           <>
             {lead && <StatusBar states={SHIPMENT_STATUSES.map((k) => ({ key: k, label: SHIPMENT_STATUS_LABEL[k] }))} at={lead.status} />}
             {shipments.map((s, i) => (
-              <InlineFieldsCard
+              <DetailsCard
                 key={s.id}
                 target="shipment"
                 id={i === 0 ? "shipments" : undefined}
                 title={shipments.length > 1 ? `Shipment ${i + 1}` : "Shipment"}
-                badge={whereBadge(s, now)}
-                fields={canShip ? formFields(s) : shipmentFields(s, shipBy)}
+                actions={whereBadge(s, now)}
+                fields={shipmentFields(s, shipBy)}
                 action={fieldsAction.bind(null, o.id, `shipment:${s.id}`)}
                 canEdit={canShip}
-                save="Save shipment"
+                panelTitle={shipments.length > 1 ? `Edit shipment ${i + 1}` : "Edit the shipment"}
+                panelDescription="The way, the ports, the carrier and the papers. Saving updates the checklist."
+                edits={{ ref: ref(`shipment:${s.id}`), card: edits.cards[`shipment:${s.id}`] }}
               />
             ))}
             {shipBy.ours && (
@@ -339,7 +317,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             id="shipments"
             target="shipment"
             title="Shipment"
-            description={canShip ? "Not booked yet: + Add any value starts the shipment, its ports from the terms." : "Not booked yet."}
+            description={canShip ? "Not booked yet: Edit starts the shipment, its ports from the terms." : "Not booked yet."}
             fields={shipmentFields(fresh, shipBy)}
             action={fieldsAction.bind(null, o.id, "shipment:new")}
             canEdit={canShip}
@@ -362,6 +340,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           action={fieldsAction.bind(null, o.id, "order")}
           canEdit={canEdit}
           panelTitle="Edit shipping"
+          edits={{ ref: ref("shipping"), card: edits.cards.shipping }}
         />
       )}
     </StepPage>

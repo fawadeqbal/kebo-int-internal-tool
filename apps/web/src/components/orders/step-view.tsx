@@ -1,13 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, Card, cn, Field, Input, Select, Textarea } from "@kebo/ui";
-import { SubmitButton } from "@kebo/ui/client";
-import { ActionForm } from "@/components/common/action-form";
 import { PanelActions, PanelBody, PanelSection, SidePanel, useClosePanel } from "@/components/common/panel";
-import { EditableRows, EditButton, useFocusRow } from "@/components/common/edit-button";
+import { EditButton } from "@/components/common/edit-button";
+import { EditsChip, editedMark } from "@/components/edits/edits";
+import { useEditSave } from "@/components/edits/use-edit-save";
+import type { EditCard, EditRef } from "@/lib/types-edits";
 import type { ActionState } from "@/lib/actions";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -21,17 +20,17 @@ export const dayLabel = (iso: string | null | undefined) =>
 
 /* ---------------------------------------------------------------- the side panel (common/panel) */
 
-function PanelFooter({ save = "Save" }: { save?: string }) {
+function PanelFooter({ save = "Save", busy, note }: { save?: string; busy?: boolean; note?: ReactNode }) {
   const close = useClosePanel();
   return (
     <PanelActions>
-      <SubmitButton size="sm" pendingText="Saving…">
-        {save}
-      </SubmitButton>
-      <Button type="button" size="sm" variant="ghost" onClick={close}>
+      <Button type="submit" size="sm" disabled={busy} aria-busy={busy}>
+        {busy ? "Saving…" : save}
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => close()} disabled={busy}>
         Cancel
       </Button>
-      <span className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</span>
+      <span className="text-xs text-muted">{note ?? "Changes show in the step’s Changes."}</span>
     </PanelActions>
   );
 }
@@ -110,126 +109,110 @@ function Control({ f, id, value, onChange, autoFocus, onKeyDown }: { f: DetailFi
   );
 }
 
-/** The full form of a card in the panel: its fields grouped, Save / Cancel. */
-export function FieldsForm({ action, fields, save }: { action: Action; fields: DetailField[]; save?: string }) {
+/** How a value reads in "what changed": a choice's label, a date as "14 Jan 2027", or "empty". */
+const changeText = (f: DetailField, v: string) =>
+  (f.options?.find((o) => o.value === v)?.label ?? (f.type === "date" && ISO.test(v) ? dayLabel(v) : v.length > 40 ? `${v.slice(0, 39)}…` : v)) || "empty";
+
+/**
+ * The full form of a card in the panel: its fields grouped, Save / Cancel.
+ * Filling an empty value saves plainly; changing a saved one asks why first
+ * (Edit n), and the edit is kept for the card's "Edited n×" (`edit`).
+ */
+export function FieldsForm({
+  action,
+  fields,
+  save,
+  edit,
+  card,
+  plain,
+}: {
+  action: Action;
+  fields: DetailField[];
+  save?: string;
+  edit?: EditRef;
+  card?: EditCard | null;
+  /** Never asks why (a draft). */
+  plain?: boolean;
+}) {
   const close = useClosePanel();
   const id = useId();
   const editable = fields.filter((f) => f.name && !f.cardOnly);
   const groups = [...new Set(editable.map((f) => f.group ?? ""))];
-  return (
-    <ActionForm action={action} onDone={close} showSuccess={false} className="flex min-h-0 flex-1 flex-col">
-      {(s) => (
-        <PanelBody className="gap-5">
-          {groups.map((g, i) => (
-            <PanelSection key={g} title={g || undefined} first={i === 0}>
-              {editable
-                .filter((f) => (f.group ?? "") === g)
-                .map((f) => (
-                  <Field
-                    key={f.name}
-                    label={f.panelLabel ?? f.label}
-                    htmlFor={`${id}-${f.name}`}
-                    hint={f.hint}
-                    error={s.errors?.[f.name!]}
-                    className={cn(f.wide && "sm:col-span-2")}
-                  >
-                    <Control f={{ ...f, value: s.values?.[f.name!] ?? f.value }} id={`${id}-${f.name}`} />
-                  </Field>
-                ))}
-            </PanelSection>
-          ))}
-          <PanelFooter save={save} />
-        </PanelBody>
-      )}
-    </ActionForm>
-  );
-}
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const saver = useEditSave({ edit, card, what: "values" });
 
-/* ---------------------------------------------------------------- "+ Add" in place */
-
-/**
- * One value changed right there: an empty one is "+ Add", a filled one shows
- * a small pencil on hover (`shown`); either turns into its input and Save
- * (Enter saves, Esc cancels).
- */
-function AddInPlace({ f, action, shown }: { f: DetailField; action: Action; shown?: ReactNode }) {
-  const id = useId();
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const initial = () => (shown !== undefined && f.value ? f.value : f.type === "select" ? (f.options?.[0]?.value ?? "") : "");
-  const [v, setV] = useState(initial);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const save = () =>
-    start(async () => {
-      if (!v.trim()) return setError(`Type the ${f.label.toLowerCase()}, or Esc to cancel.`);
-      setError(null);
-      const form = new FormData();
-      form.set(f.name!, v.trim());
-      const r = await action({}, form);
-      if (r.ok) {
-        setOpen(false);
-        router.refresh();
-      } else setError(r.message ?? "Something went wrong. Please try again.");
+  const submit = (form: HTMLFormElement) => {
+    const data = new FormData(form);
+    const changes: string[] = [];
+    const keys: string[] = [];
+    let filledChanged = false;
+    for (const f of editable) {
+      if (!data.has(f.name!)) continue;
+      const now = String(data.get(f.name!) ?? "").trim();
+      const was = (f.value ?? "").trim();
+      if (now === was) continue;
+      if (was) filledChanged = true;
+      keys.push(f.name!);
+      changes.push(`${f.panelLabel ?? f.label}: ${changeText(f, was)} → ${changeText(f, now)}`);
+    }
+    if (!changes.length) return close({ ok: true });
+    setErrors({});
+    void saver.save({
+      changes,
+      keys,
+      askWhy: filledChanged && !plain,
+      run: async (reason) => {
+        if (reason) data.set("reason", reason);
+        const st = await action({}, data);
+        if (st.ok) return { ok: true };
+        const errs: Record<string, string> = {};
+        for (const [k, v] of Object.entries(st.errors ?? {})) {
+          const first = Array.isArray(v) ? v[0] : v;
+          if (first) errs[k] = String(first);
+        }
+        setErrors(errs);
+        return {
+          ok: false,
+          message: st.message ?? "Something went wrong. Please try again.",
+          reasonChoices: st.code === "reason_needed" ? (st.choices ?? []) : undefined,
+        };
+      },
     });
-  if (!open && shown !== undefined)
-    return (
-      <span className="inline-flex max-w-full items-baseline gap-1.5">
-        <span className="min-w-0">{shown}</span>
-        <button
-          type="button"
-          onClick={() => (setV(initial()), setOpen(true))}
-          className="grid size-5 shrink-0 translate-y-0.5 place-items-center self-start rounded text-primary opacity-0 transition-opacity group-hover/field:opacity-100 hover:bg-primary-soft focus-visible:opacity-100 [@media(hover:none)]:hidden"
-          aria-label={`Change the ${f.label.toLowerCase()}`}
-          title={`Change the ${f.label.toLowerCase()}`}
-        >
-          <Pencil className="size-3" aria-hidden />
-        </button>
-      </span>
-    );
-  if (!open)
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-0.5 rounded text-sm font-medium text-primary hover:underline"
-        aria-label={`Add the ${f.label.toLowerCase()}`}
-      >
-        <Plus className="size-3.5" aria-hidden /> Add
-      </button>
-    );
+  };
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="sr-only">
-        {f.label}
-      </label>
-      <Control
-        f={f}
-        id={id}
-        value={v}
-        onChange={setV}
-        autoFocus
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && f.type !== "textarea") {
-            e.preventDefault();
-            save();
-          } else if (e.key === "Escape") {
-            e.stopPropagation();
-            setOpen(false);
-            setError(null);
-          }
-        }}
-      />
-      {error && <p className="text-xs text-bad">{error}</p>}
-      <div className="flex items-center gap-2">
-        <Button size="xs" variant="primary" onClick={save} disabled={pending}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-        <Button size="xs" variant="ghost" onClick={() => (setOpen(false), setError(null))}>
-          Cancel
-        </Button>
-      </div>
-    </div>
+    <form
+      noValidate
+      className="flex min-h-0 flex-1 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit(e.currentTarget);
+      }}
+    >
+      <PanelBody className="gap-5">
+        {saver.error && <Alert tone="error">{saver.error}</Alert>}
+        {groups.map((g, i) => (
+          <PanelSection key={g} title={g || undefined} first={i === 0}>
+            {editable
+              .filter((f) => (f.group ?? "") === g)
+              .map((f) => (
+                <Field
+                  key={f.name}
+                  label={f.panelLabel ?? f.label}
+                  htmlFor={`${id}-${f.name}`}
+                  hint={f.hint}
+                  error={errors[f.name!]}
+                  className={cn(f.wide && "sm:col-span-2")}
+                >
+                  <Control f={f} id={`${id}-${f.name}`} />
+                </Field>
+              ))}
+          </PanelSection>
+        ))}
+        <PanelFooter save={save} busy={saver.busy} note={card?.first ? "Changing a saved value asks why." : undefined} />
+      </PanelBody>
+      {saver.dialog}
+    </form>
   );
 }
 
@@ -281,7 +264,7 @@ export function ViewCard({
   canEdit: boolean;
   editLabel?: string;
   /** The panel the Edit opens. */
-  panel?: { title: string; description?: string; body: ReactNode };
+  panel?: { title: string; description?: string; body: ReactNode; className?: string };
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -302,7 +285,7 @@ export function ViewCard({
       </div>
       {children}
       {open && panel && (
-        <SidePanel title={panel.title} description={panel.description} onClose={() => setOpen(false)}>
+        <SidePanel title={panel.title} description={panel.description} onClose={() => setOpen(false)} className={panel.className}>
           {panel.body}
         </SidePanel>
       )}
@@ -313,8 +296,10 @@ export function ViewCard({
 /**
  * The Details card of a step (board OrderV4Shipping): its values as a label /
  * value grid (three columns, two on a phone), "n of m filled" in the header,
- * every empty value a "+ Add" that saves it in place, and Edit for the whole
- * form in the side panel. Without the right to change it: the values only.
+ * and Edit for the whole form in the side panel (read only on the page: board
+ * "View first, edit on purpose"). "Edited n×" says how often saved values
+ * changed, and each changed value is marked. Without the right to change it:
+ * the values only.
  */
 export function DetailsCard({
   id,
@@ -329,6 +314,7 @@ export function DetailsCard({
   panelBody,
   actions,
   footer,
+  edits,
 }: {
   id?: string;
   /** Where checklist links land: the card is `target`, each value `target.name` (see goTo). */
@@ -336,7 +322,7 @@ export function DetailsCard({
   title: ReactNode;
   description?: ReactNode;
   fields: DetailField[];
-  /** Saves one value or the whole card; none: nothing is changed here. */
+  /** Saves the card; none: nothing is changed here. */
   action?: Action;
   canEdit: boolean;
   panelTitle?: string;
@@ -345,27 +331,35 @@ export function DetailsCard({
   panelBody?: ReactNode;
   actions?: ReactNode;
   footer?: ReactNode;
+  /** Where its edits are kept, and what they are so far ("Edited n×"). */
+  edits?: { ref: EditRef; card?: EditCard | null; plain?: boolean };
 }) {
   const editable = canEdit && !!action;
   const shown = fields.filter((f) => !f.panelOnly);
   const counted = shown.filter((f) => !f.uncounted);
   const n = counted.filter(filled).length;
   const hasPanel = !!panelBody || (editable && fields.some((f) => f.name && !f.cardOnly));
+  const name = typeof title === "string" ? title : "This card";
   return (
     <ViewCard
       id={id}
       target={target}
       title={title}
-      description={description ?? (editable ? "Click + Add to fill one value right here; Edit opens everything." : undefined)}
+      description={description}
       meter={{ n, of: counted.length }}
       canEdit={canEdit && hasPanel}
-      actions={actions}
+      actions={
+        <>
+          <EditsChip card={edits?.card} title={name} />
+          {actions}
+        </>
+      }
       panel={
         hasPanel
           ? {
               title: panelTitle ?? `Edit ${typeof title === "string" ? title.toLowerCase() : "the details"}`,
               description: panelDescription ?? "Everything about it in one place. Saving updates the checklist.",
-              body: panelBody ?? <FieldsForm action={action!} fields={fields} />,
+              body: panelBody ?? <FieldsForm action={action!} fields={fields} edit={edits?.ref} card={edits?.card} plain={edits?.plain} />,
             }
           : undefined
       }
@@ -375,23 +369,14 @@ export function DetailsCard({
           <div
             key={f.name ?? f.label}
             data-target={target ? `${target}.${f.target ?? f.name ?? f.label.toLowerCase()}` : undefined}
-            className="group/field -mx-1.5 flex min-w-0 flex-col gap-0.5 px-1.5 py-0.5"
+            className="-mx-1.5 flex min-w-0 flex-col gap-0.5 px-1.5 py-0.5"
           >
-            <dt className="text-xs text-muted">{f.label}</dt>
+            <dt className="text-xs text-muted">
+              {f.label}
+              {f.name && editedMark(edits?.card, f.name)}
+            </dt>
             <dd className="min-w-0 text-sm font-medium break-words text-text tabular">
-              {filled(f) ? (
-                editable && f.name && f.type !== "textarea" && !f.fixed ? (
-                  <AddInPlace f={f} action={action!} shown={shownOf(f)} />
-                ) : (
-                  shownOf(f)
-                )
-              ) : f.empty !== undefined ? (
-                f.empty
-              ) : editable && f.name ? (
-                <AddInPlace f={f} action={action!} />
-              ) : (
-                <span className="font-normal text-muted">—</span>
-              )}
+              {filled(f) ? shownOf(f) : f.empty !== undefined ? f.empty : <span className="font-normal text-muted">—</span>}
             </dd>
           </div>
         ))}
@@ -401,15 +386,12 @@ export function DetailsCard({
   );
 }
 
-const LinesClose = createContext<() => void>(() => {});
-/** Inside a LinesCard's edit mode: back to the read-only lines (an editor that saves as a whole). */
-export const useCloseLines = () => useContext(LinesClose);
-
 /**
- * A view card for a set of lines: read-only until "Edit lines", then the
- * step's line table to type into ("#edit-lines" in the address opens it, so
- * a row's "Open the lines" lands here ready). On a phone, read-only lines are
- * short text lines.
+ * A view card for a set of lines (board "View first, edit on purpose"): read
+ * only, always. "Edit lines" in its header opens the lines in the wide edit
+ * panel (`edit`, e.g. BatchLines), where changes are kept until Save changes;
+ * "#edit-lines" in the address opens it too. "Edited n×" beside it says how
+ * often the saved lines changed. On a phone, the lines are short text lines.
  */
 export function LinesCard({
   title,
@@ -419,36 +401,37 @@ export function LinesCard({
   edit,
   phone,
   actions,
-  editActions,
   editLabel = "Edit lines",
   target,
+  panelTitle,
+  panelDescription,
+  edits,
 }: {
   title: ReactNode;
   description?: ReactNode;
   canEdit: boolean;
   view: ReactNode;
+  /** The edit panel's body (BatchLines, or an editor that saves as a whole). */
   edit?: ReactNode;
   /** The lines as short text lines on a phone (read-only). */
   phone?: ReactNode;
   actions?: ReactNode;
-  /** Shown while editing (e.g. Excel, Mark all received). */
-  editActions?: ReactNode;
   editLabel?: string;
   /** Where checklist links land ("lines.packing"; see goTo). */
   target?: string;
+  panelTitle?: string;
+  panelDescription?: ReactNode;
+  /** The card's saved edits: "Edited n×". */
+  edits?: EditCard | null;
 }) {
-  const [editing, setEditing] = useState(false);
-  // The row clicked in the read-only lines: selected in the editor once it is open.
-  const [row, setRow] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const editBox = useRef<HTMLDivElement>(null);
   const editable = canEdit && !!edit;
-  useFocusRow(editing ? row : null, editBox, () => setRow(null));
   useEffect(() => {
     if (!editable) return;
     const check = () => {
       if (window.location.hash === "#edit-lines") {
-        setEditing(true);
+        setOpen(true);
         ref.current?.scrollIntoView({ block: "start" });
       }
     };
@@ -456,49 +439,47 @@ export function LinesCard({
     window.addEventListener("hashchange", check);
     return () => window.removeEventListener("hashchange", check);
   }, [editable]);
-  const desktop = editable ? (
-    <EditableRows label="Click a row to change it" onRow={(n) => (setRow(n), setEditing(true))}>
-      {view}
-    </EditableRows>
-  ) : (
-    view
-  );
+  const close = () => {
+    setOpen(false);
+    if (window.location.hash === "#edit-lines") history.replaceState(null, "", window.location.pathname + window.location.search);
+  };
+  const name = typeof title === "string" ? title : "the lines";
   return (
     <div ref={ref} id="lines" className="scroll-mt-24">
       <ViewCard
         title={title}
         target={target}
-        description={description ?? (editable && !editing ? "Click a row to change it, or edit them all." : undefined)}
+        description={description}
         canEdit={false}
         actions={
           <>
-            {editing ? editActions : actions}
-            {editable &&
-              (editing ? (
-                <Button size="sm" variant="secondary" className="h-8 px-3 text-[13px]" onClick={() => setEditing(false)}>
-                  Done
-                </Button>
-              ) : (
-                <EditButton label={editLabel} onClick={() => setEditing(true)} />
-              ))}
+            <EditsChip card={edits} title={name} />
+            {actions}
+            {editable && <EditButton label={editLabel} onClick={() => setOpen(true)} />}
           </>
         }
       >
         <div className="p-4">
-          {editing ? (
-            <div ref={editBox}>
-              <LinesClose.Provider value={() => setEditing(false)}>{edit}</LinesClose.Provider>
-            </div>
-          ) : phone ? (
+          {phone ? (
             <>
               <div className="sm:hidden">{phone}</div>
-              <div className="max-sm:hidden">{desktop}</div>
+              <div className="max-sm:hidden">{view}</div>
             </>
           ) : (
-            desktop
+            view
           )}
         </div>
       </ViewCard>
+      {open && editable && (
+        <SidePanel
+          title={panelTitle ?? `Edit ${name.toLowerCase().startsWith("lines") ? name.toLowerCase() : name}`}
+          description={panelDescription ?? "Change, add, remove or move lines here. Nothing is saved until Save changes."}
+          onClose={close}
+          className="md:w-[1180px]"
+        >
+          {edit}
+        </SidePanel>
+      )}
     </div>
   );
 }
@@ -543,68 +524,6 @@ export function PanelButton({
         </SidePanel>
       )}
     </>
-  );
-}
-
-/* ---------------------------------------------------------------- the whole form in the page */
-
-/**
- * A card that is its own form (board OrderShipping "Shipment"): every value as
- * an input in three columns, Save and Cancel (Cancel puts the saved values back).
- * Without the right to change it, the read-only card shows instead.
- */
-export function InlineFieldsCard({
-  id,
-  target,
-  title,
-  badge,
-  fields,
-  action,
-  canEdit,
-  save = "Save",
-}: {
-  id?: string;
-  target?: string;
-  title: ReactNode;
-  badge?: ReactNode;
-  fields: DetailField[];
-  action: Action;
-  canEdit: boolean;
-  save?: string;
-}) {
-  const uid = useId();
-  const router = useRouter();
-  const [round, setRound] = useState(0);
-  if (!canEdit) return <DetailsCard id={id} target={target} title={title} fields={fields} canEdit={false} actions={badge} />;
-  const editable = fields.filter((f) => f.name && !f.cardOnly);
-  return (
-    <Card id={id} data-target={target} data-target-card="" className="scroll-mt-24 p-0">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
-        <h2 className="text-base font-semibold">{title}</h2>
-        {badge}
-      </div>
-      <ActionForm key={round} action={action} onDone={() => router.refresh()} className="flex flex-col gap-4 p-4 sm:p-5">
-        {(s) => (
-          <>
-            <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-              {editable.map((f) => (
-                <div key={f.name} data-target={target ? `${target}.${f.name}` : undefined} className={cn("scroll-mt-24", f.wide && "lg:col-span-1")}>
-                  <Field label={f.panelLabel ?? f.label} htmlFor={`${uid}-${f.name}`} hint={f.hint} error={s.errors?.[f.name!]}>
-                    <Control f={{ ...f, type: f.type === "textarea" ? "text" : f.type, value: s.values?.[f.name!] ?? f.value }} id={`${uid}-${f.name}`} />
-                  </Field>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <SubmitButton pendingText="Saving…">{save}</SubmitButton>
-              <Button type="button" variant="ghost" onClick={() => setRound((r) => r + 1)}>
-                Cancel
-              </Button>
-            </div>
-          </>
-        )}
-      </ActionForm>
-    </Card>
   );
 }
 

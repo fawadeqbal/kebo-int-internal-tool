@@ -72,6 +72,7 @@ export function LinesView({
                   )}
                 >
                   {shown(c, r)}
+                  {k === 0 && r.badge}
                 </td>
               ))}
             </tr>

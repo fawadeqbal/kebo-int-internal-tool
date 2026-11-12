@@ -6,12 +6,13 @@ import { ClaimsPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
-import { InlineFieldsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
+import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { SatEdit } from "@/components/orders/view-panels";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { addClaimAction, satAction, updateClaimAction } from "../../flow-actions";
 import { fieldsAction, lightAction } from "../../light-actions";
-import { OrderLines, PhoneLines } from "@/components/orders/order-lines";
+import { OrderLines, OrderLinesEditor, PhoneLines } from "@/components/orders/order-lines";
+import { editsOf } from "@/lib/edit-data";
 import { DeliveredExcel } from "../goods";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
@@ -88,19 +89,8 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
     { label: "Claims open", value: String(openClaims), uncounted: true },
     { name: "deliveryNote", label: "Note on the delivery", value: dv.note, type: "textarea", panelOnly: true, uncounted: true, wide: true, group: "Note" },
   ];
-  // The board's form, in its order: delivered on, received by, delivery note, SAT engineer, SAT planned, SAT done, signed by.
-  const byName = (n: string) => fields.find((f) => f.name === n)!;
-  const formFields: DetailField[] = [
-    byName("deliveredOn"),
-    byName("deliveryReceivedBy"),
-    { ...byName("deliveryNote"), label: "Delivery note", type: "text" },
-    { ...byName("satEngineerId"), label: "SAT engineer" },
-    byName("satPlannedOn"),
-    byName("satDoneOn"),
-    byName("satSignedBy"),
-  ];
-  // Add in place picks the first option: a person, not "—".
-  const shownFields = fields.map((f) => (f.name === "satEngineerId" && !f.value ? { ...f, options: f.options!.slice(1) } : f));
+  const edits = await editsOf("order", o.id);
+  const ref = (card: string) => ({ type: "order" as const, id: o.id, card });
 
   return (
     <StepPage
@@ -125,14 +115,16 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
         today={now}
       />
       <StepViewDivider />
-      <InlineFieldsCard
+      <DetailsCard
         target="delivery"
         title="Delivery"
-        badge={dv.condition ? <Badge tone={dv.condition === "good" ? "ok" : "warn"} dot>{`${DELIVERY_CONDITION_LABEL[dv.condition]} · from the lines`}</Badge> : undefined}
-        fields={canEdit ? formFields : shownFields}
+        fields={fields}
         action={fieldsAction.bind(null, o.id, "delivery")}
         canEdit={canEdit}
-        save="Save delivery"
+        panelTitle="Edit the delivery"
+        panelDescription="When it reached the customer, who received it, and the site acceptance test. Saving updates the checklist."
+        actions={dv.condition ? <Badge tone={dv.condition === "good" ? "ok" : "warn"} dot>{`${DELIVERY_CONDITION_LABEL[dv.condition]} · from the lines`}</Badge> : undefined}
+        edits={{ ref: ref("delivery"), card: edits.cards.delivery }}
       />
       {goodsLines.length > 0 && (
         <LinesCard
@@ -141,10 +133,12 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
           description={delivered === goodsLines.length ? "Everything reached the customer." : "How many of each line reached the customer, and in what condition."}
           canEdit={canEdit}
           view={<OrderLines set="delivered" orderId={o.id} lines={goodsLines} canEdit={false} today={now} />}
-          edit={<OrderLines set="delivered" orderId={o.id} lines={goodsLines} canEdit today={now} />}
+          edit={<OrderLinesEditor set="delivered" orderId={o.id} lines={goodsLines} today={now} edit={ref("lines.delivered")} card={edits.cards["lines.delivered"]} />}
           phone={<PhoneLines set="delivered" lines={goodsLines} />}
           actions={<DeliveredExcel lines={goodsLines} />}
-          editActions={<DeliveredExcel lines={goodsLines} />}
+          panelTitle="Edit lines · delivered"
+          panelDescription="How many of each line reached the customer, and in what condition. Nothing is saved until Save changes."
+          edits={edits.cards["lines.delivered"]}
         />
       )}
       <ViewCard
