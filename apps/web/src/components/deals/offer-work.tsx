@@ -2,14 +2,16 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, Download, Eye, FileText, Info, List, ListPlus, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, Download, Eye, FileText, Info, ListPlus, Plus, Trash2 } from "lucide-react";
 import { formatMinor, fxRate, toMinor } from "@kebo/money";
-import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, offerTaxText, type AttachmentKind, type Incoterm } from "@kebo/shared";
+import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, lineNumbers, offerTaxText, type AttachmentKind, type Incoterm } from "@kebo/shared";
 import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
+import { localLineHandlers } from "@/components/lines/local-lines";
+import { rowKey } from "./form-bits";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
@@ -22,6 +24,9 @@ import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
 import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, type QuoteState } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
+import { BatchLines } from "@/components/edits/batch-lines";
+import { editedMark } from "@/components/edits/edits";
+import type { EditCard } from "@/lib/types-edits";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Items = SourcingView["items"];
@@ -61,63 +66,30 @@ function toBody(v: LineValues, offerRate?: number) {
   };
 }
 
-/**
- * The customer's items as an offer's lines, with the prices typed for them.
- * With `prices`, only the items that have one (and the item a priced part
- * belongs to) are kept; without, every item, unpriced.
- */
-function linesFromItems(items: Items, prices?: Record<string, string>) {
-  const priced = (id: string) => !!prices?.[id]?.replace(/[^\d.]/g, "");
-  const keep = prices ? items.filter((it) => priced(it.id) || items.some((p) => p.parentId === it.id && priced(p.id))) : items;
-  const at = new Map(keep.map((it, n) => [it.id, n]));
-  return keep.map((it) => ({
-    ...toBody({
-      description: it.description,
-      model: it.model ?? "",
-      requestedItemId: it.id,
-      quantity: it.quantity,
-      unit: it.unit,
-      unitPrice: prices?.[it.id]?.replace(/[^\d.]/g, "") ?? "0",
-      taxRate: "",
-    }),
-    partOf: it.parentId ? (at.get(it.parentId) ?? null) : null,
-  }));
-}
 
-/** A line typed in the Enter-offer window: what it is for (an item's id, "new", "part:<key>", "spec:<key>"), then its values. */
+/** A line typed in the Enter-offer window (the lines table's row): its place (a part has its line's key) and values. */
 interface OfferRow {
   key: string;
-  for: string;
-  description: string;
-  model: string;
-  quantity: string;
-  unit: string;
-  unitPrice: string;
-  taxRate: string;
+  parentKey: string | null;
+  values: LineValues;
 }
-let rowSeq = 0;
-const blankRow = (): OfferRow => ({ key: `n${(rowSeq += 1)}`, for: "new", description: "", model: "", quantity: "1", unit: "pcs", unitPrice: "", taxRate: "" });
 
 /**
- * The window's lines as the API takes them: a line for an item without a price is left out (they don't
- * offer it), so are empty lines; parts and other specs point at their line's place in the list.
+ * The window's lines as the API takes them: a line for an item without a price is left out (they don't offer
+ * it) unless one of its parts has a price; parts and other specs point at their line's place in the list.
  */
 export function offerLinesOf(rows: OfferRow[], offerTax: string) {
-  const kept = rows.filter((r) => r.description.trim() && (!/^[0-9a-f-]{36}$/i.test(r.for) || r.unitPrice.replace(/[^\d.]/g, "")));
+  const priced = (r: OfferRow) => !!(r.values.unitPrice ?? "").replace(/[^\d.]/g, "");
+  const kept = rows.filter(
+    (r) =>
+      (r.values.description ?? "").trim() &&
+      (!r.values.requestedItemId || priced(r) || rows.some((p) => p.parentKey === r.key && priced(p))),
+  );
   const at = new Map(kept.map((r, n) => [r.key, n]));
-  const ref = (r: OfferRow, kind: "part" | "spec") => (r.for.startsWith(`${kind}:`) ? (at.get(r.for.slice(kind.length + 1)) ?? null) : null);
   return kept.map((r) => ({
-    ...toBody({
-      description: r.description,
-      model: r.model,
-      requestedItemId: /^[0-9a-f-]{36}$/i.test(r.for) ? r.for : "",
-      quantity: r.quantity || "1",
-      unit: r.unit,
-      unitPrice: r.unitPrice.replace(/[^\d.]/g, "") || "0",
-      taxRate: r.taxRate || offerTax,
-    }),
-    partOf: ref(r, "part"),
-    specOf: ref(r, "spec"),
+    ...toBody({ ...r.values, taxRate: r.values.taxRate || offerTax }),
+    partOf: r.parentKey ? (at.get(r.parentKey) ?? null) : null,
+    specOf: !r.parentKey && r.values.alternativeOfId ? (at.get(r.values.alternativeOfId) ?? null) : null,
   }));
 }
 
@@ -411,6 +383,7 @@ export function OfferLines({
   canEdit,
   mainCurrency,
   lines,
+  edits,
 }: {
   q: FactoryQuoteView;
   others: FactoryQuoteView[];
@@ -418,6 +391,8 @@ export function OfferLines({
   canEdit: boolean;
   mainCurrency: string;
   lines: OfferLineActions;
+  /** This offer's saved edits to its lines ("Edited n×"). */
+  edits?: EditCard | null;
 }) {
   const used = q.lines.some((l) => l.used);
   const rows: LineRow[] = q.lines.map((l) => ({
@@ -434,6 +409,8 @@ export function OfferLines({
       alternativeOfId: l.alternativeOfId ?? "",
     },
   }));
+  // The view marks lines changed since they were first saved ("edited 2×"); the editor shows them plain.
+  const viewRows: LineRow[] = rows.map((r) => ({ ...r, badge: editedMark(edits, r.key) }));
   // Lines another spec can point at: the offer's main lines (not parts, not specs themselves).
   const mains = q.lines.filter((l) => !l.parentId && !l.alternativeOfId);
   const numberOf = (id: string) => q.lines.find((l) => l.id === id)?.no ?? "";
@@ -605,7 +582,7 @@ export function OfferLines({
       actions={<LinesExcel name={sheet.name} rows={rows} columns={columns} numbers={q.lines.map((l) => l.no)} />}
       view={
         q.lines.length ? (
-          <LinesView label={`${q.factory.name} · lines`} rows={rows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
+          <LinesView label={`${q.factory.name} · lines`} rows={viewRows} columns={viewColumns} numbers={q.lines.map((l) => l.no)} footer={footer} />
         ) : (
           <p className="text-sm text-muted">No lines yet.</p>
         )
@@ -630,19 +607,10 @@ export function OfferLines({
           </ul>
         ) : undefined
       }
-      edit={
-        <OfferLinesEditor
-          q={q}
-          others={others}
-          items={items}
-          rows={rows}
-          columns={columns}
-          footer={footer}
-          sheet={sheet}
-          used={used}
-          lines={lines}
-        />
-      }
+      edits={edits}
+      panelTitle={`Edit lines · ${q.factory.name}`}
+      panelDescription="Type, paste or upload the factory's lines and prices. Nothing is saved until Save changes."
+      edit={<OfferLinesEditor q={q} others={others} items={items} rows={rows} columns={columns} sheet={sheet} used={used} lines={lines} card={edits} />}
     />
   );
 }
@@ -653,115 +621,74 @@ function OfferLinesEditor({
   items,
   rows,
   columns,
-  footer,
   sheet,
   used,
   lines,
+  card,
 }: {
   q: FactoryQuoteView;
   others: FactoryQuoteView[];
   items: Items;
   rows: LineRow[];
   columns: LineColumn[];
-  footer: ReactNode;
   sheet: { name: string; upload: boolean; templateRows: { no: string; values: LineValues }[] };
   used: boolean;
   lines: OfferLineActions;
+  card?: EditCard | null;
 }) {
   const [copyFrom, setCopyFrom] = useState(others[0]?.id ?? "");
-  const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
 
-  /** The line table's answer from an action's answer; new line ids for "keep adding after this". */
+  /** The line table's answer from an action's answer; the offer's lines that were not there before (new ones). */
   const result = (r: OfferLineResult): LineResult => {
     if (!r.ok) return { ok: false, message: r.message, reasonChoices: r.reasonChoices };
     const had = new Set(q.lines.map((l) => l.id));
     return { ok: true, keys: r.offer.lines.filter((l) => !had.has(l.id)).map((l) => l.id) };
   };
-  const start = async (fn: () => Promise<OfferLineResult>) => {
-    setStarting(true);
-    setStartError(null);
-    const r = await fn();
-    setStarting(false);
-    if (!r.ok) setStartError(r.message);
+  /** Lines as new rows of this offer: values for its columns, parts under their line. */
+  const asNew = (src: { id: string; parentId: string | null; values: LineValues }[]): NewLine[] => {
+    const at = new Map(src.map((l, n) => [l.id, n]));
+    return src.map((l) => ({ values: l.values, partOf: l.parentId ? (at.get(l.parentId) ?? null) : null }));
+  };
+  const fromItems = () =>
+    asNew(
+      items.map((it) => ({
+        id: it.id,
+        parentId: it.parentId,
+        values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(q.taxRate) },
+      })),
+    );
+  const fromOffer = (o: FactoryQuoteView) =>
+    asNew(
+      o.lines
+        .filter((l) => !l.alternativeOfId)
+        .map((l) => ({
+          id: l.id,
+          parentId: l.parentId,
+          values: { description: l.description, model: l.model ?? "", requestedItemId: l.requestedItemId ?? "", quantity: l.quantity, unit: l.unit, unitPrice: "", taxRate: String(q.taxRate) },
+        })),
+    );
+  const total = (list: LineRow[]) => {
+    let t = 0;
+    for (const r of list) {
+      if (r.values.alternativeOfId) continue;
+      const p = Number((r.values.unitPrice ?? "").replace(/,/g, ""));
+      const n = Number((r.values.quantity ?? "").replace(/,/g, ""));
+      if (Number.isFinite(p * n)) t += Math.round(toMinor(p) * n);
+    }
+    return t;
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {used && (
-        <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
-          <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-          <span>
-            A quotation is priced from this offer. Changing a price, quantity or the order of its lines asks why; wording and models can
-            change freely (the quotation keeps its own copy).
-          </span>
-        </p>
-      )}
-      {q.lines.length === 0 && (items.length > 0 || others.length > 0) && (
-        <div className="flex flex-col gap-3 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary-soft/20 p-3 sm:p-4">
-          <p className="text-sm font-semibold">Start this offer</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {items.length > 0 && (
-              <button
-                type="button"
-                onClick={() => void start(() => lines.add(q.id, { lines: linesFromItems(items) }))}
-                disabled={starting}
-                className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-left text-sm hover:border-primary disabled:opacity-60"
-              >
-                <ListPlus className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                <span>
-                  <span className="block font-medium">From the customer&apos;s list ({items.length})</span>
-                  <span className="block text-xs text-text-2">Then change the models and add their prices</span>
-                </span>
-              </button>
-            )}
-            {others.length > 0 && (
-              <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-sm">
-                <span className="flex items-start gap-2.5">
-                  <Copy className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                  <span>
-                    <span className="block font-medium">Copy another factory&apos;s lines</span>
-                    <span className="block text-xs text-text-2">Same lines, prices left empty</span>
-                  </span>
-                </span>
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <Select
-                    compact
-                    aria-label="Offer to copy lines from"
-                    value={copyFrom}
-                    onChange={(e) => setCopyFrom(e.target.value)}
-                    className="h-8 min-w-0 flex-1"
-                  >
-                    {others.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.factory.name} ({o.lines.length})
-                      </option>
-                    ))}
-                  </Select>
-                  <Button
-                    size="xs"
-                    variant="secondary"
-                    onClick={() => copyFrom && void start(() => lines.copy(q.id, copyFrom))}
-                    disabled={starting}
-                  >
-                    Copy
-                  </Button>
-                </span>
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-muted">
-            Or type the first line in the table below, paste their list, or use the Excel menu to upload their file.
-          </p>
-          {startError && <p className="text-xs text-bad">{startError}</p>}
-        </div>
-      )}
-      <LineTable
-        rows={rows}
-        columns={columns}
-        noun="line"
-        sheet={sheet}
-        onAdd={async (newLines: NewLine[], at, reason) =>
+    <BatchLines
+      rows={rows}
+      columns={columns}
+      noun="line"
+      sheet={sheet}
+      edit={{ type: "factory_quote", id: q.id, card: "lines" }}
+      card={card}
+      plain={!used}
+      handlers={{
+        onAdd: async (newLines: NewLine[], at, reason) =>
           result(
             await lines.add(q.id, {
               lines: newLines.map((l) => ({ ...toBody(l.values, q.taxRate), partOf: l.partOf })),
@@ -769,19 +696,87 @@ function OfferLinesEditor({
               parentId: at.parentKey,
               reason,
             }),
-          )
-        }
-        onEdit={async (key, values, reason) => {
+          ),
+        onEdit: async (key, values, reason) => {
           const body: Record<string, unknown> = { reason };
-          const full = toBody({ ...rows.find((r) => r.key === key)!.values, ...values }, q.taxRate);
+          const full = toBody({ ...(rows.find((r) => r.key === key)?.values ?? {}), ...values }, q.taxRate);
           for (const k of Object.keys(values)) body[k] = full[k as keyof typeof full];
           return result(await lines.edit(key, body));
-        }}
-        onRemove={async (key, reason) => result(await lines.remove(key, reason))}
-        onMove={async (key, to: LineMove, reason) => result(await lines.move(key, { to, reason }))}
-        footer={footer}
-      />
-    </div>
+        },
+        onRemove: async (key, reason) => result(await lines.remove(key, reason)),
+        onMove: async (key, to: LineMove, reason) => result(await lines.move(key, { to, reason })),
+      }}
+      footer={(list) =>
+        list.length ? (
+          <div className="flex flex-wrap items-center justify-end gap-x-1.5 px-3 py-2 text-sm text-muted">
+            Factory total <span className="font-semibold text-text tabular">{formatMinor(total(list), q.currency)}</span>
+            {q.taxIncluded ? "tax included" : "without tax"}
+          </div>
+        ) : null
+      }
+      note={used ? "A quotation is priced from this offer: it keeps its own copy." : undefined}
+      above={({ rows: now, add }) => (
+        <>
+          {used && (
+            <p className="flex items-start gap-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm">
+              <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+              <span>A quotation is priced from this offer. Saving changes to its lines asks why; the quotation keeps its own copy.</span>
+            </p>
+          )}
+          {now.length === 0 && (items.length > 0 || others.length > 0) && (
+            <div className="flex flex-col gap-3 rounded-xl border-[1.5px] border-dashed border-primary/40 bg-primary-soft/20 p-3 sm:p-4">
+              <p className="text-sm font-semibold">Start this offer</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {items.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => add(fromItems())}
+                    className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-left text-sm hover:border-primary"
+                  >
+                    <ListPlus className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                    <span>
+                      <span className="block font-medium">From the customer&apos;s list ({items.length})</span>
+                      <span className="block text-xs text-text-2">Then change the models and add their prices</span>
+                    </span>
+                  </button>
+                )}
+                {others.length > 0 && (
+                  <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-surface px-3 py-2.5 text-sm">
+                    <span className="flex items-start gap-2.5">
+                      <Copy className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                      <span>
+                        <span className="block font-medium">Copy another factory&apos;s lines</span>
+                        <span className="block text-xs text-text-2">Same lines, prices left empty</span>
+                      </span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <Select compact aria-label="Offer to copy lines from" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className="h-8 min-w-0 flex-1">
+                        {others.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.factory.name} ({o.lines.length})
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => {
+                          const o = others.find((x) => x.id === copyFrom);
+                          if (o) add(fromOffer(o));
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted">Or type the first line in the table below, paste their list, or use the Excel menu to upload their file.</p>
+            </div>
+          )}
+        </>
+      )}
+    />
   );
 }
 
@@ -909,44 +904,106 @@ function AddOfferForm({
   const [taxRate, setTaxRate] = useState(String(taxDefault.rate));
   const [f, setF] = useState(blank);
   const [files, setFiles] = useState<File[]>([]);
-  const startRows = (): OfferRow[] =>
-    items.length
-      ? items.map((it) => ({
-          key: it.id,
-          for: it.id,
-          description: it.description.split("\n")[0] ?? "",
-          model: it.model ?? "",
-          quantity: it.quantity,
-          unit: it.unit,
-          unitPrice: "",
-          taxRate: "",
-        }))
-      : [blankRow()];
+  /** The customer's items as the first lines (parts under their item), each waiting for its price. */
+  const startRows = (): OfferRow[] => {
+    const keyOf = new Map(items.map((it) => [it.id, rowKey()]));
+    return items.map((it) => ({
+      key: keyOf.get(it.id)!,
+      parentKey: it.parentId ? (keyOf.get(it.parentId) ?? null) : null,
+      values: {
+        requestedItemId: it.id,
+        description: it.description,
+        model: it.model ?? "",
+        quantity: it.quantity,
+        unit: it.unit,
+        unitPrice: "",
+        taxRate: "",
+        alternativeOfId: "",
+      },
+    }));
+  };
   const [lineRows, setLineRows] = useState<OfferRow[]>(startRows);
-  const [pasting, setPasting] = useState(false);
+  const lineHandlers = localLineHandlers(
+    lineRows,
+    setLineRows,
+    (values, parentKey) => ({ key: rowKey(), parentKey, values: { alternativeOfId: "", ...values } }),
+    (row, values) => ({ ...row, values: { ...row.values, ...values } }),
+  );
   const [error, setError] = useState<string | null>(null);
   const another = useRef(false);
   const set = (k: keyof typeof blank, v: string) => setF((x) => ({ ...x, [k]: v }));
   const rate = fxRate(currency, mainCurrency, mainCurrency, rates);
   const fx = { main: mainCurrency, rates };
   const own = items.length === 0;
-  const amountOf = (r: OfferRow) => num(r.unitPrice) * num(r.quantity);
+  const amountOf = (v: LineValues) => num(v.unitPrice ?? "") * num(v.quantity ?? "");
   // Another spec is a choice beside its line: shown, left out of the total.
-  const total = lineRows.filter((r) => !r.for.startsWith("spec:")).reduce((t, r) => t + amountOf(r), 0);
-  const setRow = (key: string, patch: Partial<OfferRow>) => setLineRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const addRows = (more: OfferRow[], after?: string) =>
-    setLineRows((rs) => {
-      const at = after ? rs.findIndex((r) => r.key === after) + 1 : rs.length;
-      return [...rs.slice(0, at), ...more, ...rs.slice(at)];
-    });
-  /** Rows pasted from Excel: description, model, qty, unit, price (tab between, one line per row). */
-  const pasted = (text: string): OfferRow[] =>
-    text
-      .replace(/\r?\n$/, "")
-      .split(/\r?\n/)
-      .map((line) => line.split("\t").map((c) => c.trim()))
-      .filter((c) => c[0])
-      .map((c) => ({ ...blankRow(), description: c[0]!, model: c[1] ?? "", quantity: (c[2] ?? "1").replace(/[^\d.]/g, "") || "1", unit: c[3] || "pcs", unitPrice: (c[4] ?? "").replace(/[^\d.]/g, "") }));
+  const total = lineRows.filter((r) => !r.values.alternativeOfId || r.parentKey).reduce((t, r) => t + amountOf(r.values), 0);
+  const mains = lineRows.filter((r) => !r.parentKey && !r.values.alternativeOfId);
+  const numbers = lineNumbers(lineRows.map((r) => ({ key: r.key, parentKey: r.parentKey })));
+  const noOf = (key: string) => numbers[lineRows.findIndex((r) => r.key === key)] ?? "";
+  const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const addColumns: LineColumn[] = [
+    ...(items.length
+      ? [
+          {
+            key: "requestedItemId",
+            label: "For item",
+            width: "6.5rem",
+            input: "select" as const,
+            options: [{ value: "", label: "— extra" }, ...items.map((it) => ({ value: it.id, label: `${it.no} ${it.description.split("\n")[0]!.slice(0, 40)}` }))],
+            format: (v: LineValues) => items.find((it) => it.id === v.requestedItemId)?.no ?? <span className="text-muted">extra</span>,
+          },
+        ]
+      : []),
+    { key: "description", label: "Description (as the factory wrote it)", width: "minmax(0,1fr)", input: "textarea", required: "Each line needs a description" },
+    { key: "model", label: "Model", width: "6.5rem", input: "text", maxLength: 120, placeholder: "Model" },
+    { key: "quantity", label: "Qty", width: "4.5rem", input: "number", align: "right", initial: "1", required: "Enter a quantity" },
+    { key: "unit", label: "Unit", width: "5rem", input: "unit", maxLength: 20, initial: (p) => (p ? "sets" : "pcs") },
+    {
+      key: "unitPrice",
+      label: `Price ${currency}`,
+      width: "6.5rem",
+      input: "number",
+      align: "right",
+      placeholder: "0",
+      format: (v) => (num(v.unitPrice ?? "") ? fmt(num(v.unitPrice ?? "")) : <span className="text-muted">—</span>),
+    },
+    { key: "taxRate", label: "Tax %", width: "3.5rem", input: "number", align: "right", placeholder: taxRate || "0", phoneHidden: true },
+    {
+      key: "alternativeOfId",
+      label: "Spec of",
+      width: "5rem",
+      input: "select",
+      options: [{ value: "", label: "—" }, ...mains.map((r) => ({ value: r.key, label: `${noOf(r.key)} ${(r.values.description ?? "").split("\n")[0]!.slice(0, 30)}` }))],
+      phoneHidden: true,
+      format: (v) =>
+        v.alternativeOfId ? (
+          <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn" title="Another spec of that line: a choice, left out of the total">
+            of {noOf(v.alternativeOfId)}
+          </span>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+    {
+      key: "total",
+      label: "Amount",
+      width: "7rem",
+      align: "right",
+      format: (v) =>
+        amountOf(v) ? (
+          v.alternativeOfId ? (
+            <span className="text-muted" title="Another spec: not in the total">
+              ({fmt(amountOf(v))})
+            </span>
+          ) : (
+            fmt(amountOf(v))
+          )
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+  ];
 
   const payload = {
     factoryId: factory?.id ?? null,
@@ -1065,178 +1122,27 @@ function AddOfferForm({
               </Field>
             </div>
 
-            <section className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-[15px] font-bold">Lines</h3>
-                <Button type="button" variant="secondary" size="sm" onClick={() => setPasting((x) => !x)} aria-expanded={pasting}>
-                  <List aria-hidden /> Paste from Excel
-                </Button>
-              </div>
+            <section className="flex flex-col gap-2">
+              <h3 className="text-[15px] font-bold">Lines</h3>
               {own && <p className="text-xs text-text-2">The inquiry has no item list, so these lines become the offer&rsquo;s items to compare.</p>}
-              {pasting && (
-                <div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-primary/40 bg-primary-soft/20 p-3">
-                  <label htmlFor="add-paste" className="text-sm font-medium">
-                    Paste their rows: description, model, qty, unit, price (one row per line)
-                  </label>
-                  <Textarea
-                    id="add-paste"
-                    rows={3}
-                    placeholder="Copy the rows in Excel and paste here"
-                    onPaste={(e) => {
-                      const more = pasted(e.clipboardData.getData("text/plain"));
-                      if (!more.length) return;
-                      e.preventDefault();
-                      // Pasting into an empty start replaces its blank line.
-                      setLineRows((rs) => [...rs.filter((r) => r.description.trim() || r.unitPrice.trim()), ...more]);
-                      setPasting(false);
-                    }}
-                  />
-                </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[860px] border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-surface-2 text-left text-muted">
-                      <th scope="col" className="w-[190px] px-2 py-2.5 font-semibold">For item</th>
-                      <th scope="col" className="px-2 py-2.5 font-semibold">Description *</th>
-                      <th scope="col" className="w-[90px] px-2 py-2.5 font-semibold">Model</th>
-                      <th scope="col" className="w-[76px] px-2 py-2.5 text-right font-semibold">Qty *</th>
-                      <th scope="col" className="w-[76px] px-2 py-2.5 font-semibold">Unit</th>
-                      <th scope="col" className="w-[120px] px-2 py-2.5 text-right font-semibold">Unit price *</th>
-                      <th scope="col" className="w-[70px] px-2 py-2.5 text-right font-semibold">Tax %</th>
-                      <th scope="col" className="w-[110px] px-2 py-2.5 text-right font-semibold">Amount</th>
-                      <th scope="col" className="w-10 px-1 py-2.5">
-                        <span className="sr-only">Remove</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lineRows.map((r, i) => {
-                      // A part or another spec points at a main line above it.
-                      const above = lineRows.slice(0, i).filter((x) => !x.for.startsWith("part:") && !x.for.startsWith("spec:"));
-                      const label = (x: OfferRow) => (x.model || x.description || "line").slice(0, 24);
-                      const spec = r.for.startsWith("spec:");
-                      return (
-                        <tr key={r.key} className={cn("border-t border-line", spec && "bg-warn-soft/30")}>
-                          <td className="px-1.5 py-1.5">
-                            <Select aria-label={`Line ${i + 1}: what it is for`} className="h-[38px] text-[13px]" value={r.for} onChange={(e) => setRow(r.key, { for: e.target.value })}>
-                              {items.map((it) => (
-                                <option key={it.id} value={it.id}>
-                                  Item {it.no}: {it.description.split("\n")[0]!.slice(0, 30)}
-                                </option>
-                              ))}
-                              <option value="new">{own ? "A line of its own" : "Extra (not asked)"}</option>
-                              {above
-                                .filter((x) => x.key !== r.key)
-                                .map((x) => (
-                                  <option key={`p${x.key}`} value={`part:${x.key}`}>
-                                    Part of: {label(x)}
-                                  </option>
-                                ))}
-                              {above
-                                .filter((x) => x.key !== r.key)
-                                .map((x) => (
-                                  <option key={`s${x.key}`} value={`spec:${x.key}`}>
-                                    Another spec of: {label(x)}
-                                  </option>
-                                ))}
-                            </Select>
-                          </td>
-                          <td className="px-1.5 py-1.5">
-                            <Input
-                              aria-label={`Line ${i + 1}: description`}
-                              className="h-[38px] text-[13px]"
-                              value={r.description}
-                              onChange={(e) => setRow(r.key, { description: e.target.value })}
-                              onPaste={(e) => {
-                                const text = e.clipboardData.getData("text/plain");
-                                if (!/[\t\n]/.test(text.trim())) return;
-                                e.preventDefault();
-                                const more = pasted(text);
-                                if (!more.length) return;
-                                setRow(r.key, { description: more[0]!.description, model: more[0]!.model, quantity: more[0]!.quantity, unit: more[0]!.unit, unitPrice: more[0]!.unitPrice || r.unitPrice });
-                                addRows(more.slice(1), r.key);
-                              }}
-                            />
-                          </td>
-                          <td className="px-1.5 py-1.5">
-                            <Input aria-label={`Line ${i + 1}: model`} className="h-[38px] text-[13px]" value={r.model} maxLength={120} onChange={(e) => setRow(r.key, { model: e.target.value })} />
-                          </td>
-                          <td className="px-1.5 py-1.5">
-                            <Input aria-label={`Line ${i + 1}: quantity`} inputMode="decimal" className="h-[38px] text-right text-[13px] tabular" value={r.quantity} onChange={(e) => setRow(r.key, { quantity: e.target.value.replace(/[^\d.,]/g, "") })} />
-                          </td>
-                          <td className="px-1.5 py-1.5">
-                            <Input aria-label={`Line ${i + 1}: unit`} className="h-[38px] text-[13px]" value={r.unit} maxLength={20} onChange={(e) => setRow(r.key, { unit: e.target.value })} />
-                          </td>
-                          <td className="px-1.5 py-1.5">
-                            <Input
-                              aria-label={`Line ${i + 1}: unit price`}
-                              data-add-price={i}
-                              inputMode="decimal"
-                              className="h-[38px] text-right text-[13px] tabular"
-                              value={r.unitPrice}
-                              onChange={(e) => setRow(r.key, { unitPrice: e.target.value.replace(/[^\d.,]/g, "") })}
-                              onKeyDown={(e) => {
-                                if (e.key !== "Enter") return;
-                                e.preventDefault();
-                                document.querySelector<HTMLInputElement>(`[data-add-price="${i + 1}"]`)?.focus();
-                              }}
-                              onPaste={(e) => {
-                                // A column of prices copied from Excel fills this line and the ones below.
-                                const values = e.clipboardData.getData("text/plain").replace(/\r?\n$/, "").split(/\r?\n/).map((v) => v.split("\t").pop()!.trim());
-                                if (values.length < 2) return;
-                                e.preventDefault();
-                                const below = lineRows.slice(i, i + values.length).map((x) => x.key);
-                                setLineRows((rs) => rs.map((x) => (below.includes(x.key) ? { ...x, unitPrice: values[below.indexOf(x.key)]!.replace(/[^\d.]/g, "") } : x)));
-                              }}
-                            />
-                          </td>
-                          <td className="px-1.5 py-1.5">
-                            <Input aria-label={`Line ${i + 1}: tax %`} inputMode="decimal" placeholder={taxRate || "0"} className="h-[38px] text-right text-[13px] tabular" value={r.taxRate} onChange={(e) => setRow(r.key, { taxRate: e.target.value.replace(/[^\d.]/g, "") })} />
-                          </td>
-                          <td className="px-2 py-1.5 text-right tabular">
-                            {amountOf(r) ? (
-                              spec ? (
-                                <span className="text-muted" title="Another spec: a choice, not in the total">
-                                  ({amountOf(r).toLocaleString("en-US", { maximumFractionDigits: 2 })})
-                                </span>
-                              ) : (
-                                amountOf(r).toLocaleString("en-US", { maximumFractionDigits: 2 })
-                              )
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td className="px-1 py-1.5 text-center">
-                            <Button
-                              type="button"
-                              size="icon-xs"
-                              variant="ghost"
-                              aria-label={`Remove line ${i + 1}`}
-                              onClick={() => setLineRows((rs) => rs.filter((x) => x.key !== r.key).map((x) => (x.for.endsWith(`:${r.key}`) ? { ...x, for: "new" } : x)))}
-                            >
-                              <Trash2 aria-hidden />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <Button type="button" variant="secondary" size="sm" onClick={() => addRows([blankRow()])}>
-                  <Plus aria-hidden /> Add line
-                </Button>
-                <span className="flex gap-10 px-2 text-base font-bold">
-                  <span>Total</span>
-                  <span className="tabular">
-                    {currency} {total.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                  </span>
-                </span>
-              </div>
+              <LineTable
+                rows={lineRows}
+                columns={addColumns}
+                noun="line"
+                sheet={{ name: "Factory offer lines", upload: true }}
+                empty="No lines yet: type the first one below, or paste their rows from Excel."
+                footer={
+                  <div className="flex justify-end gap-10 px-3 py-2 text-base font-bold">
+                    <span>Total</span>
+                    <span className="tabular">
+                      {currency} {fmt(total)}
+                    </span>
+                  </div>
+                }
+                {...lineHandlers}
+              />
               <p className="text-xs text-muted">
-                Prices in {currency}, {taxIncluded ? "tax included" : "without tax"}. An item they don&apos;t offer: leave its price empty and it is left out. &ldquo;Another spec of&rdquo; a line is a choice beside it and is not added to the total.
+                Prices in {currency}, {taxIncluded ? "tax included" : "without tax"}. An item they don&apos;t offer: leave its price empty and it is left out. &ldquo;Spec of&rdquo; marks another spec of a line: a choice beside it, not added to the total.
               </p>
             </section>
 

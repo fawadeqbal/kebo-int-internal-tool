@@ -18,6 +18,7 @@ import { RequestMore } from "@/components/deals/ask-window";
 import { factoryRequestStatusAction, removeFactoryRequestAction } from "../../factory-request-actions";
 import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, offerFieldsAction, removeFactoryQuoteAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 import { getSettings } from "@/lib/loaders";
+import { editsOf } from "@/lib/edit-data";
 
 export const metadata = { title: "Factory prices" };
 
@@ -88,6 +89,7 @@ export default async function SourcingPage({
   const requests = await optional(() => api.get<FactoryRequests>(`/inquiries/${d.id}/factory-requests`));
   const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
   const editing = s.quotes.find((x) => x.id === sp.offer) ?? null;
+  const offerEdits = editing ? await editsOf("factory_quote", editing.id) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -242,6 +244,7 @@ export default async function SourcingPage({
                 canEdit={canEdit}
                 mainCurrency={s.currency}
                 lines={lines}
+                edits={offerEdits?.cards.lines}
               />
             </div>
           )}

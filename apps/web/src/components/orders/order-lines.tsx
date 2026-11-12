@@ -4,6 +4,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
 import { LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
 import { Badge, cn } from "@kebo/ui";
+import { BatchLines } from "@/components/edits/batch-lines";
+import type { EditCard, EditRef } from "@/lib/types-edits";
 import { LineTable, type LineColumn, type LineResult, type LineRow, type LineValues } from "@/components/lines/line-table";
 import { orderLineAction } from "@/app/(app)/orders/actions";
 import { date } from "@/lib/format";
@@ -289,6 +291,68 @@ export function OrderLines({
           {set === "received" ? " The date is today unless you type another." : ""}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * The step's lines in the edit panel (board "View first, edit on purpose"):
+ * the step's columns typed on a copy, saved together with Save changes. Lines
+ * are not added, removed or moved here. Filling a value is plain; changing a
+ * value already saved asks why.
+ */
+export function OrderLinesEditor({
+  set,
+  orderId,
+  lines,
+  today,
+  edit,
+  card,
+}: {
+  set: LineSet;
+  orderId: string;
+  lines: OrderLineView[];
+  today: string;
+  edit?: EditRef;
+  card?: EditCard | null;
+}) {
+  const columns = useMemo(() => columnsOf(set), [set]);
+  const byNo = new Map(lines.map((l) => [l.no, l.id]));
+  const rows: LineRow[] = lines.map((l) => {
+    const top = l.no.includes(".") ? l.no.split(".")[0]! : null;
+    return { key: l.id, parentKey: top ? (byNo.get(top) ?? null) : null, values: valuesOf(l) };
+  });
+  const onEdit = async (key: string, values: LineValues): Promise<LineResult> => {
+    const body = bodyOf(set, values, today);
+    if (typeof body === "string") return { ok: false, message: body };
+    const r = await orderLineAction(orderId, key, body);
+    return r.ok ? { ok: true } : r;
+  };
+  return (
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col",
+        // The line table's tools for adding, pasting and moving lines (and its help on them) do not apply here.
+        "[&_tr[aria-label^='New_']]:hidden [&_[role=toolbar]]:hidden [&_button:has(>.lucide-clipboard-paste)]:hidden [&_div:has(>details)]:hidden",
+        "[&_tbody_tr>td:last-child:not(:first-child)]:hidden [&_thead_tr>th:last-child:not(:first-child)]:hidden [&_colgroup>col:last-child]:hidden",
+      )}
+    >
+      <BatchLines
+        rows={rows}
+        columns={columns}
+        noun="line"
+        handlers={{ onEdit, onAdd: fixed, onRemove: fixed, onMove: fixed }}
+        edit={edit}
+        card={card}
+        askOnAdd={false}
+        empty="No goods lines on this order."
+        below={
+          <p className="text-xs text-muted">
+            Click a cell and type: Enter keeps it and goes down, Esc cancels. Nothing is saved until Save changes.
+            {set === "received" ? " The date is today unless you type another." : ""}
+          </p>
+        }
+      />
     </div>
   );
 }

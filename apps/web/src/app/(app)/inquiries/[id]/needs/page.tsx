@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/session";
 import { qty } from "@/lib/format";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { LinesCard } from "@/components/orders/step-view";
+import { EditedMark } from "@/components/edits/edits";
+import { editsOf } from "@/lib/edit-data";
 import { ItemsEditor, ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
 import { dealFieldsAction } from "../../actions";
 import { itemsLine } from "../steps";
@@ -25,6 +27,8 @@ export default async function DealNeeds({ params }: { params: Promise<{ id: stri
   const offers = new Map<string, number>();
   for (const q of sourcing?.quotes ?? []) for (const id of new Set(q.lines.map((l) => l.requestedItemId).filter((x): x is string => !!x))) offers.set(id, (offers.get(id) ?? 0) + 1);
   const parentNo = new Map(d.items.map((i) => [i.id, i.no]));
+  const edits = await editsOf("inquiry", id);
+  const needs = edits.cards.needs;
   const fromOffer = (sourcing?.quotes.length ?? 0) > 0 && d.items.length > 0;
 
   const table = (
@@ -48,7 +52,10 @@ export default async function DealNeeds({ params }: { params: Promise<{ id: stri
               <Tr key={i.id}>
                 <Td className="tabular">{i.no}</Td>
                 <Td>
-                  <span className="block font-semibold whitespace-pre-line">{i.description}</span>
+                  <span className="block font-semibold whitespace-pre-line">
+                    {i.description}
+                    <EditedMark card={needs} k={i.id} />
+                  </span>
                   {i.parentId && <span className="block text-xs text-text-2">part of {parentNo.get(i.parentId)}</span>}
                 </Td>
                 <Td>{i.model ?? ""}</Td>
@@ -71,7 +78,10 @@ export default async function DealNeeds({ params }: { params: Promise<{ id: stri
         description={d.items.length ? (fromOffer ? "made from the first offer" : itemsLine(d)) : "none yet"}
         canEdit={d.allowed.edit}
         editLabel={d.items.length ? "Edit items" : "Add item"}
-        editActions={<ItemsExcel items={d.items} />}
+        actions={d.items.length ? <ItemsExcel items={d.items} /> : undefined}
+        edits={needs}
+        panelTitle={d.items.length ? "Edit items" : "Add items"}
+        panelDescription="What the customer needs: type, paste their list or upload Excel. Nothing is saved until Save changes."
         view={
           d.items.length ? (
             table
@@ -82,7 +92,16 @@ export default async function DealNeeds({ params }: { params: Promise<{ id: stri
           )
         }
         phone={<ItemsView items={d.items} requirements={null} phone />}
-        edit={<ItemsEditor items={d.items} requirements={d.requirements} action={dealFieldsAction.bind(null, d.id)} upload={!quoted} />}
+        edit={
+          <ItemsEditor
+            items={d.items}
+            requirements={d.requirements}
+            action={dealFieldsAction.bind(null, d.id)}
+            upload={!quoted}
+            edit={{ type: "inquiry", id: d.id, card: "needs" }}
+            card={needs}
+          />
+        }
       />
       <Card>
         <CardHeader title="Written by the customer" />

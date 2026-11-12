@@ -21,6 +21,10 @@ export const REASON_CHOICES = {
   factoryDetails: ["Factory renamed", "Spelling fixed", "Another person handles this factory"],
   settings: ["New exchange rate", "New company policy", "Mistake fixed"],
   plan: ["Customer asked for more time", "Agreed a new schedule", "Order changed", "Mistake fixed"],
+  /** Changing what a card already saved (lines or values): Save changes asks why. */
+  /** Changing a card's saved values (dates, numbers, names). */
+  editValues: ["Customer asked for it", "Factory changed it", "The date moved", "Typed wrong", "Mistake fixed"],
+  edit: ["Customer changed the list", "Customer changed the quantity", "Factory changed the price", "Typed wrong", "Mistake fixed"],
   payment: ["Wrong amount", "Wrong date", "Wrong order or factory", "Wrong exchange rate", "Mistake fixed"],
 } as const satisfies Record<string, readonly string[]>;
 
