@@ -1,3 +1,4 @@
+import { setRequestZone } from "@/lib/format";
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
@@ -17,6 +18,9 @@ export interface Me {
   /** A platform admin working in this company. */
   viaPlatform?: boolean;
   company?: { slug: string; name: string; kind: "client" | "demo" | "trial"; status: "active" | "read_only" | "off" | "deleted"; statusReason: string | null; endsAt: string | null } | null;
+  /** Their own language (en, zh, ur) and time zone (empty: the company's). */
+  language?: string;
+  timeZone?: string | null;
 }
 
 /** The company the person is signed in to: its plan, usage, features and the notices to show. */
@@ -50,6 +54,8 @@ export const requireUser = cache(async (): Promise<Me> => {
   try {
     const me = await api.get<Me>("/auth/me");
     if (me.twoStepSetupRequired) redirect(TWO_STEP_SETUP_PATH);
+    // Times on this request's pages read in their own time zone.
+    setRequestZone(me.timeZone);
     return me;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) redirect("/login");

@@ -204,6 +204,8 @@ export const factoryQuoteLineInput = z.object({
   requestedItemId: optionalId,
   /** A part of an earlier line of this offer: that line's position in `lines` (0-based). */
   partOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
+  /** Another spec of an earlier line of this offer (its position in `lines`): a choice beside it, left out of the total. */
+  specOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
   description: text(2000, "Each line needs a description"),
   model: optionalText(120),
   quantity,
@@ -277,6 +279,8 @@ export const factoryLinePatch = z.object({
   unit: z.string().trim().min(1).max(20).optional(),
   unitPrice: amount("Enter the factory's price").optional(),
   taxRate: percentOr(DEFAULT_TAX_RATE).optional(),
+  /** Another spec of this line of the same offer (empty: a line of its own, counted in the total). */
+  alternativeOfId: optionalId.optional(),
   reason: reasonField,
 });
 export type FactoryLinePatch = z.infer<typeof factoryLinePatch>;

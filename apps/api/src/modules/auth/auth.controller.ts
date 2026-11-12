@@ -76,6 +76,6 @@ export class AuthController {
   @AllowDuringTwoStepSetup()
   @Get("me")
   me(@CurrentUser() user: SessionUser) {
-    return this.auth.profile(user);
+    return this.auth.me(user);
   }
 }

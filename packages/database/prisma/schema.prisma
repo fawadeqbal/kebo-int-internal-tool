@@ -898,6 +898,10 @@ model FactoryQuoteLine {
   parentId        String?            @map("parent_id") @db.Uuid
   parent          FactoryQuoteLine?  @relation("FactoryLineParts", fields: [parentId], references: [id], onDelete: Cascade)
   parts           FactoryQuoteLine[] @relation("FactoryLineParts")
+  /// Another spec of that line of the same offer (35 or 41 stations): a choice beside it, left out of the offer's total.
+  alternativeOfId String?            @map("alternative_of_id") @db.Uuid
+  alternativeOf   FactoryQuoteLine?  @relation("FactoryLineSpecs", fields: [alternativeOfId], references: [id], onDelete: SetNull)
+  alternatives    FactoryQuoteLine[] @relation("FactoryLineSpecs")
   /// The same product across factories' offers: a line copied from another offer keeps that line's key, so offers can be compared product by product.
   productKey      String?            @map("product_key") @db.Uuid
 
@@ -905,6 +909,7 @@ model FactoryQuoteLine {
 
   @@index([factoryQuoteId])
   @@index([parentId])
+  @@index([alternativeOfId])
   @@index([productKey])
   @@index([companyId])
   @@map("factory_quote_lines")

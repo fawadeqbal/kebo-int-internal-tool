@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { formatMinor, toMinor } from "@kebo/money";
 import { formatDate as fmtDate, formatDateTime as fmtDateTime, timeAgo as ago, type ISODate } from "@kebo/utils";
 
@@ -20,9 +21,18 @@ export const short = (amount: string | number | null | undefined, currency: stri
   if (a >= 10_000) return `${currency} ${(v / 1_000).toLocaleString("en-US", { maximumFractionDigits: 1 })}K`;
   return `${currency} ${Math.round(v).toLocaleString("en-US")}`;
 };
-export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, TZ);
-export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, TZ);
-export const timeAgo = (d: Date | string) => ago(d, TZ);
+/**
+ * The time zone of this request (server pages): the signed-in person's own when they set one on My
+ * account, else the company's. React's cache keeps one per request; in the browser it is the company's.
+ */
+const requestZone = cache((): { zone: string } => ({ zone: TZ }));
+export function setRequestZone(zone: string | null | undefined) {
+  if (zone) requestZone().zone = zone;
+}
+const zone = () => requestZone().zone;
+export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, zone());
+export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, zone());
+export const timeAgo = (d: Date | string) => ago(d, zone());
 export const qty = (q: string | number) => Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 /** "1 Apr" (a calendar day, no year). */

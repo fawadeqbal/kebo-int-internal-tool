@@ -106,3 +106,14 @@ function SendBackDialog({ action, what, onClose }: { action: Action; what: strin
     document.body,
   );
 }
+
+/** "Verify chosen": the form the ticked rows belong to (their checkboxes say form="verify-chosen"). */
+export function VerifyChosen({ action }: { action: Action }) {
+  return (
+    <ActionForm action={action} id="verify-chosen" className="flex flex-col items-end gap-1">
+      <SubmitButton pendingText="Verifying…">
+        <Check aria-hidden /> Verify chosen
+      </SubmitButton>
+    </ActionForm>
+  );
+}

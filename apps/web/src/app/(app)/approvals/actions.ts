@@ -25,3 +25,22 @@ export async function withdrawAction(id: string, _prev: ActionState, form: FormD
   if (r.ok) revalidatePath("/", "layout");
   return r;
 }
+
+/** Verify chosen (board VerificationQueue): approves every one ticked, one after the other; says how many went through. */
+export async function approveManyAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const ids = [...new Set(form.getAll("id").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x)))];
+  if (!ids.length) return { ok: false, message: "Tick the ones to verify first." };
+  let done = 0;
+  const failed: string[] = [];
+  for (const id of ids) {
+    try {
+      await api.post(`/submissions/${id}/approve`, {});
+      done += 1;
+    } catch (e) {
+      failed.push(e instanceof Error ? e.message : "could not be approved");
+    }
+  }
+  revalidatePath("/", "layout");
+  if (!failed.length) return { ok: true, message: `Verified ${done}. ${done === 1 ? "It counts" : "They count"} now.` };
+  return { ok: false, message: `Verified ${done} of ${ids.length}. ${failed.length} could not be: ${failed[0]}` };
+}

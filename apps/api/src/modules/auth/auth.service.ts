@@ -338,6 +338,12 @@ export class AuthService {
   }
 
   /** What the apps know about the signed-in person: who, their role and what they may do. */
+  /** GET /auth/me: who is signed in, with their own language and time zone. */
+  async me(user: SessionUser) {
+    const own = await this.prisma.db.user.findUnique({ where: { id: user.id }, select: { language: true, timeZone: true } });
+    return { ...this.profile(user), language: own?.language ?? "en", timeZone: own?.timeZone ?? null };
+  }
+
   profile(user: SessionUser) {
     const c = CompanyContext.current();
     return {

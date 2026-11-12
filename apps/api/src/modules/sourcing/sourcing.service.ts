@@ -41,6 +41,15 @@ const quoteInclude = {
  * converted at today's rate. A quotation offers one or more whole offers as
  * options A, B…
  */
+/** "Another spec of" points at an earlier line of the same list that is not itself another spec or a part. */
+function checkSpec(lines: { specOf?: number | null; partOf: number | null; description: string }[], n: number) {
+  const l = lines[n]!;
+  if (l.specOf === null || l.specOf === undefined) return;
+  const of = lines[l.specOf];
+  if (l.specOf >= n || !of || (of.specOf ?? null) !== null || of.partOf !== null || l.partOf !== null)
+    throw new DomainError(`"${l.description.split("\n")[0]}" can only be another spec of a line above it (not of a part or of another spec).`);
+}
+
 @Injectable()
 export class SourcingService {
   constructor(
@@ -101,13 +110,16 @@ export class SourcingService {
           costNote: taxSentence(unitPriceMinor, taxRate, q.currency, q.taxIncluded),
           /** One unit's landed cost in the selling currency. */
           unitCost: cost === null ? null : fromMinor(cost),
-          costMinor: cost === null ? null : Math.round(cost * Number(l.quantity)),
+          costMinor: cost === null || l.alternativeOfId ? (cost === null ? null : 0) : Math.round(cost * Number(l.quantity)),
           /** The same product in other factories' offers (lines copied from each other share it). */
           productKey: l.productKey ?? l.id,
           /** A quotation is priced from it: changing its price, quantity or place asks why. */
           used: l._count.quoteLines > 0,
-          totalMinor,
-          taxMinor,
+          /** Another spec of that line (its id and number): a choice beside it, left out of the offer's total. */
+          alternativeOfId: l.alternativeOfId,
+          alternativeOfNo: l.alternativeOfId ? (lineNo[q.lines.findIndex((x) => x.id === l.alternativeOfId)] ?? null) : null,
+          totalMinor: l.alternativeOfId ? 0 : totalMinor,
+          taxMinor: l.alternativeOfId ? 0 : taxMinor,
         };
       });
       return {
@@ -244,6 +256,7 @@ export class SourcingService {
    */
   private async writeLines(tx: Tx, quoteId: string, inquiryId: string, lines: NonNullable<FactoryQuoteInput["lines"]>, offerTaxRate: number) {
     for (const [n, l] of lines.entries()) {
+      checkSpec(lines, n);
       if (l.partOf === null) continue;
       if (l.partOf >= n || lines[l.partOf]!.partOf !== null)
         throw new DomainError(`"${l.description.split("\n")[0]}" can only be a part of a line above it that is not a part itself.`);
@@ -256,6 +269,7 @@ export class SourcingService {
     const dropped = [...existing].filter((id) => !keep.includes(id));
     if (dropped.length) {
       await tx.factoryQuoteLine.updateMany({ where: { parentId: { in: dropped } }, data: { parentId: null } });
+      await tx.factoryQuoteLine.updateMany({ where: { alternativeOfId: { in: dropped } }, data: { alternativeOfId: null } });
       await tx.factoryQuoteLine.deleteMany({ where: { id: { in: dropped } } });
     }
     const ids: string[] = [];
@@ -273,6 +287,7 @@ export class SourcingService {
         taxRate: l.taxRate ?? offerTaxRate,
         sortOrder: n,
         parentId: l.partOf === null ? null : ids[l.partOf]!,
+        alternativeOfId: l.specOf === null || l.specOf === undefined ? null : ids[l.specOf]!,
       };
       if (l.id && existing.has(l.id)) ids.push((await tx.factoryQuoteLine.update({ where: { id: l.id }, data: row })).id);
       else ids.push((await tx.factoryQuoteLine.create({ data: { ...row, factoryQuoteId: quoteId } })).id);
@@ -497,6 +512,7 @@ export class SourcingService {
       const parent = input.parentId ? lines.find((l) => l.id === input.parentId) : null;
       if (input.parentId && (!parent || parent.parentId)) throw new DomainError("A part can only go under a line that is not a part itself.");
       for (const [n, l] of input.lines.entries()) {
+        checkSpec(input.lines, n);
         if (l.partOf === null) continue;
         if (parent || l.partOf >= n || input.lines[l.partOf]!.partOf !== null)
           throw new DomainError(`"${l.description.split("\n")[0]}" can only be a part of a line above it that is not a part itself.`);
@@ -517,6 +533,7 @@ export class SourcingService {
             // Left out: the offer's tax %.
             taxRate: l.taxRate ?? q.taxRate,
             parentId,
+            alternativeOfId: l.specOf === null || l.specOf === undefined ? null : created[l.specOf]!.id,
             sortOrder: 100000 + created.length,
           },
         });
@@ -566,6 +583,13 @@ export class SourcingService {
       if (patch.quantity !== undefined && Number(patch.quantity) !== Number(line.quantity))
         changes.push(`qty ${line.quantity.toString()} → ${Number(patch.quantity)}`);
       const reason = used && changes.length ? requireReason(patch.reason, "factoryPrice", "you are changing a price a quotation uses") : patch.reason;
+      if (patch.alternativeOfId) {
+        const of = await tx.factoryQuoteLine.findUnique({ where: { id: patch.alternativeOfId } });
+        if (!of || of.factoryQuoteId !== line.factoryQuoteId || of.id === line.id || of.alternativeOfId || of.parentId || line.parentId)
+          throw new DomainError("A line can only be another spec of a main line of the same offer (not of a part or of another spec).");
+        if ((await tx.factoryQuoteLine.count({ where: { alternativeOfId: line.id } })) > 0)
+          throw new DomainError("Other lines are specs of this one: make them lines of their own first.");
+      }
       const { reason: _r, ...data } = patch;
       await tx.factoryQuoteLine.update({ where: { id: lineId }, data });
       await tx.factoryQuote.update({ where: { id: q.id }, data: { updatedAt: new Date() } });
