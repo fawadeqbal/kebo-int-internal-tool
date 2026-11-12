@@ -7,12 +7,14 @@ import type { ShipmentView } from "@/lib/types-flow";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
-import { DetailsCard, FieldsForm, PanelButton, StatusBar, type DetailField } from "@/components/orders/step-view";
+import { DetailsCard, FieldsForm, PanelButton, type DetailField } from "@/components/orders/step-view";
 import { HeaderTap } from "@/components/orders/header-slot";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { RecordPaymentLink } from "@/components/money/pay-links";
-import { goodsOf } from "../shared";
+import { docHref, goodsOf } from "../shared";
+import { PackingCard } from "../goods";
+import { packingAction, packingMarksAction } from "../../actions";
 import { stageTool } from "../close-tool";
 import { stepData } from "../step-data";
 
@@ -214,7 +216,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       tools.arrived = { kind: "tap", tap: { label: "Arrived today", action: lightAction.bind(null, o.id, `arrived:${going.map((s) => s.id).join(",")}`), on: now } };
   }
   if (goods.length)
-    tools.packing_list = { kind: "link", label: o.goods.packed ? "See it" : canEdit ? "Make it" : "See it", href: `/orders/${o.id}/packing` };
+    tools.packing_list = { kind: "link", label: o.goods.packed ? "See it" : canEdit ? "Make it" : "See it", href: "#edit-lines" };
   if (canPay && Number(o.money.due) > 0)
     tools.balance_in = {
       kind: "node",
@@ -261,6 +263,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const edits = await editsOf("order", o.id);
   const ref = (card: string) => ({ type: "order" as const, id: o.id, card });
 
+  const packGoods = goodsOf(o);
+
   return (
     <StepPage
       steps={d.steps}
@@ -275,6 +279,8 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         label="Shipping"
         items={d.items}
         current={d.current}
+        nowKey={d.nowKey}
+        waits={d.waits}
         canEdit={d.steps.canEdit}
         run={d.run}
         dealId={o.inquiry.id}
@@ -288,7 +294,6 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
       {shipping ? (
         shipments.length ? (
           <>
-            {lead && <StatusBar states={SHIPMENT_STATUSES.map((k) => ({ key: k, label: SHIPMENT_STATUS_LABEL[k] }))} at={lead.status} />}
             {shipments.map((s, i) => (
               <DetailsCard
                 key={s.id}
@@ -304,7 +309,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
                 edits={{ ref: ref(`shipment:${s.id}`), card: edits.cards[`shipment:${s.id}`] }}
               />
             ))}
-            {shipBy.ours && (
+            {shipBy.ours && (shipBy.lc || shipBy.late) && (
               <p className={shipBy.late ? "text-sm text-bad" : "text-sm text-text-2"}>
                 Ship by {date(shipBy.ours)}
                 {shipBy.lc && ` · LC latest shipment ${date(shipBy.lc)}`}
@@ -343,6 +348,34 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           edits={{ ref: ref("shipping"), card: edits.cards.shipping }}
         />
       )}
+      {/* Packing belongs to Shipping (it was its own tab): the lines' packages, weights and volume, and the marks. */}
+      {packGoods.length > 0 &&
+        (o.goods.allReceived || o.stage !== "confirmed" ? (
+          <div id="lines" data-target="lines.packing" data-target-card="" className="scroll-mt-24 rounded-xl">
+            <PackingCard
+              title="Packing lines"
+              badge={o.goods.packed ? <Badge tone="ok">Done</Badge> : <Badge tone="warn">Not made yet</Badge>}
+              orderId={o.id}
+              lines={o.lines.filter((l) => l.type === "goods")}
+              goods={packGoods}
+              containerNo={o.goods.containerNo}
+              containerHref={`/orders/${o.id}/shipping#goto=shipment.containerNo`}
+              shippingMarks={o.goods.shippingMarks}
+              canEdit={canEdit}
+              canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
+              action={packingAction.bind(null, o.id)}
+              marksAction={packingMarksAction.bind(null, o.id)}
+              links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
+              today={now}
+              toggle
+              edits={edits}
+            />
+          </div>
+        ) : (
+          <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-text-2">
+            <b className="font-semibold text-text">Packing</b> · opens once production has started, for the packages, weights and volume of each line.
+          </p>
+        ))}
     </StepPage>
   );
 }

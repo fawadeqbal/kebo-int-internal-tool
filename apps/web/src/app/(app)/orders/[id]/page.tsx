@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight } from "lucide-react";
-import { can, shipByVsLc, STEP_PATH, type PaymentRoute } from "@kebo/shared";
-import { Avatar, buttonClass, Card, CardBody, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ArrowRight } from "lucide-react";
+import { can, orderProgress, shipByVsLc, STEP_PATH, type PaymentRoute } from "@kebo/shared";
+import { Avatar, Card, CardBody, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
+import { orderFilesOf, orderFlowOf, orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { date, money, whole } from "@/lib/format";
 import { QuickNote } from "@/components/notes/note-forms";
 import { addNoteAction } from "@/app/(app)/follow-ups/actions";
@@ -14,6 +14,10 @@ import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { orderCostsSetup } from "@/components/orders/costs-data";
 import { overviewFacts } from "@/components/orders/overview";
+import { LinkedDocuments } from "@/components/orders/overview-record";
+import { KeyDates, OrderPeople } from "@/components/orders/order-facts";
+import { SideFileRow, SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
+import { UploadButton } from "@/components/files/files-list";
 import { detailsAction } from "../actions";
 import { DetailsCard } from "./forms";
 import { incotermOf, termsOf } from "./shared";
@@ -42,20 +46,24 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const [steps, m, flow, deal, costs, history, pos] = await Promise.all([
+  const [steps, m, flow, deal, costs, history, pos, files] = await Promise.all([
     orderStepsOf(id),
     optional(() => orderMoneyOf(id)),
     optional(() => orderFlowOf(id)),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
     orderCostsSetup(id).then((x) => x?.costs ?? null),
     optional(() => orderHistoryOf(id, undefined, 5)),
-    optional(() => api.get<{ items: { total: string | null; currency: string | null }[] }>(`/orders/${id}/purchase-orders`)),
+    optional(() => api.get<{ items: { number: string; total: string | null; currency: string | null }[] }>(`/orders/${id}/purchase-orders`)),
+    optional(() => orderFilesOf(id)),
   ]);
   // The purchase orders' total in their currency ("CNY 292,860"), for those who see factory prices.
   const poCur = pos?.items.find((p) => p.currency)?.currency;
   const poSum = (pos?.items ?? []).reduce((t, p) => t + Number(p.total ?? 0), 0);
   const poTotal = poCur && poSum > 0 && (pos?.items ?? []).every((p) => !p.currency || p.currency === poCur) ? whole(poSum, poCur) : null;
   const base = `/orders/${o.id}`;
+  const progress = orderProgress(steps.items, steps.steps.map((s) => s.key));
+  // The first open item is "Do next" (on top of every page); the rest are listed here.
+  const also = progress.open.slice(1, 7);
   const open = o.status !== "cancelled";
   const now = today();
   const doNow = steps.doNow;
@@ -69,6 +77,13 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const closeTool = allDone ? stageTool(me, o, "done", now) : null;
   const openClaims = flow?.delivery?.claims.filter((c) => c.status === "open" || c.status === "with_factory").length ?? 0;
   const satOn = flow?.delivery?.satDoneOn ?? flow?.delivery?.deliveredOn ?? null;
+  // Where this order came from and what it led to.
+  const linked = [
+    { kind: "Inquiry", label: o.inquiry.refNo, href: `/inquiries/${o.inquiry.id}` },
+    ...(o.quotation ? [{ kind: "Quotation", label: `${o.quotation.refNo} R${o.quotation.number}`, href: `/inquiries/${o.inquiry.id}/quotation` }] : []),
+    ...(pos?.items ?? []).map((x) => ({ kind: "Purchase order", label: x.number, href: `${base}/factory` })),
+    { kind: "Payments", label: m ? `${money(m.received, m.currency)} in` : "View", href: `/payments?order=${o.id}` },
+  ];
   const days = o.orderedOn ? Math.round((Date.parse(satOn ?? now) - Date.parse(o.orderedOn)) / 86_400_000) : null;
   /** "+ USD 400" over the plan, "– USD 400" under it. */
   const diff = (n: number) => (!costs || Math.abs(n) < 0.5 ? "—" : `${n > 0 ? "+" : "–"} ${whole(Math.abs(n), costs.currency)}`);
@@ -76,28 +91,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
 
   return (
     <div className="flex flex-col gap-4">
-      {open && doNow ? (
-        <section
-          aria-label="Do this now"
-          className={cn(
-            "flex flex-col gap-3 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between",
-            doNow.late ? "border-[#f3c7c2] bg-bad-soft dark:border-bad/40" : "border-[#f6d3bd] bg-action-soft dark:border-action/30",
-          )}
-        >
-          <p className="flex min-w-0 items-start gap-2">
-            {doNow.late && <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />}
-            <span>
-              <strong className={cn("block font-bold", doNow.late ? "text-bad" : "text-[#8a3a07] dark:text-action")}>Next: {doNow.title}.</strong>
-              <span className="block text-sm text-text-2">
-                {doNow.dueOn ? `${doNow.late ? "Was due" : "Due"} ${date(doNow.dueOn)}` : doNow.needs ? `Needs ${doNow.needs}` : ""} · {doNow.label}
-              </span>
-            </span>
-          </p>
-          <Link href={`${base}/${STEP_PATH[doNow.step]}`} className={buttonClass("primary", "md", "w-fit")}>
-            Open {doNow.label} <ArrowRight aria-hidden />
-          </Link>
-        </section>
-      ) : allDone ? (
+      {allDone ? (
         <>
           <section
             aria-label="All steps done"
@@ -171,7 +165,40 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
       ) : null}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
-          {/* The order (board): customer, terms, route, supplier, dates; Edit opens the same fields as before. */}
+          {/* What else can be done today, from every step ("Do next" above is the first). */}
+          {open && also.length > 0 && (
+            <Card className="overflow-hidden">
+              <CardHeader
+                title="Also open now"
+                actions={
+                  progress.waiting.length > 0 ? (
+                    <span className="text-[13px] text-text-2">
+                      {progress.waiting.length} waiting · {steps.items.filter((i) => i.done || i.skipped).length} done
+                    </span>
+                  ) : undefined
+                }
+              />
+              <ul className="flex flex-col divide-y divide-line">
+                {also.map((i) => (
+                  <li key={i.id ?? i.key ?? i.title} className="flex flex-wrap items-center gap-x-4 gap-y-0.5 px-4 py-2.5 text-[13px]">
+                    <span className="min-w-0 flex-1 basis-56">
+                      <span className="font-semibold">{i.title}</span>{" "}
+                      <span className="text-text-2">· {steps.steps.find((x) => x.key === i.step)?.label}</span>
+                      {i.needs && <span className="block text-xs text-text-2">Needs {i.needs}</span>}
+                    </span>
+                    <span className={cn("w-24 tabular", i.late ? "font-semibold text-bad" : "text-text-2")}>
+                      {i.dueOn ? `${i.late ? "was " : ""}${date(i.dueOn)}` : ""}
+                    </span>
+                    <span className="w-24 truncate text-text-2">{i.assignee?.name ?? ""}</span>
+                    <Link href={`${base}/${STEP_PATH[i.step]}#todo`} className="font-semibold text-primary hover:underline">
+                      Open
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {/* The order: customer, terms, route, supplier, dates; Edit opens every field. */}
           <DetailsCard
             action={detailsAction.bind(null, o.id)}
             canEdit={can(me, "orders.update") && open}
@@ -278,7 +305,34 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
         </div>
 
         <aside aria-label="Beside the order" className="flex min-w-0 flex-col gap-4">
-          {/* Money (board). */}
+          <SidePanelCard>
+            <KeyDates o={o} flow={flow} now={now} />
+            <OrderPeople o={o} flow={flow} />
+            {f.watch.length > 0 && (
+              <SideSection title="Keep an eye on">
+                {f.watch.map((w, k) => (
+                  <li key={k} className="py-1 text-[13px] text-text-2">
+                    <b className={cn("font-semibold", w.tone === "bad" ? "text-bad" : w.tone === "warn" ? "text-warn" : "text-text")}>{w.strong}</b> {w.rest}
+                  </li>
+                ))}
+              </SideSection>
+            )}
+            <SideSection
+              title="Files"
+              count={files?.files.length ?? 0}
+              action={
+                files?.canUpload ? (
+                  <UploadButton orderId={o.id} step={null} label="Upload" variant="ghost" size="sm" />
+                ) : undefined
+              }
+              empty="None yet. Drop a file anywhere on the order, or upload."
+            >
+              {(files?.files ?? []).slice(0, 5).map((x) => (
+                <SideFileRow key={x.id} file={x} set={files!.files} meta={x.attachedTo.label} />
+              ))}
+            </SideSection>
+          </SidePanelCard>
+          {/* Money. */}
           <Card>
             <CardHeader
               title="Money"
@@ -345,6 +399,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
               )}
             </CardBody>
           </Card>
+          <LinkedDocuments links={linked} />
         </aside>
       </div>
     </div>

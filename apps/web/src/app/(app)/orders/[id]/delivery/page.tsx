@@ -105,6 +105,8 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
         label="Delivery & SAT"
         items={d.items}
         current={d.current}
+        nowKey={d.nowKey}
+        waits={d.waits}
         canEdit={d.steps.canEdit}
         run={d.run}
         dealId={o.inquiry.id}

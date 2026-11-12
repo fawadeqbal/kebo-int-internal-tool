@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { Package, Printer, XCircle } from "lucide-react";
-import { PAYMENT_ROUTE_SHORT, STEP_PATH, type FlowStep, type StepState } from "@kebo/shared";
-import { buttonClass, cn, OrderStageBadge, PageHeader, RefCode, StatusBadge } from "@kebo/ui";
+import { Package, XCircle } from "lucide-react";
+import { orderProgress, orderStatusLine, PAYMENT_ROUTE_SHORT, STEP_PATH, type FlowStep, type ProgressState } from "@kebo/shared";
+import { cn, PageHeader, RefCode } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date, whole } from "@/lib/format";
+import { today } from "@/components/orders/today";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { ScrolledBar } from "@/components/orders/scrolled-bar";
-import { OrderTabs } from "@/components/orders/order-tabs";
+import { DoNext, OrderNav } from "@/components/orders/order-nav";
+import { readable } from "@/components/orders/step-page";
 import { orderCostsSetup } from "@/components/orders/costs-data";
 import { FileToolsProvider } from "@/components/files/file-tools";
 import { OrderDrop } from "@/components/files/order-drop";
@@ -35,7 +37,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
     optional(() => api.get<{ items: { number: string; sentOn: string | null }[] }>(`/orders/${id}/purchase-orders`)),
   ]);
   // What each step box says (board): where it stands in a few words.
-  const statusOf = (key: FlowStep, state: StepState, line: string): string => {
+  const statusOf = (key: FlowStep, state: ProgressState, line: string): string => {
     if (key === "payment") {
       const deposit = Number(o.money.deposit);
       if (flow?.payment.depositIn || (deposit > 0 && Number(o.money.received) >= deposit)) return Number(o.money.due) <= 0 ? "Paid in full" : "Deposit received";
@@ -56,22 +58,36 @@ export default async function OrderLayout({ children, params }: { children: Reac
       const head = list.length ? `${list.filter((x) => x.doneOn).length} of ${list.length} steps` : null;
       if (head && ready) return `${head} · ready ${date(ready)}`;
       if (ready) return `Ready ${date(ready)}`;
-      return head ?? (state === "todo" ? "—" : "Ready date not known");
+      return head ?? (state === "wait" ? "" : "Ready date not known");
     }
     if (key === "shipping") {
       const sh = flow?.shipping?.shipments[0];
       if (sh?.arrivedOn) return `Arrived ${date(sh.arrivedOn)}`;
       if (sh?.departedOn) return sh.eta ? `At sea · ETA ${date(sh.eta)}` : `Left ${date(sh.departedOn)}`;
     }
-    return state === "todo" ? "—" : line;
+    // The papers and bank steps: how many are in (their list is on the page).
+    if (key === "documents") return "";
+    return state === "wait" ? "" : readable(line);
   };
+  // Where the order stands, read from its to-do items: the line of steps, the status in words and "Do next" agree.
+  const todayIs = today();
+  const progress = steps ? orderProgress(steps.items, steps.steps.map((s) => s.key)) : null;
+  const status = orderStatusLine(steps?.items ?? [], { cancelled: o.status === "cancelled", closed: o.status === "closed" }, todayIs);
+  const statusText = (
+    <span className={cn("font-semibold whitespace-nowrap", status.tone === "bad" ? "text-bad" : status.tone === "ok" ? "text-ok" : "text-action")}>
+      {status.stage}
+      {status.note ? ` · ${status.note}` : ""}
+    </span>
+  );
+  const next = progress?.open[0] ?? null;
+  const nextStep = next ? steps!.steps.find((s) => s.key === next.step) : null;
   const ship = flow?.shipping?.shipments[0];
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const route = flow?.payment.route ? PAYMENT_ROUTE_SHORT[flow.payment.route] : null;
   const proforma = o.documents.find((d) => d.kind === "proforma");
   const pdf = proforma ? docHref(o, proforma) : null;
-  const now = steps?.doNow;
+  const now = next && nextStep ? { step: next.step, title: next.title, late: next.late, dueOn: next.dueOn } : null;
   // On a phone the paper buttons fold into ⋯ (design system: page header).
   const paperItems: MenuEntry[] = [{ label: "Papers", href: `${base}/documents` }];
   const proformaItems: MenuEntry[] = pdf
@@ -89,6 +105,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
 
   // Board: SO · customer · from RFQ · QUO R2 · CPT Kabul · USD 52,400 (route and who handles it after).
   const meta = [
+    <span key="st">{statusText}</span>,
     <RefCode key="no">{o.refNo}</RefCode>,
     <Link key="c" href={`/customers/${o.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
       {o.customer.name}
@@ -117,7 +134,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
         bar={
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-2 font-medium">
-              {o.refNo} <OrderStageBadge stage={o.stage} />{" "}
+              {o.refNo} <span className="text-xs">{statusText}</span>{" "}
               <span className="hidden font-normal text-muted sm:inline">{o.customer.name}</span>
             </span>
             {now && open && (
@@ -136,12 +153,6 @@ export default async function OrderLayout({ children, params }: { children: Reac
           crumbs={[{ label: "Operations & trading" }, { label: "Orders", href: "/orders" }, { label: o.refNo }]}
           icon={Package}
           title={o.inquiry.title || <span className="tabular">{o.refNo}</span>}
-          badge={
-            <>
-              <OrderStageBadge stage={o.stage} />
-              {!open && <StatusBadge meaning="bad">Cancelled</StatusBadge>}
-            </>
-          }
           summary={
             <p className="min-w-0">
               {meta.map((m, i) => (
@@ -157,15 +168,10 @@ export default async function OrderLayout({ children, params }: { children: Reac
             </p>
           }
           papers={
-            <>
-              <Link href={`${base}/documents`} className={buttonClass("secondary", "md")}>
-                <Printer aria-hidden /> Papers
-              </Link>
-              {/* A tab's main button lands here (HeaderSlot). */}
-              <span id="order-header-slot" className="contents" />
-            </>
+            // A page's own main button lands here (HeaderSlot).
+            <span id="order-header-slot" className="contents" />
           }
-          more={<MoreMenu label={`More for ${o.refNo}`} phoneItems={paperItems} items={moreItems} />}
+          more={<MoreMenu label={`More for ${o.refNo}`} items={[...paperItems, ...moreItems]} />}
         />
 
         {o.cancelled && (
@@ -180,18 +186,44 @@ export default async function OrderLayout({ children, params }: { children: Reac
         )}
       </ScrolledBar>
 
-      {steps && (
-        <OrderTabs
+      {steps && progress && (
+        <OrderNav
           base={base}
-          steps={steps.steps.map((s) => ({
-            key: s.key,
-            number: s.number,
-            label: s.label,
-            state: s.state,
-            status: statusOf(s.key, s.state, s.line),
-            href: `${base}/${STEP_PATH[s.key]}`,
-          }))}
-          costs={costs && { spent: whole(costs.costs.totals.spent, costs.costs.currency) }}
+          steps={steps.steps.map((s) => {
+            const p = progress.steps.find((x) => x.step === s.key)!;
+            return {
+              key: s.key,
+              number: s.number,
+              label: s.label,
+              state: p.state,
+              // A date or an amount when there is one; else what the step waits for.
+              fact: (p.state === "wait" ? p.waits : null) || statusOf(s.key, p.state, s.line) || p.waits || (p.state === "done" ? "Done" : `${p.done} of ${p.total} done`),
+              href: `${base}/${STEP_PATH[s.key]}`,
+            };
+          })}
+          pages={[
+            { href: `${base}/items`, label: "Items" },
+            { href: `${base}/money`, label: "Money" },
+            ...(costs ? [{ href: `${base}/costs`, label: "Costs" }] : []),
+            { href: `${base}/history`, label: "History" },
+          ]}
+        />
+      )}
+      {open && next && nextStep && (
+        <DoNext
+          base={base}
+          step={next.step}
+          stepLabel={nextStep.label}
+          late={next.late}
+          title={next.title}
+          meta={[
+            nextStep.label,
+            next.dueOn ? `${next.late ? "was due" : "due"} ${date(next.dueOn)}` : null,
+            next.assignee?.name ?? null,
+            next.needs ? `needs ${next.needs}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         />
       )}
       {/* Documents v3: the same file tools (viewer, menus, dialogs) on every page of the order, and drop anywhere. */}

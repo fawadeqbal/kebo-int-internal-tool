@@ -4,7 +4,8 @@ import { BASIS_STEP_LABEL, type BasisStep, type FlowStep } from "@kebo/shared";
 import { buttonClass, Card } from "@kebo/ui";
 import { dateTime, money, whole, TZ } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/types";
-import { orderFilesOf, orderOf, orderPapersOf } from "@/lib/order-data";
+import { orderFilesOf, orderFlowOf, orderOf, orderPapersOf } from "@/lib/order-data";
+import { KeyDates, OrderPeople } from "./order-facts";
 import { optional } from "@/components/print/data";
 import { UploadButton } from "@/components/files/files-list";
 import { docHref } from "@/app/(app)/orders/[id]/shared";
@@ -149,8 +150,9 @@ export async function StepSidePanel({
   changes: HistoryEntry[];
   historyHref: string;
 }) {
-  const [o, papers, files, costs] = await Promise.all([
+  const [o, flow, papers, files, costs] = await Promise.all([
     orderOf(id),
+    optional(() => orderFlowOf(id)),
     optional(() => orderPapersOf(id)),
     optional(() => orderFilesOf(id)),
     orderCostsSetup(id),
@@ -184,7 +186,7 @@ export async function StepSidePanel({
         title="Costs"
         count={here.length}
         action={<AddOrderExpense setup={costs.setup} step={step} variant="ghost" size="sm" />}
-        empty={`No expense on this step yet · ${money("0", c)}`}
+        empty="None on this step yet."
         footer={
           <>
             {here.length > 0 && (
@@ -240,7 +242,9 @@ export async function StepSidePanel({
   const lines = compactChanges(changes);
 
   return (
-    <SidePanelCard label="This step's papers, costs, files and changes">
+    <SidePanelCard label="Key dates, people, and this step's papers, costs, files and changes">
+      <KeyDates o={o} flow={flow} now={now} />
+      <OrderPeople o={o} flow={flow} first={step === "shipping" || step === "documents" ? "Forwarder" : step === "factory" || step === "production" ? "Factory" : undefined} />
       {papers && (
         <SideSection
           title="Papers"
@@ -279,7 +283,7 @@ export async function StepSidePanel({
               </Link>
             )
           }
-          empty="No files on this step yet. Drop them on the page, or upload."
+          empty="None yet. Drop a file on the page, or upload."
         >
           {stepFiles.map((f) => (
             <SideFileRow key={f.id} file={f} set={stepFiles} meta={fileMeta(f)} />

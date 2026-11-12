@@ -14,6 +14,7 @@ export * from "./workflows/numbers";
 export * from "./workflows/basis";
 export * from "./workflows/flow";
 export * from "./workflows/checklist";
+export * from "./workflows/progress";
 export * from "./workflows/costs";
 export * from "./workflows/papers";
 export * from "./workflows/files";

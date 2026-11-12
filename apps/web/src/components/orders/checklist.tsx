@@ -519,6 +519,7 @@ function Row({
   item,
   page,
   now,
+  waits,
   active,
   onActive,
   canEdit,
@@ -534,6 +535,8 @@ function Row({
   /** The step of the page the checklist is on (a link to it stays on the page). */
   page: FlowStep;
   now: boolean;
+  /** What it waits for ("After the booking"): it can still be done, it is just not its turn. */
+  waits?: string;
   /** Its form is open (the current item, or the one the person opened). */
   active: boolean;
   onActive: (open: boolean) => void;
@@ -765,7 +768,8 @@ function Row({
                     ))}
                   </span>,
                 )}
-              {item.needs && !showForm && <span className="text-muted">Needs: {item.needs}</span>}
+              {waits && !showForm && <span className="text-muted">{waits}</span>}
+              {item.needs && !showForm && !waits && <span className="text-muted">Needs: {item.needs}</span>}
             </>
           )}
           {/* Documents v3: the item's files as chips with the same tools as everywhere (view here, download, ⋯). */}
@@ -937,10 +941,16 @@ export function Checklist({
   payNode,
   payFor = {},
   listHref,
-  title = "Checklist",
+  title = "To do",
   me,
   today,
+  nowKey,
+  waits,
 }: {
+  /** The item to do first (from the order's progress); by default the first open one. */
+  nowKey?: string | null;
+  /** What each waiting item waits for ("After the booking"), by item. */
+  waits?: Record<string, string>;
   step: FlowStep;
   label: string;
   items: ChecklistItem[];
@@ -965,21 +975,21 @@ export function Checklist({
 }) {
   const done = items.filter((i) => i.done || i.skipped).length;
   const open = items.filter((i) => !i.done && !i.skipped);
-  const nowItem = current ? (open.find((i) => i.late) ?? open[0]) : undefined;
   const keyOf = (i: ChecklistItem) => i.id ?? i.key ?? i.title;
+  const nowItem = current ? ((nowKey ? open.find((i) => keyOf(i) === nowKey) : undefined) ?? open.find((i) => i.late) ?? open[0]) : undefined;
   // Only one row shows its form: the current item until another is opened (or it is closed).
   const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   const activeKey = chosen === undefined ? (canEdit && nowItem ? keyOf(nowItem) : null) : chosen;
   return (
-    // Board: the checklist comes after the step's own cards.
-    <Card className="order-last">
+    // Design "Order flow, redesigned": what to do comes first on a step's page, the details after it.
+    <Card id="todo" className="order-first scroll-mt-28">
       <CardHeader
         title={
           <>
-            {title} · {done} of {items.length}
+            {title} in {label} <span className="font-normal text-muted">· {done} of {items.length} done</span>
           </>
         }
-        description="Each item asks only what ticks it. Everything else: Edit in the view below."
+        description="Each row asks only for what ticks it. Everything else: Edit on the cards below."
         actions={
           listHref ? (
             <Link href={listHref} className={buttonClass("ghost", "xs")}>
@@ -996,6 +1006,7 @@ export function Checklist({
               item={i}
               page={step}
               now={i === nowItem}
+              waits={!i.done && !i.skipped ? waits?.[keyOf(i)] : undefined}
               active={activeKey === keyOf(i)}
               onActive={(o) => setChosen(o ? keyOf(i) : null)}
               canEdit={canEdit}

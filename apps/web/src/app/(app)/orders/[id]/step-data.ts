@@ -1,5 +1,5 @@
 import "server-only";
-import { can, STEP_PATH, type FlowStep } from "@kebo/shared";
+import { can, orderProgress, STEP_PATH, type FlowStep } from "@kebo/shared";
 import { requireUser } from "@/lib/session";
 import { orderDefaultsOf, orderFlowOf, orderHistoryOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
@@ -19,7 +19,11 @@ export async function stepData(id: string, step: FlowStep) {
     optional(() => orderDefaultsOf(id)),
   ]);
   const base = `/orders/${o.id}`;
-  const view = steps.steps.find((s) => s.key === step) ?? null;
+  // The same reading of the items as the order's line of steps and "Do next" (shared orderProgress).
+  const progress = orderProgress(steps.items, steps.steps.map((s) => s.key));
+  const mine = progress.steps.find((s) => s.step === step) ?? null;
+  const keyOf = (i: { id: string | null; key: string | null; title: string }) => i.id ?? i.key ?? i.title;
+  const firstOpen = progress.open.find((i) => i.step === step) ?? null;
   return {
     me,
     o,
@@ -33,7 +37,11 @@ export async function stepData(id: string, step: FlowStep) {
     now: today(),
     open: o.status !== "cancelled",
     items: steps.items.filter((i) => i.step === step),
-    current: view?.state === "now" || view?.state === "late",
+    current: mine?.state === "now" || mine?.state === "late",
+    /** The item to do first on this step (lit up, its form open). */
+    nowKey: firstOpen ? keyOf(firstOpen) : null,
+    /** What each waiting item of this step waits for, by item. */
+    waits: Object.fromEntries(progress.waiting.filter((w) => w.item.step === step).map((w) => [keyOf(w.item), w.waits])),
     run: checklistAction.bind(null, o.id),
     historyHref: `${base}/history?step=${step}`,
     listHref: can(me, "settings.manage") ? "/settings/order-checklist" : undefined,
