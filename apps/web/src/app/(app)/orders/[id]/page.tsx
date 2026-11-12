@@ -216,7 +216,7 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
                   </>
                 ),
               },
-              { label: "Their PO", value: o.customerRef ?? null },
+              { label: "Their PO", value: o.customerRef ? `${o.customerRef}${o.customerPoOn ? ` · ${date(o.customerPoOn)}` : ""}` : null },
               {
                 label: "Accepted",
                 value: o.quotation?.acceptedOn
@@ -237,6 +237,11 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
               containerNo: o.goods.containerNo,
               documentTitle: o.documentTitle,
               portOfDischarge: o.portOfDischarge,
+              customerRef: o.customerRef ?? null,
+              customerPoOn: o.customerPoOn ?? null,
+              consignee: o.consignee ?? null,
+              notifyParty: o.notifyParty ?? null,
+              deliveryAddress: o.deliveryAddress ?? null,
             }}
             readyEach={
               (o.readyBy ?? []).filter((r) => r.factoryId).length > 1

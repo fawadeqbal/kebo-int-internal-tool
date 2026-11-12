@@ -545,6 +545,10 @@ export class OrdersService {
         : null,
       documentTitle: o.documentTitle,
       portOfDischarge: o.portOfDischarge,
+      customerPoOn: fromDbDateOrNull(o.customerPoOn),
+      consignee: o.consignee,
+      notifyParty: o.notifyParty,
+      deliveryAddress: o.deliveryAddress,
       currency: o.currency,
       total: o.total.toFixed(2),
       /** The deposit % as accepted on the quotation (the plan may ask for another: money.depositPercent). */
@@ -1257,6 +1261,11 @@ export class OrdersService {
       if (input.documentTitle !== undefined) data.documentTitle = input.documentTitle;
       if (input.portOfDischarge !== undefined) data.portOfDischarge = input.portOfDischarge;
       if (input.shippingMarks !== undefined) data.shippingMarks = input.shippingMarks;
+      if (input.customerRef !== undefined) data.customerRef = input.customerRef;
+      if (input.customerPoOn !== undefined) data.customerPoOn = toDbDateOrNull(input.customerPoOn);
+      if (input.consignee !== undefined) data.consignee = input.consignee;
+      if (input.notifyParty !== undefined) data.notifyParty = input.notifyParty;
+      if (input.deliveryAddress !== undefined) data.deliveryAddress = input.deliveryAddress;
       const ship = shipFacts(o.shipments);
       // Once shipped, the ship date and B/L are on the customer's documents: changing them says why.
       const shippedFacts =

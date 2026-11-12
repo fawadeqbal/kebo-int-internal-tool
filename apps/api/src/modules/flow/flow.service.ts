@@ -323,6 +323,16 @@ export class FlowService {
       departedOn: fromDbDateOrNull(s.departedOn),
       arrivedOn: fromDbDateOrNull(s.arrivedOn),
       note: s.note,
+      forwarderContact: s.forwarderContact,
+      forwarderPhone: s.forwarderPhone,
+      customsBroker: s.customsBroker,
+      trackingNo: s.trackingNo,
+      freightAmount: s.freightAmount === null ? null : s.freightAmount.toString(),
+      freightCurrency: s.freightCurrency,
+      insurer: s.insurer,
+      insurancePolicyNo: s.insurancePolicyNo,
+      customsDeclarationNo: s.customsDeclarationNo,
+      clearedOn: fromDbDateOrNull(s.clearedOn),
     }));
     const sat = o.satChecks.map((c) => ({ id: c.id, item: c.item, result: c.result, note: c.note }));
     const claims = o.claims.map((c) => ({
@@ -418,6 +428,8 @@ export class FlowService {
             satPlannedOn: fromDbDateOrNull(o.delivery?.satPlannedOn),
             satDoneOn: fromDbDateOrNull(o.delivery?.satDoneOn),
             satSignedBy: o.delivery?.satSignedBy ?? null,
+            installedOn: fromDbDateOrNull(o.delivery?.installedOn),
+            warrantyMonths: o.delivery?.warrantyMonths ?? null,
             sat,
             suggestedSat: sat.length ? [] : [...DEFAULT_SAT_CHECKS],
             claims,
@@ -964,10 +976,19 @@ export class FlowService {
       "sealNo",
       "vgmKg",
       "note",
+      "forwarderContact",
+      "forwarderPhone",
+      "customsBroker",
+      "trackingNo",
+      "freightAmount",
+      "freightCurrency",
+      "insurer",
+      "insurancePolicyNo",
+      "customsDeclarationNo",
     ] as const) {
       if (input[k] !== undefined) (d as Record<string, unknown>)[k] = input[k];
     }
-    for (const k of ["loadedOn", "etd", "eta", "departedOn", "arrivedOn"] as const) if (input[k] !== undefined) d[k] = toDbDateOrNull(input[k]);
+    for (const k of ["loadedOn", "etd", "eta", "departedOn", "arrivedOn", "clearedOn"] as const) if (input[k] !== undefined) d[k] = toDbDateOrNull(input[k]);
     return d as Prisma.ShipmentUncheckedCreateWithoutOrderInput;
   }
 
@@ -1190,6 +1211,8 @@ export class FlowService {
       if (input.satPlannedOn !== undefined) data.satPlannedOn = toDbDateOrNull(input.satPlannedOn);
       if (input.satDoneOn !== undefined) data.satDoneOn = toDbDateOrNull(input.satDoneOn);
       if (input.satSignedBy !== undefined) data.satSignedBy = input.satSignedBy;
+      if (input.installedOn !== undefined) data.installedOn = toDbDateOrNull(input.installedOn);
+      if (input.warrantyMonths !== undefined) data.warrantyMonths = input.warrantyMonths;
       await this.setDelivery(tx, id, data);
       const what = input.satDoneOn
         ? "SAT signed off"

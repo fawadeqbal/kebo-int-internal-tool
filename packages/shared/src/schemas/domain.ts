@@ -417,6 +417,13 @@ export const orderDetailsInput = z.object({
   /** The packing list's container and the marks on the cartons. */
   containerNo: optionalText(120).optional(),
   shippingMarks: optionalText(2000).optional(),
+  /** The customer's own PO: its number and day. */
+  customerRef: optionalText(80).optional(),
+  customerPoOn: optionalDate.optional(),
+  /** Who the goods are consigned to, who is told on arrival, where they are delivered. */
+  consignee: optionalText(500).optional(),
+  notifyParty: optionalText(500).optional(),
+  deliveryAddress: optionalText(500).optional(),
   reason: reasonField,
 });
 export type OrderDetailsInput = z.infer<typeof orderDetailsInput>;

@@ -73,6 +73,11 @@ export interface OrderView {
   blNo: string | null;
   /** Shipment 1, where shipped on, the B/L and the container live (null: no shipment yet). */
   shipment?: { id: string; mode: ShipMode; count: number; blNo: string | null; containerNo: string | null; departedOn: string | null } | null;
+  /** The customer's PO day; who the goods are consigned to, who is told, where they are delivered. */
+  customerPoOn?: string | null;
+  consignee?: string | null;
+  notifyParty?: string | null;
+  deliveryAddress?: string | null;
   documentTitle: string | null;
   /** The contract destination (the default port of discharge of a new shipment). */
   portOfDischarge: string | null;

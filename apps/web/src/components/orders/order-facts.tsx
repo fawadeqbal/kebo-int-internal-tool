@@ -26,7 +26,9 @@ export function KeyDates({ o, flow, now }: { o: OrderView; flow: OrderFlow | nul
     ["Ship by", o.shipBy, !!sailed],
     [sailed ? "Sailed" : "Sails", sailed ?? ship?.etd ?? null, !!sailed],
     [ship?.arrivedOn ? "Arrived" : "Arrives", ship?.arrivedOn ?? ship?.eta ?? null, !!ship?.arrivedOn],
+    ["Cleared customs", ship?.clearedOn ?? null, true],
     ["Delivered", dv?.deliveredOn ?? null, true],
+    ["Installed", dv?.installedOn ?? null, true],
     [dv?.satDoneOn ? "SAT signed" : "SAT planned", dv?.satDoneOn ?? dv?.satPlannedOn ?? null, !!dv?.satDoneOn],
   ];
   // Always the four people plan by; the others once they have a day.
@@ -62,7 +64,10 @@ export function OrderPeople({ o, flow, first }: { o: OrderView; flow: OrderFlow 
     { role: "Customer", name: o.customer.name, sub: o.contactName ?? null, href: `/customers/${o.customer.id}` },
     ...(o.inquiry.assignee ? [{ role: "Handles it", name: o.inquiry.assignee.name }] : []),
     ...factories.map((x) => ({ role: "Factory", name: x.name, sub: flow?.factory.orderNo ? `their order ${flow.factory.orderNo}` : null, href: `/factories/${x.id}` })),
-    ...(ship?.forwarder ? [{ role: "Forwarder", name: ship.forwarder, sub: ship.bookingNo ? `booking ${ship.bookingNo}` : null }] : []),
+    ...(ship?.forwarder
+      ? [{ role: "Forwarder", name: ship.forwarder, sub: [ship.forwarderContact, ship.forwarderPhone].filter(Boolean).join(" · ") || (ship.bookingNo ? `booking ${ship.bookingNo}` : null) }]
+      : []),
+    ...(ship?.customsBroker ? [{ role: "Customs broker", name: ship.customsBroker }] : []),
     ...(contract && (contract.customerBank || contract.ourBank)
       ? [{ role: "Banks", name: [contract.customerBank, contract.ourBank].filter(Boolean).join(" → "), sub: contract.number }]
       : []),

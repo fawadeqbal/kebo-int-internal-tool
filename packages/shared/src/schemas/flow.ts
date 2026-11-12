@@ -135,6 +135,22 @@ const shipmentFields = {
   departedOn: optionalDate,
   arrivedOn: optionalDate,
   note: optionalText(2000),
+  /** The forwarder's person and phone, the customs broker, the carrier's tracking number. */
+  forwarderContact: optionalText(120),
+  forwarderPhone: optionalText(40),
+  customsBroker: optionalText(120),
+  trackingNo: optionalText(80),
+  /** The freight agreed with the forwarder (in its currency) and the insurance on the goods. */
+  freightAmount: z.preprocess(
+    (v) => (v === "" || v === null ? null : typeof v === "string" ? v.replace(/,/g, "").trim() : v),
+    z.coerce.number().min(0, "Cannot be negative").max(999_999_999).nullable(),
+  ),
+  freightCurrency: z.preprocess((v) => (v === "" || v === null ? null : typeof v === "string" ? v.trim().toUpperCase() : v), z.string().length(3, "A currency like USD").nullable()),
+  insurer: optionalText(120),
+  insurancePolicyNo: optionalText(60),
+  /** Customs at the destination. */
+  customsDeclarationNo: optionalText(60),
+  clearedOn: optionalDate,
 };
 const etaAfterEtd = (v: { etd?: string | null; eta?: string | null }) => !v.etd || !v.eta || v.eta >= v.etd;
 const etaMessage = { message: "The arrival date (ETA) cannot be before the departure date (ETD)", path: ["eta"] };
@@ -145,6 +161,12 @@ export const shipmentInput = z
     mode: shipmentFields.mode.default("sea"),
     status: shipmentFields.status.default("planned"),
     vgmKg: shipmentFields.vgmKg.optional().transform((v) => v ?? null),
+    ...Object.fromEntries(
+      (["forwarderContact", "forwarderPhone", "customsBroker", "trackingNo", "freightAmount", "freightCurrency", "insurer", "insurancePolicyNo", "customsDeclarationNo", "clearedOn"] as const).map((k) => [
+        k,
+        shipmentFields[k].optional(),
+      ]),
+    ),
     /** Not sent: from the order's terms (portsOf: E/F terms load at the Incoterm place, C/D terms discharge there). Empty: none. */
     portOfLoading: shipmentFields.portOfLoading.optional(),
     portOfDischarge: shipmentFields.portOfDischarge.optional(),
@@ -201,6 +223,11 @@ export const deliveryInput = z.object({
   satPlannedOn: maybe(optionalDate),
   satDoneOn: maybe(optionalDate),
   satSignedBy: maybe(optionalText(120)),
+  /** The day the machine was installed, and the warranty in months (counted from the SAT, else the delivery). */
+  installedOn: maybe(optionalDate),
+  warrantyMonths: maybe(
+    z.preprocess((v) => (v === "" || v === null ? null : v), z.coerce.number().int("Whole months").min(0).max(240).nullable()),
+  ),
 });
 export type DeliveryInput = z.infer<typeof deliveryInput>;
 

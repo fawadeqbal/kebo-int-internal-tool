@@ -187,6 +187,39 @@ describe("order flow: from asking factories to SAT", () => {
     const ship = f.shipping.shipments[0];
     expect(ship).toMatchObject({ mode: "sea", status: "booked", portOfDischarge: "Karachi", eta: day(34) });
     await api(app, sana).patch(`/shipments/${ship.id}`, { eta: day(-10) }).expect(400); // before ETD
+    // The forwarder's person, tracking, freight and insurance, customs: kept on the shipment.
+    f = (
+      await api(app, sana)
+        .patch(`/shipments/${ship.id}`, {
+          forwarderContact: "Mr. Zhao Lei",
+          forwarderPhone: "+86 532 5550 0101",
+          customsBroker: "Karachi Clearing Co.",
+          trackingNo: "MEDU1234567",
+          freightAmount: "4,200.50",
+          freightCurrency: "usd",
+          insurer: "PICC",
+          insurancePolicyNo: "PL-2291",
+          customsDeclarationNo: "KAPW-HC-1021",
+        })
+        .expect(200)
+    ).body;
+    expect(f.shipping.shipments[0]).toMatchObject({
+      forwarderContact: "Mr. Zhao Lei",
+      customsBroker: "Karachi Clearing Co.",
+      trackingNo: "MEDU1234567",
+      freightAmount: "4200.5",
+      freightCurrency: "USD",
+      insurancePolicyNo: "PL-2291",
+      customsDeclarationNo: "KAPW-HC-1021",
+      clearedOn: null,
+    });
+    await api(app, sana).patch(`/shipments/${ship.id}`, { freightCurrency: "dollars" }).expect(422);
+    // The order: the customer's PO, the consignee, the notify party and where it is delivered.
+    await api(app, sana)
+      .patch(`/orders/${orderId}/details`, { customerRef: "KMS-PO-2291", customerPoOn: day(-30), consignee: "Kabul Medical Supplies\nKabul", notifyParty: "Same as consignee", deliveryAddress: "Warehouse 4" })
+      .expect(200);
+    const order = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body;
+    expect(order).toMatchObject({ customerRef: "KMS-PO-2291", customerPoOn: day(-30), notifyParty: "Same as consignee", deliveryAddress: "Warehouse 4" });
     await api(app, sana).post(`/orders/${orderId}/shipments`, { etd: day(20), eta: day(-10) }).expect(422);
     expect((await api(app, sana).get(`/orders/${orderId}`)).body.stage).toBe("in_production"); // booked is not shipped
     f = (await api(app, sana).patch(`/shipments/${ship.id}`, { status: "departed", departedOn: day(-12), blNo: "COSU6281734510", containerNo: "CSNU7154420" }).expect(200)).body;
@@ -279,6 +312,10 @@ describe("order flow: from asking factories to SAT", () => {
     const claim = f.delivery.claims[0];
     expect(claim).toMatchObject({ status: "open", title: "Dented guard door" });
     f = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { satDoneOn: day(-9), satSignedBy: "Mr. Ali, QA head" }).expect(200)).body;
+    // Installed on and the warranty (months, from the SAT).
+    const installed = (await api(app, sana).patch(`/orders/${orderId}/delivery`, { installedOn: day(-9), warrantyMonths: "12" }).expect(200)).body;
+    expect(installed.delivery).toMatchObject({ installedOn: day(-9), warrantyMonths: 12, satSignedBy: "Mr. Ali, QA head" });
+    await api(app, sana).patch(`/orders/${orderId}/delivery`, { warrantyMonths: 999 }).expect(422);
     expect(stepState(f).delivery).toBe("current"); // the claim is still open
     await api(app, sana).patch(`/claims/${claim.id}`, { status: "resolved" }).expect(400); // how was it settled?
     f = (await api(app, sana).patch(`/claims/${claim.id}`, { status: "resolved", resolution: "Factory sent a new door by air; fitted." }).expect(200)).body;
