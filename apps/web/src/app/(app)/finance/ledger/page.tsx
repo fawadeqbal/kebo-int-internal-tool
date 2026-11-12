@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, Pager, Segmented, Table, Td, Th, THead, Tr, toPage } from "@kebo/ui";
+import { Alert, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, Pager, Segmented, Table, Td, Th, THead, Tr, toPage } from "@kebo/ui";
+import { ArrowRight, Factory, Landmark, List, User, Users } from "lucide-react";
+import { FilterCard } from "@/components/common/filter-card";
 import { todayIn } from "@kebo/utils";
 import { PageHeader } from "@kebo/ui";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -19,6 +21,9 @@ export const metadata = { title: "General ledger" };
 
 type Search = {
   view?: string;
+  who?: string;
+  q?: string;
+  has?: string;
   period?: string;
   from?: string;
   to?: string;
@@ -33,6 +38,7 @@ type Search = {
 };
 
 const VIEWS = [
+  { key: "balances", label: "Balances" },
   { key: "all", label: "All entries" },
   { key: "accounts", label: "By account" },
   { key: "customers", label: "Customers" },
@@ -53,7 +59,9 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   await requirePermission("ledger.view");
   const sp = await searchParams;
   const today = todayIn(TZ);
-  const view: View = VIEWS.some((v) => v.key === sp.view) ? (sp.view as View) : "all";
+  // Balances first (board General ledger); a link into the entries (an account, an order, a period) opens them.
+  const entriesAsked = !!(sp.account || sp.order || sp.type || sp.period || sp.from || sp.cur || sp.removed || sp.page);
+  const view: View = VIEWS.some((v) => v.key === sp.view) ? (sp.view as View) : entriesAsked ? "all" : "balances";
   const period = periodOf(sp, today);
   const all = sp as Record<string, string | undefined>;
   const entry =
@@ -67,7 +75,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       <PageHeader
         crumbs={crumbsFor(PATH)}
         title={labelFor(PATH)}
-        description={`Every money record, posted from its document · ${main} at each entry's rate`}
+        description={view === "balances" ? "Every customer, supplier, account and person with a balance" : `Every money record, posted from its document · ${main} at each entry's rate`}
         actions={
           <>
             {view === "all" && (
@@ -95,12 +103,14 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         label="Ledger views"
         className="mb-3"
         options={VIEWS.map((v) => ({
-          href: buildHref(PATH, {}, { view: v.key === "all" ? undefined : v.key, period: sp.period, from: sp.from, to: sp.to }),
+          href: buildHref(PATH, {}, { view: v.key === "balances" ? undefined : v.key, period: sp.period, from: sp.from, to: sp.to }),
           label: v.label,
           active: v.key === view,
         }))}
       />
-      {view === "all" || view === "orders" ? (
+      {view === "balances" ? (
+        <Balances sp={sp} />
+      ) : view === "all" || view === "orders" ? (
         <Entries sp={sp} all={all} view={view} period={period} today={today} main={main} />
       ) : view === "accounts" ? (
         <Accounts period={period} />
@@ -250,6 +260,105 @@ async function OrderPicker() {
         </DataTable>
       )}
     </Card>
+  );
+}
+
+type BalanceRow = { account: string; kind: "customer" | "supplier" | "account" | "person"; id: string | null; label: string; currency: string; in: string; out: string; balance: string };
+const WHO = [
+  { key: "all", label: "All", icon: List },
+  { key: "customer", label: "Customers", icon: Users },
+  { key: "supplier", label: "Suppliers", icon: Factory },
+  { key: "account", label: "Accounts", icon: Landmark },
+  { key: "person", label: "People", icon: User },
+] as const;
+
+/** Balances (board General ledger): who, currency, charged / in, paid / out, balance, and their statement. */
+async function Balances({ sp }: { sp: Search }) {
+  const rows = await api.get<BalanceRow[]>("/ledger/balances");
+  const who = WHO.some((w) => w.key === sp.who) ? sp.who! : "all";
+  const q = sp.q?.trim().toLowerCase() ?? "";
+  const currencies = [...new Set(rows.map((r) => r.currency))].sort();
+  const all = sp.has === "all";
+  const shown = rows
+    .filter((r) => who === "all" || r.kind === who)
+    .filter((r) => !q || r.label.toLowerCase().includes(q))
+    .filter((r) => !sp.cur || r.currency === sp.cur)
+    .filter((r) => all || Math.abs(Number(r.balance)) >= 0.005)
+    .sort((a, b) => Math.abs(Number(b.balance)) - Math.abs(Number(a.balance)));
+  const statement = (r: BalanceRow) =>
+    !r.id ? null : r.kind === "account" ? `/finance/cash-book?acct=${r.id}` : partyHref(r.kind === "customer" ? "customer" : r.kind === "supplier" ? "factory" : "staff", r.id);
+  const fmt = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (
+    <div className="flex flex-col gap-4">
+      <LinkTabs
+        label="Whose"
+        tabs={WHO.map((w) => ({
+          href: buildHref(PATH, { q: sp.q, cur: sp.cur, has: sp.has }, { who: w.key === "all" ? undefined : w.key }),
+          label: (
+            <>
+              <w.icon aria-hidden /> {w.label}
+            </>
+          ),
+          active: who === w.key,
+        }))}
+      />
+      <div>
+        <FilterCard
+          search="Search…"
+          value={sp.q}
+          keep={{ who: who === "all" ? undefined : who }}
+          clearHref={buildHref(PATH, { who: who === "all" ? undefined : who, cur: sp.cur, has: sp.has }, {})}
+          selects={[
+            { name: "cur", label: "Currency", value: sp.cur, options: currencies.map((c) => ({ value: c, label: c })) },
+            { name: "has", label: "Has balance", value: sp.has, options: [{ value: "all", label: "Any" }], all: "Yes" },
+          ]}
+        />
+        <Card className="overflow-x-auto p-0">
+          {shown.length === 0 ? (
+            <EmptyState title="Nothing here" description="Balances appear when money is recorded: orders, payments, expenses, transfers." />
+          ) : (
+            <Table className="min-w-[760px]">
+              <THead>
+                <tr>
+                  <Th>Who</Th>
+                  <Th>Currency</Th>
+                  <Th className="text-right">Charged / in</Th>
+                  <Th className="text-right">Paid / out</Th>
+                  <Th className="text-right">Balance</Th>
+                  <Th>
+                    <span className="sr-only">Statement</span>
+                  </Th>
+                </tr>
+              </THead>
+              <tbody>
+                {shown.map((r) => {
+                  const href = statement(r);
+                  return (
+                    <Tr key={`${r.account}:${r.currency}`}>
+                      <Td>
+                        <span className="block font-semibold">{r.label}</span>
+                        <span className="block text-xs text-text-2">{r.kind === "person" ? "person · own money" : r.kind}</span>
+                      </Td>
+                      <Td>{r.currency}</Td>
+                      <Td className="text-right tabular">{fmt(r.in)}</Td>
+                      <Td className="text-right tabular">{fmt(r.out)}</Td>
+                      <Td className={cn("text-right font-semibold tabular", Number(r.balance) < 0 && "text-bad")}>{fmt(r.balance)}</Td>
+                      <Td className="text-right">
+                        {href && (
+                          <Link href={href} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                            <ArrowRight className="size-4" aria-hidden /> Statement
+                          </Link>
+                        )}
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }
 

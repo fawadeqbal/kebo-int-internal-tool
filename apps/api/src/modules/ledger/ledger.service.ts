@@ -1021,6 +1021,40 @@ export class LedgerService {
   /* ---------------------------------------------------------------- accounts */
 
   /** Every account's balance (per currency, and in the main currency), grouped as "By account" shows them. */
+  /**
+   * Every customer, supplier, account and person with entries (board General ledger), one row per currency:
+   * what was charged / came in, what was paid / went out, and the balance as they read it
+   * (a customer: what they owe; a supplier or a person: what we owe; an account: what is in it).
+   */
+  async balances() {
+    await this.posting.ensureBuilt();
+    const rows = await this.prisma.db.$queryRaw<{ account: string; currency: string; debit: string; credit: string }[]>`
+      select account, currency::text, sum(debit)::text as debit, sum(credit)::text as credit
+        from ledger_entries
+       where account like 'customer:%' or account like 'factory:%' or account like 'money:%' or account like 'staff:%'
+       group by 1, 2 order by 1, 2`;
+    const n = await this.names(rows.map((r) => ({ account: r.account, customerId: null, factoryId: null, userId: null, orderId: null, moneyAccountId: null })));
+    const KIND = { customer: "customer", factory: "supplier", money: "account", staff: "person" } as const;
+    return rows.map((r) => {
+      const a = parseLedgerAccount(r.account);
+      const kind = KIND[a.kind as keyof typeof KIND];
+      const d = minor(r.debit);
+      const c = minor(r.credit);
+      // A customer and an account grow with debits; a supplier and a person (what we owe them) with credits.
+      const debitSide = kind === "customer" || kind === "account";
+      return {
+        account: r.account,
+        kind,
+        id: a.id,
+        label: ledgerAccountLabel(r.account, n),
+        currency: r.currency,
+        in: money(debitSide ? d : c),
+        out: money(debitSide ? c : d),
+        balance: money(debitSide ? d - c : c - d),
+      };
+    });
+  }
+
   async accounts(q: { to?: ISODate } = {}) {
     await this.posting.ensureBuilt();
     const db = this.prisma.db;

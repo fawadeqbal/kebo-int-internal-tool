@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FileText } from "lucide-react";
+import { Check, Clock, FileText } from "lucide-react";
 import { can, EXPENSE_CATEGORY_LABEL, type ExpenseCategory } from "@kebo/shared";
 import {
   Alert,
@@ -11,17 +11,25 @@ import {
   ListToolbar,
   PageHeader,
   Pager,
+  StatRow,
+  StatTile,
   StatusBadge,
+  Table,
+  Td,
+  Th,
+  THead,
   toPage,
+  Tr,
   type StatusMeaning,
 } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
-import { date, dateTime, money, timeAgo } from "@/lib/format";
+import { date, dateTime, money, timeAgo, whole } from "@/lib/format";
 import type { Submission, SubmissionList, SubmissionStatus } from "@/lib/types-approvals";
 import { ApproveButtons, WithdrawButton } from "@/components/money/approval-actions";
 import { approveAction, sendBackAction, withdrawAction } from "./actions";
 import { crumbsFor, labelFor } from "@/lib/nav";
+import { today } from "@/components/orders/today";
 
 export const metadata = { title: "Verification queue" };
 
@@ -71,20 +79,40 @@ export default async function ApprovalsPage({
     return `/approvals${q.size ? `?${q}` : ""}`;
   };
   const keep = { mine: mine && approver ? "true" : undefined, status: status === "pending" ? undefined : status };
+  // The waiting ones on this page: their total per currency, and how long the oldest has waited.
+  const sums = new Map<string, number>();
+  for (const r of list.rows) if (r.status === "pending" && r.amount && r.currency) sums.set(r.currency, (sums.get(r.currency) ?? 0) + Number(r.amount));
+  const waitingSum = [...sums.entries()].map(([c, a]) => whole(a, c)).join(" · ");
+  const now = Date.parse(today());
+  const firstWait = list.rows.filter((r) => r.status === "pending").map((r) => Date.parse(r.submittedAt.slice(0, 10))).sort((a, b) => a - b)[0];
+  const oldest = firstWait === undefined ? null : Math.max(0, Math.round((now - firstWait) / 86_400_000));
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <PageHeader
         crumbs={crumbsFor("/approvals")}
+        icon={Check}
         title={labelFor("/approvals")}
         summary={
           mine
             ? "Sent for approval: money received and expenses you added. Each counts once a manager approves it."
-            : list.counts.pending
-              ? `To approve: ${list.counts.pending} waiting · approving records it as the usual payment or expense, with its photo`
-              : "Nothing is waiting for you"
+            : "Payments recorded by the team, waiting for a manager to check the bank"
         }
       />
+      {!mine && (
+        <StatRow className="mb-4">
+          <StatTile
+            icon={Clock}
+            iconColor={2}
+            label="Waiting"
+            value={list.counts.pending}
+            sub={status === "pending" && waitingSum ? waitingSum : undefined}
+            tone={list.counts.pending ? "warn" : undefined}
+          />
+          <StatTile label="Oldest" value={oldest === null ? "—" : oldest === 0 ? "today" : `${oldest} day${oldest === 1 ? "" : "s"}`} />
+          <StatTile icon={Check} iconColor={1} label="Approved" value={list.counts.approved} sub={list.counts.sent_back ? `${list.counts.sent_back} sent back` : undefined} />
+        </StatRow>
+      )}
       {approver && submitter && (
         <LinkTabs
           label="Whose"
@@ -124,11 +152,36 @@ export default async function ApprovalsPage({
             }
           />
         ) : (
-          <ul aria-label={mine ? "Sent for approval" : "To approve"} className="divide-y divide-line">
-            {list.rows.map((s) => (
-              <Row key={s.id} s={s} />
-            ))}
-          </ul>
+          <>
+            <ul aria-label={mine ? "Sent for approval" : "To approve"} className="divide-y divide-line md:hidden">
+              {list.rows.map((s) => (
+                <Row key={s.id} s={s} />
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <Table>
+                <THead>
+                  <tr>
+                    <Th>What</Th>
+                    <Th>Date</Th>
+                    <Th>{status === "pending" && !mine ? "Customer · for" : "Who · for"}</Th>
+                    <Th>Method</Th>
+                    <Th className="text-right">Amount</Th>
+                    <Th>By</Th>
+                    <Th>Slip</Th>
+                    <Th>
+                      <span className="sr-only">Actions</span>
+                    </Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {list.rows.map((s) => (
+                    <TableRow key={s.id} s={s} />
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          </>
         )}
         <Pager base="/approvals" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />
       </Card>
@@ -193,6 +246,57 @@ function Row({ s }: { s: Submission }) {
         </div>
       )}
     </li>
+  );
+}
+
+/** One submission as a table row (board VerificationQueue): what, date, who it is from and for, amount, who added it, the slip, and the buttons. */
+function TableRow({ s }: { s: Submission }) {
+  const when = s.paidOn ?? s.spentOn;
+  return (
+    <Tr className="align-middle">
+      <Td>
+        <div className="flex flex-col items-start gap-1">
+          <Badge tone={s.kind === "payment" ? "info" : "neutral"}>{kindWords(s)}</Badge>
+          {s.status !== "pending" && <StatusBadge meaning={STATUS_MEANING[s.status]}>{STATUS_LABEL[s.status]}</StatusBadge>}
+        </div>
+      </Td>
+      <Td className="whitespace-nowrap">{when ? date(when) : "—"}</Td>
+      <Td className="min-w-56">
+        <span className="block font-semibold">{whatOf(s)}</span>
+        <span className="block text-xs text-text-2">
+          {s.order ? (
+            <Link href={`/orders/${s.order.id}`} className="hover:text-primary">
+              {s.order.refNo}
+            </Link>
+          ) : (
+            "No order"
+          )}
+          {s.reference && <> · ref. {s.reference}</>}
+        </span>
+        {s.status === "sent_back" && s.reason && <span className="mt-1 block text-xs text-bad">Sent back: {s.reason}</span>}
+      </Td>
+      <Td className="text-sm">{s.method ?? "—"}</Td>
+      <Td className="text-right whitespace-nowrap tabular">{amountOf(s)}</Td>
+      <Td className="text-sm">
+        <span title={dateTime(s.submittedAt)}>{s.submittedBy.name.split(" ")[0]}</span>
+      </Td>
+      <Td className="text-sm">
+        {s.file ? (
+          <a href={`/files/${s.file.id}?view=1`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-primary hover:underline">
+            <FileText className="size-3.5" aria-hidden /> {s.file.name}
+          </a>
+        ) : (
+          <span className="text-muted">no slip</span>
+        )}
+      </Td>
+      <Td className="text-right">
+        {s.can.approve ? (
+          <ApproveButtons approve={approveAction.bind(null, s.id)} sendBack={sendBackAction.bind(null, s.id)} what={nameOf(s)} />
+        ) : s.can.withdraw ? (
+          <WithdrawButton action={withdrawAction.bind(null, s.id)} />
+        ) : null}
+      </Td>
+    </Tr>
   );
 }
 

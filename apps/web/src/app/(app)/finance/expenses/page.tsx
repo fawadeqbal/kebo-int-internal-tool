@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { PageHeader } from "@kebo/ui";
+import { ButtonLink, PageHeader } from "@kebo/ui";
+import { Banknote, Plus } from "lucide-react";
 import { todayIn } from "@kebo/utils";
 import { PlanOff } from "@/components/common/plan-off";
 import { crumbsFor, labelFor } from "@/lib/nav";
@@ -18,7 +19,17 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   return (
     <div>
-      <PageHeader crumbs={crumbs} title={labelFor("/finance/expenses")} description="What the company spends to run, and what is spent on each customer and their orders." />
+      <PageHeader
+        crumbs={crumbs}
+        icon={Banknote}
+        title="Expenses"
+        summary="Every cost, and which inquiry, order or step it belongs to"
+        primary={
+          <ButtonLink href="/payments/new?kind=expense" variant="primary">
+            <Plus aria-hidden /> New expense
+          </ButtonLink>
+        }
+      />
       <ExpensesBody sp={sp} today={todayIn(TZ)} />
     </div>
   );

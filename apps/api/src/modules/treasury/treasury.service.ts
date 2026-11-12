@@ -32,6 +32,11 @@ export interface PaymentsQuery {
   q?: string;
   order?: string;
   party?: string;
+  /** Only expenses. */
+  kind?: "expense";
+  account?: string;
+  /** A method's label ("Bank transfer"). */
+  method?: string;
   page: number;
   pageSize: number;
 }
@@ -47,6 +52,14 @@ const LEDGER_SOURCE: Partial<Record<PaymentRecordKind, string>> = {
 };
 
 const name = { select: { id: true, name: true } } as const;
+/** "Sana" of "Sana Malik". */
+const first = (u: { name: string } | null | undefined) => u?.name.split(" ")[0] ?? null;
+/** The rows' amounts added up per currency, largest first. */
+function sums(rows: { amount: string; currency: string }[]): { currency: string; amount: string }[] {
+  const by = new Map<string, number>();
+  for (const r of rows) by.set(r.currency, (by.get(r.currency) ?? 0) + decimalToMinor(r.amount));
+  return [...by.entries()].sort((a, b) => b[1] - a[1]).map(([currency, minor]) => ({ currency, amount: (minor / 100).toFixed(2) }));
+}
 const orderRef = { select: { id: true, refNo: true } } as const;
 const money = (d: Prisma.Decimal) => d.toFixed(2);
 /** "USD 14,692.15": an amount as a page shows it. */
@@ -135,9 +148,28 @@ export class TreasuryService {
       out: found.filter((r) => r.direction === "out").length,
       move: found.filter((r) => r.direction === "move").length,
       to_verify: found.filter((r) => r.status === "to_verify").length,
+      expense: found.filter((r) => r.kind === "expense" && r.status !== "void").length,
     };
+    const live = found.filter((r) => r.status === "recorded" && !r.fromCredit);
+    const moneyIn = live.filter((r) => r.direction === "in");
+    const moneyOut = live.filter((r) => r.direction === "out" && r.kind !== "expense");
+    const totals = {
+      in: sums(moneyIn),
+      inCount: moneyIn.length,
+      out: sums(moneyOut),
+      outCount: moneyOut.length,
+      toVerify: sums(found.filter((r) => r.status === "to_verify")),
+      expenses: sums(live.filter((r) => r.kind === "expense")),
+    };
+    const accounts = [...new Map(rows.filter((r) => r.accountId && r.account).map((r) => [r.accountId!, { id: r.accountId!, name: r.account! }])).values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    const methods = [...new Set(rows.map((r) => r.method).filter((m): m is string => !!m))].sort();
     const shown = found
       .filter((r) => !q.dir || r.direction === q.dir)
+      .filter((r) => !q.kind || r.kind === q.kind)
+      .filter((r) => !q.account || r.accountId === q.account)
+      .filter((r) => !q.method || r.method === q.method)
       .filter((r) => (q.status ? r.status === q.status : r.status !== "void"))
       // Newest first; what waits for a manager stays on top of its day.
       .sort(
@@ -151,7 +183,7 @@ export class TreasuryService {
       : q.party
         ? ((await this.prisma.db.party.findFirst({ where: { id: q.party }, select: { name: true } }))?.name ?? null)
         : null;
-    return { rows: page, total: shown.length, page: q.page, pageSize: q.pageSize, counts, scope, canRecord: this.canRecord(user, s) };
+    return { rows: page, total: shown.length, page: q.page, pageSize: q.pageSize, counts, totals, accounts, methods, scope, canRecord: this.canRecord(user, s) };
   }
 
   /** Every row this person sees in the period and filters (numbers are added for the page shown); `only`: one record. */
@@ -188,6 +220,7 @@ export class TreasuryService {
             include: {
               party: name,
               account: name,
+              recordedBy: name,
               allocations: { where: { later: false, ...orderPart }, select: { kind: true, amount: true, voidedAt: true, order: orderRef } },
             },
           })
@@ -215,7 +248,7 @@ export class TreasuryService {
               ...(range ? { valueDate: range } : {}),
               ...(party ? { partyId: party } : {}),
             },
-            include: { party: name, account: name },
+            include: { party: name, account: name, recordedBy: name },
           })
         : [],
       s.supplier && pick("supplier")
@@ -228,7 +261,7 @@ export class TreasuryService {
               ...(range ? { on: range } : {}),
               ...(party ? { movement: { partyId: party } } : {}),
             },
-            include: { purchaseOrder: orderRef, movement: { include: { party: name, account: name } } },
+            include: { purchaseOrder: orderRef, movement: { include: { party: name, account: name, recordedBy: name } } },
           })
         : [],
       s.expense && pick("expense")
@@ -239,13 +272,21 @@ export class TreasuryService {
               ...(q.order ? { orderId: q.order } : {}),
               ...(party ? { OR: [{ customerId: party }, { factoryId: party }] } : {}),
             },
-            include: { order: orderRef, inquiry: orderRef, customer: name, factory: name, account: name, paidBy: name },
+            include: {
+              order: orderRef,
+              inquiry: orderRef,
+              customer: name,
+              factory: name,
+              account: { select: { id: true, name: true, kind: true } },
+              paidBy: name,
+              recordedBy: name,
+            },
           })
         : [],
       s.transfer && !q.order && !party && pick("transfer")
         ? this.prisma.db.moneyMovement.findMany({
             where: { ...pick("transfer"), direction: "move", ...(range ? { valueDate: range } : {}) },
-            include: { account: name, toAccount: name },
+            include: { account: name, toAccount: name, recordedBy: name },
           })
         : [],
       (s.approves.length || s.submits) && pick("submission")
@@ -259,7 +300,7 @@ export class TreasuryService {
                 ...(s.approves.length ? [{ kind: { in: s.approves }, OR: [{ orderId: null }, { order: { is: access } }] }] : []),
               ],
             },
-            include: { order: { select: { id: true, refNo: true, currency: true, customer: name } } },
+            include: { order: { select: { id: true, refNo: true, currency: true, customer: name } }, submittedBy: name },
           })
         : [],
     ]);
@@ -288,6 +329,9 @@ export class TreasuryService {
         reference: m.reference,
         status: statusOf(m.voidedAt),
         fromCredit: false,
+        method: PAYMENT_METHOD_LABEL[m.method],
+        by: first(m.recordedBy),
+        accountId: m.accountId,
       });
     }
     for (const a of fromCredit)
@@ -306,6 +350,9 @@ export class TreasuryService {
         reference: null,
         status: statusOf(a.voidedAt),
         fromCredit: true,
+        method: "From credit",
+        by: null,
+        accountId: null,
       });
     for (const m of refunds)
       out.push({
@@ -323,6 +370,9 @@ export class TreasuryService {
         reference: null,
         status: statusOf(m.voidedAt),
         fromCredit: false,
+        method: PAYMENT_METHOD_LABEL[m.method],
+        by: first(m.recordedBy),
+        accountId: m.accountId,
       });
     for (const p of supplierPaid)
       out.push({
@@ -340,6 +390,9 @@ export class TreasuryService {
         reference: p.movement.reference,
         status: statusOf(p.voidedAt ?? p.movement.voidedAt),
         fromCredit: false,
+        method: PAYMENT_METHOD_LABEL[p.movement.method],
+        by: first(p.movement.recordedBy),
+        accountId: p.movement.accountId,
       });
     for (const e of expenses)
       out.push({
@@ -357,6 +410,9 @@ export class TreasuryService {
         reference: e.reference,
         status: statusOf(e.voidedAt),
         fromCredit: false,
+        method: e.ownMoney ? "Own money" : e.account?.kind === "cash" ? "Cash" : e.account ? "Bank transfer" : null,
+        by: first(e.recordedBy),
+        accountId: e.accountId,
       });
     for (const t of transfers)
       out.push({
@@ -374,6 +430,9 @@ export class TreasuryService {
         reference: t.reference,
         status: statusOf(t.voidedAt),
         fromCredit: false,
+        method: "Transfer",
+        by: first(t.recordedBy),
+        accountId: t.accountId,
       });
     for (const m of submissions) {
       const b = (m.body ?? {}) as Record<string, unknown>;
@@ -396,6 +455,9 @@ export class TreasuryService {
         reference: typeof b.reference === "string" ? b.reference : null,
         status: m.status === "pending" ? "to_verify" : "sent_back",
         fromCredit: false,
+        method: typeof b.method === "string" && b.method in PAYMENT_METHOD_LABEL ? PAYMENT_METHOD_LABEL[b.method as PaymentMethod] : null,
+        by: first(m.submittedBy),
+        accountId: typeof b.accountId === "string" ? b.accountId : null,
       });
     }
     return out;
@@ -493,6 +555,14 @@ export class TreasuryService {
           orderId: one?.orderId ?? null,
           partId: one?.id ?? null,
           voidPath: !m.voidedAt && can(user, "orders.manage") ? (one ? `/payments/${one.id}/void` : `/customer-receipts/${m.id}/void`) : null,
+          parts: m.allocations.map((a) => ({
+            order: a.order!.refNo,
+            href: `/orders/${a.order!.id}`,
+            part: PAYMENT_KIND_LABEL[a.kind as PaymentKind],
+            amount: money(a.amount),
+            currency: m.allocCurrency,
+            released: !!a.voidedAt && !m.voidedAt,
+          })),
         };
       }
       case "credit": {

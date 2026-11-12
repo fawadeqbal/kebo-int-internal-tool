@@ -159,6 +159,20 @@ describe("treasury: every payment in one list", () => {
     expect((await list(manager, `q=TT-${tag}`)).rows.map((r) => r.id)).toEqual([paymentId]);
   });
 
+  it("adds up the period's money in, out and expenses, and filters by kind, account and method", async () => {
+    const l = await list(manager, `order=${orderId}`);
+    expect(l.totals.in.length + l.totals.out.length + l.totals.expenses.length).toBeGreaterThan(0);
+    expect(l.counts.expense).toBe(l.rows.filter((r) => r.kind === "expense" && r.status !== "void").length);
+    const expenses = await list(manager, `order=${orderId}&kind=expense`);
+    expect(expenses.rows.every((r) => r.kind === "expense")).toBe(true);
+    const pay = l.rows.find((r) => r.id === paymentId)!;
+    expect(pay.method).toBeTruthy();
+    expect(pay.by).toBeTruthy();
+    const byMethod = await list(manager, `order=${orderId}&method=${encodeURIComponent(pay.method!)}`);
+    expect(byMethod.rows.every((r) => r.method === pay.method)).toBe(true);
+    if (pay.accountId) expect((await list(manager, `order=${orderId}&account=${pay.accountId}`)).rows.every((r) => r.accountId === pay.accountId)).toBe(true);
+  });
+
   it("shows a removed payment only under Removed", async () => {
     await api(app, manager).post(`/expenses/${expenseId}/void`, { reason: "Typed twice" }).expect(200);
     expect((await list(manager, `order=${orderId}`)).rows.some((r) => r.id === expenseId)).toBe(false);

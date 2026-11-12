@@ -16,6 +16,9 @@ const paymentsQuery = z.object({
   q: z.string().trim().max(100).optional(),
   order: z.uuid().optional(),
   party: z.uuid().optional(),
+  kind: z.enum(["expense"]).optional(),
+  account: z.uuid().optional(),
+  method: z.string().trim().max(40).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
