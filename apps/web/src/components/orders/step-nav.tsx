@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { isPaperKind, PAPER_STEP, STEP_PATH, type StepState } from "@kebo/shared";
-import { cn, SectionNav } from "@kebo/ui";
+import { cn, SectionNav, StageBar } from "@kebo/ui";
 
 export interface StepNavStep {
   key: string;
@@ -104,6 +104,8 @@ export function StepNav({
   label = "Order steps",
   glance = "The order at a glance",
   extra = [],
+  stages,
+  files,
 }: {
   base: string;
   steps: StepNavStep[];
@@ -114,6 +116,10 @@ export function StepNav({
   glance?: string;
   /** Links after History (e.g. the inquiry's "Order →"). */
   extra?: { href: string; label: string }[];
+  /** The record's stage as a bar above the chips (board: New → Sourcing → Quoted → Won). */
+  stages?: { list: string[]; current: number };
+  /** A Files page between Costs and History. */
+  files?: boolean;
 }) {
   const at = usePathname();
   // A paper's Make page (/orders/:id/papers/:kind) belongs to the paper's step.
@@ -125,6 +131,7 @@ export function StepNav({
     { href: base, label: "Overview" },
     ...steps,
     ...(costs ? [{ href: `${base}/costs`, label: "Costs", tag: costs.spent }] : []),
+    ...(files ? [{ href: `${base}/files`, label: "Files" }] : []),
     { href: `${base}/history`, label: "History" },
     ...extra,
   ];
@@ -148,15 +155,23 @@ export function StepNav({
 
   return (
     <>
-      {/* From a tablet up: the steps as boxes, then the record's other pages as chips (the phone has the picker below). */}
+      {/* From a tablet up (board): the stage bar, then every page as chips, a step's chip with its mark and short status. */}
       <div className="mt-4 flex flex-col gap-3 max-md:hidden">
-        <StepBoxes steps={steps} label={label} isHere={active} />
+        {stages && <StageBar stages={stages.list} current={stages.current} label="Stage" />}
         <SectionNav
-          label={`${label}: more`}
+          label={label}
           phone="none"
-          items={links
-            .filter((l) => !("number" in l))
-            .map((l) => ({ href: l.href, label: l.label, active: active(l.href), count: "tag" in l ? l.tag : undefined }))}
+          items={links.map((l) => {
+            const s = "number" in l ? l : null;
+            return {
+              href: l.href,
+              label: l.label,
+              active: active(l.href),
+              mark: s ? <StepMark state={s.state} number={s.number} /> : undefined,
+              alert: s?.state === "late",
+              count: s ? tagOf(s) || undefined : "tag" in l ? l.tag : undefined,
+            };
+          })}
         />
       </div>
 

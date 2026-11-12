@@ -58,31 +58,26 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   ];
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {open && doNow ? (
         <section
           aria-label="Do this now"
           className={cn(
-            "flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
-            doNow.late ? "border-bad/30 bg-bad-soft" : "border-primary/20 bg-primary-soft/70",
+            "flex flex-col gap-3 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between",
+            doNow.late ? "border-[#f3c7c2] bg-bad-soft dark:border-bad/40" : "border-[#f6d3bd] bg-action-soft dark:border-action/30",
           )}
         >
-          <p className={cn("flex min-w-0 items-start gap-2 text-sm", doNow.late && "text-bad")}>
-            {doNow.late ? (
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-            ) : (
-              <ArrowRight className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-            )}
+          <p className="flex min-w-0 items-start gap-2">
+            {doNow.late && <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />}
             <span>
-              <span className="font-semibold">Do this now · {doNow.title}</span>{" "}
-              <span className={doNow.late ? "" : "text-text-2"}>
-                {doNow.dueOn ? `${doNow.late ? "was due" : "is due"} ${date(doNow.dueOn)}` : doNow.needs ? `needs ${doNow.needs}` : ""} (
-                {doNow.label})
+              <strong className={cn("block font-bold", doNow.late ? "text-bad" : "text-[#8a3a07] dark:text-action")}>Next: {doNow.title}.</strong>
+              <span className="block text-sm text-text-2">
+                {doNow.dueOn ? `${doNow.late ? "Was due" : "Due"} ${date(doNow.dueOn)}` : doNow.needs ? `Needs ${doNow.needs}` : ""} · {doNow.label}
               </span>
             </span>
           </p>
-          <Link href={`${base}/${STEP_PATH[doNow.step]}`} className={buttonClass("primary", "sm", "w-fit")}>
-            Open {doNow.label}
+          <Link href={`${base}/${STEP_PATH[doNow.step]}`} className={buttonClass("primary", "md", "w-fit")}>
+            Open {doNow.label} <ArrowRight aria-hidden />
           </Link>
         </section>
       ) : finished ? (

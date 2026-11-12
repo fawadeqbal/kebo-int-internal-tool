@@ -392,8 +392,8 @@ export function OrderFigures({ o, f, steps }: { o: OverviewInput["o"]; f: Overvi
 export function WhatNext({ f, base }: { f: OverviewFacts; base: string }) {
   const stepsShown = [...new Set(f.nextItems.map((i) => i.step))].slice(0, 2);
   return (
-    <section aria-labelledby="next-title" className="flex flex-col gap-2.5 rounded-xl border border-primary bg-surface p-4 shadow-card ring-1 ring-primary sm:px-[18px]">
-      <h2 id="next-title" className="text-sm font-semibold">
+    <section aria-labelledby="next-title" className="flex flex-col gap-2.5 rounded-2xl border border-line bg-surface p-4 sm:px-5">
+      <h2 id="next-title" className="text-base font-bold">
         What happens next
       </h2>
       {f.nextItems.length ? (

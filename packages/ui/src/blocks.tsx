@@ -340,6 +340,29 @@ export function RankedBars({ rows, label }: { rows: { key: string; label: ReactN
 
 export type StepState = "done" | "current" | "attention" | "todo";
 
+/**
+ * A record's stage as one bar of segments (board: status bar): the stages before in green, the current one
+ * in orange, the ones after in grey. The current segment is marked for screen readers.
+ */
+export function StageBar({ stages, current, label = "Stage" }: { stages: string[]; current: number; label?: string }) {
+  return (
+    <ol aria-label={label} className="flex flex-wrap text-[13px] font-semibold">
+      {stages.map((st, i) => (
+        <li
+          key={st}
+          aria-current={i === current ? "step" : undefined}
+          className={cn(
+            "min-w-[110px] flex-[1_1_130px] px-3.5 py-2.5 first:rounded-l-[10px] last:rounded-r-[10px]",
+            i < current ? "bg-primary-solid text-white" : i === current ? "bg-action-solid text-white" : "bg-surface-3 text-text-2",
+          )}
+        >
+          {st}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 const STEP_WORD: Record<StepState, string> = { done: "Done", current: "Now", attention: "Late", todo: "Later" };
 
 /**

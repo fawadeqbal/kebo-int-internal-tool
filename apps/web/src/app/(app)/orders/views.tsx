@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Package, XCircle } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, STAGE_FLOW, UNKNOWN_COUNTRY, type FlowStep, type OrderStage } from "@kebo/shared";
 import {
-  buildHref,
   ButtonLink,
   Card,
-  cn,
   DataRow,
   EmptyState,
   LinkTabs,
@@ -15,10 +13,15 @@ import {
   Pager,
   PhoneList,
   PhoneRow,
+  RefCode,
+  StatRow,
+  StatTile,
   StatusBadge,
+  THead,
   Td,
   Th,
-  THead,
+  buildHref,
+  cn,
   toPage,
 } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
@@ -90,7 +93,8 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
     <div>
       <PageHeader
         crumbs={crumbsFor("/orders")}
-        title="Orders"
+        icon={Package}
+        title="Sales orders"
         summary={
           <>
             {plural(c.open, "open order")}
@@ -99,6 +103,21 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
           </>
         }
       />
+
+      <StatRow className="mb-4">
+        <StatTile icon={Package} iconColor={1} label="Open orders" value={c.open} sub="not closed yet" href={href({ status: undefined })} />
+        <StatTile
+          icon={AlertTriangle}
+          iconColor={2}
+          label="Late"
+          value={c.late}
+          tone={c.late > 0 ? "bad" : undefined}
+          sub={c.late > 0 ? "a step is past its date" : "nothing late"}
+          href={href({ status: "late" })}
+        />
+        <StatTile icon={CheckCircle2} iconColor={3} label="Done" value={c.closed} sub="closed orders" href={href({ status: "closed" })} />
+        <StatTile icon={XCircle} iconColor={4} label="Cancelled" value={c.cancelled} sub="kept for the record" href={href({ status: "cancelled" })} />
+      </StatRow>
 
       <ListToolbar
         search={{ placeholder: "Search order no., customer, inquiry…", value: sp.q, clearHref: href({ q: undefined }) }}
@@ -162,11 +181,12 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
               <THead>
                 <tr>
                   <Th>Order</Th>
-                  <Th>Customer</Th>
-                  <Th>Status</Th>
-                  <Th>Needs now</Th>
-                  <Th className="text-right">Still due</Th>
-                  <Th className="max-xl:hidden">Handled by</Th>
+                  <Th>What · customer</Th>
+                  <Th>Date</Th>
+                  <Th className="text-right">Total</Th>
+                  <Th className="text-right">They owe</Th>
+                  <Th>Now</Th>
+                  <Th>Stage</Th>
                   <Th className="w-12">
                     <span className="sr-only">Actions</span>
                   </Th>
@@ -176,16 +196,16 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                 {data.rows.map((o) => (
                   <DataRow key={o.id} href={`/orders/${o.id}`} className={cn(o.status === "cancelled" && "text-text-2")}>
                     <Td>
-                      <Link href={`/orders/${o.id}`} className="font-semibold whitespace-nowrap hover:text-primary">
-                        {o.refNo}
-                      </Link>
-                      <span className="block max-w-40 truncate text-xs text-text-2">{o.inquiry.title}</span>
+                      <RefCode href={`/orders/${o.id}`}>{o.refNo}</RefCode>
                     </Td>
                     <Td>
-                      <span className="block max-w-40 truncate">{o.customer.name}</span>
+                      <span className="block max-w-56 truncate font-semibold">{o.inquiry.title}</span>
+                      <span className="block max-w-56 truncate text-xs text-muted">{o.customer.name}</span>
                       {o.customer.country === UNKNOWN_COUNTRY && <span className="block text-xs text-warn">Country not set</span>}
                     </Td>
-                    <Td>{statusBadge(o)}</Td>
+                    <Td className="whitespace-nowrap">{date(o.orderedOn)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">{money(o.total, o.currency)}</Td>
+                    <Td className="text-right font-bold whitespace-nowrap tabular">{due(o)}</Td>
                     <Td>
                       {o.needs ? (
                         <>
@@ -200,11 +220,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
                         <span className="text-xs text-text-2">{o.status === "open" ? "Nothing now" : "—"}</span>
                       )}
                     </Td>
-                    <Td className="text-right whitespace-nowrap tabular">
-                      {due(o)}
-                      <span className="block text-xs text-text-2">of {money(o.total, o.currency)}</span>
-                    </Td>
-                    <Td className="max-xl:hidden">{o.inquiry.assignee?.name ?? <span className="text-xs text-text-2">Nobody</span>}</Td>
+                    <Td>{statusBadge(o)}</Td>
                     <Td className="text-right">
                       <RowMenu items={rowMenu(o)} label={`Actions for ${o.refNo}`} />
                     </Td>
