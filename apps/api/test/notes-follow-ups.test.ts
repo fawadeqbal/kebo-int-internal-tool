@@ -481,6 +481,14 @@ describe("notes and follow-ups", () => {
     const list = (await api(app, me.token).get(`/follow-ups?mine=true&to=${day}&open=true`).expect(200)).body as FollowUpList;
     expect(list.rows.map((r) => r.id)).toEqual([yesterday.id, someTime.id, at9.id, at11.id]);
     expect(list.counts).toEqual({ open: 4, done: 1, late: 2 });
+    // The list's filters: only the late ones, words, who it is for, what it is about.
+    const ids = async (qs: string) => ((await api(app, me.token).get(`/follow-ups?mine=true&${qs}`).expect(200)).body as FollowUpList).rows.map((r) => r.id);
+    expect(await ids("late=true")).toEqual([yesterday.id, at9.id]);
+    expect(await ids("q=eleven")).toEqual([at11.id]);
+    expect(await ids(`who=${me.id}&open=true&to=${day}`)).toHaveLength(4);
+    expect(await ids("about=order")).toEqual([]);
+    expect(await ids(`about=none&open=true&to=${day}`)).toHaveLength(4);
+    await api(app, me.token).get("/follow-ups?about=planet").expect(422);
     // At noon, eleven o'clock is late too.
     vi.spyOn(clock, "now").mockReturnValue(momentIn(day, "12:00", tz));
     expect(((await api(app, me.token).get("/me/today").expect(200)).body as Today).late).toBe(3);

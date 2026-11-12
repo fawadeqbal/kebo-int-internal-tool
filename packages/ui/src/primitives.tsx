@@ -2,13 +2,9 @@ import Link from "next/link";
 import { ScrollFade } from "./scroll-fade";
 import type { ComponentProps, ReactNode } from "react";
 import {
-  AlertTriangle,
   BookOpen,
-  CheckCircle2,
   Globe,
   House,
-  Info,
-  Inbox,
   LayoutDashboard,
   Package,
   Settings,
@@ -341,7 +337,7 @@ export function Breadcrumb({ items, className }: { items: { label: string; href?
  * for an empty list inside a card.
  */
 export function EmptyState({
-  icon: Icon = Inbox,
+  icon: Icon = Package,
   title,
   description,
   action,
@@ -355,40 +351,31 @@ export function EmptyState({
   framed?: boolean;
   className?: string;
 }) {
-  if (framed)
-    return (
-      <div className={cn("m-4 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary-line bg-primary-soft/40 px-6 py-8 text-center", className)}>
-        <p className="text-sm font-semibold text-text">{title}</p>
-        {description && <p className="mt-1 max-w-sm text-sm text-text-2">{description}</p>}
-        {action && <div className="mt-3">{action}</div>}
-      </div>
-    );
+  // Board "Empty list": the same look in a card or on its own (`framed` is kept for the callers).
+  void framed;
   return (
-    <div className={cn("flex flex-col items-center justify-center px-6 py-14 text-center", className)}>
-      <div className="mb-3 flex size-14 items-center justify-center rounded-full bg-primary-soft text-primary">
+    <div className={cn("flex flex-col items-center justify-center gap-2.5 px-6 py-12 text-center", className)}>
+      <div className="flex size-14 items-center justify-center rounded-full bg-primary-soft text-primary">
         <Icon className="size-6" aria-hidden />
       </div>
-      <p className="text-sm font-semibold text-text">{title}</p>
-      {description && <p className="mt-1 max-w-sm text-sm text-muted">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
+      <p className="text-base font-bold text-text">{title}</p>
+      {description && <p className="max-w-[420px] text-sm text-muted">{description}</p>}
+      {action && <div className="mt-1">{action}</div>}
     </div>
   );
 }
 
 const ALERT_TONES = {
-  info: { box: "border-info/25 bg-info-soft text-text", icon: Info, iconClass: "text-info" },
-  error: { box: "border-bad/25 bg-bad-soft text-text", icon: AlertTriangle, iconClass: "text-bad" },
-  success: { box: "border-ok/25 bg-ok-soft text-text", icon: CheckCircle2, iconClass: "text-ok" },
-  warning: { box: "border-warn/25 bg-warn-soft text-text", icon: AlertTriangle, iconClass: "text-warn" },
+  info: "bg-info-soft text-info",
+  error: "bg-bad-soft text-bad",
+  success: "bg-ok-soft text-ok",
+  warning: "bg-warn-soft text-warn",
 };
 
 export function Alert({ tone = "info", children, className }: { tone?: keyof typeof ALERT_TONES; children: ReactNode; className?: string }) {
-  const t = ALERT_TONES[tone];
-  const Icon = t.icon;
   return (
-    <div role={tone === "error" ? "alert" : "status"} className={cn("flex gap-2.5 rounded-xl border px-3.5 py-3 text-sm", t.box, className)}>
-      <Icon className={cn("mt-0.5 size-4 shrink-0", t.iconClass)} aria-hidden />
-      <div className="min-w-0 flex-1">{children}</div>
+    <div role={tone === "error" ? "alert" : "status"} className={cn("rounded-xl px-3.5 py-3 text-[13px] [&_strong]:font-bold", ALERT_TONES[tone], className)}>
+      {children}
     </div>
   );
 }

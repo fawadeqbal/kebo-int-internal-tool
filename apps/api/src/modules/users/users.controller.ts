@@ -67,10 +67,18 @@ export class UsersController {
   }
 }
 
+const ownProfileInput = z.object({ name: z.string().trim().min(1, "Enter your name").max(120) });
+
 @ApiTags("me")
 @Controller("me")
 export class AccountController {
   constructor(private readonly users: UsersService) {}
+
+  /** { name }: your own name (the email and role are changed by who manages people). */
+  @Patch()
+  rename(@CurrentUser() actor: SessionUser, @Body(Validate(ownProfileInput)) body: z.infer<typeof ownProfileInput>) {
+    return this.users.renameSelf(actor, body.name);
+  }
 
   @Post("password")
   @HttpCode(200)

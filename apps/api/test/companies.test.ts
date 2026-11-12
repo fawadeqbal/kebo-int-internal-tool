@@ -428,7 +428,7 @@ describe("companies: isolation and the platform", () => {
       );
     const [inB, inKebo] = [await rows(b.id), await rows(FIRST_COMPANY_ID)];
     // The right password, at B's address (or naming B): no.
-    expect((await login({ email, password: "Staff@12345" }, b.slug).expect(401)).body.error).toBe("Wrong email or password.");
+    expect((await login({ email, password: "Staff@12345" }, b.slug).expect(401)).body.error).toBe("That email and password do not match. Try again, or ask your admin for a new password.");
     await login({ email, password: "Staff@12345", company: b.slug }).expect(401);
     // Wrong passwords there, many times: Kebo's account is not locked or counted, and no history anywhere.
     for (let i = 0; i < 6; i++) await login({ email, password: `wrong-${i}` }, b.slug).expect(401);

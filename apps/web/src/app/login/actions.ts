@@ -6,7 +6,13 @@ import { addressCompany, apiFetch, SESSION_COOKIE } from "@/lib/api";
 import type { ActionState } from "@/lib/actions";
 import { localPath } from "@/lib/paths";
 
-const cookieOptions = (maxAge: number) => ({ httpOnly: true, sameSite: "lax" as const, secure: process.env.COOKIE_SECURE === "true", path: "/", maxAge });
+const cookieOptions = (maxAge: number | undefined) => ({
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.COOKIE_SECURE === "true",
+  path: "/",
+  maxAge,
+});
 /** Only same-site paths after sign-in (no open redirects). */
 const safeNext = (v: unknown) => localPath(v, "/dashboard");
 
@@ -14,13 +20,32 @@ export async function loginAction(_prev: ActionState, form: FormData): Promise<A
   const email = String(form.get("email") ?? "");
   // At a company's own address only its accounts count; otherwise the person may have chosen one.
   const company = (await addressCompany()) ?? (String(form.get("company") ?? "") || undefined);
-  const res = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ email, password: String(form.get("password") ?? ""), company }), auth: false });
+  const res = await apiFetch("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password: String(form.get("password") ?? ""), company }),
+    auth: false,
+  });
   const body = await res.json().catch(() => ({}));
   // Their email and password fit more than one company: they choose (and type the password again).
-  if (res.status === 409 && body.code === "choose_company") return { ok: false, code: "choose_company", message: body.error, values: { email }, data: body.companies };
-  if (!res.ok) return { ok: false, message: body.error ?? "Could not sign in.", errors: body.fieldErrors, values: { email, ...(company ? { company } : {}) } };
-  (await cookies()).set(SESSION_COOKIE, body.token, cookieOptions(body.expiresInSeconds));
-  redirect(body.twoStepRequired ? `/login/two-step?next=${encodeURIComponent(safeNext(form.get("next")))}` : body.twoStepSetupRequired ? "/login/set-up-two-step" : safeNext(form.get("next")));
+  if (res.status === 409 && body.code === "choose_company")
+    return { ok: false, code: "choose_company", message: body.error, values: { email }, data: body.companies };
+  if (!res.ok)
+    return {
+      ok: false,
+      message: body.error ?? "Could not sign in.",
+      errors: body.fieldErrors,
+      values: { email, ...(company ? { company } : {}) },
+    };
+  // "Keep me signed in" off: the cookie goes when the browser closes (the session itself still ends on time).
+  const keep = form.get("keep") !== null || form.get("keepAsked") === null;
+  (await cookies()).set(SESSION_COOKIE, body.token, cookieOptions(keep ? body.expiresInSeconds : undefined));
+  redirect(
+    body.twoStepRequired
+      ? `/login/two-step?next=${encodeURIComponent(safeNext(form.get("next")))}`
+      : body.twoStepSetupRequired
+        ? "/login/set-up-two-step"
+        : safeNext(form.get("next")),
+  );
 }
 
 export async function twoStepAction(_prev: ActionState, form: FormData): Promise<ActionState> {

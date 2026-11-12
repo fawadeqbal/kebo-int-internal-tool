@@ -1,109 +1,147 @@
-import { UserRound } from "lucide-react";
-import { Avatar, Card, CardBody, CardHeader, PageHeader, SectionList, StatusBadge } from "@kebo/ui";
+import { KeyRound, UserRound } from "lucide-react";
+import { Badge, Card, CardHeader, PageHeader, StatusBadge } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { date } from "@/lib/format";
-import type { SessionRow, SignInRow, TwoStepStatus } from "@/lib/types-people";
+import { date, timeAgo } from "@/lib/format";
+import type { SessionRow, TwoStepStatus } from "@/lib/types-people";
 import { ConfirmAction } from "@/components/people/confirm-action";
-import { SessionList } from "@/components/security/session-list";
-import { SignInList } from "@/components/security/sign-in-list";
-import { changePasswordAction, confirmTwoStepAction, endMySessionAction, newRecoveryCodesAction, signOutOthersAction, startTwoStepAction, turnOffTwoStepAction } from "./actions";
-import { PasswordEdit, TwoStepPanel } from "./forms";
+import { PanelButton } from "@/components/orders/step-view";
+import {
+  changePasswordAction,
+  confirmTwoStepAction,
+  endMySessionAction,
+  newRecoveryCodesAction,
+  renameSelfAction,
+  signOutOthersAction,
+  startTwoStepAction,
+  turnOffTwoStepAction,
+} from "./actions";
+import { PasswordCardForm, ProfileForm, TwoStepPanel } from "./forms";
 
 export const metadata = { title: "My account" };
 
-type Tab = "password" | "two-step" | "devices";
-
 /**
- * The signed-in person's own sign-in, in the Settings frame: the sections down
- * the left (chips on a phone); the password read-only with ✎ Change for the
- * side panel, two-step sign-in, and the devices and sign-ins.
+ * My account (board "My account"): Profile and Password on the left; Two-step sign-in and where you are
+ * signed in on the right.
  */
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  const tab: Tab = sp.tab === "two-step" || sp.tab === "devices" ? sp.tab : "password";
-  const [status, sessions, signIns] = await Promise.all([api.get<TwoStepStatus>("/me/two-step"), api.get<SessionRow[]>("/me/sessions"), api.get<SignInRow[]>("/me/sign-ins")]);
-  const others = sessions.filter((s) => !s.current).length;
+  const [status, sessions] = await Promise.all([api.get<TwoStepStatus>("/me/two-step"), api.get<SessionRow[]>("/me/sessions")]);
+  const twoStep = (
+    <TwoStepPanel
+      status={status}
+      sinceText={status.since ? date(status.since) : null}
+      start={startTwoStepAction}
+      confirm={confirmTwoStepAction}
+      newCodes={newRecoveryCodesAction}
+      turnOff={turnOffTwoStepAction}
+    />
+  );
+  // This device first, then the latest four; the rest are signed out together.
+  const shown = [
+    ...sessions.filter((x) => x.current),
+    ...sessions
+      .filter((x) => !x.current)
+      .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt))
+      .slice(0, 4),
+  ];
+  const others = sessions.filter((x) => !x.current).length;
+  // Asked for (a reminder's link), or needed and still off: the setup shows in the card itself.
+  const inline = sp.tab === "two-step" || (status.required && !status.on);
   return (
-    <div>
-      <PageHeader
-        crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "My account" }]}
-        icon={UserRound}
-        title="My account"
-        summary={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Avatar name={me.name} size={22} />
-            {me.name} · {me.email} · {me.roleName}
-          </span>
-        }
-      />
-      <SectionList
-        label="Account sections"
-        wide={tab === "devices"}
-        items={[
-          { href: "/account", label: "Password", active: tab === "password" },
-          { href: "/account?tab=two-step", label: "Two-step sign-in", count: status.on ? "on" : "off", alert: !status.on && status.required, active: tab === "two-step" },
-          { href: "/account?tab=devices", label: "Devices and sign-ins", count: sessions.length, active: tab === "devices" },
-        ]}
-      >
-        {tab === "password" && (
+    <>
+      <PageHeader crumbs={[{ label: "My account" }]} icon={UserRound} title="My account" summary={`${me.name} · ${me.roleName}`} />
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-4">
           <Card>
-            <CardHeader title="Password" description="What you sign in with. Changing it signs you out on your other devices." className="max-sm:flex-row max-sm:gap-3" actions={<PasswordEdit action={changePasswordAction} />} />
-            <CardBody>
-              <dl>
-                <dt className="text-xs text-muted">Password</dt>
-                <dd className="mt-0.5 text-sm tracking-widest" aria-label="Set, hidden">
-                  ••••••••••
-                </dd>
-              </dl>
-            </CardBody>
+            <CardHeader title="Profile" />
+            <div className="p-5">
+              <ProfileForm action={renameSelfAction} name={me.name} email={me.email} />
+            </div>
           </Card>
-        )}
-        {tab === "two-step" && (
           <Card>
-            <CardHeader
-              title={
-                <span className="flex items-center gap-2">
-                  Two-step sign-in {status.on ? <StatusBadge meaning="ok">On</StatusBadge> : <StatusBadge meaning={status.required ? "warn" : "neutral"}>Off</StatusBadge>}
-                </span>
-              }
-              description="A code from your phone as well as your password."
-            />
-            <CardBody>
-              <TwoStepPanel
-                status={status}
-                sinceText={status.since ? date(status.since) : null}
-                start={startTwoStepAction}
-                confirm={confirmTwoStepAction}
-                newCodes={newRecoveryCodesAction}
-                turnOff={turnOffTwoStepAction}
-              />
-            </CardBody>
+            <CardHeader title="Password" />
+            <div className="p-5">
+              <PasswordCardForm action={changePasswordAction} />
+            </div>
           </Card>
-        )}
-        {tab === "devices" && (
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-            <Card className="overflow-hidden">
-              <CardHeader
-                title="Where you are signed in"
-                description="Browsers and phones that can use your account. Sign out any you do not recognise, then change your password."
-                actions={
-                  others > 0 ? (
-                    <ConfirmAction action={signOutOthersAction} confirm={`Sign out your ${others} other device${others === 1 ? "" : "s"}?`} label="Sign out the others" pendingText="Signing out…" variant="secondary" size="xs" />
-                  ) : undefined
-                }
-              />
-              <SessionList sessions={sessions} end={(id) => endMySessionAction.bind(null, id)} />
-            </Card>
-            <Card className="overflow-hidden">
-              <CardHeader title="Recent sign-ins" description="Yours, right and wrong. A wrong password you did not type means someone is trying: change it." />
-              {signIns.length ? <SignInList rows={signIns} /> : <p className="px-4 py-3 text-sm text-muted">None yet.</p>}
-            </Card>
-          </div>
-        )}
-        <p className="text-xs text-muted">To change your name, email or role, ask a Super Admin.</p>
-      </SectionList>
-    </div>
+        </div>
+        <aside className="grid gap-4">
+          <Card>
+            <CardHeader title="Two-step sign-in" />
+            <div className="flex flex-col items-start gap-2.5 p-5 text-sm">
+              <p>
+                {status.on ? (
+                  <StatusBadge meaning="ok">On</StatusBadge>
+                ) : (
+                  <StatusBadge meaning={status.required ? "warn" : "neutral"}>Off</StatusBadge>
+                )}{" "}
+                Two-step sign-in with an authenticator app
+              </p>
+              {status.required && <p className="text-[13px] text-muted">Your role requires it.</p>}
+              {inline ? (
+                <div className="w-full">{twoStep}</div>
+              ) : (
+                <PanelButton
+                  size="sm"
+                  className="w-full justify-start"
+                  icon={<KeyRound aria-hidden />}
+                  label={status.on ? "Recovery codes" : "Turn on two-step sign-in"}
+                  title="Two-step sign-in"
+                  description="A code from your phone as well as your password."
+                  body={<div className="p-5">{twoStep}</div>}
+                />
+              )}
+            </div>
+          </Card>
+          <Card>
+            <CardHeader title="Where you are signed in" />
+            <ul className="flex flex-col gap-3 p-5 text-[13px]">
+              {shown.map((s) => (
+                <li key={s.id} className="flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-text">
+                      {s.device}
+                      {s.ip && <span className="text-muted"> · {s.ip}</span>}
+                    </span>
+                    <span className="block text-text-2">{s.current ? "this device" : timeAgo(s.lastSeenAt)}</span>
+                  </span>
+                  {s.current ? (
+                    <Badge tone="ok">Now</Badge>
+                  ) : (
+                    <ConfirmAction
+                      action={endMySessionAction.bind(null, s.id)}
+                      confirm={`Sign out ${s.device}?`}
+                      label="Sign out"
+                      pendingText="Signing out…"
+                      variant="danger-ghost"
+                      size="sm"
+                      showSuccess={false}
+                    />
+                  )}
+                </li>
+              ))}
+              {others > shown.length - 1 && (
+                <li className="flex items-center justify-between gap-3 border-t border-surface-2 pt-3 text-text-2">
+                  <span>
+                    {others} other device{others === 1 ? "" : "s"} in all
+                  </span>
+                  <ConfirmAction
+                    action={signOutOthersAction}
+                    confirm={`Sign out your ${others} other devices?`}
+                    label="Sign out all"
+                    pendingText="Signing out…"
+                    variant="danger-ghost"
+                    size="sm"
+                    showSuccess={false}
+                  />
+                </li>
+              )}
+            </ul>
+          </Card>
+        </aside>
+      </div>
+    </>
   );
 }

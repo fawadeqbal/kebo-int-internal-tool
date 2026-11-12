@@ -36,6 +36,14 @@ export async function removeNoteAction(noteId: string, _prev: ActionState, form:
   return r;
 }
 
+const RECORD_KEYS = ["inquiryId", "orderId", "customerId", "factoryId"] as const;
+
+/** The About select's "orderId:…" → { orderId: "…" } (anything else: on nothing). */
+function chosenRecord(about: string | undefined): Partial<Record<RecordKey["key"], string>> {
+  const [key, id] = (about ?? "").split(":");
+  return id && (RECORD_KEYS as readonly string[]).includes(key!) ? { [key!]: id } : {};
+}
+
 /** A new follow-up, on the record the card is on (or the one chosen), for the person chosen. */
 export async function addFollowUpAction(on: RecordKey | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
@@ -50,9 +58,21 @@ export async function addFollowUpAction(on: RecordKey | null, _prev: ActionState
         place: v.place || null,
         note: v.note || null,
         assigneeId: v.assigneeId || null,
-        ...(on ? { [on.key]: on.id } : {}),
+        ...(on ? { [on.key]: on.id } : chosenRecord(v.about)),
       }),
     "Follow-up added.",
+  );
+  if (r.ok) revalidatePath("/", "layout");
+  return r;
+}
+
+/** A follow-up's fields changed (What, Who does it, Due, At, Place) from the list's pencil. */
+export async function editFollowUpAction(id: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(
+    form,
+    () => api.patch(`/follow-ups/${id}`, { title: v.title, dueOn: v.dueOn, dueAt: v.dueAt || null, place: v.place || null, assigneeId: v.assigneeId || undefined }),
+    "Follow-up saved.",
   );
   if (r.ok) revalidatePath("/", "layout");
   return r;

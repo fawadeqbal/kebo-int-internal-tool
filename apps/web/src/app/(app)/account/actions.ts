@@ -60,3 +60,11 @@ export async function signOutOthersAction(_prev: ActionState, _form: FormData): 
   const n = (r.data as { ended: number }).ended;
   return { ok: true, message: n ? `Signed out ${n} other device${n === 1 ? "" : "s"}.` : "No other devices were signed in." };
 }
+
+/** Your own name (the Profile card). */
+export async function renameSelfAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const v = formValues(form);
+  const r = await attempt(form, () => api.patch("/me", { name: v.name }), "Saved.");
+  if (r.ok) revalidatePath("/", "layout");
+  return r;
+}

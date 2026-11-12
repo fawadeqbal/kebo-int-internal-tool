@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Alert } from "@kebo/ui";
 import { AuthShell } from "./auth-shell";
 import { LoginForm } from "./forms";
@@ -12,27 +13,40 @@ const DEMO_LOGINS = [
 
 export const metadata = { title: "Sign in" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; moved?: string }> }) {
-  const { next, moved } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; moved?: string; forgot?: string }> }) {
+  const { next, moved, forgot } = await searchParams;
   // At a company's own address: its name over the form.
   const slug = await addressCompany();
   const res = slug ? await apiFetch(`/platform/public/company?slug=${encodeURIComponent(slug)}`, { auth: false }).catch(() => null) : null;
   // Its name only while it is switched on.
   const company = res?.ok ? ((await res.json()) as { name: string | null }).name : null;
   return (
-    <AuthShell subtitle={company ?? undefined}>
+    <AuthShell subtitle={company ?? undefined} tag={false}>
       {moved && (
         <Alert tone="info" className="mb-4">
           This is your company&apos;s new address. Sign in once more here, and bookmark it.
         </Alert>
       )}
-      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Sign in</h1>
-      <p className="mt-1 text-sm text-muted">
-        {demoMode()
-          ? "This is a demo with sample data. Pick a person below to look around."
-          : "Use the email and password your admin gave you."}
+      <h1 className="text-[28px] leading-9 font-bold tracking-tight">Welcome back</h1>
+      <p className="mt-1 text-[15px] text-muted">
+        {demoMode() ? "This is a demo with sample data. Pick a person below to look around." : (company ?? "Sign in to your company")}
       </p>
-      <LoginForm next={next} demo={demoMode() ? DEMO_LOGINS : undefined} />
+      {forgot && (
+        <Alert tone="info" className="mt-4">
+          Ask your company&apos;s admin for a new password: they send you a link to set one.
+        </Alert>
+      )}
+      <LoginForm
+        next={next}
+        demo={demoMode() ? DEMO_LOGINS : undefined}
+        forgotHref={`/login?forgot=1${next ? `&next=${encodeURIComponent(next)}` : ""}`}
+      />
+      <p className="mt-4 text-center text-[13px] text-muted">
+        New company?{" "}
+        <Link href="/request-a-demo" className="font-semibold text-primary hover:underline">
+          Request a demo
+        </Link>
+      </p>
     </AuthShell>
   );
 }

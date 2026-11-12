@@ -152,6 +152,14 @@ export const followUpListQuery = z
     to: optionalDay,
     /** true: not done yet; false: done; not given: both. */
     open: flag,
+    /** Only the late ones (open, past their day or time). */
+    late: flag,
+    /** Words in the title, place or note. */
+    q: z.preprocess(blank, z.string().trim().max(100).optional()),
+    /** Only those for this person. */
+    who: z.preprocess(blank, z.uuid().optional()),
+    /** Only those on this kind of record ("none": on nothing). */
+    about: z.preprocess(blank, z.enum(["inquiry", "order", "customer", "factory", "none"]).optional()),
     ...targets,
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(200).default(100),
