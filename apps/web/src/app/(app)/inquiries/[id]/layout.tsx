@@ -89,6 +89,11 @@ export default async function DealLayout({ children, params }: { children: React
         steps={inquirySteps(d, offers).map((s) => ({ key: s.key, number: s.number, label: s.label, state: s.state, status: s.status, href: `${base}/${s.path}` }))}
         costs={managers ? {} : null}
         extra={order ? [{ href: `/orders/${order.id}`, label: "Order →" }] : []}
+        files
+        stages={{
+          list: ["New", "Sourcing", "Quoted", d.stage === "lost" ? "Lost" : "Won"],
+          current: d.stage === "new" ? 0 : d.stage === "sourcing" ? 1 : d.stage === "quoted" ? 2 : 3,
+        }}
       />
       <div className="mt-5">{children}</div>
     </div>

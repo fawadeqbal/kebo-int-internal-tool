@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { XCircle } from "lucide-react";
+import { Package, XCircle } from "lucide-react";
 import { PAYMENT_ROUTE_SHORT, STEP_PATH } from "@kebo/shared";
-import { cn, OrderStageBadge, PageHeader, StatusBadge } from "@kebo/ui";
+import { cn, OrderStageBadge, PageHeader, RefCode, StatusBadge } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
@@ -54,11 +54,12 @@ export default async function OrderLayout({ children, params }: { children: Reac
   ];
 
   const meta = [
-    <Link key="c" href={`/customers/${o.customer.id}`} className="font-medium text-text hover:underline">
+    <RefCode key="no">{o.refNo}</RefCode>,
+    <Link key="c" href={`/customers/${o.customer.id}`} className="font-medium text-primary hover:underline">
       {o.customer.name}
     </Link>,
     <Link key="i" href={`/inquiries/${o.inquiry.id}`} className="hover:underline">
-      {o.inquiry.title || o.inquiry.refNo}
+      from {o.inquiry.refNo}
     </Link>,
     <span key="t" className="tabular">
       {money(o.total, o.currency)}
@@ -89,9 +90,9 @@ export default async function OrderLayout({ children, params }: { children: Reac
         }
       >
         <PageHeader
-          backHref="/orders"
-          backLabel="Orders"
-          title={<span className="tabular">{o.refNo}</span>}
+          crumbs={[{ label: "Operations & trading" }, { label: "Orders", href: "/orders" }, { label: o.refNo }]}
+          icon={Package}
+          title={o.inquiry.title || <span className="tabular">{o.refNo}</span>}
           badge={
             <>
               <OrderStageBadge stage={o.stage} />

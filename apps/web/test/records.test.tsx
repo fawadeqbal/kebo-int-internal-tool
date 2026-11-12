@@ -54,24 +54,21 @@ describe("DetailsCard", () => {
     { label: "Added", value: "03 Nov 2026", readOnly: true },
   ];
 
-  it("counts what is filled, says + Add in place and opens the edit panel from ✎ Edit, + Add and the pencils", () => {
+  it("shows the values as on the board, — when empty, and opens the edit window from ✎ Edit", () => {
     render(<DetailsCard items={items} edit={{ panel: "edit-customer", id: "c1", label: "Edit Lahore Pharma" }} />);
-    expect(screen.getByText("2 of 3 filled · click + Add or Edit")).toBeTruthy();
     const edit = screen.getByRole("link", { name: "Edit Lahore Pharma" });
     expect(edit.getAttribute("href")).toBe("/customers/c1?panel=edit-customer&id=c1");
     expect(edit.getAttribute("aria-haspopup")).toBe("dialog");
-    expect(screen.getByRole("link", { name: "Add email" }).getAttribute("href")).toBe("/customers/c1?panel=edit-customer&id=c1");
-    expect(screen.getByRole("link", { name: "Change contact" })).toBeTruthy();
-    // Optional and empty: not shown; read-only: no pencil.
+    expect(screen.getByText("Ali Raza")).toBeTruthy();
+    expect(screen.getByText("—")).toBeTruthy();
+    // Optional and empty: not shown.
     expect(screen.queryByText("Notes")).toBeNull();
-    expect(screen.queryByRole("link", { name: "Change added" })).toBeNull();
   });
 
   it("is read-only without the permission: no buttons, — for what is missing", () => {
     render(<DetailsCard items={items} />);
     expect(screen.queryAllByRole("link")).toHaveLength(0);
     expect(screen.getByText("—")).toBeTruthy();
-    expect(screen.getByText("2 of 3 filled")).toBeTruthy();
   });
 });
 

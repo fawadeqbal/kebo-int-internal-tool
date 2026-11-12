@@ -229,34 +229,21 @@ export function DetailsCard({
     { label: "Port of discharge", value: values.portOfDischarge },
     { label: "Heading on documents", value: values.documentTitle },
   ];
-  const filled = rows.filter((r) => r.value !== null && r.value !== undefined && r.value !== "").length;
   return (
     <Card id="details" className="scroll-mt-24">
       <CardHeader
-        title="Details"
-        description={`terms, dates and shipping · ${filled} of ${rows.length} filled`}
+        title="The order"
         actions={canEdit && !editing ? <EditButton onClick={() => setEditing(true)} /> : undefined}
       />
       <CardBody>
         {!editing ? (
-          <dl className="grid grid-cols-2 gap-x-5 gap-y-3.5">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
             {rows.map((r) => (
-              <div key={r.label} className="flex min-w-0 flex-col gap-0.5">
-                <dt className="text-xs text-text-2">{r.label}</dt>
-                <dd className="text-sm font-medium [overflow-wrap:anywhere]">
-                  {r.value !== null && r.value !== undefined && r.value !== "" ? (
-                    r.value
-                  ) : r.note ? (
-                    <span className="font-normal text-muted">—</span>
-                  ) : canEdit ? (
-                    <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setEditing(true)}>
-                      + Add
-                    </button>
-                  ) : (
-                    <span className="font-normal text-muted">—</span>
-                  )}
+              <div key={r.label} className="flex min-w-0 flex-col">
+                <dt className="text-xs text-muted">{r.label}</dt>
+                <dd className="mt-[3px] text-sm [overflow-wrap:anywhere]">
+                  {r.value !== null && r.value !== undefined && r.value !== "" ? r.value : <span className="text-muted">—</span>}
                 </dd>
-                {r.note && <dd>{r.note}</dd>}
               </div>
             ))}
           </dl>

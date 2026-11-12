@@ -1,19 +1,18 @@
 import { redirect } from "next/navigation";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { Avatar, Banner, Card, CardBody, CardHeader, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, Tr, ButtonLink } from "@kebo/ui";
-import { ArrowRight, FileText, MessageSquare, Package, Wallet } from "lucide-react";
-import { todayIn } from "@kebo/utils";
-import { late, OPEN_STAGES, owes } from "./shared";
+import { ArrowRight } from "lucide-react";
 import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type OrderStage } from "@kebo/shared";
 import { customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
-import { date, money, timeAgo, TZ } from "@/lib/format";
-import { requireUser } from "@/lib/session";
+import { date, money, timeAgo } from "@/lib/format";
+import { hasFeature, requireUser } from "@/lib/session";
+import { api } from "@/lib/api";
+import type { OrderGroups } from "@/lib/types-facts";
 import { customerOf } from "@/lib/party-data";
 import { countryName } from "@/lib/countries";
 import { OpenPanelButton } from "@/components/common/panel";
 import { DetailsCard } from "@/components/common/record";
 import { RecordLanding } from "@/components/common/record-nav";
-import { PerformanceCard } from "@/components/insights/performance";
 import { getSettings } from "@/lib/loaders";
 import { saveCustomerAction } from "../actions";
 import { CustomerPanel } from "../customer-panel";
@@ -47,18 +46,20 @@ export default async function CustomerOverview({ params, searchParams }: { param
   const me = await requireUser();
   const canEdit = can(me, "customers.manage");
   const editing = canEdit && sp.panel === "edit-customer";
-  const [c, settings, pay, notes] = await Promise.all([customerOf(id), editing ? getSettings() : null, customerPaymentsOf(id), partyNotesOf("customers", id)]);
+  const insights = can(me, "reports.view") && (await hasFeature("insights"));
+  const [c, settings, pay, notes, groups] = await Promise.all([
+    customerOf(id),
+    editing ? getSettings() : null,
+    customerPaymentsOf(id),
+    partyNotesOf("customers", id),
+    insights ? api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", customerId: id }).catch(() => null) : null,
+  ]);
+  const facts = groups?.rows[0];
   const latest = [...(pay?.orders ?? [])].sort((a, b) => b.orderedOn.localeCompare(a.orderedOn)).slice(0, 5);
   const totals = pay?.totals ?? [];
-  const today = todayIn(TZ);
   const openOrders = c.orders.filter((o) => o.status === "open").length;
-  const openDeals = c.inquiries.filter((d) => OPEN_STAGES.includes(d.stage)).length;
   const won = c.inquiries.filter((d) => d.stage === "won").length;
   const lost = c.inquiries.filter((d) => d.stage === "lost").length;
-  const dueTotals = totals.filter((t) => Number(t.due) > 0.005);
-  const lateOrders = (pay?.orders ?? []).filter((o) => late(o, today)).length;
-  const owing = (pay?.orders ?? []).filter(owes).length;
-  const held = (pay?.credit.balances ?? []).filter((b) => Number(b.amount) > 0.005);
   const primary = c.contacts.find((p) => p.isPrimary) ?? c.contacts[0] ?? null;
   const countryKnown = c.country !== UNKNOWN_COUNTRY;
 
@@ -66,23 +67,10 @@ export default async function CustomerOverview({ params, searchParams }: { param
     <div className="flex flex-col gap-4">
       <RecordLanding />
       <StatRow>
-        <StatTile
-          icon={FileText}
-          iconColor={2}
-          label="Receivable"
-          value={dueTotals.length ? dueTotals.map((t) => money(t.due, t.currency)).join(" · ") : pay ? "Nothing due" : "—"}
-          sub={lateOrders ? `${lateOrders} late` : owing ? `on ${owing} order${owing === 1 ? "" : "s"} · none late` : "paid up"}
-          tone={lateOrders ? "bad" : undefined}
-        />
-        <StatTile icon={Package} iconColor={3} label="Open orders" value={openOrders} sub={`${c.orders.length} in all`} />
-        <StatTile icon={MessageSquare} iconColor={4} label="Open inquiries" value={openDeals} sub={`${won} won · ${lost} lost`} />
-        <StatTile
-          icon={Wallet}
-          iconColor={5}
-          label="Advance held"
-          value={held.length ? held.map((b) => money(b.amount, b.currency)).join(" · ") : "—"}
-          sub={held.length ? "their money we hold" : "none"}
-        />
+        <StatTile label="Orders" value={c.orders.filter((o) => o.status !== "cancelled").length} sub={`${openOrders} open`} />
+        <StatTile label="Win rate" value={won + lost ? `${Math.round((won / (won + lost)) * 100)}%` : "—"} sub={`${won} of ${won + lost} inquiries`} />
+        <StatTile label="Avg. days to pay" value={facts?.daysToPay === null || facts?.daysToPay === undefined ? "—" : String(Math.round(facts.daysToPay))} sub="order to paid in full" />
+        <StatTile label="Margin" value={facts?.marginQuote === null || facts?.marginQuote === undefined ? "—" : `${Math.round(facts.marginQuote * 10) / 10}%`} sub="on their orders" />
       </StatRow>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -90,45 +78,15 @@ export default async function CustomerOverview({ params, searchParams }: { param
           flash={sp.saved === c.id}
           edit={canEdit ? { panel: "edit-customer", id: c.id, label: `Edit ${c.name}` } : null}
           items={[
-            { label: "Contact", value: primary && [primary.name, primary.position].filter(Boolean).join(" · ") },
-            {
-              label: "Email",
-              value: primary?.email && (
-                <a href={`mailto:${primary.email}`} className="break-all hover:text-primary hover:underline">
-                  {primary.email}
-                </a>
-              ),
-            },
-            {
-              label: "Phone / WhatsApp",
-              value: (primary?.phone || primary?.whatsapp) && (
-                <>
-                  {primary.phone && (
-                    <a href={`tel:${primary.phone}`} className="hover:text-primary hover:underline">
-                      {primary.phone}
-                    </a>
-                  )}
-                  {primary.whatsapp && primary.whatsapp !== primary.phone && (
-                    <>
-                      {primary.phone && " · "}
-                      <a href={waLink(primary.whatsapp)} target="_blank" rel="noreferrer" className="hover:text-primary hover:underline">
-                        WhatsApp {primary.whatsapp}
-                      </a>
-                    </>
-                  )}
-                </>
-              ),
-            },
-            { label: "Country", value: countryKnown ? countryName(c.country) : null },
-            { label: "Address on papers", value: c.address && <span className="whitespace-pre-line">{c.address}</span> },
-            { label: "Business license number", value: c.taxNo },
-            { label: "Currency they pay in", value: c.defaultCurrency },
-            { label: "Type", value: PARTY_TYPE_LABEL[c.type] },
-            { label: "WeChat", value: primary?.wechat, optional: true },
-            { label: "Reg. number", value: c.regNo, optional: true },
-            { label: "Letters on documents", value: c.initials, optional: true },
-            { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, wide: true, optional: true },
-          ]}
+          { label: "Type", value: PARTY_TYPE_LABEL[c.type] },
+          { label: "Country", value: countryKnown ? countryName(c.country) : null },
+          { label: "Default currency", value: c.defaultCurrency },
+          { label: "Address", value: c.address && <span className="whitespace-pre-line">{c.address}</span>, wide: true },
+          { label: "Initials on papers", value: c.initials },
+          { label: "Tax no.", value: c.taxNo },
+          { label: "Registration no.", value: c.regNo },
+          { label: "Notes", value: c.notes && <span className="whitespace-pre-line">{c.notes}</span>, wide: true },
+        ]}
           footer={
             !countryKnown && (
               <Banner meaning="warn" className="mx-4 mb-4">
@@ -193,7 +151,6 @@ export default async function CustomerOverview({ params, searchParams }: { param
               </CardBody>
             )}
           </Card>
-          <PerformanceCard kind="customer" id={c.id} me={me} balances={false} />
         </div>
 
         <aside aria-label="At a glance" className="flex min-w-0 flex-col gap-4">

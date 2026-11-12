@@ -1,7 +1,7 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
-import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
-import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, cn, Meter, PriorityBadge, RefCode, StageBadge, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type InquiryStage, type Priority } from "@kebo/shared";
+import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, cn, RefCode, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { ArrowRight, Coins, FileText, Package, PieChart, Plus, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
 import type { Aging } from "@/lib/types-facts";
 import { getSettings } from "@/lib/loaders";
@@ -9,20 +9,15 @@ import type { OrderRow } from "@/lib/types-orders";
 import type { Paged } from "@/lib/types";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
-import { date, money, TZ, plural } from "@/lib/format";
+import { money, TZ, plural } from "@/lib/format";
 import type { Person } from "@/lib/types";
 import type { Reminders } from "@/lib/types-insights";
 import { loadHome, type AccountRow } from "@/lib/insights-data";
 import { amountCell, bigMoney, change, monthYearOf, percent } from "@/lib/insights-period";
-import { TargetRing } from "@/components/insights/kpi";
-import { TargetEditor } from "@/components/insights/targets";
 import { Delta } from "@/components/insights/frame";
 import { ChartCard } from "@/components/insights/chart-card";
 import { SalesProfitChart } from "@/components/insights/facts-charts";
-import { ReminderList } from "@/components/insights/reminder-list";
 import { readableDates } from "@/components/insights/readable-dates";
-import type { Today } from "@/lib/types-notes";
-import { FollowUpRow } from "@/components/notes/cards";
 
 export const metadata = { title: "Home" };
 
@@ -44,30 +39,6 @@ interface Dashboard {
   workload: { id: string; name: string; openDeals: number; openOrders: number }[] | null;
 }
 
-function DealList({ rows, empty }: { rows: DealLine[]; empty: string }) {
-  if (!rows.length) return <p className="text-sm text-muted">{empty}</p>;
-  return (
-    <ul className="flex flex-col divide-y divide-line">
-      {rows.map((d) => (
-        <li key={d.id}>
-          <Link href={`/inquiries/${d.id}`} className="flex items-center gap-3 py-2.5 hover:text-primary">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {d.refNo} · {d.title}
-              </p>
-              <p className="truncate text-xs text-muted">
-                {d.customer.name}
-                {d.requiredBy ? ` · needed by ${date(d.requiredBy)}` : ""}
-              </p>
-            </div>
-            <PriorityBadge priority={d.priority} />
-            <StageBadge stage={d.stage} onHold={d.onHold} />
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 export default async function DashboardPage() {
   const me = await requireUser();
@@ -141,58 +112,6 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* The rest of the day's work, in the same cards */}
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] [&>*]:min-w-0">
-        <div className="flex flex-col gap-4">
-          <Suspense fallback={<AttentionSkeleton />}>
-            <Attention all={can(me, "inquiries.viewAll")} />
-          </Suspense>
-          <Card>
-            <CardHeader title="My open inquiries" description="Earliest needed-by first" />
-            <CardBody>
-              <DealList rows={d.myDeals} empty="No open inquiries assigned to you." />
-            </CardBody>
-          </Card>
-        </div>
-        <div className="flex flex-col gap-4">
-          <Suspense fallback={<div className="h-[140px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
-            <FollowUpsToday />
-          </Suspense>
-          {insights && (
-            <Suspense>
-              <MonthTarget today={d.today} />
-            </Suspense>
-          )}
-          <Suspense>
-            <MyTarget />
-          </Suspense>
-          <Suspense>
-            <MyOrders />
-          </Suspense>
-          <Suspense>
-            <ThisWeek today={d.today} />
-          </Suspense>
-          {d.workload && (
-            <Card>
-              <CardHeader title="Team" description="Open inquiries and orders per person" />
-              <CardBody>
-                <ul className="flex flex-col gap-2">
-                  {d.workload.map((p) => (
-                    <li key={p.id}>
-                      <Link href={`/inquiries?assignee=${p.id}`} className="flex items-center justify-between rounded-[10px] border border-line px-3 py-2 text-sm hover:border-line-strong">
-                        <span className="font-medium">{p.name}</span>
-                        <span className="text-xs text-muted tabular">
-                          {p.openDeals} {p.openDeals === 1 ? "inquiry" : "inquiries"} · {p.openOrders} order{p.openOrders === 1 ? "" : "s"}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </CardBody>
-            </Card>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -284,8 +203,8 @@ async function Figures({ today, insights, seeMoney }: { today: string; insights:
             icon={Wallet}
             iconColor={5}
             label="Cash & bank"
-            value={cash[0] ? money(cash[0].amount, cash[0].currency) : "—"}
-            sub={cash.length > 1 ? cash.slice(1).map((x) => money(x.amount, x.currency)).join(" · ") : plural(accounts.filter((a) => !a.archived).length, "account")}
+            value={cash[0] ? bigMoney(cash[0].amount, cash[0].currency) : "—"}
+            sub={cash.length > 1 ? cash.slice(1).map((x) => bigMoney(x.amount, x.currency)).join(" · ") : plural(accounts.filter((a) => !a.archived).length, "account")}
             href="/finance/cash-book"
           />
         )}
@@ -302,23 +221,6 @@ function cashTotals(accounts: AccountRow[]) {
   return [...by].map(([currency, amount]) => ({ currency, amount })).sort((x, y) => y.amount - x.amount);
 }
 
-/** This month's company target (managers), in its own card. */
-async function MonthTarget({ today }: { today: string }) {
-  const h = await getHome(today);
-  if (!h) return null;
-  return (
-    <Card>
-      <CardHeader title="This month's target" actions={h.target.canSet ? <TargetEditor month={h.target.month} current={h.target.amount} currency={h.currency} /> : undefined} />
-      <CardBody>
-        {h.target.amount && h.target.percent !== null ? (
-          <TargetRing percent={h.target.percent} reached={h.target.reached} amount={h.target.amount} currency={h.currency} size={112} />
-        ) : (
-          <p className="text-sm text-muted">No target yet. Set one to see at a glance how the month is going.</p>
-        )}
-      </CardBody>
-    </Card>
-  );
-}
 
 /** Inquiry pipeline (board): open inquiries by stage, a bar each. */
 function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
@@ -357,7 +259,6 @@ function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-muted">On hold: {counts.onHold}</p>
       </CardBody>
     </Card>
   );
@@ -436,7 +337,7 @@ async function SalesChart({ today }: { today: string }) {
   const c = h.currency;
   return (
     <ChartCard
-      title="Sales and gross profit, last 6 months"
+      title="Sales and costs"
       description={c}
       actions={
         <Link href="/reports" className="text-sm text-primary hover:underline">
@@ -453,124 +354,9 @@ async function SalesChart({ today }: { today: string }) {
   );
 }
 
-/** My own sales target this month, when a manager set one (Insights › Targets). */
-async function MyTarget() {
-  if (!(await hasFeature("insights"))) return null;
-  const t = await api.get<{ month: string; target: string | null; sold: string | null; percent: number | null; currency: string | null; daysLeft: number | null }>("/me/target").catch(() => null);
-  if (!t || t.target === null || t.currency === null) return null;
-  const left = Math.max(Number(t.target) - Number(t.sold ?? 0), 0);
-  const monthName = new Date(`${t.month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
-  return (
-    <Card className="rounded-2xl">
-      <CardHeader title={`My ${monthName} target`} description={`${money(t.sold, t.currency)} of ${money(t.target, t.currency)}`} />
-      <CardBody>
-        <Meter
-          label="Sold this month"
-          figure={`${t.percent ?? 0}%`}
-          percent={Math.min(t.percent ?? 0, 100)}
-          tone={(t.percent ?? 0) >= 100 ? "ok" : undefined}
-          hint={
-            (t.percent ?? 0) >= 100
-              ? "Reached. Well done."
-              : t.daysLeft
-                ? `${t.daysLeft} day${t.daysLeft === 1 ? "" : "s"} left · ${money(left / t.daysLeft, t.currency)} a day to make it`
-                : `${money(left, t.currency)} to go`
-          }
-        />
-      </CardBody>
-    </Card>
-  );
-}
 
-/** My open orders by where they are in the flow (orders board module); each count opens the board at that step. */
-async function MyOrders() {
-  if (!(await hasFeature("orders_board"))) return null;
-  const board = await api.get<{ items: { id: string; current: { key: FlowStep } | null }[] }>("/order-board", { mine: "true" }).catch(() => null);
-  if (!board || !board.items.length) return null;
-  const cols: [string, string, FlowStep[]][] = [
-    ["Payment", "payment", ["payment"]],
-    ["Factory", "production", ["factory", "production"]],
-    ["Shipping", "shipping", ["shipping"]],
-    ["Papers", "documents", ["documents"]],
-    ["SAT", "delivery", ["delivery"]],
-  ];
-  const count = (steps: FlowStep[]) => board.items.filter((i) => (i.current ? steps.includes(i.current.key) : steps.includes("delivery"))).length;
-  return (
-    <Card className="rounded-2xl">
-      <CardHeader title="My orders" description={`${board.items.length} open, by where they are`} />
-      <CardBody className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-        {cols.map(([label, key, steps]) => (
-          <Link key={key} href={`/orders/board?mine=1&stage=${key}`} className="rounded-xl border border-line bg-surface p-3 transition-colors hover:border-primary-line hover:bg-primary-soft/50">
-            <p className="truncate text-xs font-medium text-text-2">{label}</p>
-            <p className="text-2xl font-bold text-primary tabular">{count(steps)}</p>
-          </Link>
-        ))}
-      </CardBody>
-    </Card>
-  );
-}
 
-/** My calls and visits for today and the ones still open from before (late, in the bad tone with the word). */
-async function FollowUpsToday() {
-  const t = await api.get<Today>("/me/today").catch(() => null);
-  if (!t) return null;
-  return (
-    <Card className="overflow-clip rounded-2xl">
-      <CardHeader
-        title={`Follow-ups today${t.total ? ` · ${t.total}` : ""}`}
-        description={t.late ? <span className="font-medium text-bad">{t.late} late</span> : t.total ? "Your calls and visits" : undefined}
-        actions={
-          <Link href="/follow-ups" className="text-sm text-primary hover:underline">
-            All follow-ups
-          </Link>
-        }
-      />
-      {t.rows.length ? (
-        <ul aria-label="Follow-ups today" className="divide-y divide-line">
-          {t.rows.slice(0, 8).map((f) => (
-            <FollowUpRow key={f.id} f={f} showRecord today={t.today} />
-          ))}
-        </ul>
-      ) : (
-        <p className="px-4 py-3 text-sm text-muted">Nothing planned for today. Add a follow-up on an order, a customer or a factory and it shows here on its day.</p>
-      )}
-      {t.rows.length > 8 && (
-        <p className="border-t border-line px-4 py-2 text-xs text-text-2">
-          <Link href="/follow-ups?mine=true" className="font-medium text-primary hover:underline">
-            {t.rows.length - 8} more
-          </Link>
-        </p>
-      )}
-    </Card>
-  );
-}
 
-/** The next seven days from "Needs attention": what falls due when (deposits, quotation expiry, arrivals, SATs). */
-async function ThisWeek({ today }: { today: string }) {
-  const reminders = await getReminders().catch(() => null);
-  if (!reminders) return null;
-  const end = new Date(`${today}T00:00:00Z`);
-  end.setUTCDate(end.getUTCDate() + 7);
-  const last = end.toISOString().slice(0, 10);
-  const week = reminders.items.filter((i) => i.due && i.due >= today && i.due <= last).sort((a, b) => a.due!.localeCompare(b.due!));
-  if (!week.length) return null;
-  const dayOf = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
-  return (
-    <Card className="rounded-2xl">
-      <CardHeader title="This week" description="What falls due in the next seven days" />
-      <ul className="flex flex-col divide-y divide-line">
-        {week.slice(0, 8).map((i) => (
-          <li key={i.key}>
-            <Link href={i.href} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 px-4 py-2.5 text-sm hover:bg-surface-2">
-              <span className={i.due === today ? "font-semibold text-primary" : "text-muted"}>{i.due === today ? "Today" : dayOf(i.due!)}</span>
-              <span className="min-w-0 truncate">{readableDates(i.title)}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
 
 /** The latest open sales orders (the board's "Recent sales orders"): what each is worth, what is still due, where it is. */
 async function RecentOrders() {
@@ -618,19 +404,6 @@ async function RecentOrders() {
   );
 }
 
-async function Attention({ all }: { all: boolean }) {
-  const reminders = await getReminders();
-  return (
-    <Card className="overflow-hidden rounded-2xl">
-      <CardHeader
-        title="Needs attention"
-        description={all ? "Everyone's, the most urgent first" : "Yours, the most urgent first"}
-        actions={reminders.counts.total ? <Badge tone={reminders.counts.bad ? "bad" : "info"}>{reminders.counts.total}</Badge> : undefined}
-      />
-      <ReminderList data={reminders} />
-    </Card>
-  );
-}
 
 function FiguresSkeleton() {
   return (
@@ -643,16 +416,3 @@ function FiguresSkeleton() {
 }
 
 
-function AttentionSkeleton() {
-  return (
-    <div
-      className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-4"
-      aria-busy="true"
-      aria-label="Needs attention, loading"
-    >
-      {[0, 1, 2, 3, 4].map((k) => (
-        <div key={k} className="h-12 animate-pulse rounded-lg bg-surface-2" />
-      ))}
-    </div>
-  );
-}

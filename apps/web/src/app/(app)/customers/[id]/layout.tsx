@@ -1,6 +1,6 @@
-import { BookOpen, Eye, MessageSquare, Package, Plus, StickyNote, Users, Wallet } from "lucide-react";
+import { Eye, Pencil, MessageSquare, Package, Plus, StickyNote, Users, Wallet } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { ButtonLink, PageHeader, StatusBadge } from "@kebo/ui";
+import { ButtonLink, PageHeader } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
@@ -9,7 +9,7 @@ import { countryName } from "@/lib/countries";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { removeCustomerAction } from "../actions";
-import { customerStatus, late } from "./shared";
+import { late } from "./shared";
 
 /** "Mar 2025" */
 const monthOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: TZ });
@@ -25,16 +25,15 @@ export default async function CustomerLayout({ children, params }: { children: R
   const me = await requireUser();
   const [c, pay, notes] = await Promise.all([customerOf(id), customerPaymentsOf(id), partyNotesOf("customers", id)]);
   const today = todayIn(TZ);
-  const status = customerStatus(pay, c, today);
   const canAsk = can(me, "inquiries.create");
   const countryKnown = c.country !== UNKNOWN_COUNTRY;
-  const handledBy = c.inquiries.find((d) => d.assignee)?.assignee?.name;
   const base = `/customers/${c.id}`;
 
   const lateOrders = (pay?.orders ?? []).filter((o) => late(o, today)).length;
 
   const ledger = can(me, "ledger.view") ? `/finance/ledger/customers/${c.id}` : null;
   const more: MenuEntry[] = [
+    { label: "Payments", href: `/payments?party=${c.id}` },
     ...(ledger ? [{ label: "Ledger and statement", href: ledger }] : []),
     { label: "Their inquiries", href: `/inquiries?customer=${c.id}&stage=all` },
     { label: "Copy link", copy: base },
@@ -61,28 +60,21 @@ export default async function CustomerLayout({ children, params }: { children: R
         crumbs={[{ label: "Partners & CRM" }, { label: "Customers", href: "/customers" }, { label: c.name }]}
         phoneStack
         title={c.name}
-        badge={<StatusBadge meaning={status.meaning}>{status.label}</StatusBadge>}
         summary={
           <>
             {c.type === "individual" ? PARTY_TYPE_LABEL.individual : "Company"}
             {" · "}
             {countryKnown ? countryName(c.country) : <span className="text-warn">Country not set</span>}
             {c.defaultCurrency && ` · ${c.defaultCurrency}`}
-            {` · customer since ${monthOf(c.createdAt)}`}
-            {handledBy && <span className="max-sm:hidden"> · handled by {handledBy}</span>}
+            {` · since ${monthOf(c.createdAt)}`}
           </>
         }
         papers={
-          <>
-            <ButtonLink href={`/payments?party=${c.id}`} variant="secondary">
-              Payments
+          can(me, "customers.manage") && (
+            <ButtonLink href={`${base}?panel=edit-customer&id=${c.id}`} variant="secondary" scroll={false}>
+              <Pencil aria-hidden /> Edit
             </ButtonLink>
-            {ledger && (
-              <ButtonLink href={ledger} variant="secondary">
-                <BookOpen aria-hidden /> Ledger
-              </ButtonLink>
-            )}
-          </>
+          )
         }
         primary={
           canAsk && (

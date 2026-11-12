@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { buttonClass, Card, cn } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 
@@ -54,12 +54,9 @@ export interface DetailValue {
 const missing = (v: ReactNode) => v === null || v === undefined || v === "" || v === false;
 
 /**
- * The record's Details card: "Details", "7 of 8 filled · click a value or
- * Edit", ✎ Edit in its header (opens the side panel `edit`), then the values,
- * label above value in up to three columns (label and value on one line on a
- * phone). A missing value says "+ Add" in place and a filled one shows a
- * pencil on hover — both open the same panel. Without `edit` (no permission)
- * it is read-only: no buttons, missing values show "—".
+ * The record's Details card (board): "Details" with ✎ Edit in its header (opens the edit window), then the
+ * values, label above value in up to three columns. A missing value shows "—". Without `edit` (no
+ * permission) it is read-only.
  */
 export function DetailsCard({
   items,
@@ -68,7 +65,10 @@ export function DetailsCard({
   description,
   flash,
   footer,
+  editHref,
 }: {
+  /** Edit on its own page (a link) instead of the edit window. */
+  editHref?: string;
   items: DetailValue[];
   edit?: { panel: string; id?: string; label?: string } | null;
   title?: string;
@@ -78,64 +78,33 @@ export function DetailsCard({
   footer?: ReactNode;
 }) {
   const shown = items.filter((i) => !(i.optional && missing(i.value)));
-  const counted = items.filter((i) => !i.optional);
-  const filled = counted.filter((i) => !missing(i.value)).length;
-  const desc =
-    description ?? `${filled} of ${counted.length} filled${edit ? (filled < counted.length ? " · click + Add or Edit" : " · click a value or Edit") : ""}`;
   return (
     <Card className={cn(flash && "animate-flash")} aria-labelledby="details-title">
-      <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
         <div className="min-w-0">
-          <h2 id="details-title" className="text-[15px] font-semibold text-text">
+          <h2 id="details-title" className="text-base font-bold text-text">
             {title}
           </h2>
-          <p className="mt-0.5 text-xs text-muted">{desc}</p>
+          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
+        {editHref && (
+          <Link href={editHref} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline">
+            <Pencil className="size-4" aria-hidden /> Edit
+          </Link>
+        )}
         {edit && (
-          <OpenPanelButton panel={edit.panel} id={edit.id} size="sm" className="h-8 px-2.5 text-[13px] [&_svg]:size-3.5" label={edit.label}>
+          <OpenPanelButton panel={edit.panel} id={edit.id} variant="link" size="sm" className="h-auto text-[13px] font-semibold [&_svg]:size-4" label={edit.label}>
             <Pencil aria-hidden /> Edit
           </OpenPanelButton>
         )}
       </div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 px-4 py-3.5 sm:grid-cols-2 sm:gap-y-4 xl:grid-cols-3">
-        {shown.map((i) => {
-          const empty = missing(i.value);
-          return (
-            <div
-              key={i.label}
-              className={cn("group/value flex min-w-0 items-baseline justify-between gap-3 sm:block", i.wide && "sm:col-span-2 xl:col-span-3")}
-            >
-              <dt className="shrink-0 text-xs text-text-2 sm:mb-0.5">{i.label}</dt>
-              <dd className="min-w-0 text-right text-sm font-medium break-words text-text sm:text-left">
-                {empty ? (
-                  edit ? (
-                    <OpenPanelButton panel={edit.panel} id={edit.id} variant="link" size="sm" className="h-auto p-0 font-semibold" label={`Add ${i.label.toLowerCase()}`}>
-                      <Plus aria-hidden className="size-3.5" /> Add
-                    </OpenPanelButton>
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )
-                ) : (
-                  <span className="inline">
-                    {i.value}
-                    {edit && !i.readOnly && (
-                      <OpenPanelButton
-                        panel={edit.panel}
-                        id={edit.id}
-                        variant="ghost"
-                        size="icon-xs"
-                        className="ml-1 size-5 align-[-4px] text-muted opacity-0 group-hover/value:opacity-100 focus-visible:opacity-100 max-sm:hidden"
-                        label={`Change ${i.label.toLowerCase()}`}
-                      >
-                        <Pencil aria-hidden className="size-3" />
-                      </OpenPanelButton>
-                    )}
-                  </span>
-                )}
-              </dd>
-            </div>
-          );
-        })}
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-4 px-4 py-4 sm:grid-cols-2 sm:px-5 xl:grid-cols-3">
+        {shown.map((i) => (
+          <div key={i.label} className={cn("min-w-0", i.wide && "sm:col-span-2 xl:col-span-3")}>
+            <dt className="text-xs text-muted">{i.label}</dt>
+            <dd className="mt-[3px] text-sm break-words text-text">{missing(i.value) ? <span className="text-muted">—</span> : i.value}</dd>
+          </div>
+        ))}
       </dl>
       {footer}
     </Card>
