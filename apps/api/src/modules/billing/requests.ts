@@ -53,6 +53,18 @@ export interface RowReceipt {
   /** What of this payment went to the row. */
   amount: string;
   paidOn: ISODate;
+  /** The whole payment on the order (what it settles): more than `amount` when it also paid another row. */
+  whole: string;
+  /** bank_transfer, cash… ("credit": paid from the customer's credit). */
+  method: string;
+  reference: string | null;
+  /** The account it arrived in. */
+  account: string | null;
+  recordedBy: string | null;
+  /** The bank slip or other proof is kept with the payment. */
+  hasProof: boolean;
+  /** The payment entry it belongs to (its page in Payments); null when it was paid from the customer's credit. */
+  entryId: string | null;
 }
 
 export interface OrderRequests {
@@ -86,7 +98,17 @@ export async function requestsOf(db: Db, orderIds: string[], timeZone: string): 
       allocations: {
         where: livePart,
         orderBy: [{ on: "asc" }, { createdAt: "asc" }],
-        select: { id: true, amount: true, bankCharges: true, on: true, receiptNo: true },
+        select: {
+          id: true,
+          amount: true,
+          bankCharges: true,
+          on: true,
+          receiptNo: true,
+          later: true,
+          movementId: true,
+          recordedBy: { select: { name: true } },
+          movement: { select: { method: true, reference: true, account: { select: { name: true } }, files: { where: { deletedAt: null }, select: { id: true }, take: 1 } } },
+        },
       },
       bankSteps: { where: { step: "sent_to_our_bank" }, select: { doneOn: true } },
       papers: {
@@ -169,6 +191,13 @@ export async function requestsOf(db: Db, orderIds: string[], timeZone: string): 
             number: paperNumber(o.refNo, "payment-receipt", a.receiptNo ?? i + 1),
             amount: fromMinor(part.minor),
             paidOn: fromDbDate(a.on),
+            whole: fromMinor(decimalToMinor(a.amount) + decimalToMinor(a.bankCharges)),
+            method: a.later ? "credit" : a.movement.method,
+            reference: a.later ? null : a.movement.reference,
+            account: a.later ? null : (a.movement.account?.name ?? null),
+            recordedBy: a.recordedBy?.name ?? null,
+            hasProof: !a.later && a.movement.files.length > 0,
+            entryId: a.later ? null : a.movementId,
           },
         ]);
       }

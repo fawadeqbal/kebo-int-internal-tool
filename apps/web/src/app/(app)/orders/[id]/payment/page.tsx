@@ -1,12 +1,12 @@
-import { ArrowDownLeft } from "lucide-react";
 import { BALANCE_TERMS_LABEL, can, PAYMENT_ROUTE_LABEL, type PaymentRoute } from "@kebo/shared";
 import { CardBody } from "@kebo/ui";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
-import { StepPage, StepViewDivider } from "@/components/orders/step-page";
+import { TodoFold } from "@/components/orders/todo-fold";
+import { StepPage } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
-import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/step-view";
+import { ViewCard, type DetailField } from "@/components/orders/step-view";
 import { PaymentEdit } from "@/components/orders/view-panels";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { PaymentPlan } from "@/components/money/forms";
@@ -15,11 +15,9 @@ import { PlanRequests } from "@/components/money/requests";
 import { RecordPaymentLink, ViewPaymentsLink } from "@/components/money/pay-links";
 import { savePlanAction, sendRequestAction } from "../../../money/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
-import { fieldsAction, lightAction } from "../../light-actions";
+import { lightAction } from "../../light-actions";
 import { useCreditAction } from "../../actions";
-import { CustomerSummary, MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
-import { termsOf } from "../shared";
 
 export const metadata = { title: "Order · payment" };
 
@@ -161,100 +159,95 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
     );
   const shown = fields.map((f) => (f.type === "date" && f.value ? { ...f, show: date(f.value) } : f));
 
+  const routeWords = route ? PAYMENT_ROUTE_LABEL[route].replace(/ \(.*\)$/, "") : null;
+  const planEditor = <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly startOpen />;
+
   return (
     <StepPage
       steps={d.steps}
       step="payment"
       base={d.base}
       action={pay("Record a payment", false)}
-      side={<StepSidePanel id={o.id} step="payment" changes={d.changes} historyHref={d.historyHref} />}
+      side={<StepSidePanel id={o.id} step="payment" changes={d.changes} historyHref={d.historyHref} hidePapers={["payment-request", "payment-receipt"]} />}
     >
-      <Checklist
-        payFor={await expensePayTools(o.id, d.items)}
-        step="payment"
-        label="Payment"
-        items={d.items}
-        current={d.current}
-        nowKey={d.nowKey}
-        waits={d.waits}
-        canEdit={d.steps.canEdit}
-        run={d.run}
-        dealId={o.inquiry.id}
-        people={d.people}
-        tools={tools}
-        payNode={pay("Record payment")}
-        listHref={d.listHref}
-        me={me.name}
-        today={now}
-      />
-      <StepViewDivider />
-      <DetailsCard
-        id="route"
-        target="payment"
-        title="How they pay"
-        description={
-          route
-            ? undefined
-            : canRoute
-              ? "No route yet: choose it in the checklist above, or Edit."
-              : "The route is chosen in the checklist above."
-        }
-        fields={shown}
-        action={bankRoute ? fieldsAction.bind(null, o.id, "contract") : undefined}
-        canEdit={canRoute}
-        panelTitle="Edit how they pay"
-        panelDescription="The route decides the plan, the papers and the bank steps. Change it and the plan is rebuilt (payments already recorded stay)."
-        panelBody={
-          flow ? (
-            <PaymentEdit
-              routeAction={routeAction.bind(null, o.id)}
-              contractAction={bankContractAction.bind(null, o.id)}
-              route={route}
-              contract={contract}
-              bankRoutes={flow.modules.bankContracts}
-              currency={c}
-              terms={
-                route
-                  ? terms
-                  : {
-                      balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment",
-                      lcTerms: null,
-                      lcDays: null,
-                    }
-              }
-              fromQuotation={flow.payment.fromQuotation}
-              suggest={SUGGEST[o.balanceTerms] ?? null}
-            />
-          ) : undefined
-        }
-        footer={
-          lc && flow?.payment.lcChecks ? (
-            <div className="flex flex-col gap-1 border-t border-line px-4 py-3">
-              <p className="text-xs font-semibold text-text-2">The LC against the order</p>
-              <LcChecks checks={flow.payment.lcChecks} />
-            </div>
-          ) : undefined
-        }
-      />
+      {/* The to-do list as one thin line; it opens when there is something to do in it now. */}
+      <TodoFold label="Payment" items={d.items} waits={d.waits} open={d.current}>
+        <Checklist
+          payFor={await expensePayTools(o.id, d.items)}
+          step="payment"
+          label="Payment"
+          items={d.items}
+          current={d.current}
+          nowKey={d.nowKey}
+          waits={d.waits}
+          canEdit={d.steps.canEdit}
+          run={d.run}
+          dealId={o.inquiry.id}
+          people={d.people}
+          tools={tools}
+          payNode={pay("Record payment")}
+          listHref={d.listHref}
+          me={me.name}
+          today={now}
+        />
+      </TodoFold>
+      {/* One card for the money: how they pay in its heading, the parts as requests, the totals at its foot. */}
       <ViewCard
         id="plan"
         target="plan"
-        title="Payment requests"
-        description={
-          m.route.summary
-            ? `The plan, built from the route: ${m.route.summary}. Each part is a request with where it stands.`
-            : "The plan: deposit and balance, each a request with where it stands. Choose the route to build the balance part."
+        title={
+          <>
+            Payment
+            <span className="font-normal text-text-2" data-target="payment.route">
+              {" "}
+              · {routeWords ? `${routeWords} · ${o.money.depositPercent > 0 ? `${o.money.depositPercent}% deposit, ` : ""}${m.terms.toLowerCase()}` : "no route chosen yet"}
+            </span>
+          </>
         }
-        canEdit={false}
+        canEdit={(canRoute || m.plan.canEdit) && !!flow}
+        panel={
+          flow
+            ? {
+                title: "Edit payment",
+                description: `${o.refNo} · ${o.customer.name} · ${money(m.total, c)}`,
+                className: "md:w-[900px]",
+                body: (
+                  <PaymentEdit
+                    routeAction={routeAction.bind(null, o.id)}
+                    contractAction={bankContractAction.bind(null, o.id)}
+                    route={route}
+                    contract={contract}
+                    bankRoutes={flow.modules.bankContracts}
+                    currency={c}
+                    terms={
+                      route
+                        ? terms
+                        : {
+                            balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment",
+                            lcTerms: null,
+                            lcDays: null,
+                          }
+                    }
+                    fromQuotation={flow.payment.fromQuotation}
+                    suggest={SUGGEST[o.balanceTerms] ?? null}
+                    parts={m.plan.canEdit ? planEditor : undefined}
+                  />
+                ),
+              }
+            : undefined
+        }
         actions={
-          <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />
+          <>
+            {canPay && p.credit.canUse && <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />}
+            {!flow && <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />}
+          </>
         }
       >
-        <CardBody className="flex flex-col gap-2">
+        <CardBody className="flex flex-col gap-3">
           {!m.plan.matchesTotal && (
             <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
-              The parts do not add up to the order total ({money(m.plan.difference, c)}{" "}
-              {Number(m.plan.difference) > 0 ? "missing" : "too much"}). Change the plan.
+              The parts do not add up to the order total ({money(m.plan.difference, c)} {Number(m.plan.difference) > 0 ? "missing" : "too much"}). Edit the
+              parts.
             </p>
           )}
           <PlanRequests
@@ -265,44 +258,40 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
             received={m.received}
             due={m.due}
             send={sendRequestAction.bind(null, o.id)}
-            canPay={canPay}
-            back={`/orders/${o.id}/payment`}
+            foot={p.payments.length > 0 ? <ViewPaymentsLink order={o.id} label="All payments of this order" /> : undefined}
           />
+          {m.charged.length > 0 && (
+            <ul aria-label="Charged to the customer" className="flex flex-col divide-y divide-line rounded-lg border border-line text-sm">
+              {m.charged.map((x) => (
+                <li key={x.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
+                  <span>
+                    <span className="text-text-2">Charged to the customer:</span> {x.description}
+                  </span>
+                  <span className="font-medium tabular">{money(x.amount, c)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {bankRoute && (
+            <dl className="grid gap-x-6 gap-y-2 border-t border-line pt-3 text-sm sm:grid-cols-3">
+              {shown
+                .filter((f) => f.name)
+                .map((f) => (
+                  <div key={f.label} data-target={`payment.${f.name}`}>
+                    <dt className="text-xs text-muted">{f.label}</dt>
+                    <dd className="font-medium">{f.show ?? f.value ?? "—"}</dd>
+                  </div>
+                ))}
+            </dl>
+          )}
+          {lc && flow?.payment.lcChecks && (
+            <div className="flex flex-col gap-1 border-t border-line pt-3">
+              <p className="text-xs font-semibold text-text-2">The LC against the order</p>
+              <LcChecks checks={flow.payment.lcChecks} />
+            </div>
+          )}
         </CardBody>
       </ViewCard>
-      <MoneySection
-        id="customer"
-        target="payments.received"
-        icon={<ArrowDownLeft aria-hidden />}
-        title="Payments received"
-        sub={`${o.customer.name} pays us · ${termsOf(o)}`}
-        action={
-          canPay && p.credit.canUse ? (
-            <UseCredit action={useCreditAction.bind(null, o.id)} credit={p.credit.amount} due={p.due} currency={c} today={now} />
-          ) : undefined
-        }
-      >
-        <CustomerSummary o={o} />
-        {m.charged.length > 0 && (
-          <ul
-            aria-label="Charged to the customer"
-            className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface text-sm"
-          >
-            {m.charged.map((x) => (
-              <li key={x.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
-                <span>
-                  <span className="text-text-2">Charged to you:</span> {x.description}
-                </span>
-                <span className="font-medium tabular">{money(x.amount, c)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex flex-wrap items-center gap-3">
-          <ViewPaymentsLink order={o.id} />
-          {pay("Record payment")}
-        </div>
-      </MoneySection>
     </StepPage>
   );
 }

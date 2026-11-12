@@ -648,7 +648,87 @@ export interface RequestView {
   through: "customer" | "bank";
   /** Sent, still open, and the row no longer says what was sent: send it again. */
   changed: boolean;
-  receipts: { id: string; number: string; amount: string; paidOn: string }[];
+  receipts: RowReceipt[];
+}
+
+/** A payment that paid (part of) a request, with its receipt and how it came. */
+export interface RowReceipt {
+  id: string;
+  /** The receipt's number (RC-2026-0041-2). */
+  number: string;
+  /** What of this payment went to the request. */
+  amount: string;
+  paidOn: string;
+  /** The whole payment on the order: more than `amount` when it also paid another request. */
+  whole: string;
+  method: string;
+  reference: string | null;
+  account: string | null;
+  recordedBy: string | null;
+  hasProof: boolean;
+  /** Its page in Payments (null: paid from the customer's credit). */
+  entryId: string | null;
+}
+
+type InvoiceStatus = "paid" | "part_paid" | "unpaid";
+interface InvoiceRef {
+  kind: "commercial" | "proforma";
+  number: string;
+  issuedOn: string;
+  version: number;
+}
+
+/** GET /billing/customer-invoices */
+export interface CustomerInvoices {
+  rows: {
+    invoice: InvoiceRef;
+    order: { id: string; refNo: string };
+    customer: { id: string; name: string };
+    lookedAfterBy: { id: string; name: string } | null;
+    currency: string;
+    total: string;
+    paid: string;
+    due: string;
+    status: InvoiceStatus;
+    nextDue: string | null;
+    late: number;
+  }[];
+}
+
+/** GET /billing/customer-invoices/:orderId */
+export interface CustomerInvoice {
+  /** Null: not issued yet (the proforma comes first). */
+  invoice: InvoiceRef | null;
+  order: { id: string; refNo: string; status: string };
+  customer: { id: string; name: string };
+  lookedAfterBy: { id: string; name: string } | null;
+  currency: string;
+  lines: { id: string; type: string; description: string; model: string | null; quantity: string; unit: string; unitPrice: string; amount: string }[];
+  discount: string | null;
+  orderTotal: string;
+  charged: string;
+  total: string;
+  paid: string;
+  due: string;
+  status: InvoiceStatus;
+  parts: {
+    ref: string;
+    number: string;
+    label: string;
+    dueOn: string | null;
+    rule: string | null;
+    amount: string;
+    paid: string;
+    late: number;
+    request: { state: RequestState; with: SentWith | null; sentOn: string | null; revision: number | null; changed: boolean; through: "customer" | "bank" };
+    lastPaidOn: string | null;
+  }[];
+  terms: { priceBasis: string; payment: string };
+  linked: {
+    quotation: { refNo: string; revision: number; inquiryId: string } | null;
+    proforma: { number: string; versions: number } | null;
+    commercial: { number: string; versions: number } | null;
+  };
 }
 
 /** One copy kept when a request was sent. */

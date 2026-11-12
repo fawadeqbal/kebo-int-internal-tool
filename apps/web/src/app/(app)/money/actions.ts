@@ -11,7 +11,6 @@ const refresh = (orderId?: string | null, customerId?: string | null) => {
   revalidatePath("/finance", "layout");
   revalidatePath("/purchasing", "layout");
   revalidatePath("/payments", "layout");
-  revalidatePath("/operations/payment-requests", "layout");
 };
 
 /** The customer's instalments: payload { items: [{ id?, label, amount, dueOn }] }. */

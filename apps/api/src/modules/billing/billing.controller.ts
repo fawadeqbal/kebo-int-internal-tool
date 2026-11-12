@@ -57,6 +57,31 @@ export class BillingController {
     return this.billing.requests(user, q.mine);
   }
 
+  /** Invoices to customers: each order's invoice (the commercial invoice once made, else the proforma) with what was paid. ?mine=true. */
+  @Get("billing/customer-invoices")
+  customerInvoices(
+    @CurrentUser() user: SessionUser,
+    @Query(
+      Validate(
+        z.object({
+          mine: z
+            .enum(["true", "false"])
+            .optional()
+            .transform((v) => v === "true"),
+        }),
+      ),
+    )
+    q: { mine: boolean },
+  ) {
+    return this.billing.customerInvoices(user, q.mine);
+  }
+
+  /** One order's invoice, its own view: what it bills, how it is paid, its terms. */
+  @Get("billing/customer-invoices/:orderId")
+  customerInvoice(@CurrentUser() user: SessionUser, @Param("orderId", new ParseUUIDPipe()) orderId: string) {
+    return this.billing.customerInvoice(user, orderId);
+  }
+
   /** The open invoices of one side, instalment by instalment (late first). ?side=receivable|payable, ?mine=true. */
   @Get("billing/invoices")
   invoices(@CurrentUser() user: SessionUser, @Query(Validate(invoicesQuery)) q: InvoicesQuery) {

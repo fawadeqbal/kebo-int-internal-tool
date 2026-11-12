@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote, Check, Download, List, Plus, TriangleAlert } from "lucide-react";
-import { PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow, type PaymentSum } from "@kebo/shared";
+import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow, type PaymentSum } from "@kebo/shared";
 import {
   Badge,
   buildHref,
@@ -16,6 +16,7 @@ import {
   PhoneList,
   PhoneRow,
   RefCode,
+  Segmented,
   StatRow,
   StatTile,
   StatusBadge,
@@ -33,12 +34,15 @@ import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
 import { FilterCard } from "@/components/common/filter-card";
 import { periodOf } from "@/components/common/period";
+import { RequestsTab } from "./requests-tab";
 import { opensPayments, paymentHref } from "./shared";
 
 export const metadata = { title: "Payments" };
 
 const PAGE_SIZE = 50;
-type Search = { p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
+type Search = { tab?: string; mine?: string; p?: string; dir?: string; status?: string; kind?: string; q?: string; order?: string; party?: string; account?: string; method?: string; page?: string };
+/** A link that filters the list of payments (an order's, a party's, a search) opens the Paid tab. */
+const LIST_FILTERS = ["p", "dir", "kind", "order", "party", "account", "method"] as const;
 
 const STATUS_MEANING = { to_verify: "warn", sent_back: "bad", recorded: "ok", void: "neutral" } as const;
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -59,10 +63,42 @@ function statusOf(r: PaymentRow) {
   return <StatusBadge meaning="ok">Paid</StatusBadge>;
 }
 
+/**
+ * Treasury › Payments: what is asked for and what was paid, in one place. Two tabs: Payment requests (every
+ * part of an order's plan still being asked for; open to everyone who sees orders) and Paid (every payment
+ * recorded, with its receipt; for the people who see money).
+ */
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const me = await requireUser();
-  if (!opensPayments(me)) redirect("/forbidden");
   const sp = await searchParams;
+  const seesMoney = opensPayments(me);
+  const tab: "requests" | "paid" =
+    !seesMoney || sp.tab === "requests"
+      ? "requests"
+      : sp.tab === "paid" || sp.status === "to_verify" || sp.status === "void" || LIST_FILTERS.some((k) => sp[k])
+        ? "paid"
+        : "requests";
+  if (tab === "requests") {
+    return (
+      <div>
+        <PageHeader
+          crumbs={crumbsFor("/payments")}
+          title="Payments"
+          summary="What is asked for and what was paid, in one place"
+          primary={
+            can(me, "payments.record") ? (
+              <ButtonLink href="/payments/new?kind=in" variant="primary">
+                <Plus aria-hidden /> Record payment
+              </ButtonLink>
+            ) : undefined
+          }
+        />
+        {seesMoney && <Tabs tab="requests" />}
+        <RequestsTab sp={sp} />
+      </div>
+    );
+  }
+  if (!seesMoney) redirect("/forbidden");
   const today = todayIn(TZ);
   const order = UUID.test(sp.order ?? "") ? sp.order : undefined;
   const party = UUID.test(sp.party ?? "") ? sp.party : undefined;
@@ -90,7 +126,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     page,
     pageSize: PAGE_SIZE,
   });
-  const keep = { p: sp.p, dir, status, kind, q, order, party, account, method };
+  const keep = { tab: "paid", p: sp.p, dir, status, kind, q, order, party, account, method };
   const href = (change: Record<string, string | undefined>) => buildHref("/payments", keep, { page: undefined, ...change });
   const chip = (c: Record<string, string | undefined>) => href({ dir: undefined, status: undefined, kind: undefined, ...c });
   const recordHref = order ? `/payments/new?kind=in&order=${order}` : "/payments/new";
@@ -114,12 +150,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           order || party ? (
             <>
               For {list.scope ?? "this record"} ·{" "}
-              <Link href={buildHref("/payments", {}, {})} className="font-medium text-primary hover:underline">
+              <Link href={buildHref("/payments", {}, { tab: "paid" })} className="font-medium text-primary hover:underline">
                 All payments
               </Link>
             </>
           ) : (
-            "All money in and out"
+            "What is asked for and what was paid, in one place"
           )
         }
         actions={
@@ -135,6 +171,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           ) : undefined
         }
       />
+      {!order && !party && <Tabs tab="paid" />}
       <StatRow className="mb-4">
         <StatTile icon={ArrowDownToLine} iconColor={1} label={`In${when}`} value={top(t.in)} sub={`${t.inCount} receipt${t.inCount === 1 ? "" : "s"}`} />
         <StatTile icon={ArrowUpFromLine} iconColor={2} label={`Out${when}`} value={top(t.out)} sub={`${t.outCount} payment${t.outCount === 1 ? "" : "s"} out`} />
@@ -165,7 +202,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       <FilterCard
         search="Search number, customer, reference…"
         value={q}
-        keep={{ dir, status, kind, order, party }}
+        keep={{ tab: "paid", dir, status, kind, order, party }}
         clearHref={href({ q: undefined })}
         selects={[
           { name: "account", label: "Account", value: account, options: list.accounts.map((a) => ({ value: a.id, label: a.name })) },
@@ -239,6 +276,20 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <Pager base="/payments" params={keep} page={page} pageSize={PAGE_SIZE} total={list.total} />
       </Card>
     </div>
+  );
+}
+
+/** The page's two tabs. */
+function Tabs({ tab }: { tab: "requests" | "paid" }) {
+  return (
+    <Segmented
+      label="Show"
+      className="mb-4"
+      options={[
+        { href: "/payments?tab=requests", label: "Payment requests", active: tab === "requests" },
+        { href: "/payments?tab=paid", label: "Paid", active: tab === "paid" },
+      ]}
+    />
   );
 }
 

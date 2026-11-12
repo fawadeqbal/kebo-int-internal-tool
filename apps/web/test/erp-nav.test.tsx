@@ -64,10 +64,10 @@ describe("the modules", () => {
     expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines", "Analytics & reports", "Audit log"]);
     expect(pages(m, "public")).toEqual(["Website form"]);
     expect(pages(m, "partners")).toEqual(["Customers", "Suppliers"]);
-    expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders", "Payment requests", "Purchase orders", "Fulfillment & logistics"]);
+    expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders", "Purchase orders", "Fulfillment & logistics"]);
     expect(pages(m, "revenue")).toEqual(["Profit & loss", "Cost & expense allocation", "Variance analysis"]);
     expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue", "Multi-currency vault"]);
-    expect(pages(m, "finance")).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
+    expect(pages(m, "finance")).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)", "General ledger"]);
     expect(pages(m, "admin")).toEqual(["Company settings", "Sales & quotations", "Reminders", "Emails", "Order checklist", "Document templates", "Users", "Roles", "Sessions", "Sign-ins"]);
   });
 
@@ -113,20 +113,23 @@ describe("the modules", () => {
 
   it("hide the pages a person may not open, and a module with none left", () => {
     const m = staff();
-    expect(titles(m)).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments"]);
+    // Payments (its Payment requests tab) and Invoices are open to everyone who sees orders.
+    expect(titles(m)).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments", "Finance & general ledger"]);
+    expect(pages(m, "finance")).toEqual(["Invoices"]);
     expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines"]);
     expect(pages(m, "partners")).toEqual(["Customers"]);
     // Staff who send money for approval see their payments and the queue.
     expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue"]);
     // No verification queue for someone who neither verifies nor sends money for it.
     const none = buildModules({ can: () => false, feature: () => true, approvals: null, approves: false, companyAddresses: false });
-    expect(titles(none)).toEqual(["Overview", "Partners & CRM", "Operations & trading"]);
+    expect(titles(none)).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments", "Finance & general ledger"]);
+    expect(pages(none, "treasury")).toEqual(["Payments"]);
   });
 
   it("follow the plan: no vault, costs, reports or audit log when the plan leaves them out", () => {
     const m = buildModules({ can: () => true, feature: (f) => !["cash_book", "expenses", "insights", "audit_log"].includes(f), approvals: 0, approves: true, companyAddresses: false });
     expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue"]);
-    expect(pages(m, "finance")).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
+    expect(pages(m, "finance")).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)", "General ledger"]);
     expect(titles(m)).not.toContain("Revenue & profitability");
     expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines"]);
   });
@@ -139,7 +142,7 @@ describe("the modules", () => {
     expect(pages(m, "admin")).toEqual(["Users"]);
     // A recorder without expenses: receivables and payables, no money reports (they need expenses.manage).
     const recorder = buildModules({ can: (p) => ["sourcing.manage", "payments.record", "reports.view"].includes(p), feature: () => true, approvals: 0, approves: true, companyAddresses: false });
-    expect(pages(recorder, "finance")).toEqual(["Receivables (AR)", "Payables (AP)"]);
+    expect(pages(recorder, "finance")).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)"]);
     expect(pages(recorder, "revenue")).toBeUndefined();
   });
 
@@ -222,23 +225,23 @@ describe("the module menus", () => {
     const m = screen.getByRole("menu", { name: "Finance & general ledger" });
     expect(finance.getAttribute("aria-controls")).toBe(m.id);
     const items = within(m).getAllByRole("menuitem");
-    expect(items.map((a) => a.textContent)).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);
-    expect(items[2]!.getAttribute("aria-current")).toBe("page");
+    expect(items.map((a) => a.textContent)).toEqual(["Invoices", "Receivables (AR)", "Payables (AP)", "General ledger"]);
+    expect(items[3]!.getAttribute("aria-current")).toBe("page");
     fireEvent.keyDown(finance, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(items[0]!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(items[1]!, { key: "ArrowUp" });
     fireEvent.keyDown(items[0]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(items[2]);
-    fireEvent.keyDown(items[2]!, { key: "Home" });
+    expect(document.activeElement).toBe(items[3]);
+    fireEvent.keyDown(items[3]!, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
     fireEvent.keyDown(document.activeElement!, { key: "Escape" });
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(finance);
     expect(finance.getAttribute("aria-expanded")).toBe("false");
     fireEvent.keyDown(finance, { key: "Enter" });
-    expect(document.activeElement?.textContent).toBe("Receivables (AR)");
+    expect(document.activeElement?.textContent).toBe("Invoices");
   });
 
   it("Tab in a menu closes it and moves on to the next module", () => {
@@ -266,7 +269,7 @@ describe("the phone drawer", () => {
     shell(staff());
     fireEvent.click(screen.getAllByRole("button", { name: /Open menu|Menu/ })[0]!);
     const drawer = within(screen.getByRole("complementary", { name: "Menu" }));
-    expect(drawer.getAllByRole("button", { expanded: false }).map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments"]);
+    expect(drawer.getAllByRole("button", { expanded: false }).map((b) => b.textContent?.replace(/\d+/g, ""))).toEqual(["Overview", "Partners & CRM", "Operations & trading", "Treasury & payments", "Finance & general ledger"]);
     for (const b of drawer.getAllByRole("button", { expanded: false })) expect(b.className).toContain("min-h-11");
     expect(drawer.getByRole("link", { name: "Dashboard" }).className).toContain("min-h-11");
     fireEvent.click(drawer.getByRole("button", { name: /^Partners/ }));
