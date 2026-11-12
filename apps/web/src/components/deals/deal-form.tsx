@@ -15,7 +15,6 @@ import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/a
 import { CustomerPicker } from "./customer-picker";
 import { send, type Staged } from "./documents-panel";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
-import { NewItems, blankItem } from "./new-items";
 import { LineTable, type LineColumn } from "@/components/lines/line-table";
 import { localLineHandlers } from "@/components/lines/local-lines";
 import { rowKey } from "./form-bits";
@@ -204,7 +203,8 @@ export function DealForm({
 
   const create = mode === "create";
   /** The item table is open: a new inquiry starts without one ("Add items now"). */
-  const listing = !create || v.items.length > 0;
+  const [itemsOpen, setItemsOpen] = useState(false);
+  const listing = !create || v.items.length > 0 || itemsOpen;
   const required = !v.items.length;
   const footer = (
     <div className="flex flex-wrap items-center gap-2.5">
@@ -398,13 +398,25 @@ export function DealForm({
                 <CardHeader title={<TitleSub title="Items" sub={listing ? "a part (1.1) belongs to its main item" : "optional"} />} />
                 <CardBody>
                   {listing ? (
-                    <NewItems items={v.items} onChange={(items) => set("items", items)} currency={currency} error={s.errors?.items?.[0]} />
+                    <LineTable
+                      rows={v.items.map((it) => ({
+                        key: it.key,
+                        parentKey: it.parentKey,
+                        values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
+                      }))}
+                      columns={ITEM_COLUMNS}
+                      noun="item"
+                      sheet={{ name: "Customer items", upload: itemsFromExcel }}
+                      error={s.errors?.items?.[0]}
+                      empty="Type the first item below, or paste the customer's list from Excel."
+                      {...itemHandlers}
+                    />
                   ) : (
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm text-text-2">
                         <strong className="text-text">No item list yet.</strong> That is fine: the items come from the factory offers.
                       </p>
-                      <Button size="sm" variant="secondary" onClick={() => set("items", [blankItem()])}>
+                      <Button size="sm" variant="secondary" onClick={() => setItemsOpen(true)}>
                         <Plus aria-hidden /> Add items now
                       </Button>
                     </div>
