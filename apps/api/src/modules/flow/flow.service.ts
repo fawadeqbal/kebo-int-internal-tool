@@ -48,7 +48,7 @@ import {
   type SendPurchaseOrderInput,
 } from "@kebo/shared";
 import { fromMinor } from "@kebo/money";
-import { addDays, dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { setPaymentTerms } from "../orders/payment-terms";
 import { AuditService } from "../../common/audit/audit.service";
@@ -861,12 +861,38 @@ export class FlowService {
 
   /* ---------------------------------------------------------------- shipping */
 
+  /**
+   * The order's checks: what looks out of order in a save. A screen that can ask (`ask`) gets 409 "confirm"
+   * with what was seen; sent again with `confirm` and why, it is saved and the history keeps the exception.
+   * Returns the words for the history (" (went ahead: …)"), empty when nothing was out of order.
+   */
+  private checked(seen: string[], input: { ask?: boolean; confirm?: boolean; reason?: string }): string {
+    if (!seen.length || (!input.ask && !input.confirm)) return "";
+    if (!input.confirm) throw new GateError(seen.join(" "), "confirm");
+    if (!input.reason?.trim()) throw new DomainError("Say why it is saved anyway.");
+    return ` (went ahead: ${seen.join(" ")} Why: ${input.reason.trim()})`;
+  }
+
+  /** A shipment's dates against each other and the order's ship-by date. */
+  private shipmentSeen(next: { departedOn?: string | null; arrivedOn?: string | null }, shipBy: string | null, changed: { departedOn: boolean; arrivedOn: boolean }): string[] {
+    const seen: string[] = [];
+    if ((changed.arrivedOn || changed.departedOn) && next.arrivedOn && next.departedOn && next.arrivedOn < next.departedOn)
+      seen.push(`It arrived on ${next.arrivedOn}, before it sailed on ${next.departedOn}.`);
+    if (changed.departedOn && next.departedOn && shipBy && next.departedOn > shipBy) {
+      const days = Math.round((Date.parse(next.departedOn) - Date.parse(shipBy)) / 86_400_000);
+      seen.push(`It sails ${days} day${days === 1 ? "" : "s"} after the ship-by date (${shipBy}).`);
+    }
+    return seen;
+  }
+
   async addShipment(user: SessionUser, id: string, input: ShipmentInput) {
     await this.must(user, "shipping.manage", "shipping", "manage shipping");
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
       // Ports not sent: from the order's terms (E/F terms load at the Incoterm place, C/D terms discharge there).
       const ports = portsOf(o);
+      const order = await tx.order.findUniqueOrThrow({ where: { id }, select: { shipBy: true } });
+      const went = this.checked(this.shipmentSeen(input, fromDbDateOrNull(order.shipBy), { departedOn: !!input.departedOn, arrivedOn: !!input.arrivedOn }), input);
       const s = await tx.shipment.create({
         data: {
           orderId: id,
@@ -880,7 +906,7 @@ export class FlowService {
         user,
         id,
         "shipment",
-        `${o.refNo}: shipment added (${input.mode}${input.blNo ? `, B/L ${input.blNo}` : ""})`,
+        `${o.refNo}: shipment added (${input.mode}${input.blNo ? `, B/L ${input.blNo}` : ""})${went}`,
         undefined,
         { shipmentId: s.id, ...input },
       );
@@ -899,13 +925,22 @@ export class FlowService {
       const next = { etd: fromDbDateOrNull(before.etd), eta: fromDbDateOrNull(before.eta), ...input };
       if (next.etd && next.eta && next.eta < next.etd)
         throw new DomainError("The arrival date (ETA) cannot be before the departure date (ETD).");
+      const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { shipBy: true } });
+      const was = { departedOn: fromDbDateOrNull(before.departedOn), arrivedOn: fromDbDateOrNull(before.arrivedOn) };
+      const went = this.checked(
+        this.shipmentSeen({ ...was, ...input }, fromDbDateOrNull(order.shipBy), {
+          departedOn: input.departedOn !== undefined && input.departedOn !== was.departedOn,
+          arrivedOn: input.arrivedOn !== undefined && input.arrivedOn !== was.arrivedOn,
+        }),
+        input,
+      );
       await tx.shipment.update({ where: { id: shipmentId }, data: this.shipmentData(input) });
       await this.log(
         tx,
         user,
         orderId,
         "shipment",
-        `${o.refNo}: shipment changed${input.status ? ` (${input.status})` : ""}`,
+        `${o.refNo}: shipment changed${input.status ? ` (${input.status})` : ""}${went}`,
         { status: before.status, blNo: before.blNo },
         input,
       );
@@ -1198,6 +1233,17 @@ export class FlowService {
       const delivered = input.deliveredOn !== undefined ? input.deliveredOn : fromDbDateOrNull(was?.deliveredOn);
       const satDone = input.satDoneOn !== undefined ? input.satDoneOn : fromDbDateOrNull(was?.satDoneOn);
       if (satDone && !delivered) throw new DomainError("Record the delivery before signing off the SAT.");
+      // Delivered while the goods are, by the shipments, still on the way (or before they arrived): ask first.
+      const seen: string[] = [];
+      if (input.deliveredOn && input.deliveredOn !== fromDbDateOrNull(was?.deliveredOn)) {
+        const ships = await tx.shipment.findMany({ where: { orderId: id }, select: { arrivedOn: true, departedOn: true, eta: true } });
+        const arrived = ships.map((x) => fromDbDateOrNull(x.arrivedOn)).filter((x): x is string => !!x).sort();
+        if (ships.length && arrived.length < ships.length) {
+          const eta = ships.map((x) => fromDbDateOrNull(x.eta)).filter((x): x is string => !!x).sort().at(-1);
+          seen.push(`Delivered on ${input.deliveredOn}, but the shipment has not arrived yet${eta ? ` (expected ${eta})` : ""}.`);
+        } else if (arrived.length && input.deliveredOn < arrived.at(-1)!) seen.push(`Delivered on ${input.deliveredOn}, before the shipment arrived on ${arrived.at(-1)}.`);
+      }
+      const went = this.checked(seen, input);
       if (satDone && delivered && satDone < delivered) throw new DomainError("The SAT cannot be signed off before the delivery.");
       if (satDone && input.satDoneOn) {
         const failed = await tx.satCheck.count({ where: { orderId: id, result: { in: ["fail", "pending"] } } });
@@ -1224,7 +1270,7 @@ export class FlowService {
         user,
         id,
         "delivery",
-        `${o.refNo}: ${what}`,
+        `${o.refNo}: ${what}${went}`,
         { deliveredOn: fromDbDateOrNull(was?.deliveredOn), satDoneOn: fromDbDateOrNull(was?.satDoneOn) },
         input,
       );

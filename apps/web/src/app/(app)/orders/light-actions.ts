@@ -56,6 +56,12 @@ const DETAILS = ["shipBy", "readyOn", "shippedOn", "blNo", "portOfDischarge", "c
 /** A factory's own ready date field on the Factory card: "readyOn__<factory id>". */
 const READY_OF = "readyOn__";
 
+/** What a form says about the order's checks: it can ask (`ask`), or the person went ahead (`confirm`, with why). */
+const ahead = (v: Record<string, string>) => ({
+  ...(v.ask === "true" ? { ask: true } : {}),
+  ...(v.confirm === "true" ? { confirm: true, reason: v.reason?.trim() || undefined } : {}),
+});
+
 const pick = (v: Record<string, string>, keys: string[]) => Object.fromEntries(keys.filter((k) => k in v).map((k) => [k, v[k]]));
 
 /** A shipment only moves forward: planned → booked → loaded → departed → arrived (cleared stays). */
@@ -78,7 +84,7 @@ async function flowOf(orderId: string) {
 
 /** Saves a shipment's fields (a new one's ports, when not typed, come from the order's terms: the API fills them), moving its status on with them. */
 async function saveShipment(orderId: string, shipmentId: string | null, v: Record<string, string>, status?: ShipmentStatus) {
-  const body: Record<string, unknown> = pick(v, SHIPMENT);
+  const body: Record<string, unknown> = { ...pick(v, SHIPMENT), ...ahead(v) };
   let current: ShipmentView | undefined;
   if (shipmentId) current = (await flowOf(orderId)).shipping?.shipments.find((s) => s.id === shipmentId);
   const next = status ? forward(current?.status, status) : impliedStatus(current?.status, v);
@@ -135,7 +141,7 @@ export async function fieldsAction(orderId: string, target: string, _prev: Actio
         case "order":
           return api.patch(`/orders/${orderId}/details`, { ...pick(v, DETAILS), reason: reasonOf(form) });
         case "delivery":
-          return api.patch(`/orders/${orderId}/delivery`, pick(v, DELIVERY));
+          return api.patch(`/orders/${orderId}/delivery`, { ...pick(v, DELIVERY), ...ahead(v) });
         default:
           throw new Error(`Unknown card ${target}`);
       }

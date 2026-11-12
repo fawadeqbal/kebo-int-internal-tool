@@ -152,6 +152,12 @@ const shipmentFields = {
   customsDeclarationNo: optionalText(60),
   clearedOn: optionalDate,
 };
+/**
+ * A save that looks out of order (delivered before it arrived, sailing after the ship-by date) asks first:
+ * `ask` says the screen can ask (the API answers 409 "confirm" with what it saw), `confirm` goes ahead, with why.
+ */
+const goAhead = { ask: z.boolean().optional(), confirm: z.boolean().optional(), reason: z.string().trim().max(500).optional() };
+
 const etaAfterEtd = (v: { etd?: string | null; eta?: string | null }) => !v.etd || !v.eta || v.eta >= v.etd;
 const etaMessage = { message: "The arrival date (ETA) cannot be before the departure date (ETD)", path: ["eta"] };
 
@@ -170,12 +176,16 @@ export const shipmentInput = z
     /** Not sent: from the order's terms (portsOf: E/F terms load at the Incoterm place, C/D terms discharge there). Empty: none. */
     portOfLoading: shipmentFields.portOfLoading.optional(),
     portOfDischarge: shipmentFields.portOfDischarge.optional(),
+    ...goAhead,
   })
   .refine(etaAfterEtd, etaMessage);
 export type ShipmentInput = z.infer<typeof shipmentInput>;
 
 export const shipmentUpdateInput = z
-  .object(Object.fromEntries(Object.entries(shipmentFields).map(([k, v]) => [k, v.optional()])) as { [K in keyof typeof shipmentFields]: z.ZodOptional<(typeof shipmentFields)[K]> })
+  .object({
+    ...(Object.fromEntries(Object.entries(shipmentFields).map(([k, v]) => [k, v.optional()])) as { [K in keyof typeof shipmentFields]: z.ZodOptional<(typeof shipmentFields)[K]> }),
+    ...goAhead,
+  })
   .refine(etaAfterEtd, etaMessage);
 export type ShipmentUpdateInput = z.infer<typeof shipmentUpdateInput>;
 
@@ -228,6 +238,7 @@ export const deliveryInput = z.object({
   warrantyMonths: maybe(
     z.preprocess((v) => (v === "" || v === null ? null : v), z.coerce.number().int("Whole months").min(0).max(240).nullable()),
   ),
+  ...goAhead,
 });
 export type DeliveryInput = z.infer<typeof deliveryInput>;
 

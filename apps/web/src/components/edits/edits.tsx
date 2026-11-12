@@ -97,7 +97,13 @@ export function ReasonDialog({
   busy,
   onCancel,
   onSave,
+  sub = "Your reason is kept with this edit, in the record's history.",
+  saveLabel = "Save changes",
+  cancelLabel = "Back to editing",
 }: {
+  sub?: string;
+  saveLabel?: string;
+  cancelLabel?: string;
   title?: string;
   n?: number;
   /** The server's own words when it asked (e.g. a quotation is priced from these lines). */
@@ -119,22 +125,22 @@ export function ReasonDialog({
           {n ? <span className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn">Edit {n}</span> : null}
         </span>
       }
-      sub="Your reason is kept with this edit, in the record's history."
+      sub={sub}
       onClose={onCancel}
       busy={busy}
       footer={
         <>
           <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
-            Back to editing
+            {cancelLabel}
           </Button>
           <Button type="button" disabled={!reason || busy} onClick={() => onSave(reason)}>
-            {busy ? "Saving…" : "Save changes"}
+            {busy ? "Saving…" : saveLabel}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        {note && <p className="rounded-lg bg-info-soft px-3 py-2 text-sm">{note}</p>}
+        {note && <p className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm leading-relaxed">{note}</p>}
         {changes.length > 0 && (
           <ul className="flex max-h-56 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line text-[13px]">
             {changes.map((c, i) => (
