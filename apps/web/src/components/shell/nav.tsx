@@ -158,7 +158,7 @@ function ThemeMenu() {
   return (
     <Menu
       label="Theme"
-      trigger={<span className={buttonClass("ghost", "icon-sm")}>{dark ? <Moon aria-hidden /> : <Sun aria-hidden />}</span>}
+      trigger={<span className={cn(buttonClass("ghost", "icon"), "size-[42px]")}>{dark ? <Moon aria-hidden /> : <Sun aria-hidden />}</span>}
     >
       {options.map(([m, label, Icon]) => (
         <button
@@ -185,11 +185,11 @@ function AccountMenu({ user }: { user: { name: string; email: string; role: stri
       label="Account"
       className="w-60"
       trigger={
-        <span className="flex items-center gap-2.5 rounded-full lg:py-1 lg:pr-2 lg:pl-1 lg:hover:bg-surface-2">
-          <Avatar name={user.name} size={34} />
+        <span className="flex items-center gap-2.5 rounded-xl lg:py-1 lg:pr-2 lg:pl-1 lg:hover:bg-surface-2">
+          <Avatar name={user.name} size={36} className="font-bold" />
           <span className="hidden text-left leading-tight lg:block">
             <span className="block max-w-36 truncate text-sm font-semibold text-text">{user.name}</span>
-            <span className="block max-w-36 truncate text-[11px] text-muted">{user.role}</span>
+            <span className="block max-w-36 truncate text-xs text-muted">{user.role}</span>
           </span>
         </span>
       }
@@ -483,15 +483,14 @@ function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean;
           onClick={show}
           onKeyDown={onButtonKey}
           className={cn(
-            "relative flex h-[58px] min-w-[76px] flex-col items-center justify-center gap-1 rounded-t-xl px-2.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+            "relative flex min-w-[104px] flex-col items-center gap-1 rounded-t-xl border-b-[3px] border-transparent px-2.5 pt-2.5 pb-2 text-[13px] font-medium whitespace-nowrap text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
             open && "bg-surface-2 text-text",
-            current && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
+            current && "border-primary-solid bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
           )}
         >
-          <Icon className="size-5" strokeWidth={current ? 2.25 : 1.85} aria-hidden />
+          <Icon className="size-5" strokeWidth={2} aria-hidden />
           <span>{m.short}</span>
-          {total > 0 && <span className="absolute top-2 right-3 size-2 rounded-full bg-action-solid ring-2 ring-surface" aria-hidden />}
-          {current && <span className="absolute inset-x-2 bottom-0 h-[3px] rounded-full bg-primary-solid" aria-hidden />}
+          {total > 0 && <span className="absolute top-2 right-6 size-2 rounded-full bg-action-solid ring-2 ring-surface" aria-hidden />}
         </button>
         {open && pos && (
           <div
@@ -540,57 +539,24 @@ function TopMenu({ modules }: { modules: NavModule[] }) {
   const home = isActive(pathname, HOME_HREF);
   return (
     <nav aria-label="Main" className="no-print hidden border-b border-line bg-surface md:block">
-      <ul className="mx-auto flex max-w-[1440px] items-end gap-1 overflow-x-auto px-4 pt-1.5 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+      <ul className="mx-auto flex max-w-[1440px] items-end gap-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <li className="flex">
           <Link
             href={HOME_HREF}
             data-module-item
             aria-current={home ? "page" : undefined}
             className={cn(
-              "relative flex h-[58px] min-w-[76px] flex-col items-center justify-center gap-1 rounded-t-xl px-2.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
-              home && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
+              "relative flex min-w-[104px] flex-col items-center gap-1 rounded-t-xl border-b-[3px] border-transparent px-2.5 pt-2.5 pb-2 text-[13px] font-medium whitespace-nowrap text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+              home && "border-primary-solid bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
             )}
           >
-            <House className="size-5" strokeWidth={home ? 2.25 : 1.85} aria-hidden />
+            <House className="size-5" strokeWidth={2} aria-hidden />
             <span>Dashboard</span>
-            {home && <span className="absolute inset-x-2 bottom-0 h-[3px] rounded-full bg-primary-solid" aria-hidden />}
           </Link>
         </li>
         {modules.map((m) => (
           <TopModule key={m.key} m={m} current={m.key === current} activeHref={activeHref} />
         ))}
-      </ul>
-    </nav>
-  );
-}
-
-/** The pages of the module the person is in, as chips under the menu: one tap to the module's other pages. */
-function ModulePages({ modules }: { modules: NavModule[] }) {
-  const pathname = usePathname();
-  const current = modules.find((m) => m.key === moduleOf(pathname, modules));
-  if (!current || current.pages.length < 2) return null;
-  const activeHref = pageOf(pathname, current.pages)?.href;
-  return (
-    <nav aria-label={`${current.title} pages`} className="no-print border-b border-line bg-surface/70">
-      <ul className="mx-auto flex max-w-[1440px] items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
-        {current.pages.map((p) => {
-          const active = p.href === activeHref;
-          return (
-            <li key={p.href} className="shrink-0">
-              <Link
-                href={p.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors",
-                  active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
-                )}
-              >
-                {p.label}
-                {!!p.badge && <Count n={p.badge} label={p.badgeLabel ?? "unread"} />}
-              </Link>
-            </li>
-          );
-        })}
       </ul>
     </nav>
   );
@@ -738,18 +704,18 @@ export function AppShell({
 
       <div className="no-print sticky top-0 z-30">
         <header className="border-b border-line bg-surface">
-          <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-4 sm:px-6">
+          <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-2.5 sm:px-6">
             <button type="button" className={cn(buttonClass("ghost", "icon"), "-ml-2 md:hidden")} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
               <MenuIcon aria-hidden />
             </button>
-            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg" aria-label={`${companyName}, dashboard`}>
+            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg md:min-w-[220px]" aria-label={`Kebo ERP, ${companyName}, dashboard`}>
               <Logo companyName={companyName} logo={logo} />
-              <span className="hidden min-w-0 leading-tight sm:block">
-                <span className="block max-w-56 truncate text-[15px] font-bold text-text">{companyName}</span>
-                <span className="block text-[11px] font-medium text-muted">Kebo ERP</span>
+              <span className="hidden min-w-0 flex-col leading-tight sm:flex">
+                <span className="text-[17px] font-bold text-text">Kebo ERP</span>
+                <span className="max-w-56 truncate text-xs text-muted">{companyName}</span>
               </span>
             </Link>
-            <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative mx-auto hidden w-full max-w-md md:block">
+            <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative mx-auto hidden max-w-[560px] flex-[1_1_320px] md:block">
               <label htmlFor="global-search" className="sr-only">
                 Search inquiries
               </label>
@@ -759,27 +725,22 @@ export function AppShell({
                 name="q"
                 type="search"
                 placeholder="Search inquiries, customers, numbers…"
-                className="h-10 w-full rounded-full border border-line bg-surface-2 pr-10 pl-10 text-sm text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
+                className="h-[42px] w-full rounded-xl border border-line-strong bg-[#f8faf9] pr-12 pl-10 text-sm text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none dark:bg-surface-2"
               />
               <input type="hidden" name="status" value="all" />
               <span className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 lg:inline-flex">
                 <Kbd>/</Kbd>
               </span>
             </form>
-            <div className="ml-auto flex items-center gap-1.5 md:ml-0">
-              {canCreate && (
-                <Link href="/inquiries/new" className={cn(buttonClass("primary", "md"), "mr-1 hidden lg:inline-flex")} title="New inquiry (N)">
-                  <Plus aria-hidden /> New inquiry
-                </Link>
-              )}
+            <div className="ml-auto flex items-center gap-2 md:ml-0">
               <Link href="/inquiries" className={cn(buttonClass("ghost", "icon"), "md:hidden")} aria-label="Search inquiries">
                 <Search aria-hidden />
               </Link>
               <ThemeMenu />
-              <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative")} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
+              <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative size-[42px]")} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
                 <Bell aria-hidden />
                 {!!unread && (
-                  <span className="absolute top-1 right-0.5 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-[10px] leading-[18px] font-bold text-white ring-2 ring-surface" aria-hidden>
+                  <span className="absolute top-1 right-0.5 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-[10px] leading-[18px] font-bold text-white" aria-hidden>
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
@@ -790,10 +751,10 @@ export function AppShell({
         </header>
         <TopMenu modules={modules} />
       </div>
-      <ModulePages modules={modules} />
 
-      <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-5 pb-28 sm:px-6 md:pb-10">
+      <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-[18px] pb-28 sm:px-6 md:pb-10">
         {children}
+        <p className="no-print mt-6 text-xs text-muted">© {new Date().getFullYear()} Kebo ERP · {companyName}</p>
       </main>
 
       {/* Phone: bottom tab bar, thumb-reachable, with the main action in the middle */}

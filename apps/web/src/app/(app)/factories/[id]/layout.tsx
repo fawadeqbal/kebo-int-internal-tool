@@ -1,9 +1,8 @@
-import { BookOpen, Coins, Eye, Factory, MessageSquareReply, Package, Search, StickyNote, Tag, Wallet } from "lucide-react";
+import { BookOpen, Coins, Eye, Factory, Package, Search, StickyNote, Tag } from "lucide-react";
 import { can } from "@kebo/shared";
-import { ButtonLink, PageHeader, StatRow, StatTile, StatusBadge, type StatusMeaning } from "@kebo/ui";
+import { ButtonLink, PageHeader, StatusBadge, type StatusMeaning } from "@kebo/ui";
 import { requirePermission, hasFeature } from "@/lib/session";
-import { factoryOf, factoryPayablesOf, partyNotesOf } from "@/lib/party-data";
-import { date, money, plural } from "@/lib/format";
+import { factoryOf, partyNotesOf } from "@/lib/party-data";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { removeFactoryAction } from "../actions";
@@ -17,9 +16,8 @@ import { removeFactoryAction } from "../actions";
 export default async function FactoryLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requirePermission("sourcing.manage");
-  const [f, payables, notes, managers] = await Promise.all([
+  const [f, notes, managers] = await Promise.all([
     factoryOf(id),
-    factoryPayablesOf(id),
     partyNotesOf("factories", id),
     can(me, "expenses.manage") ? hasFeature("expenses") : false,
   ]);
@@ -30,8 +28,6 @@ export default async function FactoryLayout({ children, params }: { children: Re
     : r.openOrders.length
       ? { meaning: "info", label: "Making for us" }
       : { meaning: "neutral", label: f.quotes.length ? "No open order" : "Not quoted yet" };
-  const toPay = payables.filter((p) => Number(p.toPay) > 0.005);
-  const answered = r.asked ? Math.round((r.answered / r.asked) * 100) : null;
 
   const ledger = can(me, "ledger.view") ? `/finance/ledger/factories/${f.id}` : null;
   const more: MenuEntry[] = [
@@ -82,34 +78,9 @@ export default async function FactoryLayout({ children, params }: { children: Re
         more={<MoreMenu items={more} label={`More for ${f.name}`} />}
       />
 
-      <StatRow className="mt-1">
-        <StatTile
-          icon={Wallet}
-          iconColor={2}
-          label="Payable"
-          value={toPay.length ? toPay.map((p) => money(p.toPay, p.currency)).join(" · ") : "Nothing to pay"}
-          sub={toPay.length ? `on ${plural(toPay.reduce((n, p) => n + p.orders.length, 0), "order")}` : "paid up"}
-        />
-        <StatTile
-          icon={Package}
-          iconColor={3}
-          label="Making for us now"
-          value={r.openOrders.length}
-          sub={r.lateSteps ? `${plural(r.lateSteps, "production step")} late` : "open orders"}
-          tone={r.lateSteps ? "bad" : undefined}
-        />
-        <StatTile
-          icon={MessageSquareReply}
-          iconColor={1}
-          label="Answers when asked"
-          value={answered === null ? "—" : `${answered}%`}
-          sub={r.asked ? `${r.answered} of ${r.asked}${r.avgDaysToAnswer !== null ? ` · ${r.avgDaysToAnswer} days on average` : ""}` : "not asked yet"}
-          tone={answered !== null && answered < 50 ? "bad" : undefined}
-        />
-        <StatTile icon={Tag} iconColor={4} label="Price offers" value={f.quotes.length} sub={f.quotes[0] ? `last ${date(f.quotes[0].receivedOn)}` : "none yet"} />
-      </StatRow>
 
       <RecordTabs
+        className="mt-0"
         base={base}
         label="The supplier"
         tabs={[

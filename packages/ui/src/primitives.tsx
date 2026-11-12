@@ -39,8 +39,8 @@ const buttonVariants: Record<ButtonVariant, string> = {
 };
 const buttonSizes: Record<ButtonSize, string> = {
   xs: "h-7 rounded-lg px-2 text-xs [&_svg]:size-3.5",
-  sm: "h-8 px-3",
-  md: "h-10 px-4",
+  sm: "h-9 px-3 text-[13px]",
+  md: "h-10 px-3.5",
   lg: "h-11 px-5",
   icon: "size-10",
   "icon-sm": "size-9",
@@ -163,15 +163,15 @@ export function Field({
 
 /* ---------------------------------------------------------------- Card */
 export function Card({ className, ...props }: ComponentProps<"section">) {
-  return <section className={cn("rounded-2xl border border-line bg-surface shadow-card", className)} {...props} />;
+  return <section className={cn("rounded-2xl border border-line bg-surface", className)} {...props} />;
 }
 
 export function CardHeader({ title, description, actions, className }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; className?: string }) {
   return (
     // With a description and actions, a phone puts the actions under the text instead of squeezing it.
-    <div className={cn("flex items-start justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5", description && actions && "max-sm:flex-col max-sm:gap-2", className)}>
+    <div className={cn("flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5", description && actions && "max-sm:flex-col max-sm:items-start max-sm:gap-2", className)}>
       <div className="min-w-0">
-        <h2 className="text-[15px] font-bold text-text">{title}</h2>
+        <h2 className="text-base font-bold text-text">{title}</h2>
         {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
@@ -261,7 +261,7 @@ export function PageHeader({
   const Icon = icon === null ? null : (icon ?? (crumbs?.[0] ? MODULE_ICONS[crumbs[0].label] : undefined));
   const trail = crumbs && crumbs.length > 0 ? (crumbs[0]!.label === "Dashboard" ? crumbs : [{ label: "Dashboard", href: "/dashboard" }, ...crumbs]) : null;
   return (
-    <header className="mb-5">
+    <header className="mb-4">
       {trail && <Breadcrumb items={trail} />}
       {backHref && (
         <Link href={backHref} className="mb-1 inline-flex min-h-7 items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover">
@@ -271,17 +271,17 @@ export function PageHeader({
       <div className={cn("flex items-start justify-between gap-3", framed ? "sm:flex-wrap" : "flex-wrap", phoneStack && "max-sm:flex-col")}>
         <div className={cn("flex min-w-0 items-start gap-3", framed ? "flex-1 sm:flex-[1_1_18rem]" : "flex-[1_1_18rem]")}>
           {Icon && (
-            <span data-slot="page-icon" className="mt-0.5 hidden size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary sm:grid" aria-hidden>
+            <span data-slot="page-icon" className="mt-0.5 hidden size-11 shrink-0 place-items-center rounded-xl bg-primary-solid text-white sm:grid" aria-hidden>
               <Icon className="size-[22px]" strokeWidth={2} />
             </span>
           )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <h1 className={cn("font-bold tracking-tight text-text", framed ? "text-[22px] leading-7 sm:text-2xl" : "text-2xl leading-8 sm:text-[28px] sm:leading-9")}>{title}</h1>
+              <h1 className={cn("font-bold text-text", framed ? "text-[22px] leading-7 sm:text-[26px] sm:leading-8" : "text-2xl leading-8 sm:text-[26px] sm:leading-8")}>{title}</h1>
               {badge}
             </div>
-            {summary && <div className="mt-1 text-sm text-text-2">{summary}</div>}
-            {description && <div className="mt-1 max-w-2xl text-sm text-muted">{description}</div>}
+            {summary && <div className="mt-0.5 text-[13px] text-muted">{summary}</div>}
+            {description && <div className="mt-0.5 max-w-2xl text-[13px] text-muted">{description}</div>}
           </div>
         </div>
         {/* Papers first, then the one primary, then ⋯: always top right. */}
@@ -307,23 +307,23 @@ export function PageHeader({
 /** "Dashboard / Finance / Cash book" above a page's title: where it is in the menu. The last part is this page. */
 export function Breadcrumb({ items, className }: { items: { label: string; href?: string }[]; className?: string }) {
   return (
-    <nav aria-label="Breadcrumb" className={cn("mb-1.5 text-[13px] text-muted", className)}>
+    <nav aria-label="Breadcrumb" className={cn("mb-2 text-xs font-medium text-muted", className)}>
       <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((c, i) => {
           const last = i === items.length - 1;
           return (
             <li key={`${c.label}-${i}`} className="flex items-center gap-1.5">
               {i > 0 && (
-                <span aria-hidden="true" className="text-line-strong">
+                <span aria-hidden="true" className="text-muted">
                   /
                 </span>
               )}
               {c.href && !last ? (
-                <Link href={c.href} className="font-medium text-primary hover:text-primary-hover hover:underline">
+                <Link href={c.href} className="text-primary hover:text-primary-hover hover:underline">
                   {c.label}
                 </Link>
               ) : (
-                <span className={cn(last ? "text-text-2" : "font-medium text-primary")} aria-current={last ? "page" : undefined}>
+                <span className={cn(last ? "text-muted" : "text-primary")} aria-current={last ? "page" : undefined}>
                   {c.label}
                 </span>
               )}
@@ -411,20 +411,20 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
     <ScrollFade className="w-full overflow-x-auto focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
-      <table className={cn("w-full border-collapse text-sm", className)} {...props} />
+      <table className={cn("w-full border-collapse text-[13px]", className)} {...props} />
     </ScrollFade>
   );
 }
 export function THead({ className, ...props }: ComponentProps<"thead">) {
-  return <thead className={cn("bg-surface-2/70", className)} {...props} />;
+  return <thead className={cn("bg-[#f8faf9] dark:bg-surface-2", className)} {...props} />;
 }
 export function Th({ className, ...props }: ComponentProps<"th">) {
   // relative: a hidden (sr-only) name inside is placed in its cell, so a table that scrolls
   // sideways keeps it in its box instead of widening the page.
-  return <th scope="col" className={cn("relative h-10 border-b border-line px-3 text-left text-xs font-semibold whitespace-nowrap text-muted first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5", className)} {...props} />;
+  return <th scope="col" className={cn("relative h-[42px] border-b border-line px-3.5 text-left text-[13px] font-semibold whitespace-nowrap text-muted", className)} {...props} />;
 }
 export function Td({ className, ...props }: ComponentProps<"td">) {
-  return <td className={cn("h-13 border-b border-line px-3 align-middle text-text first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5", className)} {...props} />;
+  return <td className={cn("h-[52px] border-b border-line px-3.5 py-3 align-middle text-text", className)} {...props} />;
 }
 export function Tr({ className, ...props }: ComponentProps<"tr">) {
   return <tr className={cn("transition-colors last:[&>td]:border-b-0", className)} {...props} />;
@@ -557,6 +557,18 @@ export function Avatar({ name, size = 32, className }: { name: string; size?: nu
   );
 }
 
+/** A record's number (SO-2026-0035, RFQ-2026-0058) as the grey monospace chip of the tables; a link when given `href`. */
+export function RefCode({ children, href, className }: { children: ReactNode; href?: string; className?: string }) {
+  const cls = cn("inline-block rounded-md bg-surface-2 px-[7px] py-0.5 font-mono text-xs font-semibold whitespace-nowrap text-text-2", href && "hover:text-primary", className);
+  return href ? (
+    <Link href={href} className={cls}>
+      {children}
+    </Link>
+  ) : (
+    <span className={cls}>{children}</span>
+  );
+}
+
 export function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="inline-flex h-5 items-center rounded border border-line bg-surface-2 px-1.5 font-mono text-[11px] text-muted">{children}</kbd>;
 }
@@ -610,7 +622,7 @@ export function FilterChip({ href, active, count, pill, children }: { href: stri
       aria-current={active ? "true" : undefined}
       className={cn(
         pill
-          ? "inline-flex h-9 shrink-0 items-center gap-1 rounded-[10px] border border-line-strong bg-surface px-3 text-[13px] font-medium whitespace-nowrap text-text transition-colors hover:bg-surface-2"
+          ? "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-[13px] font-medium whitespace-nowrap text-text transition-colors hover:bg-surface-2"
           : buttonClass("secondary", "sm"),
         !pill && "h-8 gap-1 border-dashed px-2.5 text-xs",
         active &&
@@ -661,7 +673,7 @@ export function ListToolbar({
 }) {
   const name = search?.name ?? "q";
   return (
-    <div data-slot="list-toolbar" className={cn("mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-3 shadow-card", className)}>
+    <div data-slot="list-toolbar" className={cn("mb-4 flex flex-wrap items-center gap-2.5 rounded-[14px] border border-line bg-surface p-3", className)}>
       {search && (
         <form role="search" aria-label={search.label ?? "Search this list"} className="w-full sm:w-auto">
           {Object.entries(keep).map(([k, v]) => (v && k !== name && k !== "page" ? <input key={k} type="hidden" name={k} value={v} /> : null))}
@@ -683,7 +695,7 @@ export function ListToolbar({
                 </FilterChip>
               ))}
               {filters && (
-                <div className="flex shrink-0 items-center gap-1.5 [&_select]:h-9 [&_select]:rounded-[10px] [&_select]:border-line-strong [&_select]:text-[13px] [&_select]:font-medium [&_select]:shadow-none">
+                <div className="flex shrink-0 items-center gap-1.5 [&_select]:h-10 [&_select]:rounded-[10px] [&_select]:border-line-strong [&_select]:text-[13px] [&_select]:font-medium [&_select]:shadow-none">
                   {filters}
                 </div>
               )}
@@ -729,7 +741,7 @@ export function SearchField({ defaultValue, placeholder, clearHref, label = "Sea
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
       </svg>
-      <input id="search" name="q" type="search" defaultValue={defaultValue} placeholder={placeholder} className={cn(controlClass, "h-9 pr-8 pl-9 [&::-webkit-search-cancel-button]:appearance-none")} />
+      <input id="search" name="q" type="search" defaultValue={defaultValue} placeholder={placeholder} className={cn(controlClass, "h-10 pr-8 pl-9 [&::-webkit-search-cancel-button]:appearance-none")} />
       {defaultValue && clearHref && (
         <Link href={clearHref} className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-muted hover:text-text" aria-label="Clear search">
           <svg aria-hidden viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

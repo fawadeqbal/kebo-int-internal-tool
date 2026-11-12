@@ -49,7 +49,6 @@ export function StepMark({ state, number, size = "sm" }: { state: StepState; num
   );
 }
 
-const SR: Record<StepState, string> = { done: "done", now: "now", late: "late", todo: "later" };
 const WORD: Record<StepState, string> = { done: "Done", now: "Now", late: "Late", todo: "Later" };
 
 /**

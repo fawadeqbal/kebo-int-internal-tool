@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { FileText, MessageSquare, Package, Plus, Users } from "lucide-react";
+import { FileText, MessageSquare, Package, Plus, TrendingUp, Users } from "lucide-react";
+import type { OrderGroups } from "@/lib/types-facts";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
 import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
@@ -63,6 +64,18 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     // What each customer owes (managers with Insights): the "They owe" column and figures.
     insightsOn ? api.get<Owed>("/insights/facts/owed", { side: "receivable" }).catch(() => null) : null,
   ]);
+  // What each customer bought (all time) and this year's sales against last year's (Insights).
+  const year = new Date().getFullYear();
+  const [sold, soldYear, soldLastYear] = insightsOn
+    ? await Promise.all([
+        api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "customer" }).catch(() => null),
+        api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", from: `${year}-01-01`, to: `${year}-12-31` }).catch(() => null),
+        api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", from: `${year - 1}-01-01`, to: `${year - 1}-12-31` }).catch(() => null),
+      ])
+    : [null, null, null];
+  const soldBy = new Map((sold?.rows ?? []).map((r) => [r.key, r]));
+  const salesYear = (soldYear?.rows ?? []).reduce((t, r) => t + Number(r.sales), 0);
+  const salesLast = (soldLastYear?.rows ?? []).reduce((t, r) => t + Number(r.sales), 0);
   const insights = insightsOn;
   const owes = new Map((owed?.rows ?? []).map((r) => [r.partyId, r]));
   const owedTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.total), 0);
@@ -141,8 +154,27 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             href="/finance/to-receive"
           />
         )}
-        <StatTile icon={MessageSquare} iconColor={4} label="Open inquiries" value={data.rows.reduce((t, c) => t + c.openDeals, 0)} sub={data.total > data.rows.length ? "on this page" : "of these customers"} href="/inquiries" />
-        <StatTile icon={Package} iconColor={3} label="Open orders" value={data.rows.reduce((t, c) => t + c.openOrders, 0)} sub={data.total > data.rows.length ? "on this page" : "of these customers"} href="/orders" />
+        {soldYear ? (
+          <StatTile
+            icon={TrendingUp}
+            iconColor={3}
+            label="Sold this year"
+            value={money(salesYear, soldYear.currency)}
+            tone={salesLast > 0 && salesYear >= salesLast ? "ok" : undefined}
+            sub={salesLast > 0 ? `${salesYear >= salesLast ? "▲" : "▼"} ${Math.abs(Math.round(((salesYear - salesLast) / salesLast) * 100))}% vs ${year - 1}` : `${year}`}
+            href="/reports/customers"
+          />
+        ) : (
+          <StatTile icon={Package} iconColor={3} label="Open orders" value={data.rows.reduce((t, c) => t + c.openOrders, 0)} sub={data.total > data.rows.length ? "on this page" : "of these customers"} href="/orders" />
+        )}
+        <StatTile
+          icon={MessageSquare}
+          iconColor={4}
+          label="Open inquiries"
+          value={data.rows.reduce((t, c) => t + c.openDeals, 0)}
+          sub={`from ${plural(data.rows.filter((c) => c.openDeals > 0).length, "customer")}`}
+          href="/inquiries"
+        />
       </StatRow>
 
       <ListToolbar
@@ -209,7 +241,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                   <Th>Country</Th>
                   <Th>Currency</Th>
                   <Th className="text-right">Orders</Th>
-                  <Th className="text-right">Open inquiries</Th>
+                  {sold && <Th className="text-right">Sold</Th>}
                   {owed && <Th className="text-right">They owe</Th>}
                   <Th>Status</Th>
                   <Th className="w-12">
@@ -236,13 +268,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                         {c.country === UNKNOWN_COUNTRY ? <StatusBadge meaning="warn">Country not set</StatusBadge> : countryName(c.country)}
                       </Td>
                       <Td className="text-text-2">{c.defaultCurrency ?? "—"}</Td>
-                      <Td className="text-right tabular">
-                        {c.orders ? c.orders : <span className="text-muted">0</span>}
-                        {c.openOrders > 0 && <span className="block text-xs text-text-2">{c.openOrders} open</span>}
-                      </Td>
-                      <Td className="text-right tabular">{c.openDeals ? c.openDeals : <span className="text-muted">0</span>}</Td>
+                      <Td className="text-right tabular">{c.orders ? c.orders : <span className="text-muted">0</span>}</Td>
+                      {sold && (
+                        <Td className="text-right whitespace-nowrap tabular">
+                          {soldBy.has(c.id) && Number(soldBy.get(c.id)!.sales) > 0 ? money(soldBy.get(c.id)!.sales, sold.currency) : <span className="text-muted">—</span>}
+                        </Td>
+                      )}
                       {owed && (
-                        <Td className="text-right font-semibold tabular">
+                        <Td className="text-right font-bold whitespace-nowrap tabular">
                           {owes.has(c.id) ? money(owes.get(c.id)!.total, owed.currency) : <span className="font-normal text-muted">—</span>}
                         </Td>
                       )}

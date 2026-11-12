@@ -1,15 +1,15 @@
-import { BookOpen, Eye, FileText, MessageSquare, Package, Plus, StickyNote, Users, Wallet } from "lucide-react";
+import { BookOpen, Eye, MessageSquare, Package, Plus, StickyNote, Users, Wallet } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { ButtonLink, PageHeader, StatRow, StatTile, StatusBadge } from "@kebo/ui";
+import { ButtonLink, PageHeader, StatusBadge } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
-import { money, TZ } from "@/lib/format";
+import { TZ } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { removeCustomerAction } from "../actions";
-import { customerStatus, late, OPEN_STAGES, owes } from "./shared";
+import { customerStatus, late } from "./shared";
 
 /** "Mar 2025" */
 const monthOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: TZ });
@@ -31,14 +31,7 @@ export default async function CustomerLayout({ children, params }: { children: R
   const handledBy = c.inquiries.find((d) => d.assignee)?.assignee?.name;
   const base = `/customers/${c.id}`;
 
-  const openOrders = c.orders.filter((o) => o.status === "open").length;
-  const openDeals = c.inquiries.filter((d) => OPEN_STAGES.includes(d.stage)).length;
-  const won = c.inquiries.filter((d) => d.stage === "won").length;
-  const lost = c.inquiries.filter((d) => d.stage === "lost").length;
-  const dueTotals = (pay?.totals ?? []).filter((t) => Number(t.due) > 0.005);
   const lateOrders = (pay?.orders ?? []).filter((o) => late(o, today)).length;
-  const owing = (pay?.orders ?? []).filter(owes).length;
-  const held = (pay?.credit.balances ?? []).filter((b) => Number(b.amount) > 0.005);
 
   const ledger = can(me, "ledger.view") ? `/finance/ledger/customers/${c.id}` : null;
   const more: MenuEntry[] = [
@@ -101,27 +94,9 @@ export default async function CustomerLayout({ children, params }: { children: R
         more={<MoreMenu items={more} label={`More for ${c.name}`} />}
       />
 
-      <StatRow className="mt-1">
-        <StatTile
-          icon={FileText}
-          iconColor={2}
-          label="Receivable"
-          value={dueTotals.length ? dueTotals.map((t) => money(t.due, t.currency)).join(" · ") : pay ? "Nothing due" : "—"}
-          sub={lateOrders ? `${lateOrders} late` : owing ? `on ${owing} order${owing === 1 ? "" : "s"} · none late` : "paid up"}
-          tone={lateOrders ? "bad" : undefined}
-        />
-        <StatTile icon={Package} iconColor={3} label="Open orders" value={openOrders} sub={`${c.orders.length} in all`} />
-        <StatTile icon={MessageSquare} iconColor={4} label="Open inquiries" value={openDeals} sub={`${won} won · ${lost} lost`} />
-        <StatTile
-          icon={Wallet}
-          iconColor={5}
-          label="Advance held"
-          value={held.length ? held.map((b) => money(b.amount, b.currency)).join(" · ") : "—"}
-          sub={held.length ? "their money we hold" : "none"}
-        />
-      </StatRow>
 
       <RecordTabs
+        className="mt-0"
         base={base}
         label="The customer"
         tabs={[
