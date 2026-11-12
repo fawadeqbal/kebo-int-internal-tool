@@ -1,6 +1,5 @@
-import { ArrowUpRight } from "lucide-react";
 import { can } from "@kebo/shared";
-import { Card, CardBody, CardHeader } from "@kebo/ui";
+import { Card, CardBody } from "@kebo/ui";
 import { orderMoneyOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
 import { api } from "@/lib/api";
@@ -11,14 +10,14 @@ import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
 import { editsOf } from "@/lib/edit-data";
-import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
+import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { RecordPaymentLink } from "@/components/money/pay-links";
-import { FactoryPlanCard } from "@/components/money/money-v2";
+import { FactoryPlanForm } from "@/components/money/money-v2";
+import { SupplierParts, supplierPlanWords } from "@/components/money/supplier-plan";
+import { TodoFold } from "@/components/orders/todo-fold";
 import { factoryPlanAction } from "../../../money/actions";
 import { fieldsAction, lightAction } from "../../light-actions";
-import { FactoriesView } from "../money-cards";
-import { MoneySection } from "../money-sections";
 import { stepData } from "../step-data";
 
 export const metadata = { title: "Order · factory order" };
@@ -153,24 +152,27 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           today={now}
         />
       ))}
-      <Checklist
-        payFor={await expensePayTools(o.id, d.items)}
-        step="factory"
-        label="Factory order"
-        items={d.items}
-        current={d.current}
-        nowKey={d.nowKey}
-        waits={d.waits}
-        canEdit={d.steps.canEdit}
-        run={d.run}
-        dealId={o.inquiry.id}
-        people={d.people}
-        tools={tools}
-        payNode={payFactory("Pay")}
-        listHref={d.listHref}
-        me={me.name}
-        today={now}
-      />
+      {/* The to-do list as one thin line; it opens when there is something to do in it now. */}
+      <TodoFold label="Factory order" items={d.items} waits={d.waits} open={d.current}>
+        <Checklist
+          payFor={await expensePayTools(o.id, d.items)}
+          step="factory"
+          label="Factory order"
+          items={d.items}
+          current={d.current}
+          nowKey={d.nowKey}
+          waits={d.waits}
+          canEdit={d.steps.canEdit}
+          run={d.run}
+          dealId={o.inquiry.id}
+          people={d.people}
+          tools={tools}
+          payNode={payFactory("Pay")}
+          listHref={d.listHref}
+          me={me.name}
+          today={now}
+        />
+      </TodoFold>
       <StepViewDivider />
       <DetailsCard
         target="factory"
@@ -192,49 +194,59 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
           phone={<PhoneLines set="factory" lines={priced} />}
         />
       )}
+      {/* One card per supplier for the money: its plan in the heading, the parts with what is paid, the totals, the customer's side. */}
       {m.factories?.plans.map((plan) => {
-        const next = plan.rows.find((r) => r.status !== "paid");
         const paidInOrder = m.factories!.payments
           .filter((x) => !x.voided && x.factory.id === plan.factory.id && x.currency === plan.currency)
           .reduce((t, x) => t + Number(x.inOrderCurrency), 0);
+        const owed = m.factories!.rows.find((r) => r.factory.id === plan.factory.id && r.currency === plan.currency);
         return (
-          <Card key={`${plan.factory.id}:${plan.currency}`} id={`plan-${plan.factory.id}`} data-target="factory.plan" data-target-card="">
-            <CardHeader
-              title={`What we pay ${plan.factory.name} · ${o.refNo}`}
-              description={`Agreed once per factory on the order: an advance when we order, the balance on ${plan.factory.name}'s ready date${plan.readyOn ? ` (${date(plan.readyOn)})` : ""} (or on a fixed day).`}
+          <ViewCard
+            key={`${plan.factory.id}:${plan.currency}`}
+            id={`plan-${plan.factory.id}`}
+            target="factory.plan"
+            title={
+              <>
+                Payments to {plan.factory.name}
+                <span className="font-normal text-text-2"> · {supplierPlanWords(plan)}</span>
+              </>
+            }
+            canEdit={!!m.factories?.canPlan && d.open}
+            editLabel="Edit the plan"
+            panel={{
+              title: `What we pay ${plan.factory.name}`,
+              description: `${o.refNo} · agreed once per supplier on the order`,
+              body: <FactoryPlanForm plan={plan} action={factoryPlanAction.bind(null, o.id)} />,
+              className: "md:w-[640px]",
+            }}
+          >
+            <SupplierParts
+              orderId={o.id}
+              plan={plan}
+              pay={(r) =>
+                Number(r.open) > 0
+                  ? payFactory("Pay", true, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance" })
+                  : null
+              }
+              paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
+              orderCurrency={o.currency}
+              overpaid={owed?.overpaid ?? null}
+              customer={{
+                route: m.route.route,
+                ...m.factories!.customer,
+                received: m.received,
+                owed: (Number(m.received) + Number(m.due)).toFixed(2),
+              }}
             />
-            <CardBody>
-              <FactoryPlanCard
-                plan={plan}
-                action={factoryPlanAction.bind(null, o.id)}
-                canPlan={!!m.factories?.canPlan && d.open}
-                orderCurrency={o.currency}
-                paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
-                pay={
-                  next && Number(next.open) > 0
-                    ? payFactory(`Pay ${next.label.toLowerCase()}`, true, {
-                        factoryId: plan.factory.id,
-                        amount: next.open,
-                        kind: next.dueRule === "on_order" ? "deposit" : "balance",
-                      })
-                    : null
-                }
-              />
-            </CardBody>
-          </Card>
+          </ViewCard>
         );
       })}
-      {m.factories && (
-        <MoneySection
-          id="factory-money"
-          target="factory.payments"
-          icon={<ArrowUpRight aria-hidden />}
-          title="To the factory"
-          tag="Internal"
-          sub={factories.length ? `We pay ${names} for the goods` : "What we owe the factories for this order"}
-        >
-          <FactoriesView m={m} pay={payFactory("Record payment")} />
-        </MoneySection>
+      {m.factories && m.factories.plans.length === 0 && (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-muted">No line on this order was quoted from a factory price, so there is nothing to work out what we owe.</p>
+          </CardBody>
+        </Card>
       )}
     </StepPage>
   );

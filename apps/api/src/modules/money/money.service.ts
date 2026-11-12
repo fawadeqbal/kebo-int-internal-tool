@@ -4,6 +4,7 @@ import { liveFile, livePurchase, asSupplierPayment, purchasePart, livePart, deci
 import { formatMinor, fromMinor, fxRate, orderCosting, orderMoney, planTotalMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   balanceTermsOf,
+  customerMoney,
   paperNumber,
   BALANCE_TERMS_LABEL,
   can,
@@ -323,6 +324,8 @@ export class MoneyService {
       factories: seeCosts
         ? {
             rows: factories,
+            /** Where the customer's money for this order stands, for the person paying its suppliers (by the route). */
+            customer: customerMoney({ totalMinor: position.owedMinor, receivedMinor: position.settledMinor, depositMinor: position.depositMinor, route: terms.route }),
             payments: factoryPaid.map((p) => ({
               id: p.id,
               factory: p.factory,

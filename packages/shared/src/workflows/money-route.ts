@@ -558,6 +558,31 @@ export interface FactoryPlanRow {
   dueOn: ISODate | null;
 }
 
+/**
+ * Where the customer's money for an order stands, in the words the person paying its factory needs:
+ * the route decides who pays the balance (the customer, or the bank on a contract or an LC), the
+ * payments say what is in. `warn`: money we would expect by now is not in (the deposit, or anything
+ * at all on a route where the customer pays us directly).
+ */
+export type CustomerMoneyState = "nothing" | "part_deposit" | "deposit" | "part" | "paid";
+export function customerMoney(f: { totalMinor: Minor; receivedMinor: Minor; depositMinor: Minor; route: PaymentRoute | null }): {
+  state: CustomerMoneyState;
+  words: string;
+  warn: boolean;
+} {
+  const bank = f.route === "letter_of_credit" ? "by LC" : f.route === "bank_contract" ? "through the bank" : null;
+  if (f.totalMinor > 0 && f.receivedMinor >= f.totalMinor) return { state: "paid", words: "Customer paid in full", warn: false };
+  if (f.receivedMinor <= 0) {
+    if (f.depositMinor > 0) return { state: "nothing", words: "Customer's deposit is not in yet", warn: true };
+    return bank
+      ? { state: "nothing", words: `Nothing in yet · paid ${bank}`, warn: false }
+      : { state: "nothing", words: "Customer has not paid yet", warn: true };
+  }
+  if (f.depositMinor > 0 && f.receivedMinor < f.depositMinor) return { state: "part_deposit", words: "Only part of the deposit is in", warn: true };
+  if (f.depositMinor > 0) return { state: "deposit", words: `Deposit in · balance ${bank ?? "not paid yet"}`, warn: false };
+  return { state: "part", words: `Customer part paid${bank ? ` · the rest ${bank}` : ""}`, warn: false };
+}
+
 /** The plan a factory starts with: an advance (percent) when we order, the balance on the ready date. */
 export function defaultFactoryPlan(owedMinor: Minor, advancePercent: number): FactoryPlanRow[] {
   const p = Math.min(Math.max(advancePercent, 0), 100);

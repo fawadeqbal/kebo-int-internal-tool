@@ -3,6 +3,7 @@ import { decimalToMinor, fromDbDateOrNull, isSupplier, livePart, termsSelect, to
 import { formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import {
   can,
+  customerMoney,
   dueRuleWords,
   paperNumber,
   planStatus,
@@ -10,6 +11,7 @@ import {
   type FactoryPlanInput,
   type InvoiceSide,
   type PaymentPlanInput,
+  type PaymentRoute,
   type PlanDueRule,
   type RequestState,
 } from "@kebo/shared";
@@ -801,6 +803,117 @@ export class BillingService {
       })),
     };
   }
+
+  /**
+   * Payments › To pay: every part of a supplier's plan still open on orders not cancelled (people who see
+   * factory costs), soonest first, each with the order's payment route and where the customer's money for
+   * that order stands: the person paying the factory sees both sides before paying. Nothing is stored for
+   * it: the parts are the supplier's plan (factoryPlansOf), the customer's side the order's position.
+   */
+  async toPay(user: SessionUser, mine: boolean) {
+    if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see factory costs.");
+    const today = this.clock.today();
+    const s = await this.settings.get();
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    const orders = await this.prisma.db.order.findMany({
+      where: { status: { not: "cancelled" }, id: { in: await ordersOwingFactories(this.prisma, fx) } },
+      select: {
+        id: true,
+        refNo: true,
+        currency: true,
+        mainCurrency: true,
+        mainRate: true,
+        depositPercent: true,
+        total: true,
+        expenses: chargedExpenses,
+        customer: { select: { id: true, name: true } },
+        allocations: { where: livePart, select: { amount: true, bankCharges: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+        lines: { select: { factory: { select: { id: true, owner: person } } } },
+        purchaseOrders: { select: { number: true, supplierId: true } },
+        ...termsSelect,
+      },
+      orderBy: { orderedOn: "asc" },
+    });
+    const rows: ToPayRow[] = [];
+    for (const o of orders) {
+      const owners = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.owner] as const] : [])));
+      const pos = positionOf(o, fx);
+      const route = termsOf(o).route;
+      const theirs = customerMoney({ totalMinor: pos.owedMinor, receivedMinor: pos.settledMinor, depositMinor: pos.depositMinor, route });
+      for (const f of await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx)) {
+        const owner = owners.get(f.factory.id) ?? null;
+        if (mine && owner?.id !== user.id) continue;
+        for (const [n, r] of f.rows.entries()) {
+          if (Number(r.open) <= 0) continue;
+          rows.push({
+            key: `${o.id}:${f.factory.id}:${f.currency}:${n}`,
+            ref: r.id,
+            label: r.label,
+            supplierRef: r.supplierRef,
+            part: r.dueRule === "on_order" ? "deposit" : "balance",
+            supplier: f.factory,
+            lookedAfterBy: owner,
+            order: { id: o.id, refNo: o.refNo },
+            customer: o.customer,
+            po: o.purchaseOrders.find((p) => p.supplierId === f.factory.id)?.number ?? null,
+            currency: f.currency,
+            amount: r.amount,
+            paid: r.paid,
+            open: r.open,
+            dueOn: r.due,
+            dueRule: r.dueRule,
+            late: lateDays(r.due, today),
+            status: r.status,
+            customerMoney: { route, currency: o.currency, total: fromMinor(pos.owedMinor), received: fromMinor(pos.settledMinor), ...theirs },
+          });
+        }
+      }
+    }
+    rows.sort((a, b) => b.late - a.late || (a.dueOn ?? "9999").localeCompare(b.dueOn ?? "9999") || a.order.refNo.localeCompare(b.order.refNo));
+    const totals = new Map<string, { open: Minor; late: Minor; count: number }>();
+    for (const r of rows) {
+      const t = totals.get(r.currency) ?? { open: 0, late: 0, count: 0 };
+      t.open += toMinor(r.open);
+      if (r.late > 0) t.late += toMinor(r.open);
+      t.count += 1;
+      totals.set(r.currency, t);
+    }
+    return {
+      rows,
+      totals: [...totals.entries()].map(([currency, t]) => ({ currency, open: fromMinor(t.open), late: fromMinor(t.late), count: t.count })),
+      /** May record a payment to a supplier. */
+      canPay: can(user, "payments.record"),
+    };
+  }
+}
+
+/** One open part of a supplier's plan in Payments › To pay. */
+interface ToPayRow {
+  key: string;
+  /** The invoice (null: the company's default plan, not saved for this order yet). */
+  ref: string | null;
+  label: string;
+  /** The supplier's own invoice number, if they sent one. */
+  supplierRef: string | null;
+  /** What the payment form calls it: the advance (deposit) or the balance. */
+  part: "deposit" | "balance";
+  supplier: { id: string; name: string };
+  lookedAfterBy: { id: string; name: string } | null;
+  order: { id: string; refNo: string };
+  customer: { id: string; name: string };
+  /** The purchase order's number (PO-2026-0044). */
+  po: string | null;
+  currency: string;
+  amount: string;
+  paid: string;
+  open: string;
+  dueOn: ISODate | null;
+  dueRule: string;
+  late: number;
+  status: string;
+  /** The order's route and what the customer has paid on it (in the order's currency). */
+  customerMoney: { route: PaymentRoute | null; currency: string; total: string; received: string; state: string; words: string; warn: boolean };
 }
 
 /** Days past its due date (0: not late, or no date yet). */

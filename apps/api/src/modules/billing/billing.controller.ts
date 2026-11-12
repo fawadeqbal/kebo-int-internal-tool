@@ -82,6 +82,25 @@ export class BillingController {
     return this.billing.customerInvoice(user, orderId);
   }
 
+  /** Payments › To pay: the open parts of every supplier's plan, with the order's route and the customer's money. ?mine=true: the suppliers I look after. */
+  @Get("billing/to-pay")
+  toPay(
+    @CurrentUser() user: SessionUser,
+    @Query(
+      Validate(
+        z.object({
+          mine: z
+            .enum(["true", "false"])
+            .optional()
+            .transform((v) => v === "true"),
+        }),
+      ),
+    )
+    q: { mine: boolean },
+  ) {
+    return this.billing.toPay(user, q.mine);
+  }
+
   /** The open invoices of one side, instalment by instalment (late first). ?side=receivable|payable, ?mine=true. */
   @Get("billing/invoices")
   invoices(@CurrentUser() user: SessionUser, @Query(Validate(invoicesQuery)) q: InvoicesQuery) {
