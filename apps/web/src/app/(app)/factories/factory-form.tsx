@@ -3,7 +3,8 @@
 import { Button, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton, toast } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
-import { PANEL_FORM, PanelActions, PanelBody, PanelKeys, PanelSection, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { PANEL_FORM, PanelActions, PanelBody, SidePanel, useClosePanel, useSidePanel } from "@/components/common/panel";
+import { Check } from "lucide-react";
 import type { ActionState } from "@/lib/actions";
 import type { Person } from "@/lib/types";
 import type { Factory } from "@/lib/types-people";
@@ -15,7 +16,19 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
  * paying them, For the team. After an error the typed values stay
  * (s.values), otherwise the saved ones show.
  */
-function FactoryForm({ action, factory, people, meId, onSaved }: { action: Action; factory: Factory | null; people: Person[]; meId: string; onSaved: (s: ActionState) => void }) {
+function FactoryForm({
+  action,
+  factory,
+  people,
+  meId,
+  onSaved,
+}: {
+  action: Action;
+  factory: Factory | null;
+  people: Person[];
+  meId: string;
+  onSaved: (s: ActionState) => void;
+}) {
   const close = useClosePanel();
   return (
     <ActionForm action={action} onDone={onSaved} showSuccess={false} className="flex min-h-0 flex-1 flex-col">
@@ -24,54 +37,56 @@ function FactoryForm({ action, factory, people, meId, onSaved }: { action: Actio
         const invalid = (k: string) => (s.errors?.[k] ? { "aria-invalid": true } : {});
         return (
           <PanelBody className={PANEL_FORM}>
-            <PanelSection title="Who" first>
-              <Field label="Factory name" htmlFor="name" error={s.errors?.name} hint="As it appears on their quotations and contracts">
+            {/* Board "New supplier window": three columns. */}
+            <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-3">
+              <Field label="Factory name" required htmlFor="name" error={s.errors?.name} className="sm:col-span-2">
                 <Input id="name" name="name" defaultValue={val("name")} autoComplete="organization" {...invalid("name")} />
               </Field>
-              <Field label="Looked after by" htmlFor="ownerId" optional error={s.errors?.ownerId} hint="Who in our team talks to this factory and pays it">
+              <Field label="Owner" htmlFor="ownerId" error={s.errors?.ownerId}>
                 <Select id="ownerId" name="ownerId" defaultValue={s.values?.ownerId ?? (factory ? (factory.ownerId ?? "") : meId)}>
                   <option value="">Nobody yet</option>
                   {people.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.id === meId ? `${p.name} (me)` : p.name}
+                      {p.name}
                     </option>
                   ))}
                 </Select>
               </Field>
-            </PanelSection>
-            <PanelSection title="Contact">
-              <Field label="Contact person" htmlFor="contactPerson" optional error={s.errors?.contactPerson}>
+              <Field label="Contact person" htmlFor="contactPerson" error={s.errors?.contactPerson}>
                 <Input id="contactPerson" name="contactPerson" defaultValue={val("contactPerson")} />
               </Field>
-              <Field label="Phone" htmlFor="phone" optional error={s.errors?.phone} hint="With country code, e.g. +86 138 0000 0000">
+              <Field label="Phone" htmlFor="phone" error={s.errors?.phone}>
                 <Input id="phone" name="phone" type="tel" defaultValue={val("phone")} {...invalid("phone")} />
               </Field>
-              <Field label="WeChat" htmlFor="wechat" optional error={s.errors?.wechat}>
+              <Field label="WeChat" htmlFor="wechat" error={s.errors?.wechat}>
                 <Input id="wechat" name="wechat" defaultValue={val("wechat")} />
               </Field>
-              <Field label="Email" htmlFor="email" optional error={s.errors?.email}>
+              <Field label="Email" htmlFor="email" error={s.errors?.email}>
                 <Input id="email" name="email" type="email" defaultValue={val("email")} {...invalid("email")} />
               </Field>
-            </PanelSection>
-            <PanelSection title="For paying them" className="sm:grid-cols-1">
-              <Field label="Address" htmlFor="address" optional error={s.errors?.address}>
-                <Textarea id="address" name="address" rows={2} className="min-h-0" defaultValue={val("address")} />
+              <Field label="Address" htmlFor="address" error={s.errors?.address} className="sm:col-span-2">
+                <Input id="address" name="address" defaultValue={val("address")} />
               </Field>
-              <Field label="Bank details" htmlFor="bankDetails" optional error={s.errors?.bankDetails} hint="Account name, bank, account number, for paying them">
-                <Textarea id="bankDetails" name="bankDetails" rows={3} defaultValue={val("bankDetails")} />
+              <Field label="Bank details" htmlFor="bankDetails" error={s.errors?.bankDetails} className="sm:col-span-3">
+                <Textarea
+                  id="bankDetails"
+                  name="bankDetails"
+                  rows={3}
+                  placeholder="Bank, account no., SWIFT — printed on the purchase order"
+                  defaultValue={val("bankDetails")}
+                />
               </Field>
-            </PanelSection>
-            <PanelSection title="For the team" className="sm:grid-cols-1">
-              <Field label="Notes" htmlFor="notes" optional error={s.errors?.notes} hint="What they are good at, lead times, minimum orders…">
+              <Field label="Notes" htmlFor="notes" error={s.errors?.notes} className="sm:col-span-3">
                 <Textarea id="notes" name="notes" rows={3} defaultValue={val("notes")} />
               </Field>
-            </PanelSection>
-            <PanelActions className="max-md:[&>button:first-child]:flex-1">
-              <SubmitButton pendingText="Saving…">{factory ? "Save changes" : "Add the factory"}</SubmitButton>
+            </div>
+            <PanelActions className="justify-end">
               <Button variant="ghost" onClick={close} className="max-md:hidden">
                 Cancel
               </Button>
-              <PanelKeys />
+              <SubmitButton pendingText="Saving…">
+                <Check aria-hidden /> {factory ? "Save changes" : "Save supplier"}
+              </SubmitButton>
             </PanelActions>
           </PanelBody>
         );
@@ -104,14 +119,22 @@ export function FactoryPanel({
   const saved = (s: ActionState) => {
     const d = s.data as { id: string; name: string } | undefined;
     if (!d) return panel.close();
-    toast({ message: factory ? `Saved · ${d.name}` : `Factory added · ${d.name}`, action: onRecord ? undefined : { label: "Open", href: `/factories/${d.id}` } });
+    toast({
+      message: factory ? `Saved · ${d.name}` : `Supplier added · ${d.name}`,
+      action: onRecord ? undefined : { label: "Open", href: `/factories/${d.id}` },
+    });
     panel.close({ saved: d.id });
   };
   return (
     <SidePanel
-      title={factory ? `Edit factory · ${factory.name}` : "New factory"}
-      description={factory ? "Changes apply to new prices and orders; past ones keep what was agreed." : "Only the name is needed now; add the rest when you have it."}
+      title={factory ? `Edit supplier · ${factory.name}` : "New supplier"}
+      description={
+        factory
+          ? "Changes apply to new prices and orders; past ones keep what was agreed."
+          : "Opens from Suppliers, from “Ask factories”, and from “Factory → + New” when entering an offer"
+      }
       onClose={() => panel.close()}
+      className="md:w-[900px]"
     >
       <FactoryForm action={action} factory={factory} people={people} meId={meId} onSaved={saved} />
     </SidePanel>

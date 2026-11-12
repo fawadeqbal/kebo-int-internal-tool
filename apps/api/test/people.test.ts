@@ -110,6 +110,39 @@ describe("people: users, two-step sign-in, customers, factories", () => {
     await api(app, other).get(`/customers/${c.body.id}`).expect(404);
   });
 
+  it("customers list: tax no. search, currency, status, only these ids, and the Archived chip with Restore", async () => {
+    const taxNo = `TX${tag}`;
+    const c = await api(app, admin).post("/customers", { name: `Herat ${tag}`, country: "AF", defaultCurrency: "CNY", taxNo, contacts: [{ name: "Naveed", email: `naveed-${tag}@x.test` }] }).expect(201);
+    const ids = async (qs: string) => ((await api(app, admin).get(`/customers?pageSize=100&${qs}`).expect(200)).body.rows as { id: string }[]).map((r) => r.id);
+    expect(await ids(`q=${taxNo}`)).toEqual([c.body.id]);
+    expect(await ids(`q=${taxNo}&currency=USD`)).toEqual([]);
+    expect(await ids(`q=${taxNo}&currency=CNY&status=none`)).toEqual([c.body.id]);
+    expect(await ids(`q=${taxNo}&status=order`)).toEqual([]);
+    expect(await ids(`ids=${c.body.id}`)).toEqual([c.body.id]);
+    await api(app, admin).get("/customers?ids=nope").expect(422);
+    // Removed: gone from the list, in Archived; restored: back.
+    await api(app, admin).delete(`/customers/${c.body.id}`).expect(200);
+    expect(await ids(`q=${taxNo}`)).toEqual([]);
+    expect(await ids(`q=${taxNo}&archived=true`)).toEqual([c.body.id]);
+    await api(app, staff).post(`/customers/${c.body.id}/restore`).expect(403);
+    await api(app, admin).post(`/customers/${c.body.id}/restore`).expect(200);
+    expect(await ids(`q=${taxNo}`)).toEqual([c.body.id]);
+    await api(app, admin).post(`/customers/${c.body.id}/restore`).expect(404);
+  });
+
+  it("suppliers list: owner, city (the end of the address), offers or none; the cities and offers waiting", async () => {
+    const f = await api(app, admin).post("/factories", { name: `Xiaolun ${tag}`, address: `Ruian, Wenzhou${tag}` }).expect(201);
+    const list = (await api(app, admin).get(`/factories?q=Xiaolun ${tag}`).expect(200)).body;
+    expect(list.rows[0]).toMatchObject({ id: f.body.id, city: `Wenzhou${tag}` });
+    expect(list.cities).toContain(`Wenzhou${tag}`);
+    expect(typeof list.waiting).toBe("number");
+    const ids = async (qs: string) => ((await api(app, admin).get(`/factories?pageSize=100&${qs}`).expect(200)).body.rows as { id: string }[]).map((r) => r.id);
+    expect(await ids(`city=Wenzhou${tag}`)).toEqual([f.body.id]);
+    expect(await ids(`city=Wenzhou${tag}&owner=none`)).toEqual([f.body.id]);
+    expect(await ids(`city=Wenzhou${tag}&status=offers`)).toEqual([]);
+    expect(await ids(`city=Wenzhou${tag}&status=none`)).toEqual([f.body.id]);
+  });
+
   it("manages factories with unique names", async () => {
     const f = await api(app, staff).post("/factories", { name: `Ningbo Pumps ${tag}` }).expect(201);
     expect(f.body).not.toHaveProperty("vatRate"); // no tax setting on a factory

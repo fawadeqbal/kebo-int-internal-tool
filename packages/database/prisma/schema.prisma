@@ -533,6 +533,10 @@ model Party {
   defaultCurrency String?   @map("default_currency") @db.Char(3)
   /// Short letters for the party on documents, e.g. "TN" in proforma KEB260916TN07. Empty: taken from the name.
   initials        String?   @db.VarChar(6)
+  /// CUS-0012: given when it becomes a customer (a database trigger numbers it from the company's counters).
+  customerCode    String?   @map("customer_code") @db.VarChar(20)
+  /// SUP-0007: given when it becomes a supplier.
+  supplierCode    String?   @map("supplier_code") @db.VarChar(20)
   bankDetails     String?   @map("bank_details")
   notes           String?
   /// The person in our team who looks after this party.
@@ -576,6 +580,8 @@ model Party {
   @@index([country])
   @@index([ownerId])
   @@index([companyId])
+  @@unique([companyId, customerCode])
+  @@unique([companyId, supplierCode])
   @@map("parties")
 }
 

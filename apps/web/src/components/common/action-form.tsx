@@ -55,7 +55,14 @@ export function ActionForm({
     }
   }, [state, router, onDone, resetOnSuccess]);
   return (
-    <form ref={formRef} id={id} action={formAction} className={className} noValidate onReset={keepFields ? (e) => e.preventDefault() : undefined}>
+    <form
+      ref={formRef}
+      id={id}
+      action={formAction}
+      className={className}
+      noValidate
+      onReset={keepFields ? (e) => e.preventDefault() : undefined}
+    >
       {state.code === "reason_needed" && <ReasonPrompt key={state.message} state={state} />}
       {state.message &&
         (state.ok === false || showSuccess) &&

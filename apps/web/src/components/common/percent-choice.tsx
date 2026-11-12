@@ -41,7 +41,12 @@ export function PercentChoice({
             type="button"
             aria-pressed={on}
             onClick={() => onChange(String(c.value))}
-            className={cn(buttonClass("secondary", "sm"), "h-8 px-2.5 text-xs tabular", on && "border-primary/40 bg-primary-soft text-primary hover:bg-primary-soft", invalid && !chosen && "border-bad")}
+            className={cn(
+              buttonClass("secondary", "sm"),
+              "h-8 px-2.5 text-xs tabular",
+              on && "border-primary/40 bg-primary-soft text-primary hover:bg-primary-soft",
+              invalid && !chosen && "border-bad",
+            )}
           >
             {c.label ?? `${c.value}%`}
           </button>
@@ -59,7 +64,11 @@ export function PercentChoice({
           onFocus={() => setTyping(true)}
           onBlur={() => setTyping(false)}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(controlClass, "h-8 w-20 pr-6 text-xs tabular", !chosen && text !== "" && !typing && "border-primary/40 bg-primary-soft text-primary")}
+          className={cn(
+            controlClass,
+            "h-8 w-20 pr-6 text-xs tabular",
+            !chosen && text !== "" && !typing && "border-primary/40 bg-primary-soft text-primary",
+          )}
         />
         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted">
           %

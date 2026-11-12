@@ -7,7 +7,27 @@ import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/au
 import type { SessionUser } from "../../common/auth/session-user";
 import { CustomersService } from "./customers.service";
 
-const customerList = listQuery.extend({ country: z.string().trim().toUpperCase().length(2).optional(), type: z.enum(["company", "individual"]).optional() });
+const blank = (v: unknown) => (v === "" ? undefined : v);
+const customerList = listQuery.extend({
+  country: z.string().trim().toUpperCase().length(2).optional(),
+  type: z.enum(["company", "individual"]).optional(),
+  /** Their usual currency. */
+  currency: z.preprocess(blank, z.string().trim().toUpperCase().length(3).optional()),
+  /** order: an open order; inquiry: an open inquiry; none: no order yet. */
+  status: z.preprocess(blank, z.enum(["order", "inquiry", "none"]).optional()),
+  /** The removed ones (the Archived chip). */
+  archived: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
+  /** Only these (comma-separated ids, e.g. those who owe money). */
+  ids: z.preprocess(blank, z.string().max(20_000).optional()).transform((v, ctx) => {
+    if (v === undefined) return undefined;
+    const list = v.split(",").filter(Boolean);
+    if (list.some((x) => !z.uuid().safeParse(x).success)) {
+      ctx.addIssue({ code: "custom", message: "Not a list of ids" });
+      return z.NEVER;
+    }
+    return list;
+  }),
+});
 
 @ApiTags("customers")
 @Controller("customers")
@@ -50,6 +70,15 @@ export class CustomersController {
   @RequirePermissions("customers.manage")
   update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(customerInput)) body: CustomerInput) {
     return this.customers.update(user, id, body);
+  }
+
+  /** A removed customer back in the lists. */
+  @Post(":id/restore")
+  @HttpCode(200)
+  @RequirePermissions("customers.delete")
+  async restore(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+    await this.customers.restore(user, id);
+    return { ok: true };
   }
 
   @Delete(":id")

@@ -11,6 +11,15 @@ export const money = (amount: string | number | null | undefined, currency: stri
 /** A headline amount in whole units (KPI cards): "USD 58,140". Exact amounts stay in the tables. */
 export const whole = (amount: string | number | null | undefined, currency: string) =>
   amount === null || amount === undefined ? "—" : `${currency} ${Math.round(Number(amount)).toLocaleString("en-US")}`;
+/** A figure tile's amount, short: "USD 159.6K", "USD 1.24M"; under 10,000 in whole units. */
+export const short = (amount: string | number | null | undefined, currency: string) => {
+  if (amount === null || amount === undefined) return "—";
+  const v = Number(amount);
+  const a = Math.abs(v);
+  if (a >= 1_000_000) return `${currency} ${(v / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 2 })}M`;
+  if (a >= 10_000) return `${currency} ${(v / 1_000).toLocaleString("en-US", { maximumFractionDigits: 1 })}K`;
+  return `${currency} ${Math.round(v).toLocaleString("en-US")}`;
+};
 export const date = (d: ISODate | Date | string | null | undefined) => fmtDate(d ?? null, TZ);
 export const dateTime = (d: Date | string | null | undefined) => fmtDateTime(d ?? null, TZ);
 export const timeAgo = (d: Date | string) => ago(d, TZ);

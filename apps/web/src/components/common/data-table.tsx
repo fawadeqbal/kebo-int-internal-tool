@@ -18,7 +18,17 @@ const OWN = "a,button,input,select,textarea,label,summary,[role=menu],[role=menu
  * `clearParam`: a parameter that only lights a row once (?saved=…), taken out
  * of the URL after the 2-second highlight.
  */
-export function DataTable({ label, children, clearParam, className }: { label: string; children: ReactNode; clearParam?: string; className?: string }) {
+export function DataTable({
+  label,
+  children,
+  clearParam,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  clearParam?: string;
+  className?: string;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const pathname = usePathname();

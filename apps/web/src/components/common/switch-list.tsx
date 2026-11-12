@@ -35,7 +35,12 @@ export function Switch({
         checked ? "bg-primary-solid" : "bg-surface-3",
       )}
     >
-      <span className={cn("inline-block size-4 rounded-full bg-white shadow-card transition-transform", checked ? "translate-x-[18px]" : "translate-x-0.5")} />
+      <span
+        className={cn(
+          "inline-block size-4 rounded-full bg-white shadow-card transition-transform",
+          checked ? "translate-x-[18px]" : "translate-x-0.5",
+        )}
+      />
     </button>
   );
 }
@@ -98,7 +103,13 @@ export function SwitchList({
               <span className={cn("text-xs", on ? "text-ok" : "text-muted")} aria-hidden>
                 {on ? "On" : "Off"}
               </span>
-              <Switch id={id} checked={on} disabled={i.disabled} label={`${i.label}: ${on ? "on" : "off"}`} onChange={(next) => flip(i, next)} />
+              <Switch
+                id={id}
+                checked={on}
+                disabled={i.disabled}
+                label={`${i.label}: ${on ? "on" : "off"}`}
+                onChange={(next) => flip(i, next)}
+              />
             </span>
           </li>
         );

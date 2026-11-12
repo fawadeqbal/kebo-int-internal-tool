@@ -56,7 +56,11 @@ export function MoreMenu({
   const router = useRouter();
   const openPanel = useOpenPanel();
   const phone = useIsPhone();
-  const entries = [...(phone ? phoneItems : []), ...(phone && phoneItems.length && items.length ? [{ separator: true } as const] : []), ...items];
+  const entries = [
+    ...(phone ? phoneItems : []),
+    ...(phone && phoneItems.length && items.length ? [{ separator: true } as const] : []),
+    ...items,
+  ];
   if (!entries.length) return null;
 
   const run = (e: MenuEntry) => {
@@ -130,7 +134,14 @@ export function MoreMenu({
         </FloatingMenu>
       )}
       {asking && (
-        <ConfirmDialog title={asking.confirm.title} confirmLabel={asking.confirm.confirmLabel} danger={!!asking.danger} busy={busy} onCancel={() => setAsking(null)} onConfirm={() => void confirm()}>
+        <ConfirmDialog
+          title={asking.confirm.title}
+          confirmLabel={asking.confirm.confirmLabel}
+          danger={!!asking.danger}
+          busy={busy}
+          onCancel={() => setAsking(null)}
+          onConfirm={() => void confirm()}
+        >
           {asking.confirm.body}
         </ConfirmDialog>
       )}

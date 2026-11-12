@@ -18,7 +18,17 @@ export interface RecordTab {
  * A customer's or supplier's tabs (design: Record — header, three or four figures, then tabs). One tab at a
  * time, each its own address, the current one from the path.
  */
-export function RecordTabs({ base, label, tabs, className = "mt-4" }: { base: string; label: string; tabs: RecordTab[]; className?: string }) {
+export function RecordTabs({
+  base,
+  label,
+  tabs,
+  className = "mt-4",
+}: {
+  base: string;
+  label: string;
+  tabs: RecordTab[];
+  className?: string;
+}) {
   const at = usePathname();
   const items = tabs.map((t) => {
     const href = t.path ? `${base}/${t.path}` : base;

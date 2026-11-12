@@ -22,14 +22,24 @@ function place(rect: DOMRect, w: number, h: number, align: "start" | "end") {
 
 const noop = () => () => {};
 /** True in the browser, false while rendering on the server. */
-const useMounted = () => useSyncExternalStore(noop, () => true, () => false);
+const useMounted = () =>
+  useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
 
 function subscribePhone(cb: () => void) {
   const m = window.matchMedia(PHONE);
   m.addEventListener("change", cb);
   return () => m.removeEventListener("change", cb);
 }
-export const useIsPhone = () => useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE).matches, () => false);
+export const useIsPhone = () =>
+  useSyncExternalStore(
+    subscribePhone,
+    () => window.matchMedia(PHONE).matches,
+    () => false,
+  );
 
 /**
  * Keeps a panel next to its anchor while the page or any box around it
@@ -85,7 +95,11 @@ function useFloating(anchor: Anchor, onClose: () => void, opts: { width?: number
 
 /** Shown in a menu with no item in it (a paper still waiting for its data): never an empty box. */
 const EMPTY = "Nothing to do here yet.";
-const emptyNote = <p data-menu-empty className="px-2.5 py-1.5 text-xs text-muted">{EMPTY}</p>;
+const emptyNote = (
+  <p data-menu-empty className="px-2.5 py-1.5 text-xs text-muted">
+    {EMPTY}
+  </p>
+);
 /** The note hides itself as soon as the menu has an item. */
 const HIDE_EMPTY = "[&:has([role=menuitem])>[data-menu-empty]]:hidden";
 
@@ -133,7 +147,8 @@ export function FloatingMenu({
     if (!items.length) return;
     e.preventDefault();
     const at = items.indexOf(document.activeElement as HTMLElement);
-    const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    const next =
+      e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (at + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
     items[next]!.focus();
   };
 
@@ -141,7 +156,13 @@ export function FloatingMenu({
   if (phone)
     return createPortal(
       <div className="fixed inset-0 z-[90] flex flex-col justify-end">
-        <button type="button" aria-label="Close the menu" className="absolute inset-0 bg-black/40 animate-in fade-in" onClick={onClose} tabIndex={-1} />
+        <button
+          type="button"
+          aria-label="Close the menu"
+          className="absolute inset-0 bg-black/40 animate-in fade-in"
+          onClick={onClose}
+          tabIndex={-1}
+        />
         <div
           ref={panel}
           role="menu"
@@ -184,7 +205,17 @@ export function FloatingMenu({
  * A list of suggestions under a text field (a combobox). Drawn above the page,
  * as wide as the field; it never opens as a sheet, so the field stays in view.
  */
-export function FloatingList({ anchor, onClose, children, className }: { anchor: Anchor; onClose: () => void; children: ReactNode; className?: string }) {
+export function FloatingList({
+  anchor,
+  onClose,
+  children,
+  className,
+}: {
+  anchor: Anchor;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
   const mounted = useMounted();
   const { panel, pos } = useFloating(anchor, onClose, { width: "anchor", align: "start", active: mounted });
   if (!mounted) return null;

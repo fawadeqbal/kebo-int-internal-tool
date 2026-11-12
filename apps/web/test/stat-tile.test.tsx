@@ -17,9 +17,10 @@ describe("StatTile", () => {
     expect(screen.getByRole("link", { name: /Failed sign-ins/ }).getAttribute("href")).toBe("/access/sign-ins?failed=1");
   });
 
-  it("colours the value by meaning, and draws the bad share as a bar with words", () => {
-    render(<StatTile label="Receivable" value="USD 100" tone="bad" meter={{ percent: 140, label: "USD 40 of it overdue" }} />);
-    expect(screen.getByText("USD 100").className).toContain("text-bad");
+  it("colours the line under the value by meaning (board), and draws the bad share as a bar with words", () => {
+    render(<StatTile label="Receivable" value="USD 100" sub="USD 40 late" tone="bad" meter={{ percent: 140, label: "USD 40 of it overdue" }} />);
+    expect(screen.getByText("USD 100").className).not.toContain("text-bad");
+    expect(screen.getByText("USD 40 late").className).toContain("text-bad");
     const bar = screen.getByRole("img", { name: "USD 40 of it overdue" });
     expect((bar.firstElementChild as HTMLElement).style.width).toBe("100%");
   });

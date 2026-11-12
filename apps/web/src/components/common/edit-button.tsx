@@ -63,7 +63,17 @@ function rowOf(target: EventTarget | null, box: HTMLElement): number | null {
  * table's edit mode on that row. The table itself (LineTable) is not changed:
  * this only wraps it.
  */
-export function EditableRows({ onRow, label, children, className }: { onRow: (row: number) => void; label: string; children: ReactNode; className?: string }) {
+export function EditableRows({
+  onRow,
+  label,
+  children,
+  className,
+}: {
+  onRow: (row: number) => void;
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
   const box = useRef<HTMLDivElement>(null);
   return (
     // The rows are a shortcut for the mouse; "Edit lines" in the header is the button for everyone.

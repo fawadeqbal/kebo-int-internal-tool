@@ -175,7 +175,17 @@ export function PanelBody({ children, className }: { children: ReactNode; classN
 export const PANEL_FORM = "flex flex-1 flex-col gap-5";
 
 /** A section of a panel's form: a small-caps title, then its fields, two columns at most (one on a phone). */
-export function PanelSection({ title, children, className, first }: { title?: string; children: ReactNode; className?: string; first?: boolean }) {
+export function PanelSection({
+  title,
+  children,
+  className,
+  first,
+}: {
+  title?: string;
+  children: ReactNode;
+  className?: string;
+  first?: boolean;
+}) {
   return (
     <fieldset className={cn("flex min-w-0 flex-col gap-3", !first && "border-t border-line pt-5")}>
       {title && <legend className="float-left mb-1 w-full text-sm font-bold text-text">{title}</legend>}
@@ -221,8 +231,9 @@ function usePanelUrl() {
   return useCallback(
     (patch: Record<string, string | null>) => {
       const p = new URLSearchParams(params.toString());
-      for (const [k, v] of Object.entries(patch)) if (v === null) p.delete(k);
-      else p.set(k, v);
+      for (const [k, v] of Object.entries(patch))
+        if (v === null) p.delete(k);
+        else p.set(k, v);
       const qs = p.toString();
       return qs ? `${pathname}?${qs}` : pathname;
     },

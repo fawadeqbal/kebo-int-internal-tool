@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Check, RotateCcw } from "lucide-react";
 import { FOLLOW_UP_KIND_LABEL, FOLLOW_UP_KINDS, NOTE_KIND_LABEL, NOTE_KINDS } from "@kebo/shared";
 import { Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
@@ -312,6 +312,96 @@ export function FollowUpCheck({ action, done, what }: { action: Action; done: bo
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
         className="size-[18px] cursor-pointer accent-primary-solid"
       />
+    </ActionForm>
+  );
+}
+
+/** The Activity card's quick note (board): one box, sent with the button or Ctrl+Enter; kind "note", now. */
+export function QuickNote({ action }: { action: Action }) {
+  const id = useId();
+  return (
+    <ActionForm action={action} resetOnSuccess showSuccess={false} className="flex flex-col gap-2">
+      {(s) => (
+        <>
+          <Field label="Add a note" htmlFor={`${id}-body`} error={s.errors?.body}>
+            <Textarea
+              id={`${id}-body`}
+              name="body"
+              rows={2}
+              maxLength={5000}
+              required
+              placeholder="Write a note or @mention someone"
+              className="min-h-0"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) e.currentTarget.form?.requestSubmit();
+              }}
+            />
+          </Field>
+          <input type="hidden" name="kind" value="note" />
+          <SubmitButton size="sm" variant="secondary" pendingText="Adding…" className="self-end">
+            Add note
+          </SubmitButton>
+        </>
+      )}
+    </ActionForm>
+  );
+}
+
+/**
+ * The Notes tab's "Add a note" card (board): Kind, With (the record's contacts, when it has them), When and
+ * the note. A day other than today is kept at noon; today: now.
+ */
+export function NoteCardForm({ action, contacts, today }: { action: Action; contacts?: { id: string; name: string }[]; today: string }) {
+  const id = useId();
+  const [day, setDay] = useState(today);
+  return (
+    <ActionForm action={action} resetOnSuccess showSuccess={false} onDone={() => setDay(today)} className="grid grid-cols-3 gap-4">
+      {(s) => (
+        <>
+          <Field label="Kind" htmlFor={`${id}-kind`} error={s.errors?.kind} className={contacts ? undefined : "col-span-2 sm:col-span-1"}>
+            <Select id={`${id}-kind`} name="kind" defaultValue={s.values?.kind ?? "note"}>
+              {NOTE_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {NOTE_KIND_LABEL[k]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {contacts && (
+            <Field label="With" htmlFor={`${id}-with`} error={s.errors?.contactId}>
+              <Select id={`${id}-with`} name="contactId" defaultValue={s.values?.contactId ?? ""}>
+                <option value="">—</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          <Field label="When" htmlFor={`${id}-on`} error={s.errors?.at} className={contacts ? undefined : "max-sm:col-span-1"}>
+            <Input id={`${id}-on`} type="date" max={today} value={day} onChange={(e) => setDay(e.target.value || today)} />
+          </Field>
+          <input type="hidden" name="at" value={day === today ? "" : `${day}T12:00`} />
+          <Field label="Note" required htmlFor={`${id}-body`} error={s.errors?.body} className="col-span-3">
+            <Textarea
+              id={`${id}-body`}
+              name="body"
+              rows={3}
+              maxLength={5000}
+              required
+              placeholder="What was said or agreed"
+              defaultValue={s.values?.body}
+            />
+          </Field>
+          <div className="col-span-3">
+            <SubmitButton pendingText="Adding…">
+              <Check aria-hidden />
+              Add note
+            </SubmitButton>
+          </div>
+        </>
+      )}
     </ActionForm>
   );
 }
