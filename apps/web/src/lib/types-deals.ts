@@ -100,6 +100,9 @@ export interface FactoryQuoteLineView {
   productKey: string;
   /** A quotation is priced from it: changing its price, quantity or place asks why. */
   used: boolean;
+  /** Another spec of that line of the offer (its id and number): a choice beside it, left out of the total. */
+  alternativeOfId?: string | null;
+  alternativeOfNo?: string | null;
 }
 
 /** A file kept with a factory offer: its quotation, catalogue, screenshots (internal). */

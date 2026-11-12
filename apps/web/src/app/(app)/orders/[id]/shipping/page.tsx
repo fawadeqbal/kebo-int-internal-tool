@@ -1,6 +1,6 @@
-import { Plus } from "lucide-react";
-import { can, portsOf, SHIP_MODE_LABEL, SHIP_MODES, SHIPMENT_STATUS_LABEL, SHIPMENT_STATUSES, shipByVsLc } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Globe, Plus } from "lucide-react";
+import { can, trackingLink, portsOf, SHIP_MODE_LABEL, SHIP_MODES, SHIPMENT_STATUS_LABEL, SHIPMENT_STATUSES, shipByVsLc } from "@kebo/shared";
+import { Badge, buttonClass } from "@kebo/ui";
 import { date } from "@/lib/format";
 import type { ShipmentView } from "@/lib/types-flow";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
@@ -270,9 +270,15 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
 
   const going = shipments.filter((s) => s.status !== "arrived" && s.status !== "cleared");
   const lead = shipments.find((s) => s.status !== "cleared") ?? shipments[0];
+  const track = lead ? trackingLink(lead) : null;
   const header = (
     <>
       {shipments.length > 0 && addShipment}
+      {track && (
+        <a href={track.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary")} title={`${track.carrier} · ${track.number}`}>
+          <Globe aria-hidden /> Track
+        </a>
+      )}
       {canShip && going.some((s) => s.status === "departed") && (
         <HeaderTap label="Mark arrived" action={lightAction.bind(null, o.id, `arrived:${going.map((s) => s.id).join(",")}`)} on={now} />
       )}

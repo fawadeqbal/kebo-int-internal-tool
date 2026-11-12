@@ -26,8 +26,8 @@ import { api } from "@/lib/api";
 import { hasFeature, requireUser } from "@/lib/session";
 import { date, dateTime, money, timeAgo, whole } from "@/lib/format";
 import type { Submission, SubmissionList, SubmissionStatus } from "@/lib/types-approvals";
-import { ApproveButtons, WithdrawButton } from "@/components/money/approval-actions";
-import { approveAction, sendBackAction, withdrawAction } from "./actions";
+import { ApproveButtons, VerifyChosen, WithdrawButton } from "@/components/money/approval-actions";
+import { approveAction, approveManyAction, sendBackAction, withdrawAction } from "./actions";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { today } from "@/components/orders/today";
 
@@ -98,6 +98,7 @@ export default async function ApprovalsPage({
             ? "Sent for approval: money received and expenses you added. Each counts once a manager approves it."
             : "Payments recorded by the team, waiting for a manager to check the bank"
         }
+        primary={!mine && status === "pending" && list.rows.some((r) => r.can.approve) ? <VerifyChosen action={approveManyAction} /> : undefined}
       />
       {!mine && (
         <StatRow className="mb-4">
@@ -162,6 +163,11 @@ export default async function ApprovalsPage({
               <Table>
                 <THead>
                   <tr>
+                    {!mine && status === "pending" && (
+                      <Th className="w-10">
+                        <span className="sr-only">Choose</span>
+                      </Th>
+                    )}
                     <Th>What</Th>
                     <Th>Date</Th>
                     <Th>{status === "pending" && !mine ? "Customer · for" : "Who · for"}</Th>
@@ -176,7 +182,7 @@ export default async function ApprovalsPage({
                 </THead>
                 <tbody>
                   {list.rows.map((s) => (
-                    <TableRow key={s.id} s={s} />
+                    <TableRow key={s.id} s={s} choose={!mine && status === "pending"} />
                   ))}
                 </tbody>
               </Table>
@@ -250,10 +256,17 @@ function Row({ s }: { s: Submission }) {
 }
 
 /** One submission as a table row (board VerificationQueue): what, date, who it is from and for, amount, who added it, the slip, and the buttons. */
-function TableRow({ s }: { s: Submission }) {
+function TableRow({ s, choose }: { s: Submission; choose?: boolean }) {
   const when = s.paidOn ?? s.spentOn;
   return (
     <Tr className="align-middle">
+      {choose && (
+        <Td>
+          {s.can.approve && (
+            <input type="checkbox" name="id" value={s.id} form="verify-chosen" aria-label={`Choose ${nameOf(s)}`} className="size-4 accent-[var(--primary-solid)]" />
+          )}
+        </Td>
+      )}
       <Td>
         <div className="flex flex-col items-start gap-1">
           <Badge tone={s.kind === "payment" ? "info" : "neutral"}>{kindWords(s)}</Badge>

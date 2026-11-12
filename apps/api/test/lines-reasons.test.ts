@@ -160,6 +160,38 @@ describe("lines, reasons and history", () => {
     expect(h[0]!.summary).toMatch(/Boiler/);
   });
 
+  it("keeps another spec of a line as a choice beside it, left out of the offer's total", async () => {
+    const created = await api(app, sana)
+      .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Spec Works ${tag}`, receivedOn: "2026-10-21", currency: "CNY" })
+      .expect(201);
+    const id = created.body.id as string;
+    await api(app, sana)
+      .post(`/factory-quotes/${id}/lines`, {
+        lines: [
+          { requestedItemId: items[0]!.id, description: "Press, 35 stations", quantity: 1, unit: "set", unitPrice: 256000 },
+          { description: "Press, 41 stations", quantity: 1, unit: "set", unitPrice: 298000, specOf: 0 },
+          { description: "Tooling", quantity: 1, unit: "set", unitPrice: 34200, partOf: 0 },
+        ],
+      })
+      .expect(201);
+    // Another spec of a part, or of a line below, is refused.
+    await api(app, sana)
+      .post(`/factory-quotes/${id}/lines`, { lines: [{ description: "A", quantity: 1, unitPrice: 1, specOf: 1 }, { description: "B", quantity: 1, unitPrice: 1 }] })
+      .expect(400);
+    const s = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body as {
+      quotes: { id: string; factoryTotal: string; lines: { description: string; no: string; alternativeOfId: string | null; alternativeOfNo: string | null }[] }[];
+    };
+    const offer = s.quotes.find((q) => q.id === id)!;
+    expect(Number(offer.factoryTotal)).toBe(256000 + 34200);
+    const spec = offer.lines.find((l) => l.description === "Press, 41 stations")!;
+    expect(spec.alternativeOfNo).toBe(offer.lines.find((l) => l.description === "Press, 35 stations")!.no);
+    // Made a line of its own again, it counts.
+    await api(app, sana).patch(`/factory-lines/${(spec as unknown as { id: string }).id}`, { alternativeOfId: null }).expect(200);
+    const again = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body as typeof s;
+    expect(Number(again.quotes.find((q) => q.id === id)!.factoryTotal)).toBe(256000 + 34200 + 298000);
+    await api(app, sana).delete(`/factory-quotes/${id}`).expect(200);
+  });
+
   it("numbers the quotation like the deal, and asks why prices it uses change", async () => {
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     const r1 = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, draft).expect(201)).body;
