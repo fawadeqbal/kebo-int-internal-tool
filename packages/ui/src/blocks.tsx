@@ -460,22 +460,22 @@ export function SectionNav({
 }) {
   return (
     <>
-      <nav aria-label={label} className={cn("no-print hidden border-b border-line md:block", className)}>
-        <ul className="relative -mb-px flex gap-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav aria-label={label} className={cn("no-print hidden md:block", className)}>
+        <ul className="flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {items.map((l) => (
             <li key={l.href} className="shrink-0">
               <Link
                 href={l.href}
                 aria-current={l.active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-1.5 border-b-2 px-2 py-2.5 text-sm whitespace-nowrap transition-colors xl:px-2.5",
-                  l.active ? "border-primary font-semibold text-text" : "border-transparent text-text-2 hover:text-text",
+                  "flex h-9 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] whitespace-nowrap transition-colors [&_svg]:size-4",
+                  l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface font-medium text-text-2 hover:border-line-strong hover:text-text",
                 )}
               >
                 {l.mark}
                 <span>{l.label}</span>
                 {l.count !== undefined && l.count !== null && l.count !== "" && (
-                  <span className={cn("text-[11px] tabular", l.alert ? "text-bad" : "text-muted")}>{l.count}</span>
+                  <span className={cn("rounded-md px-1.5 text-[11px] font-semibold tabular", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-surface-2 text-text-2")}>{l.count}</span>
                 )}
               </Link>
             </li>
@@ -490,8 +490,8 @@ export function SectionNav({
               href={l.href}
               aria-current={l.active ? "page" : undefined}
               className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap",
-                l.active ? "bg-primary-soft font-semibold text-primary" : "bg-surface-2 text-text-2 hover:text-text",
+                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap",
+                l.active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:text-text",
               )}
             >
               {l.label}

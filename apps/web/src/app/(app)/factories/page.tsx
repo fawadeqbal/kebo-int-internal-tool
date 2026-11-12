@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { can } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, Td, Th, THead, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { Factory, Plus, Tag, UserRound, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
 import { DataTable } from "@/components/common/data-table";
@@ -9,11 +9,11 @@ import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
 import { importFactoriesAction, removeFactoryAction, saveFactoryAction } from "./actions";
 import { FactoryPanel } from "./factory-form";
-import { requirePermission } from "@/lib/session";
+import { hasFeature, requirePermission } from "@/lib/session";
 import type { Paged } from "@/lib/types";
-import type { FactoryDetail, FactoryRow } from "@/lib/types-people";
+import type { FactoryDetail, FactoryRow, Owed } from "@/lib/types-people";
 import { crumbsFor, labelFor } from "@/lib/nav";
-import { plural } from "@/lib/format";
+import { money, plural } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
 
 export const metadata = { title: "Suppliers" };
@@ -44,6 +44,14 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
     panel ? getPeople() : null,
     panel === "edit-factory" ? api.get<FactoryDetail>(`/factories/${sp.id}`).catch(() => null) : null,
   ]);
+  // What we owe each factory (people who see money, with Insights): the "We owe" column and figure.
+  const owed =
+    can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"))
+      ? await api.get<Owed>("/insights/facts/owed", { side: "payable" }).catch(() => null)
+      : null;
+  const owes = new Map((owed?.rows ?? []).map((r) => [r.partyId, r]));
+  const owedTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.total), 0);
+  const overdueTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.overdue), 0);
   const all = mine ? other.total : data.total;
   const mineCount = mine ? data.total : other.total;
   const canRemove = can(me, "inquiries.updateAny");
@@ -69,6 +77,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
     <div>
       <PageHeader
         crumbs={crumbsFor("/factories")}
+        icon={Factory}
         title={labelFor("/factories")}
         summary={
           <>
@@ -84,6 +93,23 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
           </OpenPanelButton>
         }
       />
+
+      <StatRow className="mb-4">
+        <StatTile icon={Factory} iconColor={1} label="Suppliers" value={all} sub={mineCount ? `${mineCount} looked after by you` : "nobody's yet"} />
+        {owed && (
+          <StatTile
+            icon={Wallet}
+            iconColor={2}
+            label="We owe"
+            value={money(owedTotal, owed.currency)}
+            tone={overdueTotal > 0.005 ? "bad" : undefined}
+            sub={overdueTotal > 0.005 ? `${money(overdueTotal, owed.currency)} past its date` : `to ${plural(owed.rows.length, "factory", "factories")}`}
+            href="/purchasing/to-pay"
+          />
+        )}
+        <StatTile icon={Tag} iconColor={4} label="Price offers" value={data.rows.reduce((t, f) => t + f._count.quotes, 0)} sub={data.total > data.rows.length ? "on this page" : "from these factories"} />
+        <StatTile icon={UserRound} iconColor={3} label="Mine" value={mineCount} sub="factories you look after" href={href({ mine: "1" })} />
+      </StatRow>
 
       <ListToolbar
         search={{ placeholder: "Search factory or contact person…", value: sp.q, clearHref: href({ q: undefined }) }}
@@ -141,7 +167,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                   <Th>Factory</Th>
                   <Th>Contact</Th>
                   <Th>Looked after by</Th>
-                  <Th className="text-right">Price quotes</Th>
+                  <Th className="text-right">Price offers</Th>
+                  {owed && <Th className="text-right">We owe</Th>}
+                  <Th>Status</Th>
                   <Th className="w-12">
                     <span className="sr-only">Actions</span>
                   </Th>
@@ -168,6 +196,24 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
                     </Td>
                     <Td className="text-sm">{f.owner?.name ?? <span className="text-xs text-text-2">Nobody yet</span>}</Td>
                     <Td className="text-right tabular">{f._count.quotes || <span className="text-muted">0</span>}</Td>
+                    {owed && (
+                      <Td className="text-right font-semibold tabular">
+                        {owes.has(f.id) ? money(owes.get(f.id)!.total, owed.currency) : <span className="font-normal text-muted">—</span>}
+                      </Td>
+                    )}
+                    <Td>
+                      {owes.has(f.id) ? (
+                        Number(owes.get(f.id)!.overdue) > 0.005 ? (
+                          <StatusBadge meaning="bad">Payment late</StatusBadge>
+                        ) : (
+                          <StatusBadge meaning="warn">To pay</StatusBadge>
+                        )
+                      ) : f._count.quotes > 0 ? (
+                        <StatusBadge meaning="ok">Offers in</StatusBadge>
+                      ) : (
+                        <StatusBadge meaning="neutral">No offers yet</StatusBadge>
+                      )}
+                    </Td>
                     <Td className="text-right">
                       <RowMenu items={rowMenu(f)} label={`Actions for ${f.name}`} />
                     </Td>

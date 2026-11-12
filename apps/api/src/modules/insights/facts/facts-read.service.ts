@@ -385,6 +385,24 @@ export class FactsReadService {
   }
 
   /**
+   * What each customer owes us (receivable) or we owe each factory (payable) today, in the main currency,
+   * from the open parts of each plan (the same rows as aging): the total and what is overdue. For the
+   * customers' and suppliers' lists ("They owe", "We owe").
+   */
+  async owed(user: SessionUser, q: { side: "receivable" | "payable" }) {
+    const { seeMoney, today, currency } = await this.open(user);
+    if (q.side === "payable" && !seeMoney) throw new ForbiddenError("Only people who may see money see what we owe factories.");
+    const table = Prisma.raw(q.side === "receivable" ? "order_facts" : "factory_order_facts");
+    const party = Prisma.raw(q.side === "receivable" ? "f.customer_id" : "f.factory_id");
+    const rows = await this.prisma.db.$queryRaw<{ partyId: string; total: string; overdue: string }[]>`
+      select ${party} as "partyId", coalesce(sum(${openSql(today, null, null)} + ${openSql(today, 1, null)}), 0)::text as total,
+             coalesce(sum(${openSql(today, 1, null)}), 0)::text as overdue
+      from ${table} f where f.status <> 'cancelled' and ${party} is not null
+      group by ${party} having sum(${openSql(today, null, null)} + ${openSql(today, 1, null)}) > 0`;
+    return { side: q.side, currency, today, rows: rows.map((r) => ({ partyId: r.partyId, total: amount(r.total), overdue: amount(r.overdue) })) };
+  }
+
+  /**
    * What customers owe us (receivable) or we owe factories (payable) by how late it is today, from the open
    * parts of each plan: not due yet (or undated), 1–30, 31–60, 61–90 and over 90 days. `bucket` lists the orders.
    */

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pencil, Plus } from "lucide-react";
-import { buttonClass, Card, cn, StatTile } from "@kebo/ui";
+import { buttonClass, Card, cn } from "@kebo/ui";
 import { OpenPanelButton } from "./panel";
 
 /**
@@ -252,13 +252,3 @@ export function RecordEmpty({ title, children, action }: { title: string; childr
   );
 }
 
-/** Small figures in a card (Performance-like tiles): the app's one tile, small and without its own shadow. */
-export function FigureTiles({ items }: { items: { label: string; value: ReactNode; sub?: ReactNode; tone?: "bad" | "warn" }[] }) {
-  return (
-    <div className="grid grid-cols-2 gap-2.5 p-4 xl:grid-cols-4">
-      {items.map((t) => (
-        <StatTile key={t.label} size="sm" label={t.label} value={t.value} sub={t.sub} tone={t.tone} className="rounded-lg px-3 py-2.5 shadow-none" />
-      ))}
-    </div>
-  );
-}

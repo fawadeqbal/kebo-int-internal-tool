@@ -1,13 +1,12 @@
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, Eye, FileText, MessageSquare, Package, Plus, StickyNote, Users, Wallet } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { ButtonLink, Card, PageHeader, StatusBadge } from "@kebo/ui";
+import { ButtonLink, PageHeader, StatRow, StatTile, StatusBadge } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { requireUser } from "@/lib/session";
 import { customerOf, customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
 import { money, TZ } from "@/lib/format";
 import { countryName } from "@/lib/countries";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
-import { FigureTiles } from "@/components/common/record";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { removeCustomerAction } from "../actions";
 import { customerStatus, late, OPEN_STAGES, owes } from "./shared";
@@ -66,15 +65,16 @@ export default async function CustomerLayout({ children, params }: { children: R
   return (
     <div>
       <PageHeader
-        backHref="/customers"
-        backLabel="Customers"
+        crumbs={[{ label: "Partners & CRM" }, { label: "Customers", href: "/customers" }, { label: c.name }]}
         phoneStack
         title={c.name}
         badge={<StatusBadge meaning={status.meaning}>{status.label}</StatusBadge>}
         summary={
           <>
+            {c.type === "individual" ? PARTY_TYPE_LABEL.individual : "Company"}
+            {" · "}
             {countryKnown ? countryName(c.country) : <span className="text-warn">Country not set</span>}
-            {c.type === "individual" && ` · ${PARTY_TYPE_LABEL.individual.toLowerCase()}`}
+            {c.defaultCurrency && ` · ${c.defaultCurrency}`}
             {` · customer since ${monthOf(c.createdAt)}`}
             {handledBy && <span className="max-sm:hidden"> · handled by {handledBy}</span>}
           </>
@@ -101,36 +101,36 @@ export default async function CustomerLayout({ children, params }: { children: R
         more={<MoreMenu items={more} label={`More for ${c.name}`} />}
       />
 
-      <Card className="mt-4">
-        <FigureTiles
-          items={[
-            {
-              label: "Receivable",
-              value: dueTotals.length ? dueTotals.map((t) => money(t.due, t.currency)).join(" · ") : pay ? "Nothing due" : "—",
-              sub: lateOrders ? `${lateOrders} late` : owing ? `on ${owing} order${owing === 1 ? "" : "s"} · none late` : "paid up",
-              tone: lateOrders ? "bad" : undefined,
-            },
-            { label: "Open orders", value: openOrders, sub: `${c.orders.length} in all` },
-            { label: "Open inquiries", value: openDeals, sub: `${won} won · ${lost} lost` },
-            {
-              label: "Advance held",
-              value: held.length ? held.map((b) => money(b.amount, b.currency)).join(" · ") : "—",
-              sub: held.length ? "their money we hold" : "none",
-            },
-          ]}
+      <StatRow className="mt-1">
+        <StatTile
+          icon={FileText}
+          iconColor={2}
+          label="Receivable"
+          value={dueTotals.length ? dueTotals.map((t) => money(t.due, t.currency)).join(" · ") : pay ? "Nothing due" : "—"}
+          sub={lateOrders ? `${lateOrders} late` : owing ? `on ${owing} order${owing === 1 ? "" : "s"} · none late` : "paid up"}
+          tone={lateOrders ? "bad" : undefined}
         />
-      </Card>
+        <StatTile icon={Package} iconColor={3} label="Open orders" value={openOrders} sub={`${c.orders.length} in all`} />
+        <StatTile icon={MessageSquare} iconColor={4} label="Open inquiries" value={openDeals} sub={`${won} won · ${lost} lost`} />
+        <StatTile
+          icon={Wallet}
+          iconColor={5}
+          label="Advance held"
+          value={held.length ? held.map((b) => money(b.amount, b.currency)).join(" · ") : "—"}
+          sub={held.length ? "their money we hold" : "none"}
+        />
+      </StatRow>
 
       <RecordTabs
         base={base}
         label="The customer"
         tabs={[
-          { path: "", label: "Overview" },
-          { path: "orders", label: "Orders", count: c.orders.length, alert: lateOrders > 0 },
-          { path: "inquiries", label: "Inquiries", count: c.inquiries.length },
-          { path: "money", label: "Money" },
-          { path: "contacts", label: "Contacts", count: c.contacts.length },
-          { path: "notes", label: "Notes", count: notes.length },
+          { path: "", label: "Overview", icon: <Eye aria-hidden /> },
+          { path: "orders", label: "Orders", count: c.orders.length, alert: lateOrders > 0, icon: <Package aria-hidden /> },
+          { path: "inquiries", label: "Inquiries", count: c.inquiries.length, icon: <MessageSquare aria-hidden /> },
+          { path: "money", label: "Money", icon: <Wallet aria-hidden /> },
+          { path: "contacts", label: "Contacts", count: c.contacts.length, icon: <Users aria-hidden /> },
+          { path: "notes", label: "Notes", count: notes.length, icon: <StickyNote aria-hidden /> },
         ]}
       />
       <div className="mt-5">{children}</div>

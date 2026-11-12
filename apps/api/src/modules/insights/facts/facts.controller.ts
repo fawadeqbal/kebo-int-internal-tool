@@ -28,6 +28,7 @@ const agingQuery = z.object({
   customerId: id,
   factoryId: id,
 });
+const owedQuery = z.object({ side: z.enum(["receivable", "payable"]).default("receivable") });
 const rowsQuery = z.object({ ...span, ...filters, limit: z.coerce.number().int().min(1).max(1000).optional() });
 
 /**
@@ -72,6 +73,13 @@ export class FactsController {
   @Get("aging")
   aging(@CurrentUser() user: SessionUser, @Query(Validate(agingQuery)) q: z.infer<typeof agingQuery>) {
     return this.read.aging(user, q);
+  }
+
+  /** What each customer owes us (side=receivable) or we owe each factory (side=payable) today: total and overdue. */
+  @RequireFeature("insights")
+  @Get("owed")
+  owed(@CurrentUser() user: SessionUser, @Query(Validate(owedQuery)) q: z.infer<typeof owedQuery>) {
+    return this.read.owed(user, q);
   }
 
   /** Cash in and out by month, straight from payments, factory payments and expenses; expenses by kind. */

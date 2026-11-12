@@ -10,6 +10,8 @@ export interface RecordTab {
   label: string;
   count?: ReactNode;
   alert?: boolean;
+  /** An icon before the label (an element, e.g. <Eye aria-hidden />). */
+  icon?: ReactNode;
 }
 
 /**
@@ -23,6 +25,7 @@ export function RecordTabs({ base, label, tabs }: { base: string; label: string;
     return {
       href,
       label: t.label,
+      mark: t.icon,
       count: t.count === 0 ? undefined : t.count,
       alert: t.alert,
       active: t.path ? at === href || at.startsWith(`${href}/`) : at === base,

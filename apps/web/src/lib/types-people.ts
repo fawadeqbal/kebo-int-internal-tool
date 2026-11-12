@@ -20,8 +20,11 @@ export interface CustomerRow {
   type: PartyType;
   country: string;
   primaryContact: Contact | null;
+  defaultCurrency: string | null;
   openDeals: number;
   openOrders: number;
+  /** Every order but the cancelled ones. */
+  orders: number;
 }
 
 export interface CustomerDetail {
@@ -197,4 +200,12 @@ export interface NotificationItem {
   link: string | null;
   readAt: string | null;
   createdAt: string;
+}
+
+/** GET /insights/facts/owed: what each customer owes us (or we owe each factory) today, in the main currency. */
+export interface Owed {
+  side: "receivable" | "payable";
+  currency: string;
+  today: string;
+  rows: { partyId: string; total: string; overdue: string }[];
 }

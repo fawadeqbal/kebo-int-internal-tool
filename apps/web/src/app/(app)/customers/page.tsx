@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FileText, MessageSquare, Package, Plus, Users } from "lucide-react";
 import { can, PARTY_TYPE_LABEL, UNKNOWN_COUNTRY } from "@kebo/shared";
-import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
+import { buildHref, ButtonLink, Card, DataRow, EmptyState, ListToolbar, PageHeader, Pager, PhoneList, PhoneRow, StatRow, StatTile, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
 import { api } from "@/lib/api";
 import { PartyExcel } from "@/components/sheets/party-excel";
@@ -12,11 +12,11 @@ import { importCustomersAction, removeCustomerAction, saveCustomerAction, undoNe
 import { hasFeature, requireUser } from "@/lib/session";
 import { COUNTRIES, countryName } from "@/lib/countries";
 import type { Paged } from "@/lib/types";
-import type { CustomerDetail, CustomerRow } from "@/lib/types-people";
+import type { CustomerDetail, CustomerRow, Owed } from "@/lib/types-people";
 import { CustomerPanel } from "./customer-panel";
 import { currenciesFrom } from "./currencies";
 import { crumbsFor } from "@/lib/nav";
-import { plural } from "@/lib/format";
+import { money, plural } from "@/lib/format";
 import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Customers" };
@@ -30,30 +30,52 @@ type Params = Record<string, string | undefined>;
  * customer with ⋯ at the end, 25 a page, every filter in the URL. Staff see
  * the customers of their own deals.
  */
+/** The customer's state in one word: late money first, then money due, an open order, nothing yet. */
+function CustomerState({ c, owe }: { c: CustomerRow; owe?: Owed["rows"][number] }) {
+  if (owe && Number(owe.overdue) > 0.005) return <StatusBadge meaning="bad">Pays late</StatusBadge>;
+  if (owe) return <StatusBadge meaning="warn">Money due</StatusBadge>;
+  if (c.openOrders > 0) return <StatusBadge meaning="info">Order open</StatusBadge>;
+  if (c.openDeals > 0) return <StatusBadge meaning="info">Inquiry open</StatusBadge>;
+  if (c.orders > 0) return <StatusBadge meaning="ok">Paid up</StatusBadge>;
+  return <StatusBadge meaning="neutral">No orders yet</StatusBadge>;
+}
+
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<Params> }) {
   const me = await requireUser();
   const sp = await searchParams;
   const country = sp.country?.toUpperCase();
+  const type = sp.type === "company" || sp.type === "individual" ? sp.type : undefined;
   const canAdd = can(me, "customers.manage");
-  const keep = { q: sp.q, country };
+  const keep = { q: sp.q, country, type };
   const href = (patch: Params) => buildHref("/customers", { ...keep }, { page: undefined, ...patch });
 
   const panel = canAdd ? sp.panel : undefined;
-  const [data, all, notSet, settings, editing, insights] = await Promise.all([
-    api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, page: toPage(sp.page) }),
+  const insightsOn = can(me, "reports.view") && (await hasFeature("insights"));
+  const [data, all, notSet, companies, people, settings, editing, owed] = await Promise.all([
+    api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, type, page: toPage(sp.page) }),
     // The chips' counts (for the same search).
-    country ? api.get<Paged<CustomerRow>>("/customers", { q: sp.q, pageSize: 1 }) : null,
+    country || type ? api.get<Paged<CustomerRow>>("/customers", { q: sp.q, pageSize: 1 }) : null,
     country === UNKNOWN_COUNTRY ? null : api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country: UNKNOWN_COUNTRY, pageSize: 1 }),
+    api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, type: "company", pageSize: 1 }),
+    api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, type: "individual", pageSize: 1 }),
     panel === "new-customer" || panel === "edit-customer" ? getSettings() : null,
     panel === "edit-customer" && sp.id ? api.get<CustomerDetail>(`/customers/${sp.id}`).catch(() => null) : null,
-    can(me, "reports.view") ? hasFeature("insights") : false,
+    // What each customer owes (managers with Insights): the "They owe" column and figures.
+    insightsOn ? api.get<Owed>("/insights/facts/owed", { side: "receivable" }).catch(() => null) : null,
   ]);
+  const insights = insightsOn;
+  const owes = new Map((owed?.rows ?? []).map((r) => [r.partyId, r]));
+  const owedTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.total), 0);
+  const overdueTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.overdue), 0);
+  const lateCustomers = (owed?.rows ?? []).filter((r) => Number(r.overdue) > 0.005).length;
   const total = all?.total ?? data.total;
   const unknown = country === UNKNOWN_COUNTRY ? data.total : (notSet?.total ?? 0);
-  const filtered = !!(sp.q || country);
+  const filtered = !!(sp.q || country || type);
 
   const chips = [
-    { key: "all", label: "All", count: total, href: href({ country: undefined }), active: !country },
+    { key: "all", label: "All", count: total, href: href({ country: undefined, type: undefined }), active: !country && !type },
+    { key: "company", label: "Companies", count: companies.total, href: href({ type: type === "company" ? undefined : "company" }), active: type === "company" },
+    { key: "individual", label: "People", count: people.total, href: href({ type: type === "individual" ? undefined : "individual" }), active: type === "individual" },
     ...(unknown || country === UNKNOWN_COUNTRY
       ? [{ key: "unknown", label: "Country not set", count: unknown, href: href({ country: country === UNKNOWN_COUNTRY ? undefined : UNKNOWN_COUNTRY }), active: country === UNKNOWN_COUNTRY }]
       : []),
@@ -105,6 +127,23 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
         more={insights ? <MoreMenu items={[{ label: "Customers in Reports", href: "/reports/customers" }]} /> : undefined}
       />
+
+      <StatRow className="mb-4">
+        <StatTile icon={Users} iconColor={1} label="Customers" value={total} sub={`${companies.total} companies · ${people.total} people`} />
+        {owed && (
+          <StatTile
+            icon={FileText}
+            iconColor={2}
+            label="They owe you"
+            value={money(owedTotal, owed.currency)}
+            tone={overdueTotal > 0.005 ? "bad" : undefined}
+            sub={overdueTotal > 0.005 ? `${money(overdueTotal, owed.currency)} late · ${plural(lateCustomers, "customer")}` : "nothing late"}
+            href="/finance/to-receive"
+          />
+        )}
+        <StatTile icon={MessageSquare} iconColor={4} label="Open inquiries" value={data.rows.reduce((t, c) => t + c.openDeals, 0)} sub={data.total > data.rows.length ? "on this page" : "of these customers"} href="/inquiries" />
+        <StatTile icon={Package} iconColor={3} label="Open orders" value={data.rows.reduce((t, c) => t + c.openOrders, 0)} sub={data.total > data.rows.length ? "on this page" : "of these customers"} href="/orders" />
+      </StatRow>
 
       <ListToolbar
         search={{ placeholder: "Search name, contact, phone…", value: sp.q, clearHref: href({ q: undefined }) }}
@@ -158,8 +197,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                   flash={sp.saved === c.id}
                   title={c.name}
                   line={`${c.country === UNKNOWN_COUNTRY ? "Country not set" : countryName(c.country)} · ${plural(c.openOrders, "open order")}`}
-                  status={c.country === UNKNOWN_COUNTRY ? <StatusBadge meaning="warn">Check country</StatusBadge> : undefined}
-                  figure={plural(c.openDeals, "inquiry", "inquiries")}
+                  status={c.country === UNKNOWN_COUNTRY ? <StatusBadge meaning="warn">Check country</StatusBadge> : <CustomerState c={c} owe={owes.get(c.id)} />}
+                  figure={owed && owes.has(c.id) ? money(owes.get(c.id)!.total, owed.currency) : plural(c.openDeals, "inquiry", "inquiries")}
                 />
               ))}
             </PhoneList>
@@ -168,8 +207,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 <tr>
                   <Th>Customer</Th>
                   <Th>Country</Th>
+                  <Th>Currency</Th>
+                  <Th className="text-right">Orders</Th>
                   <Th className="text-right">Open inquiries</Th>
-                  <Th className="text-right">Open orders</Th>
+                  {owed && <Th className="text-right">They owe</Th>}
+                  <Th>Status</Th>
                   <Th className="w-12">
                     <span className="sr-only">Actions</span>
                   </Th>
@@ -193,8 +235,20 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                       <Td className="whitespace-nowrap">
                         {c.country === UNKNOWN_COUNTRY ? <StatusBadge meaning="warn">Country not set</StatusBadge> : countryName(c.country)}
                       </Td>
+                      <Td className="text-text-2">{c.defaultCurrency ?? "—"}</Td>
+                      <Td className="text-right tabular">
+                        {c.orders ? c.orders : <span className="text-muted">0</span>}
+                        {c.openOrders > 0 && <span className="block text-xs text-text-2">{c.openOrders} open</span>}
+                      </Td>
                       <Td className="text-right tabular">{c.openDeals ? c.openDeals : <span className="text-muted">0</span>}</Td>
-                      <Td className="text-right tabular">{c.openOrders ? c.openOrders : <span className="text-muted">0</span>}</Td>
+                      {owed && (
+                        <Td className="text-right font-semibold tabular">
+                          {owes.has(c.id) ? money(owes.get(c.id)!.total, owed.currency) : <span className="font-normal text-muted">—</span>}
+                        </Td>
+                      )}
+                      <Td>
+                        <CustomerState c={c} owe={owes.get(c.id)} />
+                      </Td>
                       <Td className="text-right">
                         <RowMenu items={rowMenu(c)} label={`Actions for ${c.name}`} />
                       </Td>

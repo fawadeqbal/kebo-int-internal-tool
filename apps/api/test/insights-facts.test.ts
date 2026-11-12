@@ -240,7 +240,9 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect(await row(o.orderId)).toMatchObject({ overdue: "2000.00", due: "9000.00" });
       const aging = (await api(app, manager).get(`/insights/facts/aging?side=receivable&bucket=d60&customerId=${o.customerId}`).expect(200)).body;
       expect(aging).toMatchObject({ d60: "2000.00", notDue: "7000.00", total: "9000.00" });
-      expect(aging.orders).toEqual([expect.objectContaining({ orderId: o.orderId, amount: "2000.00" })]);
+      expect(aging.orders).toEqual([expect.objectContaining({ orderId: o.orderId, amount: "2000.00" })]);      // The customers' list: the same open parts, per customer.
+      const owed = (await api(app, manager).get("/insights/facts/owed?side=receivable").expect(200)).body;
+      expect(owed.rows).toContainEqual({ partyId: o.customerId, total: "9000.00", overdue: "2000.00" });
     });
 
     it("a factory payment", async () => {
@@ -356,6 +358,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect(await inOther(() => read.funnel(boss, {}))).toMatchObject({ inquiries: 0, won: 0, lost: 0, lostReasons: [] });
       expect(await inOther(() => read.aging(boss, { side: "receivable" }))).toMatchObject({ total: "0.00", notDue: "0.00", over60: "0.00" });
       expect(await inOther(() => read.aging(boss, { side: "payable" }))).toMatchObject({ total: "0.00" });
+      expect((await inOther(() => read.owed(boss, { side: "receivable" }))).rows).toEqual([]);
       expect((await inOther(() => read.cash(boss, {}))).months).toEqual([]);
     });
 
@@ -405,6 +408,7 @@ describe("Insights data: order, inquiry and factory facts", () => {
       expect(f.length).toBeGreaterThan(0);
       expect(f.every((r) => r.spend === null && r.toPay === null && r.own === null)).toBe(true);
       await expect(inKebo(() => read.aging(reader, { side: "payable" }))).rejects.toThrow("Only people who may see money");
+      await expect(inKebo(() => read.owed(reader, { side: "payable" }))).rejects.toThrow("Only people who may see money");
       const cash = await inKebo(() => read.cash(reader, {}));
       expect(cash.months.every((m) => m.out === null && m.expenses === null && m.net === null)).toBe(true);
       const rows = (await inKebo(() => read.orders(reader, { limit: 5 }))).rows;

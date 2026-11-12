@@ -30,13 +30,14 @@ export class CustomersService {
     return this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null, ...customerAccess(user) }, select: { id: true, name: true }, orderBy: { name: "asc" } });
   }
 
-  async list(user: SessionUser, q: ListQuery & { country?: string }) {
+  async list(user: SessionUser, q: ListQuery & { country?: string; type?: "company" | "individual" }) {
     const term = q.q?.trim();
     const where: Prisma.PartyWhereInput = {
       ...isCustomer,
       deletedAt: null,
       ...customerAccess(user),
       ...(q.country ? { country: q.country } : {}),
+      ...(q.type ? { type: q.type } : {}),
       ...(term
         ? {
             AND: [
@@ -57,6 +58,7 @@ export class CustomersService {
         include: {
           contacts: { where: { deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }], take: 1 },
           _count: { select: { inquiries: { where: { deletedAt: null, stage: { in: ["new", "sourcing", "quoted"] } } }, orders: { where: { status: "open" } } } },
+          orders: { where: { status: { not: "cancelled" } }, select: { id: true } },
         },
         orderBy: { name: "asc" },
         skip: (q.page - 1) * q.pageSize,
@@ -74,8 +76,11 @@ export class CustomersService {
         type: c.type,
         country: c.country,
         primaryContact: c.contacts[0] ?? null,
+        defaultCurrency: c.defaultCurrency,
         openDeals: c._count.inquiries,
         openOrders: c._count.orders,
+        /** Every order but the cancelled ones. */
+        orders: c.orders.length,
       })),
     };
   }

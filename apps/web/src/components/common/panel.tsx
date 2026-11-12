@@ -91,7 +91,7 @@ export function SidePanel({
 
   if (!mounted) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex justify-end">
+    <div className="fixed inset-0 z-[80] flex justify-end md:items-start md:justify-center md:overflow-y-auto md:px-6 md:py-[6vh]">
       {/* The dim page beside it: a click closes (the keyboard has Escape and ✕). */}
       <div aria-hidden className="absolute inset-0 animate-in bg-black/40" onClick={() => request()} />
       <div
@@ -117,17 +117,18 @@ export function SidePanel({
           }
         }}
         className={cn(
-          "relative flex h-dvh w-full animate-panel-in flex-col border-l border-line bg-surface shadow-pop md:w-[520px] md:max-w-[calc(100vw-2rem)] xl:w-[600px]",
+          // Phone: the whole screen. Tablet and up: a window in the middle (Kebo ERP look), as tall as its form.
+          "relative flex h-dvh w-full animate-panel-in flex-col bg-surface shadow-pop md:h-auto md:max-h-[88vh] md:w-[720px] md:max-w-[calc(100vw-3rem)] md:animate-in md:overflow-hidden md:rounded-2xl md:border md:border-line",
           className,
         )}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="text-base font-semibold outline-none">
+            <h2 id={`${id}-title`} ref={head} tabIndex={-1} className="text-xl font-bold tracking-tight outline-none">
               {title}
             </h2>
             {description && (
-              <p id={`${id}-desc`} className="mt-0.5 text-xs text-muted">
+              <p id={`${id}-desc`} className="mt-0.5 text-[13px] text-text-2">
                 {description}
               </p>
             )}
@@ -164,7 +165,7 @@ export function SidePanel({
  */
 export function PanelBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div data-panel-body className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5", className)}>
+    <div data-panel-body className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto p-5 sm:px-6", className)}>
       {children}
     </div>
   );
@@ -177,7 +178,7 @@ export const PANEL_FORM = "flex flex-1 flex-col gap-5";
 export function PanelSection({ title, children, className, first }: { title?: string; children: ReactNode; className?: string; first?: boolean }) {
   return (
     <fieldset className={cn("flex min-w-0 flex-col gap-3", !first && "border-t border-line pt-5")}>
-      {title && <legend className="float-left mb-1 w-full text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</legend>}
+      {title && <legend className="float-left mb-1 w-full text-sm font-bold text-text">{title}</legend>}
       <div className={cn("grid grid-cols-1 gap-x-3 gap-y-3.5 sm:grid-cols-2", className)}>{children}</div>
     </fieldset>
   );
@@ -193,7 +194,7 @@ export function PanelActions({ children, end, className }: { children: ReactNode
   return (
     <div
       className={cn(
-        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface-2 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        "sticky -bottom-5 z-10 -mx-5 -mb-5 mt-auto flex flex-wrap items-center gap-3 border-t border-line bg-surface px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:-mx-6 sm:px-6",
         className,
       )}
     >
