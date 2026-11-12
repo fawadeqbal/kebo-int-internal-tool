@@ -1,7 +1,10 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
-import { can, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
-import { Alert, Badge, Card, CardBody, CardHeader, Meter, PageHeader, PriorityBadge, StageBadge, StatTile } from "@kebo/ui";
+import { can, ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type FlowStep, type InquiryStage, type Priority } from "@kebo/shared";
+import { Alert, Badge, ButtonLink, Card, CardBody, CardHeader, Meter, PriorityBadge, StageBadge, StatTile, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ArrowRight, FileText, PieChart, Plus, ReceiptText, TrendingUp, Wallet } from "lucide-react";
+import type { OrderRow } from "@/lib/types-orders";
+import type { Paged } from "@/lib/types";
 import { api } from "@/lib/api";
 import { requireUser, hasFeature } from "@/lib/session";
 import { date, money, TZ, plural } from "@/lib/format";
@@ -80,17 +83,31 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PageHeader
-        title={`${hello}, ${me.name.split(" ")[0]}`}
-        description={
-          <>
+      {/* The welcome card (Kebo ERP look): who, what day, how much needs them, and the day's main actions. */}
+      <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary-line bg-primary-soft px-5 py-5 sm:px-6">
+        <div className="min-w-0">
+          <p className="text-xs font-bold tracking-[0.08em] text-primary uppercase">{hello}</p>
+          <h1 className="mt-1 text-2xl leading-8 font-bold tracking-tight text-text sm:text-[28px] sm:leading-9">Welcome back, {me.name.split(" ")[0]}</h1>
+          <p className="mt-1 text-sm text-text-2">
             {dayName}
             <Suspense>
               <HowMany />
             </Suspense>
-          </>
-        }
-      />
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {can(me, "inquiries.create") && (
+            <ButtonLink href="/inquiries/new" variant="primary">
+              <Plus aria-hidden /> New inquiry
+            </ButtonLink>
+          )}
+          {can(me, "payments.record") && (
+            <ButtonLink href="/payments/new" variant="secondary">
+              <Wallet aria-hidden /> Record payment
+            </ButtonLink>
+          )}
+        </div>
+      </header>
 
       {insights && (
         <Suspense fallback={<MonthSkeleton />}>
@@ -98,10 +115,15 @@ export default async function DashboardPage() {
         </Suspense>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] [&>*]:min-w-0">
-        <Suspense fallback={<AttentionSkeleton />}>
-          <Attention all={can(me, "inquiries.viewAll")} />
-        </Suspense>
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] [&>*]:min-w-0">
+        <div className="flex flex-col gap-5">
+          <Suspense fallback={<AttentionSkeleton />}>
+            <Attention all={can(me, "inquiries.viewAll")} />
+          </Suspense>
+          <Suspense>
+            <RecentOrders />
+          </Suspense>
+        </div>
 
         <div className="flex flex-col gap-5">
           <Suspense fallback={<div className="h-[140px] animate-pulse rounded-2xl bg-surface-2" aria-hidden />}>
@@ -136,9 +158,9 @@ export default async function DashboardPage() {
                   ["Quoted", d.counts.quoted, "/inquiries?stage=quoted", "Waiting for answers"],
                 ] as const
               ).map(([label, value, href, hint]) => (
-                <Link key={label} href={href} className="rounded-xl border border-line p-3 transition-colors hover:border-line-strong">
-                  <p className="text-xs text-muted">{label}</p>
-                  <p className="text-2xl font-semibold tabular">{value}</p>
+                <Link key={label} href={href} className="rounded-xl border border-line bg-surface p-3 transition-colors hover:border-primary-line hover:bg-primary-soft/50">
+                  <p className="text-xs font-medium text-text-2">{label}</p>
+                  <p className="text-2xl font-bold text-primary tabular">{value}</p>
                   <p className="truncate text-xs text-muted">{hint}</p>
                 </Link>
               ))}
@@ -219,6 +241,8 @@ async function MonthStrip({ today }: { today: string }) {
         <Tiles>
           <StatTile
             label="Sales"
+            icon={TrendingUp}
+            iconColor={1}
             value={bigMoney(h.sales.now, c)}
             delta={<Delta value={change(h.sales.now, h.sales.before)} vs={vs} />}
             sub={`this month · ${plural(h.sales.orders, "order")}`}
@@ -226,6 +250,8 @@ async function MonthStrip({ today }: { today: string }) {
           />
           <StatTile
             label="Gross profit"
+            icon={PieChart}
+            iconColor={3}
             value={bigMoney(h.profit.now, c)}
             delta={<Delta value={change(h.profit.now, h.profit.before)} vs={vs} />}
             sub={`margin ${percent(h.profit.margin)}${h.profit.marginBefore !== null ? ` · was ${percent(h.profit.marginBefore)}` : ""}`}
@@ -233,6 +259,9 @@ async function MonthStrip({ today }: { today: string }) {
           />
           <StatTile
             label="Receivable"
+            icon={FileText}
+            iconColor={2}
+            tone={Number(overdue.amount) > 0 ? "bad" : undefined}
             value={bigMoney(owed, c)}
             meter={owed > 0 ? { percent: (Number(overdue.amount) / owed) * 100, label: `${bigMoney(Number(overdue.amount), c)} of it overdue` } : undefined}
             sub={
@@ -248,6 +277,8 @@ async function MonthStrip({ today }: { today: string }) {
           />
           <StatTile
             label="Open quotes"
+            icon={ReceiptText}
+            iconColor={4}
             value={bigMoney(Number(h.now.openQuotes.value), c)}
             sub={`${plural(h.now.openQuotes.count, "quote")}${h.now.openQuotes.likely ? ` · likely ${bigMoney(Number(h.now.openQuotes.likely), c)}` : ""}`}
             href="/inquiries?stage=quoted"
@@ -341,9 +372,9 @@ async function MyOrders() {
       <CardHeader title="My orders" description={`${board.items.length} open, by where they are`} />
       <CardBody className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {cols.map(([label, key, steps]) => (
-          <Link key={key} href={`/orders/board?mine=1&stage=${key}`} className="rounded-xl border border-line p-3 transition-colors hover:border-line-strong">
-            <p className="truncate text-xs text-muted">{label}</p>
-            <p className="text-2xl font-semibold tabular">{count(steps)}</p>
+          <Link key={key} href={`/orders/board?mine=1&stage=${key}`} className="rounded-xl border border-line bg-surface p-3 transition-colors hover:border-primary-line hover:bg-primary-soft/50">
+            <p className="truncate text-xs font-medium text-text-2">{label}</p>
+            <p className="text-2xl font-bold text-primary tabular">{count(steps)}</p>
           </Link>
         ))}
       </CardBody>
@@ -409,6 +440,54 @@ async function ThisWeek({ today }: { today: string }) {
           </li>
         ))}
       </ul>
+    </Card>
+  );
+}
+
+/** The latest open sales orders (the board's "Recent sales orders"): what each is worth, what is still due, where it is. */
+async function RecentOrders() {
+  const data = await api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1 }).catch(() => null);
+  if (!data || !data.rows.length) return null;
+  const rows = data.rows.slice(0, 6);
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Recent sales orders"
+        description={`${data.total} open`}
+        actions={
+          <ButtonLink href="/orders" variant="secondary" size="sm">
+            View all <ArrowRight aria-hidden />
+          </ButtonLink>
+        }
+      />
+      <Table>
+        <THead>
+          <tr>
+            <Th>Order</Th>
+            <Th>Customer</Th>
+            <Th className="text-right">Total</Th>
+            <Th className="text-right">Due</Th>
+            <Th>Status</Th>
+          </tr>
+        </THead>
+        <tbody>
+          {rows.map((o) => (
+            <Tr key={o.id}>
+              <Td>
+                <Link href={`/orders/${o.id}`} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-2 hover:text-primary">
+                  {o.refNo}
+                </Link>
+              </Td>
+              <Td className="max-w-56 truncate font-semibold">{o.customer.name}</Td>
+              <Td className="text-right tabular">{money(o.total, o.currency)}</Td>
+              <Td className="text-right tabular">{Number(o.due) > 0.005 ? money(o.due, o.currency) : "—"}</Td>
+              <Td>
+                <StatusBadge meaning={ORDER_STAGE_TONE[o.stage]}>{ORDER_STAGE_LABEL[o.stage]}</StatusBadge>
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </Table>
     </Card>
   );
 }

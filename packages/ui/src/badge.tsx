@@ -30,8 +30,8 @@ const TONES: Record<Tone | "primary" | "outline", string> = {
 /** Colour is never the only signal: every badge carries its words. */
 export function Badge({ tone = "neutral", dot, children, className }: { tone?: keyof typeof TONES; dot?: boolean; children: ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex h-5.5 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs font-medium whitespace-nowrap [&_svg]:size-3", TONES[tone], className)}>
-      {dot && <span className="size-1.5 rounded-full bg-current" aria-hidden />}
+    <span className={cn("inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap [&_svg]:size-3", TONES[tone], className)}>
+      {dot && <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />}
       {children}
     </span>
   );

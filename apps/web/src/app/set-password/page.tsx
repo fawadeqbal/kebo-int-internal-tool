@@ -15,7 +15,7 @@ export default async function SetPasswordPage({ searchParams }: { searchParams: 
     <AuthShell subtitle="Set your password">
       {info ? (
         <>
-          <h1 className="text-lg font-semibold">Hello {info.name}</h1>
+          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">Hello {info.name}</h1>
           <p className="mt-1 text-sm text-muted">
             Choose a password for <span className="font-medium text-text">{info.email}</span> at {info.company}.
           </p>
@@ -23,7 +23,7 @@ export default async function SetPasswordPage({ searchParams }: { searchParams: 
         </>
       ) : (
         <>
-          <h1 className="text-lg font-semibold">This link does not work</h1>
+          <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">This link does not work</h1>
           <Alert tone="warning" className="mt-3">
             It has expired or was already used. Ask your admin (or the person who sent it) for a new one.
           </Alert>

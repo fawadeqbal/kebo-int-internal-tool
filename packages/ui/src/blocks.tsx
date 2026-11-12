@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertTriangle, Check, CheckCircle2, Plus } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 
 /*
@@ -201,6 +201,8 @@ export function AddCard({
 
 /* ---------------------------------------------------------------- StatTile, Meter, RankedBars */
 
+const ICON_BG = { 1: "bg-chart-1", 2: "bg-chart-2", 3: "bg-chart-3", 4: "bg-chart-4", 5: "bg-chart-5" } as const;
+
 /** Tiles in a row of 3–6. */
 export function StatRow({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(170px,1fr))]", className)}>{children}</div>;
@@ -222,6 +224,8 @@ export function StatTile({
   meter,
   bar,
   size = "md",
+  icon: Icon,
+  iconColor = 1,
   className,
 }: {
   label: ReactNode;
@@ -237,9 +241,13 @@ export function StatTile({
   /** A bar of the caller's own (use of a limit), between the value and the context line. */
   bar?: ReactNode;
   size?: "sm" | "md";
+  /** A coloured tile with an icon on the left (the dashboard's figures). */
+  icon?: LucideIcon;
+  /** The tile's colour: one of the chart colours (1 green, 2 orange, 3 blue, 4 violet, 5 teal). */
+  iconColor?: 1 | 2 | 3 | 4 | 5;
   className?: string;
 }) {
-  const body = (
+  const figure = (
     <>
       <span className="flex items-start justify-between gap-2">
         <span className="text-xs font-medium text-text-2">{label}</span>
@@ -263,12 +271,23 @@ export function StatTile({
         </span>
       )}
       {bar}
-      {sub && <span className="text-xs text-muted">{sub}</span>}
+      {sub && <span className={cn("text-xs", tone === "bad" ? "font-medium text-bad" : "text-muted")}>{sub}</span>}
     </>
   );
+  const body = Icon ? (
+    <span className="flex min-w-0 items-start gap-3">
+      <span className={cn("hidden size-11 shrink-0 place-items-center rounded-xl text-white sm:grid", ICON_BG[iconColor])} aria-hidden>
+        <Icon className="size-5" />
+      </span>
+      <span className={cn("flex min-w-0 flex-1 flex-col", size === "sm" ? "gap-0.5" : "gap-1")}>{figure}</span>
+    </span>
+  ) : (
+    figure
+  );
   const cls = cn(
-    "flex h-full min-w-0 flex-col rounded-xl border border-line bg-surface shadow-card",
-    size === "sm" ? "gap-0.5 px-4 py-3" : "gap-1 px-4 py-3.5",
+    "flex h-full min-w-0 flex-col rounded-2xl border bg-surface shadow-card",
+    tone === "bad" ? "border-bad/30" : "border-line",
+    size === "sm" ? "gap-0.5 px-4 py-3" : "gap-1 px-4 py-4",
     className,
   );
   return href ? (
@@ -321,36 +340,60 @@ export function RankedBars({ rows, label }: { rows: { key: string; label: ReactN
 
 export type StepState = "done" | "current" | "attention" | "todo";
 
-/** Where an order is in the flow: one segment per stage, each linking to its tab. */
+const STEP_WORD: Record<StepState, string> = { done: "Done", current: "Now", attention: "Late", todo: "Later" };
+
+/**
+ * Where a record is in its flow (order steps, inquiry steps): one box per step, each linking to its
+ * tab. Done: soft green with a tick. Now: an orange edge. Needs attention: a red edge. Later: plain.
+ * The word ("Done", "Now"…) is always written; the colour only repeats it.
+ */
 export function ProgressSteps({ steps, label = "Progress" }: { steps: { key: string; label: string; sub?: ReactNode; state: StepState; href?: string }[]; label?: string }) {
   return (
-    <nav aria-label={label} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:px-0">
-      {steps.map((s) => {
-        const inner = (
-          <>
-            <span
-              className={cn(
-                "block h-1 rounded-full",
-                s.state === "done" ? "bg-ok" : s.state === "current" ? "bg-primary" : s.state === "attention" ? "bg-warn" : "bg-line",
+    <nav aria-label={label} className="-mx-4 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+      <ol className="flex gap-2">
+        {steps.map((s, i) => {
+          const inner = (
+            <>
+              <span className="flex items-center gap-1.5 text-[13px] font-bold text-text">
+                {s.state === "done" ? (
+                  <Check className="size-3.5 shrink-0 text-ok" strokeWidth={3} aria-hidden />
+                ) : s.state === "attention" ? (
+                  <AlertTriangle className="size-3.5 shrink-0 text-bad" aria-hidden />
+                ) : s.state === "current" ? (
+                  <span className="size-2 shrink-0 rounded-full bg-action-solid" aria-hidden />
+                ) : (
+                  <span className="w-3.5 shrink-0 text-center text-xs font-semibold text-muted" aria-hidden>
+                    {i + 1}
+                  </span>
+                )}
+                <span className="truncate">{s.label}</span>
+                <span className={cn("ml-auto pl-1 text-[11px] font-semibold", s.state === "attention" ? "text-bad" : s.state === "current" ? "text-action" : "text-muted")}>{STEP_WORD[s.state]}</span>
+              </span>
+              {s.sub && <span className="block truncate text-xs text-text-2">{s.sub}</span>}
+            </>
+          );
+          const cls = cn(
+            "flex min-w-40 flex-1 flex-col gap-1 rounded-xl px-3 py-2.5 transition-colors",
+            s.state === "done" && "border border-primary-line bg-primary-soft",
+            s.state === "current" && "border-2 border-action-solid bg-action-soft",
+            s.state === "attention" && "border-2 border-bad bg-bad-soft",
+            s.state === "todo" && "border border-line bg-surface",
+          );
+          return (
+            <li key={s.key} className="flex min-w-40 flex-1">
+              {s.href ? (
+                <Link href={s.href} className={cn(cls, "hover:shadow-card")} aria-current={s.state === "current" ? "step" : undefined}>
+                  {inner}
+                </Link>
+              ) : (
+                <div className={cls} aria-current={s.state === "current" ? "step" : undefined}>
+                  {inner}
+                </div>
               )}
-            />
-            <span className={cn("block text-xs font-medium", s.state === "current" ? "font-semibold text-text" : s.state === "attention" ? "font-semibold text-warn" : s.state === "done" ? "text-text-2" : "text-muted")}>
-              {s.label}
-            </span>
-            {s.sub && <span className="block text-xs text-muted">{s.sub}</span>}
-          </>
-        );
-        const cls = "flex min-w-28 flex-1 flex-col gap-1.5";
-        return s.href ? (
-          <Link key={s.key} href={s.href} className={cn(cls, "hover:opacity-80")} aria-current={s.state === "current" ? "step" : undefined}>
-            {inner}
-          </Link>
-        ) : (
-          <div key={s.key} className={cls}>
-            {inner}
-          </div>
-        );
-      })}
+            </li>
+          );
+        })}
+      </ol>
     </nav>
   );
 }

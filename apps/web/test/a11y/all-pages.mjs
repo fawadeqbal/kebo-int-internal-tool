@@ -128,7 +128,7 @@ async function primaries(page) {
     const main = document.querySelector("main") ?? document.body;
     const seen = [];
     for (const el of main.querySelectorAll("a, button, [role=button]")) {
-      if (typeof el.className !== "string" || !el.className.split(/\s+/).includes("bg-primary-solid")) continue;
+      if (typeof el.className !== "string" || !el.className.split(/\s+/).includes("bg-action-solid")) continue;
       if (el.getAttribute("role") === "switch" || el.closest("[role=dialog],[role=alertdialog],[role=menu]")) continue;
       // A table row's own confirm (LineTable's ✓ on its new-item row) belongs to the row, as a side panel's Save does.
       if (el.closest("tr")) continue;

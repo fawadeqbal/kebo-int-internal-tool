@@ -1,15 +1,18 @@
 import { Suspense, type ReactNode } from "react";
 import { Toast } from "@kebo/ui/client";
-import { ClipboardList } from "lucide-react";
-import { Card } from "@kebo/ui";
+import { Truck, TrendingUp, Wallet } from "lucide-react";
 
-/** The centred card used by sign-in, the two-step code and the public pages (request a demo, sign up). */
+/**
+ * The frame of sign-in, the two-step code and the public pages (request a demo, sign up), Kebo ERP
+ * look. Phone first: the brand mark and the form. From a laptop up, a soft green panel on the left
+ * says what the app does.
+ */
 export function AuthShell({
   children,
   wide = false,
-  title = "RFQ Desk",
+  title = "Kebo ERP",
   subtitle = "Sign in to your company",
-  footer = "Every RFQ from first message to shipped and paid.",
+  footer = "From the first inquiry to the money in the bank.",
 }: {
   children: ReactNode;
   wide?: boolean;
@@ -18,21 +21,49 @@ export function AuthShell({
   footer?: ReactNode;
 }) {
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-10">
-      <div aria-hidden className="pointer-events-none absolute -top-40 left-1/2 h-96 w-[48rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
-      <div className={wide ? "relative w-full max-w-xl" : "relative w-full max-w-sm"}>
-        <div className="mb-6 flex items-center justify-center gap-2.5">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-solid text-primary-fg shadow-card">
-            <ClipboardList className="size-6" aria-hidden />
+    <main className="flex min-h-dvh flex-col lg:flex-row">
+      <aside className="hidden flex-col justify-between gap-10 bg-primary-soft p-12 lg:flex lg:w-[46%] xl:p-16">
+        <div className="flex items-center gap-3">
+          <span className="grid size-11 place-items-center rounded-xl bg-primary-solid text-xl font-bold text-primary-fg" aria-hidden>
+            K
           </span>
-          <div className="leading-tight">
-            <p className="font-semibold text-text">{title}</p>
-            {/* text-2, not muted: it sits on the purple glow, where muted is under 4.5:1. */}
-            <p className="text-xs text-text-2">{subtitle}</p>
-          </div>
+          <span className="text-xl font-bold text-text">{title}</span>
         </div>
-        <Card className="p-6">{children}</Card>
-        {footer && <p className="mt-6 text-center text-xs text-muted">{footer}</p>}
+        <div>
+          <p className="max-w-lg text-[40px] leading-[1.1] font-bold tracking-tight text-text">From the first inquiry to the money in the bank.</p>
+          <p className="mt-4 max-w-md text-base text-text-2">Inquiries, factory offers, quotations, orders, shipping, papers and payments, for one trading company or many.</p>
+        </div>
+        <ul className="grid grid-cols-3 gap-3">
+          {(
+            [
+              [TrendingUp, "Sales", "Inquiry → quotation → order"],
+              [Truck, "Operations", "Factories, shipping, papers"],
+              [Wallet, "Money", "Payments, ledger, profit"],
+            ] as const
+          ).map(([Icon, name, line]) => (
+            <li key={name} className="rounded-2xl bg-surface p-4">
+              <Icon className="size-5 text-primary" aria-hidden />
+              <p className="mt-2 text-sm font-bold text-text">{name}</p>
+              <p className="text-xs text-text-2">{line}</p>
+            </li>
+          ))}
+        </ul>
+      </aside>
+      <div className="flex flex-1 items-center justify-center bg-surface px-4 py-10 sm:px-8">
+        <div className={wide ? "w-full max-w-xl" : "w-full max-w-sm"}>
+          <div className="mb-8 flex items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-solid text-xl font-bold text-primary-fg lg:hidden" aria-hidden>
+              K
+            </span>
+            <div className="leading-tight lg:hidden">
+              <p className="font-bold text-text">{title}</p>
+              <p className="text-xs text-text-2">{subtitle}</p>
+            </div>
+            <p className="hidden text-sm font-medium text-text-2 lg:block">{subtitle}</p>
+          </div>
+          {children}
+          {footer && <p className="mt-8 text-xs text-muted">{footer}</p>}
+        </div>
       </div>
       <Suspense>
         <Toast />

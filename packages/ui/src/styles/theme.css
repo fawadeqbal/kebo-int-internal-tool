@@ -35,91 +35,104 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg: #f7f7f9;
+  /* Kebo ERP look (client video, Nov 2026): light green-grey ground, white cards, green brand, orange for the one main action. */
+  --bg: #f4f7f5;
   --surface: #ffffff;
-  --surface-2: #f2f2f5;
-  --surface-3: #e9e9ee;
-  --line: #e4e4ea;
-  --line-strong: #d3d3dc;
-  --text: #16151c;
-  --text-2: #4a4857;
+  --surface-2: #eef3f0;
+  --surface-3: #e3eae5;
+  --line: #e2e8e4;
+  --line-strong: #d0d9d3;
+  --text: #15211a;
+  --text-2: #3d4c43;
   /* Text colours pass WCAG AA (4.5:1) on every surface and soft background. */
-  --muted: #666471;
+  --muted: #56665c;
 
-  --primary: #7c3aed;
-  --primary-hover: #6d28d9;
-  --primary-soft: #f1ebfe;
+  /* Brand: green. Links, the current page, focus, "done". */
+  --primary: #1b6e37;
+  --primary-hover: #124d26;
+  --primary-soft: #e6f2ea;
+  --primary-line: #cfe5d7;
   --primary-fg: #ffffff;
-  /* Filled buttons keep white text readable in both themes (≥ 4.5:1). */
-  --primary-solid: #7c3aed;
-  --primary-solid-hover: #6d28d9;
-  --bad-solid: #dc2626;
+  /* Filled green (Save, the brand mark): white text readable in both themes (≥ 4.5:1). */
+  --primary-solid: #1e7b3c;
+  --primary-solid-hover: #17682f;
+  /* The page's one main action: orange (white text ≥ 4.5:1). */
+  --action: #b04808;
+  --action-solid: #c2510a;
+  --action-solid-hover: #a8460a;
+  --action-soft: #fff1e7;
+  --bad-solid: #b42318;
 
-  --trust: #0f766e;
-  --trust-soft: #e6f7f5;
-  --money: #a16207;
+  --trust: #0b6a6e;
+  --trust-soft: #e3f4f4;
+  --money: #9a5b00;
   --money-soft: #fdf4e3;
-  --ok: #12703a;
-  --ok-soft: #e8f6ec;
-  --warn: #92400e;
-  --warn-soft: #fef3e2;
-  --bad: #c01c1c;
+  --ok: #1c6b35;
+  --ok-soft: #e3f4e9;
+  --warn: #8a4a05;
+  --warn-soft: #fff4e0;
+  --bad: #a12020;
   --bad-soft: #fdecec;
-  --info: #1d4ed8;
-  --info-soft: #eaf1fe;
+  --info: #1f57c3;
+  --info-soft: #e8f0fe;
 
-  --ring: color-mix(in oklab, var(--primary) 45%, transparent);
-  --shadow: 0 1px 2px rgb(16 15 25 / 0.05), 0 1px 1px rgb(16 15 25 / 0.03);
-  --shadow-lg: 0 12px 32px -8px rgb(16 15 25 / 0.18), 0 2px 6px rgb(16 15 25 / 0.06);
+  --ring: color-mix(in oklab, var(--primary-solid) 45%, transparent);
+  --shadow: 0 1px 2px rgb(21 33 26 / 0.04);
+  --shadow-lg: 0 24px 60px -12px rgb(21 33 26 / 0.25), 0 2px 6px rgb(21 33 26 / 0.06);
 
-  /* Validated categorical chart colours (light): CVD ΔE ≥ 9.7, contrast ≥ 3:1. */
-  --chart-1: #7c3aed;
-  --chart-2: #0d9488;
-  --chart-3: #d97706;
-  --chart-4: #db2777;
-  --chart-5: #2563eb;
+  /* Chart colours (light): green, orange, blue, violet, teal; each ≥ 3:1 on white. */
+  --chart-1: #1e7b3c;
+  --chart-2: #c2510a;
+  --chart-3: #2f6fdb;
+  --chart-4: #7a4bc8;
+  --chart-5: #0f7c80;
 }
 
 .dark {
-  --bg: #0b0a10;
-  --surface: #131219;
-  --surface-2: #1a1922;
-  --surface-3: #23222d;
-  --line: #262531;
-  --line-strong: #34333f;
-  --text: #f1f0f5;
-  --text-2: #b9b7c6;
-  --muted: #9391a3;
+  --bg: #0b120e;
+  --surface: #111a15;
+  --surface-2: #17221c;
+  --surface-3: #1f2c25;
+  --line: #24322a;
+  --line-strong: #314238;
+  --text: #eef4f0;
+  --text-2: #b6c4bb;
+  --muted: #93a49a;
 
-  --primary: #a78bfa;
-  --primary-hover: #c4b5fd;
-  --primary-soft: #221a38;
+  --primary: #6fcf8f;
+  --primary-hover: #8fdca8;
+  --primary-soft: #13281b;
+  --primary-line: #1f3d2a;
   --primary-fg: #ffffff;
-  --primary-solid: #7c3aed;
-  --primary-solid-hover: #8b5cf6;
-  --bad-solid: #dc2626;
+  --primary-solid: #1e7b3c;
+  --primary-solid-hover: #23904a;
+  --action: #f59a5f;
+  --action-solid: #c2510a;
+  --action-solid-hover: #d65c10;
+  --action-soft: #2c1a0e;
+  --bad-solid: #c4321f;
 
-  --trust: #5eead4;
-  --trust-soft: #11292a;
+  --trust: #5ed6d9;
+  --trust-soft: #0f2a2b;
   --money: #f5c451;
   --money-soft: #2a2213;
-  --ok: #4ade80;
-  --ok-soft: #12261a;
+  --ok: #6fcf8f;
+  --ok-soft: #13281b;
   --warn: #fbbf24;
   --warn-soft: #2a2110;
   --bad: #f87171;
   --bad-soft: #2c1517;
-  --info: #60a5fa;
+  --info: #7aa7f5;
   --info-soft: #111f33;
 
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
 
-  --chart-1: #8b5cf6;
-  --chart-2: #14a394;
-  --chart-3: #c07f12;
-  --chart-4: #e0478f;
-  --chart-5: #3b82f6;
+  --chart-1: #3fae63;
+  --chart-2: #e0712c;
+  --chart-3: #4d8af0;
+  --chart-4: #9a72e0;
+  --chart-5: #22a3a8;
 }
 
 @theme inline {
@@ -138,6 +151,11 @@
   --color-primary-fg: var(--primary-fg);
   --color-primary-solid: var(--primary-solid);
   --color-primary-solid-hover: var(--primary-solid-hover);
+  --color-primary-line: var(--primary-line);
+  --color-action: var(--action);
+  --color-action-solid: var(--action-solid);
+  --color-action-solid-hover: var(--action-solid-hover);
+  --color-action-soft: var(--action-soft);
   --color-bad-solid: var(--bad-solid);
   --color-trust: var(--trust);
   --color-trust-soft: var(--trust-soft);
@@ -158,7 +176,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Kebo Inter", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --shadow-card: var(--shadow);

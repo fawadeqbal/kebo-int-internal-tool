@@ -20,7 +20,7 @@ async function primaries(page) {
     const main = document.querySelector("main") ?? document.body;
     const seen = [];
     for (const el of main.querySelectorAll("a, button, [role=button]")) {
-      if (!el.className || typeof el.className !== "string" || !el.className.split(/\s+/).includes("bg-primary-solid")) continue;
+      if (!el.className || typeof el.className !== "string" || !el.className.split(/\s+/).includes("bg-action-solid")) continue;
       // Switches are on/off, not buttons; dialogs and side panels have their own Save.
       if (el.getAttribute("role") === "switch" || el.closest("[role=dialog],[role=alertdialog],[role=menu]")) continue;
       const r = el.getBoundingClientRect();

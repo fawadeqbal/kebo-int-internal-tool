@@ -7,7 +7,7 @@ export const metadata = { title: "No company here" };
 export default function NoCompanyPage() {
   return (
     <AuthShell subtitle="No company here">
-      <h1 className="text-lg font-semibold">There is no company at this address</h1>
+      <h1 className="text-2xl leading-8 font-bold tracking-tight sm:text-[28px] sm:leading-9">There is no company at this address</h1>
       <p className="mt-2 text-sm text-muted">
         Check the address you were given. If your company used to be here, ask your admin for its new address.
       </p>

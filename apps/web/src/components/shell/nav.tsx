@@ -17,8 +17,6 @@ import {
   Monitor,
   Moon,
   Package,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
   Search,
   Settings,
@@ -31,7 +29,7 @@ import {
 } from "lucide-react";
 import { Avatar, buttonClass, cn, Kbd } from "@kebo/ui";
 import { logoutAction } from "@/app/login/actions";
-import { HOME_HREF, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, RAIL_COOKIE, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
+import { HOME_HREF, moduleOf, moduleTotal, OPEN_COOKIE, pageOf, type ModuleKey, type NavIcon, type NavModule, type NavPage } from "@/lib/nav";
 
 export type { NavModule, NavPage } from "@/lib/nav";
 
@@ -183,7 +181,19 @@ function ThemeMenu() {
 
 function AccountMenu({ user }: { user: { name: string; email: string; role: string } }) {
   return (
-    <Menu label="Account" className="w-60" trigger={<Avatar name={user.name} size={30} />}>
+    <Menu
+      label="Account"
+      className="w-60"
+      trigger={
+        <span className="flex items-center gap-2.5 rounded-full lg:py-1 lg:pr-2 lg:pl-1 lg:hover:bg-surface-2">
+          <Avatar name={user.name} size={34} />
+          <span className="hidden text-left leading-tight lg:block">
+            <span className="block max-w-36 truncate text-sm font-semibold text-text">{user.name}</span>
+            <span className="block max-w-36 truncate text-[11px] text-muted">{user.role}</span>
+          </span>
+        </span>
+      }
+    >
       <div className="px-2 py-1.5 text-xs text-muted">
         <span className="block truncate text-sm font-medium text-text">{user.name}</span>
         <span className="block truncate">{user.email}</span>
@@ -317,22 +327,27 @@ function ModuleTree({
   );
 }
 
-/** The company's logo, or its initials. */
+/** The company's logo, or its first letter on the green brand tile. */
 function Logo({ companyName, logo }: { companyName: string; logo?: string }) {
   return logo ? (
     // eslint-disable-next-line @next/next/no-img-element -- a small static logo
-    <img src={logo} alt="" width={32} height={32} className="size-8 shrink-0" />
+    <img src={logo} alt="" width={40} height={40} className="size-10 shrink-0 rounded-xl object-contain" />
   ) : (
-    <Avatar name={companyName} size={32} className="shrink-0" />
+    <span
+      className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-solid text-lg font-bold text-primary-fg before:content-[attr(data-letter)]"
+      data-letter={(companyName.trim()[0] ?? "K").toUpperCase()}
+      aria-hidden
+    />
   );
 }
 
 /**
- * The collapsed sidebar: one icon per module. Hovering or focusing one shows its pages in a small
- * menu beside it; ↓, Enter or Space moves into the menu, ↑ ↓ Home End move in it, Esc closes it
- * (back on the icon), Tab moves on to the next icon.
+ * One module in the top menu: its icon above its one-word name. Hovering, focusing or clicking it
+ * shows its pages in a small menu under it; ↓, Enter or Space moves into the menu, ↑ ↓ Home End move
+ * in it, Esc closes it (back on the module), Tab moves on to the next module. The current module is
+ * a soft green tile with a green line under it.
  */
-function RailModule({ m, current, activeHref }: { m: NavModule; current: boolean; activeHref: string | undefined }) {
+function TopModule({ m, current, activeHref }: { m: NavModule; current: boolean; activeHref: string | undefined }) {
   const Icon = ICONS[m.icon];
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -341,7 +356,7 @@ function RailModule({ m, current, activeHref }: { m: NavModule; current: boolean
   const menu = useRef<HTMLUListElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const focusAt = useRef<number | null>(null);
-  // Focus put back on the icon by Esc does not open the menu again.
+  // Focus put back on the module by Esc does not open the menu again.
   const quiet = useRef(false);
   const menuId = useId();
   const total = moduleTotal(m);
@@ -355,10 +370,9 @@ function RailModule({ m, current, activeHref }: { m: NavModule; current: boolean
   const place = useCallback(() => {
     const r = btn.current?.getBoundingClientRect();
     if (!r) return;
-    // Beside the icon, kept inside the window.
-    const height = 44 + m.pages.length * 36;
-    setPos({ top: Math.max(8, Math.min(r.top - 6, window.innerHeight - height - 8)), left: r.right + 10 });
-  }, [m.pages.length]);
+    // Under the module, kept inside the window.
+    setPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 248)) });
+  }, []);
   const show = () => {
     window.clearTimeout(timer.current);
     place();
@@ -369,7 +383,7 @@ function RailModule({ m, current, activeHref }: { m: NavModule; current: boolean
     timer.current = window.setTimeout(() => setOpen(false), delay);
   };
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  // Esc closes it wherever focus is (hovered with the mouse, or in the menu: focus goes back to the icon).
+  // Esc closes it wherever focus is (hovered with the mouse, or in the menu: focus goes back to the module).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -381,8 +395,13 @@ function RailModule({ m, current, activeHref }: { m: NavModule; current: boolean
         btn.current?.focus();
       }
     };
+    const onScroll = () => setOpen(false);
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onScroll);
+    };
   }, [open]);
 
   const items = () => [...(menu.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
@@ -425,92 +444,159 @@ function RailModule({ m, current, activeHref }: { m: NavModule; current: boolean
     else if (e.key === "Home") go(0);
     else if (e.key === "End") go(list.length - 1);
     else if (e.key === "Tab") {
-      // On to the next icon (or back to this one): the menu closes.
+      // On to the next module (or back to this one): the menu closes.
       e.preventDefault();
       setOpen(false);
       if (e.shiftKey) {
         quiet.current = true;
         btn.current?.focus();
       } else {
-        const icons = [...(btn.current?.closest("nav")?.querySelectorAll<HTMLElement>("[data-rail-item]") ?? [])];
-        const next = icons[icons.indexOf(btn.current!) + 1];
+        const all = [...(btn.current?.closest("nav")?.querySelectorAll<HTMLElement>("[data-module-item]") ?? [])];
+        const next = all[all.indexOf(btn.current!) + 1];
         (next ?? btn.current)?.focus();
       }
     }
   };
 
   return (
-    <div
-      ref={wrap}
-      className="relative"
+    <li
+      className="relative flex"
       onMouseEnter={show}
       onMouseLeave={() => hide()}
       onBlur={(e) => {
         if (!wrap.current?.contains(e.relatedTarget as Node)) hide(0);
       }}
     >
-      <button
-        ref={btn}
-        type="button"
-        data-rail-item
-        aria-label={`${m.title}${total ? `, ${total} to look at` : ""}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onFocus={() => {
-          if (quiet.current) quiet.current = false;
-          else show();
-        }}
-        onClick={show}
-        onKeyDown={onButtonKey}
-        className={cn(
-          "relative grid size-10 place-items-center rounded-[10px] text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
-          open && "bg-surface-2 text-text",
-          current && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",
-        )}
-      >
-        <Icon className="size-[18px]" aria-hidden />
-        {total > 0 && <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-warn ring-2 ring-surface" aria-hidden />}
-      </button>
-      {open && pos && (
-        <div
-          className="fixed z-50 w-56 animate-in rounded-xl border border-line bg-surface p-2 shadow-pop"
-          style={{ top: pos.top, left: pos.left }}
-          onMouseEnter={show}
-          onMouseLeave={() => hide()}
+      <div ref={wrap} className="flex">
+        <button
+          ref={btn}
+          type="button"
+          data-module-item
+          aria-label={`${m.title}${total ? `, ${total} to look at` : ""}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? menuId : undefined}
+          onFocus={() => {
+            if (quiet.current) quiet.current = false;
+            else show();
+          }}
+          onClick={show}
+          onKeyDown={onButtonKey}
+          className={cn(
+            "relative flex h-[58px] min-w-[76px] flex-col items-center justify-center gap-1 rounded-t-xl px-2.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+            open && "bg-surface-2 text-text",
+            current && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
+          )}
         >
-          <p id={`${menuId}-t`} className="px-2.5 pt-1 pb-2 text-[13px] font-semibold text-text">
-            {m.title}
-          </p>
-          <ul ref={menu} id={menuId} role="menu" aria-labelledby={`${menuId}-t`} onKeyDown={onMenuKey}>
-            {m.pages.map((p) => {
-              const active = p.href === activeHref;
-              return (
-                <li key={p.href} role="none">
-                  <Link
-                    href={p.href}
-                    role="menuitem"
-                    tabIndex={-1}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex h-8 items-center justify-between gap-2 rounded-lg px-2.5 text-sm text-text-2 hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2",
-                      active && "bg-primary-soft font-medium text-primary hover:bg-primary-soft hover:text-primary",
-                    )}
-                  >
-                    <span className="truncate">{p.label}</span>
-                    {!!p.badge && <Count n={p.badge} label={p.badgeLabel ?? "unread"} />}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-    </div>
+          <Icon className="size-5" strokeWidth={current ? 2.25 : 1.85} aria-hidden />
+          <span>{m.short}</span>
+          {total > 0 && <span className="absolute top-2 right-3 size-2 rounded-full bg-action-solid ring-2 ring-surface" aria-hidden />}
+          {current && <span className="absolute inset-x-2 bottom-0 h-[3px] rounded-full bg-primary-solid" aria-hidden />}
+        </button>
+        {open && pos && (
+          <div
+            className="fixed z-50 w-60 animate-in rounded-2xl border border-line bg-surface p-2 shadow-pop"
+            style={{ top: pos.top, left: pos.left }}
+            onMouseEnter={show}
+            onMouseLeave={() => hide()}
+          >
+            <p id={`${menuId}-t`} className="px-2.5 pt-1 pb-2 text-[13px] font-bold text-text">
+              {m.title}
+            </p>
+            <ul ref={menu} id={menuId} role="menu" aria-labelledby={`${menuId}-t`} onKeyDown={onMenuKey}>
+              {m.pages.map((p) => {
+                const active = p.href === activeHref;
+                return (
+                  <li key={p.href} role="none">
+                    <Link
+                      href={p.href}
+                      role="menuitem"
+                      tabIndex={-1}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex h-9 items-center justify-between gap-2 rounded-lg px-2.5 text-sm text-text-2 hover:bg-surface-2 hover:text-text focus-visible:bg-surface-2",
+                        active && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
+                      )}
+                    >
+                      <span className="truncate">{p.label}</span>
+                      {!!p.badge && <Count n={p.badge} label={p.badgeLabel ?? "unread"} />}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    </li>
   );
 }
 
-/** The sidebar's contents: the company at the top, the modules, who is signed in. */
+/** Dashboard, then one TopModule per module: the top menu (tablet and desktop). */
+function TopMenu({ modules }: { modules: NavModule[] }) {
+  const pathname = usePathname();
+  const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
+  const current = moduleOf(pathname, modules);
+  const home = isActive(pathname, HOME_HREF);
+  return (
+    <nav aria-label="Main" className="no-print hidden border-b border-line bg-surface md:block">
+      <ul className="mx-auto flex max-w-[1440px] items-end gap-1 overflow-x-auto px-4 pt-1.5 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+        <li className="flex">
+          <Link
+            href={HOME_HREF}
+            data-module-item
+            aria-current={home ? "page" : undefined}
+            className={cn(
+              "relative flex h-[58px] min-w-[76px] flex-col items-center justify-center gap-1 rounded-t-xl px-2.5 text-[12px] font-medium text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
+              home && "bg-primary-soft font-semibold text-primary hover:bg-primary-soft hover:text-primary",
+            )}
+          >
+            <House className="size-5" strokeWidth={home ? 2.25 : 1.85} aria-hidden />
+            <span>Dashboard</span>
+            {home && <span className="absolute inset-x-2 bottom-0 h-[3px] rounded-full bg-primary-solid" aria-hidden />}
+          </Link>
+        </li>
+        {modules.map((m) => (
+          <TopModule key={m.key} m={m} current={m.key === current} activeHref={activeHref} />
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** The pages of the module the person is in, as chips under the menu: one tap to the module's other pages. */
+function ModulePages({ modules }: { modules: NavModule[] }) {
+  const pathname = usePathname();
+  const current = modules.find((m) => m.key === moduleOf(pathname, modules));
+  if (!current || current.pages.length < 2) return null;
+  const activeHref = pageOf(pathname, current.pages)?.href;
+  return (
+    <nav aria-label={`${current.title} pages`} className="no-print border-b border-line bg-surface/70">
+      <ul className="mx-auto flex max-w-[1440px] items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+        {current.pages.map((p) => {
+          const active = p.href === activeHref;
+          return (
+            <li key={p.href} className="shrink-0">
+              <Link
+                href={p.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors",
+                  active ? "border-primary-line bg-primary-soft font-semibold text-primary" : "border-line bg-surface text-text-2 hover:border-line-strong hover:text-text",
+                )}
+              >
+                {p.label}
+                {!!p.badge && <Count n={p.badge} label={p.badgeLabel ?? "unread"} />}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+/** The phone drawer's contents: the company at the top, the modules, who is signed in. */
 function SidebarContent({
   modules,
   companyName,
@@ -519,7 +605,6 @@ function SidebarContent({
   open,
   toggle,
   big,
-  onCollapse,
 }: {
   modules: NavModule[];
   companyName: string;
@@ -528,7 +613,6 @@ function SidebarContent({
   open: Set<ModuleKey>;
   toggle: (key: ModuleKey) => void;
   big?: boolean;
-  onCollapse?: () => void;
 }) {
   const pathname = usePathname();
   const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
@@ -539,14 +623,9 @@ function SidebarContent({
           <Logo companyName={companyName} logo={logo} />
           <span className="min-w-0 leading-tight">
             <span className="block truncate text-sm font-semibold text-text">{companyName}</span>
-            <span className="block text-[11px] text-muted">RFQ Desk</span>
+            <span className="block text-[11px] text-muted">Kebo ERP</span>
           </span>
         </Link>
-        {onCollapse && (
-          <button type="button" onClick={onCollapse} aria-label="Collapse the sidebar" title="Collapse the sidebar" className={buttonClass("ghost", "icon-sm")}>
-            <PanelLeftClose aria-hidden />
-          </button>
-        )}
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Main">
         <ModuleTree modules={modules} pathname={pathname} activeHref={activeHref} open={open} toggle={toggle} big={big} />
@@ -558,53 +637,14 @@ function SidebarContent({
   );
 }
 
-/** The collapsed sidebar: the logo, the button that opens it again, Dashboard and one icon per module. */
-function RailContent({ modules, companyName, logo, onExpand }: { modules: NavModule[]; companyName: string; logo?: string; onExpand: () => void }) {
-  const pathname = usePathname();
-  const activeHref = pageOf(pathname, modules.flatMap((m) => m.pages))?.href;
-  const current = moduleOf(pathname, modules);
-  const home = isActive(pathname, HOME_HREF);
-  return (
-    <>
-      <div className="flex h-14 shrink-0 items-center justify-center border-b border-line">
-        <Link href={HOME_HREF} aria-label={`${companyName}, home`} className="rounded-lg">
-          <Logo companyName={companyName} logo={logo} />
-        </Link>
-      </div>
-      <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto px-3 py-3" aria-label="Main">
-        <button
-          type="button"
-          onClick={onExpand}
-          aria-label="Expand the sidebar"
-          title="Expand the sidebar"
-          className="mb-1 grid size-10 place-items-center rounded-[10px] text-muted transition-colors hover:bg-surface-2 hover:text-text"
-        >
-          <PanelLeftOpen className="size-[18px]" aria-hidden />
-        </button>
-        <Link
-          href={HOME_HREF}
-          data-rail-item
-          aria-label="Dashboard"
-          aria-current={home ? "page" : undefined}
-          title="Dashboard"
-          className={cn(
-            "grid size-10 place-items-center rounded-[10px] text-text-2 transition-colors hover:bg-surface-2 hover:text-text",
-            home && "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary",
-          )}
-        >
-          <House className="size-[18px]" aria-hidden />
-        </Link>
-        {modules.map((m) => (
-          <RailModule key={m.key} m={m} current={m.key === current} activeHref={activeHref} />
-        ))}
-      </nav>
-    </>
-  );
-}
-
 /* ------------------------------------------------------------------ Shell */
 
-/** Sidebar + top bar around every signed-in screen; a bottom tab bar on phones. */
+/**
+ * The frame around every signed-in screen (Kebo ERP look). Phone first: a top bar (menu, logo,
+ * alerts, account), the module drawer, a bottom tab bar with the main action in the middle.
+ * Tablet and desktop add the search and the top menu: one item per module, icon above its name,
+ * and the current module's pages as chips under it.
+ */
 export function AppShell({
   modules,
   companyName,
@@ -612,7 +652,6 @@ export function AppShell({
   unread = 0,
   canCreate = false,
   logo,
-  initialRail = false,
   initialOpen = [],
   children,
 }: {
@@ -624,17 +663,14 @@ export function AppShell({
   user: { name: string; email: string; role: string };
   unread?: number;
   canCreate?: boolean;
-  /** The sidebar was left collapsed to icons (its cookie), so the first paint is already right. */
-  initialRail?: boolean;
-  /** The modules left open (their cookie). */
+  /** The drawer's modules left open (their cookie). */
   initialOpen?: ModuleKey[];
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
-  const [rail, setRail] = useState(initialRail);
   const pathname = usePathname();
   const current = moduleOf(pathname, modules);
-  // The modules the person opened (remembered in a cookie); the current page's module opens by itself on top,
+  // The drawer's modules the person opened (remembered in a cookie); the current page's module opens by itself on top,
   // unless they closed it on this page.
   const [opened, setOpened] = useState<Set<ModuleKey>>(() => new Set(initialOpen));
   const [shut, setShut] = useState(false);
@@ -658,10 +694,6 @@ export function AppShell({
     setOpened(next);
     writeCookie(OPEN_COOKIE, [...next].join("."));
   };
-  const setRailAndRemember = (v: boolean) => {
-    setRail(v);
-    writeCookie(RAIL_COOKIE, v ? "1" : "0");
-  };
 
   const tab = (href: string, label: string, Icon: typeof LayoutDashboard, badge?: number) => {
     const active = isActive(pathname, href);
@@ -669,18 +701,12 @@ export function AppShell({
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className={cn(
-          "relative flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px]",
-          active ? "font-medium text-primary" : "text-muted",
-        )}
+        className={cn("relative flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px]", active ? "font-semibold text-primary" : "text-muted")}
       >
         <Icon className="size-[22px]" strokeWidth={active ? 2.25 : 1.75} aria-hidden />
         {label}
         {!!badge && (
-          <span
-            className="absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-bad-solid px-1 text-center text-[10px] leading-4 font-semibold text-white"
-            aria-label={`${badge} unread`}
-          >
+          <span className="absolute top-1 left-1/2 ml-2 min-w-4 rounded-full bg-bad-solid px-1 text-center text-[10px] leading-4 font-semibold text-white" aria-label={`${badge} unread`}>
             {badge > 9 ? "9+" : badge}
           </span>
         )}
@@ -689,7 +715,7 @@ export function AppShell({
   };
 
   return (
-    <div className={cn("min-h-dvh", rail ? "lg:pl-16" : "lg:pl-60")} data-sidebar={rail ? "rail" : "open"}>
+    <div className="min-h-dvh">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-pop"
@@ -697,36 +723,12 @@ export function AppShell({
         Skip to content
       </a>
 
-      {/* Desktop sidebar: the modules, or (collapsed) their icons */}
-      <aside
-        aria-label="Sidebar"
-        className={cn("no-print fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line bg-surface lg:flex", rail ? "w-16" : "w-60")}
-      >
-        {rail ? (
-          <RailContent modules={modules} companyName={companyName} logo={logo} onExpand={() => setRailAndRemember(false)} />
-        ) : (
-          <SidebarContent
-            modules={modules}
-            companyName={companyName}
-            roleLabel={user.role}
-            logo={logo}
-            open={open}
-            toggle={toggle}
-            onCollapse={() => setRailAndRemember(true)}
-          />
-        )}
-      </aside>
-
-      {/* Phone / tablet drawer: the same modules, rows easy to tap */}
+      {/* Phone: the drawer with every module, rows easy to tap */}
       {drawer && (
-        <div className="no-print fixed inset-0 z-50 lg:hidden">
+        <div className="no-print fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} aria-hidden />
           <aside aria-label="Menu" className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] animate-slide-in flex-col border-r border-line bg-surface shadow-pop">
-            <button
-              className="absolute top-2 right-2 grid size-10 place-items-center rounded-md text-muted hover:bg-surface-2"
-              onClick={() => setDrawer(false)}
-              aria-label="Close menu"
-            >
+            <button className="absolute top-2 right-2 grid size-10 place-items-center rounded-md text-muted hover:bg-surface-2" onClick={() => setDrawer(false)} aria-label="Close menu">
               <X className="size-4" />
             </button>
             <SidebarContent modules={modules} companyName={companyName} roleLabel={user.role} logo={logo} open={open} toggle={toggle} big />
@@ -734,70 +736,73 @@ export function AppShell({
         </div>
       )}
 
-      <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-bg/80 px-4 backdrop-blur-md sm:px-6">
-        <button
-          type="button"
-          className={cn(buttonClass("ghost", "icon-sm"), "lg:hidden")}
-          onClick={() => setDrawer(true)}
-          aria-label="Open menu"
-          aria-expanded={drawer}
-        >
-          <MenuIcon aria-hidden />
-        </button>
-        <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative w-full max-w-sm">
-          <label htmlFor="global-search" className="sr-only">
-            Search inquiries
-          </label>
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
-          <input
-            id="global-search"
-            name="q"
-            type="search"
-            placeholder="Search inquiries…"
-            className="h-8 w-full rounded-lg border border-line bg-surface pr-10 pl-9 text-sm text-text shadow-card transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
-          />
-          <input type="hidden" name="status" value="all" />
-          <span className="pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 sm:inline-flex">
-            <Kbd>/</Kbd>
-          </span>
-        </form>
-        <div className="ml-auto flex items-center gap-1.5">
-          {canCreate && (
-            <Link href="/inquiries/new" className={cn(buttonClass("primary", "sm"), "mr-1 hidden lg:inline-flex")} title="New inquiry (N)">
-              <Plus aria-hidden /> New inquiry
+      <div className="no-print sticky top-0 z-30">
+        <header className="border-b border-line bg-surface">
+          <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-4 sm:px-6">
+            <button type="button" className={cn(buttonClass("ghost", "icon"), "-ml-2 md:hidden")} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}>
+              <MenuIcon aria-hidden />
+            </button>
+            <Link href={HOME_HREF} className="flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg" aria-label={`${companyName}, dashboard`}>
+              <Logo companyName={companyName} logo={logo} />
+              <span className="hidden min-w-0 leading-tight sm:block">
+                <span className="block max-w-56 truncate text-[15px] font-bold text-text">{companyName}</span>
+                <span className="block text-[11px] font-medium text-muted">Kebo ERP</span>
+              </span>
             </Link>
-          )}
-          <Link
-            href="/notifications"
-            className={cn(buttonClass("ghost", "icon-sm"), "relative hidden lg:inline-flex")}
-            aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
-          >
-            <Bell aria-hidden />
-            {!!unread && <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-bad-solid ring-2 ring-bg" aria-hidden />}
-          </Link>
-          <ThemeMenu />
-          <AccountMenu user={user} />
-        </div>
-      </header>
+            <form action="/inquiries" role="search" aria-label="Search inquiries" className="relative mx-auto hidden w-full max-w-md md:block">
+              <label htmlFor="global-search" className="sr-only">
+                Search inquiries
+              </label>
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" aria-hidden />
+              <input
+                id="global-search"
+                name="q"
+                type="search"
+                placeholder="Search inquiries, customers, numbers…"
+                className="h-10 w-full rounded-full border border-line bg-surface-2 pr-10 pl-10 text-sm text-text transition-colors placeholder:text-muted hover:border-line-strong focus-visible:border-primary-solid focus-visible:bg-surface focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
+              />
+              <input type="hidden" name="status" value="all" />
+              <span className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 lg:inline-flex">
+                <Kbd>/</Kbd>
+              </span>
+            </form>
+            <div className="ml-auto flex items-center gap-1.5 md:ml-0">
+              {canCreate && (
+                <Link href="/inquiries/new" className={cn(buttonClass("primary", "md"), "mr-1 hidden lg:inline-flex")} title="New inquiry (N)">
+                  <Plus aria-hidden /> New inquiry
+                </Link>
+              )}
+              <Link href="/inquiries" className={cn(buttonClass("ghost", "icon"), "md:hidden")} aria-label="Search inquiries">
+                <Search aria-hidden />
+              </Link>
+              <ThemeMenu />
+              <Link href="/notifications" className={cn(buttonClass("ghost", "icon"), "relative")} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
+                <Bell aria-hidden />
+                {!!unread && (
+                  <span className="absolute top-1 right-0.5 min-w-[18px] rounded-full bg-action-solid px-1 text-center text-[10px] leading-[18px] font-bold text-white ring-2 ring-surface" aria-hidden>
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </Link>
+              <AccountMenu user={user} />
+            </div>
+          </div>
+        </header>
+        <TopMenu modules={modules} />
+      </div>
+      <ModulePages modules={modules} />
 
-      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-28 sm:px-6 lg:pb-10">
+      <main id="main" className="mx-auto w-full max-w-[1440px] px-4 pt-5 pb-28 sm:px-6 md:pb-10">
         {children}
       </main>
 
       {/* Phone: bottom tab bar, thumb-reachable, with the main action in the middle */}
-      <nav
-        aria-label="Quick"
-        className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
-      >
+      <nav aria-label="Quick" className="no-print fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {tab("/dashboard", "Dashboard", LayoutDashboard)}
         {tab("/inquiries", "Inquiries", ClipboardList)}
         {canCreate ? (
           <div className="flex flex-1 items-start justify-center">
-            <Link
-              href="/inquiries/new"
-              aria-label="New inquiry"
-              className="-mt-5 grid size-14 place-items-center rounded-full bg-primary-solid text-primary-fg shadow-pop ring-4 ring-bg active:scale-95"
-            >
+            <Link href="/inquiries/new" aria-label="New inquiry" className="-mt-5 grid size-14 place-items-center rounded-full bg-action-solid text-white shadow-pop ring-4 ring-bg active:scale-95">
               <Plus className="size-7" strokeWidth={2.25} aria-hidden />
             </Link>
           </div>
@@ -805,12 +810,7 @@ export function AppShell({
           tab("/customers", "Customers", Building2)
         )}
         {tab("/notifications", "Alerts", Bell, unread)}
-        <button
-          type="button"
-          onClick={() => setDrawer(true)}
-          aria-expanded={drawer}
-          className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px] text-muted"
-        >
+        <button type="button" onClick={() => setDrawer(true)} aria-expanded={drawer} className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px] text-muted">
           <MenuIcon className="size-[22px]" strokeWidth={1.75} aria-hidden />
           Menu
         </button>

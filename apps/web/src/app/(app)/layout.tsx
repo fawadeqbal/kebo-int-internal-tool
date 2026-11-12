@@ -9,7 +9,7 @@ import { FeaturesProvider } from "@/components/common/features";
 import { leaveCompanyAction } from "@/app/platform/actions";
 import { demoMode } from "@/lib/demo";
 import { AppShell } from "@/components/shell/nav";
-import { buildModules, MODULE_PAGES, OPEN_COOKIE, RAIL_COOKIE, type ModuleKey } from "@/lib/nav";
+import { buildModules, MODULE_PAGES, OPEN_COOKIE, type ModuleKey } from "@/lib/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
 import { getSettings } from "@/lib/loaders";
@@ -43,7 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           .catch(() => 0)
       : null;
 
-  // The sidebar's modules (nine, ERP redesign): each page only for those who may open it, with the same checks as the page itself.
+  // The menu's modules (nine, ERP redesign): each page only for those who may open it, with the same checks as the page itself.
   const modules = buildModules({
     can: (p) => has(p as Parameters<typeof can>[1]),
     feature,
@@ -57,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      <AppShell modules={modules} initialRail={jar.get(RAIL_COOKIE)?.value === "1"} initialOpen={initialOpen} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
+      <AppShell modules={modules} initialOpen={initialOpen} companyName={settings.company.name} logo={logoUrl(settings.company.logo)} user={{ name: me.name, email: me.email, role: me.roleName }} unread={unread} canCreate={has("inquiries.create")}>
         {me.viaPlatform && (
           <form action={leaveCompanyAction} className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary-soft/60 px-3 py-2 text-sm">
             <span>

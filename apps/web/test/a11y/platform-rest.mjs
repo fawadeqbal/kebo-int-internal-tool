@@ -67,7 +67,7 @@ const shot = async (page, name, full = true) => SHOTS && page.screenshot({ path:
 const primaries = (page) =>
   page.evaluate(() =>
     [...document.querySelectorAll("main a, main button")]
-      .filter((el) => typeof el.className === "string" && el.className.split(/\s+/).includes("bg-primary-solid"))
+      .filter((el) => typeof el.className === "string" && el.className.split(/\s+/).includes("bg-action-solid"))
       .filter((el) => el.getAttribute("role") !== "switch" && !el.closest("[role=dialog],[role=alertdialog],[role=menu]"))
       .filter((el) => el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true }))
       .map((el) => (el.getAttribute("aria-label") || el.textContent || "").trim()),

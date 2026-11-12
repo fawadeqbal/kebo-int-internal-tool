@@ -10,7 +10,6 @@ import { ConfirmAction } from "@/components/people/confirm-action";
 import { DataTable } from "@/components/common/data-table";
 import { RowMenu, type MenuEntry } from "@/components/common/more-menu";
 import { markAllReadAction } from "./actions";
-import { crumbsFor } from "@/lib/nav";
 
 export const metadata = { title: "Notifications" };
 
@@ -60,7 +59,8 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   return (
     <div className="max-w-4xl">
       <PageHeader
-        crumbs={crumbsFor("/notifications")}
+        crumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Notifications" }]}
+        icon={Bell}
         title="Notifications"
         summary={unread ? `${unread} new · open one to go to it; it is then marked read` : "You are all caught up"}
         primary={unread > 0 && <ConfirmAction action={markAllReadAction} label="Mark all as read" pendingText="Marking…" variant="secondary" showSuccess={false} icon={<CheckCheck aria-hidden />} />}
