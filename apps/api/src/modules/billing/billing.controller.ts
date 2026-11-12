@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Param, ParseUUIDPipe, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { invoicesQuery, type InvoicesQuery } from "@kebo/shared";
@@ -30,6 +30,31 @@ export class BillingController {
     q: { mine: boolean },
   ) {
     return this.billing.payables(user, q.mine);
+  }
+
+  /** One payment request of an order (`ref`: its plan row): what it asks for, where it stands, the copies kept when sent, its payments. */
+  @Get("orders/:id/requests/:ref")
+  request(@CurrentUser() user: SessionUser, @Param("id", new ParseUUIDPipe()) id: string, @Param("ref", new ParseUUIDPipe()) ref: string) {
+    return this.billing.request(user, id, ref);
+  }
+
+  /** Payment requests across the orders I may see that still have money due, each with where it stands. ?mine=true: the orders I handle. */
+  @Get("billing/requests")
+  requests(
+    @CurrentUser() user: SessionUser,
+    @Query(
+      Validate(
+        z.object({
+          mine: z
+            .enum(["true", "false"])
+            .optional()
+            .transform((v) => v === "true"),
+        }),
+      ),
+    )
+    q: { mine: boolean },
+  ) {
+    return this.billing.requests(user, q.mine);
   }
 
   /** The open invoices of one side, instalment by instalment (late first). ?side=receivable|payable, ?mine=true. */

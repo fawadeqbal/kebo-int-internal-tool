@@ -83,3 +83,35 @@ export async function deleteDraft(tx: Db, row: VersionRow) {
   if (row.status !== "draft") throw new DomainError(`Version ${row.version} is final: it stays as it was printed. Make it again for a new version.`);
   await tx.orderPaper.delete({ where: { id: row.id } });
 }
+
+/**
+ * Kept as sent (a payment request, a payment receipt): the next version, final straight away, with exactly
+ * what it prints now. No draft: the action that sends it is what keeps it. Returns the version kept.
+ */
+export async function keepAsSent(
+  tx: Db,
+  v: { orderId: string; kind: string; ref: string; number: string; byId: string; snapshot: Prisma.InputJsonValue; options: Prisma.InputJsonValue },
+): Promise<number> {
+  const latest = await tx.orderPaper.findFirst({
+    where: { orderId: v.orderId, kind: v.kind, ref: v.ref },
+    orderBy: { version: "desc" },
+    select: { version: true },
+  });
+  const version = (latest?.version ?? 0) + 1;
+  await tx.orderPaper.create({
+    data: {
+      orderId: v.orderId,
+      kind: v.kind,
+      ref: v.ref,
+      number: v.number,
+      version,
+      status: "final",
+      options: v.options,
+      snapshot: v.snapshot,
+      madeById: v.byId,
+      finalAt: new Date(),
+    },
+  });
+  return version;
+}
+

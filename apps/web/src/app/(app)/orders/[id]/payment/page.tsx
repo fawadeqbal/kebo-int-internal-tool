@@ -10,9 +10,10 @@ import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/ste
 import { PaymentEdit } from "@/components/orders/view-panels";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { PaymentPlan } from "@/components/money/forms";
-import { LcChecks, PlanLines, UseCredit } from "@/components/money/money-v2";
+import { LcChecks, UseCredit } from "@/components/money/money-v2";
+import { PlanRequests } from "@/components/money/requests";
 import { RecordPaymentLink, ViewPaymentsLink } from "@/components/money/pay-links";
-import { savePlanAction } from "../../../money/actions";
+import { savePlanAction, sendRequestAction } from "../../../money/actions";
 import { bankContractAction, routeAction } from "../../flow-actions";
 import { fieldsAction, lightAction } from "../../light-actions";
 import { useCreditAction } from "../../actions";
@@ -238,9 +239,11 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       <ViewCard
         id="plan"
         target="plan"
-        title="The plan"
+        title="Payment requests"
         description={
-          m.route.summary ? `Built from the route: ${m.route.summary}.` : "Deposit and balance; choose the route to build the balance part."
+          m.route.summary
+            ? `The plan, built from the route: ${m.route.summary}. Each part is a request with where it stands.`
+            : "The plan: deposit and balance, each a request with where it stands. Choose the route to build the balance part."
         }
         canEdit={false}
         actions={
@@ -254,7 +257,17 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               {Number(m.plan.difference) > 0 ? "missing" : "too much"}). Change the plan.
             </p>
           )}
-          <PlanLines plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} />
+          <PlanRequests
+            orderId={o.id}
+            plan={m.plan}
+            currency={c}
+            total={m.total}
+            received={m.received}
+            due={m.due}
+            send={sendRequestAction.bind(null, o.id)}
+            canPay={canPay}
+            back={`/orders/${o.id}/payment`}
+          />
         </CardBody>
       </ViewCard>
       <MoneySection

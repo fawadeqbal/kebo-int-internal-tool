@@ -11,11 +11,22 @@ const refresh = (orderId?: string | null, customerId?: string | null) => {
   revalidatePath("/finance", "layout");
   revalidatePath("/purchasing", "layout");
   revalidatePath("/payments", "layout");
+  revalidatePath("/operations/payment-requests", "layout");
 };
 
 /** The customer's instalments: payload { items: [{ id?, label, amount, dueOn }] }. */
 export async function savePlanAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.put(`/orders/${orderId}/payment-plan`, formBody(form)), "Payment plan saved.");
+  if (r.ok) refresh(orderId);
+  return r;
+}
+
+/**
+ * Send the payment request of a plan row (`ref`): kept exactly as it prints now, and the row shows Sent.
+ * Sent again, the API asks why (the form shows "Why?" and sends again with the reason): R2, the first stays.
+ */
+export async function sendRequestAction(orderId: string, ref: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.post(`/orders/${orderId}/requests/send`, { ref, reason: reasonOf(form) }));
   if (r.ok) refresh(orderId);
   return r;
 }

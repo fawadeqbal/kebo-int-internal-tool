@@ -26,6 +26,32 @@ export function payInstalments<T extends Instalment>(items: T[], settledMinor: M
   });
 }
 
+/**
+ * Which instalments each payment paid, by the same rule as payInstalments: money pays the earliest
+ * instalment first. `payments` in the order they count (date, then when recorded). Each payment gets the
+ * instalments it paid (by index) and how much of each; what is more than the plan is left out.
+ */
+export function spreadPayments<P extends { id: string; minor: Minor }>(items: Instalment[], payments: P[]) {
+  const left = items.map((i) => Math.max(i.amountMinor, 0));
+  const out = new Map<string, { index: number; minor: Minor }[]>();
+  let at = 0;
+  for (const p of payments) {
+    let m = Math.max(p.minor, 0);
+    const parts: { index: number; minor: Minor }[] = [];
+    while (m > 0 && at < items.length) {
+      const take = Math.min(m, left[at]!);
+      if (take > 0) {
+        parts.push({ index: at, minor: take });
+        left[at]! -= take;
+        m -= take;
+      }
+      if (left[at] === 0) at++;
+    }
+    out.set(p.id, parts);
+  }
+  return out;
+}
+
 /** The sum of the instalments, to check it against the order total. */
 export const planTotalMinor = (items: Instalment[]): Minor => items.reduce((s, i) => s + i.amountMinor, 0);
 

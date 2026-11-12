@@ -14,6 +14,7 @@ import type {
   PaymentMethod,
   PaymentRoute,
   InstalmentStatus,
+  RequestState,
 } from "@kebo/shared";
 import type { Person } from "./types";
 
@@ -62,7 +63,15 @@ export interface OrderMoney {
       dueDays: number | null;
       /** "on the ready date", "14 days after shipping" (a fixed date: null). */
       rule: string | null;
+      /** The row as a payment request: where it stands and the payments that paid it. */
+      request: RequestView;
+      /** Days past its due date while still open (0: not late). */
+      late: number;
     }[];
+    /** Requests that were sent and whose row is no longer in the plan: kept as sent, cancelled. */
+    cancelled: { paperId: string; ref: string; number: string; revision: number; sentOn: string; amount: string | null; label: string | null }[];
+    /** May send a request to the customer (kept as sent). */
+    canSend: boolean;
     /** The order's dates the rules read (the ready date: the latest factory's). */
     dates: { readyOn: string | null; shippedOn: string | null; papersOn: string | null };
     matchesTotal: boolean;
@@ -617,6 +626,91 @@ export interface OpenInvoices {
     /** Days late (0: not late). */
     late: number;
     soon: boolean;
+    /** A customer's instalment as a payment request (null: a supplier's, or not on a request). */
+    request: { state: RequestState; with: SentWith | null; sentOn: string | null; revision: number | null; changed: boolean; through: "customer" | "bank" } | null;
   }[];
   totals: { currency: string; open: string; late: string; count: number }[];
+}
+
+/** How a payment request was asked for: the request itself, the proforma (the deposit), the papers at the bank (a bank route's balance). */
+export type SentWith = "request" | "proforma" | "bank";
+
+/** A plan row as a payment request (the API's RequestView). */
+export interface RequestView {
+  state: RequestState;
+  with: SentWith | null;
+  sentOn: string | null;
+  sentBy: { id: string; name: string } | null;
+  /** R1, R2… of the request (null: not sent as a request). */
+  revision: number | null;
+  proformaNo: string | null;
+  /** How it is asked for: a request to the customer, or the papers through the banks (a bank route's balance). */
+  through: "customer" | "bank";
+  /** Sent, still open, and the row no longer says what was sent: send it again. */
+  changed: boolean;
+  receipts: { id: string; number: string; amount: string; paidOn: string }[];
+}
+
+/** One copy kept when a request was sent. */
+export interface KeptCopy {
+  paperId: string;
+  ref: string;
+  number: string;
+  revision: number;
+  sentOn: string;
+  sentBy: { id: string; name: string } | null;
+  amount: string | null;
+  dueOn: string | null;
+  label: string | null;
+}
+
+/** GET /orders/:id/requests/:ref */
+export interface RequestPage {
+  orderId: string;
+  refNo: string;
+  orderStatus: string;
+  customer: { id: string; name: string };
+  currency: string;
+  ref: string;
+  copies: KeptCopy[];
+  number: string;
+  label: string;
+  amount: string;
+  dueOn: string | null;
+  paid: string;
+  open: string;
+  late: number;
+  part: string | null;
+  rule: string | null;
+  cancelled: boolean;
+  request: RequestView | null;
+  canSend: boolean;
+  canPay: boolean;
+}
+
+/** GET /billing/requests */
+export interface RequestList {
+  rows: {
+    order: { id: string; refNo: string };
+    customer: { id: string; name: string };
+    lookedAfterBy: { id: string; name: string } | null;
+    currency: string;
+    ref: string;
+    number: string;
+    label: string;
+    amount: string;
+    paid: string;
+    open: string;
+    dueOn: string | null;
+    late: number;
+    soon: boolean;
+    state: RequestState | "cancelled";
+    with: SentWith | null;
+    sentOn: string | null;
+    revision: number | null;
+    changed: boolean;
+    through: "customer" | "bank";
+  }[];
+  canPay: boolean;
+  canSend: boolean;
 }

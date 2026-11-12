@@ -10,6 +10,7 @@ import {
   type InvoiceSide,
   type PaymentPlanInput,
   type PlanDueRule,
+  type RequestState,
 } from "@kebo/shared";
 import { daysBetween, DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
@@ -24,6 +25,7 @@ import { ordersOwingFactories, ordersWithMoneyDue } from "./due";
 import { factoryPlansOf, owedByFactory } from "./factory-plan";
 import { chargedExpenses, factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "./position";
 import { livePlanOf, livePlansOf } from "./plan-live";
+import { requestsOf, requestViewOf } from "./requests";
 
 const person = { select: { id: true, name: true } } as const;
 
@@ -302,6 +304,166 @@ export class BillingService {
       .sort((a, b) => Number(b.toPay) - Number(a.toPay));
   }
 
+  /* ---------------------------------------------------------------- one payment request */
+
+  /**
+   * One payment request (a row of the order's plan, or a request that was sent and whose row is gone): what
+   * it asks for, where it stands (not sent, sent, part paid, paid, cancelled), every copy kept when it was sent
+   * (R1, R2…) and the payments that paid it. Seeing it follows the order.
+   */
+  async request(user: SessionUser, orderId: string, ref: string) {
+    const o = await this.prisma.db.order.findFirst({
+      where: { id: orderId, ...orderAccess(user) },
+      select: {
+        id: true,
+        refNo: true,
+        status: true,
+        currency: true,
+        mainCurrency: true,
+        mainRate: true,
+        depositPercent: true,
+        total: true,
+        expenses: chargedExpenses,
+        customer: { select: { id: true, name: true } },
+        allocations: { where: livePart, select: { amount: true, bankCharges: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+      },
+    });
+    if (!o) throw new NotFoundError("Order");
+    const s = await this.settings.get();
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    const today = this.clock.today();
+    const pos = positionOf(o, fx);
+    const plan = planStatus((await livePlanOf(this.prisma.db, o.id)).items, pos.settledMinor, today, s.reminders.dueSoonDays);
+    const requests = (await requestsOf(this.prisma.db, [o.id], this.clock.timeZone)).get(o.id);
+    const row = plan.find((p) => p.id === ref) ?? null;
+    const copies = row ? (requests?.copies.get(ref) ?? []) : (requests?.gone.filter((g) => g.ref === ref) ?? []);
+    if (!row && !copies.length) throw new NotFoundError("Payment request");
+    const last = copies.at(-1) ?? null;
+    const canSend = (can(user, "orders.update") || can(user, "documents.manage")) && o.status !== "cancelled";
+    const base = { orderId: o.id, refNo: o.refNo, orderStatus: o.status, customer: o.customer, currency: o.currency, ref, copies };
+    if (!row)
+      return {
+        ...base,
+        number: last!.number,
+        label: last!.label ?? "Payment request",
+        amount: last!.amount ?? fromMinor(0),
+        dueOn: last!.dueOn,
+        paid: fromMinor(0),
+        open: fromMinor(0),
+        late: 0,
+        part: null,
+        rule: null,
+        /** Its row was taken out of the plan after it was sent: it stays as it was sent. */
+        cancelled: true,
+        request: null,
+        canSend: false,
+        canPay: false,
+      };
+    return {
+      ...base,
+      number: paperNumber(o.refNo, "payment-request", row.requestNo),
+      label: row.label,
+      amount: fromMinor(row.amountMinor),
+      dueOn: row.dueOn,
+      paid: fromMinor(row.paidMinor),
+      open: fromMinor(row.openMinor),
+      late: row.openMinor > 0 ? lateDays(row.dueOn, today) : 0,
+      part: row.part,
+      rule: dueRuleWords(row),
+      cancelled: false,
+      request: requestViewOf(row, requests),
+      // A bank route's balance is asked for with the papers through the banks, not with a request.
+      canSend: canSend && row.openMinor > 0 && !requests?.byBank.has(row.id),
+      canPay: can(user, "payments.record") && o.status !== "cancelled" && row.openMinor > 0,
+    };
+  }
+
+  /**
+   * Payment requests, across the orders a person may see that still have money due: every row of their
+   * plans (paid ones too, so an order reads whole) with where it stands, and the requests that were sent
+   * and then cancelled. Late first, then by due date. `mine`: the orders I handle.
+   */
+  async requests(user: SessionUser, mine: boolean) {
+    const today = this.clock.today();
+    const s = await this.settings.get();
+    const fx = fxOf(s, await this.limits.allows("expenses"));
+    const orders = await this.prisma.db.order.findMany({
+      where: {
+        AND: [orderAccess(user), mine ? { inquiry: { assigneeId: user.id } } : {}],
+        status: { in: ["open", "closed"] },
+        id: { in: await ordersWithMoneyDue(this.prisma, fx) },
+      },
+      select: {
+        id: true,
+        refNo: true,
+        currency: true,
+        mainCurrency: true,
+        mainRate: true,
+        depositPercent: true,
+        total: true,
+        expenses: chargedExpenses,
+        customer: { select: { id: true, name: true } },
+        inquiry: { select: { assignee: person } },
+        allocations: { where: livePart, select: { amount: true, bankCharges: true } },
+        receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
+      },
+    });
+    const ids = orders.map((o) => o.id);
+    const [plans, requests] = await Promise.all([livePlansOf(this.prisma.db, ids), requestsOf(this.prisma.db, ids, this.clock.timeZone)]);
+    const rows = orders.flatMap((o) => {
+      const r = requests.get(o.id);
+      const head = { order: { id: o.id, refNo: o.refNo }, customer: o.customer, lookedAfterBy: o.inquiry.assignee, currency: o.currency };
+      const plan = planStatus(plans.get(o.id)?.items ?? [], positionOf(o, fx).settledMinor, today, s.reminders.dueSoonDays);
+      return [
+        ...plan.map((i) => {
+          const v = requestViewOf(i, r);
+          return {
+            ...head,
+            ref: i.id,
+            number: paperNumber(o.refNo, "payment-request", i.requestNo),
+            label: i.label,
+            amount: fromMinor(i.amountMinor),
+            paid: fromMinor(i.paidMinor),
+            open: fromMinor(i.openMinor),
+            dueOn: i.dueOn,
+            late: i.openMinor > 0 ? lateDays(i.dueOn, today) : 0,
+            soon: i.status === "due_soon",
+            state: v.state as RequestState | "cancelled",
+            with: v.with,
+            sentOn: v.sentOn,
+            revision: v.revision,
+            changed: v.changed,
+            through: v.through,
+          };
+        }),
+        // Sent, then taken out of the plan: the last copy of each, as it was sent.
+        ...[...new Map((r?.gone ?? []).map((g) => [g.ref, g])).values()].map((g) => ({
+          ...head,
+          ref: g.ref,
+          number: g.number,
+          label: g.label ?? "Payment request",
+          amount: g.amount ?? fromMinor(0),
+          paid: fromMinor(0),
+          open: fromMinor(0),
+          dueOn: g.dueOn,
+          late: 0,
+          soon: false,
+          state: "cancelled" as RequestState | "cancelled",
+          with: "request" as const,
+          sentOn: g.sentOn,
+          revision: g.revision,
+          changed: false,
+          through: "customer" as "customer" | "bank",
+        })),
+      ];
+    });
+    rows.sort(
+      (a, b) => b.late - a.late || (a.dueOn ?? "9999").localeCompare(b.dueOn ?? "9999") || a.order.refNo.localeCompare(b.order.refNo) || a.number.localeCompare(b.number),
+    );
+    return { rows, canPay: can(user, "payments.record"), canSend: can(user, "orders.update") || can(user, "documents.manage") };
+  }
+
   /* ---------------------------------------------------------------- open invoices */
 
   /**
@@ -342,6 +504,11 @@ export class BillingService {
         this.prisma.db,
         orders.map((o) => o.id),
       );
+      const requests = await requestsOf(
+        this.prisma.db,
+        orders.map((o) => o.id),
+        this.clock.timeZone,
+      );
       for (const o of orders) {
         const pos = positionOf(o, fx);
         const plan = planStatus(plans.get(o.id)?.items ?? [], pos.settledMinor, today, s.reminders.dueSoonDays);
@@ -363,9 +530,11 @@ export class BillingService {
             dueOn: null,
             late: 0,
             soon: false,
+            request: null,
           });
         for (const i of plan) {
           if (i.openMinor <= 0) continue;
+          const r = requestViewOf(i, requests.get(o.id));
           rows.push({
             id: i.id,
             number: paperNumber(o.refNo, "payment-request", i.requestNo),
@@ -380,6 +549,7 @@ export class BillingService {
             dueOn: i.dueOn,
             late: lateDays(i.dueOn, today),
             soon: i.status === "due_soon",
+            request: { state: r.state, with: r.with, sentOn: r.sentOn, revision: r.revision, changed: r.changed, through: r.through },
           });
         }
       }
@@ -410,6 +580,7 @@ export class BillingService {
               dueOn: r.due,
               late: lateDays(r.due, today),
               soon: r.status === "due",
+              request: null,
             });
           }
         }
@@ -461,4 +632,6 @@ interface OpenInvoice {
   late: number;
   /** Falls due within the reminder window. */
   soon: boolean;
+  /** A customer's instalment as a payment request: not sent, sent (how, when, which revision), part paid. Null: a supplier's, or not on a request. */
+  request: { state: RequestState; with: "request" | "proforma" | "bank" | null; sentOn: ISODate | null; revision: number | null; changed: boolean; through: "customer" | "bank" } | null;
 }

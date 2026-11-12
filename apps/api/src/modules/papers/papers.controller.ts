@@ -8,11 +8,13 @@ import {
   paperKind,
   paperQueryInput,
   PAPER_OPTIONS,
+  sendRequestInput,
   type PaperAgainInput,
   type PaperDraftInput,
   type PaperFixInput,
   type PaperKind,
   type PaperQueryInput,
+  type SendRequestInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
@@ -60,6 +62,13 @@ export class PapersController {
     @Query(Validate(paperQueryInput)) q: PaperQueryInput,
   ) {
     return this.papers.doc(user, id, kind, q);
+  }
+
+  /** { ref, reason? } — send the payment request of a plan row: kept exactly as it prints now. Sent again: R2, with why. */
+  @Post("orders/:id/requests/send")
+  @HttpCode(200)
+  sendRequest(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(sendRequestInput)) body: SendRequestInput) {
+    return this.papers.sendRequest(user, id, body);
   }
 
   /** { options, ref? } — save as draft. */

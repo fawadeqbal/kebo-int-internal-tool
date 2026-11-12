@@ -24,8 +24,21 @@ const ownDoc = (r: PaperRow): r is PaperRow & { kind: "proforma" | "packing-list
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const day = (iso: string) => `${iso.slice(8, 10)} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
 
+/** A paper kept as sent: "kept as sent", "sent again (R2)", "kept as recorded", "corrected"; a request not sent yet says so. */
+const keptWords = (r: PaperRow) =>
+  r.version === null
+    ? "not sent yet"
+    : r.kind === "payment-request"
+      ? r.version > 1
+        ? `sent again (R${r.version})`
+        : "kept as sent"
+      : r.version > 1
+        ? "corrected, kept again"
+        : "kept as recorded";
+
 /** Where it comes from: Made by the app, Uploaded, Kept elsewhere, Missing, Can be made… */
 function fromOf(r: PaperRow): { label: string; tone: "primary" | "info" | "neutral" | "warn" | "ok" } {
+  if (r.source === "app" && r.kept && r.state !== "ready") return { label: "Not sent", tone: "neutral" };
   if (r.source === "app")
     return r.state === "ready" || r.live
       ? { label: "Made by the app", tone: "primary" }
@@ -376,11 +389,11 @@ function PaperLine({
     <Button size="xs" variant="ghost" onClick={() => setOpen("elsewhere")}>
       Change
     </Button>
-  ) : make && canMake && !r.live && (r.state === "can" || r.state === "wait" || r.state === "draft") ? (
+  ) : make && canMake && !r.live && !r.kept && (r.state === "can" || r.state === "wait" || r.state === "draft") ? (
     <Link href={make} className={buttonClass(r.state === "draft" ? "primary" : "secondary", "xs")}>
       {r.state === "draft" ? "Continue" : "Make"}
     </Link>
-  ) : print && (paperDone(r.state) || r.live) ? (
+  ) : print && (paperDone(r.state) || r.live || r.kept) ? (
     <Link href={print.view} target="_blank" className={buttonClass("ghost", "xs")}>
       View / Print
     </Link>
@@ -395,9 +408,9 @@ function PaperLine({
   ) : null;
 
   const fileCell =
-    r.source === "app" && (r.version !== null || r.live) ? (
+    r.source === "app" && (r.version !== null || r.live || r.kept) ? (
       <span className="inline-flex items-center gap-1 text-xs">
-        <FileText className="size-3.5 text-muted" aria-hidden /> {r.live ? "live" : `version ${r.version}`}
+        <FileText className="size-3.5 text-muted" aria-hidden /> {r.live ? "live" : r.kept ? keptWords(r) : `version ${r.version}`}
         {file && <FileChip file={file} compact className="ml-1" />}
       </span>
     ) : file ? (
@@ -576,7 +589,7 @@ export function PaperMenu({
       {menu && (
         <FloatingMenu anchor={() => more.current} onClose={() => setMenu(false)} label={r.label} width={260}>
           {leading}
-          {print && (paperDone(r.state) || r.live || r.state === "draft" || !!issuing) && (
+          {print && (paperDone(r.state) || r.live || r.kept || r.state === "draft" || !!issuing) && (
             <>
               {item("View / Print", () => window.open(print.view, "_blank"))}
               {item("Download PDF", () => downloadHref(print.pdf))}

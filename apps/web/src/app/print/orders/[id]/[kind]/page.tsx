@@ -41,10 +41,10 @@ const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE"
 const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", "packing-list": "Packing List NO." };
 
 /** A paper the app makes: ?v= a version, ?opts= options to preview, ?ref= which payment, plan item or factory. */
-type PaperQuery = { v?: string; opts?: string; ref?: string; embed?: string; back?: string };
+type PaperQuery = { v?: string; opts?: string; ref?: string; now?: string; embed?: string; back?: string };
 const paperQuery = (sp: PaperQuery) =>
   Object.fromEntries(
-    (["v", "opts", "ref"] as const).flatMap((k) => (sp[k] && /^[\w,.-]{1,60}$/.test(sp[k]!) ? [[k, sp[k]!]] : [])),
+    (["v", "opts", "ref", "now"] as const).flatMap((k) => (sp[k] && /^[\w,.-]{1,60}$/.test(sp[k]!) ? [[k, sp[k]!]] : [])),
   ) as Record<string, string>;
 
 async function getPaper(id: string, kind: PaperKind, sp: PaperQuery) {
@@ -312,8 +312,16 @@ async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: P
     <>
       {sp.embed !== "1" && (
         <PrintToolbar
-          title={`${p.label} ${p.doc.number}${p.paper && p.versions.length > 1 ? ` · version ${p.paper.version}` : ""}${p.final || p.live ? "" : " (draft)"}`}
-          backHref={backTo(sp.back, `/orders/${id}/papers/${kind}${sp.ref ? `?ref=${encodeURIComponent(sp.ref)}` : ""}`)}
+          title={`${p.label} ${p.doc.number}${p.paper && p.versions.length > 1 ? ` · version ${p.paper.version}` : ""}${p.final || p.live ? "" : p.kept ? (kind === "payment-request" ? " (not sent)" : "") : " (draft)"}`}
+          backHref={backTo(
+            sp.back,
+            // Kept as sent: no Make page to go back to. A request goes back to its own page, a receipt to the Payment step.
+            kind === "payment-request" && sp.ref && UUID.test(sp.ref)
+              ? `/orders/${id}/requests/${sp.ref}`
+              : p.kept
+                ? `/orders/${id}/payment`
+                : `/orders/${id}/papers/${kind}${sp.ref ? `?ref=${encodeURIComponent(sp.ref)}` : ""}`,
+          )}
           pdfHref={pdf}
         />
       )}

@@ -50,6 +50,24 @@ export function planStatus<T extends PlanItem>(items: T[], settledMinor: Minor, 
   });
 }
 
+/**
+ * Where a payment request stands (the plan row with a status, claude/core-plan.md phase 1): not sent yet,
+ * sent (the request itself, or the proforma for the deposit), part paid, paid. Worked out, never typed:
+ * paid and part paid from the money received (earliest row first), sent from the copy kept when it was sent.
+ * A row paid without a request ever being sent is simply paid.
+ */
+export type RequestState = "not_sent" | "sent" | "part_paid" | "paid";
+
+export const REQUEST_STATE_LABEL: Record<RequestState, string> = {
+  not_sent: "Not sent",
+  sent: "Sent",
+  part_paid: "Part paid",
+  paid: "Paid",
+};
+
+export const requestState = (row: { paidMinor: Minor; openMinor: Minor }, sent: boolean): RequestState =>
+  row.openMinor <= 0 ? "paid" : row.paidMinor > 0 ? "part_paid" : sent ? "sent" : "not_sent";
+
 /** "Deposit 30%: USD 3,000.00 is late (due 1 Nov)" for reminders. */
 export const instalmentSentence = (label: string, openMinor: Minor, currency: string, dueOn: ISODate | null) =>
   `${label}: ${formatMinor(openMinor, currency)}${dueOn ? ` due ${dueOn}` : ""}`;

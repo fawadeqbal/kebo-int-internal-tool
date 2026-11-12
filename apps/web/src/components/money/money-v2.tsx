@@ -3,20 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
-import {
-  allocateOldestFirst,
-  CREDIT_KIND_LABEL,
-  FACTORY_DUE_RULE_LABEL,
-  FACTORY_PLAN_STATUS_LABEL,
-  INSTALMENT_STATUS_LABEL,
-  PAYMENT_METHOD_LABEL,
-  PAYMENT_METHODS,
-  type FactoryDueRule,
-  type FactoryPlanStatus,
-  type InstalmentStatus,
-  type LcCheck,
-  type PaymentMethod,
-} from "@kebo/shared";
+import { allocateOldestFirst, CREDIT_KIND_LABEL, FACTORY_DUE_RULE_LABEL, FACTORY_PLAN_STATUS_LABEL, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type FactoryDueRule, type FactoryPlanStatus, type LcCheck, type PaymentMethod } from "@kebo/shared";
 import { Alert, Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -25,8 +12,7 @@ import { MoneyInput } from "@/components/common/money-input";
 import { LineTable, type LineColumn, type LineResult, type LineRow } from "@/components/lines/line-table";
 import { rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
-import { dueText } from "@/lib/format";
-import type { CustomerCreditView, FactoryPlanView, OrderMoney } from "@/lib/types-money";
+import type { CustomerCreditView, FactoryPlanView } from "@/lib/types-money";
 import { useBankBand } from "@/components/orders/bank-tracker";
 import { AccountSelect } from "./accounts";
 import { FilePicker, useSaveThenSend } from "./attachment";
@@ -942,72 +928,9 @@ export function RemoveEntry({ action, label = "Remove" }: { action: Action; labe
 
 /* ---------------------------------------------------------------- the plan (LineTable) */
 
-const STATUS_TONE: Record<InstalmentStatus, "ok" | "info" | "warn" | "bad" | "neutral"> = {
-  paid: "ok",
-  part_paid: "info",
-  due_soon: "warn",
-  late: "bad",
-  open: "neutral",
-};
 const fixed = async (): Promise<LineResult> => ({ ok: false, message: "Change the plan with “Change the plan”." });
 /** The line table's tools for adding, pasting and moving lines do not apply to a read-only money table. */
 const readOnlyTable = "[&_tr[aria-label^='New_']]:hidden [&_[role=toolbar]]:hidden [&_button:has(>.lucide-clipboard-paste)]:hidden [&>div>div:has(>details)]:hidden";
-
-/** The plan as the same line table as the order (No., Part, How, Due, Amount, Received, Status) with the totals under it. */
-export function PlanLines({ plan, currency, total, received, due }: { plan: OrderMoney["plan"]; currency: string; total: string; received: string; due: string }) {
-  const rows: LineRow[] = plan.items.map((i) => ({
-    key: i.id,
-    parentKey: null,
-    values: { label: i.label, how: i.how, due: dueText(i), amount: fromMinor(toMinor(i.amount)), paid: fromMinor(toMinor(i.paid)), status: i.status, paidOn: "" },
-  }));
-  const columns: LineColumn[] = [
-    // Fixed widths: the line table gives a flexible column 16rem at least, more than a step page's card has.
-    { key: "label", label: "Part", width: "11rem" },
-    { key: "how", label: "How", width: "7rem", phoneHidden: true },
-    { key: "due", label: "Due", width: "7.5rem" },
-    { key: "amount", label: `Amount ${currency}`, width: "6.5rem", align: "right", format: (v) => <span className="tabular">{grouped(v.amount)}</span> },
-    { key: "paid", label: "Received", width: "6rem", align: "right", phoneHidden: true, format: (v) => <span className="tabular">{grouped(v.paid)}</span> },
-    {
-      key: "status",
-      label: "Status",
-      width: "6.5rem",
-      format: (v) => (
-        <Badge tone={STATUS_TONE[v.status as InstalmentStatus]} dot>
-          {INSTALMENT_STATUS_LABEL[v.status as InstalmentStatus]}
-        </Badge>
-      ),
-    },
-  ];
-  return (
-    <div className={cn("flex flex-col gap-2", readOnlyTable)}>
-      <LineTable
-        rows={rows}
-        columns={columns}
-        noun="part"
-        readOnly
-        flat
-        onAdd={fixed}
-        onEdit={fixed}
-        onRemove={fixed}
-        onMove={fixed}
-        empty="No plan yet."
-        footer={
-          <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 text-sm">
-            <span className="text-muted">
-              Order total <span className="font-semibold text-text tabular">{fmt(toMinor(total), currency)}</span>
-            </span>
-            <span className="text-muted">
-              Received <span className="font-semibold text-text tabular">{fmt(toMinor(received), currency)}</span>
-            </span>
-            <span className="text-muted">
-              Still due <span className="font-semibold text-text tabular">{fmt(toMinor(due), currency)}</span>
-            </span>
-          </div>
-        }
-      />
-    </div>
-  );
-}
 
 /* ---------------------------------------------------------------- LC checks */
 

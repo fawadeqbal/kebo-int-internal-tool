@@ -21,6 +21,8 @@ export interface PaperRow {
   printable: boolean;
   makeable: boolean;
   live: boolean;
+  /** Kept as sent (a payment request, a receipt): no draft and no Make page; `version` is the copy kept. */
+  kept?: boolean;
   inSet: boolean;
   doc: { id: string; status: string; keptWhere: string | null; file: { id: string; name: string } | null; issuedOn: string | null } | null;
   docKind: OrderDocumentKind | null;
@@ -80,6 +82,8 @@ export interface PaperDocView {
   refNo: string;
   label: string;
   live: boolean;
+  /** Kept as sent: `final` is the copy that was sent; not final: how it would print now. */
+  kept?: boolean;
   final: boolean;
   watermark: string | null;
   paper: PaperVersion | null;

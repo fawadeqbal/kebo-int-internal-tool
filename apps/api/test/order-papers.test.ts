@@ -315,9 +315,10 @@ describe("order papers", () => {
       await freeze(0, false);
     }
     const receiptDoc = await doc("payment-receipt", `?ref=${receipt.key.split(":")[1]}`);
-    expect(receiptDoc).toMatchObject({ live: true, watermark: null });
+    // Kept when the payment was recorded: the copy, never a draft.
+    expect(receiptDoc).toMatchObject({ live: false, kept: true, final: true, watermark: null });
     expect(receiptDoc.doc.total).toMatchObject({ label: "Received", amount: "1000.00" });
-    // Live papers are never drafts.
+    // Kept papers are never drafts.
     await api(app, sana).post(`/orders/${orderId}/papers/payment-receipt`, {}).expect(400);
   });
 

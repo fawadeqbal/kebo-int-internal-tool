@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger, type OnModuleInit } from "@nestjs/common";
 import { asPayment, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf, type WithTerms } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
 import { chargedExpenses, fxOf, positionOf as orderPositionOf } from "../billing/api";
@@ -12,6 +12,8 @@ import {
   inSentence,
   LIVE_PAPERS,
   ORDER_DOCUMENT_LABEL,
+  planStatus,
+  SENT_PAPERS,
   orderDetailsInput,
   PAPER_DOCUMENT,
   PAPER_FEATURE,
@@ -48,8 +50,9 @@ import {
   type PaperQueryInput,
   type PaperState,
   type PlanFeature,
+  type SendRequestInput,
 } from "@kebo/shared";
-import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
+import { dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -59,7 +62,9 @@ import { SettingsService } from "../settings/settings.service";
 import { companySnapshot } from "../quotations/quotations.service";
 import { buyerOf, partyOf } from "../orders/buyer";
 import { quotedTermsPrinted } from "../orders/order-docs";
-import { deleteDraft, makeAgain, makeFinal, paperReady, saveDraft, startDraft } from "../documents/api";
+import { deleteDraft, keepAsSent, makeAgain, makeFinal, paperReady, saveDraft, startDraft } from "../documents/api";
+import { requireReason } from "../../common/audit/reason";
+import { EventBus } from "../../common/events/event-bus";
 import { termsOf } from "../billing/api";
 import { orderAccess } from "../../common/auth/order-access";
 import { OrdersService } from "../orders/orders.service";
@@ -71,6 +76,7 @@ import {
   livePlanOfPaper,
   paperOrderInclude,
   positionOf,
+  receiptMark,
   reportItem,
   type PaperCtx,
   type PaperOrder,
@@ -105,6 +111,8 @@ export interface PaperListRow {
   makeable: boolean;
   /** Printed from the data whenever opened (no draft or final). */
   live: boolean;
+  /** Kept as sent (a payment request, a receipt): no draft and no Make page; `version` is the copy kept (a request's R1, R2…). */
+  kept?: boolean;
   /** Part of the document set the shipment needs (the Documents page). */
   inSet: boolean;
   /** The document-set row (upload, kept elsewhere). */
@@ -145,7 +153,9 @@ const asOptions = (v: Prisma.JsonValue): PaperOptions =>
  * prices, so only people who see them (sourcing.manage) get it.
  */
 @Injectable()
-export class PapersService {
+export class PapersService implements OnModuleInit {
+  private readonly logger = new Logger("Papers");
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -154,7 +164,13 @@ export class PapersService {
     private readonly settings: SettingsService,
     private readonly orders: OrdersService,
     private readonly flow: FlowService,
+    private readonly events: EventBus,
   ) {}
+
+  /** A payment recorded: its receipt is kept at once, as it prints then. */
+  onModuleInit() {
+    this.events.on("payment.recorded", (e) => this.keepReceipts(e.orderId));
+  }
 
   /* ---------------------------------------------------------------- reading */
 
@@ -189,6 +205,10 @@ export class PapersService {
     if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make papers.");
     if (LIVE_PAPERS.includes(kind))
       throw new DomainError(`The ${PAPER_LABEL[kind].toLowerCase()} is printed from the data whenever it is opened.`);
+    if (SENT_PAPERS.includes(kind))
+      throw new DomainError(
+        kind === "payment-request" ? "A payment request is kept when it is sent: use Send request." : "A receipt is kept when its payment is recorded.",
+      );
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
   }
 
@@ -244,7 +264,7 @@ export class PapersService {
     return Object.fromEntries(keys.map((k) => [k, all[k] !== false])) as PaperOptions;
   }
 
-  private async ctx(user: SessionUser, o: PaperOrder, kind: PaperKind | null, options: PaperOptions, ref: string): Promise<PaperCtx> {
+  private async ctx(user: SessionUser | null, o: PaperOrder, kind: PaperKind | null, options: PaperOptions, ref: string): Promise<PaperCtx> {
     const [settings, features, customer] = await Promise.all([this.settings.get(), this.limits.features(), this.customerOf(o)]);
     const fileIds = o.checklist
       .flatMap((i) => Object.values((i.data ?? {}) as Record<string, string>))
@@ -262,7 +282,7 @@ export class PapersService {
       options,
       ref,
       fileNames: new Map(files.map((f) => [f.id, f.fileName])),
-      statement: kind === "customer-statement" ? await this.statementOf(user, o.customerId) : null,
+      statement: kind === "customer-statement" && user ? await this.statementOf(user, o.customerId) : null,
       number:
         kind === "purchase-order" && /^[0-9a-f-]{36}$/i.test(ref)
           ? ((await this.prisma.db.purchaseOrder.findFirst({ where: { orderId: o.id, supplierId: ref }, select: { number: true } }))?.number ?? null)
@@ -295,7 +315,9 @@ export class PapersService {
       if (ref && !factories.some((f) => f.id === ref)) throw new NotFoundError("Factory on this order");
       return ref || factories[0]?.id || "";
     }
-    if (kind === "payment-receipt" || kind === "payment-request") return ref ?? "";
+    // A receipt without a ref is the last payment's.
+    if (kind === "payment-receipt") return ref || o.allocations.at(-1)?.id || "";
+    if (kind === "payment-request") return ref ?? "";
     return "";
   }
 
@@ -322,10 +344,16 @@ export class PapersService {
    * (a draft, with the DRAFT watermark), with ?opts= to preview options.
    */
   async doc(user: SessionUser, orderId: string, kind: PaperKind, q: PaperQueryInput) {
-    const o = await this.order(user, orderId);
+    let o = await this.order(user, orderId);
     await this.mayRead(user, kind, o);
+    // A receipt not kept yet (recorded before receipts were kept, or its payment corrected since): kept now.
+    if (kind === "payment-receipt" && this.receiptsToKeep(o).length) {
+      await this.keepReceipts(o.id);
+      o = await this.order(user, orderId);
+    }
     const ref = this.refOf(kind, o, q.ref);
     const rows = this.rowsOf(o, kind, ref);
+    const kept = SENT_PAPERS.includes(kind);
     const asked = q.v ? rows.find((p) => p.version === q.v) : undefined;
     if (q.v && !asked) throw new NotFoundError("Version");
     const row = asked ?? rows.at(-1) ?? null;
@@ -335,16 +363,26 @@ export class PapersService {
       refNo: o.refNo,
       label: PAPER_LABEL[kind],
       live: LIVE_PAPERS.includes(kind),
+      kept,
       paper: this.paperView(row),
       versions: rows.map((p) => this.paperView(p)!),
     };
-    if (row?.status === "final" && row.snapshot && !(q.opts !== undefined && !asked)) {
-      return { ...head, doc: row.snapshot as unknown as PaperDoc, final: true, watermark: cancelled };
+    // Kept as sent: the copy, unless asked how it would print now (?now=1, before sending it again).
+    if (row?.status === "final" && row.snapshot && !(q.opts !== undefined && !asked) && !(kept && q.now && !asked)) {
+      // What it was about is gone (its row taken out of the plan, its payment removed): it stays, marked.
+      const gone = kept && !!ref && (kind === "payment-request" ? ref !== "balance" && o.receivables.every((r) => r.id !== ref) : o.allocations.every((a) => a.id !== ref));
+      return { ...head, doc: row.snapshot as unknown as PaperDoc, final: true, watermark: cancelled ?? (gone ? "CANCELLED" : null) };
     }
-    const options = this.optionsOf(kind, o, row ? asOptions(row.options) : null, parsePaperOptions(kind, q.opts));
-    const { doc } = this.build(kind, await this.ctx(user, o, kind, options, ref));
+    const options = this.optionsOf(kind, o, row && !kept ? asOptions(row.options) : null, parsePaperOptions(kind, q.opts));
+    const { doc } = this.build(kind, { ...(await this.ctx(user, o, kind, options, ref)), revision: kind === "payment-request" ? this.revisionOf(rows) : null });
     const live = LIVE_PAPERS.includes(kind);
-    return { ...head, doc, final: false, watermark: cancelled ?? (live ? null : "DRAFT") };
+    return { ...head, doc, final: false, watermark: cancelled ?? (live || kind === "payment-receipt" ? null : kind === "payment-request" ? "NOT SENT" : "DRAFT") };
+  }
+
+  /** A request sent before: the next one is its revision (R2…), and says which day's it replaces. */
+  private revisionOf(rows: PaperRow[]) {
+    const last = rows.filter((p) => p.status === "final").at(-1);
+    return last ? { n: last.version + 1, replaces: dateIn(last.finalAt ?? last.madeAt, this.clock.timeZone) } : null;
   }
 
   /** GET /orders/:id/papers/:kind/checks — the Make page: what the paper takes from the order, options, versions. */
@@ -372,7 +410,7 @@ export class PapersService {
       ref: ref || null,
       factories: PER_FACTORY_PAPERS.includes(kind) ? factoriesOf(o).map((f) => ({ id: f.id, name: f.name })) : null,
       live: LIVE_PAPERS.includes(kind),
-      canMake: can(user, "documents.manage") && o.status !== "cancelled" && !LIVE_PAPERS.includes(kind),
+      canMake: can(user, "documents.manage") && o.status !== "cancelled" && !LIVE_PAPERS.includes(kind) && !SENT_PAPERS.includes(kind),
       state: this.stateOf(latest, ready),
       ready,
       checks,
@@ -407,7 +445,12 @@ export class PapersService {
 
   /** GET /orders/:id/papers — every paper of the order with where it stands, for the step pages and the Documents page. */
   async list(user: SessionUser, orderId: string) {
-    const o = await this.order(user, orderId);
+    let o = await this.order(user, orderId);
+    // Receipts not kept yet (payments from before receipts were kept, or corrected since): kept now.
+    if (this.receiptsToKeep(o).length) {
+      await this.keepReceipts(o.id);
+      o = await this.order(user, orderId);
+    }
     const features = await this.limits.features();
     const has = (f: PlanFeature) => !features || features.includes(f);
     const c = await this.ctx(user, o, null, {}, "");
@@ -437,7 +480,7 @@ export class PapersService {
               : d.status === "draft"
                 ? "draft"
                 : "miss";
-    const row = (r: Omit<PaperListRow, "stateLabel">): PaperListRow => ({ ...r, stateLabel: PAPER_STATE_LABEL[r.state] });
+    const row = (r: Omit<PaperListRow, "stateLabel"> & { stateLabel?: string }): PaperListRow => ({ ...r, stateLabel: r.stateLabel ?? PAPER_STATE_LABEL[r.state] });
 
     // The order's own papers: final when issued (the proforma) or shipped (the packing list), Make again for the next version.
     const own = (kind: "proforma" | "packing-list") => {
@@ -507,9 +550,10 @@ export class PapersService {
       if (FACTORY_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) continue;
       // Switched off: printed-from-the-data papers go; made ones stay (below).
       if (!used(kind) && LIVE_PAPERS.includes(kind)) continue;
-      const base = { kind, source: "app" as const, step: PAPER_STEP[kind], printable: true, live: LIVE_PAPERS.includes(kind) };
+      const base = { kind, source: "app" as const, step: PAPER_STEP[kind], printable: true, live: LIVE_PAPERS.includes(kind), kept: SENT_PAPERS.includes(kind) };
       if (kind === "payment-receipt") {
-        o.allocations.map(asPayment).forEach((p, i) =>
+        o.allocations.map(asPayment).forEach((p, i) => {
+          const copy = this.rowsOf(o, kind, p.id).at(-1) ?? null;
           out.push(
             row({
               ...base,
@@ -518,49 +562,62 @@ export class PapersService {
               state: "ready",
               // Given when the payment was recorded: never moved by a void or a back-dated payment.
               number: paperNumber(o.refNo, kind, p.receiptNo ?? i + 1),
-              version: null,
-              sub: `${p.currency} ${p.amount.toFixed(2)} · ${fromDbDate(p.paidOn)}`,
+              // Kept when the payment was recorded; version 2 and on: the payment was corrected.
+              version: copy?.version ?? null,
+              paperId: copy?.id ?? null,
+              sub: `${p.currency} ${p.amount.toFixed(2)} · ${fromDbDate(p.paidOn)}${copy && copy.version > 1 ? " · corrected" : ""}`,
               ref: p.id,
               makeable: false,
               inSet: false,
               doc: null,
               docKind: null,
             }),
-          ),
-        );
+          );
+        });
         continue;
       }
       if (kind === "payment-request") {
         const pos = positionOf(c);
-        livePlanOfPaper(o).forEach((p, i) =>
+        /** The copy kept when the request was last sent (R1, R2…), with the day. */
+        const sentOf = (ref: string) => {
+          const copy = this.rowsOf(o, kind, ref).filter((x) => x.status === "final").at(-1) ?? null;
+          return copy ? { copy, on: dateIn(copy.finalAt ?? copy.madeAt, this.clock.timeZone) } : null;
+        };
+        livePlanOfPaper(o).forEach((p, i) => {
+          const sent = sentOf(p.id);
           out.push(
             row({
               ...base,
               key: `${kind}:${p.id}`,
               label: `${PAPER_LABEL[kind]} · ${p.label}`,
-              state: "can",
+              state: sent ? "ready" : "can",
+              stateLabel: sent ? "Sent" : "Not sent",
               // Given when the plan row was made: a rebuilt plan keeps the numbers of the rows it keeps.
               number: paperNumber(o.refNo, kind, p.requestNo ?? i + 1),
-              version: null,
-              sub: `${o.currency} ${fromMinor(p.amountMinor)}${p.dueOn ? ` · due ${p.dueOn}` : ""}`,
+              version: sent?.copy.version ?? null,
+              paperId: sent?.copy.id ?? null,
+              sub: `${o.currency} ${fromMinor(p.amountMinor)}${p.dueOn ? ` · due ${p.dueOn}` : ""}${sent ? ` · sent ${sent.on}${sent.copy.version > 1 ? ` (R${sent.copy.version})` : ""}` : ""}`,
               ref: p.id,
               makeable: false,
               inSet: false,
               doc: null,
               docKind: null,
             }),
-          ),
-        );
-        if (Number(pos.due) > 0 && !o.receivables.length)
+          );
+        });
+        if (Number(pos.due) > 0 && !o.receivables.length) {
+          const sent = sentOf("balance");
           out.push(
             row({
               ...base,
               key: `${kind}:balance`,
               label: PAPER_LABEL[kind],
-              state: "can",
+              state: sent ? "ready" : "can",
+              stateLabel: sent ? "Sent" : "Not sent",
               number: paperNumber(o.refNo, kind),
-              version: null,
-              sub: `${o.currency} ${pos.due} still due`,
+              version: sent?.copy.version ?? null,
+              paperId: sent?.copy.id ?? null,
+              sub: `${o.currency} ${pos.due} still due${sent ? ` · sent ${sent.on}` : ""}`,
               ref: "balance",
               makeable: false,
               inSet: false,
@@ -568,6 +625,7 @@ export class PapersService {
               docKind: null,
             }),
           );
+        }
         continue;
       }
       if (kind === "customer-statement") {
@@ -740,6 +798,112 @@ export class PapersService {
       summary: `${o.refNo}: ${summary}`,
       newValues: { kind, ...values, step: PAPER_STEP[kind] },
     });
+  }
+
+  /* ---------------------------------------------------------------- kept as sent */
+
+  /**
+   * POST /orders/:id/requests/send — the payment request of a plan row is sent: exactly what it prints now is
+   * kept (its number, the amount, the due date, the account so far, our bank details), and the row shows Sent.
+   * Sent again (the amount or the date changed, or a new copy was asked for): the next revision (R2…), with
+   * why; the first copy stays as it was. "balance": the rest due on an order that has no plan.
+   */
+  async sendRequest(user: SessionUser, orderId: string, input: SendRequestInput) {
+    if (!can(user, "orders.update") && !can(user, "documents.manage")) throw new ForbiddenError("You cannot send payment requests.");
+    const kind = "payment-request" as const;
+    return this.prisma.tx(async (tx) => {
+      const o = await this.lock(tx, user, orderId);
+      await this.mayRead(user, kind, o);
+      if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
+      const items = livePlanOfPaper(o);
+      const item = items.find((x) => x.id === input.ref) ?? null;
+      if (!item && !(input.ref === "balance" && !o.receivables.length)) throw new NotFoundError("Payment request");
+      const rows = this.rowsOf(o, kind, input.ref);
+      const before = this.revisionOf(rows);
+      const reason = before ? requireReason(input.reason, "requestAgain", "the request is sent again") : null;
+      const c = await this.ctx(user, o, kind, this.optionsOf(kind, o, null, null), input.ref);
+      if (item) {
+        const settled = orderPositionOf(o, fxOf(c.settings, !c.features || c.features.includes("expenses"))).settledMinor;
+        const row = planStatus(items, settled, c.today, 0).find((x) => x.id === item.id)!;
+        if (row.openMinor <= 0) throw new DomainError(`${item.label} is already paid: there is nothing to ask for.`);
+      }
+      const { doc, checks } = this.build(kind, { ...c, revision: before });
+      const missing = checks.filter((x) => x.required && !x.ok);
+      if (missing.length) throw new DomainError(`Still needed before it is sent: ${missing.map((x) => inSentence(x.label)).join(", ")}.`);
+      const amount = doc.total?.amount ?? "0.00";
+      const version = await keepAsSent(tx, {
+        orderId: o.id,
+        kind,
+        ref: input.ref,
+        number: doc.number,
+        byId: user.id,
+        snapshot: doc as unknown as Prisma.InputJsonValue,
+        // What it asked for: the row shows "changed since it was sent" when it no longer says the same.
+        options: { amount, dueOn: item?.dueOn ?? null, label: item?.label ?? "Balance due on the order" },
+      });
+      // Own items that send this paper tick themselves.
+      await tx.orderChecklistItem.updateMany({
+        where: { orderId: o.id, key: null, paper: kind, doneAt: null },
+        data: { doneAt: new Date(), doneById: user.id, skippedAt: null, skipReason: null, data: { number: doc.number } },
+      });
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "paper.sent",
+        entityType: "order",
+        entityId: o.id,
+        summary: `${o.refNo}: ${PAPER_LABEL[kind]} ${doc.number} sent${version > 1 ? ` again (R${version})` : ""}: ${o.currency} ${amount}${item?.dueOn ? `, due ${item.dueOn}` : ""}`,
+        newValues: { kind, number: doc.number, version, ref: input.ref, amount, dueOn: item?.dueOn ?? null, step: PAPER_STEP[kind] },
+        reason,
+      });
+      return { orderId: o.id, ref: input.ref, number: doc.number, revision: version };
+    });
+  }
+
+  /** The order's payments whose receipt is not kept yet, or was kept before the payment was corrected. */
+  private receiptsToKeep(o: PaperOrder) {
+    return o.allocations.filter((a) => {
+      const copy = this.rowsOf(o, "payment-receipt", a.id).at(-1);
+      return !copy || JSON.stringify({ ...receiptMark(asPayment(a)) }) !== JSON.stringify(this.markOf(copy.options));
+    });
+  }
+
+  private markOf(v: Prisma.JsonValue) {
+    const o = (v && typeof v === "object" && !Array.isArray(v) ? v : {}) as Record<string, unknown>;
+    return { amount: o.amount, bankCharges: o.bankCharges, paidOn: o.paidOn, method: o.method, reference: o.reference };
+  }
+
+  /**
+   * Keeps the receipt of every payment of the order that has none yet, exactly as it prints (the account as
+   * it stood once that payment counted), and again as the next version for a payment corrected since. Runs
+   * when a payment is recorded, and before a receipt is read (payments from before receipts were kept).
+   * Never breaks what called it.
+   */
+  async keepReceipts(orderId: string) {
+    const kind = "payment-receipt" as const;
+    try {
+      await this.prisma.tx(async (tx) => {
+        await tx.$queryRaw`select id from orders where id = ${orderId}::uuid for update`;
+        const o = await tx.order.findUnique({ where: { id: orderId }, include: paperOrderInclude });
+        if (!o) return;
+        const todo = this.receiptsToKeep(o);
+        if (!todo.length) return;
+        const base = await this.ctx(null, o, kind, this.optionsOf(kind, o, null, null), "");
+        for (const a of todo) {
+          const { doc } = this.build(kind, { ...base, ref: a.id });
+          await keepAsSent(tx, {
+            orderId: o.id,
+            kind,
+            ref: a.id,
+            number: doc.number,
+            byId: a.recordedById,
+            snapshot: doc as unknown as Prisma.InputJsonValue,
+            options: receiptMark(asPayment(a)),
+          });
+        }
+      });
+    } catch (e) {
+      this.logger.warn(`receipts of order ${orderId} not kept: ${(e as Error).message}`);
+    }
   }
 
   /** POST /orders/:id/papers/:kind — save as draft (version 1, or the open draft's options). */

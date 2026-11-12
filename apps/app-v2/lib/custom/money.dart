@@ -652,6 +652,17 @@ Future<void> shareRequest(
 }) async {
   final name = await _contactName(context.api, customerId);
   if (!context.mounted) return;
+  // Kept as sent: a request not sent yet is sent first (kept exactly as it prints), so what is shared is
+  // the copy and not a draft. Asked for through the banks, or not allowed to send: shared as it prints now.
+  final request = item['request'];
+  if (request is Map && request['state'] == 'not_sent' && request['through'] != 'bank') {
+    try {
+      await context.api.post('/api/orders/$orderId/requests/send', {'ref': item.str('id')});
+    } on ApiException catch (_) {
+      // Shared as it prints now.
+    }
+    if (!context.mounted) return;
+  }
   final label = item.str('label');
   final open = fmtMoney(item.strOrNull('open') ?? item.str('amount'), currency);
   final due = item.strOrNull('dueOn');
