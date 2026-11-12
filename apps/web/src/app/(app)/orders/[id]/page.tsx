@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
-import { can, shipByVsLc, STEP_PATH } from "@kebo/shared";
-import { Avatar, buttonClass, Card, CardBody, CardHeader, cn, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { AlertTriangle, ArrowRight } from "lucide-react";
+import { can, shipByVsLc, STEP_PATH, type PaymentRoute } from "@kebo/shared";
+import { Avatar, buttonClass, Card, CardBody, CardHeader, cn, StatRow, StatTile, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { orderFlowOf, orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
-import { date, money } from "@/lib/format";
+import { date, money, whole } from "@/lib/format";
+import { QuickNote } from "@/components/notes/note-forms";
+import { addNoteAction } from "@/app/(app)/follow-ups/actions";
 import type { DealDetail } from "@/lib/types";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
@@ -15,6 +17,15 @@ import { overviewFacts } from "@/components/orders/overview";
 import { detailsAction } from "../actions";
 import { DetailsCard } from "./forms";
 import { incotermOf, termsOf } from "./shared";
+import { stageTool } from "./close-tool";
+
+const ROUTE_WORD: Record<PaymentRoute, string> = { informal: "Bank transfer (informal)", bank_contract: "Bank contract", letter_of_credit: "Letter of credit" };
+const BALANCE_SHORT: Record<string, string> = {
+  before_shipment: "before shipping",
+  against_bl_copy: "vs B/L copy",
+  after_arrival: "after arrival",
+  letter_of_credit: "by the LC",
+};
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -31,14 +42,19 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const me = await requireUser();
   const o = await orderOf(id);
-  const [steps, m, flow, deal, costs, history] = await Promise.all([
+  const [steps, m, flow, deal, costs, history, pos] = await Promise.all([
     orderStepsOf(id),
     optional(() => orderMoneyOf(id)),
     optional(() => orderFlowOf(id)),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
     orderCostsSetup(id).then((x) => x?.costs ?? null),
     optional(() => orderHistoryOf(id, undefined, 5)),
+    optional(() => api.get<{ items: { total: string | null; currency: string | null }[] }>(`/orders/${id}/purchase-orders`)),
   ]);
+  // The purchase orders' total in their currency ("CNY 292,860"), for those who see factory prices.
+  const poCur = pos?.items.find((p) => p.currency)?.currency;
+  const poSum = (pos?.items ?? []).reduce((t, p) => t + Number(p.total ?? 0), 0);
+  const poTotal = poCur && poSum > 0 && (pos?.items ?? []).every((p) => !p.currency || p.currency === poCur) ? whole(poSum, poCur) : null;
   const base = `/orders/${o.id}`;
   const open = o.status !== "cancelled";
   const now = today();
@@ -48,6 +64,14 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
   // Shipped on, the B/L and the container are Shipment 1's: edited on Shipping when the company has the module.
   const onShipping = flow?.modules.shipping ?? true;
   const lcLatest = flow?.payment.route === "letter_of_credit" ? (flow.payment.bankContract?.latestShipOn ?? null) : null;
+  // Every step done (board OrderDone): ready to close, or closed.
+  const allDone = open && !doNow && (o.next?.to === "done" || o.stage === "done");
+  const closeTool = allDone ? stageTool(me, o, "done", now) : null;
+  const openClaims = flow?.delivery?.claims.filter((c) => c.status === "open" || c.status === "with_factory").length ?? 0;
+  const satOn = flow?.delivery?.satDoneOn ?? flow?.delivery?.deliveredOn ?? null;
+  const days = o.orderedOn ? Math.round((Date.parse(satOn ?? now) - Date.parse(o.orderedOn)) / 86_400_000) : null;
+  /** "+ USD 400" over the plan, "– USD 400" under it. */
+  const diff = (n: number) => (!costs || Math.abs(n) < 0.5 ? "—" : `${n > 0 ? "+" : "–"} ${whole(Math.abs(n), costs.currency)}`);
 
 
   return (
@@ -73,11 +97,77 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             Open {doNow.label} <ArrowRight aria-hidden />
           </Link>
         </section>
-      ) : finished ? (
-        <p className="flex items-center gap-2 rounded-xl border border-ok/25 bg-ok-soft px-4 py-3 text-sm">
-          <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden />
-          <span className="font-medium">Done: every step is ticked and the order is closed.</span>
-        </p>
+      ) : allDone ? (
+        <>
+          <section
+            aria-label="All steps done"
+            className="flex flex-col gap-3 rounded-2xl border border-ok/25 bg-ok-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p>
+              <strong className="block font-bold text-ok">
+                All steps done. {Number(o.money.due) > 0 ? `${money(o.money.due, o.currency)} still to come.` : "Paid in full."}
+              </strong>
+              <span className="block text-sm text-text-2">
+                {finished
+                  ? "The order is closed."
+                  : openClaims
+                    ? `${openClaims === 1 ? "One claim is" : `${openClaims} claims are`} still with the factory. You can close now and keep the claim open.`
+                    : "Close the order to finish it."}
+              </span>
+            </p>
+            {closeTool}
+          </section>
+          {costs?.profit && (
+            <StatRow>
+              <StatTile label="Sale" value={whole(costs.profit.sale, costs.currency)} />
+              <StatTile label="Cost" value={whole(Number(costs.profit.sale) - Number(costs.profit.expected), costs.currency)} />
+              <StatTile
+                label="Profit"
+                value={whole(costs.profit.expected, costs.currency)}
+                sub={[costs.profit.margin !== null ? `${costs.profit.margin.toFixed(1)}%` : null, costs.profit.onQuoteMargin !== null ? `planned ${costs.profit.onQuoteMargin.toFixed(1)}%` : null].filter(Boolean).join(" · ")}
+                tone={Number(costs.profit.expected) < 0 ? "bad" : "ok"}
+              />
+              <StatTile label="Days" value={days ?? "—"} sub={flow?.delivery?.satDoneOn ? "order → SAT" : satOn ? "order → delivery" : "order → today"} />
+            </StatRow>
+          )}
+          {costs?.profit && (
+            <Card className="p-0">
+              <CardHeader title="Planned vs actual" />
+              <Table>
+                <THead>
+                  <tr>
+                    <Th />
+                    <Th className="text-right">Planned</Th>
+                    <Th className="text-right">Actual</Th>
+                    <Th className="text-right">Difference</Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {costs.planned.filter((r) => r.planned !== null).map((r) => (
+                    <Tr key={r.key}>
+                      <Td>{r.label}</Td>
+                      <Td className="text-right tabular">{r.planned === null ? "—" : whole(r.planned, costs.currency)}</Td>
+                      <Td className="text-right tabular">{whole(r.spent, costs.currency)}</Td>
+                      <Td className="text-right tabular">{diff(r.planned === null ? 0 : Number(r.spent) - Number(r.planned))}</Td>
+                    </Tr>
+                  ))}
+                  <Tr>
+                    <Td>Other costs</Td>
+                    <Td className="text-right tabular">—</Td>
+                    <Td className="text-right tabular">{Number(costs.profit.notPlanned) ? whole(costs.profit.notPlanned, costs.currency) : "—"}</Td>
+                    <Td className="text-right tabular">{diff(Number(costs.profit.notPlanned))}</Td>
+                  </Tr>
+                  <Tr className="border-t-2 border-line font-semibold">
+                    <Td>Profit</Td>
+                    <Td className="text-right tabular">{whole(costs.profit.onQuote, costs.currency)}</Td>
+                    <Td className="text-right tabular">{whole(costs.profit.expected, costs.currency)}</Td>
+                    <Td className="text-right tabular">{diff(Number(costs.profit.expected) - Number(costs.profit.onQuote))}</Td>
+                  </Tr>
+                </tbody>
+              </Table>
+            </Card>
+          )}
+        </>
       ) : null}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -86,13 +176,32 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             action={detailsAction.bind(null, o.id)}
             canEdit={can(me, "orders.update") && open}
             today={now}
+            compact
             fixed={[
-              { label: "Customer", value: o.customer.name },
+              {
+                label: "Customer",
+                value: (
+                  <>
+                    <Link href={`/customers/${o.customer.id}`} className="text-primary underline underline-offset-2 hover:opacity-80">
+                      {o.customer.name}
+                    </Link>
+                    {o.contactName ? ` · ${o.contactName}` : ""}
+                  </>
+                ),
+              },
+              { label: "Their PO", value: o.customerRef ?? null },
+              {
+                label: "Accepted",
+                value: o.quotation?.acceptedOn
+                  ? `${date(o.quotation.acceptedOn)}${o.quotation.option ? ` · Option ${o.quotation.option}` : ""}`
+                  : date(o.orderedOn),
+              },
               { label: "Incoterm", value: incotermOf(o) },
-              { label: "Payment terms", value: termsOf(o) },
-              { label: "Ordered on", value: date(o.orderedOn) },
+              { label: "Payment", value: termsOf(o) },
+              { label: "Route", value: flow?.payment.route ? ROUTE_WORD[flow.payment.route] : null },
               { label: "Supplier", value: [...new Set(o.lines.map((l) => l.factory?.name).filter(Boolean))].join(", ") || "—" },
             ]}
+            after={o.quotation?.deliveryTerms ? [{ label: "Delivery terms", value: o.quotation.deliveryTerms }] : []}
             values={{
               shipBy: o.shipBy,
               readyOn: o.readyOn,
@@ -174,19 +283,27 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
             <CardHeader
               title="Money"
               actions={
-                <Link href={`${base}/payment`} className="text-[13px] font-semibold text-primary hover:underline">
-                  Payment
+                <Link href={`${base}/money`} className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline">
+                  <ArrowRight className="size-3.5" aria-hidden /> Money tab
                 </Link>
               }
             />
             <CardBody className="flex flex-col gap-2.5 text-[13px]">
               {(
                 [
-                  ["Order total", money(o.money.total, o.currency)],
-                  [`Deposit ${o.money.depositPercent}%`, money(o.money.deposit, o.currency)],
-                  ["Received", money(o.money.received, o.currency)],
-                  ["They owe", money(o.money.due, o.currency)],
-                  ...(f.profit ? [["Margin", f.profit.margin !== null ? `${f.profit.margin.toFixed(1)}%` : money(f.profit.expected, o.currency)] as [string, string]] : []),
+                  ["Order total", whole(o.money.total, o.currency)],
+                  [
+                    `Deposit ${o.money.depositPercent}%`,
+                    `${whole(o.money.deposit, o.currency)}${Number(o.money.received) >= Number(o.money.deposit) && Number(o.money.deposit) > 0 ? " · received" : Number(o.money.deposit) > 0 ? " · to come" : ""}`,
+                  ],
+                  ...(o.money.depositPercent < 100
+                    ? [[`Balance ${100 - o.money.depositPercent}%`, `${whole(Number(o.money.total) - Number(o.money.deposit), o.currency)} · ${BALANCE_SHORT[o.balanceTerms] ?? "later"}`] as [string, string]]
+                    : []),
+                  ["They owe", whole(o.money.due, o.currency)],
+                  ...(poTotal ? [["Purchase order", poTotal] as [string, string]] : []),
+                  ...(f.profit
+                    ? [["Planned profit", `${whole(f.profit.expected, o.currency)}${f.profit.margin !== null ? ` · ${f.profit.margin.toFixed(1)}%` : ""}`] as [string, string]]
+                    : []),
                 ] as [string, string][]
               ).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3">
@@ -207,7 +324,8 @@ export default async function OrderOverview({ params }: { params: Promise<{ id: 
                 </Link>
               }
             />
-            <CardBody>
+            <CardBody className="flex flex-col gap-4">
+              {open && <QuickNote action={addNoteAction.bind(null, { key: "orderId", id: o.id })} />}
               {history?.length ? (
                 <ol className="flex flex-col gap-3">
                   {history.slice(0, 5).map((e) => (

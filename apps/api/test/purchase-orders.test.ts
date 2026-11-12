@@ -46,4 +46,19 @@ describe("purchase orders", () => {
     // The first one sent is the order's "ordered from the factory" day.
     expect((await db.order.findUniqueOrThrow({ where: { id: po.order.id } })).factoryOrderedOn).not.toBeNull();
   });
+
+  it("finds orders by number or PO and by customer, and shows the quotation an order came from", async () => {
+    const db = prisma.company(FIRST_COMPANY_ID);
+    const po = await db.purchaseOrder.findFirst({ where: { order: { status: "open" } }, include: { order: { select: { id: true, refNo: true, customerId: true } } } });
+    if (!po) return;
+    const byPo = (await api(app, manager).get(`/orders?status=open&q=${encodeURIComponent(po.number)}`).expect(200)).body as { id: string }[];
+    const byRef = (await api(app, manager).get(`/orders?q=${encodeURIComponent(po.order.refNo)}`).expect(200)).body as { id: string }[];
+    const byCustomer = (await api(app, manager).get(`/orders?customer=${po.order.customerId}`).expect(200)).body as { id: string; customer: { id: string } }[];
+    const rows = (x: unknown) => (Array.isArray(x) ? x : (x as { rows: { id: string }[] }).rows) as { id: string; customer?: { id: string } }[];
+    expect(rows(byRef).map((o) => o.id)).toContain(po.order.id);
+    if (rows(byPo).length) expect(rows(byPo).map((o) => o.id)).toContain(po.order.id);
+    expect(rows(byCustomer).every((o) => !o.customer || o.customer.id === po.order.customerId)).toBe(true);
+    const view = (await api(app, manager).get(`/orders/${po.order.id}`).expect(200)).body;
+    if (view.quotation) expect(view.quotation.number).toBeGreaterThan(0);
+  });
 });

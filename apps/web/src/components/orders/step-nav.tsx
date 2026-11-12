@@ -73,11 +73,20 @@ export function StepBoxes({ steps, label, isHere }: { steps: StepNavStep[]; labe
                   s.state === "now" && "border-2 border-action-solid bg-action-soft",
                   s.state === "late" && "border-2 border-bad bg-bad-soft",
                   s.state === "todo" && "border border-line bg-surface",
-                  here && "ring-2 ring-primary-solid ring-offset-2 ring-offset-bg",
+                  here && "shadow-card",
                 )}
               >
                 <span className="flex items-center gap-2 text-[13px] font-bold text-text">
-                  <StepMark state={s.state} number={s.number} />
+                  {/* Board: a tick when done, a dot now (or late), else the step's number. */}
+                  {s.state === "done" ? (
+                    <Check className="size-3.5 shrink-0 text-ok" strokeWidth={3} aria-hidden />
+                  ) : s.state === "now" || s.state === "late" ? (
+                    <span aria-hidden className={cn("size-2 shrink-0 rounded-full", s.state === "late" ? "bg-bad" : "bg-action-solid")} />
+                  ) : (
+                    <span aria-hidden className="font-semibold text-text-2 tabular">
+                      {s.number}
+                    </span>
+                  )}
                   <span className="truncate">{s.label}</span>
                   <span className={cn("ml-auto text-[11px] font-semibold", s.state === "late" ? "text-bad" : s.state === "now" ? "text-action" : "text-muted")}>{WORD[s.state]}</span>
                 </span>

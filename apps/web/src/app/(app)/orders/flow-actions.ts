@@ -137,3 +137,10 @@ export async function sendPurchaseOrderAction(orderId: string, poId: string, _pr
   if (r.ok) revalidatePath(`/orders/${orderId}`, "layout");
   return r;
 }
+
+/** The production steps (board OrderProduction): payload { steps: [{ id?, title, factoryId?, plannedOn?, doneOn?, note? }] }. */
+export async function productionStepsAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.put(`/orders/${orderId}/production`, formBody(form)), "Production steps saved.");
+  if (r.ok) revalidatePath(`/orders/${orderId}`, "layout");
+  return r;
+}

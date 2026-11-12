@@ -98,7 +98,28 @@ const orderInclude = {
     },
   },
   customer: { select: { id: true, name: true, country: true } },
-  inquiry: { select: { id: true, refNo: true, title: true, assigneeId: true, requiredBy: true, assignee: { select: { id: true, name: true } } } },
+  inquiry: {
+    select: {
+      id: true,
+      refNo: true,
+      title: true,
+      assigneeId: true,
+      requiredBy: true,
+      assignee: { select: { id: true, name: true } },
+      contact: { select: { name: true } },
+    },
+  },
+  // The quotation it was made from (board: "from QUO-2026-0051 R2", "Accepted 10 Nov · Option A", delivery terms).
+  revision: {
+    select: {
+      id: true,
+      number: true,
+      answeredOn: true,
+      deliveryTerms: true,
+      quotation: { select: { refNo: true } },
+      options: { where: { status: "accepted" }, select: { letter: true } },
+    },
+  },
   // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
   shipments: orderShipments,
   // Each factory's ready date (the order's is the latest of them).
@@ -478,10 +499,23 @@ export class OrdersService {
     const back = o.status === "cancelled" ? null : previousStage(o.stage);
     const numbers = orderLineNumbers(o.lines);
     const ship = shipFacts(o.shipments);
-    const { requiredBy, ...inquiry } = o.inquiry;
+    const { requiredBy, contact, ...inquiry } = o.inquiry;
     return {
       id: o.id,
       refNo: o.refNo,
+      /** The customer's PO / reference (given when they accepted). */
+      customerRef: o.customerRef,
+      /** The inquiry's contact person. */
+      contactName: contact?.name ?? null,
+      /** The accepted quotation: its number and revision, the day and the option chosen, its delivery terms. */
+      quotation: {
+        refNo: o.revision.quotation.refNo,
+        revisionId: o.revision.id,
+        number: o.revision.number,
+        acceptedOn: fromDbDateOrNull(o.revision.answeredOn),
+        option: o.revision.options[0]?.letter ?? null,
+        deliveryTerms: o.revision.deliveryTerms,
+      },
       status: o.status,
       stage: o.stage,
       stageSince: dateIn(o.stageSince, this.clock.timeZone),

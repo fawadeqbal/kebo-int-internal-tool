@@ -48,6 +48,12 @@ export type OrderDocumentKind = "proforma" | "packing-list";
 export interface OrderView {
   id: string;
   refNo: string;
+  /** The customer's PO / reference (given when they accepted). */
+  customerRef?: string | null;
+  /** The inquiry's contact person. */
+  contactName?: string | null;
+  /** The accepted quotation: number, revision, day, option and its delivery terms. */
+  quotation?: { refNo: string; revisionId: string; number: number; acceptedOn: string | null; option: string | null; deliveryTerms: string | null };
   status: OrderStatus;
   stage: OrderStage;
   stageSince: string;

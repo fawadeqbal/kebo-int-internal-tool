@@ -7,6 +7,7 @@ import type { BankContract, BankStepView, DeliveryView, FlowDocument, SatCheckVi
 import { BankContractForm, RouteForm, SatEditor, type RouteTermsValue } from "./flow-forms";
 import { BankChainPanel, PaperSetPanel } from "./flow-panels";
 import { PanelBody, useClosePanel } from "@/components/common/panel";
+import { useRouter } from "next/navigation";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -54,6 +55,44 @@ export function PaymentEdit({
       )}
       <p className="text-xs text-muted">Changes show in the step&rsquo;s Changes.</p>
     </PanelBody>
+  );
+}
+
+/** How the customer pays, right on the page (board OrderPayment): the route's cards and terms, then the LC or bank contract. */
+export function PaymentInline({
+  routeAction,
+  contractAction,
+  route,
+  contract,
+  bankRoutes,
+  currency,
+  terms,
+  fromQuotation,
+  suggest,
+}: {
+  routeAction: Action;
+  contractAction: Action;
+  route: PaymentRoute | null;
+  contract: BankContract | null;
+  bankRoutes: boolean;
+  currency: string;
+  terms?: RouteTermsValue;
+  fromQuotation?: boolean;
+  suggest?: PaymentRoute | null;
+}) {
+  const router = useRouter();
+  const done = () => router.refresh();
+  const bank = route === "bank_contract" || route === "letter_of_credit";
+  return (
+    <div className="flex flex-col gap-6">
+      <RouteForm action={routeAction} route={route} bankRoutes={bankRoutes} terms={terms} fromQuotation={fromQuotation} suggest={suggest} onDone={done} />
+      {bank && bankRoutes && (
+        <section className="border-t border-line pt-5">
+          <h3 className={h}>{route === "letter_of_credit" ? "The LC" : "The bank contract"}</h3>
+          <BankContractForm action={contractAction} contract={contract} lc={route === "letter_of_credit"} currency={currency} onDone={done} />
+        </section>
+      )}
+    </div>
   );
 }
 

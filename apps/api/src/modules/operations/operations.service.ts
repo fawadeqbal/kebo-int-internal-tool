@@ -35,7 +35,18 @@ export class OperationsService {
         order: { ...orderAccess(user), status: { not: "cancelled" } },
         ...(all ? {} : { status: { in: UNDER_WAY } }),
       },
-      include: { order: { select: { id: true, refNo: true, customer: { select: { id: true, name: true } } } } },
+      include: {
+        order: {
+          select: {
+            id: true,
+            refNo: true,
+            customer: { select: { id: true, name: true } },
+            inquiry: { select: { title: true } },
+            // The papers the order's set still misses (board: "Papers missing · SO-2026-0032 · CO").
+            documents: { where: { status: "missing" }, select: { kind: true } },
+          },
+        },
+      },
       orderBy: [{ eta: { sort: "asc", nulls: "last" } }, { etd: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
       take: 500,
     });
@@ -43,6 +54,8 @@ export class OperationsService {
     return rows.map((s) => {
       const eta = fromDbDateOrNull(s.eta);
       return {
+        what: s.order.inquiry.title,
+        papersMissing: s.order.documents.map((d) => d.kind),
         id: s.id,
         order: { id: s.order.id, refNo: s.order.refNo },
         customer: s.order.customer,

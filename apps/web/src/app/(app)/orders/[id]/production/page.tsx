@@ -1,5 +1,8 @@
 import { can } from "@kebo/shared";
-import { Badge } from "@kebo/ui";
+import { Check } from "lucide-react";
+import { Badge, Card, CardBody, CardHeader, cn, StatRow, StatTile } from "@kebo/ui";
+import { ProductionSteps } from "@/components/orders/production-steps";
+import { productionStepsAction } from "../../flow-actions";
 import { orderMoneyOf } from "@/lib/order-data";
 import { date } from "@/lib/format";
 import type { ChecklistItem } from "@/lib/types-checklist";
@@ -91,6 +94,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
 
   const left = o.readyOn ? Math.round((Date.parse(`${o.readyOn}T00:00:00Z`) - Date.parse(`${now}T00:00:00Z`)) / DAY) : null;
   const factories = flow?.factory.factories ?? [];
+  const plan = flow?.production ?? null;
   const own = d.items.filter((i) => !i.auto);
   const fat = own.find((i) => /\bFAT\b|test run/i.test(i.title));
   const inspection = own.find((i) => /inspection/i.test(i.title));
@@ -120,8 +124,58 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       steps={d.steps}
       step="production"
       base={d.base}
-      side={<StepSidePanel id={o.id} step="production" changes={d.changes} historyHref={d.historyHref} />}
+      side={
+        <>
+          {plan && plan.steps.length > 0 && (
+            <Card>
+              <CardHeader title="Timeline" />
+              <CardBody>
+                <ol className="flex flex-col gap-3">
+                  {plan.steps.map((st, i) => {
+                    const current = !st.doneOn && plan.steps.findIndex((x) => !x.doneOn) === i;
+                    return (
+                      <li key={st.id} className="flex items-start gap-3">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full",
+                            st.doneOn ? "bg-ok text-white" : current ? (st.late ? "bg-bad" : "bg-action-solid") : "bg-surface-3",
+                          )}
+                        >
+                          {st.doneOn && <Check className="size-3.5" strokeWidth={3} />}
+                        </span>
+                        <span className="text-[13px]">
+                          <strong className="block">{st.title}</strong>
+                          <span className={cn("text-xs", st.late && !st.doneOn ? "text-bad" : "text-muted")}>
+                            {st.doneOn ? `done ${date(st.doneOn)}` : st.plannedOn ? `${st.late ? "was planned" : "planned"} ${date(st.plannedOn)}` : "no date yet"}
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </CardBody>
+            </Card>
+          )}
+          <StepSidePanel id={o.id} step="production" changes={d.changes} historyHref={d.historyHref} />
+        </>
+      }
     >
+      <StatRow>
+        <StatTile label="Ready by" value={o.readyOn ? date(o.readyOn) : "—"} sub={o.readyOn ? "from the factory" : "not known yet"} />
+        <StatTile label="Steps done" value={plan ? `${plan.steps.filter((x) => x.doneOn).length} of ${plan.steps.length}` : "—"} />
+        <StatTile label="Days left" value={left === null ? "—" : left < 0 ? `${-left} late` : left} tone={left !== null && left < 0 ? "bad" : undefined} />
+        <StatTile label="Late steps" value={plan ? plan.steps.filter((x) => x.late && !x.doneOn).length : 0} tone={plan?.steps.some((x) => x.late && !x.doneOn) ? "bad" : undefined} />
+      </StatRow>
+      {plan && (
+        <ProductionSteps
+          steps={plan.steps.map((st) => ({ id: st.id, title: st.title, factoryId: st.factory?.id ?? "", plannedOn: st.plannedOn ?? "", doneOn: st.doneOn ?? "", note: st.note ?? "" }))}
+          suggested={plan.suggested}
+          factories={factories}
+          action={productionStepsAction.bind(null, o.id)}
+          canEdit={canEdit}
+        />
+      )}
       <Checklist
         payFor={await expensePayTools(o.id, d.items)}
         step="production"

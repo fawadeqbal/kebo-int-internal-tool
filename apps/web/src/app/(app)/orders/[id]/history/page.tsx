@@ -1,9 +1,10 @@
 import { can, FLOW_STEP_LABEL, FLOW_STEPS, type FlowStep } from "@kebo/shared";
-import { Card, CardBody, CardHeader, Segmented } from "@kebo/ui";
+import { Card, CardBody, CardHeader } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderHistoryOf, orderMoneyOf, orderOf, orderStepsOf } from "@/lib/order-data";
 import { today } from "@/components/orders/today";
-import { HistoryList } from "@/components/common/history-list";
+import { HistoryTable, historyText } from "@/components/common/history-list";
+import { FilterCard } from "@/components/common/filter-card";
 import { optional } from "@/components/print/data";
 import { api } from "@/lib/api";
 import type { DealDetail } from "@/lib/types";
@@ -25,7 +26,7 @@ export default async function OrderHistory({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ step?: string }>;
+  searchParams: Promise<{ step?: string; q?: string; who?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -42,6 +43,15 @@ export default async function OrderHistory({
     optional(() => getPeople()),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
   ]);
+  const pos = manage ? await optional(() => api.get<{ items: { number: string }[] }>(`/orders/${id}/purchase-orders`)) : null;
+  const ended = [
+    o.quotation ? `The quotation R${o.quotation.number} becomes \u201cvoid\u201d` : null,
+    pos?.items.length ? `${pos.items.map((x) => x.number).join(", ")} ${pos.items.length === 1 ? "is" : "are"} cancelled` : null,
+  ].filter(Boolean);
+  const voids = ended.length ? `${ended.join(" and ")}.` : undefined;
+  const people2 = [...new Map(history.map((e) => [e.by?.id ?? "system", e.by?.name ?? "System"])).entries()].map(([value, label]) => ({ value, label }));
+  const q = sp.q?.trim().toLowerCase() ?? "";
+  const rows = history.filter((e) => (!q || historyText(e).includes(q)) && (!sp.who || (e.by?.id ?? "system") === sp.who));
   const factoryPaid = (m?.factories?.rows ?? [])
     .filter((r) => Number(r.paid) > 0)
     .map((r) => `${r.currency} ${Number(r.paid).toLocaleString("en-US", { minimumFractionDigits: 2 })} to ${r.factory.name}`);
@@ -49,6 +59,23 @@ export default async function OrderHistory({
   const shown = steps?.steps.map((s) => s.key) ?? [...FLOW_STEPS];
   return (
     <div className="flex flex-col gap-5">
+      <div>
+        <FilterCard
+          search="Search history…"
+          value={sp.q}
+          clearHref={base}
+          selects={[
+            { name: "who", label: "Who", value: sp.who, options: people2 },
+            { name: "step", label: "Step", value: step, options: shown.map((s) => ({ value: s, label: FLOW_STEP_LABEL[s] })) },
+          ]}
+        />
+        <Card>
+          <HistoryTable
+            entries={rows}
+            empty={q || sp.who ? "Nothing matches. Clear the search or choose everyone." : step ? "Nothing changed in this step yet." : "Nothing has changed yet."}
+          />
+        </Card>
+      </div>
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <NotesCard
           on={{ key: "orderId", id: o.id }}
@@ -74,24 +101,6 @@ export default async function OrderHistory({
           meId={me.id}
         />
       </div>
-      <Card>
-        <CardHeader
-          title="History"
-          description={
-            step ? `Changes in ${FLOW_STEP_LABEL[step]}, newest first` : "Every change, newest first, with the reason when one was asked"
-          }
-        />
-        <CardBody className="flex flex-col gap-4">
-          <Segmented
-            label="Show the changes of"
-            options={[
-              { href: base, label: "All", active: !step },
-              ...shown.map((s) => ({ href: `${base}?step=${s}`, label: FLOW_STEP_LABEL[s], active: step === s })),
-            ]}
-          />
-          <HistoryList entries={history} empty={step ? "Nothing changed in this step yet." : undefined} />
-        </CardBody>
-      </Card>
       {manage && (
         <Card className="border-bad/25">
           <CardHeader
@@ -107,6 +116,8 @@ export default async function OrderHistory({
               currency={o.currency}
               factoryPaid={factoryPaid}
               today={today()}
+              total={o.money.total}
+              voids={voids}
             />
           </CardBody>
         </Card>

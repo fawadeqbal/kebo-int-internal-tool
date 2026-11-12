@@ -6,7 +6,7 @@ import { ClaimsPanel } from "@/components/orders/flow-panels";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
-import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
+import { InlineFieldsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { SatEdit } from "@/components/orders/view-panels";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { addClaimAction, satAction, updateClaimAction } from "../../flow-actions";
@@ -88,6 +88,17 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
     { label: "Claims open", value: String(openClaims), uncounted: true },
     { name: "deliveryNote", label: "Note on the delivery", value: dv.note, type: "textarea", panelOnly: true, uncounted: true, wide: true, group: "Note" },
   ];
+  // The board's form, in its order: delivered on, received by, delivery note, SAT engineer, SAT planned, SAT done, signed by.
+  const byName = (n: string) => fields.find((f) => f.name === n)!;
+  const formFields: DetailField[] = [
+    byName("deliveredOn"),
+    byName("deliveryReceivedBy"),
+    { ...byName("deliveryNote"), label: "Delivery note", type: "text" },
+    { ...byName("satEngineerId"), label: "SAT engineer" },
+    byName("satPlannedOn"),
+    byName("satDoneOn"),
+    byName("satSignedBy"),
+  ];
   // Add in place picks the first option: a person, not "—".
   const shownFields = fields.map((f) => (f.name === "satEngineerId" && !f.value ? { ...f, options: f.options!.slice(1) } : f));
 
@@ -114,14 +125,14 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
         today={now}
       />
       <StepViewDivider />
-      <DetailsCard
+      <InlineFieldsCard
         target="delivery"
         title="Delivery"
-        description={canEdit ? undefined : o.customer.name}
-        fields={shownFields}
+        badge={dv.condition ? <Badge tone={dv.condition === "good" ? "ok" : "warn"} dot>{`${DELIVERY_CONDITION_LABEL[dv.condition]} · from the lines`}</Badge> : undefined}
+        fields={canEdit ? formFields : shownFields}
         action={fieldsAction.bind(null, o.id, "delivery")}
         canEdit={canEdit}
-        panelTitle="Edit the delivery and SAT"
+        save="Save delivery"
       />
       {goodsLines.length > 0 && (
         <LinesCard

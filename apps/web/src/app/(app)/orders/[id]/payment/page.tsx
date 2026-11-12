@@ -1,13 +1,13 @@
 import { ArrowDownLeft } from "lucide-react";
 import { BALANCE_TERMS_LABEL, can, PAYMENT_ROUTE_LABEL, type PaymentRoute } from "@kebo/shared";
-import { CardBody } from "@kebo/ui";
+import { Card, CardBody } from "@kebo/ui";
 import { orderMoneyOf, orderPaymentsOf } from "@/lib/order-data";
 import { date, money } from "@/lib/format";
 import { Checklist, type AutoTool } from "@/components/orders/checklist";
 import { StepPage, StepViewDivider } from "@/components/orders/step-page";
 import { StepSidePanel } from "@/components/orders/side-panel";
 import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/step-view";
-import { PaymentEdit } from "@/components/orders/view-panels";
+import { PaymentEdit, PaymentInline } from "@/components/orders/view-panels";
 import { expensePayTools } from "@/components/orders/costs-card";
 import { PaymentPlan } from "@/components/money/forms";
 import { LcChecks, PlanLines, UseCredit } from "@/components/money/money-v2";
@@ -59,7 +59,9 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       action: routeAction.bind(null, o.id),
       route,
       bankRoutes: !!flow?.modules.bankContracts,
-      terms: route ? terms : { balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment", lcTerms: null, lcDays: null },
+      terms: route
+        ? terms
+        : { balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment", lcTerms: null, lcDays: null },
       suggest: SUGGEST[o.balanceTerms] ?? null,
     };
   if (canRoute && bankRoute) {
@@ -70,8 +72,20 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       label: contract ? (lc ? "Open the LC" : "Open the contract") : lc ? "Add the LC" : "Add the contract",
       action: lightAction.bind(null, o.id, "contract"),
       fields: [
-        { name: "number", label: lc ? "LC no." : "Contract no.", value: contract?.number, required: true, placeholder: lc ? "e.g. LC/HBL/2026/118" : undefined },
-        { name: "amount", label: `Amount, ${contract?.currency ?? c}`, type: "number", value: contract?.amount !== null && contract?.amount !== undefined ? String(contract.amount) : balance, required: true },
+        {
+          name: "number",
+          label: lc ? "LC no." : "Contract no.",
+          value: contract?.number,
+          required: true,
+          placeholder: lc ? "e.g. LC/HBL/2026/118" : undefined,
+        },
+        {
+          name: "amount",
+          label: `Amount, ${contract?.currency ?? c}`,
+          type: "number",
+          value: contract?.amount !== null && contract?.amount !== undefined ? String(contract.amount) : balance,
+          required: true,
+        },
         { name: "expiresOn", label: lc ? "Expires" : "Expires (if it does)", type: "date", value: contract?.expiresOn, required: lc },
         {
           name: "customerBank",
@@ -79,11 +93,23 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
           value: contract?.customerBank ?? banks?.customerBank,
           hint: !contract?.customerBank && banks?.customerBank ? `As on ${banks.refNo}` : undefined,
         },
-        { name: "ourBank", label: "Our bank", value: contract?.ourBank ?? banks?.ourBank, hint: !contract?.ourBank && banks?.ourBank ? `As on ${banks.refNo}` : undefined },
+        {
+          name: "ourBank",
+          label: "Our bank",
+          value: contract?.ourBank ?? banks?.ourBank,
+          hint: !contract?.ourBank && banks?.ourBank ? `As on ${banks.refNo}` : undefined,
+        },
       ],
       chips: [
         { label: "Opened on", field: { name: "openedOn", label: "Opened on", type: "date", value: contract?.openedOn ?? now, max: now } },
-        ...(lc ? [{ label: "Ship by", field: { name: "latestShipOn", label: "Ship by (latest)", type: "date" as const, value: contract?.latestShipOn } }] : []),
+        ...(lc
+          ? [
+              {
+                label: "Ship by",
+                field: { name: "latestShipOn", label: "Ship by (latest)", type: "date" as const, value: contract?.latestShipOn },
+              },
+            ]
+          : []),
         { label: lc ? "LC copy" : "Contract copy", field: { name: "attachmentId", label: lc ? "LC copy" : "Contract copy", type: "file" } },
         { label: "Note", field: { name: "itemNote", label: "Note", type: "textarea" } },
       ],
@@ -159,51 +185,96 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         today={now}
       />
       <StepViewDivider />
-      <DetailsCard
-        id="route"
-        target="payment"
-        title="How they pay"
-        description={bankRoute && canRoute ? undefined : route ? undefined : "The route is chosen in the checklist above."}
-        fields={shown}
-        action={bankRoute ? fieldsAction.bind(null, o.id, "contract") : undefined}
-        canEdit={canRoute}
-        panelTitle="Edit how they pay"
-        panelDescription="The route decides the plan, the papers and the bank steps. Change it and the plan is rebuilt (payments already recorded stay)."
-        panelBody={
-          flow ? (
-            <PaymentEdit
+      {canRoute && flow ? (
+        <Card id="route" data-target="payment" data-target-card="" className="scroll-mt-24 p-0">
+          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
+            <h2 className="text-base font-semibold">How the customer pays</h2>
+            {route && (
+              <span className="text-xs text-text-2">
+                Deposit {o.money.depositPercent}% · {money(o.money.deposit, c)}
+              </span>
+            )}
+          </div>
+          <CardBody className="p-4 sm:p-5">
+            <PaymentInline
               routeAction={routeAction.bind(null, o.id)}
               contractAction={bankContractAction.bind(null, o.id)}
               route={route}
               contract={contract}
               bankRoutes={flow.modules.bankContracts}
               currency={c}
-              terms={terms}
+              terms={
+                route
+                  ? terms
+                  : {
+                      balanceWhen: o.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment",
+                      lcTerms: null,
+                      lcDays: null,
+                    }
+              }
               fromQuotation={flow.payment.fromQuotation}
+              suggest={SUGGEST[o.balanceTerms] ?? null}
             />
-          ) : undefined
-        }
-        footer={
-          lc && flow?.payment.lcChecks ? (
-            <div className="flex flex-col gap-1 border-t border-line px-4 py-3">
-              <p className="text-xs font-semibold text-text-2">The LC against the order</p>
-              <LcChecks checks={flow.payment.lcChecks} />
-            </div>
-          ) : undefined
-        }
-      />
+            {lc && flow.payment.lcChecks && (
+              <div className="mt-4 flex flex-col gap-1 border-t border-line pt-3">
+                <p className="text-xs font-semibold text-text-2">The LC against the order</p>
+                <LcChecks checks={flow.payment.lcChecks} />
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      ) : (
+        <DetailsCard
+          id="route"
+          target="payment"
+          title="How they pay"
+          description={bankRoute && canRoute ? undefined : route ? undefined : "The route is chosen in the checklist above."}
+          fields={shown}
+          action={bankRoute ? fieldsAction.bind(null, o.id, "contract") : undefined}
+          canEdit={canRoute}
+          panelTitle="Edit how they pay"
+          panelDescription="The route decides the plan, the papers and the bank steps. Change it and the plan is rebuilt (payments already recorded stay)."
+          panelBody={
+            flow ? (
+              <PaymentEdit
+                routeAction={routeAction.bind(null, o.id)}
+                contractAction={bankContractAction.bind(null, o.id)}
+                route={route}
+                contract={contract}
+                bankRoutes={flow.modules.bankContracts}
+                currency={c}
+                terms={terms}
+                fromQuotation={flow.payment.fromQuotation}
+              />
+            ) : undefined
+          }
+          footer={
+            lc && flow?.payment.lcChecks ? (
+              <div className="flex flex-col gap-1 border-t border-line px-4 py-3">
+                <p className="text-xs font-semibold text-text-2">The LC against the order</p>
+                <LcChecks checks={flow.payment.lcChecks} />
+              </div>
+            ) : undefined
+          }
+        />
+      )}
       <ViewCard
         id="plan"
         target="plan"
         title="The plan"
-        description={m.route.summary ? `Built from the route: ${m.route.summary}.` : "Deposit and balance; choose the route to build the balance part."}
+        description={
+          m.route.summary ? `Built from the route: ${m.route.summary}.` : "Deposit and balance; choose the route to build the balance part."
+        }
         canEdit={false}
-        actions={<PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />}
+        actions={
+          <PaymentPlan plan={m.plan} currency={c} total={m.total} terms={m.terms} action={savePlanAction.bind(null, o.id)} buttonOnly />
+        }
       >
         <CardBody className="flex flex-col gap-2">
           {!m.plan.matchesTotal && (
             <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs">
-              The parts do not add up to the order total ({money(m.plan.difference, c)} {Number(m.plan.difference) > 0 ? "missing" : "too much"}). Change the plan.
+              The parts do not add up to the order total ({money(m.plan.difference, c)}{" "}
+              {Number(m.plan.difference) > 0 ? "missing" : "too much"}). Change the plan.
             </p>
           )}
           <PlanLines plan={m.plan} currency={c} total={m.total} received={m.received} due={m.due} />
@@ -223,7 +294,10 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
       >
         <CustomerSummary o={o} />
         {m.charged.length > 0 && (
-          <ul aria-label="Charged to the customer" className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface text-sm">
+          <ul
+            aria-label="Charged to the customer"
+            className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface text-sm"
+          >
             {m.charged.map((x) => (
               <li key={x.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
                 <span>
