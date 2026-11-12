@@ -382,6 +382,18 @@ function commercialInvoice(c: PaperCtx): Built {
   const shipped = ship.shippedOn;
   const prices = c.options.prices !== false;
   const ships = has(c, "shipping");
+  // What the customer already paid on the order (the deposit, any advance) comes off the invoice's total: the
+  // invoice says what is left to pay, by the customer or under the LC. Never more than the invoice itself.
+  const totals = totalsOf(c);
+  const invoiceMinor = toMinor(totals.total.amount);
+  const advanceMinor = Math.min(toMinor(positionOf(c).received), invoiceMinor);
+  const under =
+    c.options.advance !== false && prices && advanceMinor > 0
+      ? [
+          { label: "Less: advance received", value: money(fromMinor(-advanceMinor), c.o.currency) },
+          { label: "Balance payable", value: money(fromMinor(invoiceMinor - advanceMinor), c.o.currency) },
+        ]
+      : [];
   return {
     checks: [
       buyerCheck(c),
@@ -415,7 +427,8 @@ function commercialInvoice(c: PaperCtx): Built {
       heading: c.o.documentTitle,
       columns: [COL.no, COL.item, ...(hs.show ? [COL.hs] : []), COL.qty, ...(prices ? [COL.amount] : [])],
       rows: itemRows(c).map((r) => r.cells),
-      ...totalsOf(c),
+      ...totals,
+      under,
       foot: null,
       boxTitle: "Shipment and declaration",
       bullets: [

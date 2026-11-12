@@ -96,6 +96,7 @@ export function PaperSheet({ doc, brand, watermark }: { doc: PaperDoc; brand: Do
               label: doc.total.label,
               words: docWords(doc.total.amount, doc.total.currency),
               amount: docMoney(doc.total.amount, doc.total.currency),
+              under: (doc.under ?? []).map((s) => ({ label: s.label, value: String(cell(s.value)) })),
             }
           : null
       }
