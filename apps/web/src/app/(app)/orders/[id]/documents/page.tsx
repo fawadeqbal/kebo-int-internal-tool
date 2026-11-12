@@ -223,6 +223,8 @@ export default async function OrderDocuments({
           label="Documents & bank"
           items={own}
           current={d.current}
+        nowKey={d.nowKey}
+        waits={d.waits}
           canEdit={d.steps.canEdit}
           run={d.run}
           dealId={o.inquiry.id}

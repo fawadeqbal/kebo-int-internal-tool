@@ -174,6 +174,8 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
         label="Payment"
         items={d.items}
         current={d.current}
+        nowKey={d.nowKey}
+        waits={d.waits}
         canEdit={d.steps.canEdit}
         run={d.run}
         dealId={o.inquiry.id}

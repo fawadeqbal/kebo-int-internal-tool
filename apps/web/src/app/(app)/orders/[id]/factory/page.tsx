@@ -159,6 +159,8 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
         label="Factory order"
         items={d.items}
         current={d.current}
+        nowKey={d.nowKey}
+        waits={d.waits}
         canEdit={d.steps.canEdit}
         run={d.run}
         dealId={o.inquiry.id}
