@@ -21,7 +21,7 @@ import {
   type FlowStep,
   type RepayInput,
 } from "@kebo/shared";
-import { DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { daysBetween, DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
 import { removeProof, setProof } from "../../common/storage/proofs";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -38,7 +38,7 @@ import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
-import { livePlanOf } from "../billing/api";
+import { livePlanOf, requestsOfOrder, requestViewOf } from "../billing/api";
 import { LedgerPosting } from "../ledger/posting.service";
 
 const person = { select: { id: true, name: true } } as const;
@@ -166,6 +166,8 @@ export class MoneyService {
     // The plan as it stands now: each instalment dated from its rule and the order's dates, named from its amount.
     const live = await livePlanOf(this.prisma.db, o.id);
     const plan = planStatus(live.items, position.settledMinor, today, s.reminders.dueSoonDays);
+    // Each row as a payment request: sent or not (the copy kept), and the payments that paid it.
+    const requests = await requestsOfOrder(this.prisma.db, o.id, this.clock.timeZone);
     const planSum = planTotalMinor(plan);
     const next = plan.find((p) => p.status !== "paid") ?? null;
 
@@ -301,7 +303,15 @@ export class MoneyService {
           rule: dueRuleWords(p),
           /** When an undated part falls due ("90 days after the papers"). */
           when: p.dueOn ? null : planWhen(p, terms) || null,
+          /** The row as a payment request: not sent, sent (how, when, by whom, which revision), part paid, paid; its receipts. */
+          request: requestViewOf(p, requests),
+          /** Days past its due date while still open (0: not late). */
+          late: p.openMinor > 0 && p.dueOn && p.dueOn < today ? daysBetween(p.dueOn, today) : 0,
         })),
+        /** Requests that were sent and whose row is no longer in the plan: cancelled, kept as they were sent. */
+        cancelled: requests.gone.map((g) => ({ paperId: g.paperId, ref: g.ref, number: g.number, revision: g.revision, sentOn: g.sentOn, amount: g.amount, label: g.label })),
+        /** May send a request to the customer (kept as sent). */
+        canSend: (can(user, "orders.update") || can(user, "documents.manage")) && o.status !== "cancelled",
         /** The order's dates the rules read (the ready date: the latest factory's). */
         dates: live.dates,
         /** The instalments must add up to the order total; a different sum is shown as a problem to fix. */

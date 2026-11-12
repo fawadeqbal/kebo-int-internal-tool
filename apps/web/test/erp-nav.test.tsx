@@ -64,7 +64,7 @@ describe("the modules", () => {
     expect(pages(m, "overview")).toEqual(["Follow-ups", "Pipelines", "Analytics & reports", "Audit log"]);
     expect(pages(m, "public")).toEqual(["Website form"]);
     expect(pages(m, "partners")).toEqual(["Customers", "Suppliers"]);
-    expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders", "Purchase orders", "Fulfillment & logistics"]);
+    expect(pages(m, "operations")).toEqual(["Inquiries (RFQs)", "Orders", "Payment requests", "Purchase orders", "Fulfillment & logistics"]);
     expect(pages(m, "revenue")).toEqual(["Profit & loss", "Cost & expense allocation", "Variance analysis"]);
     expect(pages(m, "treasury")).toEqual(["Payments", "Verification queue", "Multi-currency vault"]);
     expect(pages(m, "finance")).toEqual(["Receivables (AR)", "Payables (AP)", "General ledger"]);

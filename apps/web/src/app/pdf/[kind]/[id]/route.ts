@@ -59,14 +59,14 @@ const paper =
   (kind: PaperKind): Kind =>
   async (id, token, url) => {
     const q: Record<string, string> = {};
-    for (const k of ["v", "ref"]) {
+    for (const k of ["v", "ref", "now"]) {
       const v = url.searchParams.get(k);
       if (v && /^[\w-]{1,60}$/.test(v)) q[k] = v;
     }
     const d = await ask<PaperDocView>(token, `/orders/${id}/papers/${kind}/doc`, q);
     const qs = new URLSearchParams(q);
     return {
-      name: `${d.label} ${d.doc.number}${d.paper && d.versions.length > 1 ? ` v${d.paper.version}` : ""}${d.final || d.live ? "" : " (draft)"}`,
+      name: `${d.label} ${d.doc.number}${d.paper && d.versions.length > 1 ? ` v${d.paper.version}` : ""}${d.final || d.live ? "" : d.kept ? (d.doc.kind === "payment-request" ? " (not sent)" : "") : " (draft)"}`,
       path: `/print/orders/${id}/${kind}${qs.size ? `?${qs}` : ""}`,
     };
   };

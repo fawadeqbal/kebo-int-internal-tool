@@ -492,6 +492,12 @@ export function MakePaper({
 
         {p.live ? (
           <p className="text-xs text-muted">Printed from the data whenever it is opened: nothing to make final.</p>
+        ) : p.kind === "payment-request" || p.kind === "payment-receipt" ? (
+          <p className="text-xs text-muted">
+            {p.kind === "payment-request"
+              ? "Kept as sent: send it from the order's Payment step (Send request). Nothing to make here."
+              : "Kept when its payment was recorded: nothing to make here."}
+          </p>
         ) : p.canMake ? (
           final ? (
             <div className="flex flex-col gap-2">

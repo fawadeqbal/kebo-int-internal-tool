@@ -228,7 +228,7 @@ export function PapersCard({
                     Change
                   </Button>
                 )}
-                {make && canMake && !r.live && (r.state === "can" || r.state === "wait" || r.state === "draft") ? (
+                {make && canMake && !r.live && !r.kept && (r.state === "can" || r.state === "wait" || r.state === "draft") ? (
                   <Link href={make} className={buttonClass(r.state === "wait" ? "secondary" : "primary", "xs")}>
                     {r.state === "draft" ? "Continue" : r.kind === "shipping-advice" ? "Make and send" : "Make"}
                   </Link>

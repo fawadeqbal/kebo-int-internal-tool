@@ -139,7 +139,7 @@ export function SidePaperRow({
   const done = paperDone(r.state);
   const papersHref = `/orders/${orderId}/documents?tab=all#papers`;
   const make = r.makeable ? `/orders/${orderId}/papers/${r.kind}${r.ref ? `?ref=${r.ref}` : ""}` : null;
-  const canMakeIt = !!make && canMake && !r.live && (r.state === "can" || r.state === "wait" || r.state === "draft");
+  const canMakeIt = !!make && canMake && !r.live && !r.kept && (r.state === "can" || r.state === "wait" || r.state === "draft");
   const what = done ? (r.number ?? sub ?? r.stateLabel.toLowerCase()) : r.state === "miss" ? "missing" : r.stateLabel.toLowerCase();
   return (
     <li className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2.5 border-b border-line py-2 last:border-b-0">

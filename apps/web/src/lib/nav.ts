@@ -68,6 +68,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; short: string; icon:
     pages: [
       { href: "/inquiries", label: "Inquiries (RFQs)" },
       { href: "/orders", label: "Orders" },
+      { href: "/operations/payment-requests", label: "Payment requests" },
       { href: "/operations/purchase-orders", label: "Purchase orders" },
       { href: "/operations/shipments", label: "Fulfillment & logistics" },
     ],

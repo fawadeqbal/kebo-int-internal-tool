@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { requestWords } from "@/lib/requests";
 import type { PaymentList } from "@kebo/shared";
 import type { ReactNode } from "react";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Banknote } from "lucide-react";
@@ -126,21 +127,33 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
     <>
       {plan && kind === "in" && plan.plan.items.length > 0 && (
         <Card className="p-0">
-          <CardHeader title={`${plan.refNo ?? "The order"} · payment plan`} />
+          <CardHeader
+            title={`${plan.refNo ?? "The order"} · payment requests`}
+            description={(() => {
+              // Money pays the earliest request first: say which one this payment answers.
+              const first = plan.plan.items.find((x) => x.request.state !== "paid");
+              return first ? `Money pays the earliest first: this goes to ${first.number} (${first.label}).` : "Every request is paid.";
+            })()}
+          />
           <Table>
             <THead>
               <tr>
-                <Th>Part</Th>
+                <Th>Request</Th>
                 <Th>Due</Th>
-                <Th className="text-right">Amount</Th>
+                <Th className="text-right">Still due</Th>
               </tr>
             </THead>
             <tbody>
               {plan.plan.items.map((x) => (
                 <Tr key={x.id}>
-                  <Td>{x.label}</Td>
+                  <Td>
+                    {x.label}
+                    <span className="block text-xs text-muted">
+                      {x.number} · {requestWords(x.request)}
+                    </span>
+                  </Td>
                   <Td className="whitespace-nowrap">{x.dueOn ? date(x.dueOn) : (x.when ?? x.rule ?? "—")}</Td>
-                  <Td className="text-right tabular">{Number(x.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Td>
+                  <Td className="text-right tabular">{Number(x.open).toLocaleString("en-US", { minimumFractionDigits: 2 })}</Td>
                 </Tr>
               ))}
             </tbody>

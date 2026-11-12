@@ -27,6 +27,8 @@ export const REASON_CHOICES = {
   /** Changing a card's saved values (dates, numbers, names). */
   editValues: ["Customer asked for it", "Factory changed it", "The date moved", "Typed wrong", "Mistake fixed"],
   edit: ["Customer changed the list", "Customer changed the quantity", "Factory changed the price", "Typed wrong", "Mistake fixed"],
+  /** Sending a payment request again (R2): the first one stays as it was sent. */
+  requestAgain: ["Amount changed", "Due date changed", "Customer asked for a new copy", "Bank details changed", "Mistake fixed"],
   payment: ["Wrong amount", "Wrong date", "Wrong order or factory", "Wrong exchange rate", "Mistake fixed"],
 } as const satisfies Record<string, readonly string[]>;
 

@@ -121,7 +121,8 @@ describe("one money truth", () => {
       const r = (await api(app, manager).get("/money/receivables").expect(200)).body;
       expect(r.rows.find((x: { id: string }) => x.id === o.orderId)).toMatchObject({ due: "800.00", charged: "800.00" });
 
-      // Papers: the payment request for the balance asks for it, the statement and the receipt show it.
+      // Papers: the payment request for the balance asks for it and the statement shows it. The receipt was kept
+      // when its payment was recorded, before the charge: it still says the account as it stood then.
       const request = await doc(o.orderId, "payment-request");
       expect(request.total).toMatchObject({ label: "Amount due", amount: "800.00", currency: "USD" });
       expect(request.sums).toContainEqual({ label: "Charged to you (expenses)", value: { money: "800.00", currency: "USD" } });
@@ -130,8 +131,8 @@ describe("one money truth", () => {
       expect(statement.total).toMatchObject({ label: "Balance due (incl. USD 800.00 charged)", amount: "800.00" });
       expect(statement.rows[0]).toMatchObject({ total: { money: "10000.00" }, charged: { money: "800.00" }, due: { money: "800.00" } });
       const receipt = await doc(o.orderId, "payment-receipt");
-      expect(receipt.bullets).toContainEqual({ label: "Still due:", value: { money: "800.00", currency: "USD" } });
-      expect(receipt.bullets).toContainEqual({ label: "Charged to you:", value: { money: "800.00", currency: "USD" } });
+      expect(receipt.bullets).toContainEqual({ label: "Still due:", value: { money: "0.00", currency: "USD" } });
+      expect(receipt.bullets.some((b: unknown) => typeof b === "object" && (b as { label: string }).label === "Charged to you:")).toBe(false);
       const proforma = (await api(app, manager).get(`/orders/${o.orderId}/documents/proforma`).expect(200)).body;
       expect(proforma.totals).toMatchObject({ total: "10000.00", charged: "800.00", received: "10000.00", due: "800.00" });
     });

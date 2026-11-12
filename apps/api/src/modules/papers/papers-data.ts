@@ -1,5 +1,5 @@
 import { asSupplierPayment, purchasesWithEntry, asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf } from "@kebo/database";
-import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, toMinor } from "@kebo/money";
+import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, spreadPayments, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
   deliveryConditionOf,
@@ -124,6 +124,8 @@ export interface PaperCtx {
   statement: StatementData | null;
   /** The paper's own number when it has one: a purchase order's PO-2026-0044 (purchase_orders), not one made from the order's. */
   number?: string | null;
+  /** A payment request sent again: its revision (2, 3…) and the day the one before it was sent. */
+  revision?: { n: number; replaces: ISODate } | null;
 }
 
 /** What a builder makes: the Make page's checks and the paper itself (title, number and company are added after). */
@@ -202,6 +204,8 @@ export function positionOf(c: PaperCtx) {
     chargedMinor: p.chargedMinor,
     received: fromMinor(p.settledMinor),
     due: fromMinor(p.dueMinor),
+    /** The order total and what was charged to the customer. */
+    owedMinor: p.owedMinor,
     depositPercent: p.depositPercent,
   };
 }
@@ -643,10 +647,32 @@ function shippingAdvice(c: PaperCtx): Built {
   };
 }
 
+/** What a receipt is kept with: when any of it differs from the payment now, the payment was corrected and the receipt is kept again. */
+export const receiptMark = (p: { amount: { toString(): string }; bankCharges: { toString(): string }; paidOn: Date; method: string; reference: string | null }) => ({
+  amount: Number(p.amount.toString()).toFixed(2),
+  bankCharges: Number(p.bankCharges.toString()).toFixed(2),
+  paidOn: fromDbDate(p.paidOn),
+  method: p.method,
+  reference: p.reference ?? "",
+});
+
 function paymentReceipt(c: PaperCtx): Built {
   const list = c.o.allocations.map(asPayment);
   const p = c.ref ? list.find((x) => x.id === c.ref) : list.at(-1);
-  const pos = positionOf(c);
+  const live = positionOf(c);
+  // The account as it stood once this payment counted (the payments up to it, in date order), not as it stands
+  // today: a receipt says the same whenever it is printed.
+  const settledMinor = (p ? list.slice(0, list.indexOf(p) + 1) : list).reduce((t, x) => t + toMinor(x.amount.toString()) + toMinor(x.bankCharges.toString()), 0);
+  const pos = { ...live, received: fromMinor(settledMinor), due: fromMinor(Math.max(live.owedMinor - settledMinor, 0)) };
+  // The payment requests it paid: money pays the earliest row of the plan first.
+  const plan = livePlanOfPaper(c.o);
+  const paid = p
+    ? (spreadPayments(
+        plan,
+        list.map((x) => ({ id: x.id, minor: toMinor(x.amount.toString()) + toMinor(x.bankCharges.toString()) })),
+      ).get(p.id) ?? [])
+    : [];
+  const rowsPaid = paid.map((x) => ({ label: plan[x.index]!.label, number: paperNumber(c.o.refNo, "payment-request", plan[x.index]!.requestNo ?? x.index + 1) }));
   return {
     // Given when the payment was recorded: voiding or back-dating another payment never moves it.
     n: p ? (p.receiptNo ?? list.indexOf(p) + 1) : null,
@@ -673,7 +699,7 @@ function paymentReceipt(c: PaperCtx): Built {
         ? [
             {
               no: "1",
-              item: { item: `${PAYMENT_KIND_LABEL[p.kind]} for order ${c.o.refNo}` },
+              item: { item: `${rowsPaid.length ? rowsPaid.map((r) => r.label).join(" and ") : PAYMENT_KIND_LABEL[p.kind]} for order ${c.o.refNo}` },
               ref: p.reference ?? "",
               amount: money(p.amount.toString(), p.currency),
             },
@@ -696,6 +722,7 @@ function paymentReceipt(c: PaperCtx): Built {
       bullets: p
         ? [
             `Received with thanks by ${PAYMENT_METHOD_LABEL[p.method].toLowerCase()} on ${paperDateText(fromDbDate(p.paidOn))}.`,
+            ...(rowsPaid.length ? [`Against payment request${rowsPaid.length > 1 ? "s" : ""} ${rowsPaid.map((r) => r.number).join(" and ")}.`] : []),
             { label: "Order total:", value: money(pos.total, c.o.currency) },
             ...(pos.chargedMinor > 0 ? [{ label: "Charged to you:", value: money(pos.charged, c.o.currency) }] : []),
             { label: "Received so far:", value: money(pos.received, c.o.currency) },
@@ -738,6 +765,7 @@ function paymentRequest(c: PaperCtx): Built {
       meta: [
         { label: "Order No.", value: c.o.refNo },
         { label: "Due by", value: date(due) ?? "on receipt" },
+        ...(c.revision ? [{ label: "Revision", value: `R${c.revision.n}` }] : []),
       ],
       heading: null,
       columns: [{ key: "no", label: "No.", width: 32 }, { key: "item", label: "For" }, { key: "due", label: "Due", width: 90 }, COL.amount],
@@ -757,6 +785,7 @@ function paymentRequest(c: PaperCtx): Built {
         // The balance asked for includes what was charged to them (an instalment of the plan does not).
         ...(item ? [] : chargedLine(pos.chargedMinor, c.o.currency)),
         `Please quote ${number} with the payment.`,
+        ...(c.revision ? [`This replaces the request sent on ${paperDateText(c.revision.replaces)}.`] : []),
         termsSentence(c),
         ...quotedTerms(c),
       ],

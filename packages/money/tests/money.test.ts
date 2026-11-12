@@ -337,6 +337,27 @@ describe("order profit", () => {
       [200, 500],
     ]);
   });
+
+  it("says which instalments each payment paid, and agrees with payInstalments", async () => {
+    const { spreadPayments } = await import("../src");
+    const plan = [{ amountMinor: 300 }, { amountMinor: 0 }, { amountMinor: 700 }];
+    const paid = spreadPayments(plan, [
+      { id: "a", minor: 200 },
+      { id: "b", minor: 400 },
+      { id: "c", minor: 900 },
+    ]);
+    expect(paid.get("a")).toEqual([{ index: 0, minor: 200 }]);
+    // The second payment finishes the deposit and starts the balance.
+    expect(paid.get("b")).toEqual([
+      { index: 0, minor: 100 },
+      { index: 2, minor: 300 },
+    ]);
+    // More than the plan: only what the plan still had open.
+    expect(paid.get("c")).toEqual([{ index: 2, minor: 400 }]);
+    const perRow = [0, 0, 0];
+    for (const parts of paid.values()) for (const x of parts) perRow[x.index]! += x.minor;
+    expect(perRow).toEqual(payInstalments(plan, 1500).map((i) => i.paidMinor));
+  });
 });
 describe("costs that are not lines", () => {
   it("adds them to the cost and spreads them over the lines by what each costs", async () => {

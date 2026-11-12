@@ -9,6 +9,7 @@ import { ExportLink } from "@/components/sheets/export-link";
 import { hasFeature } from "@/lib/session";
 import { PeriodBar, periodOf } from "@/components/common/period";
 import type { Receivables } from "@/lib/types-insights";
+import { requestHref, requestWords } from "@/lib/requests";
 import { date, money, TZ, whole } from "@/lib/format";
 import type { CashBook, CashRow, ExpenseList, OpenInvoices, Payable } from "@/lib/types-money";
 import { recordPaymentHref } from "@/components/money/pay-links";
@@ -814,8 +815,17 @@ export async function InvoicesBody({ side, mine = false }: { side: "receivable" 
                 {r.rows.map((i, n) => (
                   <Tr key={i.id ?? `${i.order.id}-${n}`} className="hover:bg-surface-2/50">
                     <Td>
-                      <span className="block font-medium">{i.number ?? <span className="text-muted">No number yet</span>}</span>
+                      <span className="block font-medium">
+                        {i.number && i.id && i.request ? (
+                          <Link href={requestHref(i.order.id, i.id)} className="hover:text-primary">
+                            {i.number}
+                          </Link>
+                        ) : (
+                          (i.number ?? <span className="text-muted">No number yet</span>)
+                        )}
+                      </span>
                       <span className="block text-xs text-muted">
+                        {i.request ? `${requestWords(i.request)}${i.request.changed ? ", changed since" : ""} · ` : ""}
                         {i.label} ·{" "}
                         <Link href={`/orders/${i.order.id}/${receivable ? "payment" : "money"}`} className="hover:text-primary">
                           {i.order.refNo}

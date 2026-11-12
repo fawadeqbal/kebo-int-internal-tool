@@ -11,8 +11,10 @@ import { requiredDocuments, type FlowStep } from "./flow";
  * - Made papers (sales contract, commercial invoice, …) are a draft until made
  *   final: final keeps a snapshot of exactly what was printed, locks the number
  *   and ticks the checklist; "Make again" starts version 2 and keeps version 1.
- * - Live papers (receipts, payment requests, the customer statement) are
- *   printed from the data whenever opened, numbered from the order.
+ * - The customer statement is live: printed from the data whenever opened.
+ * - Payment requests and receipts are kept as sent: a request is kept exactly
+ *   as printed when it is sent (sent again: R2, the first one stays), a receipt
+ *   when its payment is recorded. No draft and no Make page.
  * - The proforma and the packing list are the order's own documents and work
  *   as before; papers others issue (B/L, certificate of origin…) are uploaded
  *   or marked "kept elsewhere".
@@ -191,7 +193,15 @@ export const PAPER_ROUTES: Partial<Record<PaperKind, readonly PaymentRoute[]>> =
 export const BANK_PAPERS: readonly PaperKind[] = ["bill-of-exchange", "beneficiary-certificate", "bank-cover-letter"];
 
 /** Printed from the data whenever opened: no draft, final or versions. */
-export const LIVE_PAPERS: readonly PaperKind[] = ["payment-receipt", "payment-request", "customer-statement"];
+export const LIVE_PAPERS: readonly PaperKind[] = ["customer-statement"];
+
+/**
+ * Kept as sent (claude/core-plan.md, phase 1): no draft and no Make page. A payment request is kept, exactly
+ * as it prints, when it is sent (Send request), and again as R2, R3… when it is sent again; a payment receipt
+ * when its payment is recorded (again when the payment is corrected). Until a request is sent it prints from
+ * the data, marked NOT SENT.
+ */
+export const SENT_PAPERS: readonly PaperKind[] = ["payment-request", "payment-receipt"];
 
 /** Papers made one per factory (?ref=<factory id>). */
 export const PER_FACTORY_PAPERS: readonly PaperKind[] = ["purchase-order"];

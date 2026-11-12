@@ -38,5 +38,14 @@ export const paperQueryInput = z.object({
   v: z.coerce.number().int().min(1).max(999).optional(),
   opts: z.string().max(200).optional(),
   ref: z.string().max(60).optional(),
+  /** A payment request as it would print if sent now (not the copy that was sent). */
+  now: z.enum(["1"]).optional(),
 });
 export type PaperQueryInput = z.infer<typeof paperQueryInput>;
+
+/** Send a payment request (kept as sent). `ref`: the plan row, or "balance" for an order without a plan. Sent again: says why. */
+export const sendRequestInput = z.object({
+  ref: z.string().trim().min(1).max(60),
+  reason: z.string().trim().max(500).nullish(),
+});
+export type SendRequestInput = z.infer<typeof sendRequestInput>;
