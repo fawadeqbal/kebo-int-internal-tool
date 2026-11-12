@@ -43,7 +43,7 @@ export async function moveStageAction(orderId: string, _prev: ActionState, form:
   return r;
 }
 
-const DETAIL_FIELDS = ["shipBy", "readyOn", "shippedOn", "blNo", "containerNo", "documentTitle", "portOfDischarge"] as const;
+const DETAIL_FIELDS = ["shipBy", "readyOn", "shippedOn", "blNo", "containerNo", "documentTitle", "portOfDischarge", "customerRef", "customerPoOn", "consignee", "notifyParty", "deliveryAddress"] as const;
 
 /**
  * The Details card: ship-by, ready date, the contract destination and the heading; shipped on, the B/L and

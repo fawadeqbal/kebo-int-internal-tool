@@ -101,6 +101,18 @@ export interface ShipmentView {
   departedOn: string | null;
   arrivedOn: string | null;
   note: string | null;
+  /** The forwarder's person and phone, the customs broker, the carrier's tracking number. */
+  forwarderContact?: string | null;
+  forwarderPhone?: string | null;
+  customsBroker?: string | null;
+  trackingNo?: string | null;
+  /** The freight agreed ("4200.00") in its currency, and the insurance. */
+  freightAmount?: string | null;
+  freightCurrency?: string | null;
+  insurer?: string | null;
+  insurancePolicyNo?: string | null;
+  customsDeclarationNo?: string | null;
+  clearedOn?: string | null;
 }
 
 export interface FlowDocument {
@@ -161,6 +173,9 @@ export interface DeliveryView {
   satPlannedOn: string | null;
   satDoneOn: string | null;
   satSignedBy: string | null;
+  /** The day it was installed; the warranty in months (from the SAT, else the delivery). */
+  installedOn?: string | null;
+  warrantyMonths?: number | null;
   sat: SatCheckView[];
   suggestedSat: string[];
   claims: ClaimView[];

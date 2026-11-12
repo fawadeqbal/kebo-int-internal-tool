@@ -57,7 +57,7 @@ export async function factoryOrderAction(orderId: string, _prev: ActionState, fo
 
 /* ---------------------------------------------------------------- shipping */
 
-const SHIPMENT = ["mode", "status", "forwarder", "bookingNo", "blNo", "vessel", "portOfLoading", "portOfDischarge", "containerNo", "containerType", "sealNo", "loadedOn", "vgmKg", "etd", "eta", "departedOn", "arrivedOn", "note"];
+const SHIPMENT = ["mode", "status", "forwarder", "bookingNo", "blNo", "vessel", "portOfLoading", "portOfDischarge", "containerNo", "containerType", "sealNo", "loadedOn", "vgmKg", "etd", "eta", "departedOn", "arrivedOn", "note", "forwarderContact", "forwarderPhone", "customsBroker", "trackingNo", "freightAmount", "freightCurrency", "insurer", "insurancePolicyNo", "customsDeclarationNo", "clearedOn"];
 
 export async function addShipmentAction(orderId: string, _prev: ActionState, form: FormData) {
   return run(orderId, form, () => api.post(`/orders/${orderId}/shipments`, pick(form, SHIPMENT)), "Shipment added.");

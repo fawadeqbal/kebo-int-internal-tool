@@ -2,7 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, cn, DetailList, Field, Input, Textarea } from "@kebo/ui";
+import { Button, Card, CardBody, CardHeader, cn, Field, Input, Textarea } from "@kebo/ui";
+import { PanelBody, SidePanel } from "@/components/common/panel";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { EditButton } from "@/components/common/edit-button";
 import { ActionForm } from "@/components/common/action-form";
@@ -182,6 +183,12 @@ export function DetailsCard({
     containerNo: string | null;
     documentTitle: string | null;
     portOfDischarge: string | null;
+    /** The customer's PO (number and day), the consignee, the notify party and where it is delivered. */
+    customerRef?: string | null;
+    customerPoOn?: string | null;
+    consignee?: string | null;
+    notifyParty?: string | null;
+    deliveryAddress?: string | null;
   };
   /** The same values, formatted for reading. */
   shown: { shipBy: string | null; readyOn: string | null; shippedOn: string | null; blNo: string | null };
@@ -235,6 +242,9 @@ export function DetailsCard({
     { label: "Container", value: values.containerNo, note: fromShipment(!!values.containerNo) },
     { label: "Port of discharge", value: values.portOfDischarge },
     { label: "Heading on documents", value: values.documentTitle },
+    { label: "Consignee", value: values.consignee ? <span className="whitespace-pre-line">{values.consignee}</span> : null },
+    { label: "Notify party", value: values.notifyParty ? <span className="whitespace-pre-line">{values.notifyParty}</span> : null },
+    { label: "Deliver to", value: values.deliveryAddress ? <span className="whitespace-pre-line">{values.deliveryAddress}</span> : null },
   ];
   return (
     <Card id="details" className="scroll-mt-24">
@@ -243,7 +253,7 @@ export function DetailsCard({
         actions={canEdit && !editing ? <EditButton onClick={() => setEditing(true)} /> : undefined}
       />
       <CardBody>
-        {!editing ? (
+        {
           <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
             {[
               ...(compact ? rows.filter((r, i) => i < fixed.length || r.label === "Ready by" || (r.value !== null && r.value !== undefined && r.value !== "")) : rows),
@@ -257,11 +267,30 @@ export function DetailsCard({
               </div>
             ))}
           </dl>
-        ) : (
+        }
+        {editing && (
+          <SidePanel title="Edit the order" description="Its dates, the customer's PO, and who the goods go to. Saving updates every page of the order." onClose={() => setEditing(false)}>
+          <PanelBody>
           <ActionForm action={action} onDone={() => setEditing(false)} className="flex flex-col gap-3">
             {(s) => (
               <>
-                <DetailList columns={2} items={fixed} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Their PO no." htmlFor="d-po" optional error={s.errors?.customerRef}>
+                    <Input id="d-po" name="customerRef" maxLength={80} defaultValue={s.values?.customerRef ?? values.customerRef ?? ""} />
+                  </Field>
+                  <Field label="Their PO date" htmlFor="d-poOn" optional error={s.errors?.customerPoOn}>
+                    <Input id="d-poOn" name="customerPoOn" type="date" max={today} defaultValue={s.values?.customerPoOn ?? values.customerPoOn ?? ""} />
+                  </Field>
+                </div>
+                <Field label="Consignee" htmlFor="d-consignee" optional hint="Who the goods are consigned to, as it should print. Empty: the customer." error={s.errors?.consignee}>
+                  <Textarea id="d-consignee" name="consignee" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.consignee ?? values.consignee ?? ""} />
+                </Field>
+                <Field label="Notify party" htmlFor="d-notify" optional hint="Who the carrier tells on arrival. Empty: same as the consignee." error={s.errors?.notifyParty}>
+                  <Textarea id="d-notify" name="notifyParty" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.notifyParty ?? values.notifyParty ?? ""} />
+                </Field>
+                <Field label="Deliver to" htmlFor="d-deliver" optional hint="The address the goods go to after the port" error={s.errors?.deliveryAddress}>
+                  <Textarea id="d-deliver" name="deliveryAddress" rows={2} className="min-h-0" maxLength={500} defaultValue={s.values?.deliveryAddress ?? values.deliveryAddress ?? ""} />
+                </Field>
                 <Field
                   label="Ship by"
                   htmlFor="d-shipBy"
@@ -328,6 +357,8 @@ export function DetailsCard({
               </>
             )}
           </ActionForm>
+          </PanelBody>
+          </SidePanel>
         )}
       </CardBody>
     </Card>

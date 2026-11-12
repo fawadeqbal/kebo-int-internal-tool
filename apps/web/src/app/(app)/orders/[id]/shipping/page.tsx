@@ -52,6 +52,9 @@ function shipByFields(b: ShipBy): DetailField[] {
   ];
 }
 
+/** A value asked for later: in the Edit panel always; on the card (and counted) only once it is filled. */
+const later = (v: string | null | undefined) => ({ panelOnly: !v, uncounted: true });
+
 /** A shipment's values for its card and its Edit panel (board OrderV4ShippingEdit), grouped as the panel shows them. */
 function shipmentFields(s: Partial<ShipmentView>, shipBy: ShipBy): DetailField[] {
   const air = s.mode === "air";
@@ -82,6 +85,10 @@ function shipmentFields(s: Partial<ShipmentView>, shipBy: ShipBy): DetailField[]
     { name: "portOfDischarge", label: "To", value: s.portOfDischarge, group: "Way and ports", panelOnly: true, placeholder: air ? "e.g. Lahore LHE" : "e.g. Karachi" },
     { name: "forwarder", label: "Forwarder", value: s.forwarder, group: "Forwarder and booking" },
     { name: "bookingNo", label: "Booking no.", value: s.bookingNo, group: "Forwarder and booking" },
+    // The rest of the forwarder's side: shown on the card once filled, always in the Edit panel.
+    { name: "forwarderContact", label: "Forwarder's contact", panelLabel: "Contact person", value: s.forwarderContact, group: "Forwarder and booking", ...later(s.forwarderContact) },
+    { name: "forwarderPhone", label: "Forwarder's phone", panelLabel: "Phone or WhatsApp", value: s.forwarderPhone, group: "Forwarder and booking", ...later(s.forwarderPhone) },
+    { name: "trackingNo", label: "Tracking no.", value: s.trackingNo, group: "Forwarder and booking", ...later(s.trackingNo), hint: "The carrier's own number, for the Track link" },
   ];
   if (!air)
     out.push(
@@ -102,6 +109,13 @@ function shipmentFields(s: Partial<ShipmentView>, shipBy: ShipBy): DetailField[]
   out.push(
     { name: "departedOn", label: air ? "Flown on" : "Sailed on", value: s.departedOn, type: "date", group: "Dates" },
     { name: "arrivedOn", label: "Arrived on", value: s.arrivedOn, type: "date", group: "Dates", uncounted: !SAILED.includes(s.status ?? "") , panelOnly: !SAILED.includes(s.status ?? "") },
+    { name: "freightAmount", label: "Freight", panelLabel: "Freight agreed", value: s.freightAmount, type: "number", group: "Freight and insurance", ...later(s.freightAmount), show: s.freightAmount ? `${s.freightCurrency ?? ""} ${Number(s.freightAmount).toLocaleString("en-US", { maximumFractionDigits: 2 })}`.trim() : null },
+    { name: "freightCurrency", label: "Freight currency", value: s.freightCurrency, group: "Freight and insurance", panelOnly: true, uncounted: true, placeholder: "e.g. USD" },
+    { name: "insurer", label: "Insured with", value: s.insurer, group: "Freight and insurance", ...later(s.insurer) },
+    { name: "insurancePolicyNo", label: "Policy no.", value: s.insurancePolicyNo, group: "Freight and insurance", ...later(s.insurancePolicyNo) },
+    { name: "customsBroker", label: "Customs broker", value: s.customsBroker, group: "Arrival and customs", ...later(s.customsBroker) },
+    { name: "customsDeclarationNo", label: "Customs declaration no.", value: s.customsDeclarationNo, group: "Arrival and customs", ...later(s.customsDeclarationNo) },
+    { name: "clearedOn", label: "Cleared customs on", value: s.clearedOn, type: "date", group: "Arrival and customs", ...later(s.clearedOn) },
     { name: "note", label: "Note", value: s.note, type: "textarea", group: "Note", panelOnly: true, uncounted: true, wide: true },
   );
   // Dates show as people read them.

@@ -1094,6 +1094,12 @@ model Order {
   proformaNo          String?           @map("proforma_no") @db.VarChar(40)
   /// The customer's own PO number or reference for this order (given when they accepted the quotation).
   customerRef         String?           @map("customer_ref") @db.VarChar(80)
+  /// The day of the customer's own purchase order.
+  customerPoOn        DateTime?         @map("customer_po_on") @db.Date
+  /// Who the goods are consigned to, who is told on arrival, and where they are delivered (as printed).
+  consignee           String?
+  notifyParty         String?           @map("notify_party")
+  deliveryAddress     String?           @map("delivery_address")
   proformaIssuedOn    DateTime?         @map("proforma_issued_on") @db.Date
   /// The buyer as on the order (@kebo/shared BuyerSnapshot): taken when the order is made, printed on every paper of the
   /// order; "Refresh from customer" (with a reason) takes it again. Final papers keep the buyer they were printed with.
@@ -1364,6 +1370,9 @@ model OrderDelivery {
   satPlannedOn  DateTime? @map("sat_planned_on") @db.Date
   satDoneOn     DateTime? @map("sat_done_on") @db.Date
   satSignedBy   String?   @map("sat_signed_by") @db.VarChar(120)
+  /// The day the machine was installed, and the warranty in months (counted from the SAT, else the delivery).
+  installedOn    DateTime? @map("installed_on") @db.Date
+  warrantyMonths Int?      @map("warranty_months")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1525,6 +1534,19 @@ model Shipment {
   departedOn      DateTime?      @map("departed_on") @db.Date
   arrivedOn       DateTime?      @map("arrived_on") @db.Date
   note            String?
+  /// The forwarder's person and phone, the customs broker, and the carrier's tracking number.
+  forwarderContact     String?   @map("forwarder_contact") @db.VarChar(120)
+  forwarderPhone       String?   @map("forwarder_phone") @db.VarChar(40)
+  customsBroker        String?   @map("customs_broker") @db.VarChar(120)
+  trackingNo           String?   @map("tracking_no") @db.VarChar(80)
+  /// The freight agreed with the forwarder, and the insurance on the goods.
+  freightAmount        Decimal?  @map("freight_amount") @db.Decimal(14, 2)
+  freightCurrency      String?   @map("freight_currency") @db.Char(3)
+  insurer              String?   @db.VarChar(120)
+  insurancePolicyNo    String?   @map("insurance_policy_no") @db.VarChar(60)
+  /// Customs at the destination.
+  customsDeclarationNo String?   @map("customs_declaration_no") @db.VarChar(60)
+  clearedOn            DateTime? @map("cleared_on") @db.Date
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 

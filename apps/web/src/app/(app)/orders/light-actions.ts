@@ -38,10 +38,20 @@ const SHIPMENT = [
   "departedOn",
   "arrivedOn",
   "note",
+  "forwarderContact",
+  "forwarderPhone",
+  "customsBroker",
+  "trackingNo",
+  "freightAmount",
+  "freightCurrency",
+  "insurer",
+  "insurancePolicyNo",
+  "customsDeclarationNo",
+  "clearedOn",
 ];
 const CONTRACT = ["number", "status", "customerBank", "ourBank", "amount", "currency", "openedOn", "latestShipOn", "expiresOn", "note"];
-const DELIVERY = ["deliveredOn", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy"];
-const DETAILS = ["shipBy", "readyOn", "shippedOn", "blNo", "portOfDischarge", "containerNo", "shippingMarks", "documentTitle"];
+const DELIVERY = ["deliveredOn", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy", "installedOn", "warrantyMonths"];
+const DETAILS = ["shipBy", "readyOn", "shippedOn", "blNo", "portOfDischarge", "containerNo", "shippingMarks", "documentTitle", "customerRef", "customerPoOn", "consignee", "notifyParty", "deliveryAddress"];
 
 /** A factory's own ready date field on the Factory card: "readyOn__<factory id>". */
 const READY_OF = "readyOn__";

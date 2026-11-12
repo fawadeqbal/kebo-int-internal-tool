@@ -19,6 +19,16 @@ import { stepData } from "../step-data";
 
 export const metadata = { title: "Order · delivery and SAT" };
 
+/** A day some months later (YYYY-MM-DD), kept inside the month it lands in. */
+function addMonths(iso: string, months: number) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
+  return d.toISOString().slice(0, 10);
+}
+
 const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;
 
 /**
@@ -63,6 +73,10 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   if (close) tools.closed = { kind: "node", node: close };
 
   const day = (v: string | null) => (v ? date(v) : null);
+  // "12 months · until 10 Feb 2028": counted from the SAT, else the delivery.
+  const from = dv.satDoneOn ?? dv.deliveredOn;
+  const until = from && dv.warrantyMonths ? addMonths(from, dv.warrantyMonths) : null;
+  const warranty = dv.warrantyMonths ? `${dv.warrantyMonths} months${until ? ` · until ${date(until)}` : " · from the SAT"}` : null;
   const fields: DetailField[] = [
     { name: "deliveredOn", label: "Delivered on", value: dv.deliveredOn, type: "date", max: now, show: day(dv.deliveredOn), group: "Delivery" },
     // Worked out from the goods lines (the worst of them): set on the lines below, or "All delivered OK".
@@ -86,6 +100,8 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
       group: "Site acceptance test",
     },
     { name: "satSignedBy", label: "Signed by", value: dv.satSignedBy, group: "Site acceptance test", placeholder: "e.g. Mr. Ali, QA head" },
+    { name: "installedOn", label: "Installed on", value: dv.installedOn ?? null, type: "date", max: now, show: day(dv.installedOn ?? null), group: "Installation and warranty", uncounted: true, panelOnly: !dv.installedOn },
+    { name: "warrantyMonths", label: "Warranty", panelLabel: "Warranty, months", value: dv.warrantyMonths === null || dv.warrantyMonths === undefined ? null : String(dv.warrantyMonths), type: "number", show: warranty, group: "Installation and warranty", uncounted: true, hint: "Counted from the SAT (else the delivery)", placeholder: "e.g. 12" },
     { label: "Claims open", value: String(openClaims), uncounted: true },
     { name: "deliveryNote", label: "Note on the delivery", value: dv.note, type: "textarea", panelOnly: true, uncounted: true, wide: true, group: "Note" },
   ];
