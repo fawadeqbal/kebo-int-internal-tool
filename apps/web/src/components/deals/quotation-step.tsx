@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, ChevronRight, Lock, Plus, Send } from "lucide-react";
-import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS } from "@kebo/shared";
+import { AlertTriangle, Check, CheckCircle2, ChevronRight, Lock, Plus, Send } from "lucide-react";
+import { BASIS_STEP_LABEL, LINE_TYPE_LABEL, LOST_REASON_LABEL, LOST_REASONS, PAYMENT_ROUTES, type PaymentRoute } from "@kebo/shared";
 import { Badge, Button, buttonClass, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
@@ -340,19 +340,23 @@ export function MarkSentButton({
   size = "md",
   variant = "primary",
   className,
+  label = "Mark as sent",
+  icon = <Send aria-hidden />,
 }: {
   number: number;
   action: Action;
   today: string;
   size?: "sm" | "md";
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "ghost";
   className?: string;
+  label?: string;
+  icon?: ReactNode;
 }) {
   return (
     <PanelButton
       className={className}
-      label="Mark as sent"
-      icon={<Send aria-hidden />}
+      label={label}
+      icon={icon}
       size={size}
       variant={variant}
       title={`Mark R${number} as sent`}
@@ -362,61 +366,124 @@ export function MarkSentButton({
   );
 }
 
-/** Accepted: which option (when there are several) and when; it makes the order. */
-function AcceptForm({ number, options, currency, action, today, onOrder }: { number: number; options: OptionView[]; currency: string; action: Action; today: string; onOrder: (o: { orderId: string; orderRefNo: string }) => void }) {
+/**
+ * "Customer accepted R2" (board QuoteAccept): which option (big cards with
+ * lines, lead time and margin), the day, their PO or reference and how they
+ * pay, then what happens. It makes the order.
+ */
+function AcceptForm({
+  options,
+  currency,
+  action,
+  today,
+  onOrder,
+  route,
+}: {
+  options: OptionView[];
+  currency: string;
+  action: Action;
+  today: string;
+  onOrder: (o: { orderId: string; orderRefNo: string }) => void;
+  /** The route the quotation's terms imply. */
+  route: PaymentRoute | null;
+}) {
   const close = useClosePanel();
-  const [optionId, setOptionId] = useState(options.length === 1 ? options[0]!.id : "");
+  const [optionId, setOptionId] = useState(options.length === 1 ? options[0]!.id : (options[0]?.id ?? ""));
+  const chosen = options.find((o) => o.id === optionId);
+  const others = options.filter((o) => o.id !== optionId);
+  const factories = chosen?.factory ? [chosen.factory.name] : [];
   return (
-    <PanelBody>
-      <ActionForm
-        action={action}
-        onDone={(s) => {
-          const data = s.data as { orderId?: string; orderRefNo?: string } | undefined;
-          if (data?.orderId && data.orderRefNo) onOrder({ orderId: data.orderId, orderRefNo: data.orderRefNo });
-          close();
-        }}
-        className={PANEL_FORM}
-      >
-        {(s) => (
-          <>
-            <input type="hidden" name="to" value="accepted" />
-            <input type="hidden" name="optionId" value={optionId} />
-            {options.length > 1 && (
-              <fieldset className="flex flex-col gap-2">
-                <legend className="mb-1.5 text-sm font-medium">Which option did they accept?</legend>
-                {options.map((o) => (
-                  <label
-                    key={o.id}
-                    className={cn("flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm", optionId === o.id ? "border-primary bg-primary-soft" : "border-line bg-surface")}
-                  >
-                    <input type="radio" name="option-choice" checked={optionId === o.id} onChange={() => setOptionId(o.id)} className="accent-[var(--color-primary)]" />
-                    <span className="flex-1">
-                      <span className="font-semibold">Option {o.letter}</span>
-                      {o.factory && <span className="text-text-2"> · {o.factory.name}</span>}
+    <ActionForm
+      action={action}
+      onDone={(s) => {
+        const data = s.data as { orderId?: string; orderRefNo?: string } | undefined;
+        if (data?.orderId && data.orderRefNo) onOrder({ orderId: data.orderId, orderRefNo: data.orderRefNo });
+        close();
+      }}
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      {(s) => (
+        <>
+          <input type="hidden" name="to" value="accepted" />
+          <input type="hidden" name="optionId" value={optionId} />
+          <PanelBody className="flex flex-col gap-4">
+            <fieldset className="flex flex-col gap-3">
+              <legend className="mb-3 text-[13px] font-semibold">
+                Which option did they accept?<span className="text-bad"> *</span>
+              </legend>
+              {options.map((o) => (
+                <label
+                  key={o.id}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-3.5 rounded-xl border px-4 py-3.5",
+                    optionId === o.id ? "border-2 border-primary bg-primary-soft/40" : "border-line bg-surface hover:border-line-strong",
+                  )}
+                >
+                  <input type="radio" name="option-choice" checked={optionId === o.id} onChange={() => setOptionId(o.id)} className="size-[18px] accent-[var(--color-primary)]" />
+                  <span className="min-w-0 flex-1">
+                    <strong className="block text-base">
+                      Option {o.letter}
+                      {o.factory ? ` · ${o.factory.name}` : ""}
+                    </strong>
+                    <span className="block text-xs text-muted">
+                      {[`${o.lines.length} line${o.lines.length === 1 ? "" : "s"}`, o.leadTime, o.costing?.marginPercent != null ? `margin ${o.costing.marginPercent.toFixed(1)}%` : null].filter(Boolean).join(" · ")}
                     </span>
-                    <span className="tabular">{money(o.total, currency)}</span>
-                  </label>
-                ))}
-                <p className="text-xs text-muted">The other options are marked not chosen. The order is made from this option only.</p>
-              </fieldset>
+                  </span>
+                  <strong className="text-base whitespace-nowrap tabular">{money(o.total, currency)}</strong>
+                </label>
+              ))}
+            </fieldset>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Accepted on" htmlFor="accept-on" required error={s.errors?.on}>
+                <Input id="accept-on" name="on" type="date" max={today} defaultValue={s.values?.on ?? today} />
+              </Field>
+              <Field label="Their PO / reference" htmlFor="accept-ref" error={s.errors?.customerRef}>
+                <Input id="accept-ref" name="customerRef" maxLength={80} defaultValue={s.values?.customerRef ?? ""} />
+              </Field>
+              <Field label="Payment route" htmlFor="accept-route" error={s.errors?.route}>
+                <Select id="accept-route" name="route" defaultValue={s.values?.route ?? route ?? "informal"}>
+                  {PAYMENT_ROUTES.map((r) => (
+                    <option key={r} value={r}>
+                      {ROUTE_WORD[r]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            {chosen && (
+              <div className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">
+                <strong className="block text-text">What happens</strong>
+                <span className="block">
+                  · Sales order <strong className="text-text">SO-{today.slice(0, 4)}-…</strong> is made with Option {chosen.letter}&apos;s lines, prices and terms.
+                </span>
+                {factories.length > 0 && (
+                  <span className="block">
+                    · A purchase order is opened for {factories.join(", ")} (sent later, from the order).
+                  </span>
+                )}
+                <span className="block">
+                  · {others.length ? `${others.map((o) => `Option ${o.letter}`).join(", ")} ${others.length === 1 ? "is" : "are"} marked “not chosen”; the` : "The"} inquiry becomes{" "}
+                  <strong className="text-text">Won</strong>.
+                </span>
+              </div>
             )}
-            <Field label="Answered on" htmlFor="accept-on" optional hint="Today when empty" error={s.errors?.on}>
-              <Input id="accept-on" name="on" type="date" max={today} className="w-44" defaultValue={s.values?.on} />
-            </Field>
-            <PanelActions>
-              <SubmitButton size="sm" pendingText="Saving…" disabled={!optionId}>
-                {options.length > 1 ? (optionId ? `Option ${options.find((o) => o.id === optionId)!.letter} accepted: make the order` : "Choose an option") : `R${number} accepted: make the order`}
-              </SubmitButton>
-              <Button size="sm" variant="ghost" onClick={close}>
-                Cancel
-              </Button>
-            </PanelActions>
-          </>
-        )}
-      </ActionForm>
-    </PanelBody>
+          </PanelBody>
+          <PanelActions className="static mx-0 mb-0 justify-end">
+            <Button variant="ghost" onClick={close}>
+              Cancel
+            </Button>
+            <SubmitButton pendingText="Saving…" disabled={!optionId}>
+              <Check aria-hidden /> Accept and make the order
+            </SubmitButton>
+          </PanelActions>
+        </>
+      )}
+    </ActionForm>
   );
 }
+
+/** The payment routes as the accept window says them. */
+const ROUTE_WORD: Record<PaymentRoute, string> = { informal: "Bank transfer (informal)", bank_contract: "Bank contract", letter_of_credit: "Letter of credit" };
 
 /** Lost: why (for the reports), and the sent revision recorded as rejected. */
 function LostForm({ action, today }: { action: Action; today: string }) {
@@ -503,7 +570,13 @@ export function AnswerCard({
   answerAction,
   lostAction,
   startNext,
+  subtitle,
+  route,
 }: {
+  /** Under the accept window's title: "QUO-2026-0051 · Kabul Medical Supplies". */
+  subtitle?: string;
+  /** The payment route the quotation's terms imply (the accept window starts on it). */
+  route?: PaymentRoute | null;
   /** The open draft (Mark as sent), with its number. */
   draft: { number: number } | null;
   /** The sent revision waiting for the answer. */
@@ -558,9 +631,10 @@ export function AnswerCard({
                   size="sm"
                   variant="secondary"
                   label="Accepted…"
-                  title={`R${live.number} accepted`}
-                  description="It makes the order from the option they chose."
-                  body={<AcceptForm number={live.number} options={live.options} currency={currency} action={answerAction} today={today} onOrder={setOrder} />}
+                  title={`Customer accepted R${live.number}`}
+                  description={subtitle ?? "It makes the order from the option they chose."}
+                  panelClassName="md:w-[760px]"
+                  body={<AcceptForm options={live.options} currency={currency} action={answerAction} today={today} onOrder={setOrder} route={route ?? null} />}
                 />
                 {startNext && (
                   <Button size="sm" variant="ghost" onClick={() => setChanges((v) => !v)} aria-expanded={changes}>

@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { currency, revisionInput, revisionMoveInput, type RevisionInput } from "@kebo/shared";
+import { currency, revisionEmailInput, revisionInput, revisionMoveInput, type RevisionInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -77,6 +77,14 @@ export class QuotationsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body(Validate(revisionMoveInput)) body: z.infer<typeof revisionMoveInput>,
   ) {
-    return this.quotations.move(user, id, body.to, body.on, body.reason, body.optionId);
+    return this.quotations.move(user, id, body.to, body.on, body.reason, body.optionId, { customerRef: body.customerRef, route: body.route });
+  }
+
+  /** Email the revision to the customer (with its PDF, made by the web app) and mark it sent. */
+  @Post("revisions/:id/email")
+  @HttpCode(200)
+  @RequirePermissions("quotations.manage")
+  email(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(revisionEmailInput)) body: z.infer<typeof revisionEmailInput>) {
+    return this.quotations.email(user, id, body);
   }
 }

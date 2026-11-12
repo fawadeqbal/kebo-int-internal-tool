@@ -370,6 +370,7 @@ const ALERT_TONES = {
   error: "bg-bad-soft text-bad",
   success: "bg-ok-soft text-ok",
   warning: "bg-warn-soft text-warn",
+  neutral: "bg-surface-2 text-text-2 [&_strong]:text-text",
 };
 
 export function Alert({ tone = "info", children, className }: { tone?: keyof typeof ALERT_TONES; children: ReactNode; className?: string }) {

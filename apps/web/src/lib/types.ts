@@ -25,6 +25,9 @@ export interface DealRow {
   customer: { id: string; name: string; country: string };
   assignee: Person | null;
   items: number;
+  /** Factories asked for prices, and the offers in. */
+  asked?: number;
+  offers?: number;
   quotation: {
     refNo: string;
     /** `total` is the accepted option's, else the lowest option's; `totalUpTo` the highest when the options differ. */
@@ -137,7 +140,7 @@ export interface DealDetail {
       sentOn: string | null;
     }[];
   } | null;
-  orders: { id: string; refNo: string; status: OrderStatus; orderedOn: string; total: string; currency: string }[];
+  orders: { id: string; refNo: string; status: OrderStatus; orderedOn: string; total: string; currency: string; customerRef?: string | null }[];
   people: Record<string, string>;
   canWork: boolean;
   allowed: { edit: boolean; quote: boolean; source: boolean; assign: boolean; hold: boolean; reopen: boolean };

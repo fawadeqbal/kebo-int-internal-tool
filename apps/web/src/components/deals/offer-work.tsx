@@ -1,23 +1,15 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Download, Eye, FileText, Info, ListPlus, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, Download, Eye, FileText, Info, ListPlus, Plus, Trash2 } from "lucide-react";
 import { formatMinor, fxRate, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, basisText, INCOTERMS, offerTaxText, type AttachmentKind, type Incoterm } from "@kebo/shared";
-import { Badge, Button, cn, Field, Input, Select } from "@kebo/ui";
+import { Badge, Button, cn, Field, Input, Select, Textarea } from "@kebo/ui";
 import { ConfirmSubmit, SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CurrencySelect } from "@/components/common/currency-select";
-import {
-  LineTable,
-  type LineColumn,
-  type LineMove,
-  type LineResult,
-  type LineRow,
-  type LineValues,
-  type NewLine,
-} from "@/components/lines/line-table";
+import { LineTable, type LineColumn, type LineMove, type LineResult, type LineRow, type LineValues, type NewLine } from "@/components/lines/line-table";
 import { DetailsCard, LinesCard, type DetailField } from "@/components/orders/step-view";
 import { PanelActions, PanelBody, SidePanel, useClosePanel } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
@@ -26,7 +18,9 @@ import { rateSentence } from "@/lib/fx";
 import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { FileDrop, send, type Staged } from "./documents-panel";
-import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, TaxBox, type QuoteState } from "./factory-quote-form";
+import { FileRow, FileZone } from "@/components/common/file-zone";
+import { fileSize } from "@/lib/format";
+import { BASIS_HINT, FactoryPicker, OfferHeaderForm, PortPicker, type QuoteState } from "./factory-quote-form";
 import { LinesExcel, LinesView } from "./lines-view";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -749,7 +743,10 @@ export function AddOfferButton({
   variant = "secondary",
   size = "md",
   defaultOpen = false,
+  refNo,
 }: {
+  /** The inquiry's number, in the window's line under the title. */
+  refNo?: string;
   dealId: string;
   items: Items;
   today: string;
@@ -774,8 +771,9 @@ export function AddOfferButton({
       </Button>
       {open && (
         <SidePanel
-          title="Add a factory offer"
-          description="Who and their prices. The rest can be added later."
+          title="Enter factory offer"
+          description={`${refNo ? `${refNo} · ` : ""}${items.length ? "their prices for the customer’s items" : "the inquiry has no item list, so these lines become its items"}`}
+          className="md:w-[1180px]"
           onClose={() => setOpen(false)}
         >
           <AddOfferForm
@@ -795,17 +793,15 @@ export function AddOfferButton({
   );
 }
 
-type Extra = "validUntil" | "paymentTerms" | "moq" | "reference" | "file";
-const EXTRAS: { key: Extra; label: string }[] = [
-  { key: "validUntil", label: "Valid until" },
-  { key: "paymentTerms", label: "Payment terms" },
-  { key: "moq", label: "Minimum order" },
-  { key: "reference", label: "Their ref." },
-  { key: "file", label: "Their quotation file" },
-];
+const num = (v: string) => Number(v.replace(/[^\d.]/g, "")) || 0;
 
-const h = "mb-2 text-[11px] font-semibold tracking-wide text-muted uppercase";
-
+/**
+ * "Enter factory offer" (board RecordOffer): the factory and its terms in
+ * three columns, its prices for the customer's items (each line's amount and
+ * the total), notes and the factory's own quotation files. With no item list
+ * the lines open right after saving, ready to paste their list or Excel; they
+ * become the inquiry's items.
+ */
 function AddOfferForm({
   dealId,
   items,
@@ -829,41 +825,56 @@ function AddOfferForm({
 }) {
   const router = useRouter();
   const close = useClosePanel();
+  const blank = {
+    reference: "",
+    receivedOn: today,
+    validUntil: "",
+    basisPlace: "",
+    leadTime: "",
+    moq: "",
+    paymentTerms: "",
+    advancePercent: "",
+    notes: "",
+  };
+  const [round, setRound] = useState(0);
   const [factory, setFactory] = useState<QuoteState["factory"]>(null);
   const [basis, setBasis] = useState<Incoterm | "">("");
-  const [basisPlace, setBasisPlace] = useState("");
   const [currency, setCurrency] = useState("CNY");
-  const [leadTime, setLeadTime] = useState("");
   const [taxIncluded, setTaxIncluded] = useState(taxDefault.included);
   const [taxRate, setTaxRate] = useState(String(taxDefault.rate));
-  const [shown, setShown] = useState<Extra[]>([]);
-  const [extra, setExtra] = useState<Record<Exclude<Extra, "file">, string>>({ validUntil: "", paymentTerms: "", moq: "", reference: "" });
-  const [file, setFile] = useState<File | null>(null);
+  const [f, setF] = useState(blank);
+  const [files, setFiles] = useState<File[]>([]);
   const [prices, setPrices] = useState<Record<string, string>>({});
-  const [own, setOwn] = useState(items.length === 0);
   const [error, setError] = useState<string | null>(null);
+  const another = useRef(false);
+  const set = (k: keyof typeof blank, v: string) => setF((x) => ({ ...x, [k]: v }));
   const rate = fxRate(currency, mainCurrency, mainCurrency, rates);
   const fx = { main: mainCurrency, rates };
+  const own = items.length === 0;
+  const amountOf = (it: Items[number]) => num(prices[it.id] ?? "") * Number(it.quantity);
+  const total = items.reduce((t, it) => t + amountOf(it), 0);
 
   const payload = {
     factoryId: factory?.id ?? null,
     newFactoryName: factory && !factory.id ? factory.name : null,
-    reference: extra.reference,
-    receivedOn: today,
-    validUntil: extra.validUntil || null,
+    reference: f.reference,
+    receivedOn: f.receivedOn || today,
+    validUntil: f.validUntil || null,
     currency,
     basis: basis || null,
-    basisPlace,
-    leadTime,
-    moq: extra.moq,
-    paymentTerms: extra.paymentTerms,
-    notes: "",
+    basisPlace: f.basisPlace,
+    leadTime: f.leadTime,
+    moq: f.moq,
+    paymentTerms: f.paymentTerms,
+    ...(f.advancePercent.trim() ? { advancePercent: f.advancePercent.trim() } : {}),
+    notes: f.notes,
     taxIncluded,
     taxRate: taxRate.trim() || "0",
   };
 
   return (
     <ActionForm
+      key={round}
       action={createAction}
       keepFields
       showSuccess={false}
@@ -872,224 +883,212 @@ function AddOfferForm({
         const id = (st.data as { id?: string } | undefined)?.id;
         if (!id) return;
         setError(null);
+        const problems: string[] = [];
         if (!own) {
           const lines = linesFromItems(items, prices);
           if (lines.length) {
             const r = await addLines(id, { lines });
-            if (!r.ok) setError(r.message);
+            if (!r.ok) problems.push(r.message ?? "The prices were not saved.");
           }
         }
-        if (file) {
-          const staged: Staged = { key: "f", file, kind: guessOfferKind(file.name, file.type), note: "", progress: 0, error: null };
+        for (const file of files) {
+          const staged: Staged = { key: file.name, file, kind: guessOfferKind(file.name, file.type), note: "", progress: 0, error: null };
           const e = await send(dealId, staged, () => {}, { factoryQuoteId: id });
-          if (e) setError(`The offer was added, but ${file.name} did not upload: ${e}`);
+          if (e) problems.push(`${file.name} did not upload: ${e}`);
+        }
+        router.refresh();
+        if (another.current && !problems.length) {
+          another.current = false;
+          setFactory(null);
+          setF(blank);
+          setFiles([]);
+          setPrices({});
+          setRound((n) => n + 1);
+          return;
+        }
+        if (problems.length) {
+          setError(`The offer was saved, but: ${problems.join(" ")}`);
+          return;
         }
         close();
         const priced = Object.values(prices).some((p) => p.trim());
         router.push(`/inquiries/${dealId}/sourcing?offer=${id}${own || !priced ? "#edit-lines" : ""}`);
-        router.refresh();
       }}
     >
       {(s) => (
         <>
           <input type="hidden" name="payload" value={JSON.stringify(payload)} />
           <PanelBody className="flex flex-col gap-5">
-            <section>
-              <h3 className={h}>The offer</h3>
-              <div className="grid grid-cols-1 gap-x-3 gap-y-3 sm:grid-cols-2">
-                <Field label="Factory" htmlFor="factory" error={s.errors?.factoryId ?? s.errors?.newFactoryName}>
-                  <FactoryPicker value={factory} search={searchFactories} error={s.errors?.factoryId} onChange={(f) => setFactory(f)} />
-                </Field>
-                <Field label="Price basis" htmlFor="add-basis" error={s.errors?.basis} hint={basis ? BASIS_HINT[basis] : undefined}>
-                  <Select id="add-basis" value={basis} onChange={(e) => setBasis(e.target.value as Incoterm | "")}>
-                    <option value="">Not said</option>
-                    {INCOTERMS.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label={basis === "EXW" ? "Town" : "Port"} htmlFor="add-port" optional error={s.errors?.basisPlace}>
-                  <PortPicker id="add-port" value={basisPlace} onChange={setBasisPlace} exw={basis === "EXW"} />
-                </Field>
-                <Field
-                  label="Currency"
-                  htmlFor="add-currency"
-                  error={s.errors?.currency}
-                  hint={
-                    rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)
-                  }
-                >
-                  <CurrencySelect id="add-currency" value={currency} short onChange={(e) => setCurrency(e.target.value)} />
-                </Field>
-                <Field label="Lead time" htmlFor="add-lead" optional error={s.errors?.leadTime}>
-                  <Input
-                    id="add-lead"
-                    value={leadTime}
-                    onChange={(e) => setLeadTime(e.target.value)}
-                    maxLength={120}
-                    placeholder="e.g. 45 days"
-                  />
-                </Field>
-                {shown.includes("validUntil") && (
-                  <Field label="Valid until" htmlFor="add-valid" error={s.errors?.validUntil}>
-                    <Input
-                      id="add-valid"
-                      type="date"
-                      value={extra.validUntil}
-                      onChange={(e) => setExtra((x) => ({ ...x, validUntil: e.target.value }))}
-                      autoFocus
-                    />
-                  </Field>
-                )}
-                {shown.includes("moq") && (
-                  <Field label="Minimum order" htmlFor="add-moq" error={s.errors?.moq}>
-                    <Input
-                      id="add-moq"
-                      value={extra.moq}
-                      onChange={(e) => setExtra((x) => ({ ...x, moq: e.target.value }))}
-                      maxLength={60}
-                      autoFocus
-                    />
-                  </Field>
-                )}
-                {shown.includes("reference") && (
-                  <Field label="Their ref." htmlFor="add-ref" error={s.errors?.reference}>
-                    <Input
-                      id="add-ref"
-                      value={extra.reference}
-                      onChange={(e) => setExtra((x) => ({ ...x, reference: e.target.value }))}
-                      maxLength={80}
-                      placeholder="Their quote no."
-                      autoFocus
-                    />
-                  </Field>
-                )}
-                {shown.includes("paymentTerms") && (
-                  <Field label="Payment terms" htmlFor="add-pay" error={s.errors?.paymentTerms} className="sm:col-span-2">
-                    <Input
-                      id="add-pay"
-                      value={extra.paymentTerms}
-                      onChange={(e) => setExtra((x) => ({ ...x, paymentTerms: e.target.value }))}
-                      maxLength={2000}
-                      placeholder="e.g. 30% deposit, 70% before delivery"
-                      autoFocus
-                    />
-                  </Field>
-                )}
-                {shown.includes("file") && (
-                  <Field label="Their quotation file" htmlFor="add-file" className="sm:col-span-2" hint="PDF, Excel or a WeChat screenshot">
-                    <Input id="add-file" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-                  </Field>
-                )}
-              </div>
-              {shown.length < EXTRAS.length && (
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                  Add if you have it:
-                  {EXTRAS.filter((x) => !shown.includes(x.key)).map((x) => (
-                    <button
-                      key={x.key}
-                      type="button"
-                      onClick={() => setShown((v) => [...v, x.key])}
-                      className="inline-flex items-center rounded-full border border-dashed border-primary/40 px-2.5 py-1 font-medium text-primary hover:bg-primary-soft"
-                    >
-                      + {x.label}
-                    </button>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Field label="Factory" htmlFor="factory" required error={s.errors?.factoryId ?? s.errors?.newFactoryName} className="md:col-span-2">
+                <FactoryPicker value={factory} search={searchFactories} error={s.errors?.factoryId} onChange={(x) => setFactory(x)} />
+              </Field>
+              <Field label="Their reference" htmlFor="add-ref" error={s.errors?.reference}>
+                <Input id="add-ref" value={f.reference} onChange={(e) => set("reference", e.target.value)} maxLength={80} placeholder="Their quote no." />
+              </Field>
+              <Field label="Received on" htmlFor="add-received" required error={s.errors?.receivedOn}>
+                <Input id="add-received" type="date" max={today} value={f.receivedOn} onChange={(e) => set("receivedOn", e.target.value)} />
+              </Field>
+              <Field label="Valid until" htmlFor="add-valid" error={s.errors?.validUntil}>
+                <Input id="add-valid" type="date" value={f.validUntil} onChange={(e) => set("validUntil", e.target.value)} />
+              </Field>
+              <Field
+                label="Currency"
+                htmlFor="add-currency"
+                error={s.errors?.currency}
+                hint={rate === null ? `No exchange rate for ${currency} in Settings` : (rateSentence(fx, mainCurrency, currency) ?? undefined)}
+              >
+                <CurrencySelect id="add-currency" value={currency} short onChange={(e) => setCurrency(e.target.value)} />
+              </Field>
+              <Field label="Basis" htmlFor="add-basis" error={s.errors?.basis} hint={basis ? BASIS_HINT[basis] : undefined}>
+                <Select id="add-basis" value={basis} onChange={(e) => setBasis(e.target.value as Incoterm | "")}>
+                  <option value="">Not said</option>
+                  {INCOTERMS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
                   ))}
-                </div>
-              )}
-              <TaxBox
-                idPrefix="add"
-                className="mt-4"
-                included={taxIncluded}
-                rate={taxRate}
-                onIncluded={setTaxIncluded}
-                onRate={setTaxRate}
-                error={s.errors?.taxRate ?? s.errors?.taxIncluded}
-              />
-            </section>
+                </Select>
+              </Field>
+              <Field label="Place" htmlFor="add-port" error={s.errors?.basisPlace}>
+                <PortPicker id="add-port" value={f.basisPlace} onChange={(v) => set("basisPlace", v)} exw={basis === "EXW"} />
+              </Field>
+              <Field label="Lead time" htmlFor="add-lead" error={s.errors?.leadTime}>
+                <Input id="add-lead" value={f.leadTime} onChange={(e) => set("leadTime", e.target.value)} maxLength={120} placeholder="e.g. 40 days" />
+              </Field>
+              <label className="flex items-center gap-2.5 self-end py-2.5 text-sm">
+                <input type="checkbox" checked={taxIncluded} onChange={(e) => setTaxIncluded(e.target.checked)} className="size-[18px] accent-primary" />
+                Prices include tax
+              </label>
+              <Field label="Tax rate %" htmlFor="add-tax" error={s.errors?.taxRate ?? s.errors?.taxIncluded}>
+                <Input id="add-tax" inputMode="decimal" className="tabular" value={taxRate} onChange={(e) => setTaxRate(e.target.value.replace(/[^0-9.]/g, ""))} />
+              </Field>
+              <Field label="MOQ" htmlFor="add-moq" error={s.errors?.moq}>
+                <Input id="add-moq" value={f.moq} onChange={(e) => set("moq", e.target.value)} maxLength={60} placeholder="e.g. 1 set" />
+              </Field>
+              <Field label="Payment terms" htmlFor="add-pay" error={s.errors?.paymentTerms} className="md:col-span-2">
+                <Input id="add-pay" value={f.paymentTerms} onChange={(e) => set("paymentTerms", e.target.value)} maxLength={2000} placeholder="e.g. 30% advance, 70% before shipping" />
+              </Field>
+              <Field label="Advance %" htmlFor="add-adv" error={s.errors?.advancePercent}>
+                <Input id="add-adv" inputMode="decimal" className="tabular" value={f.advancePercent} onChange={(e) => set("advancePercent", e.target.value.replace(/[^0-9.]/g, ""))} placeholder="default" />
+              </Field>
+            </div>
 
-            <section>
-              <h3 className={h}>Their prices</h3>
+            <section className="flex flex-col gap-3">
+              <h3 className="text-[15px] font-bold">Lines</h3>
               {own ? (
                 <p className="rounded-lg bg-surface-2/60 px-3 py-2.5 text-sm text-text-2">
-                  Their own lines: once the offer is added, its lines open ready to paste their list or upload their Excel.
-                  {items.length > 0 && (
-                    <>
-                      {" "}
-                      <button type="button" className="font-medium text-primary hover:underline" onClick={() => setOwn(false)}>
-                        Price the customer&apos;s items instead
-                      </button>
-                    </>
-                  )}
+                  The inquiry has no item list, so this offer&apos;s lines become its items. Once it is saved its lines open, ready to paste their list or upload their Excel.
                 </p>
               ) : (
                 <>
-                  <ul className="flex flex-col gap-1.5" aria-label="The customer's items">
-                    {items.map((it, i) => (
-                      <li key={it.id} className="flex items-center gap-3">
-                        <span className="w-7 shrink-0 text-xs text-muted tabular">{it.no}</span>
-                        <span className={cn("min-w-0 flex-1 text-sm", it.parentId && "pl-2")}>
-                          <span className="line-clamp-2">{it.description.split("\n")[0]}</span>
-                          <span className="text-xs text-muted tabular">
-                            {Number(it.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })} {it.unit}
-                          </span>
-                        </span>
-                        <Input
-                          aria-label={`Price for ${it.no}`}
-                          data-add-price={i}
-                          inputMode="decimal"
-                          placeholder="Price"
-                          className="h-9 w-28 shrink-0 text-right tabular"
-                          value={prices[it.id] ?? ""}
-                          onChange={(e) => setPrices((p) => ({ ...p, [it.id]: e.target.value }))}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter") return;
-                            e.preventDefault();
-                            document.querySelector<HTMLInputElement>(`[data-add-price="${i + 1}"]`)?.focus();
-                          }}
-                          onPaste={(e) => {
-                            // A column of prices copied from Excel fills this item and the ones below.
-                            const values = e.clipboardData
-                              .getData("text/plain")
-                              .replace(/\r?\n$/, "")
-                              .split(/\r?\n/)
-                              .map((v) => v.split("\t").pop()!.trim());
-                            if (values.length < 2) return;
-                            e.preventDefault();
-                            const below = items.slice(i);
-                            setPrices((p) => ({
-                              ...p,
-                              ...Object.fromEntries(
-                                below.slice(0, values.length).map((x, n) => [x.id, values[n]!.replace(/[^\d.,]/g, "").replace(/,/g, "")]),
-                              ),
-                            }));
-                          }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 text-xs text-muted">
-                    Type each price ({currency}, {taxIncluded ? "tax included" : "without tax"}), leave out what they don&apos;t offer. Their own wording, models and extra
-                    lines:{" "}
-                    <button type="button" className="font-medium text-primary hover:underline" onClick={() => setOwn(true)}>
-                      Paste from Excel
-                    </button>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] border-collapse text-[13px]">
+                      <thead>
+                        <tr className="bg-surface-2 text-left text-muted">
+                          <th scope="col" className="w-12 px-2 py-2.5 font-semibold">For item</th>
+                          <th scope="col" className="px-2 py-2.5 font-semibold">Description</th>
+                          <th scope="col" className="w-[70px] px-2 py-2.5 text-right font-semibold">Qty</th>
+                          <th scope="col" className="w-[70px] px-2 py-2.5 font-semibold">Unit</th>
+                          <th scope="col" className="w-[130px] px-2 py-2.5 text-right font-semibold">Unit price *</th>
+                          <th scope="col" className="w-[120px] px-2 py-2.5 text-right font-semibold">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((it, i) => (
+                          <tr key={it.id} className="border-t border-line">
+                            <td className="px-2 py-2 text-muted tabular">{it.no}</td>
+                            <td className={cn("px-2 py-2", it.parentId && "pl-5")}>
+                              <span className="line-clamp-2">{it.description.split("\n")[0]}</span>
+                              {it.model && <span className="block text-xs text-muted">{it.model}</span>}
+                            </td>
+                            <td className="px-2 py-2 text-right tabular">{Number(it.quantity).toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
+                            <td className="px-2 py-2">{it.unit}</td>
+                            <td className="px-2 py-1.5">
+                              <Input
+                                aria-label={`Price for ${it.no}`}
+                                data-add-price={i}
+                                inputMode="decimal"
+                                className="h-[38px] text-right tabular"
+                                value={prices[it.id] ?? ""}
+                                onChange={(e) => setPrices((p) => ({ ...p, [it.id]: e.target.value }))}
+                                onKeyDown={(e) => {
+                                  if (e.key !== "Enter") return;
+                                  e.preventDefault();
+                                  document.querySelector<HTMLInputElement>(`[data-add-price="${i + 1}"]`)?.focus();
+                                }}
+                                onPaste={(e) => {
+                                  // A column of prices copied from Excel fills this item and the ones below.
+                                  const values = e.clipboardData
+                                    .getData("text/plain")
+                                    .replace(/\r?\n$/, "")
+                                    .split(/\r?\n/)
+                                    .map((v) => v.split("\t").pop()!.trim());
+                                  if (values.length < 2) return;
+                                  e.preventDefault();
+                                  const below = items.slice(i);
+                                  setPrices((p) => ({
+                                    ...p,
+                                    ...Object.fromEntries(below.slice(0, values.length).map((x, n) => [x.id, values[n]!.replace(/[^\d.,]/g, "").replace(/,/g, "")])),
+                                  }));
+                                }}
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-right tabular">{amountOf(it) ? amountOf(it).toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-10 px-2 text-base font-bold">
+                    <span>Total</span>
+                    <span className="tabular">
+                      {currency} {total.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted">
+                    Prices in {currency}, {taxIncluded ? "tax included" : "without tax"}; leave out what they don&apos;t offer. Their own wording, models and extra lines are added on the offer after saving.
                   </p>
                 </>
               )}
             </section>
+
+            <div className="grid items-start gap-4 md:grid-cols-2">
+              <Field label="Notes" htmlFor="add-notes" error={s.errors?.notes}>
+                <Textarea id="add-notes" rows={3} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Packing, samples, anything to remember about this offer" />
+              </Field>
+              <FileZone
+                label="The factory’s own quotation"
+                hint="Their PDF, Excel, or WeChat screenshots · kept with this offer, seen only by people who see factory prices"
+                onFiles={(list) => setFiles((x) => [...x, ...list])}
+              >
+                {files.length > 0 &&
+                  files.map((file, n) => (
+                    <FileRow
+                      key={`${file.name}-${n}`}
+                      name={file.name}
+                      meta={`${ATTACHMENT_KIND_LABEL[guessOfferKind(file.name, file.type)]} · ${fileSize(file.size)}`}
+                      actions={
+                        <Button size="icon-xs" variant="ghost" onClick={() => setFiles((x) => x.filter((_, k) => k !== n))} aria-label={`Remove ${file.name}`}>
+                          <Trash2 aria-hidden />
+                        </Button>
+                      }
+                    />
+                  ))}
+              </FileZone>
+            </div>
             {error && <p className="text-sm text-bad">{error}</p>}
           </PanelBody>
-          <PanelActions className="static mx-0 mb-0">
-            <SubmitButton size="sm" pendingText="Adding…">
-              Add the offer
-            </SubmitButton>
-            <Button type="button" size="sm" variant="ghost" onClick={close}>
+          <PanelActions className="static mx-0 mb-0 justify-end">
+            <Button type="button" variant="ghost" onClick={close}>
               Cancel
             </Button>
-            <span className="text-xs text-muted">Our cost works out by itself.</span>
+            <SubmitButton variant="secondary" pendingText="Saving…" onClick={() => (another.current = true)}>
+              <Plus aria-hidden /> Save &amp; enter another
+            </SubmitButton>
+            <SubmitButton pendingText="Saving…" onClick={() => (another.current = false)}>
+              <Check aria-hidden /> Save offer
+            </SubmitButton>
           </PanelActions>
         </>
       )}

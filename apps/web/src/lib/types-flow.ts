@@ -182,7 +182,19 @@ export interface FactoryRequests {
     note: string | null;
     by: { id: string; name: string };
   }[];
-  suggestions: { id: string; name: string; reach: string | null; lastAskedOn: string | null; offers: number; askedHere: boolean }[];
+  suggestions: {
+    id: string;
+    name: string;
+    reach: string | null;
+    lastAskedOn: string | null;
+    offers: number;
+    askedHere: boolean;
+    contact?: string | null;
+    wechat?: string | null;
+    won?: number;
+    goodAt?: string | null;
+    isNew?: boolean;
+  }[];
   counts: { asked: number; quoted: number; waiting: number; late: number };
 }
 

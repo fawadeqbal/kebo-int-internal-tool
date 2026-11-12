@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { UserPlus, X } from "lucide-react";
-import { CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type InquiryChannel } from "@kebo/shared";
-import { Alert, Badge, Button, buttonClass, Card, CardBody, CardFooter, CardHeader, Field, Input, Select, Textarea } from "@kebo/ui";
+import { Check, Download, Eye, Plus, Trash2, X } from "lucide-react";
+import { ATTACHMENT_KIND_LABEL, CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL, UNKNOWN_COUNTRY, type AttachmentKind, type InquiryChannel } from "@kebo/shared";
+import { Alert, Badge, Button, buttonClass, Card, CardBody, CardHeader, Field, Input, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { CountrySelect } from "@/components/people/country-select";
@@ -13,7 +13,9 @@ import type { ActionState } from "@/lib/actions";
 import type { ContactOption, CustomerOption, DealFormValues, PersonWithRole } from "@/lib/types-deals";
 import type { QuickCustomer, QuickCustomerResult } from "@/app/(app)/inquiries/actions";
 import { CustomerPicker } from "./customer-picker";
-import { FileDrop, send, type Staged } from "./documents-panel";
+import { send, type Staged } from "./documents-panel";
+import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
+import { NewItems, blankItem } from "./new-items";
 import { LineTable, type LineColumn } from "@/components/lines/line-table";
 import { localLineHandlers } from "@/components/lines/local-lines";
 import { rowKey } from "./form-bits";
@@ -82,7 +84,10 @@ export function DealForm({
   cancelHref,
   mode,
   itemsFromExcel = true,
+  currency = "USD",
 }: {
+  /** The main currency (the target price placeholder). */
+  currency?: string;
   /** Edit: saves and opens the deal. Create: returns the new id ({ data: { id } }); the form uploads the files, then opens it. */
   action: Action;
   initial: DealFormValues;
@@ -111,6 +116,7 @@ export function DealForm({
   const [adding, setAdding] = useState(false);
   const [staged, setStaged] = useState<Staged[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [kindNext, setKindNext] = useState<AttachmentKind>("urs");
   const stagedNow = useRef(staged);
   useEffect(() => {
     stagedNow.current = staged;
@@ -144,11 +150,12 @@ export function DealForm({
     setV((s) => (s.customer?.id === c.id ? { ...s, contactId: (list.find((x) => x.isPrimary) ?? list[0])?.id ?? "" } : s));
   };
 
-  // A new inquiry is saved first, then its files go up one by one, then the deal opens.
+  // A new inquiry is saved first, then its files go up one by one, then the deal opens
+  // ("Save & add another": the form empties for the next one instead).
   const submit: Action = async (prev, form) => {
     const r = await action(prev, form);
     if (mode === "edit" || !r.ok) return r;
-    const id = (r.data as { id: string }).id;
+    const { id, refNo } = r.data as { id: string; refNo?: string };
     const files = stagedNow.current;
     if (files.length) {
       setUploading(true);
@@ -164,6 +171,14 @@ export function DealForm({
         setCreated({ id, failed });
         return { ok: true };
       }
+    }
+    if (form.get("another")) {
+      setV({ ...initial, customer: null, contactId: "", items: [] });
+      setContacts([]);
+      setStaged([]);
+      setOtherCategory(false);
+      window.scrollTo({ top: 0 });
+      return { ok: true, code: "another", message: `${refNo ?? "The inquiry"} is saved. Add the next one.` };
     }
     router.push(`/inquiries/${id}`);
     return { ok: true, message: "Inquiry created." };
@@ -187,231 +202,355 @@ export function DealForm({
       </Alert>
     );
 
+  const create = mode === "create";
+  /** The item table is open: a new inquiry starts without one ("Add items now"). */
+  const listing = !create || v.items.length > 0;
+  const required = !v.items.length;
+  const footer = (
+    <div className="flex flex-wrap items-center gap-2.5">
+      <SubmitButton pendingText={uploading ? "Uploading files…" : "Saving…"}>
+        <Check aria-hidden /> {create ? "Save inquiry" : "Save changes"}
+      </SubmitButton>
+      {create && (
+        <SubmitButton variant="secondary" name="another" value="1" pendingText="Saving…">
+          <Plus aria-hidden /> Save &amp; add another
+        </SubmitButton>
+      )}
+      <Link href={cancelHref} className={buttonClass("ghost")}>
+        Cancel
+      </Link>
+    </div>
+  );
+
   return (
-    <ActionForm action={submit} keepFields>
+    <ActionForm
+      action={submit}
+      keepFields
+      banner={(st) =>
+        st.message && (st.ok === false || st.code === "another") ? (
+          <Alert tone={st.ok ? "success" : "error"} className="mb-4">
+            {st.ok ? (
+              st.message
+            ) : (
+              <>
+                <strong>Not saved.</strong> {notSaved(st)}
+              </>
+            )}
+          </Alert>
+        ) : null
+      }
+    >
       {(s) => (
         <>
-          <input type="hidden" name="payload" value={JSON.stringify(payload(v, mode === "create"))} />
-          <div className="flex flex-col gap-5">
+          <input type="hidden" name="payload" value={JSON.stringify(payload(v, create))} />
+          <div className="flex flex-col gap-4">
             <Card>
-              <CardHeader title="Customer" description="Who is asking, and how they reached us" />
-              <CardBody className="grid gap-4 md:grid-cols-2">
-                <Field label="Customer" htmlFor="customer" error={s.errors?.customerId} className="md:col-span-2">
-                  {adding && addCustomer ? (
-                    <QuickCustomerForm
-                      add={addCustomer}
-                      search={searchCustomers}
-                      onCancel={() => setAdding(false)}
-                      onUse={(c, list) => {
-                        setAdding(false);
-                        void chooseCustomer(c, list);
-                      }}
-                    />
-                  ) : (
-                    <div className="flex flex-wrap items-start gap-2">
-                      <div className="min-w-0 flex-1 basis-72">
-                        <CustomerPicker
-                          value={v.customer}
-                          onChange={(c) => void chooseCustomer(c)}
-                          search={searchCustomers}
-                          error={s.errors?.customerId}
-                          disabled={!!customerLocked}
-                          disabledReason={customerLocked}
-                        />
-                      </div>
-                      {canAddCustomer && addCustomer && !customerLocked && !v.customer && (
-                        <Button variant="secondary" onClick={() => setAdding(true)}>
-                          <UserPlus aria-hidden /> New customer
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </Field>
-                <Field
-                  label="Contact person"
-                  htmlFor="contactId"
-                  optional
-                  error={s.errors?.contactId}
-                  hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}
-                >
-                  <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
-                    <option value="">{v.customer ? "Not specified" : "Choose the customer first"}</option>
-                    {contacts.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {contactLine(c)}
-                        {c.isPrimary ? " (main)" : ""}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Came in by" htmlFor="channel" error={s.errors?.channel}>
-                  <Select id="channel" value={v.channel} onChange={(e) => set("channel", e.target.value as InquiryChannel)}>
-                    {INQUIRY_CHANNELS.map((c) => (
-                      <option key={c} value={c}>
-                        {CHANNEL_LABEL[c]}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title={mode === "create" ? "What the customer needs" : "Requirement"}
-                description="Their requirement as they sent it, with the URS. The lines are made at factory prices, as each factory offers them."
-              />
               <CardBody className="flex flex-col gap-4">
-                <Field
-                  label="Requirement"
-                  htmlFor="requirements"
-                  optional={v.items.length > 0}
-                  hint="What they want, specs, standards, packing, destination port — anything the factories need to know"
-                  error={s.errors?.requirements}
-                >
-                  <Textarea id="requirements" rows={5} value={v.requirements} onChange={(e) => set("requirements", e.target.value)} />
-                </Field>
-                {mode === "create" && <FileDrop staged={staged} setStaged={setStaged} busy={uploading} />}
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Their list of items (optional)"
-                description="Only if the customer sent a list. Factories may answer with their own models and breakdown; that is decided at factory prices."
-              />
-              <CardBody>
-                <LineTable
-                  rows={v.items.map((it) => ({
-                    key: it.key,
-                    parentKey: it.parentKey,
-                    values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
-                    badge: it.priced ? (
-                      <span className="ml-1 align-middle" title="A factory has priced this: changing it will ask why">
-                        <Badge tone="info">Priced</Badge>
-                      </span>
-                    ) : undefined,
-                  }))}
-                  columns={ITEM_COLUMNS}
-                  noun="item"
-                  sheet={{ name: "Customer items", upload: itemsFromExcel }}
-                  error={s.errors?.items?.[0]}
-                  empty="No list: the requirement above is enough."
-                  {...itemHandlers}
-                />
-              </CardBody>
-            </Card>
-
-
-            <Card>
-              <CardHeader title="The inquiry" />
-              <CardBody className="grid gap-4 md:grid-cols-2">
-                <Field label="Category" htmlFor="category" error={s.errors?.category}>
-                  <Select
-                    id="category"
-                    value={otherCategory ? OTHER : v.category}
-                    onChange={(e) => {
-                      if (e.target.value === OTHER) {
-                        setOtherCategory(true);
-                        set("category", "");
-                      } else {
-                        setOtherCategory(false);
-                        set("category", e.target.value);
-                      }
-                    }}
-                  >
-                    <option value="" disabled>
-                      Choose a category
-                    </option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                    <option value={OTHER}>Another category…</option>
-                  </Select>
-                  {otherCategory && (
-                    <Input
-                      aria-label="Category name"
-                      placeholder="Type the category"
-                      value={v.category}
-                      onChange={(e) => set("category", e.target.value)}
-                      maxLength={120}
-                      autoFocus
-                    />
-                  )}
-                </Field>
-                <Field
-                  label="Needed by"
-                  htmlFor="requiredBy"
-                  optional
-                  hint="When the customer wants our offer"
-                  error={s.errors?.requiredBy}
-                >
-                  <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
-                </Field>
-                {people && (
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Field label="Customer" htmlFor="customer" required error={s.errors?.customerId} className="md:col-span-2">
+                    {adding && addCustomer ? (
+                      <QuickCustomerForm
+                        add={addCustomer}
+                        search={searchCustomers}
+                        onCancel={() => setAdding(false)}
+                        onUse={(c, list) => {
+                          setAdding(false);
+                          void chooseCustomer(c, list);
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <CustomerPicker
+                            value={v.customer}
+                            onChange={(c) => void chooseCustomer(c)}
+                            search={searchCustomers}
+                            error={s.errors?.customerId}
+                            disabled={!!customerLocked}
+                            disabledReason={customerLocked}
+                          />
+                        </div>
+                        {canAddCustomer && addCustomer && !customerLocked && (
+                          <Button variant="secondary" onClick={() => setAdding(true)}>
+                            <Plus aria-hidden /> New
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </Field>
                   <Field
-                    label="Handled by"
-                    htmlFor="assigneeId"
-                    optional
-                    hint={canAssignOthers ? "Assigning someone starts sourcing" : "Take it yourself, or leave it for a manager to assign"}
-                    error={s.errors?.assigneeId}
+                    label="Contact"
+                    htmlFor="contactId"
+                    error={s.errors?.contactId}
+                    hint={v.customer && !contacts.length ? "This customer has no contacts yet." : undefined}
                   >
-                    <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
-                      <option value="">Nobody yet</option>
-                      {assignable.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.id === meId ? `${p.name} (me)` : p.name}
+                    <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
+                      <option value="">{v.customer ? "Not specified" : "Choose the customer first"}</option>
+                      {contacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {contactLine(c)}
+                          {c.isPrimary ? " (main)" : ""}
                         </option>
                       ))}
                     </Select>
                   </Field>
-                )}
-                <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
-                  <Select id="priority" value={v.priority} onChange={(e) => set("priority", e.target.value)}>
-                    {PRIORITIES.map((p) => (
-                      <option key={p} value={p}>
-                        {PRIORITY_LABEL[p]}
+                  <Field label="Came by" htmlFor="channel" required error={s.errors?.channel}>
+                    <Select id="channel" value={v.channel} onChange={(e) => set("channel", e.target.value as InquiryChannel)}>
+                      {INQUIRY_CHANNELS.map((c) => (
+                        <option key={c} value={c}>
+                          {CHANNEL_LABEL[c]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Category" htmlFor="category" required error={s.errors?.category}>
+                    <Select
+                      id="category"
+                      value={otherCategory ? OTHER : v.category}
+                      aria-invalid={!!s.errors?.category || undefined}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER) {
+                          setOtherCategory(true);
+                          set("category", "");
+                        } else {
+                          setOtherCategory(false);
+                          set("category", e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="" disabled>
+                        Choose…
                       </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field
-                  label="Title"
-                  htmlFor="title"
-                  optional
-                  hint="Leave empty to name it after the items"
-                  error={s.errors?.title}
-                  className="md:col-span-2"
-                >
-                  <Input
-                    id="title"
-                    value={v.title}
-                    onChange={(e) => set("title", e.target.value)}
-                    maxLength={200}
-                    placeholder="e.g. Gate valves for Jebel Ali project"
-                  />
-                </Field>
+                      {categories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                      <option value={OTHER}>Other…</option>
+                    </Select>
+                    {otherCategory && (
+                      <Input
+                        aria-label="Category name"
+                        placeholder="Type the category"
+                        value={v.category}
+                        onChange={(e) => set("category", e.target.value)}
+                        maxLength={120}
+                        autoFocus
+                      />
+                    )}
+                  </Field>
+                  <Field label="Title" htmlFor="title" error={s.errors?.title}>
+                    <Input
+                      id="title"
+                      value={v.title}
+                      onChange={(e) => set("title", e.target.value)}
+                      maxLength={200}
+                      placeholder="Short name, e.g. “Tablet press”"
+                    />
+                  </Field>
+                  <Field label="Priority" htmlFor="priority" error={s.errors?.priority}>
+                    <Select id="priority" value={v.priority} onChange={(e) => set("priority", e.target.value)}>
+                      {PRIORITIES.map((p) => (
+                        <option key={p} value={p}>
+                          {PRIORITY_LABEL[p]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Needed by" htmlFor="requiredBy" error={s.errors?.requiredBy}>
+                    <Input id="requiredBy" type="date" value={v.requiredBy} onChange={(e) => set("requiredBy", e.target.value)} />
+                  </Field>
+                  {people && (
+                    <Field label="Handles it" htmlFor="assigneeId" error={s.errors?.assigneeId}>
+                      <Select id="assigneeId" value={v.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}>
+                        {assignable.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.id === meId ? `${p.name} (me)` : p.name}
+                          </option>
+                        ))}
+                        <option value="">Nobody yet</option>
+                      </Select>
+                    </Field>
+                  )}
+                  <Field
+                    label="What they need"
+                    htmlFor="requirements"
+                    required={required}
+                    hint={required ? "Write it as the customer said it. You can add items now, or later from the factory offers." : undefined}
+                    error={s.errors?.requirements}
+                    className="md:col-span-3"
+                  >
+                    <Textarea
+                      id="requirements"
+                      rows={3}
+                      value={v.requirements}
+                      placeholder={required ? undefined : "Optional when you list the items"}
+                      onChange={(e) => set("requirements", e.target.value)}
+                    />
+                  </Field>
+                </div>
+                {!listing && <div className="border-t border-line pt-4">{footer}</div>}
               </CardBody>
-              <CardFooter>
-                <Link href={cancelHref} className={buttonClass("ghost")}>
-                  Cancel
-                </Link>
-                <SubmitButton pendingText={uploading ? "Uploading files…" : "Saving…"}>
-                  {mode === "create"
-                    ? staged.length
-                      ? `Create the inquiry and upload ${staged.length} file${staged.length === 1 ? "" : "s"}`
-                      : "Create the inquiry"
-                    : "Save changes"}
-                </SubmitButton>
-              </CardFooter>
             </Card>
+
+            {create ? (
+              <Card>
+                <CardHeader title={<TitleSub title="Items" sub={listing ? "a part (1.1) belongs to its main item" : "optional"} />} />
+                <CardBody>
+                  {listing ? (
+                    <NewItems items={v.items} onChange={(items) => set("items", items)} currency={currency} error={s.errors?.items?.[0]} />
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-text-2">
+                        <strong className="text-text">No item list yet.</strong> That is fine: the items come from the factory offers.
+                      </p>
+                      <Button size="sm" variant="secondary" onClick={() => set("items", [blankItem()])}>
+                        <Plus aria-hidden /> Add items now
+                      </Button>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader title={<TitleSub title="Items" sub="a part (1.1) belongs to its main item" />} />
+                <CardBody>
+                  <LineTable
+                    rows={v.items.map((it) => ({
+                      key: it.key,
+                      parentKey: it.parentKey,
+                      values: { description: it.description, model: it.model, quantity: it.quantity, unit: it.unit, targetPrice: it.targetPrice },
+                      badge: it.priced ? (
+                        <span className="ml-1 align-middle" title="A factory has priced this: changing it will ask why">
+                          <Badge tone="info">Priced</Badge>
+                        </span>
+                      ) : undefined,
+                    }))}
+                    columns={ITEM_COLUMNS}
+                    noun="item"
+                    sheet={{ name: "Customer items", upload: itemsFromExcel }}
+                    error={s.errors?.items?.[0]}
+                    empty="No list: what they need above is enough."
+                    {...itemHandlers}
+                  />
+                </CardBody>
+              </Card>
+            )}
+
+            {create && (
+              <Card>
+                <CardHeader title={<TitleSub title="Files" sub="optional" />} />
+                <CardBody>
+                  <FileZone
+                    label="Files from the customer"
+                    hint="Their URS, drawings, photos of the old machine… PDF, images, Excel, Word · up to 25 MB each"
+                    disabled={uploading}
+                    onFiles={(files) =>
+                      setStaged((x) => [
+                        ...x,
+                        ...files.map((file) => ({ key: rowKey(), file, kind: kindNext, note: "", progress: null, error: null })),
+                      ])
+                    }
+                    kind={
+                      <Select
+                        aria-label="What kind of file"
+                        value={kindNext}
+                        onChange={(e) => setKindNext(e.target.value as AttachmentKind)}
+                        className="h-[34px] w-auto text-[13px]"
+                      >
+                        {NEW_KINDS.map((k) => (
+                          <option key={k} value={k}>
+                            {KIND_WORD[k]}
+                          </option>
+                        ))}
+                      </Select>
+                    }
+                  >
+                    {staged.length > 0 &&
+                      staged.map((f) => (
+                        <FileRow
+                          key={f.key}
+                          name={f.file.name}
+                          meta={
+                            f.error ? (
+                              <span className="text-bad">{f.error}</span>
+                            ) : (
+                              `${ATTACHMENT_KIND_LABEL[f.kind]} · ${fileSize(f.file.size)} · ${f.progress === null ? "added now" : `uploading ${f.progress}%`}`
+                            )
+                          }
+                          actions={
+                            <>
+                              <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, false)} aria-label={`View ${f.file.name}`}>
+                                <Eye aria-hidden />
+                              </Button>
+                              <Button size="icon-xs" variant="ghost" onClick={() => open(f.file, true)} aria-label={`Download ${f.file.name}`}>
+                                <Download aria-hidden />
+                              </Button>
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                disabled={uploading}
+                                onClick={() => setStaged((x) => x.filter((y) => y.key !== f.key))}
+                                aria-label={`Remove ${f.file.name}`}
+                              >
+                                <Trash2 aria-hidden />
+                              </Button>
+                            </>
+                          }
+                        />
+                      ))}
+                  </FileZone>
+                </CardBody>
+              </Card>
+            )}
+
+            {listing && (
+              <Card>
+                <CardBody>
+                  <div className="border-t border-line pt-4">{footer}</div>
+                </CardBody>
+              </Card>
+            )}
           </div>
         </>
       )}
     </ActionForm>
   );
+}
+
+/** "Items · optional": a card title with its small grey note. */
+function TitleSub({ title, sub }: { title: string; sub: string }) {
+  return (
+    <>
+      {title}
+      <span className="text-xs font-normal text-muted"> · {sub}</span>
+    </>
+  );
+}
+
+/** The kinds of file a customer sends, in the order the select lists them. */
+const NEW_KINDS: AttachmentKind[] = ["urs", "drawing", "photo", "specification", "other"];
+const KIND_WORD: Partial<Record<AttachmentKind, string>> = { urs: "URS (requirements)", drawing: "Drawing", photo: "Photo", specification: "Specification", other: "Other" };
+
+/** Shows (or downloads) a file that is not uploaded yet. */
+function open(file: File, download: boolean) {
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  if (download) a.download = file.name;
+  else a.target = "_blank";
+  a.rel = "noopener";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** "Choose a category. Write what the customer needs, or add their list of items." */
+function notSaved(st: ActionState) {
+  const all = Object.values(st.errors ?? {})
+    .flat()
+    .filter((x): x is string => !!x);
+  const list = [...new Set(all.length ? all : [st.message ?? ""])].filter(Boolean);
+  return list.map((m) => (/[.!?]$/.test(m) ? m : `${m}.`)).join(" ");
 }
 
 /** Enter in these small inputs must not save the whole inquiry. */

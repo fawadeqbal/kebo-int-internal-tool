@@ -24,7 +24,10 @@ export function ActionForm({
   quietCodes,
   keepFields,
   id,
+  banner,
 }: {
+  /** Draws the form's own message instead of the usual one (return null to show nothing). */
+  banner?: (state: ActionState) => ReactNode;
   /** The form's id, for a submit button placed outside it (form="…"). */
   id?: string;
   action: Action;
@@ -64,7 +67,9 @@ export function ActionForm({
       onReset={keepFields ? (e) => e.preventDefault() : undefined}
     >
       {state.code === "reason_needed" && <ReasonPrompt key={state.message} state={state} />}
-      {state.message &&
+      {banner && state.code !== "reason_needed" && banner(state)}
+      {!banner &&
+        state.message &&
         (state.ok === false || showSuccess) &&
         state.code !== "reason_needed" &&
         !(state.code && quietCodes?.includes(state.code)) && (

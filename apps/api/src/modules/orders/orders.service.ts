@@ -31,6 +31,7 @@ import {
   type ReceiptInput,
   type LineCondition,
   LINE_CONDITION_LABEL,
+  type PaymentRoute,
 } from "@kebo/shared";
 import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -235,7 +236,14 @@ export class OrdersService {
   /* ---------------------------------------------------------------- creating and cancelling */
 
   /** The order made when a revision is accepted (inside that transaction): the accepted lines frozen and the terms copied. */
-  async createFromRevision(tx: Tx, revisionId: string, optionId: string, acceptedOn: ISODate, actorId: string) {
+  async createFromRevision(
+    tx: Tx,
+    revisionId: string,
+    optionId: string,
+    acceptedOn: ISODate,
+    actorId: string,
+    accept: { customerRef?: string | null; route?: PaymentRoute } = {},
+  ) {
     const rev = await tx.quotationRevision.findUniqueOrThrow({
       where: { id: revisionId },
       include: { quotation: { include: { inquiry: true } } },
@@ -271,6 +279,7 @@ export class OrdersService {
         revisionId: rev.id,
         customerId: inquiry.customerId,
         orderedOn: toDbDate(acceptedOn),
+        customerRef: accept.customerRef?.trim() || null,
         stage: "confirmed",
         currency: rev.currency,
         total: option.total,
@@ -315,7 +324,16 @@ export class OrdersService {
     // balance timing), shown "from the quotation" and changeable (choosing another rebuilds what is not paid or
     // changed by hand). The plan is built from it: the deposit dated, the balance with its due rule.
     const days = (await this.settings.get()).reminders;
-    const implied = routeFromTerms(rev.balanceTerms);
+    const terms = routeFromTerms(rev.balanceTerms);
+    // Chosen when it was accepted ("Payment route"): another route than the terms imply.
+    const implied: typeof terms =
+      !accept.route || accept.route === terms.route
+        ? terms
+        : accept.route === "informal"
+          ? { route: "informal", balanceWhen: terms.balanceWhen ?? (rev.balanceTerms === "against_bl_copy" ? "against_bl_copy" : "before_shipment"), lcTerms: null, lcDays: null }
+          : accept.route === "letter_of_credit"
+            ? { route: "letter_of_credit", balanceWhen: null, lcTerms: "at_sight", lcDays: null }
+            : { route: "bank_contract", balanceWhen: null, lcTerms: null, lcDays: null };
     const route =
       implied.route && implied.route !== "informal" && !(await this.limits.allows("bank_contracts"))
         ? { route: null, balanceWhen: balanceWhenOf(rev.balanceTerms), lcTerms: null, lcDays: null }

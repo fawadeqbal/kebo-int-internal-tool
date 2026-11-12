@@ -457,6 +457,8 @@ export interface SectionNavItem {
   count?: ReactNode;
   /** The count in red (late). */
   alert?: boolean;
+  /** After the label: a short status in a small grey pill ("Written", "No offers", "R2 draft"). */
+  tag?: string;
 }
 
 /**
@@ -496,6 +498,9 @@ export function SectionNav({
                 <span>{l.label}</span>
                 {l.count !== undefined && l.count !== null && l.count !== "" && (
                   <span className={cn("-ml-0.5 tabular", l.alert && "rounded-md bg-bad-soft px-1.5 font-semibold text-bad")}>{l.count}</span>
+                )}
+                {l.tag && (
+                  <span className={cn("rounded-lg px-[7px] py-px text-[11px] font-medium", l.alert ? "bg-bad-soft text-bad" : l.active ? "bg-surface text-primary" : "bg-bg text-muted")}>{l.tag}</span>
                 )}
               </Link>
             </li>

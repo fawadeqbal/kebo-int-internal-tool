@@ -9,6 +9,9 @@ export interface MailMessage {
   text: string;
   html?: string;
   replyTo?: string;
+  cc?: string | string[];
+  /** Files sent with it (a quotation's PDF). */
+  attachments?: { filename: string; content: Buffer; contentType?: string }[];
 }
 
 export interface Mailer {
@@ -34,7 +37,12 @@ class SmtpMailer implements Mailer {
       secure: port === 465,
       auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
     });
-    await transport.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, ...message, to: [message.to].flat().join(", ") });
+    await transport.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      ...message,
+      to: [message.to].flat().join(", "),
+      cc: message.cc ? [message.cc].flat().join(", ") : undefined,
+    });
   }
 }
 

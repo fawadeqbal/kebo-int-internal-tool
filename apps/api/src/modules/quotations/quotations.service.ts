@@ -24,6 +24,7 @@ import {
   type RevisionInput,
   type RevisionStatus,
   type Settings,
+  type PaymentRoute,
 } from "@kebo/shared";
 import { addDays, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -38,6 +39,7 @@ import { OrdersService } from "../orders/orders.service";
 import { requireReason } from "../../common/audit/reason";
 import { customerSnapshot } from "../orders/buyer";
 import { figuresOf } from "./revision-figures";
+import { getMailer } from "../../common/notify/mailer";
 
 /** NUMERIC(14,2) can hold up to this; totals above it are refused with a clear message. */
 const MAX_TOTAL_MINOR = 999_999_999_999_99;
@@ -658,6 +660,40 @@ export class QuotationsService {
   /* ---------------------------------------------------------------- sending and answers */
 
   /**
+   * Emails the revision to the customer with its PDF (made by the web app from
+   * the print page) and, while it is a draft, marks it sent "By email to …".
+   */
+  async email(user: SessionUser, revisionId: string, input: { to: string[]; cc: string[]; subject: string; message?: string | null; pdf?: string | null; fileName?: string | null }) {
+    this.assertCan(user);
+    const head = await this.prisma.db.quotationRevision.findFirst({ where: { id: revisionId, deletedAt: null }, include: { quotation: true } });
+    if (!head) throw new NotFoundError("Quotation");
+    const { r, inquiry } = await this.loadRevision(user, revisionId, this.prisma.db);
+    await this.inquiries.findWorkable(user, inquiry.id, this.prisma.db);
+    if (r.status !== "draft" && r.status !== "sent") throw new GateError(`A ${r.status} revision is not sent again.`, "revision_move");
+    const mailer = getMailer();
+    if (!mailer.enabled)
+      throw new DomainError("Email is not set up on this server yet. Download the PDF, send it yourself, then use “Sent another way — mark as sent”.");
+    await mailer.send({
+      to: input.to,
+      cc: input.cc.length ? input.cc : undefined,
+      subject: input.subject,
+      text: input.message?.trim() || input.subject,
+      replyTo: user.email ?? undefined,
+      attachments: input.pdf ? [{ filename: input.fileName || `${head.quotation.refNo} R${r.number}.pdf`, content: Buffer.from(input.pdf, "base64"), contentType: "application/pdf" }] : undefined,
+    });
+    const how = `By email to ${input.to.join(", ")}`;
+    if (r.status === "draft") return this.move(user, revisionId, "sent", null, how);
+    await this.audit.record(this.prisma.db, {
+      userId: user.id,
+      action: "update",
+      entityType: "quotation",
+      entityId: r.id,
+      summary: `${head.quotation.refNo} R${r.number} emailed again to ${input.to.join(", ")}`,
+    });
+    return { ok: true };
+  }
+
+  /**
    * Draft → sent (frozen, with who it was for and from), older sent revisions
    * superseded, the deal moves to Quoted. Then: accepted — exactly one option,
    * the others not chosen; the order is made from it and the deal is Won —
@@ -670,6 +706,8 @@ export class QuotationsService {
     on: ISODate | null,
     reasonInput?: string | null,
     optionId?: string | null,
+    /** Accepted: the customer's PO or reference, and the payment route when it is not the one the terms imply. */
+    accept: { customerRef?: string | null; route?: PaymentRoute } = {},
   ) {
     this.assertCan(user);
     const today = this.clock.today();
@@ -735,7 +773,7 @@ export class QuotationsService {
               where: { quotationId: r.quotationId, number: { in: drafts } },
               data: { deletedAt: new Date() },
             });
-          const { event } = await this.orders.createFromRevision(tx, r.id, chosen.id, day, user.id);
+          const { event } = await this.orders.createFromRevision(tx, r.id, chosen.id, day, user.id, accept);
           events.push(event);
           const moved = await this.stages.after(tx, inquiry, "quotation_accepted", user.id);
           if (moved) events.push(moved);

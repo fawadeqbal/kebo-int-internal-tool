@@ -1,12 +1,13 @@
-import { MessageSquareText } from "lucide-react";
+import { ArrowRight, Banknote, Eye, Factory, File, FileText, History, List, MessageSquareText, Package, Pencil } from "lucide-react";
 import Link from "next/link";
-import { can, CHANNEL_LABEL } from "@kebo/shared";
-import { Banner, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
-import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
+import { can } from "@kebo/shared";
+import { Banner, ButtonLink, PageHeader, PriorityBadge, RefCode, StageBadge } from "@kebo/ui";
+import { date } from "@/lib/format";
+import { askFactories } from "./ask";
 import { requireUser, hasFeature } from "@/lib/session";
 import { dealOf, sourcingOf } from "@/lib/deal-data";
 import { StepNav } from "@/components/orders/step-nav";
-import { inquirySteps } from "./steps";
+import { guidance, inquirySteps } from "./steps";
 
 /**
  * Every page of an inquiry shares one top (design system: page header): its
@@ -25,24 +26,18 @@ export default async function DealLayout({ children, params }: { children: React
   const order = d.orders.find((o) => o.status !== "cancelled");
   const base = `/inquiries/${d.id}`;
   const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const moreItems: MenuEntry[] = [
-    ...(d.allowed.edit ? [{ label: "Edit details", href: `${base}/edit` }] : []),
-    ...(order ? [{ label: `Open the order ${order.refNo}`, href: `/orders/${order.id}` }] : []),
-    { label: `Open the customer ${d.customer.name}`, href: `/customers/${d.customer.id}` },
-    { label: "Copy link to this inquiry", copy: base },
-  ];
+  const g = guidance(d);
+  // The one main action at the top (board): Ask factories while prices are wanted, else what comes next.
+  const ask = d.canWork && (d.stage === "new" || d.stage === "sourcing") ? await askFactories(d, me, "primary") : null;
   const meta = [
-    d.title && (
-      <span key="r" className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-2">
-        {d.refNo}
-      </span>
-    ),
-    <Link key="c" href={`/customers/${d.customer.id}`} className="hover:underline">
+    <RefCode key="r">{d.refNo}</RefCode>,
+    <Link key="c" href={`/customers/${d.customer.id}`} className="text-primary underline underline-offset-2">
       {d.customer.name}
     </Link>,
     d.category && <span key="cat">{d.category}</span>,
-    <span key="ch">{CHANNEL_LABEL[d.channel]}</span>,
-    d.assignee && <span key="a">{d.assignee.name}</span>,
+    <PriorityBadge key="p" priority={d.priority} />,
+    <span key="a">{d.assignee ? `${d.assignee.name} handles it` : "nobody handles it yet"}</span>,
+    d.requiredBy && <span key="n">needed by {date(d.requiredBy)}</span>,
   ].filter(Boolean);
 
   return (
@@ -51,16 +46,11 @@ export default async function DealLayout({ children, params }: { children: React
         crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
         icon={MessageSquareText}
         title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}
-        badge={
-          <>
-            <StageBadge stage={d.stage} onHold={d.onHold} />
-            <PriorityBadge priority={d.priority} />
-          </>
-        }
+        badge={<StageBadge stage={d.stage} onHold={d.onHold} />}
         summary={
-          <p className="min-w-0">
+          <span className="flex min-w-0 flex-wrap items-center gap-y-1">
             {meta.map((m, i) => (
-              <span key={i}>
+              <span key={i} className="inline-flex items-center">
                 {i > 0 && (
                   <span aria-hidden className="px-1.5 text-muted">
                     ·
@@ -69,9 +59,23 @@ export default async function DealLayout({ children, params }: { children: React
                 {m}
               </span>
             ))}
-          </p>
+          </span>
         }
-        more={<MoreMenu label={`More for ${d.refNo}`} items={moreItems} />}
+        papers={
+          d.allowed.edit && (
+            <ButtonLink href={`${base}/edit`}>
+              <Pencil aria-hidden /> Edit
+            </ButtonLink>
+          )
+        }
+        primary={
+          ask?.button ??
+          (g.href && g.label && (
+            <ButtonLink href={g.href} variant="primary">
+              {g.label} <ArrowRight aria-hidden />
+            </ButtonLink>
+          ))
+        }
       />
       {d.customer.country === "ZZ" && (
         <Banner meaning="warn" className="mb-3">
@@ -90,6 +94,16 @@ export default async function DealLayout({ children, params }: { children: React
         costs={managers ? {} : null}
         extra={order ? [{ href: `/orders/${order.id}`, label: "Order →" }] : []}
         files
+        icons={{
+          Overview: <Eye aria-hidden />,
+          Needs: <List aria-hidden />,
+          "Factory prices": <Factory aria-hidden />,
+          Quotation: <FileText aria-hidden />,
+          Costs: <Banknote aria-hidden />,
+          Files: <File aria-hidden />,
+          History: <History aria-hidden />,
+          "Order →": <Package aria-hidden />,
+        }}
         stages={{
           list: ["New", "Sourcing", "Quoted", d.stage === "lost" ? "Lost" : "Won"],
           current: d.stage === "new" ? 0 : d.stage === "sourcing" ? 1 : d.stage === "quoted" ? 2 : 3,

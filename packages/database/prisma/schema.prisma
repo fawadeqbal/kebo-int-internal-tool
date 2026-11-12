@@ -1081,6 +1081,8 @@ model Order {
   /// The proforma invoice's number once issued, e.g. KEB260916TN07 (prefix, issue date, customer letters, the handler's count this year).
   /// An index only: the proforma itself is its OrderPaper rows (kind "proforma"), final with a snapshot; only issuing writes these.
   proformaNo          String?           @map("proforma_no") @db.VarChar(40)
+  /// The customer's own PO number or reference for this order (given when they accepted the quotation).
+  customerRef         String?           @map("customer_ref") @db.VarChar(80)
   proformaIssuedOn    DateTime?         @map("proforma_issued_on") @db.Date
   /// The buyer as on the order (@kebo/shared BuyerSnapshot): taken when the order is made, printed on every paper of the
   /// order; "Refresh from customer" (with a reason) takes it again. Final papers keep the buyer they were printed with.

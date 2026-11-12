@@ -1,33 +1,39 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, FileText } from "lucide-react";
-import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, can, type BasisStep } from "@kebo/shared";
-import { Alert, buttonClass, ButtonLink, Card, CardBody, CardHeader, RevisionBadge } from "@kebo/ui";
+import { AlertTriangle, Check, CheckCircle2, Clock, Download, Eye, Pencil, Printer, Send } from "lucide-react";
+import { BALANCE_TERMS_LABEL, BASIS_STEP_LABEL, can, routeFromTerms, type BasisStep } from "@kebo/shared";
+import { Alert, Badge, buttonClass, ButtonLink, Card, CardBody, CardHeader, RefCode, RevisionBadge, StatusBadge, Td, Th, THead, Tr } from "@kebo/ui";
+import { PanelButton } from "@/components/orders/step-view";
+import { FollowUpForm } from "@/components/notes/note-forms";
+import { addFollowUpAction } from "../../../follow-ups/actions";
+import { getPeople } from "@/lib/loaders";
 import { todayIn } from "@kebo/utils";
 import { api } from "@/lib/api";
-import { FileActions } from "@/components/common/file-actions";
-import { hasFeature, requireUser } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import { date, money, TZ } from "@/lib/format";
-import { dealHistoryOf, dealOf, quotationOf } from "@/lib/deal-data";
+import { dealOf, quotationOf } from "@/lib/deal-data";
 import type { QuoteOffers, RevisionDraft, RevisionView } from "@/lib/types-deals";
-import { optional } from "@/components/print/data";
-import { StepChanges, StepFrame, StepHeader, StepPrevNext } from "@/components/orders/step-page";
 import { DetailsCard, ViewCard, type DetailField } from "@/components/orders/step-view";
 import { StartRevision } from "@/components/deals/quotation-panels";
 import { AnswerCard, MarkSentButton, OptionsCard, TermsPanel } from "@/components/deals/quotation-step";
-import { changesIn, FilesCard } from "@/components/deals/inquiry-side";
 import { PriceEditor } from "@/components/deals/price-editor";
-import { inquirySteps } from "../steps";
-import { createRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
+import { createRevisionAction, emailRevisionAction, lostAction, moveRevisionAction, offersAction, revisionFieldsAction, updateRevisionAction } from "./actions";
+import { SendQuoteCard } from "@/components/deals/send-quote";
 
 export const metadata = { title: "Quotation" };
 
+/** Board "What each status means". */
+const STATUS_MEANING: [RevisionView["status"], string][] = [
+  ["draft", "Being made. Only one draft at a time."],
+  ["sent", "Out to the customer, waiting for an answer."],
+  ["accepted", "Customer said yes to one option; the order is made."],
+  ["rejected", "Customer said no to this revision."],
+  ["expired", "Passed its valid-until date with no answer."],
+  ["superseded", "Replaced by a newer revision."],
+  ["void", "Was accepted, but its order was cancelled."],
+];
+
 const printHref = (r: { id: string }) => `/print/revisions/${r.id}`;
 const pdfHref = (r: { id: string }) => `/pdf/revisions/${r.id}`;
-/** "A USD 63,000 · B USD 56,620" (or the one total). */
-const totals = (r: RevisionView) =>
-  r.options.length > 1 && r.status !== "accepted"
-    ? r.options.map((o) => `${o.letter} ${r.currency} ${Math.round(Number(o.total)).toLocaleString("en-US")}`).join(" · ")
-    : `${r.currency} ${Math.round(Number(r.total)).toLocaleString("en-US")}`;
 
 /**
  * Step 3, Quotation (board InqV4Quotation): only the current revision — its
@@ -40,12 +46,12 @@ export default async function QuotationPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ start?: string; edit?: string; option?: string; add?: string }>;
+  searchParams: Promise<{ start?: string; edit?: string; option?: string; add?: string; send?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const me = await requireUser();
-  const [d, q, history] = await Promise.all([dealOf(id), quotationOf(id), optional(() => dealHistoryOf(id))]);
+  const [d, q, people] = await Promise.all([dealOf(id), quotationOf(id), getPeople().catch(() => [])]);
   const quoter = can(me, "quotations.manage");
   const manage = quoter && d.allowed.quote;
   const showCosts = can(me, "sourcing.manage");
@@ -66,8 +72,6 @@ export default async function QuotationPage({
   const accepted = revs.find((r) => r.status === "accepted");
   const order = d.orders.find((o) => o.status !== "cancelled");
   const move = (r: RevisionView) => moveRevisionAction.bind(null, d.id, r.id);
-  const step = inquirySteps(d, showCosts ? 0 : null).find((x) => x.key === "quotation")!;
-  const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const checks = draft ? draftChecks(draft) : [];
   // R1 starts from the offer the API picks: say which, so nobody has to guess.
   const firstOffer = revs.length === 0 && startValues?.options[0]?.factoryQuoteId ? (offers?.offers.find((o) => o.factoryQuoteId === startValues.options[0]!.factoryQuoteId) ?? null) : null;
@@ -80,8 +84,6 @@ export default async function QuotationPage({
       {offers!.offers.length > 1 ? " Add more offers as Options B, C… for the customer to choose from." : ""}
     </>
   ) : undefined;
-  // R1 open: the editor takes the page's full width (no side column).
-  const startOpen = revs.length === 0 && sp.start === "1" && manage && q.canStartRevision && !!startValues;
   const start = (props: { open?: boolean; label?: string; empty?: boolean }) =>
     quoter ? (
       <StartRevision
@@ -105,20 +107,49 @@ export default async function QuotationPage({
         openHref={props.empty ? "?start=1" : undefined}
       />
     ) : null;
+  // Send (board QuoteSend): the quotation as printed, beside the email to the customer.
+  const sending = sp.send && manage ? revs.find((r) => r.id === sp.send && (r.status === "draft" || r.status === "sent")) : undefined;
+  if (sending) {
+    const who = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0];
+    const copy = d.customer.contacts.filter((c) => c.email && c.id !== who?.id).map((c) => c.email);
+    const quoteRef = `${d.quotation?.refNo ?? d.refNo} R${sending.number}`;
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonLink href={`${base}/quotation`}>
+            <Pencil aria-hidden /> Back to edit
+          </ButtonLink>
+          <ButtonLink href={printHref(sending)} target="_blank">
+            <Printer aria-hidden /> Print
+          </ButtonLink>
+        </div>
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-2xl border border-line bg-surface">
+            <iframe title={`${quoteRef} as printed`} src={`${printHref(sending)}?embed=1`} className="h-[1100px] w-full border-0" />
+          </div>
+          <aside className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
+            <SendQuoteCard
+              number={sending.number}
+              action={emailRevisionAction.bind(null, d.id, sending.id, `${quoteRef}.pdf`)}
+              to={who?.email ?? ""}
+              cc={copy.slice(0, 2).join(", ")}
+              subject={`Quotation ${quoteRef} — ${d.title}`}
+              message={`Dear ${who?.name.split(" ")[0] ?? "Sir or Madam"}, please find our ${sending.number > 1 ? "revised " : ""}quotation for ${d.title}.`}
+              pdfHref={pdfHref(sending)}
+              backHref={`${base}/quotation`}
+              markSent={
+                sending.status === "draft" ? (
+                  <MarkSentButton number={sending.number} action={move(sending)} today={today} variant="ghost" label="Sent another way — mark as sent" icon={<Check aria-hidden />} />
+                ) : null
+              }
+            />
+          </aside>
+        </div>
+      </div>
+    );
+  }
   // The customer said no (or let it lapse) and nothing new is being drafted: the next step is a new revision.
   const closedLive = !draft && live && (live.status === "rejected" || live.status === "expired") ? live : null;
-
-  const statusWords = (r: RevisionView) =>
-    r.status === "draft"
-      ? checks.length
-        ? `draft, ${checks.length} to check`
-        : "draft, checked"
-      : r.status === "sent"
-        ? `sent ${date(r.sentOn)}`
-        : `${r.status === "superseded" ? "replaced" : r.status}${r.answeredOn ? ` ${date(r.answeredOn)}` : ""}`;
-  const line = current
-    ? [`${q.quotation?.refNo ?? ""} R${current.number}`.trim(), statusWords(current), totals(current), `valid until ${date(current.validUntil)}`].join(" · ")
-    : "No quotation yet: each factory offer becomes an option the customer can choose.";
 
   const editTerms = !!(draft && manage && draftValues && offers);
 
@@ -159,47 +190,55 @@ export default async function QuotationPage({
       }
     />
   );
-  const earlier = revs.filter((r) => r.id !== current?.id);
-  const pdfs = revs.filter((r) => r.status !== "draft").map((r) => ({ id: r.id, name: `${q.quotation?.refNo ?? "Quotation"} R${r.number}.pdf`, href: pdfHref(r) }));
+
+  const waitingLive = !draft && live?.status === "sent" ? live : null;
+  const statusCell = (r: RevisionView) =>
+    r.status === "sent" ? (
+      <StatusBadge meaning="info">Sent {r.sentOn ? date(r.sentOn) : ""}</StatusBadge>
+    ) : r.status === "superseded" ? (
+      <Badge tone="primary" dot>
+        Superseded{revs.find((x) => x.number === r.number + 1) ? ` by R${r.number + 1}` : ""}
+      </Badge>
+    ) : (
+      <RevisionBadge status={r.status} />
+    );
 
   return (
-    <StepFrame
-      header={
-        <StepHeader
-          step={{ number: step.number, label: step.label, state: step.state, stateLabel: step.stateLabel, line }}
-          action={
-            <>
-              {current && <FileActions viewHref={printHref(current)} pdfHref={pdfHref(current)} />}
-              {draft && manage && <MarkSentButton number={draft.number} action={move(draft)} today={today} className="max-sm:w-full" />}
-              {!draft && live?.canAnswer && manage && (
-                <Link href="#answer" className={buttonClass("primary", "md", "max-sm:w-full")}>
-                  Record the answer
-                </Link>
-              )}
-              {revs.length === 0 && manage && q.canStartRevision && sp.start !== "1" && (
-                <Link href="?start=1" className={buttonClass("primary", "md", "max-sm:w-full")}>
-                  Make the quotation
-                </Link>
-              )}
-            </>
-          }
-        />
-      }
-      side={
-        startOpen ? undefined : (
-          <>
-            <FilesCard files={pdfs} empty="The PDF of each revision sent shows here." />
-            {history && <StepChanges entries={changesIn(history, "quotation")} historyHref={`${base}/history`} />}
-          </>
-        )
-      }
-      prevNext={
-        <StepPrevNext
-          prev={showCosts ? { href: `${base}/sourcing`, label: "Factory prices" } : { href: `${base}/needs`, label: "Needs" }}
-          next={managers ? { href: `${base}/costs`, label: "Costs" } : { href: `${base}/history`, label: "History" }}
-        />
-      }
-    >
+    <div className="flex flex-col gap-4">
+      {/* Board "Quotation — quoted": who we wait for and until when, with a follow-up. */}
+      {waitingLive && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f6d3bd] bg-action-soft px-5 py-4 dark:border-action/30">
+          <p className="min-w-0">
+            <strong className="block font-bold text-[#8a3a07] dark:text-action">Waiting for {d.customer.name}.</strong>
+            <span className="block text-sm text-text-2">
+              R{waitingLive.number} sent{waitingLive.sentOn ? ` ${date(waitingLive.sentOn)}` : ""}, valid to {date(waitingLive.validUntil)}.
+              {waitingLive.validUntil < today ? " It has passed its date: follow up, or record that it expired." : ""}
+            </span>
+          </p>
+          <span className="flex flex-wrap gap-2">
+            {quoter && (
+              <PanelButton
+                icon={<Clock aria-hidden />}
+                label="Add follow-up"
+                title="New follow-up"
+                description={`On ${d.refNo}. Shows on the dashboard on its day, with a reminder.`}
+                body={<FollowUpForm action={addFollowUpAction.bind(null, { key: "inquiryId", id: d.id })} people={people} meId={me.id} today={today} record={`${d.refNo} · ${d.customer.name}`} />}
+              />
+            )}
+            {manage && live?.canAnswer && (
+              <Link href="#answer" className={buttonClass("primary", "md")}>
+                <Check aria-hidden /> Customer answered…
+              </Link>
+            )}
+          </span>
+        </section>
+      )}
+      {draft && (
+        <p className="rounded-xl bg-surface-2 px-4 py-3 text-[13px] text-text-2">
+          <strong className="text-text">Revision {draft.number}.</strong>{" "}
+          {draft.number > 1 ? `R${draft.number - 1} stays as it was sent; this R${draft.number} replaces it once sent.` : "The first quotation: check it, then send it."}
+        </p>
+      )}
       {accepted && order && (
         <section aria-label="Order created" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ok/30 bg-ok-soft p-4">
           <p className="flex items-center gap-2 text-sm">
@@ -251,6 +290,8 @@ export default async function QuotationPage({
         </div>
       )}
 
+      <div className={draft ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]" : "contents"}>
+      <div className="flex min-w-0 flex-col gap-4">
       {terms}
 
       {current && (
@@ -260,6 +301,49 @@ export default async function QuotationPage({
           edit={editTerms ? { showCosts, canAdd: offers!.offers.length + 1 > current.options.length, pricesHref: `${base}/quotation?edit=prices` } : null}
         />
       )}
+
+      </div>
+      {draft && (
+        <aside className="flex flex-col gap-4">
+          <Card>
+            <CardHeader title="Summary" />
+            <CardBody className="flex flex-col gap-2.5 text-[13px]">
+              {draft.options.map((o) => (
+                <div key={o.id} className="flex justify-between gap-3">
+                  <span className="text-text-2">Option {o.letter}</span>
+                  <strong className="tabular">{money(o.total, draft.currency)}</strong>
+                </div>
+              ))}
+              <div className="flex justify-between gap-3">
+                <span className="text-text-2">Deposit ({draft.depositPercent}%)</span>
+                <strong className="tabular">
+                  {draft.options.map((o) => Math.round((Number(o.total) * draft.depositPercent) / 100).toLocaleString("en-US")).join(" / ")}
+                </strong>
+              </div>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title={`R${draft.number} · draft`} />
+            <CardBody className="flex flex-col gap-2">
+              <ButtonLink href={printHref(draft)} target="_blank" className="w-full justify-start">
+                <Eye aria-hidden /> Preview
+              </ButtonLink>
+              {editTerms && (
+                <ButtonLink href={`${base}/quotation?edit=prices`} variant="brand" className="w-full justify-start">
+                  <Pencil aria-hidden /> Edit prices
+                </ButtonLink>
+              )}
+              {manage && (
+                <ButtonLink href={`${base}/quotation?send=${draft.id}`} variant="primary" className="w-full justify-start">
+                  <Send aria-hidden /> Send R{draft.number}…
+                </ButtonLink>
+              )}
+              <p className="text-xs text-muted">Each option is one factory&apos;s offer. Every line of that offer gets a price.</p>
+            </CardBody>
+          </Card>
+        </aside>
+      )}
+      </div>
 
       {(draft || live?.canAnswer) && (
         <AnswerCard
@@ -271,6 +355,8 @@ export default async function QuotationPage({
           answerAction={live?.canAnswer && manage ? move(live) : null}
           lostAction={live?.canAnswer && manage && d.canWork ? lostAction.bind(null, d.id, live.id) : null}
           startNext={!draft && manage && q.canStartRevision ? start({ open: true, label: `Start R${(live?.number ?? 0) + 1} from R${live?.number ?? 1}` }) : null}
+          subtitle={`${d.quotation?.refNo ?? d.refNo} · ${d.customer.name}`}
+          route={live ? routeFromTerms(live.balanceTerms).route : null}
         />
       )}
 
@@ -293,33 +379,75 @@ export default async function QuotationPage({
         </ViewCard>
       )}
 
-      {earlier.length > 0 && (
-        <ViewCard title="Earlier revisions" canEdit={false}>
-          <ul className="flex flex-col divide-y divide-line px-4">
-            {earlier.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 text-sm">
-                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="font-semibold">R{r.number}</span>
-                  <RevisionBadge status={r.status} />
-                  <span className="text-xs text-text-2">
-                    {[r.sentOn ? `sent ${date(r.sentOn)}` : null, totals(r), r.answeredOn ? `answered ${date(r.answeredOn)}` : null].filter(Boolean).join(" · ")}
-                  </span>
-                </span>
-                <span className="flex items-center gap-3 text-xs">
-                  <Link href={printHref(r)} target="_blank" className="font-medium text-primary hover:underline">
-                    View / Print
-                  </Link>
-                  <a href={pdfHref(r)} className="font-medium text-primary hover:underline" aria-label={`Download R${r.number} as PDF`}>
-                    <FileText className="mr-0.5 inline size-3.5" aria-hidden />
-                    PDF
-                  </a>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </ViewCard>
+      {revs.length > 0 && !draft && (
+        <Card className="overflow-clip">
+          <CardHeader title={`${q.quotation?.refNo ?? "Quotation"} · revisions`} actions={manage && q.canStartRevision ? start({ label: "New revision" }) : undefined} />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-[13px]">
+              <THead>
+                <tr>
+                  <Th>Revision</Th>
+                  <Th>Made</Th>
+                  <Th>Options</Th>
+                  <Th className="text-right">Total</Th>
+                  <Th>Valid until</Th>
+                  <Th>Status</Th>
+                  <Th className="text-right">
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                </tr>
+              </THead>
+              <tbody>
+                {revs.map((r) => (
+                  <Tr key={r.id}>
+                    <Td>
+                      <RefCode>R{r.number}</RefCode>
+                    </Td>
+                    <Td className="whitespace-nowrap">{date(r.createdAt)}</Td>
+                    <Td>{r.options.map((o) => `${o.letter}${o.factory ? ` ${o.factory.name.split(" ")[0]}` : ""}`).join(" · ")}</Td>
+                    <Td className="text-right whitespace-nowrap tabular">
+                      {r.currency} {r.options.map((o) => Math.round(Number(o.total)).toLocaleString("en-US")).join(" / ")}
+                    </Td>
+                    <Td className="whitespace-nowrap">{date(r.validUntil)}</Td>
+                    <Td>{statusCell(r)}</Td>
+                    <Td className="text-right whitespace-nowrap">
+                      <span className="inline-flex gap-1.5">
+                        {r.canAnswer && manage && (
+                          <Link href="#answer" className={buttonClass("primary", "sm")}>
+                            <Check aria-hidden /> Customer accepted…
+                          </Link>
+                        )}
+                        <ButtonLink href={printHref(r)} target="_blank" size="sm">
+                          <Eye aria-hidden /> View
+                        </ButtonLink>
+                        <a href={pdfHref(r)} className={buttonClass("ghost", "sm")} aria-label={`Download R${r.number} as PDF`}>
+                          <Download aria-hidden /> PDF
+                        </a>
+                      </span>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
-    </StepFrame>
+
+      {revs.length > 0 && (
+        <Card>
+          <CardHeader title="What each status means" />
+          <CardBody className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {STATUS_MEANING.map(([st, words]) => (
+              <div key={st} className="flex flex-col gap-1.5">
+                <RevisionBadge status={st} />
+                <span className="text-[13px] text-text-2">{words}</span>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+      )}
+    </div>
+
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
@@ -106,6 +106,7 @@ export function StepNav({
   extra = [],
   stages,
   files,
+  icons,
 }: {
   base: string;
   steps: StepNavStep[];
@@ -120,6 +121,8 @@ export function StepNav({
   stages?: { list: string[]; current: number };
   /** A Files page between Costs and History. */
   files?: boolean;
+  /** Board inquiry tabs: an icon before each page (by its label) and the step's status as a grey pill, instead of numbers. */
+  icons?: Record<string, ReactNode>;
 }) {
   const at = usePathname();
   // A paper's Make page (/orders/:id/papers/:kind) belongs to the paper's step.
@@ -167,9 +170,10 @@ export function StepNav({
               href: l.href,
               label: l.label,
               active: active(l.href),
-              mark: s ? <StepMark state={s.state} number={s.number} /> : undefined,
+              mark: icons ? icons[l.label] : s ? <StepMark state={s.state} number={s.number} /> : undefined,
               alert: s?.state === "late",
-              count: s ? tagOf(s) || undefined : "tag" in l ? l.tag : undefined,
+              count: icons ? undefined : s ? tagOf(s) || undefined : "tag" in l ? l.tag : undefined,
+              tag: icons ? (s ? tagOf(s) || undefined : "tag" in l ? l.tag : undefined) : undefined,
             };
           })}
         />

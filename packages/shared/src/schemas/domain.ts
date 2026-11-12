@@ -16,6 +16,7 @@ import {
   ORDER_STAGES,
   PAYMENT_KINDS,
   PAYMENT_METHODS,
+  PAYMENT_ROUTES,
   PRIORITIES,
   REVISION_STATUSES,
 } from "../enums";
@@ -190,6 +191,7 @@ export const inquiryListQuery = listQuery.extend({
   customerId: z.uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   channel: z.enum(INQUIRY_CHANNELS).optional(),
+  category: z.string().trim().max(120).optional(),
   sort: z.enum(["newest", "oldest", "required", "priority", "updated"]).default("newest"),
 });
 export type InquiryListQuery = z.infer<typeof inquiryListQuery>;
@@ -355,7 +357,21 @@ export const revisionMoveInput = z.object({
   optionId: optionalId,
   /** The day it was sent or answered; today when empty. */
   on: optionalDate,
+  /** Accepted: the customer's PO number or reference, kept on the order. */
+  customerRef: optionalText(80),
+  /** Accepted: how the customer pays; empty: what the quotation's terms imply. */
+  route: z.preprocess((v) => (v === "" ? undefined : v), z.enum(PAYMENT_ROUTES).optional()),
   reason: reasonField,
+});
+
+/** Email a revision: to whom, a copy, the subject and message, and its PDF (base64, made by the web app). */
+export const revisionEmailInput = z.object({
+  to: z.array(z.string().trim().email("Check the email address")).min(1, "Who is it to?").max(10),
+  cc: z.array(z.string().trim().email("Check the copy address")).max(10).default([]),
+  subject: text(300, "Write a subject"),
+  message: optionalText(10000),
+  pdf: z.string().max(20_000_000).nullish(),
+  fileName: optionalText(200),
 });
 
 /* ---------------------------------------------------------------- orders */

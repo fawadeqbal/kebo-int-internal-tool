@@ -518,11 +518,14 @@ export function PanelButton({
   size = "md",
   icon,
   className,
+  panelClassName,
 }: {
   label: ReactNode;
   title: string;
   description?: string;
   body: ReactNode;
+  /** The window's own width and such (md:w-[820px]). */
+  panelClassName?: string;
   variant?: "primary" | "secondary" | "ghost";
   size?: "xs" | "sm" | "md";
   icon?: ReactNode;
@@ -535,7 +538,7 @@ export function PanelButton({
         {icon} {label}
       </Button>
       {open && (
-        <SidePanel title={title} description={description} onClose={() => setOpen(false)}>
+        <SidePanel title={title} description={description} onClose={() => setOpen(false)} className={panelClassName}>
           {body}
         </SidePanel>
       )}
