@@ -1,15 +1,17 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fromDbDateOrNull, isSupplier, livePart, termsSelect, toDbDateOrNull, type Prisma } from "@kebo/database";
+import { decimalToMinor, fromDbDateOrNull, isSupplier, livePart, termsSelect, toDbDateOrNull, wordFactsOf, wordSelect, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import {
   can,
   customerMoney,
+  orderWord,
   dueRuleWords,
   paperNumber,
   planStatus,
   routePaymentSentence,
   type FactoryPlanInput,
   type InvoiceSide,
+  type OrderWord,
   type PaymentPlanInput,
   type PaymentRoute,
   type PlanDueRule,
@@ -248,6 +250,7 @@ export class BillingService {
         lines: linesWithFactory,
         supplierPaid: supplierPaidRelation,
         expenses: factoryBorneExpenses,
+        ...wordSelect,
       },
       orderBy: { orderedOn: "asc" },
     });
@@ -262,6 +265,7 @@ export class BillingService {
           id: string;
           refNo: string;
           stage: string;
+          word: OrderWord;
           customer: string;
           toPay: string;
           next: { label: string; due: string | null; open: string; status: string } | null;
@@ -269,6 +273,7 @@ export class BillingService {
       }
     >();
     const today = this.clock.today();
+    const features = await this.limits.features();
     for (const o of orders) {
       const factoryOf = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
       // What we owe each factory here, less what we paid and what it bears: factoryPosition, as on the order.
@@ -287,6 +292,7 @@ export class BillingService {
           id: o.id,
           refNo: o.refNo,
           stage: o.stage,
+          word: orderWord(wordFactsOf(o), features),
           customer: o.customer.name,
           toPay: fromMinor(f.toPayMinor),
           next: plan?.next ?? null,

@@ -14,6 +14,7 @@ import type {
   PaymentMethod,
   PaymentRoute,
   InstalmentStatus,
+  OrderWord,
   RequestState,
 } from "@kebo/shared";
 import type { Person } from "./types";
@@ -301,6 +302,8 @@ export interface Payable {
     id: string;
     refNo: string;
     stage: string;
+    /** Where the order stands in one word (worked out, as on its own page). */
+    word: OrderWord;
     customer: string;
     toPay: string;
     /** The next part of the factory's payment plan and when it is due. */
@@ -526,6 +529,8 @@ export interface CustomerPayments {
     refNo: string;
     status: "open" | "closed" | "cancelled";
     stage: string;
+    /** Where the order stands in one word (worked out, as on its own page). */
+    word: OrderWord;
     currency: string;
     orderedOn: string;
     total: string;

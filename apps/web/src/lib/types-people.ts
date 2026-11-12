@@ -1,4 +1,4 @@
-import type { PartyType, InquiryStage, LostReason, OrderStatus, Permission, Role, SignInResult } from "@kebo/shared";
+import type { PartyType, InquiryStage, LostReason, OrderStatus, OrderWord, Permission, Role, SignInResult } from "@kebo/shared";
 import type { Person } from "./types";
 
 /** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
@@ -55,7 +55,7 @@ export interface CustomerDetail {
     createdAt: string;
     assignee: Person | null;
   }[];
-  orders: { id: string; refNo: string; status: OrderStatus; total: string; currency: string; orderedOn: string }[];
+  orders: { id: string; refNo: string; status: OrderStatus; word: OrderWord; total: string; currency: string; orderedOn: string }[];
 }
 
 export interface Factory {

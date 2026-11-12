@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { fromDbDate, fromDbDateOrNull, readyByOf, readySelect } from "@kebo/database";
+import { fromDbDate, fromDbDateOrNull, readyByOf, readySelect, wordFactsOf } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import { can, type ShipmentStatus } from "@kebo/shared";
+import { can, orderWord, orderWordColumn, type ShipmentStatus } from "@kebo/shared";
 import { ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { orderAccess } from "../../common/auth/order-access";
@@ -96,6 +96,9 @@ export class OperationsService {
         factoryOrderNo: true,
         customer: { select: { id: true, name: true } },
         purchaseOrders: { select: { id: true, number: true, supplierId: true, sentOn: true, sentEarlyReason: true, supplierRef: true } },
+        // What the order's one status word reads: "shipped" here is that word, not the stored stage.
+        shipments: { select: { status: true, departedOn: true } },
+        delivery: { select: { deliveredOn: true } },
         lines: {
           select: {
             receivedOn: true,
@@ -116,9 +119,13 @@ export class OperationsService {
       take: 500,
     });
     const today = this.clock.today();
+    const features = await this.limits.features();
     const rows = orders.flatMap((o) => {
       const names = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.name] as const] : [])));
       const ready = new Map(readyByOf(o).map((r) => [r.factoryId, r.readyOn] as const));
+      // Where the order stands, by its one worked-out word: still with the factory, or shipped and after.
+      const at = orderWordColumn(orderWord(wordFactsOf(o), features));
+      const beforeShipping = at === "confirmed" || at === "in_production";
       return factoryPositionOf(o, fx)
         .filter((f) => f.lines > 0)
         .map((f) => {
@@ -129,7 +136,7 @@ export class OperationsService {
           const status =
             o.status === "cancelled"
               ? "cancelled"
-              : o.stage === "shipped" || o.stage === "done"
+              : !beforeShipping
                 ? "shipped"
                 : mine.length > 0 && mine.every((l) => l.receivedOn)
                   ? "ready"
@@ -145,14 +152,14 @@ export class OperationsService {
             /** not_sent · in_production · late (ready date passed) · ready · shipped · cancelled */
             status,
             sentEarlyReason: po?.sentEarlyReason ?? null,
-            order: { id: o.id, refNo: o.refNo, stage: o.stage, closed: o.status === "closed" },
+            order: { id: o.id, refNo: o.refNo, stage: o.stage, closed: o.status === "closed", beforeShipping },
             customer: o.customer,
             supplier: { id: f.factoryId, name: names.get(f.factoryId) ?? "Supplier" },
             orderedOn: sentOn,
             supplierRef: po?.supplierRef ?? o.factoryOrderNo,
             readyOn,
             /** Ready date passed and the order not shipped yet. */
-            late: !!readyOn && readyOn < today && (o.stage === "confirmed" || o.stage === "in_production"),
+            late: !!readyOn && readyOn < today && beforeShipping,
             currency: f.currency,
             owed: fromMinor(f.owedMinor),
             paid: fromMinor(f.settledMinor),
@@ -160,6 +167,6 @@ export class OperationsService {
           };
         });
     });
-    return open ? rows.filter((r) => r.status !== "cancelled" && (Number(r.toPay) > 0 || r.order.stage === "confirmed" || r.order.stage === "in_production")) : rows;
+    return open ? rows.filter((r) => r.status !== "cancelled" && (Number(r.toPay) > 0 || r.order.beforeShipping)) : rows;
   }
 }

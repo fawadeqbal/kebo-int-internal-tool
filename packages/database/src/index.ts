@@ -14,3 +14,4 @@ export * from "./allocations";
 export * from "./files";
 export * from "./ready";
 export * from "./terms";
+export * from "./word";

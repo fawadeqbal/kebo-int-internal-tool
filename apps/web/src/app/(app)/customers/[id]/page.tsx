@@ -19,7 +19,7 @@ import {
   ButtonLink,
 } from "@kebo/ui";
 import { ArrowRight, FileText } from "lucide-react";
-import { ORDER_STAGE_LABEL, ORDER_STAGE_TONE, type OrderStage } from "@kebo/shared";
+import { ORDER_WORD_TONE } from "@kebo/shared";
 import { customerPaymentsOf, partyNotesOf } from "@/lib/party-data";
 import { date, timeAgo, TZ, whole } from "@/lib/format";
 import { todayIn } from "@kebo/utils";
@@ -179,15 +179,7 @@ export default async function CustomerOverview({
                       <Td className="text-right whitespace-nowrap tabular">{whole(o.total, o.currency)}</Td>
                       <Td className="text-right whitespace-nowrap tabular">{Number(o.due) > 0.005 ? whole(o.due, o.currency) : "—"}</Td>
                       <Td>
-                        {o.status === "cancelled" ? (
-                          <StatusBadge meaning="neutral">Cancelled</StatusBadge>
-                        ) : o.status === "closed" ? (
-                          <StatusBadge meaning="ok">Closed</StatusBadge>
-                        ) : (
-                          <StatusBadge meaning={ORDER_STAGE_TONE[o.stage as OrderStage] ?? "info"}>
-                            {ORDER_STAGE_LABEL[o.stage as OrderStage] ?? o.stage}
-                          </StatusBadge>
-                        )}
+                        <StatusBadge meaning={ORDER_WORD_TONE[o.word]}>{o.word}</StatusBadge>
                       </Td>
                     </Tr>
                   ))}

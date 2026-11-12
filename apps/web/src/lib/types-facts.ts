@@ -1,4 +1,5 @@
 /** Insights data (GET /insights/facts/*): the three calculated tables, added up. Money in the main currency. */
+import type { OrderWord } from "@kebo/shared";
 
 export interface OrderGroupRow {
   period: string;
@@ -193,6 +194,8 @@ export interface FactoryOrders {
     orderedOn: string;
     status: "open" | "closed" | "cancelled";
     stage: string;
+    /** Where the order stands in one word (worked out, as on its own page). */
+    word: OrderWord | null;
     currency: string;
     owed: string;
     paid: string;

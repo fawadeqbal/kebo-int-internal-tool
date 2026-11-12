@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Banknote, ChevronLeft, ChevronRight, Filter, Landmark, LayoutGrid, List, Users, Wallet, X } from "lucide-react";
-import { can, CURRENCIES, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, MONEY_ACCOUNT_KIND_LABEL, ORDER_STAGE_LABEL, type ExpenseCategory, type OrderStage } from "@kebo/shared";
+import { can, CURRENCIES, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABEL, MONEY_ACCOUNT_KIND_LABEL, type ExpenseCategory } from "@kebo/shared";
 import { Alert, Badge, buildHref, buttonClass, Card, CardBody, CardHeader, cn, EmptyState, FilterChip, LinkTabs, Segmented, Select, Table, Td, Th, THead, Tr, Pagination, toPage, StatRow, StatTile } from "@kebo/ui";
 import { convertAmount } from "@kebo/money";
 import { addDays } from "@kebo/utils";
@@ -925,7 +925,7 @@ export async function OweBody({ mine }: { mine: boolean }) {
                       {o.refNo}
                     </Link>{" "}
                     <span className="text-text-2">{o.customer}</span>{" "}
-                    <span className="text-xs text-muted">· {ORDER_STAGE_LABEL[o.stage as OrderStage]}</span>
+                    <span className="text-xs text-muted">· {o.word}</span>
                     {o.next && (
                       <span className={cn("block text-xs", o.next.status === "late" ? "font-medium text-bad" : "text-muted")}>
                         Next: {o.next.label} {money(o.next.open, r.currency)}

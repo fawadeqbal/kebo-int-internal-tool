@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma, isCustomer, isSupplier } from "@kebo/database";
+import { Prisma, isCustomer, isSupplier, wordFactsByOrder } from "@kebo/database";
 import { fromMinor, roundHalfAway, toMinor } from "@kebo/money";
-import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
+import { can, LOST_REASON_LABEL, orderWord, type LostReason } from "@kebo/shared";
 import { ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../../database/prisma.service";
 import { Clock } from "../../../common/time/clock.service";
@@ -420,6 +420,8 @@ export class FactsReadService {
       where f.factory_id = ${q.factoryId}::uuid and f.status <> 'cancelled'
       order by f.ordered_on desc, o.ref_no desc limit 200`;
     const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+    // Where each order stands in one word, from what is stored now (orderWord), as on the order's own page.
+    const [facts, features] = await Promise.all([wordFactsByOrder(this.prisma.db, rows.map((r) => r.orderId)), this.limits.features()]);
     return {
       currency,
       rows: rows.map((r) => ({
@@ -428,6 +430,7 @@ export class FactsReadService {
         orderedOn: day(r.orderedOn),
         status: r.status,
         stage: r.stage,
+        word: facts.has(r.orderId) ? orderWord(facts.get(r.orderId)!, features) : null,
         currency: r.currency ?? currency,
         owed: amount(r.currency ? r.owed! : r.owedMain),
         paid: amount(r.currency ? r.paid! : r.paidMain),

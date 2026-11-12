@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderProgress, orderStatusLine, type ProgressItem } from "../src/workflows/progress";
+import { orderProgress, orderStatusLine, orderWord, type OrderWordFacts, type ProgressItem } from "../src/workflows/progress";
 
 const item = (step: ProgressItem["step"], key: string | null, done = false, more: Partial<ProgressItem> = {}): ProgressItem => ({ step, key, done, ...more });
 
@@ -87,5 +87,39 @@ describe("order status in words", () => {
   it("says how late", () => {
     const late = tick(fresh(), "factory_ordered").map((i) => (i.key === "ready_date" ? { ...i, late: true, dueOn: "2026-11-06" } : i));
     expect(orderStatusLine(late, {}, today)).toEqual({ stage: "In production", note: "6 days late", tone: "bad" });
+  });
+});
+
+describe("orderWord: one word for where an order stands, from what is stored", () => {
+  const at = (f: Partial<OrderWordFacts>, features: string[] | null = null) => orderWord({ status: "open", ordered: false, shipments: [], delivered: false, ...f }, features);
+  it("moves with the facts, forward and back", () => {
+    expect(at({})).toBe("Confirmed");
+    expect(at({ ordered: true })).toBe("In production");
+    expect(at({ ordered: true, shipments: [{ status: "booked", left: false }] })).toBe("In production");
+    expect(at({ ordered: true, shipments: [{ status: "departed", left: true }] })).toBe("Shipped");
+    // Two shipments, one still at sea: not arrived yet.
+    expect(at({ shipments: [{ status: "arrived", left: true }, { status: "departed", left: true }] })).toBe("Shipped");
+    expect(at({ shipments: [{ status: "arrived", left: true }, { status: "cleared", left: true }] })).toBe("Arrived");
+    expect(at({ shipments: [{ status: "arrived", left: true }], delivered: true })).toBe("Delivered");
+    // A shipment set back to planned: the word goes back with it.
+    expect(at({ ordered: true, shipments: [{ status: "planned", left: false }] })).toBe("In production");
+  });
+  it("closed is Done and cancelled is Cancelled, whatever else is stored", () => {
+    expect(at({ status: "closed", ordered: true })).toBe("Done");
+    expect(at({ status: "cancelled", delivered: true })).toBe("Cancelled");
+  });
+  it("does not read a module that is switched off", () => {
+    expect(at({ delivered: true, ordered: true }, ["shipping"])).toBe("In production");
+    expect(at({ shipments: [{ status: "arrived", left: true }] }, [])).toBe("Shipped");
+    expect(at({ shipments: [{ status: "planned", left: false }] }, [])).toBe("Confirmed");
+  });
+  it("the order page says the word it is given, with what is late or left from its items", () => {
+    const items: ProgressItem[] = [{ step: "factory", key: "factory_ordered", done: true }, { step: "shipping", key: "sailed", done: false, late: true, dueOn: "2026-11-01" }];
+    expect(orderStatusLine(items, { word: "In production" }, "2026-11-04")).toEqual({ stage: "In production", note: "3 days late", tone: "bad" });
+    // The stage was moved by hand but nothing was ordered: the page says what the facts say.
+    expect(orderStatusLine(items, { word: "Confirmed" }, "2026-11-04").stage).toBe("Confirmed");
+    const done = items.map((i) => ({ ...i, done: true, late: false }));
+    expect(orderStatusLine(done, { word: "Shipped" }, "2026-11-04")).toEqual({ stage: "Shipped", note: "all done, close it", tone: "ok" });
+    expect(orderStatusLine(done, { word: "Done", closed: true }, "2026-11-04").stage).toBe("Done");
   });
 });

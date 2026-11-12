@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
-import { INSTALMENT_STATUS_LABEL, ORDER_STAGE_LABEL, ORDER_STAGES, type InstalmentStatus, type OrderStage } from "@kebo/shared";
-import { Badge, Card, CardHeader, cn } from "@kebo/ui";
+import { INSTALMENT_STATUS_LABEL, type InstalmentStatus } from "@kebo/shared";
+import { Badge, Card, CardHeader } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import type { OrderMoney } from "@/lib/types-money";
 import { RecordPaymentLink, ViewPaymentsLink } from "@/components/money/pay-links";
@@ -11,30 +10,6 @@ import { RecordPaymentLink, ViewPaymentsLink } from "@/components/money/pay-link
  * documents. Each shows what its owning page gives it: the plan comes from Billing (each instalment an
  * invoice with its payment request number), payments are listed only under Treasury › Payments.
  */
-
-/** Confirmed › In production › Shipped › Done › Closed, the current one filled. */
-export function OrderStatusBar({ stage, status }: { stage: OrderStage; status: string }) {
-  const steps = [...ORDER_STAGES.map((s) => ({ key: s as string, label: ORDER_STAGE_LABEL[s] })), { key: "closed", label: "Closed" }];
-  const at = status === "closed" ? steps.length - 1 : ORDER_STAGES.indexOf(stage);
-  return (
-    <ol aria-label="Status" className="flex flex-wrap overflow-hidden rounded-lg border border-line bg-surface">
-      {steps.map((s, i) => (
-        <li
-          key={s.key}
-          aria-current={i === at ? "step" : undefined}
-          className={cn(
-            "flex h-8 items-center gap-1.5 border-r border-line px-3.5 text-[13px] font-medium last:border-r-0",
-            i < at ? "text-text-2" : i === at ? "bg-primary-soft font-semibold text-primary" : "text-muted",
-          )}
-        >
-          {i < at && <Check className="size-3.5 text-ok" aria-hidden />}
-          {s.label}
-          {i < at && <span className="sr-only"> (done)</span>}
-        </li>
-      ))}
-    </ol>
-  );
-}
 
 const TONE: Record<InstalmentStatus, "ok" | "info" | "warn" | "bad" | "neutral"> = {
   paid: "ok",

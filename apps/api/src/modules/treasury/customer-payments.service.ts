@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { decimalToMinor, fileOf, fromDbDate, isCustomer, liveFile, orderPart, toDbDate, type Prisma, routeOf, type WithTerms } from "@kebo/database";
+import { decimalToMinor, fileOf, fromDbDate, isCustomer, liveFile, orderPart, toDbDate, type Prisma, routeOf, wordFactsOf, wordSelect, type WithTerms } from "@kebo/database";
 import { formatMinor, fromMinor, fxRate, toMinor, type Minor } from "@kebo/money";
 import {
   bankStepsFor,
@@ -14,6 +14,7 @@ import {
   type PaymentKind,
   type PaymentMethod,
   type UseCreditInput,
+  orderWord,
 } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -197,7 +198,6 @@ export class CustomerPaymentsService {
       select: {
         id: true,
         refNo: true,
-        status: true,
         stage: true,
         currency: true,
         total: true,
@@ -205,6 +205,8 @@ export class CustomerPaymentsService {
         mainCurrency: true,
         mainRate: true,
         orderedOn: true,
+        // What the order's one status word reads (with its status).
+        ...wordSelect,
         receivables: { orderBy: { sortOrder: "asc" }, select: { id: true, label: true, amount: true, dueOn: true, part: true } },
         expenses: chargedExpenses,
       },
@@ -228,6 +230,7 @@ export class CustomerPaymentsService {
     const soon = settings.reminders.dueSoonDays;
     const fx = fxOf(settings, await this.limits.allows("expenses"));
     const totals = new Map<string, { totalMinor: number; receivedMinor: number; dueMinor: number; orders: number }>();
+    const features = await this.limits.features();
     const rows = orders.map((o) => {
       const live = parts.filter((p) => p.orderId === o.id && !p.voidedAt);
       const pos = positionOf({ ...o, allocations: live }, fx);
@@ -246,6 +249,8 @@ export class CustomerPaymentsService {
         refNo: o.refNo,
         status: o.status,
         stage: o.stage,
+        /** Where it stands in one word (orderWord), as on the order's own page. */
+        word: orderWord(wordFactsOf(o), features),
         currency: o.currency,
         orderedOn: fromDbDate(o.orderedOn),
         total: fromMinor(pos.totalMinor),
