@@ -1,38 +1,24 @@
 import Link from "next/link";
-import { ArrowLeft, Factory } from "lucide-react";
-import { basisText, offerTaxTag } from "@kebo/shared";
-import { Alert, Badge, buttonClass, ButtonLink, Card, cn, EmptyState, Table, Td, Th, THead, Tr } from "@kebo/ui";
+import { ArrowLeft, Factory, FileText, Package, Pencil } from "lucide-react";
+import { basisText, offerTaxTag, REQUEST_CHANNEL_LABEL } from "@kebo/shared";
+import { api } from "@/lib/api";
+import type { FactoryRequests } from "@/lib/types-flow";
+import { Alert, Badge, buttonClass, ButtonLink, Card, CardHeader, cn, EmptyState, StatusBadge, Table, Td, Th, THead, Tr } from "@kebo/ui";
 import { todayIn } from "@kebo/utils";
 import { requirePermission } from "@/lib/session";
 import { date, money, qty, TZ } from "@/lib/format";
-import { dealHistoryOf, dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
+import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
 import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
 import { optional } from "@/components/print/data";
-import { StepChanges, StepFrame, StepHeader, StepPrevNext } from "@/components/orders/step-page";
-import { ViewCard } from "@/components/orders/step-view";
-import { changesIn, FilesCard } from "@/components/deals/inquiry-side";
-import { cheapestComplete, coverOf, detailsFilled, offerNeeds, shortName, theirTotalMinor } from "@/components/deals/offer-facts";
-import { AddOfferButton, CoverBadge, OfferDetails, OfferLines } from "@/components/deals/offer-work";
+import { cheapestComplete, shortName } from "@/components/deals/offer-facts";
+import { AddOfferButton, OfferDetails, OfferLines } from "@/components/deals/offer-work";
 import { removeFileAction } from "../../actions";
 import { askFactories } from "../ask";
-import { inquirySteps, plural } from "../steps";
-import {
-  addOfferLinesAction,
-  copyOfferLinesAction,
-  editOfferLineAction,
-  moveOfferLineAction,
-  offerFieldsAction,
-  removeFactoryQuoteAction,
-  removeOfferLineAction,
-  saveFactoryQuoteAction,
-  searchFactoriesAction,
-} from "./actions";
+import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, offerFieldsAction, removeFactoryQuoteAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
 import { getSettings } from "@/lib/loaders";
 
 export const metadata = { title: "Factory prices" };
 
-/** "USD 51,741": whole units for the step's header line. */
-const whole = (v: string | number, currency: string) => `${currency} ${Math.round(Number(v)).toLocaleString("en-US")}`;
 
 /**
  * Step 2, Factory prices (board InqV4Prices): the offers as one compare table
@@ -51,35 +37,22 @@ export default async function SourcingPage({
   const { id } = await params;
   const sp = await searchParams;
   const me = await requirePermission("sourcing.manage");
-  const [d, s, settings, q, history] = await Promise.all([
+  const [d, s, settings, q] = await Promise.all([
     dealOf(id),
     sourcingOf(id),
     getSettings(),
     optional(() => quotationOf(id)),
-    optional(() => dealHistoryOf(id)),
   ]);
   const canEdit = d.allowed.source;
   const base = `/inquiries/${d.id}/sourcing`;
   const today = todayIn(TZ);
-  const step = inquirySteps(d, s.quotes.length).find((x) => x.key === "sourcing")!;
   const ask = await askFactories(d, me, "ghost");
   const compare = sp.view === "compare";
-  const selected = s.quotes.find((x) => x.id === sp.offer) ?? s.quotes[0] ?? null;
   const cheapest = cheapestComplete(s.quotes);
   // Which quotation option each offer is, on the newest revision (a draft when one is open).
   const revs = [...(q?.revisions ?? [])].sort((a, b) => b.number - a.number);
   const current = revs[0] ?? null;
   const letterOf = new Map((current?.options ?? []).filter((o) => o.factoryQuoteId).map((o) => [o.factoryQuoteId!, o.letter]));
-  const needing = (selected && offerNeeds(selected, s.items).length ? selected : null) ?? s.quotes.find((x) => offerNeeds(x, s.items).length) ?? null;
-  const line = s.quotes.length
-    ? [
-        `${plural(s.quotes.length, "offer")} in`,
-        needing ? `${shortName(needing.factory.name)}'s offer needs ${offerNeeds(needing, s.items).join(", ")}` : "every offer is complete",
-        cheapest?.totalCost ? `cheapest that covers everything: ${shortName(cheapest.factory.name)} ${whole(cheapest.totalCost, s.currency)}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : "No offers yet: ask two or three factories, then add each one's prices.";
   const withLines = s.quotes.some((x) => x.lines.length);
   const lines = {
     add: addOfferLinesAction.bind(null, d.id),
@@ -108,34 +81,13 @@ export default async function SourcingPage({
       />
     ) : null;
   const quotationHref = `/inquiries/${d.id}/quotation`;
-  const offerFiles = s.quotes.flatMap((x) => x.files.map((f) => ({ id: f.id, name: f.fileName, offer: x.factory.name })));
+
+  const requests = await optional(() => api.get<FactoryRequests>(`/inquiries/${d.id}/factory-requests`));
+  const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
+  const editing = s.quotes.find((x) => x.id === sp.offer) ?? null;
 
   return (
-    <StepFrame
-      header={
-        <StepHeader
-          step={{ number: step.number, label: step.label, state: step.state, stateLabel: step.stateLabel, line }}
-          action={
-            <>
-              {ask?.button}
-              {s.quotes.length > 0 && addOffer({ variant: "secondary", open: sp.add === "1" })}
-              {withLines && (
-                <Link href={current ? quotationHref : `${quotationHref}?start=1`} className={buttonClass("primary", "md", "max-sm:w-full")}>
-                  {current ? "Open the quotation" : "Make the quotation"}
-                </Link>
-              )}
-            </>
-          }
-        />
-      }
-      side={
-        <>
-          <FilesCard files={offerFiles.map((f) => ({ id: f.id, name: f.name }))} empty="No factory files yet." />
-          {history && <StepChanges entries={changesIn(history, "sourcing", offerFiles.map((f) => f.name))} historyHref={`/inquiries/${d.id}/history`} />}
-        </>
-      }
-      prevNext={<StepPrevNext prev={{ href: `/inquiries/${d.id}/needs`, label: "Needs" }} next={{ href: quotationHref, label: "Quotation" }} />}
-    >
+    <div className="flex flex-col gap-4">
       {!canEdit && (
         <Alert tone="info">
           {d.stage === "won" || d.stage === "lost"
@@ -144,7 +96,63 @@ export default async function SourcingPage({
         </Alert>
       )}
 
-      {s.quotes.length === 0 ? (
+      {/* Requests (board): who was asked, how, when the answer is due, and where each stands. */}
+      {requests && (
+        <Card className="overflow-clip">
+          <CardHeader title="Requests" actions={<span className="flex flex-wrap gap-2">{ask?.button}{s.quotes.length > 0 && addOffer({ variant: "primary", label: "Enter an offer", open: sp.add === "1" })}</span>} />
+          {requests.items.length === 0 ? (
+            <EmptyState title="Nobody asked yet" description="Send the customer's list to two or three factories; each one shows here with when its answer is due." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-[13px]">
+                <THead>
+                  <tr>
+                    <Th>Factory</Th>
+                    <Th>Asked by</Th>
+                    <Th>Sent</Th>
+                    <Th>Reply by</Th>
+                    <Th>Status</Th>
+                    <Th className="text-right">
+                      <span className="sr-only">Actions</span>
+                    </Th>
+                  </tr>
+                </THead>
+                <tbody>
+                  {requests.items.map((r) => (
+                    <Tr key={r.id}>
+                      <Td>
+                        <Link href={`/factories/${r.factory.id}`} className="font-semibold hover:text-primary">
+                          {r.factory.name}
+                        </Link>
+                        {r.note && <span className="block text-xs text-text-2">{r.note}</span>}
+                      </Td>
+                      <Td>{r.channel ? REQUEST_CHANNEL_LABEL[r.channel] : "—"}</Td>
+                      <Td className="whitespace-nowrap">{date(r.sentOn)}</Td>
+                      <Td className="whitespace-nowrap">{r.replyBy ? date(r.replyBy) : "—"}</Td>
+                      <Td>
+                        <StatusBadge meaning={r.status === "quoted" ? "ok" : r.status === "declined" ? "bad" : r.status === "no_reply" ? "neutral" : r.late ? "warn" : "info"}>
+                          {r.status === "sent" ? (r.late ? "Sent · reply due" : "Sent") : r.statusLabel}
+                        </StatusBadge>
+                      </Td>
+                      <Td className="text-right whitespace-nowrap">
+                        {r.factoryQuoteId ? (
+                          <ButtonLink href={`${base}?offer=${r.factoryQuoteId}#offer`} size="sm">
+                            Open offer
+                          </ButtonLink>
+                        ) : r.status === "sent" ? (
+                          addOffer({ variant: "primary", size: "sm", label: "Enter offer" })
+                        ) : null}
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {s.quotes.length === 0 && waiting.length === 0 ? (
         <NoOffers items={s.items} add={addOffer({ variant: "primary", label: "Add the first offer", open: sp.add === "1" })} />
       ) : compare ? (
         <>
@@ -155,119 +163,140 @@ export default async function SourcingPage({
         </>
       ) : (
         <>
-          <ViewCard title={`Offers · ${s.quotes.length}`} canEdit={false}>
-            <OffersTable quotes={s.quotes} view={s} selected={selected?.id ?? null} base={base} letterOf={letterOf} />
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3 text-xs text-muted">
-              <span>Click a factory to see its offer below. Our cost = their price to our basis, plus tax unless it is included, in {s.currency}.</span>
-              <Link href={`${base}?view=compare`} className={buttonClass("ghost", "xs")}>
-                Compare side by side
-              </Link>
+          {/* One card per offer (board), and one per factory still to answer. */}
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            {s.quotes.map((x) => (
+              <OfferCard key={x.id} q={x} base={base} letter={letterOf.get(x.id)} cheapest={cheapest?.id === x.id} canEdit={canEdit} />
+            ))}
+            {waiting.map((r) => (
+              <Card key={r.id}>
+                <CardHeader title={r.factory.name} />
+                <EmptyState
+                  icon={Package}
+                  title={`Waiting for ${shortName(r.factory.name)}`}
+                  description={`${r.replyBy ? `Reply due ${date(r.replyBy)}. ` : ""}Enter the offer when it comes, or mark “No reply” under Ask factories.`}
+                  action={addOffer({ variant: "secondary", label: "Enter offer" })}
+                />
+              </Card>
+            ))}
+          </div>
+          {s.quotes.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+              <span>Our cost = their price to our basis, plus tax unless it is included, in {s.currency}.</span>
+              <span className="flex flex-wrap gap-2">
+                {s.quotes.length > 1 && (
+                  <ButtonLink href={`${base}?view=compare`} size="sm">
+                    Compare side by side
+                  </ButtonLink>
+                )}
+                {withLines && (
+                  <Link href={current ? quotationHref : `${quotationHref}?start=1`} className={buttonClass("primary", "sm")}>
+                    {current ? "Open the quotation" : "Make the quotation"}
+                  </Link>
+                )}
+              </span>
             </div>
-          </ViewCard>
-          {selected && (
-            <>
+          )}
+          {editing && (
+            <div id="offer" className="flex scroll-mt-24 flex-col gap-4">
               <OfferDetails
-                key={`d-${selected.id}`}
+                key={`d-${editing.id}`}
                 dealId={d.id}
-                q={selected}
+                q={editing}
                 canEdit={canEdit}
                 today={today}
                 mainCurrency={s.currency}
                 rates={settings.sales.exchangeRates}
                 searchFactories={searchFactoriesAction}
-                saveAction={saveFactoryQuoteAction.bind(null, d.id, selected.id)}
-                fieldsAction={offerFieldsAction.bind(null, d.id, selected.id)}
-                removeAction={removeFactoryQuoteAction.bind(null, d.id, selected.id)}
+                saveAction={saveFactoryQuoteAction.bind(null, d.id, editing.id)}
+                fieldsAction={offerFieldsAction.bind(null, d.id, editing.id)}
+                removeAction={removeFactoryQuoteAction.bind(null, d.id, editing.id)}
                 removeFile={lines.removeFile}
               />
               <OfferLines
-                key={`l-${selected.id}`}
-                q={selected}
-                others={s.quotes.filter((x) => x.id !== selected.id && x.lines.length)}
+                key={`l-${editing.id}`}
+                q={editing}
+                others={s.quotes.filter((x) => x.id !== editing.id && x.lines.length)}
                 items={s.items}
                 canEdit={canEdit}
                 mainCurrency={s.currency}
                 lines={lines}
               />
-            </>
+            </div>
           )}
         </>
       )}
-    </StepFrame>
-  );
-}
-
-/** One row per offer: who and on what basis, valid until, their total, our cost, what it covers, how complete it is, and its quotation option. */
-function OffersTable({
-  quotes,
-  view,
-  selected,
-  base,
-  letterOf,
-}: {
-  quotes: FactoryQuoteView[];
-  view: SourcingView;
-  selected: string | null;
-  base: string;
-  letterOf: Map<string, string>;
-}) {
-  return (
-    <div className="overflow-x-auto px-4 pt-2 pb-3">
-      <Table>
-        <THead>
-          <tr>
-            <Th>Factory</Th>
-            <Th className="hidden md:table-cell">Valid until</Th>
-            <Th className="hidden text-right lg:table-cell">Their total</Th>
-            <Th className="text-right">Our cost</Th>
-            <Th className="hidden sm:table-cell">Covers</Th>
-            <Th className="hidden xl:table-cell">Details</Th>
-            <Th className="hidden md:table-cell">Quotation</Th>
-          </tr>
-        </THead>
-        <tbody>
-          {quotes.map((x) => {
-            const on = x.id === selected;
-            const filled = detailsFilled(x);
-            const letter = letterOf.get(x.id);
-            return (
-              <Tr key={x.id} className={cn("relative", on ? "bg-primary-soft/60 shadow-[inset_3px_0_0_var(--color-primary)]" : "hover:bg-surface-2/60")}>
-                <Td>
-                  <Link href={`${base}?offer=${x.id}`} scroll={false} aria-current={on ? "true" : undefined} className="block font-medium after:absolute after:inset-0">
-                    {x.factory.name}
-                  </Link>
-                  <span className="block text-xs text-muted">
-                    {[x.basis ? basisText(x.basis, x.basisPlace) : "Basis not said", x.leadTime].filter(Boolean).join(" · ")}
-                  </span>
-                  {offerTaxTag(x.taxRate, x.taxIncluded) && (
-                    <span className="block text-xs text-muted">{offerTaxTag(x.taxRate, x.taxIncluded)}</span>
-                  )}
-                  <span className="mt-1 block sm:hidden">
-                    <CoverBadge cover={coverOf(x, view.items)} />
-                  </span>
-                </Td>
-                <Td className="hidden whitespace-nowrap text-text-2 md:table-cell">{x.validUntil ? date(x.validUntil) : <span className="text-muted">—</span>}</Td>
-                <Td className="hidden text-right whitespace-nowrap tabular lg:table-cell">{x.lines.length ? whole(theirTotalMinor(x) / 100, x.currency) : <span className="text-muted">—</span>}</Td>
-                <Td className="text-right font-semibold whitespace-nowrap tabular">
-                  {x.totalCost === null ? <span className="text-xs font-medium text-warn">No rate</span> : x.lines.length ? whole(x.totalCost, view.currency) : <span className="text-muted">—</span>}
-                </Td>
-                <Td className="hidden sm:table-cell">
-                  <CoverBadge cover={coverOf(x, view.items)} />
-                </Td>
-                <Td className="hidden text-xs whitespace-nowrap text-text-2 tabular xl:table-cell">
-                  {filled.n} of {filled.of}
-                </Td>
-                <Td className="hidden md:table-cell">{letter ? <Badge tone="primary">Option {letter}</Badge> : <span className="text-muted">—</span>}</Td>
-              </Tr>
-            );
-          })}
-        </tbody>
-      </Table>
     </div>
   );
 }
 
-/** No offer yet: what to do, and what the factories quote on. */
+/** One factory's offer as the board draws it: its total and tax, basis, lead time, MOQ, payment, validity, their ref., the lines, the files, Edit. */
+function OfferCard({ q, base, letter, cheapest, canEdit }: { q: FactoryQuoteView; base: string; letter?: string; cheapest: boolean; canEdit: boolean }) {
+  const tax = offerTaxTag(q.taxRate, q.taxIncluded);
+  const facts: [string, string | null][] = [
+    ["Basis", q.basis ? basisText(q.basis, q.basisPlace) : null],
+    ["Lead time", q.leadTime],
+    ["MOQ", q.moq],
+    ["Payment", q.paymentTerms ?? (q.advancePercent !== null ? `${q.advancePercent}% advance` : null)],
+    ["Valid until", q.validUntil ? date(q.validUntil) : null],
+    ["Their ref.", q.reference],
+  ];
+  return (
+    <Card>
+      <CardHeader
+        title={q.factory.name}
+        actions={
+          <span className="flex gap-1.5">
+            {letter && <Badge tone="info">Option {letter}</Badge>}
+            {cheapest && <Badge tone="ok">Cheapest complete</Badge>}
+          </span>
+        }
+      />
+      <div className="flex flex-col gap-3.5 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <strong className="text-2xl font-bold tabular">{money(q.factoryTotal, q.currency)}</strong>
+          {tax && <Badge tone="ok">{q.taxIncluded ? `Tax included ${q.taxRate}%` : `+${q.taxRate}% tax`}</Badge>}
+        </div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+          {facts.map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-xs text-muted">{k}</dt>
+              <dd className="text-sm">{v ?? "—"}</dd>
+            </div>
+          ))}
+        </dl>
+        {q.lines.length > 0 && (
+          <ul className="flex flex-col gap-1.5 border-t border-surface-2 pt-3 text-[13px]">
+            {q.lines.map((l) => (
+              <li key={l.id} className="flex justify-between gap-3">
+                <span className="min-w-0">
+                  {l.answersNo ? `${l.no}` : "Extra"} · {l.description.split("\n")[0]} × {qty(l.quantity)} {l.unit}
+                </span>
+                <span className="tabular">{(Number(l.quantity) * Number(l.unitPrice)).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {q.files.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {q.files.map((f) => (
+              <a key={f.id} href={`/files/${f.id}?view=1`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                <FileText className="size-3.5" aria-hidden /> {f.fileName}
+              </a>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href={`${base}?offer=${q.id}#offer`} size="sm">
+            <Pencil aria-hidden /> {canEdit ? "Edit" : "Open"}
+          </ButtonLink>
+          {q.unpriced > 0 && <Badge tone="warn">{q.unpriced} line{q.unpriced === 1 ? "" : "s"} without a price</Badge>}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function NoOffers({ items, add }: { items: SourcingView["items"]; add: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-5">

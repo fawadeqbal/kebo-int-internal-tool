@@ -1,150 +1,96 @@
-import Link from "next/link";
-import { Plus } from "lucide-react";
-import { can, CHANNEL_LABEL, INQUIRY_CHANNELS, PRIORITIES, PRIORITY_LABEL } from "@kebo/shared";
-import { buttonClass } from "@kebo/ui";
+import { can } from "@kebo/shared";
+import { Badge, Card, CardBody, CardHeader, Td, Th, THead, Tr } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
-import { date } from "@/lib/format";
-import { dealHistoryOf, dealOf } from "@/lib/deal-data";
-import { optional } from "@/components/print/data";
-import { StepChanges, StepFrame, StepHeader, StepPrevNext } from "@/components/orders/step-page";
-import { DetailsCard, LinesCard, ViewCard, type DetailField } from "@/components/orders/step-view";
-import { changesIn, FilesCard } from "@/components/deals/inquiry-side";
-import { DocumentChips, DocumentsButton, ItemsEditor, ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
-import { dealFieldsAction, describeFileAction, removeFileAction } from "../../actions";
-import { askFactories } from "../ask";
-import { inquirySteps, itemsLine } from "../steps";
+import { qty } from "@/lib/format";
+import { dealOf, sourcingOf } from "@/lib/deal-data";
+import { LinesCard } from "@/components/orders/step-view";
+import { ItemsEditor, ItemsExcel, ItemsView } from "@/components/deals/needs-cards";
+import { dealFieldsAction } from "../../actions";
+import { itemsLine } from "../steps";
 
 export const metadata = { title: "Inquiry · needs" };
 
 /**
- * Step 1, Needs (board InqV4Needs): who asked and how, what they need (their
- * items, read only until Edit lines) and their URS and documents; the files
- * and the step's changes on the side.
+ * Needs (board "Inquiry — Needs"): the items — numbered, parts under their item, model, quantity, unit,
+ * target price and how many factory offers answer each — with Add item (the lines editor); then what the
+ * customer wrote.
  */
 export default async function DealNeeds({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
-  const [d, history] = await Promise.all([dealOf(id), optional(() => dealHistoryOf(id))]);
-  const base = `/inquiries/${d.id}`;
-  const sourcing = can(me, "sourcing.manage");
-  const step = inquirySteps(d, sourcing ? 0 : null).find((s) => s.key === "needs")!;
-  const ask = await askFactories(d, me);
-  const name = (uid: string | null) => (uid ? (d.people[uid] ?? "Someone") : "System");
-  // No contact chosen: the customer's main one is who we talk to.
-  const contact = d.customer.contacts.find((c) => c.id === d.contactId) ?? d.customer.contacts.find((c) => c.isPrimary) ?? d.customer.contacts[0] ?? null;
-  const urs = d.attachments.find((f) => f.kind === "urs");
+  const d = await dealOf(id);
+  const sourcing = can(me, "sourcing.manage") ? await sourcingOf(id).catch(() => null) : null;
   const quoted = d.quotation?.revisions.some((r) => r.status !== "draft") ?? false;
-  const files = d.attachments.map((f) => ({
-    ...f,
-    uploadedBy: name(f.uploadedById),
-    when: date(f.createdAt),
-    canChange: f.uploadedById === me.id || d.canWork,
-    describe: describeFileAction.bind(null, d.id, f.id),
-    remove: removeFileAction.bind(null, d.id, f.id),
-  }));
-  const canEdit = d.allowed.edit;
+  // How many offers price each item.
+  const offers = new Map<string, number>();
+  for (const q of sourcing?.quotes ?? []) for (const id of new Set(q.lines.map((l) => l.requestedItemId).filter((x): x is string => !!x))) offers.set(id, (offers.get(id) ?? 0) + 1);
+  const parentNo = new Map(d.items.map((i) => [i.id, i.no]));
+  const fromOffer = (sourcing?.quotes.length ?? 0) > 0 && d.items.length > 0;
 
-  const fields: DetailField[] = [
-    {
-      label: "Customer",
-      value: d.customer.name,
-      show: (
-        <Link href={`/customers/${d.customer.id}`} className="hover:underline">
-          {d.customer.name}
-        </Link>
-      ),
-    },
-    {
-      name: "contactId",
-      label: "Contact",
-      type: "select",
-      value: d.contactId ?? contact?.id ?? null,
-      options: d.customer.contacts.map((c) => ({ value: c.id, label: c.name })),
-      show: contact ? [contact.name, contact.whatsapp ?? contact.phone ?? contact.email].filter(Boolean).join(" · ") : undefined,
-    },
-    {
-      name: "channel",
-      label: "Came by",
-      type: "select",
-      value: d.channel,
-      options: INQUIRY_CHANNELS.map((c) => ({ value: c, label: CHANNEL_LABEL[c] })),
-      show: `${CHANNEL_LABEL[d.channel]} · ${date(d.createdAt)}`,
-    },
-    { label: "Handled by", value: d.assignee?.name ?? null },
-    { name: "requiredBy", label: "Wanted by", type: "date", value: d.requiredBy, show: d.requiredBy ? date(d.requiredBy) : undefined },
-    { name: "category", label: "Category", value: d.category },
-    { name: "priority", label: "Priority", type: "select", value: d.priority, options: PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABEL[p] })), panelOnly: true },
-    { name: "title", label: "Title", value: d.title, panelOnly: true, wide: true, placeholder: "Leave empty to name it after the items" },
-  ];
+  const table = (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px] text-[13px]">
+        <THead>
+          <tr>
+            <Th className="w-14">#</Th>
+            <Th>Item</Th>
+            <Th>Model</Th>
+            <Th className="text-right">Qty</Th>
+            <Th>Unit</Th>
+            <Th className="text-right">Target price</Th>
+            {sourcing && <Th>Offers</Th>}
+          </tr>
+        </THead>
+        <tbody>
+          {d.items.map((i) => {
+            const n = offers.get(i.id) ?? 0;
+            return (
+              <Tr key={i.id}>
+                <Td className="tabular">{i.no}</Td>
+                <Td>
+                  <span className="block font-semibold whitespace-pre-line">{i.description}</span>
+                  {i.parentId && <span className="block text-xs text-text-2">part of {parentNo.get(i.parentId)}</span>}
+                </Td>
+                <Td>{i.model ?? ""}</Td>
+                <Td className="text-right tabular">{qty(i.quantity)}</Td>
+                <Td>{i.unit}</Td>
+                <Td className="text-right tabular">{i.targetPrice ? Number(i.targetPrice).toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}</Td>
+                {sourcing && <Td>{n ? <Badge tone="ok">{n === 1 ? "1 offer" : n + " offers"}</Badge> : <Badge tone="neutral">No offer</Badge>}</Td>}
+              </Tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
-    <StepFrame
-      header={
-        <StepHeader
-          step={{
-            number: step.number,
-            label: step.label,
-            state: step.state,
-            stateLabel: step.stateLabel,
-            line: [itemsLine(d), urs?.fileName ?? null, d.assignee ? `handled by ${d.assignee.name}` : "nobody handles it yet"].filter(Boolean).join(" · "),
-          }}
-          action={ask?.button}
-        />
-      }
-      side={
-        <>
-          <FilesCard
-            files={d.attachments.map((f) => ({ id: f.id, name: f.fileName }))}
-            add={
-              <DocumentsButton dealId={d.id} files={files}>
-                <Plus className="size-3.5" aria-hidden /> Add files
-              </DocumentsButton>
-            }
-          />
-          {history && <StepChanges entries={changesIn(history, "needs")} historyHref={`${base}/history`} />}
-        </>
-      }
-      prevNext={
-        <StepPrevNext
-          prev={{ href: base, label: "Overview" }}
-          next={sourcing ? { href: `${base}/sourcing`, label: "Factory prices" } : { href: `${base}/quotation`, label: "Quotation" }}
-        />
-      }
-    >
-      <DetailsCard
-        title="Customer and request"
-        description=""
-        fields={fields}
-        action={dealFieldsAction.bind(null, d.id)}
-        canEdit={canEdit}
-        panelTitle="Edit the customer and request"
-        panelDescription="Who asked, how and by when. To change the customer itself, use Edit details at the top."
-      />
+    <div className="flex flex-col gap-4">
       <LinesCard
-        title="What they need"
-        description={itemsLine(d)}
-        canEdit={canEdit}
-        actions={<ItemsExcel items={d.items} />}
-        view={<ItemsView items={d.items} requirements={d.requirements} />}
-        phone={<ItemsView items={d.items} requirements={d.requirements} phone />}
+        title="Items"
+        description={d.items.length ? (fromOffer ? "made from the first offer" : itemsLine(d)) : "none yet"}
+        canEdit={d.allowed.edit}
+        editLabel={d.items.length ? "Edit items" : "Add item"}
+        editActions={<ItemsExcel items={d.items} />}
+        view={
+          d.items.length ? (
+            table
+          ) : (
+            <p className="px-5 py-6 text-sm text-text-2">
+              <strong className="text-text">No item list yet.</strong> That is fine: the items come from the factory offers, or add them here.
+            </p>
+          )
+        }
+        phone={<ItemsView items={d.items} requirements={null} phone />}
         edit={<ItemsEditor items={d.items} requirements={d.requirements} action={dealFieldsAction.bind(null, d.id)} upload={!quoted} />}
       />
-      <ViewCard
-        id="documents"
-        title="URS & documents"
-        canEdit={false}
-        actions={
-          d.attachments.length > 1 ? (
-            <a href={`/files/inquiries/${d.id}`} className={buttonClass("ghost", "xs")}>
-              Download all
-            </a>
-          ) : undefined
-        }
-      >
-        <div className="px-4 py-3.5">
-          <DocumentChips dealId={d.id} files={files} canAdd />
-        </div>
-      </ViewCard>
-    </StepFrame>
+      <Card>
+        <CardHeader title="Written by the customer" />
+        <CardBody>
+          <span className="block text-xs text-muted">What they need</span>
+          <p className="mt-0.5 text-sm whitespace-pre-line">{d.requirements || "—"}</p>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

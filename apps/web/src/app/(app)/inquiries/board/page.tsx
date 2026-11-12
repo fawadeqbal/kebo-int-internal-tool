@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { LayoutGrid, List, Plus } from "lucide-react";
-import { can, INQUIRY_STAGE_LABEL, PRIORITY_LABEL, REVISION_STATUS_LABEL, type InquiryStage } from "@kebo/shared";
-import { buildHref, ButtonLink, LinkTabs, ListToolbar, PageHeader, StatusBadge } from "@kebo/ui";
+import { LayoutGrid, List, MessageSquareText, Package, Plus } from "lucide-react";
+import { can, INQUIRY_STAGE_LABEL, LOST_REASON_LABEL, REVISION_STATUS_LABEL, type InquiryStage } from "@kebo/shared";
+import { Badge, buildHref, ButtonLink, LinkTabs, PageHeader, RefCode, StatusBadge } from "@kebo/ui";
+import { FilterCard } from "@/components/common/filter-card";
+import { getPeople, getSettings } from "@/lib/loaders";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { date, money, plural } from "@/lib/format";
+import { plural, short, whole } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 
 export const metadata = { title: "Inquiry pipeline" };
@@ -26,28 +28,35 @@ function DealCard({ d }: { d: DealRow }) {
     <li>
       <Link href={`/inquiries/${d.id}`} className="flex flex-col gap-1.5 rounded-xl border border-line bg-surface p-3 shadow-card transition-colors hover:border-primary-line">
         <span className="flex items-center justify-between gap-2">
-          <span className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-2">{d.refNo}</span>
+          <RefCode>{d.refNo}</RefCode>
           {d.onHold ? (
-            <StatusBadge meaning="neutral">On hold</StatusBadge>
-          ) : d.priority === "urgent" || d.priority === "high" ? (
-            <StatusBadge meaning={d.priority === "urgent" ? "bad" : "warn"}>{PRIORITY_LABEL[d.priority]}</StatusBadge>
+            <Badge tone="primary" dot>
+              On hold
+            </Badge>
+          ) : d.stage === "won" ? (
+            <StatusBadge meaning="ok">Won</StatusBadge>
+          ) : d.stage === "lost" ? (
+            <StatusBadge meaning="bad">{d.lostReason ? LOST_REASON_LABEL[d.lostReason] : "Lost"}</StatusBadge>
+          ) : d.priority === "urgent" ? (
+            <StatusBadge meaning="bad">Urgent</StatusBadge>
+          ) : !d.assignee ? (
+            <StatusBadge meaning="warn">Assign</StatusBadge>
           ) : d.overdue ? (
             <StatusBadge meaning="bad">Past needed-by</StatusBadge>
+          ) : d.stage === "sourcing" && d.offers && !r ? (
+            <StatusBadge meaning="info">Make quotation</StatusBadge>
+          ) : d.priority === "high" ? (
+            <StatusBadge meaning="warn">High</StatusBadge>
           ) : null}
         </span>
         <span className="truncate text-[13px] font-bold text-text">{d.title}</span>
         <span className="truncate text-xs text-text-2">
-          {d.customer.name}
-          {d.assignee ? ` · ${d.assignee.name}` : " · nobody yet"}
-        </span>
-        <span className="truncate text-xs text-muted">
           {d.order
-            ? `Order ${d.order.refNo}`
-            : r
-              ? `R${r.number} ${REVISION_STATUS_LABEL[r.status].toLowerCase()} · ${money(r.total, r.currency)}`
-              : d.requiredBy
-                ? `needed by ${date(d.requiredBy)}`
-                : plural(d.items, "item")}
+            ? `${d.order.refNo}${r ? ` · ${whole(r.total, r.currency)}` : ""}`
+            : [
+                d.customer.name,
+                r ? `R${r.number} ${REVISION_STATUS_LABEL[r.status].toLowerCase()}` : d.offers ? `${d.offers} offer${d.offers === 1 ? "" : "s"}` : (d.assignee?.name ?? "nobody yet"),
+              ].join(" · ")}
         </span>
       </Link>
     </li>
@@ -62,19 +71,29 @@ function DealCard({ d }: { d: DealRow }) {
 export default async function InquiryBoardPage({ searchParams }: { searchParams: Promise<Params> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  const mine = sp.mine === "1";
-  const keep = { mine: mine ? "1" : undefined };
+  const mine = sp.mine === "1" || sp.assignee === "me";
+  const keep = { mine: mine ? "1" : undefined, q: sp.q, assignee: sp.assignee, category: sp.category };
+  const [settings, people] = await Promise.all([getSettings(), getPeople().catch(() => [])]);
   const lists = await Promise.all(
     COLUMNS.map((c) =>
       api.get<Paged<DealRow>>("/inquiries", {
         stage: c.key,
-        assignee: mine ? "me" : undefined,
+        assignee: mine ? "me" : sp.assignee || undefined,
+        q: sp.q?.trim() || undefined,
+        category: sp.category || undefined,
         sort: "newest",
         pageSize: c.key === "won" || c.key === "lost" ? LATEST : 50,
       }),
     ),
   );
-  const cols = COLUMNS.map((c, i) => ({ ...c, rows: lists[i]!.rows, total: lists[i]!.total }));
+  const currency = settings.sales.currency;
+  // A column's worth: its quotations' latest totals in the main currency (the cards shown).
+  const cols = COLUMNS.map((c, i) => ({
+    ...c,
+    rows: lists[i]!.rows,
+    total: lists[i]!.total,
+    value: lists[i]!.rows.reduce((t, d) => t + (d.quotation?.latest && d.quotation.latest.currency === currency ? Number(d.quotation.latest.total) : 0), 0),
+  }));
   const open = cols.filter((c) => c.key === "new" || c.key === "sourcing" || c.key === "quoted").reduce((t, c) => t + c.total, 0);
   const phoneKey = cols.some((c) => c.key === sp.stage) ? sp.stage! : "new";
   const column = (c: (typeof cols)[number], hideTitle = false) => (
@@ -84,7 +103,9 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
           <h2 className="text-sm font-bold">
             {INQUIRY_STAGE_LABEL[c.key]} <span className="font-medium text-muted">{c.total}</span>
           </h2>
-          <span className="truncate text-xs text-muted">{c.note}</span>
+          <span className="truncate text-xs text-muted" title={c.note}>
+            {c.value ? short(c.value, currency) : c.note}
+          </span>
         </header>
       )}
       {c.rows.length ? (
@@ -107,10 +128,10 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   return (
     <div>
       <PageHeader
-        crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: "Pipeline" }]}
+        crumbs={[{ label: "Overview" }, { label: "Pipelines" }]}
         icon={LayoutGrid}
         title="Inquiry pipeline"
-        summary={`${plural(open, "open inquiry", "open inquiries")} · open a card to move it on`}
+        summary={`${plural(open, "open inquiry", "open inquiries")} · open a card to move its stage. Won and lost ask for the details first.`}
         actions={
           <ButtonLink href="/inquiries" variant="secondary">
             <List aria-hidden /> List
@@ -124,12 +145,22 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
           )
         }
       />
-      <ListToolbar
-        chips={[
-          { key: "all", label: "Everyone's", href: "/inquiries/board", active: !mine },
-          { key: "mine", label: "Mine", href: "/inquiries/board?mine=1", active: mine },
+      <LinkTabs
+        label="Boards"
+        className="mb-4"
+        tabs={[
+          { href: "/inquiries/board", label: <><MessageSquareText aria-hidden />Inquiries</>, active: true },
+          { href: "/orders/board", label: <><Package aria-hidden />Orders</>, active: false },
         ]}
-        label="Whose inquiries"
+      />
+      <FilterCard
+        search="Search…"
+        value={sp.q}
+        clearHref="/inquiries/board"
+        selects={[
+          { name: "assignee", label: "Handles", value: mine ? "me" : sp.assignee, options: [{ value: "me", label: "Me" }, { value: "unassigned", label: "Nobody yet" }, ...people.map((p) => ({ value: p.id, label: p.name }))] },
+          { name: "category", label: "Category", value: sp.category, options: settings.sales.categories.map((x) => ({ value: x, label: x })) },
+        ]}
       />
       <div className="xl:hidden">
         <LinkTabs

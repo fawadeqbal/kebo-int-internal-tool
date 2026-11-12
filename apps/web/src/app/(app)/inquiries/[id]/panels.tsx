@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import { LOST_REASON_LABEL, LOST_REASONS, MANUAL_MOVES, type InquiryStage } from "@kebo/shared";
 import { Button, Field, Select, Textarea } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
@@ -36,23 +37,29 @@ function StageForm({ to, action }: { to: InquiryStage; action: Action }) {
           <>
             <input type="hidden" name="to" value={to} />
             {lost && (
-              <Field label="Why was it lost?" htmlFor="lostReason" error={s.errors?.lostReason}>
-                <Select id="lostReason" name="lostReason" defaultValue={s.values?.lostReason ?? ""}>
-                  <option value="" disabled>
-                    Choose a reason
-                  </option>
+              <fieldset className="flex flex-col gap-2.5">
+                <legend className="mb-2 text-[13px] font-semibold">
+                  Why was it lost? <span className="text-bad">*</span>
+                </legend>
+                <div className="grid gap-2 sm:grid-cols-2">
                   {LOST_REASONS.map((r) => (
-                    <option key={r} value={r}>
+                    <label
+                      key={r}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-[10px] border border-line px-3 py-2.5 text-sm has-[:checked]:border-primary-solid has-[:checked]:bg-primary-soft/50"
+                    >
+                      <input type="radio" name="lostReason" value={r} defaultChecked={s.values?.lostReason === r} required className="accent-primary-solid" />
                       {LOST_REASON_LABEL[r]}
-                    </option>
+                    </label>
                   ))}
-                </Select>
-              </Field>
+                </div>
+                {s.errors?.lostReason && <p className="text-xs text-bad">{s.errors.lostReason[0]}</p>}
+              </fieldset>
             )}
-            <Field label="Note" optional htmlFor="note">
+            <Field label="Note" htmlFor="note">
               <Textarea id="note" name="note" rows={3} className="min-h-0" defaultValue={s.values?.note} />
             </Field>
-            <Buttons save="Confirm" danger={lost} />
+            {lost && <p className="rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-text-2">A quotation sent and not answered is marked “rejected”. You can reopen the inquiry later.</p>}
+            <Buttons save={lost ? "Mark lost" : "Confirm"} danger={lost} />
           </>
         )}
       </ActionForm>
@@ -83,7 +90,12 @@ export function DecisionButtons({
   canReopen,
   stageAction,
   holdAction,
+  refNo,
+  only,
 }: {
+  refNo?: string;
+  /** Just the hold button (the on-hold banner). */
+  only?: "hold";
   stage: InquiryStage;
   onHold: boolean;
   canHold: boolean;
@@ -91,15 +103,16 @@ export function DecisionButtons({
   stageAction: Action;
   holdAction: Action;
 }) {
-  const moves = MANUAL_MOVES[stage].filter((m) => !m.reopen || canReopen);
+  const moves = only ? [] : MANUAL_MOVES[stage].filter((m) => !m.reopen || canReopen);
   if (!moves.length && !canHold) return null;
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-2">
       {canHold && (
         <PanelButton
-          variant="ghost"
+          variant="secondary"
           size="sm"
-          label={onHold ? "Resume" : "Put on hold"}
+          icon={<Clock aria-hidden />}
+          label={onHold ? "Take off hold" : "Put on hold"}
           title={onHold ? "Resume the inquiry" : "Put the inquiry on hold"}
           description={onHold ? "It goes back to the lists as active." : "It stays where it is, marked on hold, until resumed."}
           body={<HoldForm onHold={onHold} action={holdAction} />}
@@ -108,10 +121,11 @@ export function DecisionButtons({
       {moves.map((m) => (
         <PanelButton
           key={m.to}
-          variant="ghost"
+          variant="secondary"
           size="sm"
-          label={m.to === "lost" ? "Mark as lost" : m.label}
-          title={m.to === "lost" ? "Mark the inquiry as lost" : m.label}
+          className={m.to === "lost" ? "border-bad/40 text-bad hover:bg-bad-soft" : undefined}
+          label={m.to === "lost" ? "Mark lost…" : m.label}
+          title={m.to === "lost" ? `Mark ${refNo ?? "the inquiry"} as lost` : m.label}
           description={m.to === "lost" ? "The reason shows on reports. A manager can reopen it." : undefined}
           body={<StageForm to={m.to} action={stageAction} />}
         />
@@ -166,16 +180,37 @@ export function AssignForm({
   );
 }
 
+/** "Handles it" (board): a list that saves as soon as another person is chosen. */
+export function AssignSelect({ action, people, current }: { action: Action; people: { id: string; name: string }[]; current: string | null }) {
+  return (
+    <ActionForm action={action} showSuccess={false}>
+      <Field label="Handles it" htmlFor="handles-it">
+        <Select id="handles-it" name="assigneeId" defaultValue={current ?? ""} onChange={(e) => e.currentTarget.form?.requestSubmit()}>
+          <option value="">Nobody yet</option>
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </ActionForm>
+  );
+}
+
 export function NoteForm({ action }: { action: Action }) {
   return (
     <ActionForm action={action} resetOnSuccess showSuccess={false} className="flex flex-col gap-2">
       {(s) => (
         <>
-          <Textarea name="body" rows={2} placeholder="Add a note for the team…" aria-label="Note" className="min-h-0" />
+          <label htmlFor="inquiry-note" className="text-[13px] font-medium text-text-2">
+            Add a note
+          </label>
+          <Textarea id="inquiry-note" name="body" rows={2} placeholder="Write a note or @mention someone" className="min-h-0" />
           {s.errors?.body && <p className="text-xs text-bad">{s.errors.body[0]}</p>}
           <div>
-            <SubmitButton size="sm" variant="secondary" pendingText="Posting…">
-              Post note
+            <SubmitButton size="sm" variant="secondary" pendingText="Adding…">
+              Add note
             </SubmitButton>
           </div>
         </>

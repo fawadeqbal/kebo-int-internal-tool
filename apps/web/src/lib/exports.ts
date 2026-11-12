@@ -60,8 +60,11 @@ async function deals(q: Q): Promise<SheetSpec> {
     stage: stage === "all" ? undefined : stage,
     q: q.q,
     assignee: q.assignee,
-    customerId: q.customer,
+    customerId: q.customer ?? q.customerId,
     sort: q.sort,
+    priority: q.priority,
+    channel: q.channel,
+    category: q.category,
   });
   return {
     name: `Inquiries ${stamp()}`,

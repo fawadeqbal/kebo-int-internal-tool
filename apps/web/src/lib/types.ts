@@ -25,6 +25,9 @@ export interface DealRow {
   customer: { id: string; name: string; country: string };
   assignee: Person | null;
   items: number;
+  /** Factories asked for prices, and the offers in. */
+  asked?: number;
+  offers?: number;
   quotation: {
     refNo: string;
     /** `total` is the accepted option's, else the lowest option's; `totalUpTo` the highest when the options differ. */

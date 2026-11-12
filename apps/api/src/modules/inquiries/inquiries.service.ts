@@ -77,6 +77,7 @@ export class InquiriesService {
     if (q.customerId) and.push({ customerId: q.customerId });
     if (q.priority) and.push({ priority: q.priority });
     if (q.channel) and.push({ channel: q.channel });
+    if (q.category) and.push({ category: { equals: q.category, mode: "insensitive" } });
     if (q.q) {
       const term = q.q.trim();
       and.push({
@@ -115,7 +116,7 @@ export class InquiriesService {
         include: {
           customer: { select: { id: true, name: true, country: true } },
           assignee: { select: { id: true, name: true } },
-          _count: { select: { items: true } },
+          _count: { select: { items: true, factoryQuotes: { where: { deletedAt: null } }, factoryRequests: true } },
           quotation: {
             select: {
               refNo: true,
@@ -162,6 +163,9 @@ export class InquiriesService {
         customer: i.customer,
         assignee: i.assignee,
         items: i._count.items,
+        /** Factories asked for prices, and the offers in. */
+        asked: i._count.factoryRequests,
+        offers: i._count.factoryQuotes,
         quotation: i.quotation
           ? { refNo: i.quotation.refNo, latest: i.quotation.revisions[0] ? revisionRow(i.quotation.revisions[0]) : null }
           : null,

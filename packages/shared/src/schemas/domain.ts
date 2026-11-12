@@ -190,6 +190,7 @@ export const inquiryListQuery = listQuery.extend({
   customerId: z.uuid().optional(),
   priority: z.enum(PRIORITIES).optional(),
   channel: z.enum(INQUIRY_CHANNELS).optional(),
+  category: z.string().trim().max(120).optional(),
   sort: z.enum(["newest", "oldest", "required", "priority", "updated"]).default("newest"),
 });
 export type InquiryListQuery = z.infer<typeof inquiryListQuery>;

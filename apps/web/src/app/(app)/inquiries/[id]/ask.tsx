@@ -1,4 +1,4 @@
-import { Send } from "lucide-react";
+import { Factory, Send } from "lucide-react";
 import { can } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { hasFeature, type Me } from "@/lib/session";
@@ -16,7 +16,7 @@ import { askFactoriesAction, factoryRequestStatusAction, removeFactoryRequestAct
  * form to send it to more (today's Factories asked card), in a side panel.
  * Null for people who do not see factory prices, or without the module.
  */
-export async function askFactories(d: DealDetail, me: Me, variant: "ghost" | "secondary" = "secondary") {
+export async function askFactories(d: DealDetail, me: Me, variant: "ghost" | "secondary" | "primary" = "secondary") {
   if (!can(me, "sourcing.manage") || !(await hasFeature("factory_requests"))) return null;
   const requests = await optional(() => api.get<FactoryRequests>(`/inquiries/${d.id}/factory-requests`));
   if (!requests) return null;
@@ -35,7 +35,7 @@ export async function askFactories(d: DealDetail, me: Me, variant: "ghost" | "se
       <PanelButton
         variant={variant}
         size="md"
-        icon={variant === "secondary" ? <Send aria-hidden /> : undefined}
+        icon={variant === "ghost" ? undefined : variant === "primary" ? <Factory aria-hidden /> : <Send aria-hidden />}
         label="Ask factories"
         title="Factories asked"
         description={asked ? `${asked} asked · ${quoted} answered${waiting ? ` · ${waiting} waiting` : ""}` : "Send the customer's list to two or three factories."}
