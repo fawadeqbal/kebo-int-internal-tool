@@ -37,10 +37,9 @@ export default async function NewDealPage({ searchParams }: { searchParams: Prom
     items: [],
   };
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
-        backHref="/inquiries"
-        backLabel="Inquiries"
+        crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: "New" }]}
         title="New inquiry"
         description="What the customer asked for, with their URS. Factory prices and the quotation come next."
       />

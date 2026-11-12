@@ -1,3 +1,4 @@
+import { MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { can, CHANNEL_LABEL } from "@kebo/shared";
 import { Banner, PageHeader, PriorityBadge, StageBadge } from "@kebo/ui";
@@ -31,10 +32,15 @@ export default async function DealLayout({ children, params }: { children: React
     { label: "Copy link to this inquiry", copy: base },
   ];
   const meta = [
-    d.title && <span key="t">{d.title}</span>,
+    d.title && (
+      <span key="r" className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-text-2">
+        {d.refNo}
+      </span>
+    ),
     <Link key="c" href={`/customers/${d.customer.id}`} className="hover:underline">
       {d.customer.name}
     </Link>,
+    d.category && <span key="cat">{d.category}</span>,
     <span key="ch">{CHANNEL_LABEL[d.channel]}</span>,
     d.assignee && <span key="a">{d.assignee.name}</span>,
   ].filter(Boolean);
@@ -42,9 +48,9 @@ export default async function DealLayout({ children, params }: { children: React
   return (
     <div>
       <PageHeader
-        backHref="/inquiries"
-        backLabel="Inquiries"
-        title={<span className="tabular">{d.refNo}</span>}
+        crumbs={[{ label: "Operations & trading" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo }]}
+        icon={MessageSquareText}
+        title={d.title ? d.title : <span className="tabular">{d.refNo}</span>}
         badge={
           <>
             <StageBadge stage={d.stage} onHold={d.onHold} />
