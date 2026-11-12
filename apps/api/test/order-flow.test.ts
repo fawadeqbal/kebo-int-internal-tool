@@ -214,6 +214,13 @@ describe("order flow: from asking factories to SAT", () => {
       clearedOn: null,
     });
     await api(app, sana).patch(`/shipments/${ship.id}`, { freightCurrency: "dollars" }).expect(422);
+    // The order's checks: a screen that can ask is told what looks out of order (409 "confirm"); going ahead needs why.
+    const odd = await api(app, sana).patch(`/shipments/${ship.id}`, { departedOn: day(-3), arrivedOn: day(-5), ask: true });
+    expect(odd.status).toBe(409);
+    expect(odd.body).toMatchObject({ code: "confirm" });
+    expect(odd.body.error).toContain("before it sailed");
+    await api(app, sana).patch(`/shipments/${ship.id}`, { departedOn: day(-3), arrivedOn: day(-5), confirm: true }).expect(400); // why?
+    expect((await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body.shipping.shipments[0].arrivedOn).toBeNull(); // nothing was saved
     // The order: the customer's PO, the consignee, the notify party and where it is delivered.
     await api(app, sana)
       .patch(`/orders/${orderId}/details`, { customerRef: "KMS-PO-2291", customerPoOn: day(-30), consignee: "Kabul Medical Supplies\nKabul", notifyParty: "Same as consignee", deliveryAddress: "Warehouse 4" })

@@ -161,10 +161,14 @@ export function FieldsForm({
       changes,
       keys,
       askWhy: filledChanged && !plain,
-      run: async (reason) => {
+      run: async (reason, confirm) => {
         if (reason) data.set("reason", reason);
+        // The order's checks (a date out of order) ask here: this form can show them and go ahead.
+        data.set("ask", "true");
+        if (confirm) data.set("confirm", "true");
         const st = await action({}, data);
         if (st.ok) return { ok: true };
+        if (st.code === "confirm") return { ok: false, message: st.message ?? "Something looks out of order.", confirm: true };
         const errs: Record<string, string> = {};
         for (const [k, v] of Object.entries(st.errors ?? {})) {
           const first = Array.isArray(v) ? v[0] : v;

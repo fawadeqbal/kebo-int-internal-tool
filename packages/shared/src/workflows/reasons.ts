@@ -22,6 +22,8 @@ export const REASON_CHOICES = {
   settings: ["New exchange rate", "New company policy", "Mistake fixed"],
   plan: ["Customer asked for more time", "Agreed a new schedule", "Order changed", "Mistake fixed"],
   /** Changing what a card already saved (lines or values): Save changes asks why. */
+  /** Saving something the order's checks asked about (a date out of order). */
+  anyway: ["It did happen, not recorded yet", "Agreed with the customer", "The other date is wrong"],
   /** Changing a card's saved values (dates, numbers, names). */
   editValues: ["Customer asked for it", "Factory changed it", "The date moved", "Typed wrong", "Mistake fixed"],
   edit: ["Customer changed the list", "Customer changed the quantity", "Factory changed the price", "Typed wrong", "Mistake fixed"],
